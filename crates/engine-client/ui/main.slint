@@ -1,11 +1,69 @@
 // Root window for the engine-client.
-//
-// Empty for M4: just a dark canvas at the default resolution. Custom drawing,
-// HUD, menus, and per-scenario overlays land in later milestones.
+
+export enum PrimitiveKind {
+    path,
+    text,
+}
+
+export struct ScenePrimitive {
+    kind: PrimitiveKind,
+    width: length,
+    height: length,
+    viewbox-width: float,
+    viewbox-height: float,
+    commands: string,
+    fill: brush,
+    stroke: brush,
+    stroke-width: length,
+    text: string,
+    color: brush,
+    font-size: length,
+    text-x: length,
+    text-y: length,
+}
+
+component ScenePrimitiveItem inherits Rectangle {
+    in property <ScenePrimitive> primitive;
+
+    x: 0px;
+    y: 0px;
+    width: primitive.width;
+    height: primitive.height;
+    background: #00000000;
+
+    Path {
+        visible: primitive.kind == PrimitiveKind.path;
+        width: parent.width;
+        height: parent.height;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: primitive.viewbox-width;
+        viewbox-height: primitive.viewbox-height;
+        commands: primitive.commands;
+        fill: primitive.fill;
+        stroke: primitive.stroke;
+        stroke-width: primitive.stroke-width;
+    }
+
+    Text {
+        visible: primitive.kind == PrimitiveKind.text;
+        x: primitive.text-x;
+        y: primitive.text-y;
+        text: primitive.text;
+        color: primitive.color;
+        font-size: primitive.font-size;
+    }
+}
 
 export component MainWindow inherits Window {
+    in property <[ScenePrimitive]> primitives;
+
     title: "Space-Wars";
     preferred-width: 1280px;
     preferred-height: 720px;
     background: #050514;
+
+    for primitive in root.primitives: ScenePrimitiveItem {
+        primitive: primitive;
+    }
 }

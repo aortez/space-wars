@@ -1,18 +1,21 @@
 //! Spacewars client: Slint UI + custom drawing + input + audio + scenario host.
 //!
-//! M6 state: opens an empty Slint window, loads user settings from disk, and
-//! saves them back on exit. Custom drawing, scenario hosting, and crash
-//! handling arrive in subsequent milestones.
+//! M8b state: opens a Slint window, loads/saves user settings, and can run an
+//! internal render-frame proof source. Scenario hosting arrives in M9.
 
+mod render;
 mod settings;
 
 use std::env;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use clap::Parser;
 use engine_common::{CrashBehavior, Settings};
+use render::Viewport;
 use settings::LoadStatus;
+use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use tracing_subscriber::EnvFilter;
 
 slint::include_modules!();
@@ -27,6 +30,14 @@ struct Args {
     /// Force CrashBehavior::Freeze for this run without writing settings.
     #[arg(long)]
     dev: bool,
+
+    /// Render an internal moving debug frame instead of an empty window.
+    #[arg(long)]
+    debug_render: bool,
+
+    /// Add this many triangles to the debug render frame for renderer stress checks.
+    #[arg(long, default_value_t = 0)]
+    debug_triangles: usize,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -73,8 +84,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let window = MainWindow::new()?;
+    let _debug_render_timer = start_debug_render_loop(&window, &args);
     window.run()?;
     Ok(())
+}
+
+fn start_debug_render_loop(window: &MainWindow, args: &Args) -> Option<Timer> {
+    if !args.debug_render && args.debug_triangles == 0 {
+        return None;
+    }
+
+    let timer = Timer::default();
+    let weak_window = window.as_weak();
+    let start = Instant::now();
+    let stress_triangles = args.debug_triangles;
+    let mut frame_count = 0_u64;
+
+    timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
+        let Some(window) = weak_window.upgrade() else {
+            return;
+        };
+
+        let convert_start = Instant::now();
+        let frame = render::debug_frame(start.elapsed(), stress_triangles);
+        let primitives =
+            render::scene_primitives_from_frame(&frame, Viewport::from_window(window.window()));
+        let scene_item_count = primitives.len();
+        window.set_primitives(ModelRc::new(VecModel::from(primitives)));
+        window.window().request_redraw();
+
+        frame_count += 1;
+        if frame_count % 120 == 0 {
+            tracing::info!(
+                stress_triangles,
+                scene_item_count,
+                convert_ms = convert_start.elapsed().as_secs_f64() * 1000.0,
+                "debug render frame converted."
+            );
+        }
+    });
+
+    Some(timer)
 }
 
 fn normalize_log_level(settings: &mut Settings) -> bool {
