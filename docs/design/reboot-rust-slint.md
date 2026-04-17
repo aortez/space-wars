@@ -378,8 +378,8 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 
 ### M11: World + planets
 
-- M11a: port deterministic sun/planet setup from `Model.java` and `Planet.java`, render sun/planets as simple circles, and host `spacewars` with the original default config instead of the temporary deathmatch preset.
-- M11b: add planet orbit/update behavior from `Planet.update()`.
+- M11a: ✅ Port deterministic sun/planet setup from `Model.java` and `Planet.java`, render sun/planets as simple circles, and host `spacewars` with the original default config instead of the temporary deathmatch preset.
+- M11b: ✅ Add planet orbit/update behavior from `Planet.update()`.
 - M11c: add planet/sun gravity on ships.
 - M11d: add planet/sun bounds and collision response.
 - Defer ownership/capture visuals unless needed for debugging.

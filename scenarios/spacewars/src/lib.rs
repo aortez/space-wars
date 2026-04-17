@@ -114,6 +114,7 @@ pub struct PlanetState {
     pub orbit_radius: f32,
     pub orbit_angle: f32,
     pub orbit_omega: f32,
+    pub wrapper_angle: f32,
     pub wrapper_omega: f32,
 }
 
@@ -339,6 +340,12 @@ impl Scenario for SpacewarsScenario {
         }
 
         let dt = dt.as_secs_f32();
+        if let Some(sun) = state.sun {
+            for planet in &mut state.planets {
+                planet.update_orbit(sun.position, dt);
+            }
+        }
+
         for ship in &mut state.ships {
             ship.update(dt);
             contain_ship(ship, state.config.universe_radius as f32);
@@ -431,6 +438,7 @@ fn build_world(config: &SpacewarsConfig, seed: u64) -> (Option<SunState>, Vec<Pl
             orbit_radius,
             orbit_angle,
             orbit_omega,
+            wrapper_angle: 0.0,
             wrapper_omega,
         });
 
@@ -450,6 +458,14 @@ fn random_color(rng: &mut SpacewarsRng) -> Color {
 
 fn body_mass(radius: f32) -> f32 {
     core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
+}
+
+impl PlanetState {
+    fn update_orbit(&mut self, sun_position: Vec2, dt: f32) {
+        self.orbit_angle += self.orbit_omega * dt;
+        self.wrapper_angle += self.wrapper_omega * dt;
+        self.position = sun_position + Vec2::from_radians(self.orbit_angle) * self.orbit_radius;
+    }
 }
 
 impl ShipState {
@@ -901,6 +917,57 @@ mod tests {
         assert_eq!(first.sun, replay.sun);
         assert_eq!(first.planets, replay.planets);
         assert_ne!(first.planets, different.planets);
+    }
+
+    #[test]
+    fn planets_advance_on_original_orbit_rates() {
+        let mut state = init_default(123);
+        let sun = state.sun.expect("default config should create a sun");
+        let planet_index = state
+            .planets
+            .iter()
+            .position(|planet| planet.orbit_omega.abs() > EPS)
+            .expect("seed should produce at least one moving planet");
+        let start = state.planets[planet_index];
+
+        step(&mut state, &[]);
+
+        let updated = state.planets[planet_index];
+        assert_close(
+            updated.orbit_angle,
+            start.orbit_angle + start.orbit_omega / 60.0,
+        );
+        assert_close(
+            updated.wrapper_angle,
+            start.wrapper_angle + start.wrapper_omega / 60.0,
+        );
+        assert_vec_close(
+            updated.position,
+            sun.position + Vec2::from_radians(updated.orbit_angle) * updated.orbit_radius,
+        );
+        assert_close(
+            updated.position.distance_to(sun.position),
+            updated.orbit_radius,
+        );
+        assert_ne!(updated.position, start.position);
+    }
+
+    #[test]
+    fn planet_orbits_replay_from_seed_and_tick_count() {
+        let mut first = init_default(7);
+        let mut replay = init_default(7);
+        let mut shorter = init_default(7);
+
+        for _ in 0..10 {
+            step(&mut first, &[]);
+            step(&mut replay, &[]);
+        }
+        for _ in 0..9 {
+            step(&mut shorter, &[]);
+        }
+
+        assert_eq!(first.planets, replay.planets);
+        assert_ne!(first.planets, shorter.planets);
     }
 
     #[test]
