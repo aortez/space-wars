@@ -14,6 +14,7 @@ path = "src/main.rs"
 engine-common = { workspace = true }
 engine-core = { workspace = true }
 scenario-null = { workspace = true }
+scenario-spacewars = { workspace = true }
 clap = { workspace = true }
 directories = { workspace = true }
 slint = { workspace = true }

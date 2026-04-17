@@ -7,6 +7,7 @@ members = [
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/null",
+    "scenarios/spacewars",
 ]
 
 [workspace.package]
@@ -32,3 +33,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 scenario-null = { path = "scenarios/null" }
+scenario-spacewars = { path = "scenarios/spacewars" }

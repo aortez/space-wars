@@ -356,13 +356,14 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 - Keep lower-level OpenGL/WGPU or software-raster backends as optimization options if Slint path batching cannot hit the RPi 5 target.
 - Acceptance: `engine-client --debug-render` visibly renders circles, lines, polygons, and text; `--debug-triangles N` exercises thousands of batched triangles; tests cover coordinate projection, z-order flattening, batching, and order preservation around text/style changes.
 
-### M9: `spacewars` scenario skeleton
+### M9: ✅ `spacewars` scenario skeleton
 
 - Add `scenarios/spacewars`.
 - Implement `Scenario` with fixed 60 Hz tick.
-- Build initial world state with universe bounds, two players, and two ships. No planets, weapons, asteroids, particles, pods, or scoring yet.
+- Build initial world state from the original deathmatch preset with universe bounds, two players, and two ships. No planets, weapons, asteroids, particles, pods, or scoring yet.
 - Wire `engine-client --scenario spacewars` to select the new scenario.
-- Acceptance: the client hosts the real scenario and draws two deterministic ships.
+- Keep client scenario selection as a concrete host enum for now; defer dynamic registry/plugin work until more scenarios need it.
+- Acceptance: the client hosts the real scenario, steps it with a fixed timestep, and draws two deterministic ships.
 
 ### M10: Ship flight slice
 

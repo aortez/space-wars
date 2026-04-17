@@ -1,21 +1,19 @@
 //! Spacewars client: Slint UI + custom drawing + input + audio + scenario host.
 //!
-//! M8b state: opens a Slint window, loads/saves user settings, and can run an
-//! internal render-frame proof source. Scenario hosting arrives in M9.
+//! M9 state: opens a Slint window, loads/saves user settings, hosts null or
+//! Spacewars scenarios, and renders their `RenderFrame`s.
 
+mod host;
 mod render;
 mod settings;
 
 use std::env;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 
 use clap::Parser;
 use engine_common::{CrashBehavior, Settings};
-use render::Viewport;
 use settings::LoadStatus;
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use tracing_subscriber::EnvFilter;
 
 slint::include_modules!();
@@ -26,6 +24,10 @@ struct Args {
     /// Scenario to load.
     #[arg(long, default_value = "null")]
     scenario: String,
+
+    /// Scenario seed.
+    #[arg(long, default_value_t = 0)]
+    seed: u64,
 
     /// Force CrashBehavior::Freeze for this run without writing settings.
     #[arg(long)]
@@ -40,6 +42,12 @@ struct Args {
     debug_triangles: usize,
 }
 
+impl Args {
+    fn uses_debug_render(&self) -> bool {
+        self.debug_render || self.debug_triangles != 0
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
@@ -51,6 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     init_tracing(&loaded);
     log_settings_load_status(&settings_path, &loaded_settings.status);
+    if !args.uses_debug_render() {
+        host::validate_scenario(&args.scenario)?;
+    }
     tracing::info!(
         path = %settings_path.display(),
         last_scenario = ?loaded.last_scenario,
@@ -65,6 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     tracing::info!(
         scenario = %args.scenario,
+        seed = args.seed,
         dev = args.dev,
         crash_behavior = ?effective_crash_behavior,
         "engine-client starting."
@@ -73,7 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Arc::new(RwLock::new(loaded));
     {
         let mut w = settings.write().unwrap();
-        let scenario_changed = w.last_scenario.as_deref() != Some(args.scenario.as_str());
+        let scenario_changed =
+            !args.uses_debug_render() && w.last_scenario.as_deref() != Some(args.scenario.as_str());
         if scenario_changed {
             w.last_scenario = Some(args.scenario.clone());
         }
@@ -84,47 +97,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let window = MainWindow::new()?;
-    let _debug_render_timer = start_debug_render_loop(&window, &args);
+    let _render_timer = if args.uses_debug_render() {
+        host::start_debug_render_loop(&window, args.debug_triangles)
+    } else {
+        host::start_scenario_loop(&window, &args.scenario, args.seed)?
+    };
     window.run()?;
     Ok(())
-}
-
-fn start_debug_render_loop(window: &MainWindow, args: &Args) -> Option<Timer> {
-    if !args.debug_render && args.debug_triangles == 0 {
-        return None;
-    }
-
-    let timer = Timer::default();
-    let weak_window = window.as_weak();
-    let start = Instant::now();
-    let stress_triangles = args.debug_triangles;
-    let mut frame_count = 0_u64;
-
-    timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
-        let Some(window) = weak_window.upgrade() else {
-            return;
-        };
-
-        let convert_start = Instant::now();
-        let frame = render::debug_frame(start.elapsed(), stress_triangles);
-        let primitives =
-            render::scene_primitives_from_frame(&frame, Viewport::from_window(window.window()));
-        let scene_item_count = primitives.len();
-        window.set_primitives(ModelRc::new(VecModel::from(primitives)));
-        window.window().request_redraw();
-
-        frame_count += 1;
-        if frame_count % 120 == 0 {
-            tracing::info!(
-                stress_triangles,
-                scene_item_count,
-                convert_ms = convert_start.elapsed().as_secs_f64() * 1000.0,
-                "debug render frame converted."
-            );
-        }
-    });
-
-    Some(timer)
 }
 
 fn normalize_log_level(settings: &mut Settings) -> bool {

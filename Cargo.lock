@@ -1382,6 +1382,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "scenario-null",
+ "scenario-spacewars",
  "slint",
  "slint-build",
  "tempfile",
@@ -4117,6 +4118,14 @@ name = "scenario-null"
 version = "0.1.0"
 dependencies = [
  "engine-common",
+]
+
+[[package]]
+name = "scenario-spacewars"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "engine-core",
 ]
 
 [[package]]
