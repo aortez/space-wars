@@ -340,12 +340,19 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 - Add `SpacewarsConfig` from `GameConfig.java`; keep the scenario seed explicit rather than hidden in global randomness.
 - Acceptance: `engine-core` has tested pure math/config primitives and keeps the no-UI/no-filesystem boundary.
 
-### M8: Render primitive contract
+### M8a: ✅ Render primitive contract
 
 - Expand `engine-common::RenderFrame` beyond empty layers: polygons, circles, lines, text, and later sprite/image handles.
+- Define the camera and world-coordinate conventions shared by scenarios and the client.
 - Do not port `UWBGL_SceneNode` directly. Replace it with simple transforms plus emitted render primitives.
-- Add enough client rendering to draw these primitives in the Slint window.
-- Acceptance: a tiny debug scenario, or `scenario-null` in debug mode, renders moving primitives through the same path the real scenario will use.
+- Keep this slice free of Slint/client renderer work and scenario visual output.
+- Acceptance: `RenderFrame` can represent circles, lines, polygons, and text; tests cover camera mapping, layer ordering, and frame construction.
+
+### M8b: Client proof renderer (pause before implementation)
+
+- Investigate Slint-side rendering options before coding: declarative shape lists, image-buffer/software rasterization, custom item/canvas APIs, or a lower-level escape hatch if needed.
+- Decide the renderer approach explicitly before adding client rendering code.
+- Acceptance: TBD after the investigation; the first proof should render debug primitives through the same path the real scenario will use.
 
 ### M9: `spacewars` scenario skeleton
 

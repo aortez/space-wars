@@ -7,6 +7,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+pub mod render;
+
+pub use render::*;
+
 // -- Scenario trait -----------------------------------------------------------
 
 /// A scenario is a runnable world hosted by the client or agent.
@@ -59,22 +63,6 @@ pub struct Action {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Observation {
     pub payload: Vec<u8>,
-}
-
-// -- Render frame -------------------------------------------------------------
-
-/// Draw list emitted by a scenario's `render_frame`. The client translates to
-/// Slint draw calls.
-#[derive(Debug, Clone, Default)]
-pub struct RenderFrame {
-    pub layers: Vec<RenderLayer>,
-}
-
-/// Ordered 2D layer within a [`RenderFrame`].
-#[derive(Debug, Clone, Default)]
-pub struct RenderLayer {
-    pub z: i32,
-    // Primitives (sprites, shapes, text) land here once defined.
 }
 
 // -- Errors -------------------------------------------------------------------
