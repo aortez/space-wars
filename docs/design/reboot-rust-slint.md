@@ -333,6 +333,16 @@ Space-Wars/
 
 The 2008 `Model` couples world generation, entity lists, gravity/collision/update loops, players, planets, projectiles, particles, sounds, and split-view state. The reboot should port it as vertical slices instead of treating "ship moves" as a single step.
 
+Physics fidelity should follow the 2008 behavior, even though the reboot should not port `UWBGL_SceneNode` directly:
+
+- Preserve the fixed 60 Hz update order from `Model.doPhysics()`: update planets, update each player entity, contain it within the universe, resolve munitions/debris/ship/body interactions, then apply gravity only for planet bodies that did not collide on that tick.
+- Model collision as the original did: a cheap Low bounds pass followed by a finer High bounds pass. Low bounds were generally coarse spheres. High bounds were still approximate bounding volumes, not exact polygon/SAT tests: circles stayed spheres, laser beams stayed lines, triangle primitives expanded into a `BoundingList` of small spheres over corners/edges/subdivisions, and lists intersected when any nested bound intersected. The reboot can represent this with simple engine-core bounds primitives (`Circle`, `Line`, and lists of circles/lines) instead of the original scene graph.
+- Reproduce triangle High bounds from `UWBGL_PrimitiveTriangle.getTriangleBoundsRecursive()`: seed tiny corner circles inset toward the centroid; compute a recursive circle at each triangle centroid with radius equal to the nearest distance from that centroid to an edge; add it unless its center is already inside an existing circle; subdivide into the three corner subtriangles and the center subtriangle while vertex distance/radius exceeds the original `min_circle_size` threshold (`max(avg_midpoint_distance * 0.15, 2.0)`).
+- Keep planet/sun gravity as the original immediate velocity impulse, without multiplying by `dt` a second time.
+- Port collision response formulas exactly where practical: planet body bounce pushes the entity to the surface, reflects velocity around the body normal, and damps speed to 50%; entity/entity collision uses the original mass-weighted velocity exchange, 90% damping, and overlap separation.
+- Treat spaceports as their own physics path: contact with the spaceport damps velocity and pulls the ship/pod toward the port rather than doing a normal body bounce. Ownership, repair, pod rebuild, sounds, and particles can layer on after the contact behavior exists.
+- Keep deterministic tests at each slice for update order, replay from seed/tick count, and "collision suppresses gravity for that body this tick."
+
 ### M7: ✅ Reference map + core math
 
 - Port gameplay constants from `reference/src-decompiled/Common.java`.
@@ -381,20 +391,26 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 - M11a: ✅ Port deterministic sun/planet setup from `Model.java` and `Planet.java`, render sun/planets as simple circles, and host `spacewars` with the original default config instead of the temporary deathmatch preset.
 - M11b: ✅ Add planet orbit/update behavior from `Planet.update()`.
 - M11c: ✅ Add planet/sun gravity on ships.
-- M11d: add planet/sun bounds and collision response.
+- M11d: add planet/sun body bounds and ship/body collision detection using the original Low/High bounds pattern: circular bodies as spheres/circles and ships as a coarse Low circle plus High lists derived from current ship triangle primitives.
+- M11e: add original body collision response: push ship out to `ship_radius + body_radius`, reflect velocity around the body normal, damp to 50%, and skip that body's gravity for the tick.
+- M11f: add minimal spaceport contact physics: rotating spaceport bound, landing contact detection, velocity damping, and pull toward the port center. Defer ownership, capture timers, healing, pod rebuild, sounds, and particles.
 - Defer ownership/capture visuals unless needed for debugging.
-- Acceptance: default config creates a recognizable world; ships are pulled by planets and bounce or settle at spaceports plausibly.
+- Acceptance: default config creates a recognizable world; ships are pulled by planets, bounce from planet/sun bodies, and settle at spaceports plausibly.
 
 ### M12: Damage, debris, and asteroids
 
-- Port entity life/damage behavior, debris, shell-like moving debris, asteroid spawning, and basic entity/entity collision.
+- Port entity life/damage behavior, debris, shell-like moving debris, asteroid spawning, and original entity/entity collision.
+- Preserve `collideEntities()` behavior for ship/ship, ship/debris, and debris/debris: mass-weighted velocity exchange, 90% damping, and overlap separation by velocity share.
+- Apply planet/body damage from relative velocity after body collision, but keep pod conversion and explosion effects for later gameplay/effects slices unless they block tests.
+- Preserve asteroid gravity skip behavior and deterministic cleanup/spawn ordering.
 - Keep visual particles optional until rendering/perf is ready.
 - Acceptance: asteroids spawn deterministically from the seed, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
 
 ### M13: Weapons
 
 - Port cannon/shell first because it is simpler and exercises moving projectile behavior.
-- Then port laser continuous firing, line bounds, intersection, and damage falloff.
+- Then port laser continuous firing, line bounds, line-vs-body/list intersections, nearest-hit truncation, and damage falloff.
+- Preserve original munition update order: active weapon updates before ship/debris/planet collision checks, and laser hits truncate the beam at the first intersection.
 - Acceptance: ships can damage each other and debris with cannon and laser fire; weapon behavior is covered by deterministic scenario tests.
 
 ### M14: Particles, exhaust, starfield, and assets
@@ -405,6 +421,7 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 
 ### M15: Gameplay loop + HUD
 
-- Port player ownership, planet capture, escape pods, ship rebuild, game-over logic, score display, and split-view framing.
+- Port player ownership, planet capture, escape pods, ship rebuild from spaceports, game-over logic, score display, and split-view framing.
+- Complete the gameplay consequences that depend on physics contacts: landing ownership timers, ship healing on owned ports, pod-to-ship rebuild timers, ship-to-pod conversion on death, and associated score/life state.
 - Add enough UI/HUD to support local two-player arcade play.
 - Acceptance: local two-player arcade mode is playable end-to-end with default config.
