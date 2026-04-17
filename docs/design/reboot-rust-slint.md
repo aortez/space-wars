@@ -333,7 +333,7 @@ Space-Wars/
 
 The 2008 `Model` couples world generation, entity lists, gravity/collision/update loops, players, planets, projectiles, particles, sounds, and split-view state. The reboot should port it as vertical slices instead of treating "ship moves" as a single step.
 
-### M7: Reference map + core math
+### M7: ✅ Reference map + core math
 
 - Port gameplay constants from `reference/src-decompiled/Common.java`.
 - Add core math/data primitives in `engine-core`: `Vec2`, angle helpers, color, transform, bounds, and deterministic RNG plumbing.
