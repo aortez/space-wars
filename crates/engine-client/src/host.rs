@@ -183,7 +183,7 @@ impl HostedScenario {
         match name {
             "null" => Ok(Self::Null(NullScenario::init(NullConfig, seed))),
             "spacewars" => Ok(Self::Spacewars(Box::new(SpacewarsScenario::init(
-                SpacewarsConfig::deathmatch(),
+                SpacewarsConfig::default(),
                 seed,
             )))),
             _ => Err(HostError::UnknownScenario { name: name.into() }),
@@ -246,6 +246,14 @@ mod tests {
         let scenario = HostedScenario::new("spacewars", 0).unwrap();
         let frame = scenario.render_frame();
 
+        match &scenario {
+            HostedScenario::Spacewars(state) => {
+                assert_eq!(state.config, SpacewarsConfig::default());
+                assert!(state.sun.is_some());
+                assert!(!state.planets.is_empty());
+            }
+            HostedScenario::Null(_) => panic!("spacewars scenario should not host null"),
+        }
         assert!(!frame.layers.is_empty());
         assert!(matches!(
             scenario.tick_model(),

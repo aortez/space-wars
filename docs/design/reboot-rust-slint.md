@@ -365,7 +365,7 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 - Keep client scenario selection as a concrete host enum for now; defer dynamic registry/plugin work until more scenarios need it.
 - Acceptance: the client hosts the real scenario, steps it with a fixed timestep, and draws two deterministic ships.
 
-### M10: Ship flight slice
+### M10: ✅ Ship flight slice
 
 - Port ship thrust, reverse, turn, wing open/close, wing speed cap, internal brake behavior, and ship bounds from `Ship.java`.
 - Wire the original hard-coded controls from `FinalDlg.handleKeys()`; the 2008 source does not have key remapping.
@@ -378,8 +378,10 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 
 ### M11: World + planets
 
-- Port sun/planet config and orbit generation from `Model.java` and `Planet.java`.
-- Add planet gravity, planet bounds, orbit update, and planet collision response.
+- M11a: port deterministic sun/planet setup from `Model.java` and `Planet.java`, render sun/planets as simple circles, and host `spacewars` with the original default config instead of the temporary deathmatch preset.
+- M11b: add planet orbit/update behavior from `Planet.update()`.
+- M11c: add planet/sun gravity on ships.
+- M11d: add planet/sun bounds and collision response.
 - Defer ownership/capture visuals unless needed for debugging.
 - Acceptance: default config creates a recognizable world; ships are pulled by planets and bounce or settle at spaceports plausibly.
 

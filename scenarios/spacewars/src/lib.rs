@@ -1,10 +1,9 @@
 //! Initial Spacewars scenario port.
 //!
-//! M10 ports the first playable ship-control slice: original hard-coded
-//! control actions, ship thrust/reverse/turn physics, wing open/close behavior,
-//! simple universe containment, and render primitive emission for wing motion.
-//! Exhaust trails, weapons, collisions, sounds, planets, asteroids, pods, and
-//! scoring land in later slices.
+//! M11a adds the first world slice on top of M10 ship controls: deterministic
+//! sun/planet setup and simple circle rendering. Orbit advancement, gravity,
+//! exhaust trails, weapons, collisions, sounds, asteroids, pods, and scoring
+//! land in later slices.
 
 use std::time::Duration;
 
@@ -13,11 +12,25 @@ use engine_common::{
     RenderPolygon, RenderPrimitive, RenderText, Scenario, StepResult, Stroke, TextAnchor,
     TickModel,
 };
-use engine_core::{Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2};
+use engine_core::{
+    Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
+    rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
+};
 
 const WORLD_LAYER: i32 = -20;
+const SUN_LAYER: i32 = -15;
+const PLANET_LAYER: i32 = -10;
 const SHIP_LAYER: i32 = 0;
 const LABEL_LAYER: i32 = 10;
+
+const MAX_PLANETS: usize = 99;
+const SUN_RADIUS: f32 = 200.0;
+const MIN_PLANET_RADIUS: f32 = 15.0;
+const MAX_PLANET_RADIUS: f32 = 150.0;
+const MIN_PLANET_SPACING: f32 = 10.0;
+const MAX_PLANET_SPACING: f32 = 50.0;
+const PLANET_MASS_DENSITY: f32 = 750.0;
+const PLANET_ORBIT_PERIOD_SCALAR: f32 = 14.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -72,6 +85,8 @@ pub struct SpacewarsState {
     pub tick: u64,
     pub players: [PlayerState; 2],
     pub ships: [ShipState; 2],
+    pub sun: Option<SunState>,
+    pub planets: Vec<PlanetState>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +95,26 @@ pub struct PlayerState {
     pub name: String,
     pub health_percent: u32,
     pub color: Color,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SunState {
+    pub position: Vec2,
+    pub radius: f32,
+    pub mass: f32,
+    pub color: Color,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PlanetState {
+    pub position: Vec2,
+    pub radius: f32,
+    pub mass: f32,
+    pub color: Color,
+    pub orbit_radius: f32,
+    pub orbit_angle: f32,
+    pub orbit_omega: f32,
+    pub wrapper_omega: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -285,6 +320,7 @@ impl Scenario for SpacewarsScenario {
                 delta_time,
             ),
         ];
+        let (sun, planets) = build_world(&config, seed);
 
         SpacewarsState {
             config,
@@ -292,6 +328,8 @@ impl Scenario for SpacewarsScenario {
             tick: 0,
             players,
             ships,
+            sun,
+            planets,
         }
     }
 
@@ -348,6 +386,70 @@ impl SpacewarsState {
             SpacewarsActionKind::FireCannonHalt => ship.fire_cannon_halt(),
         }
     }
+}
+
+fn build_world(config: &SpacewarsConfig, seed: u64) -> (Option<SunState>, Vec<PlanetState>) {
+    if !config.use_planets {
+        return (None, Vec::new());
+    }
+
+    let universe_radius = config.universe_radius as f32;
+    let sun = SunState {
+        position: Vec2::new(universe_radius, universe_radius),
+        radius: SUN_RADIUS,
+        mass: body_mass(SUN_RADIUS),
+        color: Color::YELLOW,
+    };
+    let mut planets = Vec::new();
+    let mut rng = seeded_rng(seed);
+    let mut planet_min_orbit = SUN_RADIUS + 20.0;
+
+    while planet_min_orbit < universe_radius && planets.len() < MAX_PLANETS {
+        let radius = random_range_f32(&mut rng, MIN_PLANET_RADIUS, MAX_PLANET_RADIUS);
+        let spacing = random_range_f32(&mut rng, MIN_PLANET_SPACING, MAX_PLANET_SPACING);
+        let orbit_angle = random_range_f32(&mut rng, 0.0, core::f32::consts::TAU);
+        let orbit_radius = planet_min_orbit + radius + spacing;
+
+        if orbit_radius + radius >= universe_radius {
+            break;
+        }
+
+        let max_speed = core::f32::consts::TAU / orbit_radius * PLANET_ORBIT_PERIOD_SCALAR;
+        let orbit_omega = random_range_f32(&mut rng, -max_speed, max_speed);
+        let wrapper_omega = random_range_f32(
+            &mut rng,
+            -core::f32::consts::FRAC_PI_6,
+            core::f32::consts::FRAC_PI_6,
+        );
+        let position = sun.position + Vec2::from_radians(orbit_angle) * orbit_radius;
+
+        planets.push(PlanetState {
+            position,
+            radius,
+            mass: body_mass(radius),
+            color: random_color(&mut rng),
+            orbit_radius,
+            orbit_angle,
+            orbit_omega,
+            wrapper_omega,
+        });
+
+        planet_min_orbit += radius * 2.0 + spacing;
+    }
+
+    (Some(sun), planets)
+}
+
+fn random_color(rng: &mut SpacewarsRng) -> Color {
+    Color::rgb(
+        random_unit_f32(rng),
+        random_unit_f32(rng),
+        random_unit_f32(rng),
+    )
+}
+
+fn body_mass(radius: f32) -> f32 {
+    core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
 }
 
 impl ShipState {
@@ -587,6 +689,28 @@ fn render_state(state: &SpacewarsState) -> RenderFrame {
         }),
     );
 
+    if let Some(sun) = state.sun {
+        render_body(
+            &mut frame,
+            SUN_LAYER,
+            sun.position,
+            sun.radius,
+            RenderColor::rgba(1.0, 0.93, 0.2, 0.85),
+            RenderColor::rgba(1.0, 1.0, 0.65, 0.9),
+        );
+    }
+
+    for planet in &state.planets {
+        render_body(
+            &mut frame,
+            PLANET_LAYER,
+            planet.position,
+            planet.radius,
+            render_color(planet.color),
+            RenderColor::rgba(0.72, 0.78, 0.84, 0.65),
+        );
+    }
+
     for ship in &state.ships {
         render_ship(&mut frame, ship);
     }
@@ -596,6 +720,25 @@ fn render_state(state: &SpacewarsState) -> RenderFrame {
     }
 
     frame
+}
+
+fn render_body(
+    frame: &mut RenderFrame,
+    layer: i32,
+    position: Vec2,
+    radius: f32,
+    fill: RenderColor,
+    stroke: RenderColor,
+) {
+    frame.push_primitive(
+        layer,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(position),
+            radius,
+            fill: Some(Fill::new(fill)),
+            stroke: Some(Stroke::new(stroke, 1.25)),
+        }),
+    );
 }
 
 fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
@@ -687,6 +830,10 @@ mod tests {
         SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 123)
     }
 
+    fn init_default(seed: u64) -> SpacewarsState {
+        SpacewarsScenario::init(SpacewarsConfig::default(), seed)
+    }
+
     fn step(state: &mut SpacewarsState, actions: &[Action]) -> StepResult {
         SpacewarsScenario::step(state, actions, Duration::from_secs_f32(1.0 / 60.0))
     }
@@ -716,6 +863,44 @@ mod tests {
         assert_eq!(state.ships[1].position, Vec2::new(375.0, 500.0));
         assert_eq!(state.players[0].name, "Player 1");
         assert_eq!(state.players[1].name, "Player 2");
+        assert!(state.sun.is_none());
+        assert!(state.planets.is_empty());
+    }
+
+    #[test]
+    fn default_config_builds_original_style_sun_and_planet_bands() {
+        let state = init_default(123);
+        let sun = state.sun.expect("default config should create a sun");
+        let universe_radius = state.config.universe_radius as f32;
+
+        assert_eq!(state.config.universe_radius, 1200);
+        assert_eq!(sun.position, Vec2::new(universe_radius, universe_radius));
+        assert_eq!(sun.radius, SUN_RADIUS);
+        assert_close(sun.mass, body_mass(SUN_RADIUS));
+        assert!(!state.planets.is_empty());
+        assert!(state.planets.len() <= MAX_PLANETS);
+
+        for planet in &state.planets {
+            assert!(planet.radius >= MIN_PLANET_RADIUS);
+            assert!(planet.radius < MAX_PLANET_RADIUS);
+            assert!(planet.orbit_radius + planet.radius < universe_radius);
+            assert_close(
+                planet.position.distance_to(sun.position),
+                planet.orbit_radius,
+            );
+            assert_close(planet.mass, body_mass(planet.radius));
+        }
+    }
+
+    #[test]
+    fn world_generation_replays_from_seed() {
+        let first = init_default(7);
+        let replay = init_default(7);
+        let different = init_default(8);
+
+        assert_eq!(first.sun, replay.sun);
+        assert_eq!(first.planets, replay.planets);
+        assert_ne!(first.planets, different.planets);
     }
 
     #[test]
@@ -857,5 +1042,21 @@ mod tests {
         assert_eq!(circles, 1);
         assert_eq!(polygons, 12);
         assert_eq!(text, 2);
+    }
+
+    #[test]
+    fn render_frame_contains_default_sun_and_planets() {
+        let state = init_default(123);
+        let frame = SpacewarsScenario::render_frame(&state);
+
+        let circles = frame
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
+            .count();
+
+        assert_eq!(frame.camera.center, RenderPoint::new(1200.0, 1200.0));
+        assert_eq!(circles, 2 + state.planets.len());
     }
 }
