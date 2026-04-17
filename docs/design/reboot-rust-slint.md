@@ -327,4 +327,68 @@ Space-Wars/
 4. ✅ Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
 5. ✅ Cross-compile `engine-client` to `x86_64-pc-windows-gnu` via `cargo zigbuild` (zig + cargo-zigbuild — no MinGW).
 6. ✅ Wire up the settings file: load/save via `directories` crate with `SPACEWARS_CONFIG_DIR` env override, serde-default migration, atomic writes, `Arc<RwLock<Settings>>` sharing, and startup logging config from `runtime.log_level` with `RUST_LOG` override. (`CrashBehavior` persists in the file but the panic handler that consumes it lands with the Pi work.)
-7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.
+7. Begin the initial `scenarios/spacewars` port. This is split into the milestones below; the first playable target is **deathmatch-lite**: two ships, keyboard input, fixed timestep, simple vector rendering, no planets, no asteroids, and no weapons until the core loop is proven.
+
+## Initial Spacewars port milestones
+
+The 2008 `Model` couples world generation, entity lists, gravity/collision/update loops, players, planets, projectiles, particles, sounds, and split-view state. The reboot should port it as vertical slices instead of treating "ship moves" as a single step.
+
+### M7: Reference map + core math
+
+- Port gameplay constants from `reference/src-decompiled/Common.java`.
+- Add core math/data primitives in `engine-core`: `Vec2`, angle helpers, color, transform, bounds, and deterministic RNG plumbing.
+- Add `SpacewarsConfig` from `GameConfig.java`; keep the scenario seed explicit rather than hidden in global randomness.
+- Acceptance: `engine-core` has tested pure math/config primitives and keeps the no-UI/no-filesystem boundary.
+
+### M8: Render primitive contract
+
+- Expand `engine-common::RenderFrame` beyond empty layers: polygons, circles, lines, text, and later sprite/image handles.
+- Do not port `UWBGL_SceneNode` directly. Replace it with simple transforms plus emitted render primitives.
+- Add enough client rendering to draw these primitives in the Slint window.
+- Acceptance: a tiny debug scenario, or `scenario-null` in debug mode, renders moving primitives through the same path the real scenario will use.
+
+### M9: `spacewars` scenario skeleton
+
+- Add `scenarios/spacewars`.
+- Implement `Scenario` with fixed 60 Hz tick.
+- Build initial world state with universe bounds, two players, and two ships. No planets, weapons, asteroids, particles, pods, or scoring yet.
+- Wire `engine-client --scenario spacewars` to select the new scenario.
+- Acceptance: the client hosts the real scenario and draws two deterministic ships.
+
+### M10: Ship flight slice
+
+- Port ship thrust, brake, reverse, turn, wing open/close, wing speed cap, and ship bounds from `Ship.java`.
+- Define scenario actions for thrust, brake, reverse, turn left/right, wing toggle, and placeholder weapon actions.
+- Keep exhaust trails, weapons, collision, and damage out of this slice.
+- Acceptance: two ships can fly inside a bounded universe with deterministic state tests for thrust, turn, wing transitions, and max-speed behavior.
+
+### M11: World + planets
+
+- Port sun/planet config and orbit generation from `Model.java` and `Planet.java`.
+- Add planet gravity, planet bounds, orbit update, and planet collision response.
+- Defer ownership/capture visuals unless needed for debugging.
+- Acceptance: default config creates a recognizable world; ships are pulled by planets and bounce or settle at spaceports plausibly.
+
+### M12: Damage, debris, and asteroids
+
+- Port entity life/damage behavior, debris, shell-like moving debris, asteroid spawning, and basic entity/entity collision.
+- Keep visual particles optional until rendering/perf is ready.
+- Acceptance: asteroids spawn deterministically from the seed, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
+
+### M13: Weapons
+
+- Port cannon/shell first because it is simpler and exercises moving projectile behavior.
+- Then port laser continuous firing, line bounds, intersection, and damage falloff.
+- Acceptance: ships can damage each other and debris with cannon and laser fire; weapon behavior is covered by deterministic scenario tests.
+
+### M14: Particles, exhaust, starfield, and assets
+
+- Port exhaust trails, laser/debris impact particles, primitive breakup effects, and `BGStarField`.
+- Integrate original assets selectively from `reference/rec`, with an explicit asset ownership/layout decision before moving files.
+- Acceptance: the game starts to visually resemble the 2008 artifact while preserving the render primitive boundary.
+
+### M15: Gameplay loop + HUD
+
+- Port player ownership, planet capture, escape pods, ship rebuild, game-over logic, score display, and split-view framing.
+- Add enough UI/HUD to support local two-player arcade play.
+- Acceptance: local two-player arcade mode is playable end-to-end with default config.
