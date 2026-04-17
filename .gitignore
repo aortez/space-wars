@@ -15,3 +15,6 @@ Thumbs.db
 
 # Claude Code local state.
 .claude/
+
+# Local Wine prefix for testing Windows builds.
+.wine-prefix/

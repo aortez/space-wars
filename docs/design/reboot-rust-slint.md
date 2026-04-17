@@ -322,9 +322,8 @@ Space-Wars/
 
 1. ✅ Branch current `master` to `archive/2015-qt`; reset `master` to an empty skeleton.
 2. ✅ Commit the decompiled 2008 source under `reference/src-decompiled/`, and the 2008 binary + assets + PDFs under `reference/`.
-3. Stand up the Cargo workspace: `engine-core`, `engine-common` (libraries) and `engine-client`, `engine-agent`, `engine-os-manager` (binaries). Stub `main` in each binary; stub the `Scenario` trait and a null scenario.
-4. Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
-4.5. Set up CI to build linux and windows binaries.
-5. Add `x86_64-pc-windows-gnu` target and linker config in `.cargo/config.toml`; get the same empty window rendering on Windows.
+3. ✅ Stand up the Cargo workspace: `engine-core`, `engine-common` (libraries) and `engine-client`, `engine-agent`, `engine-os-manager` (binaries). Stub `main` in each binary; stub the `Scenario` trait and a null scenario.
+4. ✅ Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
+5. ✅ Cross-compile `engine-client` to `x86_64-pc-windows-gnu` via `cargo zigbuild` (zig + cargo-zigbuild — no MinGW).
 6. Wire up the settings file: load/save, defaults, `Arc<RwLock<Settings>>` sharing, `CrashBehavior` consumed by the panic handler.
 7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.
