@@ -5,22 +5,23 @@
 
 ## Context
 
-Space-Wars is a 2008 UW Bothell CSS 450 school project (Allan + Chris, JOGL Java). Original artifacts preserved: `Final.jar` (compiled game), `lib/` (jogl, appframework, beansbinding, swing-worker, AbsoluteLayout), `rec/` assets (sprites, sounds, planets), and the proposal + final-report PDFs.
+Space-Wars is a 2008 UW Bothell CSS 450 school project (Allan + Chris, JOGL Java). Original artifacts preserved under `reference/`: `Final.jar` (compiled game), `lib/` (jogl, appframework, beansbinding, swing-worker, AbsoluteLayout), `rec/` assets (sprites, sounds, planets), the proposal + final-report PDFs, and CFR-decompiled Java source.
 
-The 2015 C++ rewrite in this repo (Qt5 + OpenGL, `spacewars.pro` qmake) is a physics-sandbox doodle — circles/rectangles only, no game entities, stalled 10+ years. Plan: branch current `master` to `archive/2015-qt` for reference, then reset `master` to an empty skeleton.
+The 2015 C++ rewrite in this repo (Qt5 + OpenGL, `spacewars.pro` qmake) was a physics-sandbox doodle — circles/rectangles only, no game entities, stalled 10+ years. Preserved on `archive/2015-qt`; `master` has been reset.
 
 ## Source recovery
 
 The 2008 `Final.jar` has been decompiled with CFR into ~4,554 lines of Java across 32 game files, plus ~5,305 lines of in-house scene-graph (`UWBGL_JavaOpenGL`). Names are preserved (Ship, Planet, Cannon, Laser, EscapePod, Debris, Particle, BGStarField, Wing_Behavior, ...).
 
-**Use the decompiled Java as a gameplay spec, not as code to port.** Physics constants, weapon behavior, wing-fold states, and ship tuning are all readable. The `UWBGL_*` scene-graph classes are obsolete — whatever rendering layer we pick provides its own.
+**Use the decompiled Java as a gameplay spec, not as code to port.** Physics constants, weapon behavior, wing-fold states, and ship tuning are all readable. The `UWBGL_*` scene-graph classes are obsolete — Slint provides the rendering layer in the reboot.
 
 ## Goals
 
 1. Run on **Linux desktop, Windows (cross-compiled from Linux), and Raspberry Pi embedded Linux** (via the sparkle-duck-shared Yocto base).
-2. **Rust (2024 edition) with Slint as the UI framework**, with custom drawing on top (same *pattern* as dirtsim's LVGL + custom graphics — different stack).
+2. **Rust (2024 edition) with Slint as the UI framework**, with custom drawing on top.
 3. **AI testbed** — hand-coded agents and NNs — same trajectory as dirtsim.
-4. **Single-player, split-screen, and networked** multiplayer.
+4. **Multi-scenario.** The 2008 arcade port is the first scenario; clock, planetary, and NES-emulator scenarios follow. Scenario support is first-class — the engine is not assumed to only run the arcade game.
+5. **Single-player, split-screen, and networked** multiplayer (for scenarios that want it).
 
 ## Why Rust + Slint (instead of C++ + LVGL like dirtsim)
 
@@ -32,24 +33,74 @@ The 2008 `Final.jar` has been decompiled with CFR into ~4,554 lines of Java acro
 - **Determinism is easier to enforce**: explicit seeded RNGs, no implicit global state, `ordered_float` for float keys.
 - **Tradeoff**: diverges from dirtsim. *Patterns* are reusable, code is not. Maintaining two projects in two languages is a real ongoing cost.
 
+## Engine + scenarios
+
+The architecture is **an engine + scenarios**, not a monolithic game.
+
+- The **engine** (`engine-core`) is a 2D entity / physics library. It owns the spacewars-flavored entity set — `Ship`, `Planet`, `Cannon`, `Laser`, `EscapePod`, `Debris`, `Particle`, `BGStarField`, etc. — and the physics that acts on them. Fluids will land as an engine feature later. The engine emits render primitives but is not tied to a specific rendering backend.
+- A **scenario** is a configuration of engine entities, rules, goals, and UI. Scenarios do not define new entity kinds (initially); they compose and drive existing ones.
+- A **separate NES emulator engine** (`engine-nes`) lives alongside `engine-core` for NES scenarios. Each NES scenario pairs the emulator core with a specific ROM and a scenario-specific agent observation/action mapping. Multiple NES scenarios share one emulator core the same way multiple spacewars-style scenarios share `engine-core`.
+
+Planned scenarios (first few):
+
+| Scenario | Engine | Notes |
+|---|---|---|
+| `scenarios/spacewars` | engine-core | The 2008 arcade port. |
+| `scenarios/clock` | engine-core | Engine entities arranged to tell time. Pi-friendly. |
+| `scenarios/planetary` | engine-core | Planetary sim using engine physics. |
+| `scenarios/nes-<rom>` | engine-nes | One per MIT-licensed homebrew ROM. Agent-first; training is the point, human play is a bonus. |
+
+The engine is not anticipated to be "generic." It is the *spacewars engine* — a 2D ships-and-planets-and-lasers physics library with room to grow (fluids, more entity kinds). "Generic game engine" is an anti-goal.
+
+### Scenario trait (sketch)
+
+Illustrative, not final:
+
+```rust
+pub trait Scenario {
+    type State;
+    type Config;
+
+    fn init(config: Self::Config, seed: u64) -> Self::State;
+    fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult;
+    fn observe(state: &Self::State) -> Observation;
+    fn render_frame(state: &Self::State) -> RenderFrame;
+
+    /// Declare tick model up front; the client's game loop honors it.
+    fn tick_model() -> TickModel;  // FixedTimestep { hz } | Variable | EmulatorClock.
+}
+```
+
+- **Tick model is per-scenario.** Spacewars wants fixed-timestep + deterministic. NES runs on the emulator's own clock (~60Hz NTSC). Clock scenario is fine with 1Hz. The client's game loop reads `tick_model()` when hosting a scenario and adjusts.
+- **Agent interface is part of the trait**, not optional plumbing. `Observation` and `Action` are defined in `engine-common`. Per-scenario schemas vary (Mario's observation ≠ Spacewars'); the transport shape is shared.
+- **Render is via `RenderFrame`**, not direct drawing. Scenarios emit primitives (sprites, shapes, text, ordered layers); the client's renderer translates them to Slint draw calls. Keeps scenarios platform-agnostic.
+
 ## Architecture
 
-Cargo workspace with four binary crates plus a shared library crate:
+Cargo workspace:
 
 ```
-spacewars-sim         # LIBRARY crate. Deterministic, narrow API. No UI / network / FS deps.
-spacewars-client      # Binary. Embeds spacewars-sim by default; `--remote-sim <url>` switches to client-of-server.
-spacewars-agent       # Binary. Embeds spacewars-sim directly for training speed.
-spacewars-os-manager  # Pi-only privileged helper binary.
-spacewars-common      # Library. Shared types: Action, WorldState, SimError, observation schemas.
-spacewars-sim-server  # (Phase 2) Binary wrapping the sim library; exposes it over UDS or QUIC for network play / multi-viewer.
+engine-core        # LIBRARY. 2D entities (Ship, Planet, Laser, Cannon, Particle, Debris, EscapePod, BGStarField), physics, fluids (later). Deterministic, narrow API. No UI / network / FS deps.
+engine-nes         # LIBRARY. NES emulator core: 6502 CPU, PPU, APU, cart mappers. Lifted from dirtsim when we get there.
+engine-common      # LIBRARY. Shared types: Settings, Action, Observation, Scenario trait, RenderFrame, SimError.
+engine-client      # BINARY. Slint UI + custom drawing + input + audio + settings IO + scenario host.
+engine-agent       # BINARY. Training entry point. Embeds scenarios directly for training speed.
+engine-os-manager  # BINARY. Pi-only privileged helper (feature-gated).
+engine-sim-server  # BINARY (Phase 2). Wraps scenarios; exposes over UDS/QUIC for network play / multi-viewer.
+
+scenarios/spacewars   # 2008 arcade port. Uses engine-core.
+scenarios/clock       # Uses engine-core.
+scenarios/planetary   # Uses engine-core.
+scenarios/nes-<rom>   # One per ROM. Uses engine-nes.
 ```
 
-Rationale: agents, human players, split-screen viewports, and replay viewers are all "clients" of the same sim. One interface serves all of them.
+Agents, human players, split-screen viewports, and replay viewers are all "clients" of the same scenario instance. One interface serves all of them.
 
 ### Sim requirements
 
-- Fixed-timestep tick; no wall-clock reads inside the step function.
+Apply to `engine-core` and the scenario-wrapping traits:
+
+- Fixed-timestep tick *when the scenario declares it*; no wall-clock reads inside the step function.
 - Seeded RNG (`rand` with explicit `SeedableRng`); no `thread_rng()` inside the step.
 - No UI, filesystem, or network side-effects inside the step.
 - Cross-platform float determinism is nice-to-have; acceptable fallback is "canonical results come from a reference platform, others are good enough for play."
@@ -57,27 +108,30 @@ Rationale: agents, human players, split-screen viewports, and replay viewers are
 
 ### Client requirements
 
-- **Slint** for UI (HUD, menus, scores).
+- **Slint** for UI (HUD, menus, scores, settings screen).
 - Custom drawing (ships, particles, stars) on top of Slint's canvas or a dedicated render surface.
-- Tick/render decoupled; client interpolates between sim states.
+- Render pipeline supports ordered 2D layers (background / sim / HUD overlay). No 3D.
+- Tick/render decoupled; client interpolates between sim states when `TickModel` supports it.
 - Renders 1..N viewports in one window (for split-screen).
+- Hosts any `Scenario` — picked via CLI flag (`--scenario spacewars`) or in-app menu.
 
 ### Observation / action API
 
-- Define early, version it.
+- Defined in `engine-common`.
+- Versioned from the start.
 - Doubles as replay format and network protocol.
-- Human input maps to the same action schema as agent output.
+- Human input maps to the same `Action` schema as agent output.
+- Observation shape is per-scenario; the container/transport is shared.
 
 ### Transport / IPC
 
-**Default: sim as library, embedded in-process.** Zero IPC and zero serialization on the hot path for local play.
+**Default: scenario runs in-process, embedded in the client.** Zero IPC and zero serialization on the hot path for local play.
 
-- `spacewars-sim` is a **library crate** with a narrow API (`Sim::new(seed)`, `Sim::step(actions) -> StepResult`, `Sim::state() -> &WorldState`). No UI, graphics, filesystem, network, or env deps.
-- `spacewars-client` embeds the sim library by default. Local play and split-screen call `sim.step(...)` directly — function call, sub-µs.
-- `spacewars-agent` embeds the sim library directly. Training speed is not negotiable.
-- `spacewars-common` holds the shared types: `Action`, `WorldState`, `SimError`, observation schemas. `WorldState` is `serde`-serializable, so the same type works in-process and later over the wire without a separate DTO layer.
+- `engine-client` hosts scenarios directly. Local play and split-screen call the scenario's `step(...)` directly — function call, sub-µs.
+- `engine-agent` hosts scenarios directly. Training speed is not negotiable.
+- Scenario state types are `serde`-serializable via `engine-common`, so the same type works in-process and later over the wire without a separate DTO layer.
 
-**Escape hatch (Phase 2): `spacewars-sim-server` binary** that wraps the library and exposes it over a remote transport. Added when network multiplayer or multi-viewer debugging comes online. The client gains a `--remote-sim <url>` flag that switches from embedded to remote mode.
+**Escape hatch (Phase 2): `engine-sim-server` binary** wraps a scenario and exposes it over a remote transport. Added when network multiplayer or multi-viewer debugging comes online. The client gains a `--remote-scenario <url>` flag that switches from embedded to remote mode.
 
 **Transport choice for sim-server** (revisit when the Phase 2 work starts):
 
@@ -88,25 +142,59 @@ Rationale: agents, human players, split-screen viewports, and replay viewers are
 
 Rationale: local play pays nothing for IPC by construction, not by configuration. Training already requires in-process. Network and remote-debug paths pay only when activated.
 
-### Crash handling
+### Settings
 
-Two modes, controlled by `SPACEWARS_MODE=user|dev` (or a `--dev` flag):
+A persistent settings file holds user-modifiable app state. Used throughout the client and (optionally) the agent.
 
-**User mode** (default on Pi kiosk deployment):
+**Location (XDG / platform conventions):**
 
-- On panic, the process crashes and exits.
-- systemd (`Restart=on-failure`, short `RestartSec`) brings it back up.
-- From the player's perspective: a brief reboot of the game; fresh state.
-- Applies to both sim panics (propagate up and kill the client) and client panics.
+| Platform | Path |
+|---|---|
+| Linux desktop | `$XDG_CONFIG_HOME/spacewars/settings.toml` (default `~/.config/spacewars/settings.toml`) |
+| Windows | `%APPDATA%\spacewars\settings.toml` |
+| Raspberry Pi (kiosk) | `/var/lib/spacewars/settings.toml` (writable; persists across A/B updates) |
 
-**Dev mode** (default on desktop):
+Resolved via the `directories` crate.
 
-- Top-level panic handler catches the unwind.
-- Render loop freezes; debug overlay shows the panic message, last `WorldState` summary, and instructions (press R to reset, Ctrl-C to quit).
-- Optional: dump `WorldState` + replay buffer to `/tmp/spacewars-crash-<timestamp>.postcard` for offline replay.
-- Developer can attach `gdb` / `lldb` or read the backtrace at leisure.
+**Format:** TOML via `serde` + `toml`. Human-readable, hand-editable, good round-tripping.
 
-**Error vs panic discipline inside the sim**:
+**Structure (sketch):**
+
+```rust
+#[derive(Serialize, Deserialize)]
+pub struct Settings {
+    pub video:         VideoSettings,     // resolution, backend, vsync — restart-required.
+    pub audio:         AudioSettings,     // master volume, mute — live.
+    pub controls:      ControlBindings,   // keymap — live.
+    pub runtime:       RuntimeSettings,   // crash_behavior, log_level — live.
+    pub last_scenario: Option<String>,    // resume hint.
+}
+```
+
+**Access pattern:**
+
+- Loaded at startup into `Arc<RwLock<Settings>>`, shared into the UI and scenario host.
+- UI writes through the lock; writes debounce to disk (~1s quiescence).
+- Each field is tagged live-apply vs restart-required in code and in the settings UI; restart-required changes get a badge.
+- `engine-common` owns the `Settings` struct. IO (load, save, defaults-on-first-run, debounced write) lives in `engine-client`. `engine-core` and `engine-nes` have no filesystem dependency.
+
+### Crash behavior
+
+Crash behavior is a settings field, not an env var / CLI flag:
+
+```rust
+pub enum CrashBehavior {
+    Reboot,   // panic → process exits → systemd restarts. Pi default.
+    Freeze,   // catch unwind, show debug overlay, wait for user. Desktop default.
+}
+```
+
+- `Reboot`: On panic, propagate up and exit. systemd (`Restart=on-failure`, short `RestartSec`) brings it back up. Player sees a brief reboot; fresh state.
+- `Freeze`: Top-level panic handler catches the unwind. Render loop freezes; debug overlay shows the panic message, last scenario-state summary, and instructions (press R to reset, Ctrl-C to quit). Optional: dump state + replay buffer to `/tmp/spacewars-crash-<timestamp>.postcard` for offline replay.
+
+**One-shot override:** `--dev` CLI flag forces `Freeze` for the current run without writing settings. Useful when debugging a Pi build in place.
+
+**Error vs panic discipline** (unchanged):
 
 - Expected failures → `Result<T, SimError>`. Client decides what to do with `Err`.
 - Invariant violations ("this should never happen") → `panic!`. Lands in the handler above.
@@ -115,17 +203,18 @@ Two modes, controlled by `SPACEWARS_MODE=user|dev` (or a `--dev` flag):
 
 UI and sim logic are separated at the crate boundary, not the process boundary. The discipline:
 
-- `spacewars-sim` depends only on `spacewars-common` + the standard library + `rand` + `serde`. No `slint`, `tokio`, `tracing-subscriber`, or filesystem deps.
-- `Sim` API is narrow and synchronous. No callbacks into client code.
-- `WorldState` is `serde`-serializable and has no interior mutability — client observes, sim mutates.
-- All human and agent input enters the sim as `Action` values from `spacewars-common`. No `KeyEvent` or `MouseEvent` inside the sim.
+- `engine-core` depends only on `engine-common` + std + `rand` + `serde`. No `slint`, `tokio`, `tracing-subscriber`, or filesystem deps.
+- `engine-nes` similarly — pure sim, no UI/net/FS.
+- Scenario APIs are narrow and synchronous. No callbacks into client code.
+- Scenario state is `serde`-serializable and has no interior mutability — client observes, sim mutates.
+- All human and agent input enters the scenario as `Action` values from `engine-common`. No `KeyEvent` or `MouseEvent` inside the sim.
 
 ### os-manager (Pi only)
 
-A small privileged service, same shape as dirtsim's. Keeps `sim`, `client`, and `agent` unprivileged on the Pi deployment.
+A small privileged service, same shape as dirtsim's. Keeps `engine-client`, `engine-agent`, and scenarios unprivileged on the Pi deployment.
 
-- **Scope**: runtime WiFi configuration, A/B update application (`ab-update` from sparkle-duck-shared), power management (shutdown/reboot for kiosk use), audio device selection, and any other operation that requires root or a privileged interface.
-- **Not involved in gameplay networking** — opening UDP/TCP sockets for network play does not need privilege; that stays in `sim` (server mode) or `client`.
+- **Scope**: runtime WiFi configuration, A/B update application (`ab-update` from sparkle-duck-shared), power management (shutdown/reboot for kiosk use), audio device selection, and any other operation that requires root.
+- **Not involved in gameplay networking** — opening UDP/TCP sockets for network play does not need privilege.
 - **IPC**: Unix domain socket with a small, audit-friendly command schema. Game processes never call `sudo`; they ask `os-manager` for the specific action they need.
 - **Feature-gated**: built only when the `os-manager` Cargo feature is enabled (default on the Pi/Yocto build, off on desktop Linux, Windows, and headless training).
 
@@ -145,22 +234,24 @@ Slint's own backends cover all three desktop/embedded targets — no hand-rolled
 | Concern | Dep |
 |---|---|
 | UI framework | `slint` |
-| Serialization | `serde` + `postcard` |
-| Networking | `tokio` + `tokio-tungstenite` (WebSocket) |
+| Serialization | `serde` + `postcard` (wire), `toml` (settings) |
+| Networking | `tokio` + `tokio-tungstenite` (WebSocket), `quinn` (QUIC, Phase 2) |
 | Args | `clap` |
 | Logging | `tracing` + `tracing-subscriber` |
 | Audio | `rodio` |
 | RNG | `rand` (explicit seeded generators) |
+| Config paths | `directories` (XDG / AppData / Pi) |
 
 All pure Rust or with clean cross-compile stories.
 
 ## Reuse from dirtsim (patterns, not code)
 
 - Sim / client / agent process split.
-- Fixed-timestep, deterministic, headless-capable sim discipline.
-- Server-client over WebSocket as the unifying interface for local, remote, and agent clients.
+- Fixed-timestep, deterministic, headless-capable sim discipline (where the scenario opts in).
+- Unified client-server interface as the story for local, remote, and agent clients.
 - Yocto layer structure. Recipes change from CMake-externalsrc to Cargo-externalsrc, but the layout of `meta-spacewars`, the image recipe, and the systemd service files translate directly.
 - `os-manager` as a privileged helper on Pi.
+- **NES emulator code** — lifted (with license checks) when `engine-nes` lands.
 
 ## What changes from dirtsim's stack
 
@@ -183,18 +274,34 @@ Space-Wars/
 ├── .cargo/
 │   └── config.toml               # cross-compile target config, linkers.
 ├── crates/
-│   ├── spacewars-sim/            # LIBRARY crate. Deterministic core: Ship, Planet, Laser, Cannon, EscapePod, Debris, Particle.
-│   ├── spacewars-client/         # Binary. Slint UI + custom drawing + input. Embeds sim library.
-│   ├── spacewars-agent/          # Binary. Training entry point. Embeds sim library.
-│   ├── spacewars-os-manager/     # Binary. Pi-only privileged helper (feature-gated).
-│   ├── spacewars-common/         # Library. Shared schema, serialization, action/observation types.
-│   └── spacewars-sim-server/     # (Phase 2) Binary. Wraps sim library; exposes over UDS/QUIC.
-├── assets/                       # jpgs + wavs from the 2008 rec/ dir, resized for Pi.
-├── yocto/meta-spacewars/         # Yocto layer: cargo-based recipes, image recipe, systemd services.
+│   ├── engine-core/              # LIBRARY. 2D entities + physics + fluids.
+│   ├── engine-nes/               # LIBRARY. NES emulator core.
+│   ├── engine-common/            # LIBRARY. Scenario trait, Settings, RenderFrame, wire types.
+│   ├── engine-client/            # BINARY. Slint UI + scenario host.
+│   ├── engine-agent/             # BINARY. Training entry point.
+│   ├── engine-os-manager/        # BINARY. Pi-only privileged helper (feature-gated).
+│   └── engine-sim-server/        # BINARY (Phase 2). Remote scenario host.
+├── scenarios/
+│   ├── spacewars/                # 2008 arcade port. Uses engine-core.
+│   ├── clock/                    # Uses engine-core.
+│   ├── planetary/                # Uses engine-core.
+│   └── nes-<rom>/                # One per ROM. Uses engine-nes.
+├── assets/
+│   ├── sprites/                  # jpgs + pngs, resized for Pi.
+│   ├── sounds/                   # wavs.
+│   └── nes-roms/                 # MIT-licensed homebrew ROMs only.
+├── yocto/meta-spacewars/         # Yocto layer: cargo recipes, image recipe, systemd services.
+├── docs/
+│   └── design/
+│       └── reboot-rust-slint.md  # this doc.
 ├── reference/
 │   ├── Final.jar                 # 2008 binary.
-│   ├── src-decompiled/           # CFR output of Final.jar, for spec lookups.
-│   └── docs/                     # 2008 proposal + final-report PDFs.
+│   ├── README.md
+│   ├── README.TXT                # 2008 run instructions.
+│   ├── docs/                     # 2008 proposal + final-report PDFs.
+│   ├── lib/                      # JOGL + Swing/Beans support jars.
+│   ├── rec/                      # 2008 game assets.
+│   └── src-decompiled/           # CFR output of Final.jar, for spec lookups.
 └── README.md
 ```
 
@@ -204,15 +311,20 @@ Space-Wars/
 2. **Audio**: `rodio` on all targets, or `kira` (richer mixing), or something else? Leaning `rodio` as the default; revisit if mixing features matter.
 3. **Split-screen implementation**: one client process with N viewports (shared render loop, simpler) vs N client processes (more dirtsim-like). Leaning one-client-N-viewports for split-screen; keep N remote clients as the network-play path.
 4. **Float determinism across platforms**: accept divergence for now, with one side pinned as authoritative for replays and network sync?
-5. **NN framework for the agent**: candle vs burn vs tch. Can defer — the `agent` crate just needs to read observations and emit actions at first.
+5. **NN framework for the agent**: candle vs burn vs tch. Can defer — the `engine-agent` crate just needs to read observations and emit actions at first.
 6. **sim-server remote transport** (when Phase 2 begins): QUIC via `quinn` (lower latency, built-in multiplexing, better loss handling) vs WebSocket via `tokio-tungstenite` (simpler, matches dirtsim's shape). Leaning QUIC for network multiplayer, WebSocket for browser-based diagnostic tooling. UDS is the obvious choice for same-machine multi-process.
 7. **Zephyr / MCU target**: out of scope for this phase. sparkle-duck-shared is Yocto Linux for Pi; Zephyr would be a separate project.
+8. **`engine-nes` lift timing**: pull the NES emulator from dirtsim after the arcade scenario is playable, or in parallel once the Scenario trait is proven?
+9. **Scenario discovery**: compile-time (cargo features per scenario) vs runtime (dynamic library loading)? Leaning compile-time — dynamic loading is painful on Windows and unnecessary for our scope.
+10. **Asset ownership**: shared `assets/` vs per-scenario asset dirs. Leaning shared for sprites/sounds that cross scenarios (a ship sprite used by arcade + clock), per-scenario for the rest; ROMs live under `assets/nes-roms/` regardless.
 
-## First milestones (for the new session)
+## First milestones
 
-1. Branch current `master` to `archive/2015-qt`; reset `master` to an empty skeleton.
-2. Commit the decompiled 2008 source under `reference/src-decompiled/`, and the 2008 binary + assets + PDFs under `reference/`.
-3. Stand up a Cargo workspace with `spacewars-sim` (library), `spacewars-common` (library), and `spacewars-client`, `spacewars-agent`, `spacewars-os-manager` (binaries). Stub `main` in each binary; stub `Sim::new/step/state` in the library.
-4. Wire Slint into `spacewars-client`; get an empty window rendering on Linux desktop.
+1. ✅ Branch current `master` to `archive/2015-qt`; reset `master` to an empty skeleton.
+2. ✅ Commit the decompiled 2008 source under `reference/src-decompiled/`, and the 2008 binary + assets + PDFs under `reference/`.
+3. Stand up the Cargo workspace: `engine-core`, `engine-common` (libraries) and `engine-client`, `engine-agent`, `engine-os-manager` (binaries). Stub `main` in each binary; stub the `Scenario` trait and a null scenario.
+4. Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
+4.5. Set up CI to build linux and windows binaries.
 5. Add `x86_64-pc-windows-gnu` target and linker config in `.cargo/config.toml`; get the same empty window rendering on Windows.
-6. First game entity: a Ship that moves with input, using the 2008 physics constants.
+6. Wire up the settings file: load/save, defaults, `Arc<RwLock<Settings>>` sharing, `CrashBehavior` consumed by the panic handler.
+7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.
