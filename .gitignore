@@ -1,0 +1,17 @@
+# Rust / Cargo.
+/target/
+**/target/
+Cargo.lock.bak
+
+# Editor / IDE.
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS.
+.DS_Store
+Thumbs.db
+
+# Claude Code local state.
+.claude/
