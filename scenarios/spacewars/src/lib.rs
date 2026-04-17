@@ -14,6 +14,7 @@ use engine_common::{
 };
 use engine_core::{
     Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
+    physics::gravity_acceleration_attracted_to,
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
 };
 
@@ -351,6 +352,8 @@ impl Scenario for SpacewarsScenario {
             contain_ship(ship, state.config.universe_radius as f32);
         }
 
+        apply_world_gravity(state);
+
         state.tick += 1;
         StepResult::default()
     }
@@ -458,6 +461,25 @@ fn random_color(rng: &mut SpacewarsRng) -> Color {
 
 fn body_mass(radius: f32) -> f32 {
     core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
+}
+
+fn apply_world_gravity(state: &mut SpacewarsState) {
+    for ship in &mut state.ships {
+        if let Some(sun) = state.sun {
+            apply_gravity(ship, sun.position, sun.mass, 1.0);
+        }
+
+        for planet in &state.planets {
+            apply_gravity(ship, planet.position, planet.mass, 1.0);
+        }
+    }
+}
+
+fn apply_gravity(ship: &mut ShipState, attractor_position: Vec2, attractor_mass: f32, scale: f32) {
+    let offset = attractor_position - ship.position;
+    let distance = offset.length();
+    let acceleration = gravity_acceleration_attracted_to(attractor_mass, distance, scale);
+    ship.velocity += offset.normalized() * acceleration;
 }
 
 impl PlanetState {
@@ -866,6 +888,26 @@ mod tests {
         assert_close(actual.y, expected.y);
     }
 
+    fn expected_gravity_delta(state: &SpacewarsState, ship_position: Vec2) -> Vec2 {
+        let mut delta = Vec2::ZERO;
+
+        if let Some(sun) = state.sun {
+            delta += gravity_delta(ship_position, sun.position, sun.mass);
+        }
+
+        for planet in &state.planets {
+            delta += gravity_delta(ship_position, planet.position, planet.mass);
+        }
+
+        delta
+    }
+
+    fn gravity_delta(ship_position: Vec2, attractor_position: Vec2, attractor_mass: f32) -> Vec2 {
+        let offset = attractor_position - ship_position;
+        let distance = offset.length();
+        offset.normalized() * gravity_acceleration_attracted_to(attractor_mass, distance, 1.0)
+    }
+
     #[test]
     fn init_builds_original_two_ship_starting_positions() {
         let state = init_deathmatch();
@@ -968,6 +1010,53 @@ mod tests {
 
         assert_eq!(first.planets, replay.planets);
         assert_ne!(first.planets, shorter.planets);
+    }
+
+    #[test]
+    fn world_gravity_applies_original_post_update_impulse() {
+        let mut state = init_default(123);
+        let start_position = state.ships[0].position;
+
+        step(&mut state, &[]);
+
+        let expected_velocity = expected_gravity_delta(&state, start_position);
+        assert_eq!(state.ships[0].position, start_position);
+        assert_vec_close(state.ships[0].velocity, expected_velocity);
+        assert!(
+            state.ships[0].velocity.dot(
+                state
+                    .sun
+                    .expect("default config should create a sun")
+                    .position
+                    - start_position
+            ) > 0.0
+        );
+    }
+
+    #[test]
+    fn world_gravity_moves_ships_on_following_tick() {
+        let mut state = init_default(123);
+        let start_position = state.ships[0].position;
+
+        step(&mut state, &[]);
+        let velocity_after_first_gravity = state.ships[0].velocity;
+        step(&mut state, &[]);
+
+        assert_vec_close(
+            state.ships[0].position,
+            start_position + velocity_after_first_gravity / 60.0,
+        );
+        assert!(state.ships[0].velocity.length() > velocity_after_first_gravity.length());
+    }
+
+    #[test]
+    fn gravity_at_zero_distance_leaves_velocity_unchanged() {
+        let mut ship = ShipState::new(0, Vec2::new(10.0, 20.0), Color::WHITE, 1.0 / 60.0);
+        ship.velocity = Vec2::new(1.0, 2.0);
+
+        apply_gravity(&mut ship, Vec2::new(10.0, 20.0), body_mass(10.0), 1.0);
+
+        assert_eq!(ship.velocity, Vec2::new(1.0, 2.0));
     }
 
     #[test]
