@@ -27,7 +27,9 @@ impl Scenario for NullScenario {
     }
 
     fn observe(_state: &Self::State) -> Observation {
-        Observation { payload: Vec::new() }
+        Observation {
+            payload: Vec::new(),
+        }
     }
 
     fn render_frame(_state: &Self::State) -> RenderFrame {

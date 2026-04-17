@@ -3,9 +3,7 @@
 //! Stable contracts live here: the [`Scenario`] trait, input / observation
 //! types, render primitives, and user [`Settings`].
 
-use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{env, fs, io};
 
 use serde::{Deserialize, Serialize};
 
@@ -102,6 +100,7 @@ impl std::error::Error for SimError {}
 
 /// User-persisted app settings. Loaded/saved by `engine-client`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     pub video: VideoSettings,
     pub audio: AudioSettings,
@@ -111,6 +110,7 @@ pub struct Settings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct VideoSettings {
     pub width: u32,
     pub height: u32,
@@ -128,6 +128,7 @@ impl Default for VideoSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AudioSettings {
     pub master_volume: f32,
     pub muted: bool,
@@ -143,11 +144,13 @@ impl Default for AudioSettings {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ControlBindings {
     // Keymap lands here once the input schema is defined.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RuntimeSettings {
     pub crash_behavior: CrashBehavior,
     pub log_level: String,
@@ -186,159 +189,5 @@ impl CrashBehavior {
 impl Default for CrashBehavior {
     fn default() -> Self {
         Self::default_for_platform()
-    }
-}
-
-// -- Settings load/save -------------------------------------------------------
-
-/// Environment variable that overrides the platform-default config directory.
-///
-/// Used by the Pi kiosk build (wants `/var/lib/spacewars/`) and by tests.
-pub const CONFIG_DIR_ENV: &str = "SPACEWARS_CONFIG_DIR";
-
-/// Settings filename within the config directory.
-pub const SETTINGS_FILENAME: &str = "settings.toml";
-
-/// Errors that can arise while loading or saving settings.
-#[derive(Debug)]
-pub enum SettingsError {
-    /// No config directory could be resolved (no home dir, no override).
-    NoConfigDir,
-    /// Filesystem I/O failed.
-    Io(io::Error),
-    /// TOML serialization failed.
-    Serialize(toml::ser::Error),
-    /// TOML deserialization failed.
-    Deserialize(toml::de::Error),
-}
-
-impl core::fmt::Display for SettingsError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::NoConfigDir => write!(f, "could not resolve a config directory"),
-            Self::Io(e) => write!(f, "settings I/O error: {e}"),
-            Self::Serialize(e) => write!(f, "settings serialize error: {e}"),
-            Self::Deserialize(e) => write!(f, "settings deserialize error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for SettingsError {}
-
-impl From<io::Error> for SettingsError {
-    fn from(e: io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<toml::ser::Error> for SettingsError {
-    fn from(e: toml::ser::Error) -> Self {
-        Self::Serialize(e)
-    }
-}
-
-impl From<toml::de::Error> for SettingsError {
-    fn from(e: toml::de::Error) -> Self {
-        Self::Deserialize(e)
-    }
-}
-
-/// Resolve the config directory for this install.
-///
-/// Priority: `$SPACEWARS_CONFIG_DIR`, then the platform default from
-/// `directories::ProjectDirs` (e.g., `~/.config/spacewars/` on Linux,
-/// `%APPDATA%\spacewars\` on Windows).
-pub fn config_dir() -> Result<PathBuf, SettingsError> {
-    if let Some(override_dir) = env::var_os(CONFIG_DIR_ENV) {
-        return Ok(PathBuf::from(override_dir));
-    }
-    let dirs = directories::ProjectDirs::from("", "", "spacewars")
-        .ok_or(SettingsError::NoConfigDir)?;
-    Ok(dirs.config_dir().to_path_buf())
-}
-
-/// Full path to the settings file.
-pub fn settings_path() -> Result<PathBuf, SettingsError> {
-    Ok(config_dir()?.join(SETTINGS_FILENAME))
-}
-
-impl Settings {
-    /// Load from `settings_path()`; return defaults (without writing) if the
-    /// file is missing. Propagates I/O and parse errors.
-    pub fn load() -> Result<Self, SettingsError> {
-        Self::load_from(&settings_path()?)
-    }
-
-    /// Load from an explicit path.
-    pub fn load_from(path: &Path) -> Result<Self, SettingsError> {
-        match fs::read_to_string(path) {
-            Ok(text) => Ok(toml::from_str(&text)?),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Save to `settings_path()`, creating parent directories as needed.
-    pub fn save(&self) -> Result<(), SettingsError> {
-        self.save_to(&settings_path()?)
-    }
-
-    /// Save to an explicit path, creating parent directories as needed.
-    pub fn save_to(&self, path: &Path) -> Result<(), SettingsError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let text = toml::to_string_pretty(self)?;
-        fs::write(path, text)?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missing_file_yields_defaults() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("settings.toml");
-
-        let s = Settings::load_from(&path).unwrap();
-        assert_eq!(s.last_scenario, None);
-        assert_eq!(s.video.width, 1280);
-        assert!(!path.exists(), "load should not create the file.");
-    }
-
-    #[test]
-    fn save_then_load_roundtrips() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("nested/settings.toml");
-
-        let mut s = Settings::default();
-        s.last_scenario = Some("spacewars".into());
-        s.video.width = 1920;
-        s.audio.muted = true;
-        s.save_to(&path).unwrap();
-
-        let reloaded = Settings::load_from(&path).unwrap();
-        assert_eq!(reloaded.last_scenario.as_deref(), Some("spacewars"));
-        assert_eq!(reloaded.video.width, 1920);
-        assert!(reloaded.audio.muted);
-    }
-
-    #[test]
-    fn config_dir_env_override_wins() {
-        let dir = tempfile::tempdir().unwrap();
-        // SAFETY: tests that touch process-global env must run single-threaded;
-        // we mark this test serial implicitly by keeping env mutations local
-        // and asserting synchronously before returning.
-        unsafe {
-            env::set_var(CONFIG_DIR_ENV, dir.path());
-        }
-        let resolved = config_dir().unwrap();
-        unsafe {
-            env::remove_var(CONFIG_DIR_ENV);
-        }
-        assert_eq!(resolved, dir.path());
     }
 }

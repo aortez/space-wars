@@ -166,7 +166,7 @@ pub struct Settings {
     pub video:         VideoSettings,     // resolution, backend, vsync — restart-required.
     pub audio:         AudioSettings,     // master volume, mute — live.
     pub controls:      ControlBindings,   // keymap — live.
-    pub runtime:       RuntimeSettings,   // crash_behavior, log_level — live.
+    pub runtime:       RuntimeSettings,   // crash_behavior live; log_level startup-applied.
     pub last_scenario: Option<String>,    // resume hint.
 }
 ```
@@ -176,7 +176,8 @@ pub struct Settings {
 - Loaded at startup into `Arc<RwLock<Settings>>`, shared into the UI and scenario host.
 - UI writes through the lock; writes debounce to disk (~1s quiescence).
 - Each field is tagged live-apply vs restart-required in code and in the settings UI; restart-required changes get a badge.
-- `engine-common` owns the `Settings` struct. IO (load, save, defaults-on-first-run, debounced write) lives in `engine-client`. `engine-core` and `engine-nes` have no filesystem dependency.
+- `engine-common` owns the `Settings` struct. IO (load, save, defaults-on-first-run, migration writeback, debounced write) lives in `engine-client`. `engine-core` and `engine-nes` have no filesystem dependency.
+- Settings structs use serde defaults so old files tolerate newly added fields and groups. After load, the client writes the normalized file back out using a temp-file + fsync + atomic replace pattern.
 
 ### Crash behavior
 
@@ -325,5 +326,5 @@ Space-Wars/
 3. ✅ Stand up the Cargo workspace: `engine-core`, `engine-common` (libraries) and `engine-client`, `engine-agent`, `engine-os-manager` (binaries). Stub `main` in each binary; stub the `Scenario` trait and a null scenario.
 4. ✅ Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
 5. ✅ Cross-compile `engine-client` to `x86_64-pc-windows-gnu` via `cargo zigbuild` (zig + cargo-zigbuild — no MinGW).
-6. ✅ Wire up the settings file: load/save via `directories` crate with `SPACEWARS_CONFIG_DIR` env override, `Arc<RwLock<Settings>>` sharing. (`CrashBehavior` persists in the file but the panic handler that consumes it lands with the Pi work.)
+6. ✅ Wire up the settings file: load/save via `directories` crate with `SPACEWARS_CONFIG_DIR` env override, serde-default migration, atomic writes, `Arc<RwLock<Settings>>` sharing, and startup logging config from `runtime.log_level` with `RUST_LOG` override. (`CrashBehavior` persists in the file but the panic handler that consumes it lands with the Pi work.)
 7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.

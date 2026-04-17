@@ -1378,11 +1378,14 @@ name = "engine-client"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "directories",
  "engine-common",
  "engine-core",
  "scenario-null",
  "slint",
  "slint-build",
+ "tempfile",
+ "toml 0.9.12+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1391,10 +1394,7 @@ dependencies = [
 name = "engine-common"
 version = "0.1.0"
 dependencies = [
- "directories",
  "serde",
- "tempfile",
- "toml 0.9.12+spec-1.1.0",
 ]
 
 [[package]]
