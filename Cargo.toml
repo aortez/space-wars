@@ -20,6 +20,8 @@ rust-version = "1.85"
 clap = { version = "4", features = ["derive"] }
 rand = { version = "0.9", features = ["std_rng"] }
 serde = { version = "1", features = ["derive"] }
+slint = { version = "1", default-features = true }
+slint-build = { version = "1" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

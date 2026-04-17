@@ -15,5 +15,9 @@ engine-common = { workspace = true }
 engine-core = { workspace = true }
 scenario-null = { workspace = true }
 clap = { workspace = true }
+slint = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+slint-build = { workspace = true }

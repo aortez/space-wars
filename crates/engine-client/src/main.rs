@@ -1,11 +1,12 @@
 //! Spacewars client: Slint UI + custom drawing + input + audio + scenario host.
 //!
-//! Stub for M3. Real work lands in subsequent milestones:
-//!   M4: Slint window.
-//!   M6: settings load, crash-behavior panic handler.
-//!   M7: scenario host loop driving scenarios/spacewars.
+//! M4 state: opens an empty Slint window on Linux desktop. Custom drawing,
+//! scenario hosting, settings, and crash handling arrive in subsequent
+//! milestones.
 
 use clap::Parser;
+
+slint::include_modules!();
 
 #[derive(Parser, Debug)]
 #[command(name = "engine-client", about = "Spacewars scenario host")]
@@ -19,7 +20,7 @@ struct Args {
     dev: bool,
 }
 
-fn main() {
+fn main() -> Result<(), slint::PlatformError> {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
@@ -28,6 +29,10 @@ fn main() {
     tracing::info!(
         scenario = %args.scenario,
         dev = args.dev,
-        "engine-client starting (stub)."
+        "engine-client starting."
     );
+
+    let window = MainWindow::new()?;
+    window.run()?;
+    Ok(())
 }
