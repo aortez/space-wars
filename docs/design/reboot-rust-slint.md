@@ -367,8 +367,12 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 
 ### M10: Ship flight slice
 
-- Port ship thrust, brake, reverse, turn, wing open/close, wing speed cap, and ship bounds from `Ship.java`.
-- Define scenario actions for thrust, brake, reverse, turn left/right, wing toggle, and placeholder weapon actions.
+- Port ship thrust, reverse, turn, wing open/close, wing speed cap, internal brake behavior, and ship bounds from `Ship.java`.
+- Wire the original hard-coded controls from `FinalDlg.handleKeys()`; the 2008 source does not have key remapping.
+- Select Slint's winit backend by default so the client can observe physical `Numpad*` keys for Player 2; still honor an explicit `SLINT_BACKEND` override.
+- Preserve original wing semantics: hold the wing key to close, release it to open. Do not turn this into a toggle.
+- Define scenario actions for thrust, reverse, turn left/right, wing open/close, internal brake, and placeholder weapon actions.
+- Keep brake unbound in the client for now; `Ship.brake()` exists in the original source, but no keyboard caller was found.
 - Keep exhaust trails, weapons, collision, and damage out of this slice.
 - Acceptance: two ships can fly inside a bounded universe with deterministic state tests for thrust, turn, wing transitions, and max-speed behavior.
 

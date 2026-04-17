@@ -4,6 +4,7 @@
 //! Spacewars scenarios, and renders their `RenderFrame`s.
 
 mod host;
+mod input;
 mod render;
 mod settings;
 
@@ -96,6 +97,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    select_slint_backend()?;
     let window = MainWindow::new()?;
     let _render_timer = if args.uses_debug_render() {
         host::start_debug_render_loop(&window, args.debug_triangles)
@@ -103,6 +105,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         host::start_scenario_loop(&window, &args.scenario, args.seed)?
     };
     window.run()?;
+    Ok(())
+}
+
+fn select_slint_backend() -> Result<(), Box<dyn std::error::Error>> {
+    let selector = slint::BackendSelector::new();
+    if env::var_os("SLINT_BACKEND").is_some() {
+        selector.select()?;
+    } else {
+        selector.backend_name("winit".into()).select()?;
+    }
     Ok(())
 }
 

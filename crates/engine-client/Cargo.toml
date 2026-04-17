@@ -17,7 +17,7 @@ scenario-null = { workspace = true }
 scenario-spacewars = { workspace = true }
 clap = { workspace = true }
 directories = { workspace = true }
-slint = { workspace = true }
+slint = { workspace = true, features = ["unstable-winit-030"] }
 tempfile = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }

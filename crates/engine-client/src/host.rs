@@ -10,6 +10,7 @@ use scenario_spacewars::SpacewarsScenario;
 use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::MainWindow;
+use crate::input::{self, ClientInput};
 use crate::render::{self, Viewport};
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
@@ -94,6 +95,8 @@ pub fn start_scenario_loop(
     let mut scenario = HostedScenario::new(scenario, seed)?;
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
+    let input = std::rc::Rc::new(std::cell::RefCell::new(ClientInput::default()));
+    input::install_window_input(window, std::rc::Rc::clone(&input));
 
     let timer = Timer::default();
     let weak_window = window.as_weak();
@@ -109,12 +112,14 @@ pub fn start_scenario_loop(
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
 
+        let mut input = input.borrow_mut();
         step_scenario(
             &mut scenario,
             tick_model,
             fixed_dt,
             elapsed,
             &mut accumulator,
+            &mut input,
         );
         present_frame(&window, scenario.render_frame());
     });
@@ -128,13 +133,15 @@ fn step_scenario(
     fixed_dt: Option<Duration>,
     elapsed: Duration,
     accumulator: &mut Duration,
+    input: &mut ClientInput,
 ) {
     match (tick_model, fixed_dt) {
         (TickModel::FixedTimestep { .. }, Some(dt)) => {
             *accumulator += elapsed;
             let mut steps = 0;
             while *accumulator >= dt && steps < MAX_FIXED_STEPS_PER_TICK {
-                scenario.step(&[], dt);
+                let actions = scenario.actions_from_input(input);
+                scenario.step(&actions, dt);
                 *accumulator -= dt;
                 steps += 1;
             }
@@ -143,7 +150,8 @@ fn step_scenario(
             }
         }
         (TickModel::Variable | TickModel::EmulatorClock, _) => {
-            scenario.step(&[], elapsed);
+            let actions = scenario.actions_from_input(input);
+            scenario.step(&actions, elapsed);
         }
         (TickModel::FixedTimestep { .. }, None) => {}
     }
@@ -193,6 +201,13 @@ impl HostedScenario {
         match self {
             Self::Null(state) => NullScenario::step(state, actions, dt),
             Self::Spacewars(state) => SpacewarsScenario::step(state, actions, dt),
+        }
+    }
+
+    pub(crate) fn actions_from_input(&self, input: &mut ClientInput) -> Vec<Action> {
+        match self {
+            Self::Null(_) => Vec::new(),
+            Self::Spacewars(_) => input.actions_for_spacewars(),
         }
     }
 
