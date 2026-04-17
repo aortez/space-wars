@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/engine-common",
+    "crates/engine-core",
+    "crates/engine-client",
+    "crates/engine-agent",
+    "crates/engine-os-manager",
+    "scenarios/null",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/aortez/space-wars"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# External.
+clap = { version = "4", features = ["derive"] }
+rand = { version = "0.9", features = ["std_rng"] }
+serde = { version = "1", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Internal.
+engine-common = { path = "crates/engine-common" }
+engine-core = { path = "crates/engine-core" }
+scenario-null = { path = "scenarios/null" }

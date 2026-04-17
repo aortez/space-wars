@@ -1,0 +1,12 @@
+# Cross-compile target config.
+#
+# Linkers must be installed for the targets you want to build:
+#   Windows (MinGW):  sudo apt install gcc-mingw-w64-x86-64
+#   aarch64 Linux:    sudo apt install gcc-aarch64-linux-gnu
+#                     (for manual cross-compile; Yocto manages its own toolchain).
+
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
