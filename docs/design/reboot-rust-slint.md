@@ -325,5 +325,5 @@ Space-Wars/
 3. ✅ Stand up the Cargo workspace: `engine-core`, `engine-common` (libraries) and `engine-client`, `engine-agent`, `engine-os-manager` (binaries). Stub `main` in each binary; stub the `Scenario` trait and a null scenario.
 4. ✅ Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
 5. ✅ Cross-compile `engine-client` to `x86_64-pc-windows-gnu` via `cargo zigbuild` (zig + cargo-zigbuild — no MinGW).
-6. Wire up the settings file: load/save, defaults, `Arc<RwLock<Settings>>` sharing, `CrashBehavior` consumed by the panic handler.
+6. ✅ Wire up the settings file: load/save via `directories` crate with `SPACEWARS_CONFIG_DIR` env override, `Arc<RwLock<Settings>>` sharing. (`CrashBehavior` persists in the file but the panic handler that consumes it lands with the Pi work.)
 7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.
