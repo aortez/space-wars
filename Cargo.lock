@@ -4126,6 +4126,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "image",
 ]
 
 [[package]]

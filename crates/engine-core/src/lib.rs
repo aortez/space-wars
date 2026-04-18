@@ -11,7 +11,7 @@ pub mod physics;
 pub mod rng;
 pub mod transform;
 
-pub use bounds::{Bounds2, Circle, Line};
+pub use bounds::{Bounds2, BoundsList, Circle, Line, triangle_high_bounds, triangle_low_bound};
 pub use color::Color;
 pub use config::{PlayerConfig, SpacewarsConfig};
 pub use math::Vec2;
