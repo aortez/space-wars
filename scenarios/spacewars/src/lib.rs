@@ -1,9 +1,8 @@
 //! Initial Spacewars scenario port.
 //!
-//! M11a adds the first world slice on top of M10 ship controls: deterministic
-//! sun/planet setup and simple circle rendering. Orbit advancement, gravity,
-//! exhaust trails, weapons, collisions, sounds, asteroids, pods, and scoring
-//! land in later slices.
+//! Current slices cover deterministic sun/planet setup, ship controls, gravity,
+//! collision response, damage, debris, and asteroid spawning. Exhaust trails,
+//! weapons, sounds, pods, and scoring land in later slices.
 
 use std::time::Duration;
 
@@ -50,6 +49,20 @@ const SPACEPORT_PULL_SCALE: f32 = 3.0;
 const PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
+const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
+const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
+const MAX_ASTEROIDS: usize = 100;
+const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
+const ASTEROID_MIN_RADIUS: f32 = 2.5;
+const ASTEROID_RADIUS_VARIATION: f32 = 5.0;
+const ASTEROID_HUGE_CHANCE: f32 = 0.98;
+const ASTEROID_HUGE_SIZE_MAX_SCALE: f32 = 10.0;
+const ASTEROID_MAX_AIM_ANGLE: f32 = core::f32::consts::FRAC_PI_2;
+const ASTEROID_MAX_SPEED: f32 = 200.0;
+const ASTEROID_DAMAGE_SCALAR: f32 = 0.01;
+const ASTEROID_MAX_OMEGA: f32 = 10.0;
+const ASTEROID_GRAVITY_FRAME_MODULUS: u64 = 7;
+const ASTEROID_GRAVITY_SCALE: f32 = 7.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -111,6 +124,7 @@ pub struct SpacewarsState {
     pub ship_collisions: Vec<ShipCollision>,
     pub ship_debris_collisions: Vec<ShipDebrisCollision>,
     pub debris_collisions: Vec<DebrisCollision>,
+    pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
 }
@@ -193,6 +207,12 @@ pub struct ShipDebrisCollision {
 pub struct DebrisCollision {
     pub a: usize,
     pub b: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DebrisBodyCollision {
+    pub debris: usize,
+    pub body: BodyId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -440,6 +460,7 @@ impl Scenario for SpacewarsScenario {
             ship_collisions: Vec::new(),
             ship_debris_collisions: Vec::new(),
             debris_collisions: Vec::new(),
+            debris_body_collisions: Vec::new(),
             body_collisions: Vec::new(),
             spaceport_contacts: Vec::new(),
         }
@@ -461,17 +482,23 @@ impl Scenario for SpacewarsScenario {
             ship.update(dt);
             contain_ship(ship, state.config.universe_radius as f32);
         }
-        for debris in &mut state.debris {
-            debris.update(dt);
-        }
 
         apply_world_gravity(state);
         state.ship_debris_collisions = resolve_ship_debris_collisions(state);
         state.ship_collisions = resolve_ship_collisions(state);
-        state.debris_collisions = resolve_debris_collisions(state);
         let collision_events = resolve_body_collisions(state);
         state.body_collisions = collision_events.body_collisions;
         state.spaceport_contacts = collision_events.spaceport_contacts;
+        if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
+            apply_debris_gravity(state);
+        }
+        state.debris_body_collisions = resolve_debris_body_collisions(state);
+        state.debris_collisions = resolve_debris_collisions(state);
+        for debris in &mut state.debris {
+            debris.update(dt);
+        }
+        remove_finished_debris(state);
+        spawn_random_asteroid(state, dt);
 
         state.tick += 1;
         StepResult::default()
@@ -599,6 +626,75 @@ fn random_color(rng: &mut SpacewarsRng) -> Color {
     )
 }
 
+fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
+    if asteroid_count(state) > MAX_ASTEROIDS {
+        return;
+    }
+
+    let mut rng = asteroid_rng_for_tick(state.seed, state.tick);
+    if state.config.asteroid_probability_per_sec * dt <= random_unit_f32(&mut rng) {
+        return;
+    }
+
+    let universe_radius = state.config.universe_radius as f32;
+    let center = universe_center(universe_radius);
+    let spawn_angle = random_unit_f32(&mut rng) * core::f32::consts::TAU;
+    let position =
+        center + Vec2::from_radians(spawn_angle) * (universe_radius * ASTEROID_SPAWN_RADIUS_FACTOR);
+
+    let mut radius = ASTEROID_MIN_RADIUS + ASTEROID_RADIUS_VARIATION * random_unit_f32(&mut rng);
+    if random_unit_f32(&mut rng) > ASTEROID_HUGE_CHANCE {
+        radius *= ASTEROID_HUGE_SIZE_MAX_SCALE * random_unit_f32(&mut rng);
+    }
+
+    let aim = (center - position)
+        .normalized()
+        .rotate_radians(random_range_f32(
+            &mut rng,
+            -ASTEROID_MAX_AIM_ANGLE,
+            ASTEROID_MAX_AIM_ANGLE,
+        ));
+    let velocity = aim * (ASTEROID_MAX_SPEED * random_unit_f32(&mut rng));
+    let color = Color::DIM_GREY.random_variation(0.2, &mut rng);
+    let mut asteroid = DebrisState::new(
+        DebrisKind::Asteroid,
+        position,
+        velocity,
+        radius,
+        ASTEROID_DAMAGE_SCALAR,
+        color,
+    );
+    asteroid.omega = random_unit_f32(&mut rng) * ASTEROID_MAX_OMEGA;
+    state.debris.push(asteroid);
+}
+
+fn asteroid_count(state: &SpacewarsState) -> usize {
+    state
+        .debris
+        .iter()
+        .filter(|debris| debris.kind == DebrisKind::Asteroid)
+        .count()
+}
+
+fn asteroid_rng_for_tick(seed: u64, tick: u64) -> SpacewarsRng {
+    seeded_rng(seed ^ ASTEROID_RNG_SALT ^ tick.wrapping_mul(0x9E37_79B9_7F4A_7C15))
+}
+
+fn remove_finished_debris(state: &mut SpacewarsState) {
+    let universe = universe_bounds(state.config.universe_radius as f32);
+    state
+        .debris
+        .retain(|debris| !debris.dead && debris_bounds(debris).intersects_circle(universe));
+}
+
+fn universe_bounds(radius: f32) -> Circle {
+    Circle::new(universe_center(radius), radius)
+}
+
+fn universe_center(radius: f32) -> Vec2 {
+    Vec2::new(radius, radius)
+}
+
 fn body_mass(radius: f32) -> f32 {
     core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
 }
@@ -614,10 +710,26 @@ fn apply_world_gravity(state: &mut SpacewarsState) {
 }
 
 fn apply_gravity(ship: &mut ShipState, attractor_position: Vec2, attractor_mass: f32, scale: f32) {
-    let offset = attractor_position - ship.position;
+    apply_gravity_to_velocity(
+        ship.position,
+        &mut ship.velocity,
+        attractor_position,
+        attractor_mass,
+        scale,
+    );
+}
+
+fn apply_gravity_to_velocity(
+    position: Vec2,
+    velocity: &mut Vec2,
+    attractor_position: Vec2,
+    attractor_mass: f32,
+    scale: f32,
+) {
+    let offset = attractor_position - position;
     let distance = offset.length();
     let acceleration = gravity_acceleration_attracted_to(attractor_mass, distance, scale);
-    ship.velocity += offset.normalized() * acceleration;
+    *velocity += offset.normalized() * acceleration;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -648,6 +760,15 @@ struct BodyContact {
     ship_radius: f32,
     overlap: f32,
     spaceport: Option<SpaceportPhysics>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DebrisBodyContact {
+    debris: usize,
+    body: BodyId,
+    body_order: usize,
+    body_position: Vec2,
+    body_radius: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -810,6 +931,94 @@ fn detect_debris_collisions(state: &SpacewarsState) -> Vec<DebrisCollision> {
     }
 
     collisions
+}
+
+fn apply_debris_gravity(state: &mut SpacewarsState) {
+    let bodies = body_physics(state);
+
+    for debris in &mut state.debris {
+        if debris.dead {
+            continue;
+        }
+
+        for body in &bodies {
+            apply_gravity_to_velocity(
+                debris.position,
+                &mut debris.velocity,
+                body.position,
+                body.mass,
+                ASTEROID_GRAVITY_SCALE,
+            );
+        }
+    }
+}
+
+fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyCollision> {
+    let contacts = select_debris_body_contacts(state);
+    let mut collisions = Vec::new();
+
+    for contact in &contacts {
+        collisions.push(DebrisBodyCollision {
+            debris: contact.debris,
+            body: contact.body,
+        });
+
+        let debris = &mut state.debris[contact.debris];
+        resolve_debris_body_collision(debris, contact.body_position, contact.body_radius);
+        apply_debris_body_collision_damage(debris);
+    }
+
+    collisions
+}
+
+fn select_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact> {
+    let contacts = detect_debris_body_contacts(state);
+    let mut selected = Vec::new();
+
+    for debris in 0..state.debris.len() {
+        let contact = contacts
+            .iter()
+            .copied()
+            .filter(|contact| contact.debris == debris)
+            .min_by(|a, b| a.body_order.cmp(&b.body_order));
+
+        if let Some(contact) = contact {
+            selected.push(contact);
+        }
+    }
+
+    selected
+}
+
+fn detect_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact> {
+    let bodies = body_physics(state);
+    let mut contacts = Vec::new();
+
+    for (debris_index, debris) in state.debris.iter().enumerate() {
+        if debris.dead {
+            continue;
+        }
+
+        let debris_bounds = debris_bounds(debris);
+        for body in &bodies {
+            if !Bounds2::Circle(debris_bounds).intersects(&Bounds2::Circle(body.low)) {
+                continue;
+            }
+            if !Bounds2::Circle(debris_bounds).intersects(&Bounds2::Circle(body.high)) {
+                continue;
+            }
+
+            contacts.push(DebrisBodyContact {
+                debris: debris_index,
+                body: body.id,
+                body_order: body.order,
+                body_position: body.position,
+                body_radius: body.radius,
+            });
+        }
+    }
+
+    contacts
 }
 
 fn detect_ship_collisions(state: &SpacewarsState) -> Vec<ShipCollision> {
@@ -1003,10 +1212,24 @@ fn resolve_ship_body_collision(
     ship.velocity = (ship.velocity - normal * (2.0 * ship.velocity.dot(normal))) * 0.5;
 }
 
+fn resolve_debris_body_collision(debris: &mut DebrisState, body_position: Vec2, body_radius: f32) {
+    let normal = collision_normal(debris.position, body_position);
+    debris.position = body_position + normal * (debris.radius + body_radius);
+    debris.velocity = (debris.velocity - normal * (2.0 * debris.velocity.dot(normal))) * 0.5;
+}
+
 fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
     let damage = ship.velocity.length() * PLANET_DAMAGE_SCALAR;
     ship.translate_life(-damage);
     damage
+}
+
+fn apply_debris_body_collision_damage(debris: &mut DebrisState) -> f32 {
+    let impact_damage = debris.velocity.length() * DEBRIS_BODY_DAMAGE_SCALAR;
+    debris.translate_life(-impact_damage);
+    let body_damage = debris.velocity.length() * PLANET_DAMAGE_SCALAR;
+    debris.translate_life(-body_damage);
+    impact_damage + body_damage
 }
 
 fn resolve_spaceport_contact(ship: &mut ShipState, spaceport_center: Vec2) {
@@ -2082,6 +2305,7 @@ mod tests {
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
         assert!(state.debris_collisions.is_empty());
+        assert!(state.debris_body_collisions.is_empty());
         assert!(state.body_collisions.is_empty());
         assert!(state.spaceport_contacts.is_empty());
     }
@@ -2608,6 +2832,7 @@ mod tests {
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
         assert!(state.debris_collisions.is_empty());
+        assert!(state.debris_body_collisions.is_empty());
     }
 
     #[test]
@@ -2794,6 +3019,152 @@ mod tests {
         );
 
         assert_close(debris.damage_amount(Vec2::new(6.0, 8.0)), 0.05);
+    }
+
+    #[test]
+    fn step_spawns_asteroids_deterministically_from_seed() {
+        let mut first = init_deathmatch();
+        let mut replay = init_deathmatch();
+        let mut different = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 124);
+
+        step(&mut first, &[]);
+        step(&mut replay, &[]);
+        step(&mut different, &[]);
+
+        assert_eq!(first.debris.len(), 1);
+        assert_eq!(first.debris, replay.debris);
+        assert_ne!(first.debris, different.debris);
+
+        let asteroid = first.debris[0];
+        let universe_radius = first.config.universe_radius as f32;
+        assert_eq!(asteroid.kind, DebrisKind::Asteroid);
+        assert_close(
+            asteroid
+                .position
+                .distance_to(universe_center(universe_radius)),
+            universe_radius * ASTEROID_SPAWN_RADIUS_FACTOR,
+        );
+        assert!(asteroid.radius >= ASTEROID_MIN_RADIUS);
+        assert!(asteroid.velocity.length() <= ASTEROID_MAX_SPEED);
+        assert_eq!(asteroid.damage_scalar, ASTEROID_DAMAGE_SCALAR);
+        assert!(!asteroid.dead);
+    }
+
+    #[test]
+    fn asteroid_spawn_respects_zero_probability() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        let mut state = SpacewarsScenario::init(config, 123);
+
+        step(&mut state, &[]);
+
+        assert!(state.debris.is_empty());
+    }
+
+    #[test]
+    fn asteroid_gravity_runs_every_seventh_frame() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        let mut state = SpacewarsScenario::init(config, 123);
+        let body_radius = 10.0;
+        let body_mass = body_mass(body_radius);
+        let debris_position = universe_center(state.config.universe_radius as f32);
+        state.sun = Some(SunState {
+            position: debris_position + Vec2::new(100.0, 0.0),
+            radius: body_radius,
+            mass: body_mass,
+            color: Color::YELLOW,
+        });
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            debris_position,
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+
+        step(&mut state, &[]);
+        let expected_velocity =
+            Vec2::X * gravity_acceleration_attracted_to(body_mass, 100.0, ASTEROID_GRAVITY_SCALE);
+        assert_vec_close(state.debris[0].velocity, expected_velocity);
+
+        step(&mut state, &[]);
+
+        assert_vec_close(state.debris[0].velocity, expected_velocity);
+    }
+
+    #[test]
+    fn debris_body_collision_bounces_and_applies_original_damage_pair() {
+        let mut state = init_deathmatch();
+        state.sun = Some(SunState {
+            position: Vec2::ZERO,
+            radius: 10.0,
+            mass: 0.0,
+            color: Color::YELLOW,
+        });
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(12.0, 0.0),
+            Vec2::new(-20.0, 0.0),
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let start_life = state.debris[0].life;
+
+        let collisions = resolve_debris_body_collisions(&mut state);
+
+        assert_eq!(
+            collisions,
+            vec![DebrisBodyCollision {
+                debris: 0,
+                body: BodyId::Sun,
+            }]
+        );
+        assert_eq!(state.debris[0].position, Vec2::new(15.0, 0.0));
+        assert_eq!(state.debris[0].velocity, Vec2::new(10.0, 0.0));
+        assert_close(
+            state.debris[0].life,
+            start_life - 10.0 * DEBRIS_BODY_DAMAGE_SCALAR - 10.0 * PLANET_DAMAGE_SCALAR,
+        );
+    }
+
+    #[test]
+    fn cleanup_removes_dead_and_out_of_bounds_debris() {
+        let mut state = init_deathmatch();
+        let center = universe_center(state.config.universe_radius as f32);
+        let mut dead = DebrisState::new(
+            DebrisKind::Asteroid,
+            center,
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        );
+        dead.dead = true;
+        state.debris.push(dead);
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            center + Vec2::new(state.config.universe_radius as f32 + 20.0, 0.0),
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            center,
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+
+        remove_finished_debris(&mut state);
+
+        assert_eq!(state.debris.len(), 1);
+        assert_eq!(state.debris[0].position, center);
     }
 
     #[test]
