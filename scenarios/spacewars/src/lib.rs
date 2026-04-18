@@ -14,7 +14,9 @@ use engine_common::{
 };
 use engine_core::{
     Bounds2, BoundsList, Circle, Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
-    constants::PLANET_DAMAGE_SCALAR,
+    constants::{
+        COLLISION_TRANSLATION_SCALAR, DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, REALLY_SMALL,
+    },
     physics::gravity_acceleration_attracted_to,
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
     triangle_high_bounds, triangle_low_bound,
@@ -103,6 +105,7 @@ pub struct SpacewarsState {
     pub ships: [ShipState; 2],
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
+    pub ship_collisions: Vec<ShipCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
 }
@@ -146,6 +149,12 @@ pub struct BodyCollision {
 pub enum BodyId {
     Sun,
     Planet(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShipCollision {
+    pub a: usize,
+    pub b: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -389,6 +398,7 @@ impl Scenario for SpacewarsScenario {
             ships,
             sun,
             planets,
+            ship_collisions: Vec::new(),
             body_collisions: Vec::new(),
             spaceport_contacts: Vec::new(),
         }
@@ -412,6 +422,7 @@ impl Scenario for SpacewarsScenario {
         }
 
         apply_world_gravity(state);
+        state.ship_collisions = resolve_ship_collisions(state);
         let collision_events = resolve_body_collisions(state);
         state.body_collisions = collision_events.body_collisions;
         state.spaceport_contacts = collision_events.spaceport_contacts;
@@ -597,6 +608,108 @@ struct BodyContact {
 struct CollisionEvents {
     body_collisions: Vec<BodyCollision>,
     spaceport_contacts: Vec<SpaceportContact>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EntityCollisionBody {
+    position: Vec2,
+    velocity: Vec2,
+    mass: f32,
+    low: Circle,
+}
+
+impl EntityCollisionBody {
+    fn from_ship(ship: &ShipState) -> Self {
+        let triangles = ship_triangles(ship);
+        Self {
+            position: ship.position,
+            velocity: ship.velocity,
+            mass: SHIP_MASS,
+            low: ship_low_bounds(&triangles),
+        }
+    }
+}
+
+fn resolve_ship_collisions(state: &mut SpacewarsState) -> Vec<ShipCollision> {
+    let collisions = detect_ship_collisions(state);
+
+    for collision in &collisions {
+        let (a, b) = ship_pair_mut(&mut state.ships, collision.a, collision.b);
+        let mut a_body = EntityCollisionBody::from_ship(a);
+        let mut b_body = EntityCollisionBody::from_ship(b);
+
+        collide_entities(&mut a_body, &mut b_body);
+
+        a.position = a_body.position;
+        a.velocity = a_body.velocity;
+        b.position = b_body.position;
+        b.velocity = b_body.velocity;
+    }
+
+    collisions
+}
+
+fn detect_ship_collisions(state: &SpacewarsState) -> Vec<ShipCollision> {
+    let ship_bounds = state
+        .ships
+        .iter()
+        .map(|ship| {
+            let triangles = ship_triangles(ship);
+            (
+                ship_low_bounds(&triangles),
+                Bounds2::List(ship_high_bounds(&triangles)),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut collisions = Vec::new();
+
+    for a in 0..state.ships.len() {
+        for b in a + 1..state.ships.len() {
+            let (a_low, a_high) = &ship_bounds[a];
+            let (b_low, b_high) = &ship_bounds[b];
+            if !Bounds2::Circle(*a_low).intersects(&Bounds2::Circle(*b_low)) {
+                continue;
+            }
+            if !a_high.intersects(b_high) {
+                continue;
+            }
+
+            collisions.push(ShipCollision { a, b });
+        }
+    }
+
+    collisions
+}
+
+fn collide_entities(a: &mut EntityCollisionBody, b: &mut EntityCollisionBody) {
+    let angle = collision_normal(a.position, b.position);
+    let v1 = a.velocity;
+    let v2 = b.velocity;
+    let m1 = a.mass;
+    let m2 = b.mass;
+    let total_velocity = v1.length() + v2.length();
+    let (a_velocity_percent, b_velocity_percent) = if total_velocity < REALLY_SMALL {
+        (0.5, 0.5)
+    } else {
+        (v1.length() / total_velocity, v2.length() / total_velocity)
+    };
+
+    a.velocity = ((v1 * (m1 - m2) + v2 * (2.0 * m2)) / (m1 + m2)) * DEFAULT_ELASTICITY;
+    b.velocity = ((v2 * (m2 - m1) + v1 * (2.0 * m1)) / (m1 + m2)) * DEFAULT_ELASTICITY;
+
+    let overlap = a.low.center.distance_to(b.low.center) - a.low.radius - b.low.radius;
+    a.position += angle * (-a_velocity_percent * overlap * COLLISION_TRANSLATION_SCALAR);
+    b.position += angle * (b_velocity_percent * overlap * COLLISION_TRANSLATION_SCALAR);
+}
+
+fn ship_pair_mut(
+    ships: &mut [ShipState; 2],
+    a: usize,
+    b: usize,
+) -> (&mut ShipState, &mut ShipState) {
+    assert!(a < b);
+    let (left, right) = ships.split_at_mut(b);
+    (&mut left[a], &mut right[0])
 }
 
 #[cfg(test)]
@@ -1706,6 +1819,7 @@ mod tests {
         assert_eq!(state.players[1].name, "Player 2");
         assert!(state.sun.is_none());
         assert!(state.planets.is_empty());
+        assert!(state.ship_collisions.is_empty());
         assert!(state.body_collisions.is_empty());
         assert!(state.spaceport_contacts.is_empty());
     }
@@ -1957,6 +2071,82 @@ mod tests {
     }
 
     #[test]
+    fn ship_collision_detection_uses_high_bounds_after_low_hit() {
+        let mut state = init_deathmatch();
+        state.ships[1].position = state.ships[0].position + Vec2::new(11.5, 0.0);
+        let first_low = ship_low_bounds(&ship_triangles(&state.ships[0]));
+        let second_low = ship_low_bounds(&ship_triangles(&state.ships[1]));
+
+        assert!(Bounds2::Circle(first_low).intersects(&Bounds2::Circle(second_low)));
+        assert!(detect_ship_collisions(&state).is_empty());
+    }
+
+    #[test]
+    fn collide_entities_exchanges_equal_mass_velocity_and_separates_by_speed_share() {
+        let mut a = EntityCollisionBody {
+            position: Vec2::new(-5.0, 0.0),
+            velocity: Vec2::new(10.0, 0.0),
+            mass: 2.0,
+            low: Circle::new(Vec2::new(-5.0, 0.0), 6.0),
+        };
+        let mut b = EntityCollisionBody {
+            position: Vec2::new(5.0, 0.0),
+            velocity: Vec2::new(-4.0, 0.0),
+            mass: 2.0,
+            low: Circle::new(Vec2::new(5.0, 0.0), 6.0),
+        };
+
+        collide_entities(&mut a, &mut b);
+
+        assert_vec_close(a.velocity, Vec2::new(-3.6, 0.0));
+        assert_vec_close(b.velocity, Vec2::new(9.0, 0.0));
+        assert_vec_close(a.position, Vec2::new(-6.428571, 0.0));
+        assert_vec_close(b.position, Vec2::new(5.571429, 0.0));
+    }
+
+    #[test]
+    fn collide_entities_splits_static_overlap_evenly() {
+        let mut a = EntityCollisionBody {
+            position: Vec2::new(-5.0, 0.0),
+            velocity: Vec2::ZERO,
+            mass: 2.0,
+            low: Circle::new(Vec2::new(-5.0, 0.0), 6.0),
+        };
+        let mut b = EntityCollisionBody {
+            position: Vec2::new(5.0, 0.0),
+            velocity: Vec2::ZERO,
+            mass: 2.0,
+            low: Circle::new(Vec2::new(5.0, 0.0), 6.0),
+        };
+
+        collide_entities(&mut a, &mut b);
+
+        assert_eq!(a.velocity, Vec2::ZERO);
+        assert_eq!(b.velocity, Vec2::ZERO);
+        assert_vec_close(a.position, Vec2::new(-6.0, 0.0));
+        assert_vec_close(b.position, Vec2::new(6.0, 0.0));
+    }
+
+    #[test]
+    fn resolve_ship_collisions_bounces_ships_without_damage() {
+        let mut state = init_deathmatch();
+        let start_life = [state.ships[0].life, state.ships[1].life];
+        state.ships[1].position = state.ships[0].position + Vec2::new(0.0, 3.0);
+        state.ships[0].velocity = Vec2::new(0.0, 20.0);
+        state.ships[1].velocity = Vec2::new(0.0, -10.0);
+        let start_distance = state.ships[0].position.distance_to(state.ships[1].position);
+
+        let collisions = resolve_ship_collisions(&mut state);
+
+        assert_eq!(collisions, vec![ShipCollision { a: 0, b: 1 }]);
+        assert_vec_close(state.ships[0].velocity, Vec2::new(0.0, -9.0));
+        assert_vec_close(state.ships[1].velocity, Vec2::new(0.0, 18.0));
+        assert!(state.ships[0].position.distance_to(state.ships[1].position) > start_distance);
+        assert_eq!(state.ships[0].life, start_life[0]);
+        assert_eq!(state.ships[1].life, start_life[1]);
+    }
+
+    #[test]
     fn spaceport_geometry_uses_original_polygon_bound_and_wrapper_rotation() {
         let mut planet = test_planet(Vec2::new(100.0, 200.0), 50.0);
         let points = spaceport_points(&planet);
@@ -2095,6 +2285,7 @@ mod tests {
         assert_eq!(state.ships[1].position, start_positions[1]);
         assert_eq!(state.ships[0].velocity, Vec2::ZERO);
         assert_eq!(state.ships[1].velocity, Vec2::ZERO);
+        assert!(state.ship_collisions.is_empty());
     }
 
     #[test]
