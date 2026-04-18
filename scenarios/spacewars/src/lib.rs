@@ -14,6 +14,7 @@ use engine_common::{
 };
 use engine_core::{
     Bounds2, BoundsList, Circle, Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
+    constants::PLANET_DAMAGE_SCALAR,
     physics::gravity_acceleration_attracted_to,
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
     triangle_high_bounds, triangle_low_bound,
@@ -186,6 +187,9 @@ pub struct ShipState {
     pub turn_behavior: TurnBehavior,
     pub laser_firing: bool,
     pub cannon_firing: bool,
+    pub life: f32,
+    pub life_max: f32,
+    pub dead: bool,
     turn_power: f32,
     thrust_power: f32,
     current_max_omega: f32,
@@ -364,12 +368,14 @@ impl Scenario for SpacewarsScenario {
                 0,
                 Vec2::new(375.0, 450.0),
                 config.players[0].color,
+                config.players[0].health_percent,
                 delta_time,
             ),
             ShipState::new(
                 1,
                 Vec2::new(375.0, 500.0),
                 config.players[1].color,
+                config.players[1].health_percent,
                 delta_time,
             ),
         ];
@@ -624,12 +630,14 @@ fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
                 planet: spaceport.planet,
             });
         } else {
+            let ship = &mut state.ships[contact.ship];
             resolve_ship_body_collision(
-                &mut state.ships[contact.ship],
+                ship,
                 contact.body_position,
                 contact.body_radius,
                 contact.ship_radius,
             );
+            apply_body_collision_damage(ship);
         }
     }
 
@@ -707,6 +715,12 @@ fn resolve_ship_body_collision(
     let normal = collision_normal(ship.position, body_position);
     ship.position = body_position + normal * (ship_radius + body_radius);
     ship.velocity = (ship.velocity - normal * (2.0 * ship.velocity.dot(normal))) * 0.5;
+}
+
+fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
+    let damage = ship.velocity.length() * PLANET_DAMAGE_SCALAR;
+    ship.translate_life(-damage);
+    damage
 }
 
 fn resolve_spaceport_contact(ship: &mut ShipState, spaceport_center: Vec2) {
@@ -897,7 +911,14 @@ impl PlanetState {
 }
 
 impl ShipState {
-    fn new(owner_id: usize, position: Vec2, color: Color, delta_time: f32) -> Self {
+    fn new(
+        owner_id: usize,
+        position: Vec2,
+        color: Color,
+        health_percent: u32,
+        delta_time: f32,
+    ) -> Self {
+        let life = health_percent as f32;
         Self {
             owner_id,
             position,
@@ -913,9 +934,29 @@ impl ShipState {
             turn_behavior: TurnBehavior::None,
             laser_firing: false,
             cannon_firing: false,
+            life,
+            life_max: life,
+            dead: false,
             turn_power: SHIP_TURN_FORCE / SHIP_MASS * delta_time,
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
+        }
+    }
+
+    #[cfg(test)]
+    fn new_with_default_life(
+        owner_id: usize,
+        position: Vec2,
+        color: Color,
+        delta_time: f32,
+    ) -> Self {
+        Self::new(owner_id, position, color, 100, delta_time)
+    }
+
+    fn translate_life(&mut self, delta: f32) {
+        self.life += delta;
+        if self.life <= 0.0 {
+            self.dead = true;
         }
     }
 
@@ -1655,6 +1696,12 @@ mod tests {
         assert_eq!(state.ships[0].position, Vec2::new(375.0, 450.0));
         assert_eq!(state.ships[1].owner_id, 1);
         assert_eq!(state.ships[1].position, Vec2::new(375.0, 500.0));
+        assert_eq!(state.ships[0].life, 50.0);
+        assert_eq!(state.ships[0].life_max, 50.0);
+        assert_eq!(state.ships[1].life, 50.0);
+        assert_eq!(state.ships[1].life_max, 50.0);
+        assert!(!state.ships[0].dead);
+        assert!(!state.ships[1].dead);
         assert_eq!(state.players[0].name, "Player 1");
         assert_eq!(state.players[1].name, "Player 2");
         assert!(state.sun.is_none());
@@ -1670,6 +1717,10 @@ mod tests {
         let universe_radius = state.config.universe_radius as f32;
 
         assert_eq!(state.config.universe_radius, 1200);
+        assert_eq!(state.ships[0].life, 100.0);
+        assert_eq!(state.ships[0].life_max, 100.0);
+        assert_eq!(state.ships[1].life, 100.0);
+        assert_eq!(state.ships[1].life_max, 100.0);
         assert_eq!(sun.position, Vec2::new(universe_radius, universe_radius));
         assert_eq!(sun.radius, SUN_RADIUS);
         assert_close(sun.mass, body_mass(SUN_RADIUS));
@@ -1789,7 +1840,8 @@ mod tests {
 
     #[test]
     fn gravity_at_zero_distance_leaves_velocity_unchanged() {
-        let mut ship = ShipState::new(0, Vec2::new(10.0, 20.0), Color::WHITE, 1.0 / 60.0);
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::new(10.0, 20.0), Color::WHITE, 1.0 / 60.0);
         ship.velocity = Vec2::new(1.0, 2.0);
 
         apply_gravity(&mut ship, Vec2::new(10.0, 20.0), body_mass(10.0), 1.0);
@@ -1927,7 +1979,8 @@ mod tests {
 
     #[test]
     fn body_collision_response_pushes_to_surface_and_reflects_velocity() {
-        let mut ship = ShipState::new(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
         ship.velocity = Vec2::new(-20.0, 0.0);
 
         resolve_ship_body_collision(&mut ship, Vec2::ZERO, 10.0, 5.0);
@@ -1937,12 +1990,40 @@ mod tests {
     }
 
     #[test]
+    fn body_collision_damage_uses_post_bounce_velocity_once() {
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
+        ship.velocity = Vec2::new(-20.0, 0.0);
+
+        resolve_ship_body_collision(&mut ship, Vec2::ZERO, 10.0, 5.0);
+        let damage = apply_body_collision_damage(&mut ship);
+
+        assert_close(damage, 0.1);
+        assert_close(ship.life, 99.9);
+        assert!(!ship.dead);
+    }
+
+    #[test]
+    fn body_collision_damage_marks_ship_dead_when_life_reaches_zero() {
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
+        ship.life = 0.05;
+        ship.velocity = Vec2::new(10.0, 0.0);
+
+        apply_body_collision_damage(&mut ship);
+
+        assert!(ship.life <= 0.0);
+        assert!(ship.dead);
+    }
+
+    #[test]
     fn spaceport_contact_damps_and_pulls_without_body_bounce() {
         let mut state = init_deathmatch();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         let spaceport = spaceport_physics(0, &state.planets[0]);
         let start_position = spaceport.bounds.center - Vec2::X;
         let offset = spaceport.bounds.center - start_position;
+        let start_life = state.ships[0].life;
         state.ships[0].position = start_position;
         state.ships[0].velocity = Vec2::ZERO;
 
@@ -1964,6 +2045,7 @@ mod tests {
             state.ships[0].velocity,
             offset * (offset.length() * SPACEPORT_PULL_SCALE / SHIP_MASS),
         );
+        assert_eq!(state.ships[0].life, start_life);
     }
 
     #[test]
@@ -1977,6 +2059,7 @@ mod tests {
         let gravity = gravity_delta(state.ships[0].position, body_position, body_mass);
         let expected_velocity = (gravity - normal * (2.0 * gravity.dot(normal))) * 0.5;
         let expected_position = body_position + normal * (ship_radius + body_radius);
+        let expected_life = state.ships[0].life - expected_velocity.length() * PLANET_DAMAGE_SCALAR;
 
         state.sun = Some(SunState {
             position: body_position,
@@ -1996,6 +2079,7 @@ mod tests {
         );
         assert_vec_close(state.ships[0].position, expected_position);
         assert_vec_close(state.ships[0].velocity, expected_velocity);
+        assert_close(state.ships[0].life, expected_life);
     }
 
     #[test]
