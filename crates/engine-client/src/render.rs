@@ -22,13 +22,24 @@ const DEFAULT_VIEWPORT_HEIGHT: f32 = 720.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Viewport {
+    pub x: f32,
+    pub y: f32,
     pub width: f32,
     pub height: f32,
 }
 
 impl Viewport {
     pub const fn new(width: f32, height: f32) -> Self {
-        Self { width, height }
+        Self::with_origin(0.0, 0.0, width, height)
+    }
+
+    pub const fn with_origin(x: f32, y: f32, width: f32, height: f32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     pub fn from_window(window: &slint::Window) -> Self {
@@ -43,13 +54,52 @@ impl Viewport {
         self.width / self.height
     }
 
+    pub fn split_horizontally(self, count: usize) -> Vec<Self> {
+        let count = count.max(1);
+        let width = self.width / count as f32;
+        (0..count)
+            .map(|index| {
+                Self::with_origin(self.x + width * index as f32, self.y, width, self.height)
+            })
+            .collect()
+    }
+
     fn with_default_if_empty(self) -> Self {
         if self.width <= 0.0 || self.height <= 0.0 {
-            Self::new(DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT)
+            Self::with_origin(
+                self.x,
+                self.y,
+                DEFAULT_VIEWPORT_WIDTH,
+                DEFAULT_VIEWPORT_HEIGHT,
+            )
         } else {
             self
         }
     }
+}
+
+/// Convert scenario frames into ordered Slint scene primitives.
+pub fn scene_primitives_from_frames(
+    frames: &[RenderFrame],
+    viewport: Viewport,
+) -> Vec<ScenePrimitive> {
+    if frames.is_empty() {
+        return Vec::new();
+    }
+
+    if frames.len() == 1 {
+        return scene_primitives_from_frame(&frames[0], viewport);
+    }
+
+    frames
+        .iter()
+        .zip(
+            viewport
+                .with_default_if_empty()
+                .split_horizontally(frames.len()),
+        )
+        .flat_map(|(frame, viewport)| scene_primitives_from_frame(frame, viewport))
+        .collect()
 }
 
 /// Convert a scenario frame into ordered Slint scene primitives.
@@ -329,6 +379,8 @@ fn text_primitive(text: &RenderText, camera: Camera2, viewport: Viewport) -> Sce
 
     ScenePrimitive {
         kind: PrimitiveKind::Text,
+        x: viewport.x,
+        y: viewport.y,
         width: viewport.width,
         height: viewport.height,
         viewbox_width: viewport.width,
@@ -348,6 +400,8 @@ fn text_primitive(text: &RenderText, camera: Camera2, viewport: Viewport) -> Sce
 fn path_primitive(commands: String, style: PathStyle, viewport: Viewport) -> ScenePrimitive {
     ScenePrimitive {
         kind: PrimitiveKind::Path,
+        x: viewport.x,
+        y: viewport.y,
         width: viewport.width,
         height: viewport.height,
         viewbox_width: viewport.width,
@@ -431,6 +485,26 @@ mod tests {
         let bottom_right = project_point(camera, viewport, RenderPoint::new(100.0, -50.0));
         assert_close(bottom_right.x, 200.0);
         assert_close(bottom_right.y, 100.0);
+    }
+
+    #[test]
+    fn multiple_frames_are_laid_out_as_equal_horizontal_viewports() {
+        let mut left = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        left.push_primitive(0, triangle_at(0.0, RenderColor::RED));
+        let mut right = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        right.push_primitive(0, triangle_at(0.0, RenderColor::GREEN));
+
+        let primitives = scene_primitives_from_frames(&[left, right], Viewport::new(200.0, 100.0));
+
+        assert_eq!(primitives.len(), 2);
+        assert_close(primitives[0].x, 0.0);
+        assert_close(primitives[0].y, 0.0);
+        assert_close(primitives[0].width, 100.0);
+        assert_close(primitives[0].height, 100.0);
+        assert_close(primitives[1].x, 100.0);
+        assert_close(primitives[1].y, 0.0);
+        assert_close(primitives[1].width, 100.0);
+        assert_close(primitives[1].height, 100.0);
     }
 
     #[test]

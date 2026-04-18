@@ -121,7 +121,7 @@ pub fn start_scenario_loop(
             &mut accumulator,
             &mut input,
         );
-        present_frame(&window, scenario.render_frame());
+        present_frames(&window, scenario.render_frames());
     });
 
     Ok(timer)
@@ -165,8 +165,12 @@ fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
 }
 
 fn present_frame(window: &MainWindow, frame: RenderFrame) -> usize {
+    present_frames(window, vec![frame])
+}
+
+fn present_frames(window: &MainWindow, frames: Vec<RenderFrame>) -> usize {
     let primitives =
-        render::scene_primitives_from_frame(&frame, Viewport::from_window(window.window()));
+        render::scene_primitives_from_frames(&frames, Viewport::from_window(window.window()));
     let scene_item_count = primitives.len();
     window.set_primitives(ModelRc::new(VecModel::from(primitives)));
     window.window().request_redraw();
@@ -217,6 +221,13 @@ impl HostedScenario {
             Self::Spacewars(state) => SpacewarsScenario::render_frame(state),
         }
     }
+
+    pub(crate) fn render_frames(&self) -> Vec<RenderFrame> {
+        match self {
+            Self::Null(state) => vec![NullScenario::render_frame(state)],
+            Self::Spacewars(state) => SpacewarsScenario::render_player_frames(state),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -259,5 +270,22 @@ mod tests {
             scenario.tick_model(),
             TickModel::FixedTimestep { hz: 60 }
         ));
+    }
+
+    #[test]
+    fn spacewars_scenario_renders_player_centered_frames_for_client() {
+        let scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let frames = scenario.render_frames();
+
+        let HostedScenario::Spacewars(state) = &scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0].camera.center.x, state.ships[0].position.x);
+        assert_eq!(frames[0].camera.center.y, state.ships[0].position.y);
+        assert_eq!(frames[1].camera.center.x, state.ships[1].position.x);
+        assert_eq!(frames[1].camera.center.y, state.ships[1].position.y);
+        assert_eq!(frames[0].camera.height, frames[1].camera.height);
     }
 }

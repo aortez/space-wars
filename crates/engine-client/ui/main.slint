@@ -7,6 +7,8 @@ export enum PrimitiveKind {
 
 export struct ScenePrimitive {
     kind: PrimitiveKind,
+    x: length,
+    y: length,
     width: length,
     height: length,
     viewbox-width: float,
@@ -25,10 +27,11 @@ export struct ScenePrimitive {
 component ScenePrimitiveItem inherits Rectangle {
     in property <ScenePrimitive> primitive;
 
-    x: 0px;
-    y: 0px;
+    x: primitive.x;
+    y: primitive.y;
     width: primitive.width;
     height: primitive.height;
+    clip: true;
     background: #00000000;
 
     Path {

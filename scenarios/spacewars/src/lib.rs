@@ -44,6 +44,7 @@ const SPACEPORT_OUTER_POINTS: usize = 15;
 const SPACEPORT_INNER_POINTS: usize = 7;
 const SPACEPORT_DAMPING: f32 = 0.94;
 const SPACEPORT_PULL_SCALE: f32 = 3.0;
+const PLAYER_VIEW_HEIGHT: f32 = 320.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -450,6 +451,14 @@ impl SpacewarsState {
             SpacewarsActionKind::FireCannon => ship.fire_cannon(),
             SpacewarsActionKind::FireCannonHalt => ship.fire_cannon_halt(),
         }
+    }
+}
+
+impl SpacewarsScenario {
+    pub fn render_player_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
+        (0..state.ships.len())
+            .map(|player| render_state_with_camera(state, player_camera(state, player)))
+            .collect()
     }
 }
 
@@ -1112,7 +1121,22 @@ fn player_state(id: usize, config: &PlayerConfig) -> PlayerState {
 fn render_state(state: &SpacewarsState) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
-    let mut frame = RenderFrame::new(Camera2::new(render_point(center), radius * 2.2));
+    render_state_with_camera(state, Camera2::new(render_point(center), radius * 2.2))
+}
+
+fn player_camera(state: &SpacewarsState, player: usize) -> Camera2 {
+    let center = state
+        .ships
+        .get(player)
+        .map(|ship| ship.position)
+        .unwrap_or(Vec2::ZERO);
+    Camera2::new(render_point(center), PLAYER_VIEW_HEIGHT)
+}
+
+fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFrame {
+    let radius = state.config.universe_radius as f32;
+    let center = Vec2::new(radius, radius);
+    let mut frame = RenderFrame::new(camera);
 
     frame.push_primitive(
         WORLD_LAYER,
@@ -2113,6 +2137,40 @@ mod tests {
         assert_eq!(circles, 1);
         assert_eq!(polygons, 12);
         assert_eq!(text, 2);
+    }
+
+    #[test]
+    fn player_cameras_center_on_each_ship_with_equal_zoom() {
+        let state = init_deathmatch();
+        let player_1 = player_camera(&state, 0);
+        let player_2 = player_camera(&state, 1);
+
+        assert_eq!(player_1.center, render_point(state.ships[0].position));
+        assert_eq!(player_2.center, render_point(state.ships[1].position));
+        assert_eq!(player_1.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(player_2.height, PLAYER_VIEW_HEIGHT);
+    }
+
+    #[test]
+    fn player_render_frames_use_per_player_cameras() {
+        let state = init_deathmatch();
+        let frames = SpacewarsScenario::render_player_frames(&state);
+
+        assert_eq!(frames.len(), 2);
+        assert_eq!(
+            frames[0].camera.center,
+            render_point(state.ships[0].position)
+        );
+        assert_eq!(
+            frames[1].camera.center,
+            render_point(state.ships[1].position)
+        );
+        assert_eq!(frames[0].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[1].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(
+            frames[0].layers,
+            SpacewarsScenario::render_frame(&state).layers
+        );
     }
 
     #[test]
