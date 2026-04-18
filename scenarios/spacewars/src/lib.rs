@@ -388,8 +388,8 @@ impl Scenario for SpacewarsScenario {
             contain_ship(ship, state.config.universe_radius as f32);
         }
 
-        state.body_collisions = detect_body_collisions(state);
         apply_world_gravity(state);
+        state.body_collisions = resolve_body_collisions(state);
 
         state.tick += 1;
         StepResult::default()
@@ -514,13 +514,11 @@ fn body_mass(radius: f32) -> f32 {
 }
 
 fn apply_world_gravity(state: &mut SpacewarsState) {
-    for ship in &mut state.ships {
-        if let Some(sun) = state.sun {
-            apply_gravity(ship, sun.position, sun.mass, 1.0);
-        }
+    let bodies = body_physics(state);
 
-        for planet in &state.planets {
-            apply_gravity(ship, planet.position, planet.mass, 1.0);
+    for ship in &mut state.ships {
+        for body in &bodies {
+            apply_gravity(ship, body.position, body.mass, 1.0);
         }
     }
 }
@@ -533,19 +531,90 @@ fn apply_gravity(ship: &mut ShipState, attractor_position: Vec2, attractor_mass:
 }
 
 #[derive(Debug, Clone, Copy)]
-struct BodyBounds {
+struct BodyPhysics {
     id: BodyId,
+    order: usize,
+    position: Vec2,
+    radius: f32,
+    mass: f32,
     low: Circle,
     high: Circle,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BodyContact {
+    ship: usize,
+    body: BodyId,
+    body_order: usize,
+    body_position: Vec2,
+    body_radius: f32,
+    ship_radius: f32,
+    overlap: f32,
+}
+
+#[cfg(test)]
 fn detect_body_collisions(state: &SpacewarsState) -> Vec<BodyCollision> {
-    let bodies = body_bounds(state);
-    let mut collisions = Vec::new();
+    select_body_contacts(state)
+        .into_iter()
+        .map(|contact| BodyCollision {
+            ship: contact.ship,
+            body: contact.body,
+        })
+        .collect()
+}
+
+fn resolve_body_collisions(state: &mut SpacewarsState) -> Vec<BodyCollision> {
+    let contacts = select_body_contacts(state);
+
+    for contact in &contacts {
+        resolve_ship_body_collision(
+            &mut state.ships[contact.ship],
+            contact.body_position,
+            contact.body_radius,
+            contact.ship_radius,
+        );
+    }
+
+    contacts
+        .into_iter()
+        .map(|contact| BodyCollision {
+            ship: contact.ship,
+            body: contact.body,
+        })
+        .collect()
+}
+
+fn select_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
+    let contacts = detect_body_contacts(state);
+    let mut selected = Vec::new();
+
+    for ship in 0..state.ships.len() {
+        let contact = contacts
+            .iter()
+            .copied()
+            .filter(|contact| contact.ship == ship)
+            .max_by(|a, b| {
+                a.overlap
+                    .total_cmp(&b.overlap)
+                    .then_with(|| b.body_order.cmp(&a.body_order))
+            });
+
+        if let Some(contact) = contact {
+            selected.push(contact);
+        }
+    }
+
+    selected
+}
+
+fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
+    let bodies = body_physics(state);
+    let mut contacts = Vec::new();
 
     for (ship_index, ship) in state.ships.iter().enumerate() {
         let triangles = ship_triangles(ship);
-        let ship_low = Bounds2::Circle(ship_low_bounds(&triangles));
+        let ship_low_circle = ship_low_bounds(&triangles);
+        let ship_low = Bounds2::Circle(ship_low_circle);
         let ship_high = Bounds2::List(ship_high_bounds(&triangles));
 
         for body in &bodies {
@@ -554,39 +623,74 @@ fn detect_body_collisions(state: &SpacewarsState) -> Vec<BodyCollision> {
             }
 
             if ship_high.intersects(&Bounds2::Circle(body.high)) {
-                collisions.push(BodyCollision {
+                contacts.push(BodyContact {
                     ship: ship_index,
                     body: body.id,
+                    body_order: body.order,
+                    body_position: body.position,
+                    body_radius: body.radius,
+                    ship_radius: ship_low_circle.radius,
+                    overlap: (ship_low_circle.radius + body.radius
+                        - ship_low_circle.center.distance_to(body.position))
+                    .max(0.0),
                 });
             }
         }
     }
 
-    collisions
+    contacts
 }
 
-fn body_bounds(state: &SpacewarsState) -> Vec<BodyBounds> {
-    let mut bodies = Vec::new();
+fn resolve_ship_body_collision(
+    ship: &mut ShipState,
+    body_position: Vec2,
+    body_radius: f32,
+    ship_radius: f32,
+) {
+    let normal = collision_normal(ship.position, body_position);
+    ship.position = body_position + normal * (ship_radius + body_radius);
+    ship.velocity = (ship.velocity - normal * (2.0 * ship.velocity.dot(normal))) * 0.5;
+}
 
-    if let Some(sun) = state.sun {
-        bodies.push(BodyBounds {
-            id: BodyId::Sun,
-            low: body_circle(sun.position, sun.radius),
-            high: body_circle(sun.position, sun.radius),
-        });
+fn collision_normal(ship_position: Vec2, body_position: Vec2) -> Vec2 {
+    let offset = ship_position - body_position;
+    if offset.length() == 0.0 {
+        Vec2::X
+    } else {
+        offset.normalized()
     }
+}
+
+fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
+    let mut bodies = Vec::new();
 
     bodies.extend(
         state
             .planets
             .iter()
             .enumerate()
-            .map(|(index, planet)| BodyBounds {
+            .map(|(index, planet)| BodyPhysics {
                 id: BodyId::Planet(index),
+                order: index,
+                position: planet.position,
+                radius: planet.radius,
+                mass: planet.mass,
                 low: body_circle(planet.position, planet.radius),
                 high: body_circle(planet.position, planet.radius),
             }),
     );
+
+    if let Some(sun) = state.sun {
+        bodies.push(BodyPhysics {
+            id: BodyId::Sun,
+            order: bodies.len(),
+            position: sun.position,
+            radius: sun.radius,
+            mass: sun.mass,
+            low: body_circle(sun.position, sun.radius),
+            high: body_circle(sun.position, sun.radius),
+        });
+    }
 
     bodies
 }
@@ -1106,12 +1210,8 @@ mod tests {
     fn expected_gravity_delta(state: &SpacewarsState, ship_position: Vec2) -> Vec2 {
         let mut delta = Vec2::ZERO;
 
-        if let Some(sun) = state.sun {
-            delta += gravity_delta(ship_position, sun.position, sun.mass);
-        }
-
-        for planet in &state.planets {
-            delta += gravity_delta(ship_position, planet.position, planet.mass);
+        for body in body_physics(state) {
+            delta += gravity_delta(ship_position, body.position, body.mass);
         }
 
         delta
@@ -1121,6 +1221,20 @@ mod tests {
         let offset = attractor_position - ship_position;
         let distance = offset.length();
         offset.normalized() * gravity_acceleration_attracted_to(attractor_mass, distance, 1.0)
+    }
+
+    fn test_planet(position: Vec2, radius: f32) -> PlanetState {
+        PlanetState {
+            position,
+            radius,
+            mass: 0.0,
+            color: Color::GREEN,
+            orbit_radius: 0.0,
+            orbit_angle: 0.0,
+            orbit_omega: 0.0,
+            wrapper_angle: 0.0,
+            wrapper_omega: 0.0,
+        }
     }
 
     fn circle_primitive_count(frame: &RenderFrame) -> usize {
@@ -1593,14 +1707,53 @@ mod tests {
     }
 
     #[test]
-    fn step_records_body_collision_without_response_yet() {
+    fn body_collision_detection_selects_deepest_contact_per_ship() {
         let mut state = init_deathmatch();
-        let start_position = state.ships[0].position;
-        let start_velocity = state.ships[0].velocity;
+        let ship_low = ship_low_bounds(&ship_triangles(&state.ships[0]));
+        state.planets = vec![test_planet(ship_low.center, 5.0)];
         state.sun = Some(SunState {
-            position: ship_low_bounds(&ship_triangles(&state.ships[0])).center,
-            radius: 10.0,
+            position: ship_low.center,
+            radius: 20.0,
             mass: 0.0,
+            color: Color::YELLOW,
+        });
+
+        assert_eq!(
+            detect_body_collisions(&state),
+            vec![BodyCollision {
+                ship: 0,
+                body: BodyId::Sun,
+            }]
+        );
+    }
+
+    #[test]
+    fn body_collision_response_pushes_to_surface_and_reflects_velocity() {
+        let mut ship = ShipState::new(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
+        ship.velocity = Vec2::new(-20.0, 0.0);
+
+        resolve_ship_body_collision(&mut ship, Vec2::ZERO, 10.0, 5.0);
+
+        assert_eq!(ship.position, Vec2::new(15.0, 0.0));
+        assert_eq!(ship.velocity, Vec2::new(10.0, 0.0));
+    }
+
+    #[test]
+    fn step_applies_gravity_before_resolving_body_collision() {
+        let mut state = init_deathmatch();
+        let body_position = state.ships[0].position + Vec2::new(8.0, 0.0);
+        let body_radius = 20.0;
+        let body_mass = body_mass(body_radius);
+        let ship_radius = ship_low_bounds(&ship_triangles(&state.ships[0])).radius;
+        let normal = (state.ships[0].position - body_position).normalized();
+        let gravity = gravity_delta(state.ships[0].position, body_position, body_mass);
+        let expected_velocity = (gravity - normal * (2.0 * gravity.dot(normal))) * 0.5;
+        let expected_position = body_position + normal * (ship_radius + body_radius);
+
+        state.sun = Some(SunState {
+            position: body_position,
+            radius: body_radius,
+            mass: body_mass,
             color: Color::YELLOW,
         });
 
@@ -1613,8 +1766,8 @@ mod tests {
                 body: BodyId::Sun,
             }]
         );
-        assert_eq!(state.ships[0].position, start_position);
-        assert_eq!(state.ships[0].velocity, start_velocity);
+        assert_vec_close(state.ships[0].position, expected_position);
+        assert_vec_close(state.ships[0].velocity, expected_velocity);
     }
 
     #[test]

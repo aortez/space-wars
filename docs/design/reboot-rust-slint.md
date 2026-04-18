@@ -335,13 +335,13 @@ The 2008 `Model` couples world generation, entity lists, gravity/collision/updat
 
 Physics fidelity should follow the 2008 behavior, even though the reboot should not port `UWBGL_SceneNode` directly:
 
-- Preserve the fixed 60 Hz update order from `Model.doPhysics()`: update planets, update each player entity, contain it within the universe, resolve munitions/debris/ship/body interactions, then apply gravity only for planet bodies that did not collide on that tick.
+- Preserve the fixed 60 Hz update shape from `Model.doPhysics()`: update planets, update each player entity, contain it within the universe, apply planet/sun gravity, then resolve deterministic body contacts. The reboot intentionally avoids the original loop-order artifact where a collision skipped gravity for the collided body and all later bodies.
 - Model collision as the original did: a cheap Low bounds pass followed by a finer High bounds pass. Low bounds were generally coarse spheres. High bounds were still approximate bounding volumes, not exact polygon/SAT tests: circles stayed spheres, laser beams stayed lines, triangle primitives expanded into a `BoundingList` of small spheres over corners/edges/subdivisions, and lists intersected when any nested bound intersected. The reboot can represent this with simple engine-core bounds primitives (`Circle`, `Line`, and lists of circles/lines) instead of the original scene graph.
 - Reproduce triangle High bounds from `UWBGL_PrimitiveTriangle.getTriangleBoundsRecursive()`: seed tiny corner circles inset toward the centroid; compute a recursive circle at each triangle centroid with radius equal to the nearest distance from that centroid to an edge; add it unless its center is already inside an existing circle; subdivide into the three corner subtriangles and the center subtriangle while vertex distance/radius exceeds the original `min_circle_size` threshold (`max(avg_midpoint_distance * 0.15, 2.0)`).
 - Keep planet/sun gravity as the original immediate velocity impulse, without multiplying by `dt` a second time.
 - Port collision response formulas exactly where practical: planet body bounce pushes the entity to the surface, reflects velocity around the body normal, and damps speed to 50%; entity/entity collision uses the original mass-weighted velocity exchange, 90% damping, and overlap separation.
 - Treat spaceports as their own physics path: contact with the spaceport damps velocity and pulls the ship/pod toward the port rather than doing a normal body bounce. Ownership, repair, pod rebuild, sounds, and particles can layer on after the contact behavior exists.
-- Keep deterministic tests at each slice for update order, replay from seed/tick count, and "collision suppresses gravity for that body this tick."
+- Keep deterministic tests at each slice for update order, replay from seed/tick count, collision detection, and collision response.
 
 ### M7: ✅ Reference map + core math
 
@@ -392,7 +392,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M11b: ✅ Add planet orbit/update behavior from `Planet.update()`.
 - M11c: ✅ Add planet/sun gravity on ships.
 - M11d: ✅ Add planet/sun body bounds and ship/body collision detection using the original Low/High bounds pattern: circular bodies as spheres/circles and ships as a coarse Low circle plus High lists derived from current ship triangle primitives.
-- M11e: add original body collision response: push ship out to `ship_radius + body_radius`, reflect velocity around the body normal, damp to 50%, and skip that body's gravity for the tick.
+- M11e: ✅ Add body collision response: apply gravity from all bodies, choose the deepest contact per ship with deterministic body-order tie-breaking, push ship out to `ship_radius + body_radius`, reflect velocity around the body normal, and damp to 50%.
 - M11f: add minimal spaceport contact physics: rotating spaceport bound, landing contact detection, velocity damping, and pull toward the port center. Defer ownership, capture timers, healing, pod rebuild, sounds, and particles.
 - Defer ownership/capture visuals unless needed for debugging.
 - Acceptance: default config creates a recognizable world; ships are pulled by planets, bounce from planet/sun bodies, and settle at spaceports plausibly.
