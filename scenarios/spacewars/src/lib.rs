@@ -1343,7 +1343,7 @@ fn render_ship_label(frame: &mut RenderFrame, state: &SpacewarsState, ship: &Shi
     let player = &state.players[ship.owner_id];
     let mut text = RenderText::new(
         render_point(ship.position + Vec2::new(2.5, 18.0)),
-        player.name.as_str(),
+        format!("{} {:.1}", player.name, ship.life.max(0.0)),
     );
     text.color = render_color(player.color);
     text.size = 14.0;
@@ -2216,11 +2216,21 @@ mod tests {
             .flat_map(|layer| &layer.primitives)
             .filter(|primitive| matches!(primitive, RenderPrimitive::Text(_)))
             .count();
+        let labels = frame
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter_map(|primitive| match primitive {
+                RenderPrimitive::Text(text) => Some(text.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
 
         assert_eq!(frame.camera.center, RenderPoint::new(300.0, 300.0));
         assert_eq!(circles, 1);
         assert_eq!(polygons, 12);
         assert_eq!(text, 2);
+        assert_eq!(labels, ["Player 1 50.0", "Player 2 50.0"]);
     }
 
     #[test]
