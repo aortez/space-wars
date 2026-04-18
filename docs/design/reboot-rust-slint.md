@@ -397,14 +397,24 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - Defer ownership/capture visuals unless needed for debugging.
 - Acceptance: default config creates a recognizable world; ships are pulled by planets, bounce from planet/sun bodies, and settle at spaceports plausibly.
 
+### M11g: Player-centered viewport slice
+
+- Pull player-centered camera work forward before damage/debris/asteroids, because the current whole-universe camera makes manual physics testing too zoomed out to judge.
+- Match the original structure closely enough for testing: `Model.doPhysics()` moves each player's view rectangle to that player's current hero, and `FinalDlg` renders two hero canvases from those rectangles while also keeping smaller world views with visible view rectangles.
+- Add a client/scenario presentation path that can render two equal player-centered views from the same scenario state. Discard the original asymmetric initial view-rectangle sizes; use one shared fixed zoom derived from the reference behavior, then tune the exact zoom after visual comparison.
+- Aim the first pass at the final two-player split layout rather than a temporary single-camera/debug-only view. The small world overview panes can remain deferred until they are useful, but the main player panes should already be structured like the final local-play UI.
+- Keep the world overview/debug camera available behind an explicit debug mode; normal `spacewars` should default to the player-centered view so local testing sees ship/body/debris contacts clearly.
+- Acceptance: `engine-client --scenario spacewars` presents two equal zoomed player-centered views that follow both ships; tests cover camera centers, zoom size, projection behavior, and deterministic frame generation for each player view.
+
 ### M12: Damage, debris, and asteroids
 
-- Port entity life/damage behavior, debris, shell-like moving debris, asteroid spawning, and original entity/entity collision.
-- Preserve `collideEntities()` behavior for ship/ship, ship/debris, and debris/debris: mass-weighted velocity exchange, 90% damping, and overlap separation by velocity share.
-- Apply planet/body damage from relative velocity after body collision, but keep pod conversion and explosion effects for later gameplay/effects slices unless they block tests.
-- Preserve asteroid gravity skip behavior and deterministic cleanup/spawn ordering.
-- Keep visual particles optional until rendering/perf is ready.
-- Acceptance: asteroids spawn deterministically from the seed, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
+- M12a: Add entity life/damage primitives. Ships should carry `life`, `life_max`, and `dead`, initialized from the original `100 * playerHealthPercent / 100` rule. Body contacts should use the original planet damage formula, `velocity.length() * 0.01`, but default to applying it once unless we explicitly decide to retain the Java ship/body double-subtraction quirk.
+- M12b: Port `collideEntities()` as a focused physics helper and use it for ship/ship first: mass-weighted full-vector velocity exchange, 90% damping, and overlap separation based on each body's share of total speed.
+- M12c: Add debris/asteroid entity core. In the original, asteroids, shell-like projectiles, and primitive breakup fragments are all `Debris` variants with position, velocity, radius, omega, damage scalar, life, and mass. Preserve the odd original debris mass/life behavior: mass is `2πr`, life starts at half mass, and damage below 80% life kills/shrinks the debris.
+- M12d: Add ship/debris and debris/debris collision/damage ordering. Ship/debris collision first runs `collideEntities()`, then damages the ship from debris relative velocity and subtracts the same damage from the debris. Debris/debris applies mutual damage before running `collideEntities()`.
+- M12e: Add asteroid spawning, asteroid gravity cadence, and cleanup. Spawn at the end of the tick from deterministic RNG; use the original probability-per-second check, edge-of-universe spawn, roughly inward randomized aim, max speed 200, damage scalar 0.01, and rare huge-asteroid size multiplier. Apply asteroid gravity every 7th frame with scale 7, then remove dead/out-of-bounds debris.
+- Keep cannon shells representable by the debris model, but do not wire cannon firing here; weapons stay in M13. Keep visual particles, primitive breakup effects, pod conversion, and explosion effects deferred unless they block tests.
+- Acceptance: asteroids spawn deterministically from the seed, render visibly in the player-centered views, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
 
 ### M13: Weapons
 
@@ -421,7 +431,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 
 ### M15: Gameplay loop + HUD
 
-- Port player ownership, planet capture, escape pods, ship rebuild from spaceports, game-over logic, score display, and split-view framing.
+- Port player ownership, planet capture, escape pods, ship rebuild from spaceports, game-over logic, score display, and final split-view/HUD polish.
 - Complete the gameplay consequences that depend on physics contacts: landing ownership timers, ship healing on owned ports, pod-to-ship rebuild timers, ship-to-pod conversion on death, and associated score/life state.
 - Add enough UI/HUD to support local two-player arcade play.
 - Acceptance: local two-player arcade mode is playable end-to-end with default config.
