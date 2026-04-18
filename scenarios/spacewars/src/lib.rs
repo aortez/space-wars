@@ -109,6 +109,8 @@ pub struct SpacewarsState {
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
     pub ship_collisions: Vec<ShipCollision>,
+    pub ship_debris_collisions: Vec<ShipDebrisCollision>,
+    pub debris_collisions: Vec<DebrisCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
 }
@@ -177,6 +179,18 @@ pub enum BodyId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ShipCollision {
+    pub a: usize,
+    pub b: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShipDebrisCollision {
+    pub ship: usize,
+    pub debris: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DebrisCollision {
     pub a: usize,
     pub b: usize,
 }
@@ -424,6 +438,8 @@ impl Scenario for SpacewarsScenario {
             sun,
             planets,
             ship_collisions: Vec::new(),
+            ship_debris_collisions: Vec::new(),
+            debris_collisions: Vec::new(),
             body_collisions: Vec::new(),
             spaceport_contacts: Vec::new(),
         }
@@ -450,7 +466,9 @@ impl Scenario for SpacewarsScenario {
         }
 
         apply_world_gravity(state);
+        state.ship_debris_collisions = resolve_ship_debris_collisions(state);
         state.ship_collisions = resolve_ship_collisions(state);
+        state.debris_collisions = resolve_debris_collisions(state);
         let collision_events = resolve_body_collisions(state);
         state.body_collisions = collision_events.body_collisions;
         state.spaceport_contacts = collision_events.spaceport_contacts;
@@ -656,6 +674,78 @@ impl EntityCollisionBody {
             low: ship_low_bounds(&triangles),
         }
     }
+
+    fn from_debris(debris: &DebrisState) -> Self {
+        Self {
+            position: debris.position,
+            velocity: debris.velocity,
+            mass: debris.mass(),
+            low: debris_bounds(debris),
+        }
+    }
+}
+
+fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisCollision> {
+    let collisions = detect_ship_debris_collisions(state);
+
+    for collision in &collisions {
+        let ship = &state.ships[collision.ship];
+        let debris = &state.debris[collision.debris];
+        let mut ship_body = EntityCollisionBody::from_ship(ship);
+        let mut debris_body = EntityCollisionBody::from_debris(debris);
+
+        collide_entities(&mut ship_body, &mut debris_body);
+
+        state.ships[collision.ship].position = ship_body.position;
+        state.ships[collision.ship].velocity = ship_body.velocity;
+        state.debris[collision.debris].position = debris_body.position;
+        state.debris[collision.debris].velocity = debris_body.velocity;
+
+        let damage =
+            state.debris[collision.debris].damage_amount(state.ships[collision.ship].velocity);
+        state.ships[collision.ship].translate_life(-damage);
+        state.debris[collision.debris].translate_life(-damage);
+    }
+
+    collisions
+}
+
+fn detect_ship_debris_collisions(state: &SpacewarsState) -> Vec<ShipDebrisCollision> {
+    let ship_bounds = state
+        .ships
+        .iter()
+        .map(|ship| {
+            let triangles = ship_triangles(ship);
+            (
+                ship_low_bounds(&triangles),
+                Bounds2::List(ship_high_bounds(&triangles)),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut collisions = Vec::new();
+
+    for (ship_index, (ship_low, ship_high)) in ship_bounds.iter().enumerate() {
+        for (debris_index, debris) in state.debris.iter().enumerate() {
+            if debris.dead {
+                continue;
+            }
+
+            let debris_bounds = debris_bounds(debris);
+            if !Bounds2::Circle(*ship_low).intersects(&Bounds2::Circle(debris_bounds)) {
+                continue;
+            }
+            if !ship_high.intersects(&Bounds2::Circle(debris_bounds)) {
+                continue;
+            }
+
+            collisions.push(ShipDebrisCollision {
+                ship: ship_index,
+                debris: debris_index,
+            });
+        }
+    }
+
+    collisions
 }
 
 fn resolve_ship_collisions(state: &mut SpacewarsState) -> Vec<ShipCollision> {
@@ -672,6 +762,51 @@ fn resolve_ship_collisions(state: &mut SpacewarsState) -> Vec<ShipCollision> {
         a.velocity = a_body.velocity;
         b.position = b_body.position;
         b.velocity = b_body.velocity;
+    }
+
+    collisions
+}
+
+fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision> {
+    let collisions = detect_debris_collisions(state);
+
+    for collision in &collisions {
+        let (a, b) = debris_pair_mut(&mut state.debris, collision.a, collision.b);
+        let damage_to_a = b.damage_amount(a.velocity);
+        a.translate_life(-damage_to_a);
+        let damage_to_b = a.damage_amount(b.velocity);
+        b.translate_life(-damage_to_b);
+
+        let mut a_body = EntityCollisionBody::from_debris(a);
+        let mut b_body = EntityCollisionBody::from_debris(b);
+        collide_entities(&mut a_body, &mut b_body);
+
+        a.position = a_body.position;
+        a.velocity = a_body.velocity;
+        b.position = b_body.position;
+        b.velocity = b_body.velocity;
+    }
+
+    collisions
+}
+
+fn detect_debris_collisions(state: &SpacewarsState) -> Vec<DebrisCollision> {
+    let mut collisions = Vec::new();
+
+    for a in 0..state.debris.len() {
+        if state.debris[a].dead {
+            continue;
+        }
+
+        for b in a + 1..state.debris.len() {
+            if state.debris[b].dead {
+                continue;
+            }
+
+            if debris_bounds(&state.debris[a]).intersects_circle(debris_bounds(&state.debris[b])) {
+                collisions.push(DebrisCollision { a, b });
+            }
+        }
     }
 
     collisions
@@ -737,6 +872,16 @@ fn ship_pair_mut(
 ) -> (&mut ShipState, &mut ShipState) {
     assert!(a < b);
     let (left, right) = ships.split_at_mut(b);
+    (&mut left[a], &mut right[0])
+}
+
+fn debris_pair_mut(
+    debris: &mut [DebrisState],
+    a: usize,
+    b: usize,
+) -> (&mut DebrisState, &mut DebrisState) {
+    assert!(a < b);
+    let (left, right) = debris.split_at_mut(b);
     (&mut left[a], &mut right[0])
 }
 
@@ -918,6 +1063,10 @@ fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
 
 fn body_circle(position: Vec2, radius: f32) -> Circle {
     Circle::new(position, radius * BODY_BOUNDS_RADIUS_SCALE)
+}
+
+fn debris_bounds(debris: &DebrisState) -> Circle {
+    Circle::new(debris.position, debris.radius)
 }
 
 fn spaceport_physics(planet: usize, state: &PlanetState) -> SpaceportPhysics {
@@ -1931,6 +2080,8 @@ mod tests {
         assert!(state.sun.is_none());
         assert!(state.planets.is_empty());
         assert!(state.ship_collisions.is_empty());
+        assert!(state.ship_debris_collisions.is_empty());
+        assert!(state.debris_collisions.is_empty());
         assert!(state.body_collisions.is_empty());
         assert!(state.spaceport_contacts.is_empty());
     }
@@ -2258,6 +2409,64 @@ mod tests {
     }
 
     #[test]
+    fn ship_debris_collision_bounces_then_applies_shared_damage() {
+        let mut state = init_deathmatch();
+        let ship_low = ship_low_bounds(&ship_triangles(&state.ships[0]));
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            ship_low.center,
+            Vec2::new(0.0, -15.0),
+            8.0,
+            0.01,
+            Color::DIM_GREY,
+        ));
+        state.ships[0].velocity = Vec2::new(0.0, 20.0);
+        let ship_life = state.ships[0].life;
+        let debris_life = state.debris[0].life;
+
+        let collisions = resolve_ship_debris_collisions(&mut state);
+
+        let damage = state.debris[0].damage_amount(state.ships[0].velocity);
+        assert_eq!(collisions, vec![ShipDebrisCollision { ship: 0, debris: 0 }]);
+        assert!(state.ships[0].velocity.y < 0.0);
+        assert!(state.debris[0].velocity.y > 0.0);
+        assert_close(state.ships[0].life, ship_life - damage);
+        assert_close(state.debris[0].life, debris_life - damage);
+    }
+
+    #[test]
+    fn debris_debris_collision_applies_mutual_damage_before_bounce() {
+        let mut state = init_deathmatch();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(-4.0, 0.0),
+            Vec2::new(10.0, 0.0),
+            5.0,
+            0.01,
+            Color::DIM_GREY,
+        ));
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(4.0, 0.0),
+            Vec2::new(-10.0, 0.0),
+            5.0,
+            0.01,
+            Color::DIM_GREY,
+        ));
+        let start_life = state.debris[0].life;
+
+        let collisions = resolve_debris_collisions(&mut state);
+
+        assert_eq!(collisions, vec![DebrisCollision { a: 0, b: 1 }]);
+        assert_close(state.debris[0].life, start_life - 0.2);
+        assert_close(state.debris[1].life, start_life - 0.2);
+        assert_vec_close(state.debris[0].velocity, Vec2::new(-9.0, 0.0));
+        assert_vec_close(state.debris[1].velocity, Vec2::new(9.0, 0.0));
+        assert!(state.debris[0].position.x < -4.0);
+        assert!(state.debris[1].position.x > 4.0);
+    }
+
+    #[test]
     fn spaceport_geometry_uses_original_polygon_bound_and_wrapper_rotation() {
         let mut planet = test_planet(Vec2::new(100.0, 200.0), 50.0);
         let points = spaceport_points(&planet);
@@ -2397,6 +2606,8 @@ mod tests {
         assert_eq!(state.ships[0].velocity, Vec2::ZERO);
         assert_eq!(state.ships[1].velocity, Vec2::ZERO);
         assert!(state.ship_collisions.is_empty());
+        assert!(state.ship_debris_collisions.is_empty());
+        assert!(state.debris_collisions.is_empty());
     }
 
     #[test]
