@@ -48,6 +48,8 @@ const SPACEPORT_INNER_POINTS: usize = 7;
 const SPACEPORT_DAMPING: f32 = 0.94;
 const SPACEPORT_PULL_SCALE: f32 = 3.0;
 const PLAYER_VIEW_HEIGHT: f32 = 320.0;
+const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
+const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -103,6 +105,7 @@ pub struct SpacewarsState {
     pub tick: u64,
     pub players: [PlayerState; 2],
     pub ships: [ShipState; 2],
+    pub debris: Vec<DebrisState>,
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
     pub ship_collisions: Vec<ShipCollision>,
@@ -137,6 +140,27 @@ pub struct PlanetState {
     pub orbit_omega: f32,
     pub wrapper_angle: f32,
     pub wrapper_omega: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DebrisState {
+    pub kind: DebrisKind,
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub radius: f32,
+    pub rotation_radians: f32,
+    pub omega: f32,
+    pub damage_scalar: f32,
+    pub life: f32,
+    pub life_max: f32,
+    pub dead: bool,
+    pub color: Color,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebrisKind {
+    Asteroid,
+    Fragment,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -396,6 +420,7 @@ impl Scenario for SpacewarsScenario {
             tick: 0,
             players,
             ships,
+            debris: Vec::new(),
             sun,
             planets,
             ship_collisions: Vec::new(),
@@ -419,6 +444,9 @@ impl Scenario for SpacewarsScenario {
         for ship in &mut state.ships {
             ship.update(dt);
             contain_ship(ship, state.config.universe_radius as f32);
+        }
+        for debris in &mut state.debris {
+            debris.update(dt);
         }
 
         apply_world_gravity(state);
@@ -1023,6 +1051,69 @@ impl PlanetState {
     }
 }
 
+impl DebrisState {
+    pub fn new(
+        kind: DebrisKind,
+        position: Vec2,
+        velocity: Vec2,
+        radius: f32,
+        damage_scalar: f32,
+        color: Color,
+    ) -> Self {
+        let life = debris_mass(radius) * 0.5;
+        Self {
+            kind,
+            position,
+            velocity,
+            radius,
+            rotation_radians: 0.0,
+            omega: 0.0,
+            damage_scalar,
+            life,
+            life_max: life,
+            dead: false,
+            color,
+        }
+    }
+
+    pub fn mass(self) -> f32 {
+        debris_mass(self.radius)
+    }
+
+    pub fn update(&mut self, dt: f32) {
+        self.rotation_radians += self.omega * dt;
+        self.position += self.velocity * dt;
+    }
+
+    pub fn translate_life(&mut self, delta: f32) {
+        self.life += delta;
+        self.update_size();
+    }
+
+    pub fn damage_amount(self, relative_velocity: Vec2) -> f32 {
+        self.damage_scalar * (relative_velocity - self.velocity).length()
+    }
+
+    fn update_size(&mut self) {
+        let factor = self.life / self.life_max;
+        if factor < DEBRIS_DEATH_LIFE_FACTOR {
+            self.life = 0.0;
+            self.dead = true;
+            self.shrink_to(DEBRIS_DEATH_SHRINK_FACTOR);
+        } else {
+            self.shrink_to(factor);
+        }
+    }
+
+    fn shrink_to(&mut self, factor: f32) {
+        self.radius *= factor;
+    }
+}
+
+fn debris_mass(radius: f32) -> f32 {
+    core::f32::consts::TAU * radius
+}
+
 impl ShipState {
     fn new(
         owner_id: usize,
@@ -1329,11 +1420,31 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
         render_ship(&mut frame, ship);
     }
 
+    for debris in &state.debris {
+        render_debris(&mut frame, debris);
+    }
+
     for ship in &state.ships {
         render_ship_label(&mut frame, state, ship);
     }
 
     frame
+}
+
+fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
+    if debris.dead || debris.radius <= 0.0 {
+        return;
+    }
+
+    frame.push_primitive(
+        SHIP_LAYER,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(debris.position),
+            radius: debris.radius,
+            fill: Some(Fill::new(render_color(debris.color))),
+            stroke: Some(Stroke::new(RenderColor::rgba(0.74, 0.78, 0.84, 0.85), 0.75)),
+        }),
+    );
 }
 
 fn render_body(
@@ -2385,6 +2496,96 @@ mod tests {
     }
 
     #[test]
+    fn debris_constructor_uses_original_mass_and_life_rules() {
+        let debris = DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(1.0, 2.0),
+            Vec2::new(3.0, 4.0),
+            5.0,
+            0.01,
+            Color::WHITE,
+        );
+
+        assert_eq!(debris.kind, DebrisKind::Asteroid);
+        assert_eq!(debris.position, Vec2::new(1.0, 2.0));
+        assert_eq!(debris.velocity, Vec2::new(3.0, 4.0));
+        assert_eq!(debris.radius, 5.0);
+        assert_close(debris.mass(), core::f32::consts::TAU * 5.0);
+        assert_close(debris.life, core::f32::consts::TAU * 5.0 * 0.5);
+        assert_eq!(debris.life, debris.life_max);
+        assert!(!debris.dead);
+    }
+
+    #[test]
+    fn debris_update_moves_and_rotates() {
+        let mut debris = DebrisState::new(
+            DebrisKind::Fragment,
+            Vec2::new(1.0, 2.0),
+            Vec2::new(3.0, 4.0),
+            5.0,
+            0.0,
+            Color::WHITE,
+        );
+        debris.omega = 2.0;
+
+        debris.update(0.5);
+
+        assert_eq!(debris.position, Vec2::new(2.5, 4.0));
+        assert_close(debris.rotation_radians, 1.0);
+    }
+
+    #[test]
+    fn debris_life_loss_shrinks_radius_by_current_life_fraction() {
+        let mut debris = DebrisState::new(
+            DebrisKind::Fragment,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            10.0,
+            0.0,
+            Color::WHITE,
+        );
+
+        debris.translate_life(-debris.life_max * 0.1);
+
+        assert_close(debris.life, debris.life_max * 0.9);
+        assert_close(debris.radius, 9.0);
+        assert!(!debris.dead);
+        assert_close(debris.mass(), core::f32::consts::TAU * 9.0);
+    }
+
+    #[test]
+    fn debris_life_below_original_threshold_kills_and_compound_shrinks() {
+        let mut debris = DebrisState::new(
+            DebrisKind::Fragment,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            10.0,
+            0.0,
+            Color::WHITE,
+        );
+
+        debris.translate_life(-debris.life_max * 0.21);
+
+        assert_eq!(debris.life, 0.0);
+        assert!(debris.dead);
+        assert_close(debris.radius, 0.1);
+    }
+
+    #[test]
+    fn debris_damage_amount_uses_relative_velocity_to_debris() {
+        let debris = DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::ZERO,
+            Vec2::new(3.0, 4.0),
+            5.0,
+            0.01,
+            Color::WHITE,
+        );
+
+        assert_close(debris.damage_amount(Vec2::new(6.0, 8.0)), 0.05);
+    }
+
+    #[test]
     fn render_frame_contains_world_two_ships_and_labels() {
         let state = init_deathmatch();
         let frame = SpacewarsScenario::render_frame(&state);
@@ -2422,6 +2623,29 @@ mod tests {
         assert_eq!(polygons, 12);
         assert_eq!(text, 2);
         assert_eq!(labels, ["Player 1 50.0", "Player 2 50.0"]);
+    }
+
+    #[test]
+    fn render_frame_includes_visible_debris_circle() {
+        let mut state = init_deathmatch();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(400.0, 450.0),
+            Vec2::ZERO,
+            5.0,
+            0.01,
+            Color::WHITE,
+        ));
+
+        let frame = SpacewarsScenario::render_frame(&state);
+        let circles = frame
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
+            .count();
+
+        assert_eq!(circles, 2);
     }
 
     #[test]
