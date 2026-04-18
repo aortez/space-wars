@@ -393,7 +393,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M11c: ✅ Add planet/sun gravity on ships.
 - M11d: ✅ Add planet/sun body bounds and ship/body collision detection using the original Low/High bounds pattern: circular bodies as spheres/circles and ships as a coarse Low circle plus High lists derived from current ship triangle primitives.
 - M11e: ✅ Add body collision response: apply gravity from all bodies, choose the deepest contact per ship with deterministic body-order tie-breaking, push ship out to `ship_radius + body_radius`, reflect velocity around the body normal, and damp to 50%.
-- M11f: add minimal spaceport contact physics: rotating spaceport bound, landing contact detection, velocity damping, and pull toward the port center. Defer ownership, capture timers, healing, pod rebuild, sounds, and particles.
+- M11f: ✅ Add minimal spaceport contact physics and debug rendering: rotating spaceport polygon/bound, landing contact detection, velocity damping, and pull toward the port center. Defer ownership, capture timers, healing, pod rebuild, sounds, and particles.
 - Defer ownership/capture visuals unless needed for debugging.
 - Acceptance: default config creates a recognizable world; ships are pulled by planets, bounce from planet/sun bodies, and settle at spaceports plausibly.
 
