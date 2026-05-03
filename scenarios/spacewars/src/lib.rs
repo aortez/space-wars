@@ -50,6 +50,13 @@ const PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
 const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
+const CANNON_SHELL_SPEED: f32 = 300.0;
+const CANNON_RECOIL_SPEED: f32 = 200.0;
+const CANNON_COOLDOWN_SECS: f32 = 0.5;
+const CANNON_SHELL_DAMAGE_SCALAR: f32 = 0.1;
+const CANNON_SHELL_OMEGA: f32 = 2.0;
+const CANNON_SHELL_SPAWN_OFFSET: f32 = 5.0;
+const CANNON_SHELL_RADIUS: f32 = 2.0;
 const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
 const MAX_ASTEROIDS: usize = 100;
 const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
@@ -75,6 +82,7 @@ const WING_CLOSED_MAX_OMEGA: f32 = BASE_MAX_OMEGA * 0.25;
 const MAX_WING_THETA: f32 = core::f32::consts::FRAC_PI_4;
 const SHIP_BOUNDS_RADIUS: f32 = 6.0;
 const SHIP_BODY_TRIANGLE_INDEX: usize = 4;
+const SHIP_LASER_TRIANGLE_INDEX: usize = 5;
 
 const SHIP_BODY: [Vec2; 3] = [
     Vec2::new(0.0, 0.0),
@@ -105,6 +113,11 @@ const SHIP_RIGHT_WING: [Vec2; 3] = [
     Vec2::new(2.5, 2.0),
     Vec2::new(4.0, -0.5),
     Vec2::new(8.0, 2.0),
+];
+const SHELL_BODY: [Vec2; 3] = [
+    Vec2::new(-2.0, 0.0),
+    Vec2::new(1.0, -1.7320508),
+    Vec2::new(1.0, 1.7320508),
 ];
 const SHIP_PIVOT: Vec2 = Vec2::new(2.5, 3.5);
 const SHIP_WING_PIVOT: Vec2 = Vec2::new(2.5, 2.0);
@@ -171,12 +184,15 @@ pub struct DebrisState {
     pub life_max: f32,
     pub dead: bool,
     pub color: Color,
+    pub owner_id: Option<usize>,
+    pub spawn_tick: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DebrisKind {
     Asteroid,
     Fragment,
+    Shell,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,6 +276,7 @@ pub struct ShipState {
     turn_power: f32,
     thrust_power: f32,
     current_max_omega: f32,
+    cannon_cooldown_remaining: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -482,6 +499,8 @@ impl Scenario for SpacewarsScenario {
             ship.update(dt);
             contain_ship(ship, state.config.universe_radius as f32);
         }
+        let new_shells = spawn_cannon_shells(state, dt);
+        state.debris.extend(new_shells);
 
         apply_world_gravity(state);
         state.ship_debris_collisions = resolve_ship_debris_collisions(state);
@@ -668,6 +687,14 @@ fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
     state.debris.push(asteroid);
 }
 
+fn spawn_cannon_shells(state: &mut SpacewarsState, dt: f32) -> Vec<DebrisState> {
+    state
+        .ships
+        .iter_mut()
+        .filter_map(|ship| ship.update_cannon(dt, state.tick))
+        .collect()
+}
+
 fn asteroid_count(state: &SpacewarsState) -> usize {
     state
         .debris
@@ -848,6 +875,9 @@ fn detect_ship_debris_collisions(state: &SpacewarsState) -> Vec<ShipDebrisCollis
     for (ship_index, (ship_low, ship_high)) in ship_bounds.iter().enumerate() {
         for (debris_index, debris) in state.debris.iter().enumerate() {
             if debris.dead {
+                continue;
+            }
+            if debris.owner_id == Some(ship_index) && debris.spawn_tick == state.tick {
                 continue;
             }
 
@@ -1411,6 +1441,10 @@ fn ship_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     ]
 }
 
+fn ship_mount_center(ship: &ShipState) -> Vec2 {
+    triangle_low_bound(ship_triangles(ship)[SHIP_LASER_TRIANGLE_INDEX]).center
+}
+
 fn transform_points(transform: Transform2, points: [Vec2; 3]) -> [Vec2; 3] {
     points.map(|point| transform.transform_point(point))
 }
@@ -1445,7 +1479,33 @@ impl DebrisState {
             life_max: life,
             dead: false,
             color,
+            owner_id: None,
+            spawn_tick: 0,
         }
+    }
+
+    pub fn new_shell(
+        owner_id: usize,
+        spawn_tick: u64,
+        position: Vec2,
+        velocity: Vec2,
+        rotation_radians: f32,
+    ) -> Self {
+        let mut shell = Self::new(
+            DebrisKind::Shell,
+            position,
+            velocity,
+            CANNON_SHELL_RADIUS,
+            CANNON_SHELL_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        );
+        shell.rotation_radians = rotation_radians;
+        shell.omega = CANNON_SHELL_OMEGA;
+        shell.life = 1.0;
+        shell.life_max = 1.0;
+        shell.owner_id = Some(owner_id);
+        shell.spawn_tick = spawn_tick;
+        shell
     }
 
     pub fn mass(self) -> f32 {
@@ -1516,6 +1576,7 @@ impl ShipState {
             turn_power: SHIP_TURN_FORCE / SHIP_MASS * delta_time,
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
+            cannon_cooldown_remaining: 0.0,
         }
     }
 
@@ -1590,6 +1651,27 @@ impl ShipState {
 
     fn fire_cannon_halt(&mut self) {
         self.cannon_firing = false;
+    }
+
+    fn update_cannon(&mut self, dt: f32, tick: u64) -> Option<DebrisState> {
+        let shell = if self.cannon_firing && self.cannon_cooldown_remaining <= 0.0 {
+            let mount_center = ship_mount_center(self);
+            let shell = DebrisState::new_shell(
+                self.owner_id,
+                tick,
+                mount_center + self.direction * CANNON_SHELL_SPAWN_OFFSET,
+                self.direction * CANNON_SHELL_SPEED + self.velocity,
+                -self.direction.angle_radians(),
+            );
+            self.velocity -= self.direction * CANNON_RECOIL_SPEED;
+            self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
+            Some(shell)
+        } else {
+            None
+        };
+
+        self.cannon_cooldown_remaining = (self.cannon_cooldown_remaining - dt).max(0.0);
+        shell
     }
 
     fn update(&mut self, dt: f32) {
@@ -1808,6 +1890,22 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
         return;
     }
 
+    if debris.kind == DebrisKind::Shell {
+        push_filled_polygon(
+            frame,
+            Transform2 {
+                translation: debris.position,
+                scale: Vec2::splat(1.0),
+                rotation_radians: debris.rotation_radians,
+                pivot: Vec2::ZERO,
+            },
+            &SHELL_BODY,
+            render_color(debris.color),
+            RenderColor::rgba(0.74, 0.78, 0.84, 0.85),
+        );
+        return;
+    }
+
     frame.push_primitive(
         SHIP_LAYER,
         RenderPrimitive::Circle(RenderCircle {
@@ -1998,6 +2096,15 @@ mod tests {
 
     fn init_deathmatch() -> SpacewarsState {
         SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 123)
+    }
+
+    fn init_deathmatch_no_asteroids() -> SpacewarsState {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        config.universe_radius = 1_000;
+        let mut state = SpacewarsScenario::init(config, 123);
+        state.ships[1].position = Vec2::new(800.0, 800.0);
+        state
     }
 
     fn init_default(seed: u64) -> SpacewarsState {
@@ -2929,6 +3036,86 @@ mod tests {
         step(&mut state, &[invalid]);
 
         assert_eq!(state.ships[0], start);
+    }
+
+    #[test]
+    fn fire_cannon_spawns_original_shell_and_recoil() {
+        let mut state = init_deathmatch_no_asteroids();
+        let start_ship = state.ships[0];
+        let mount_center = ship_mount_center(&start_ship);
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert_eq!(state.debris.len(), 1);
+        let shell = state.debris[0];
+        assert_eq!(shell.kind, DebrisKind::Shell);
+        assert_eq!(shell.owner_id, Some(0));
+        assert_eq!(shell.spawn_tick, 0);
+        assert_close(shell.life, 1.0);
+        assert_close(shell.life_max, 1.0);
+        assert_close(shell.radius, CANNON_SHELL_RADIUS);
+        assert_close(shell.damage_scalar, CANNON_SHELL_DAMAGE_SCALAR);
+        assert_close(shell.omega, CANNON_SHELL_OMEGA);
+        assert_close(
+            shell.rotation_radians,
+            core::f32::consts::FRAC_PI_2 + CANNON_SHELL_OMEGA / 60.0,
+        );
+        assert_vec_close(
+            shell.position,
+            mount_center + Vec2::Y * (CANNON_SHELL_SPAWN_OFFSET + CANNON_SHELL_SPEED / 60.0),
+        );
+        assert_vec_close(shell.velocity, Vec2::new(0.0, CANNON_SHELL_SPEED));
+        assert_vec_close(
+            state.ships[0].velocity,
+            Vec2::new(0.0, -CANNON_RECOIL_SPEED),
+        );
+    }
+
+    #[test]
+    fn held_cannon_respects_original_cooldown() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        for _ in 0..29 {
+            step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        }
+
+        assert_eq!(
+            state
+                .debris
+                .iter()
+                .filter(|debris| debris.kind == DebrisKind::Shell)
+                .count(),
+            1
+        );
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert_eq!(
+            state
+                .debris
+                .iter()
+                .filter(|debris| debris.kind == DebrisKind::Shell)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn newly_fired_shell_does_not_hit_its_owner_on_spawn_tick() {
+        let mut state = init_deathmatch_no_asteroids();
+        let start_life = state.ships[0].life;
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert_eq!(state.ships[0].life, start_life);
+        assert!(
+            state
+                .ship_debris_collisions
+                .iter()
+                .all(|collision| collision.ship != 0),
+            "owner shell should not collide with firing ship on spawn tick"
+        );
     }
 
     #[test]
