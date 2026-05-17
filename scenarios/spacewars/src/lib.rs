@@ -91,6 +91,9 @@ const STARFIELD_COLOR_ROTATE_RATE: f32 = 0.02;
 const STARFIELD_COLOR_ROTATE_RANGE: f32 = 0.2;
 const STARFIELD_MAX_STARS: usize = 100_000;
 const STARFIELD_POINTS: usize = 3;
+const STARFIELD_POINT_RADIUS_SCALE: f32 = 0.35;
+const STARFIELD_POINT_MIN_RADIUS: f32 = 0.35;
+const STARFIELD_POINT_MAX_RADIUS: f32 = 0.85;
 const EXHAUST_RNG_SALT: u64 = 0xE7A7_5A11_5EED;
 const EXHAUST_DECAY: f32 = 0.1;
 const EXHAUST_MOVE_SCALE: f32 = 0.01;
@@ -1058,11 +1061,11 @@ fn build_starfield(config: &SpacewarsConfig, seed: u64) -> Option<StarFieldState
     let mut area_filled = 0.0;
     let mut rng = seeded_rng(seed ^ STARFIELD_RNG_SALT);
     let base_color = Color::scale_255(
-        255.0,
-        150.0 + random_unit_f32(&mut rng) * 100.0,
-        150.0 + random_unit_f32(&mut rng) * 100.0,
+        220.0 + random_unit_f32(&mut rng) * 35.0,
+        225.0 + random_unit_f32(&mut rng) * 30.0,
+        235.0 + random_unit_f32(&mut rng) * 20.0,
     )
-    .with_intensity(random_unit_f32(&mut rng) * 0.5 + 0.5);
+    .with_intensity(random_unit_f32(&mut rng) * 0.25 + 0.75);
     let mut stars = Vec::new();
 
     while area_filled / total_area < STARFIELD_DENSITY && stars.len() < STARFIELD_MAX_STARS {
@@ -3488,8 +3491,8 @@ fn render_state_with_camera(
             SUN_LAYER,
             sun.position,
             sun.radius,
-            RenderColor::rgba(1.0, 0.93, 0.2, 0.85),
-            RenderColor::rgba(1.0, 1.0, 0.65, 0.9),
+            RenderColor::rgba(1.0, 0.93, 0.2, 1.0),
+            RenderColor::rgba(1.0, 1.0, 0.65, 1.0),
         );
     }
 
@@ -3499,8 +3502,8 @@ fn render_state_with_camera(
             PLANET_LAYER,
             planet.position,
             planet.radius,
-            render_color(planet.color),
-            RenderColor::rgba(0.72, 0.78, 0.84, 0.65),
+            with_alpha(render_color(planet.color), 1.0),
+            RenderColor::rgba(0.72, 0.78, 0.84, 1.0),
         );
         render_spaceport(&mut frame, state, planet);
     }
@@ -3650,8 +3653,9 @@ fn render_starfield(frame: &mut RenderFrame, state: &SpacewarsState) {
     for star in &starfield.stars {
         frame.push_primitive(
             STARFIELD_LAYER,
-            RenderPrimitive::Polygon(RenderPolygon {
-                points: star.points.into_iter().map(render_point).collect(),
+            RenderPrimitive::Circle(RenderCircle {
+                center: render_point(star_center(star)),
+                radius: star_point_radius(star),
                 fill: Some(Fill::new(color)),
                 stroke: None,
             }),
@@ -3663,7 +3667,28 @@ fn starfield_color(starfield: &StarFieldState, tick: u64) -> RenderColor {
     let intensity = 1.0 - STARFIELD_COLOR_ROTATE_RANGE * 0.5
         + (starfield.color_theta + tick as f32 * STARFIELD_COLOR_ROTATE_RATE).sin()
             * STARFIELD_COLOR_ROTATE_RANGE;
-    render_color(starfield.base_color.with_intensity(intensity))
+    let color = starfield.base_color.with_intensity(intensity);
+    RenderColor::rgba(
+        color.r.clamp(0.0, 1.0),
+        color.g.clamp(0.0, 1.0),
+        color.b.clamp(0.0, 1.0),
+        0.9,
+    )
+}
+
+fn star_center(star: &StarState) -> Vec2 {
+    polygon_center(&star.points)
+}
+
+fn star_point_radius(star: &StarState) -> f32 {
+    let center = star_center(star);
+    let max_radius = star
+        .points
+        .iter()
+        .map(|point| point.distance_to(center))
+        .fold(0.0, f32::max);
+    (max_radius * STARFIELD_POINT_RADIUS_SCALE)
+        .clamp(STARFIELD_POINT_MIN_RADIUS, STARFIELD_POINT_MAX_RADIUS)
 }
 
 fn render_exhaust(frame: &mut RenderFrame, ship: &ShipState) {
@@ -4615,6 +4640,10 @@ mod tests {
             for point in star.points {
                 assert!(point.distance_to(center) <= universe_radius + EPS);
             }
+            assert!(
+                star_center(star).distance_to(center) + star_point_radius(star)
+                    <= universe_radius + EPS
+            );
         }
     }
 
@@ -6236,8 +6265,8 @@ mod tests {
 
         let frame = SpacewarsScenario::render_frame(&state);
 
-        assert_eq!(circle_primitive_count(&frame), 2);
-        assert_eq!(polygon_primitive_count(&frame), 9 + star_count);
+        assert_eq!(circle_primitive_count(&frame), 2 + star_count);
+        assert_eq!(polygon_primitive_count(&frame), 9);
     }
 
     #[test]
@@ -6494,8 +6523,8 @@ mod tests {
         let labels = text_values(&frame);
 
         assert_eq!(frame.camera.center, RenderPoint::new(300.0, 300.0));
-        assert_eq!(circles, 1);
-        assert_eq!(polygons, 12 + star_count);
+        assert_eq!(circles, 1 + star_count);
+        assert_eq!(polygons, 12);
         assert_eq!(text, 2);
         assert_eq!(
             labels,
@@ -6528,7 +6557,14 @@ mod tests {
             .filter(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
             .count();
 
-        assert_eq!(circles, 2);
+        let star_count = state
+            .starfield
+            .as_ref()
+            .expect("deathmatch should create a starfield")
+            .stars
+            .len();
+
+        assert_eq!(circles, 2 + star_count);
         assert_eq!(debris_layer.primitives.len(), 1);
     }
 
@@ -6684,7 +6720,7 @@ mod tests {
             starfield_layer
                 .primitives
                 .iter()
-                .all(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+                .all(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
         );
     }
 
@@ -6708,7 +6744,7 @@ mod tests {
         let polygons = polygon_primitive_count(&frame);
 
         assert_eq!(frame.camera.center, RenderPoint::new(1200.0, 1200.0));
-        assert_eq!(circles, 2 + state.planets.len());
-        assert_eq!(polygons, 12 + state.planets.len() + star_count);
+        assert_eq!(circles, 2 + state.planets.len() + star_count);
+        assert_eq!(polygons, 12 + state.planets.len());
     }
 }

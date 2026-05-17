@@ -17,8 +17,7 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
 use engine_common::{
-    CrashBehavior, DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
-    MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+    CrashBehavior, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
     MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS,
     MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
     MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, RendererSetting, Settings,
@@ -1083,6 +1082,7 @@ fn log_settings_load_status(path: &Path, status: &LoadStatus) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine_common::DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT;
 
     fn base_args() -> Args {
         Args {
