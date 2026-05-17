@@ -2886,6 +2886,8 @@ impl ShipState {
             return;
         }
         self.wing_behavior = WingBehavior::Open;
+        self.thrust_behavior = ThrustBehavior::None;
+        self.cap_speed(MAX_SPEED);
     }
 
     fn thrust(&mut self) {
@@ -3049,6 +3051,7 @@ impl ShipState {
                     self.wing_theta = MAX_WING_THETA;
                 }
                 self.update_wing_position();
+                self.thrust_behavior = ThrustBehavior::Full;
             }
             WingBehavior::Open => {
                 self.wing_theta -= dt * WING_DELTA_SPEED;
@@ -3059,13 +3062,14 @@ impl ShipState {
                     self.wing_theta = 0.0;
                 }
                 self.update_wing_position();
+                self.cap_speed(MAX_SPEED);
                 if self.wing_behavior == WingBehavior::None {
                     self.thrust_behavior = ThrustBehavior::None;
                 }
             }
         }
 
-        if self.wing_state == WingState::Closed {
+        if self.wing_state == WingState::Closed && self.wing_behavior != WingBehavior::Open {
             self.thrust_behavior = ThrustBehavior::Full;
         }
     }
@@ -3077,7 +3081,6 @@ impl ShipState {
         self.velocity = self.velocity.normalized() * (speed * 0.8 + max_velocity * 0.15);
         self.current_max_omega =
             ((1.0 - self.wing_theta / MAX_WING_THETA) * BASE_MAX_OMEGA).max(WING_CLOSED_MAX_OMEGA);
-        self.thrust_behavior = ThrustBehavior::Full;
     }
 
     fn update_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
@@ -3085,7 +3088,8 @@ impl ShipState {
             ThrustBehavior::None => {}
             ThrustBehavior::Full => {
                 self.velocity += self.direction * self.thrust_power;
-                if self.wing_state == WingState::Closed {
+                if self.wing_state == WingState::Closed && self.wing_behavior != WingBehavior::Open
+                {
                     self.velocity +=
                         self.direction * (self.wing_theta / MAX_WING_THETA * WING_CLOSED_SPEED);
                     self.cap_speed(WING_CLOSED_SPEED);
@@ -5378,6 +5382,44 @@ mod tests {
         state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED * 2.0);
         step(&mut state, &[SpacewarsAction::thrust(0)]);
         assert_close(state.ships[0].velocity.length(), WING_CLOSED_SPEED);
+    }
+
+    #[test]
+    fn releasing_sweep_wings_without_thrust_restores_normal_speed_cap() {
+        let mut state = init_deathmatch();
+        state.ships[0].wing_state = WingState::Closed;
+        state.ships[0].wing_theta = MAX_WING_THETA;
+        state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED);
+
+        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+
+        assert_eq!(state.ships[0].wing_behavior, WingBehavior::Open);
+        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::None);
+        assert_close(state.ships[0].velocity.length(), MAX_SPEED);
+
+        while state.ships[0].wing_behavior == WingBehavior::Open {
+            step(&mut state, &[]);
+            assert!(
+                state.ships[0].velocity.length() <= MAX_SPEED + EPS,
+                "opening wings should not retain sweep speed: {}",
+                state.ships[0].velocity.length()
+            );
+        }
+    }
+
+    #[test]
+    fn releasing_sweep_wings_while_thrust_is_held_uses_normal_speed_cap() {
+        let mut state = init_deathmatch();
+        state.ships[0].wing_state = WingState::Closed;
+        state.ships[0].wing_theta = MAX_WING_THETA;
+        state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED);
+
+        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+        step(&mut state, &[SpacewarsAction::thrust(0)]);
+
+        assert_eq!(state.ships[0].wing_behavior, WingBehavior::Open);
+        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::Full);
+        assert_close(state.ships[0].velocity.length(), MAX_SPEED);
     }
 
     #[test]

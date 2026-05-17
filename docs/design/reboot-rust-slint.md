@@ -487,5 +487,5 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - Acceptance: a player can configure the common Spacewars world setup from the UI, restart with the same setup, and return to the launcher to alter it without editing `settings.toml` or using CLI flags.
 
 ### M19: Improve gameplay
-- Make "fast sweep wing" mode only apply while button is held, not as a toggle.  When released the ship should automatically slow down to max non-sweep-wing velocity.
-- Sometimes the player's ship gets stuck inside of planets.  What's the logic for keeping these separate?
+- M19a: ✅ Prevent ship/body collision response from reflecting already-separating velocity back into planets. A ship that has been pushed out of a shallow body overlap can now escape with normal thrust instead of needing sweep-wing speed.
+- M19b: ✅ Make "fast sweep wing" speed apply only while sweep wings are held/closed. Releasing the sweep-wing key clamps back to normal max forward velocity, regardless of whether forward thrust is also held.
