@@ -115,6 +115,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-seed-text: "0";
     in-out property <string> launcher-renderer: "vector";
     in-out property <string> launcher-raster-scale-text: "1.0";
+    in-out property <string> launcher-spacewars-preset: "Original";
     in-out property <string> launcher-universe-radius-text: "1200";
     in-out property <string> launcher-use-planets: "on";
     in-out property <string> launcher-asteroids-enabled: "on";
@@ -141,6 +142,7 @@ export component MainWindow inherits Window {
 
     callback launcher-start-game();
     callback launcher-start-benchmark();
+    callback launcher-apply-preset();
     callback launcher-quit();
     callback ingame-resume();
     callback ingame-restart();
@@ -452,7 +454,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 500px;
-            height: root.launcher-controls-visible ? 540px : 640px;
+            height: root.launcher-controls-visible ? 540px : 690px;
             background: #080a12f2;
             border-color: #596273;
             border-width: 1px;
@@ -478,7 +480,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 96px;
                 width: parent.width - 48px;
-                height: 418px;
+                height: 468px;
                 background: #00000000;
 
                 Text {
@@ -563,6 +565,34 @@ export component MainWindow inherits Window {
                 Text {
                     x: 0px;
                     y: 247px;
+                    text: "Preset";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 160px;
+                    y: 240px;
+                    width: 178px;
+                    height: 34px;
+                    model: ["Custom", "Original", "Small Duel", "Dense Asteroids", "Long Game"];
+                    current-value <=> root.launcher-spacewars-preset;
+                }
+
+                Button {
+                    x: 350px;
+                    y: 240px;
+                    width: parent.width - 350px;
+                    height: 34px;
+                    text: "Apply";
+                    clicked => {
+                        root.launcher-apply-preset();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 295px;
                     text: "World Radius";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -570,7 +600,7 @@ export component MainWindow inherits Window {
 
                 LineEdit {
                     x: 160px;
-                    y: 240px;
+                    y: 288px;
                     width: parent.width - 160px;
                     height: 34px;
                     text <=> root.launcher-universe-radius-text;
@@ -582,7 +612,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 295px;
+                    y: 343px;
                     text: "Planets";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -590,7 +620,7 @@ export component MainWindow inherits Window {
 
                 ComboBox {
                     x: 160px;
-                    y: 288px;
+                    y: 336px;
                     width: 118px;
                     height: 34px;
                     model: ["on", "off"];
@@ -599,7 +629,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 300px;
-                    y: 295px;
+                    y: 343px;
                     text: "Asteroids";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -607,7 +637,7 @@ export component MainWindow inherits Window {
 
                 ComboBox {
                     x: 380px;
-                    y: 288px;
+                    y: 336px;
                     width: parent.width - 380px;
                     height: 34px;
                     model: ["on", "off"];
@@ -616,7 +646,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 343px;
+                    y: 391px;
                     text: "Asteroid Rate";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -624,7 +654,7 @@ export component MainWindow inherits Window {
 
                 LineEdit {
                     x: 160px;
-                    y: 336px;
+                    y: 384px;
                     width: parent.width - 160px;
                     height: 34px;
                     text <=> root.launcher-asteroid-probability-text;
@@ -636,7 +666,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 391px;
+                    y: 439px;
                     text: "Player Health";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -644,7 +674,7 @@ export component MainWindow inherits Window {
 
                 LineEdit {
                     x: 160px;
-                    y: 384px;
+                    y: 432px;
                     width: parent.width - 160px;
                     height: 34px;
                     text <=> root.launcher-player-health-text;
@@ -656,7 +686,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 432px;
+                    y: 480px;
                     width: parent.width;
                     text: root.launcher-error-text;
                     color: #ff6f6f;
@@ -716,7 +746,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 24px;
-                y: 522px;
+                y: 570px;
                 width: 140px;
                 height: 36px;
                 text: "Start Game";
@@ -729,7 +759,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 174px;
-                y: 522px;
+                y: 570px;
                 width: 150px;
                 height: 36px;
                 text: "Start Benchmark";
@@ -741,7 +771,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 334px;
-                y: 522px;
+                y: 570px;
                 width: 142px;
                 height: 36px;
                 text: "Controls";
@@ -764,7 +794,7 @@ export component MainWindow inherits Window {
 
             Button {
                 x: parent.width - 164px;
-                y: root.launcher-controls-visible ? 456px : 582px;
+                y: root.launcher-controls-visible ? 456px : 630px;
                 width: 140px;
                 height: 36px;
                 text: "Quit";

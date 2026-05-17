@@ -32,6 +32,11 @@ slint::include_modules!();
 const MIN_RASTER_SCALE: f32 = 0.1;
 const MAX_RASTER_SCALE: f32 = 3.0;
 const DEFAULT_RASTER_SCALE: f32 = 1.0;
+const PRESET_CUSTOM: &str = "Custom";
+const PRESET_ORIGINAL: &str = "Original";
+const PRESET_SMALL_DUEL: &str = "Small Duel";
+const PRESET_DENSE_ASTEROIDS: &str = "Dense Asteroids";
+const PRESET_LONG_GAME: &str = "Long Game";
 
 #[derive(Parser, Debug)]
 #[command(name = "engine-client", about = "Spacewars scenario host")]
@@ -332,6 +337,7 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, setup: &Spacewar
         launch.raster_scale,
     )));
     let setup = setup.normalized();
+    window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
     window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
     window.set_launcher_use_planets(SharedString::from(bool_label(setup.use_planets)));
     window.set_launcher_asteroids_enabled(SharedString::from(bool_label(setup.asteroids_enabled)));
@@ -399,6 +405,11 @@ fn install_launcher_callbacks(
         );
     });
 
+    let weak = window.as_weak();
+    window.on_launcher_apply_preset(move || {
+        handle_launcher_apply_preset(&weak);
+    });
+
     window.on_launcher_quit(move || {
         if let Err(err) = slint::quit_event_loop() {
             tracing::error!(error = %err, "failed to quit event loop.");
@@ -450,6 +461,20 @@ fn handle_return_to_launcher(
     let settings = settings.read().unwrap();
     let launch = launch_from_settings(&settings);
     show_launcher(&window, &launch, &settings.spacewars);
+}
+
+fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
+    let Some(window) = weak_window.upgrade() else {
+        return;
+    };
+    window.set_launcher_error_text(SharedString::from(""));
+
+    let preset = window.get_launcher_spacewars_preset();
+    match spacewars_preset_from_label(preset.as_str()) {
+        Ok(Some(setup)) => set_spacewars_setup_fields(&window, &setup),
+        Ok(None) => {}
+        Err(message) => window.set_launcher_error_text(SharedString::from(message)),
+    }
 }
 
 fn handle_launcher_start(
@@ -592,6 +617,80 @@ fn spacewars_config_from_setup(setup: &SpacewarsSettings) -> SpacewarsConfig {
     }
 
     config
+}
+
+fn set_spacewars_setup_fields(window: &MainWindow, setup: &SpacewarsSettings) {
+    let setup = setup.normalized();
+    window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
+    window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
+    window.set_launcher_use_planets(SharedString::from(bool_label(setup.use_planets)));
+    window.set_launcher_asteroids_enabled(SharedString::from(bool_label(setup.asteroids_enabled)));
+    window.set_launcher_asteroid_probability_text(SharedString::from(format_float_setting(
+        setup.asteroid_probability_per_sec,
+    )));
+    window.set_launcher_player_health_text(SharedString::from(
+        setup.player_health_percent.to_string(),
+    ));
+}
+
+fn spacewars_preset_from_label(label: &str) -> Result<Option<SpacewarsSettings>, String> {
+    match label.trim() {
+        PRESET_CUSTOM => Ok(None),
+        PRESET_ORIGINAL => Ok(Some(original_spacewars_preset())),
+        PRESET_SMALL_DUEL => Ok(Some(small_duel_spacewars_preset())),
+        PRESET_DENSE_ASTEROIDS => Ok(Some(dense_asteroids_spacewars_preset())),
+        PRESET_LONG_GAME => Ok(Some(long_game_spacewars_preset())),
+        other => Err(format!("Unknown preset {other:?}.")),
+    }
+}
+
+fn preset_label_for_setup(setup: &SpacewarsSettings) -> &'static str {
+    let setup = setup.normalized();
+    if setup == original_spacewars_preset() {
+        PRESET_ORIGINAL
+    } else if setup == small_duel_spacewars_preset() {
+        PRESET_SMALL_DUEL
+    } else if setup == dense_asteroids_spacewars_preset() {
+        PRESET_DENSE_ASTEROIDS
+    } else if setup == long_game_spacewars_preset() {
+        PRESET_LONG_GAME
+    } else {
+        PRESET_CUSTOM
+    }
+}
+
+fn original_spacewars_preset() -> SpacewarsSettings {
+    SpacewarsSettings::default()
+}
+
+fn small_duel_spacewars_preset() -> SpacewarsSettings {
+    SpacewarsSettings {
+        universe_radius: 600,
+        use_planets: false,
+        asteroids_enabled: false,
+        asteroid_probability_per_sec: 0.0,
+        player_health_percent: 100,
+    }
+}
+
+fn dense_asteroids_spacewars_preset() -> SpacewarsSettings {
+    SpacewarsSettings {
+        universe_radius: 1200,
+        use_planets: true,
+        asteroids_enabled: true,
+        asteroid_probability_per_sec: 80.0,
+        player_health_percent: 100,
+    }
+}
+
+fn long_game_spacewars_preset() -> SpacewarsSettings {
+    SpacewarsSettings {
+        universe_radius: 2400,
+        use_planets: true,
+        asteroids_enabled: true,
+        asteroid_probability_per_sec: 10.0,
+        player_health_percent: 250,
+    }
 }
 
 fn launcher_selections_from_window(window: &MainWindow) -> Result<LauncherSelections, String> {
@@ -957,6 +1056,62 @@ mod tests {
         assert!(spacewars_setup_from_values("1200", "on", "sometimes", "20", "100").is_err());
         assert!(spacewars_setup_from_values("1200", "on", "on", "dense", "100").is_err());
         assert!(spacewars_setup_from_values("1200", "on", "on", "20", "strong").is_err());
+    }
+
+    #[test]
+    fn spacewars_presets_map_to_setup_fields() {
+        assert_eq!(
+            spacewars_preset_from_label(PRESET_ORIGINAL).unwrap(),
+            Some(SpacewarsSettings::default())
+        );
+        assert_eq!(
+            spacewars_preset_from_label(PRESET_SMALL_DUEL).unwrap(),
+            Some(SpacewarsSettings {
+                universe_radius: 600,
+                use_planets: false,
+                asteroids_enabled: false,
+                asteroid_probability_per_sec: 0.0,
+                player_health_percent: 100,
+            })
+        );
+        assert_eq!(
+            spacewars_preset_from_label(PRESET_DENSE_ASTEROIDS).unwrap(),
+            Some(SpacewarsSettings {
+                universe_radius: 1200,
+                use_planets: true,
+                asteroids_enabled: true,
+                asteroid_probability_per_sec: 80.0,
+                player_health_percent: 100,
+            })
+        );
+        assert_eq!(
+            spacewars_preset_from_label(PRESET_LONG_GAME).unwrap(),
+            Some(SpacewarsSettings {
+                universe_radius: 2400,
+                use_planets: true,
+                asteroids_enabled: true,
+                asteroid_probability_per_sec: 10.0,
+                player_health_percent: 250,
+            })
+        );
+        assert_eq!(spacewars_preset_from_label(PRESET_CUSTOM).unwrap(), None);
+        assert!(spacewars_preset_from_label("Arcade").is_err());
+    }
+
+    #[test]
+    fn setup_fields_infer_matching_preset_label() {
+        assert_eq!(
+            preset_label_for_setup(&SpacewarsSettings::default()),
+            PRESET_ORIGINAL
+        );
+        assert_eq!(
+            preset_label_for_setup(&small_duel_spacewars_preset()),
+            PRESET_SMALL_DUEL
+        );
+
+        let mut custom = SpacewarsSettings::default();
+        custom.universe_radius = 1800;
+        assert_eq!(preset_label_for_setup(&custom), PRESET_CUSTOM);
     }
 
     #[test]
