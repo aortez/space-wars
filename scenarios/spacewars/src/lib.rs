@@ -12,7 +12,7 @@ use engine_common::{
     TickModel,
 };
 use engine_core::{
-    Bounds2, BoundsList, Circle, Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
+    Bounds2, BoundsList, Circle, Color, Line, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
     constants::{
         COLLISION_TRANSLATION_SCALAR, DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, REALLY_SMALL,
     },
@@ -26,6 +26,7 @@ const SUN_LAYER: i32 = -15;
 const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
 const SHIP_LAYER: i32 = 0;
+const LASER_LAYER: i32 = 2;
 const BOUNDS_HIGH_LAYER: i32 = 4;
 const BOUNDS_LOW_LAYER: i32 = 5;
 const LABEL_LAYER: i32 = 10;
@@ -57,6 +58,8 @@ const CANNON_SHELL_DAMAGE_SCALAR: f32 = 0.1;
 const CANNON_SHELL_OMEGA: f32 = 2.0;
 const CANNON_SHELL_SPAWN_OFFSET: f32 = 5.0;
 const CANNON_SHELL_RADIUS: f32 = 2.0;
+const LASER_GROWTH_PER_TICK: f32 = 50.0;
+const LASER_BASE_DAMAGE: f32 = 10.0;
 const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
 const MAX_ASTEROIDS: usize = 100;
 const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
@@ -134,6 +137,7 @@ pub struct SpacewarsState {
     pub debris: Vec<DebrisState>,
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
+    pub laser_hits: Vec<LaserHit>,
     pub ship_collisions: Vec<ShipCollision>,
     pub ship_debris_collisions: Vec<ShipDebrisCollision>,
     pub debris_collisions: Vec<DebrisCollision>,
@@ -195,6 +199,19 @@ pub enum DebrisKind {
     Shell,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LaserBeamState {
+    pub head: Vec2,
+    pub tail: Vec2,
+    pub direction: Vec2,
+}
+
+impl LaserBeamState {
+    fn length(self) -> f32 {
+        self.head.distance_to(self.tail)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BodyCollision {
     pub ship: usize,
@@ -211,6 +228,21 @@ pub enum BodyId {
 pub struct ShipCollision {
     pub a: usize,
     pub b: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LaserHit {
+    pub shooter: usize,
+    pub target: LaserTarget,
+    pub point: Vec2,
+    pub damage: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaserTarget {
+    Ship(usize),
+    Debris(usize),
+    Body(BodyId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -270,6 +302,7 @@ pub struct ShipState {
     pub turn_behavior: TurnBehavior,
     pub laser_firing: bool,
     pub cannon_firing: bool,
+    pub laser_beam: Option<LaserBeamState>,
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
@@ -474,6 +507,7 @@ impl Scenario for SpacewarsScenario {
             debris: Vec::new(),
             sun,
             planets,
+            laser_hits: Vec::new(),
             ship_collisions: Vec::new(),
             ship_debris_collisions: Vec::new(),
             debris_collisions: Vec::new(),
@@ -501,6 +535,8 @@ impl Scenario for SpacewarsScenario {
         }
         let new_shells = spawn_cannon_shells(state, dt);
         state.debris.extend(new_shells);
+        update_ship_lasers(state);
+        state.laser_hits = resolve_laser_hits(state);
 
         apply_world_gravity(state);
         state.ship_debris_collisions = resolve_ship_debris_collisions(state);
@@ -693,6 +729,141 @@ fn spawn_cannon_shells(state: &mut SpacewarsState, dt: f32) -> Vec<DebrisState> 
         .iter_mut()
         .filter_map(|ship| ship.update_cannon(dt, state.tick))
         .collect()
+}
+
+fn update_ship_lasers(state: &mut SpacewarsState) {
+    for ship in &mut state.ships {
+        if ship.cannon_firing {
+            ship.laser_beam = None;
+            continue;
+        }
+
+        ship.update_laser();
+    }
+}
+
+fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
+    let bodies = body_physics(state);
+    let ship_bounds = state
+        .ships
+        .iter()
+        .map(|ship| {
+            let triangles = ship_triangles(ship);
+            (
+                ship_low_bounds(&triangles),
+                Bounds2::List(ship_high_bounds(&triangles)),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut hits = Vec::new();
+
+    for shooter in 0..state.ships.len() {
+        let Some(beam) = state.ships[shooter].laser_beam else {
+            continue;
+        };
+
+        let Some(hit) = nearest_laser_hit(state, shooter, beam, &ship_bounds, &bodies) else {
+            continue;
+        };
+
+        if let Some(beam) = &mut state.ships[shooter].laser_beam {
+            beam.tail = hit.point;
+        }
+        apply_laser_hit(state, hit);
+        hits.push(hit);
+    }
+
+    hits
+}
+
+fn nearest_laser_hit(
+    state: &SpacewarsState,
+    shooter: usize,
+    beam: LaserBeamState,
+    ship_bounds: &[(Circle, Bounds2)],
+    bodies: &[BodyPhysics],
+) -> Option<LaserHit> {
+    let line = Line::new(beam.head, beam.tail);
+    let damage = laser_damage(beam);
+    let mut nearest: Option<LaserHit> = None;
+
+    let mut consider_hit = |target: LaserTarget, point: Vec2| {
+        let hit = LaserHit {
+            shooter,
+            target,
+            point,
+            damage,
+        };
+        match nearest {
+            Some(current)
+                if current.point.distance_to(beam.head) <= hit.point.distance_to(beam.head) => {}
+            _ => nearest = Some(hit),
+        }
+    };
+
+    for (debris_index, debris) in state.debris.iter().enumerate() {
+        if debris.dead {
+            continue;
+        }
+
+        let bounds = debris_bounds(debris);
+        if !line.intersects_circle(bounds) {
+            continue;
+        }
+        if let Some(point) = line.nearest_circle_intersection(bounds) {
+            consider_hit(LaserTarget::Debris(debris_index), point);
+        }
+    }
+
+    for body in bodies {
+        let bounds = Circle::new(body.position, body.radius);
+        if !line.intersects_circle(bounds) {
+            continue;
+        }
+        if let Some(point) = line.nearest_circle_intersection(bounds) {
+            consider_hit(LaserTarget::Body(body.id), point);
+        }
+    }
+
+    for (target, (low, high)) in ship_bounds.iter().enumerate() {
+        if target == shooter {
+            continue;
+        }
+        if !Bounds2::Line(line).intersects(&Bounds2::Circle(*low)) {
+            continue;
+        }
+        if let Some(point) = nearest_bounds_intersection(line, high) {
+            consider_hit(LaserTarget::Ship(target), point);
+        }
+    }
+
+    nearest
+}
+
+fn nearest_bounds_intersection(line: Line, bounds: &Bounds2) -> Option<Vec2> {
+    match bounds {
+        Bounds2::Circle(circle) => line.nearest_circle_intersection(*circle),
+        Bounds2::List(list) => list
+            .iter()
+            .filter_map(|bounds| nearest_bounds_intersection(line, bounds))
+            .min_by(|a, b| {
+                a.distance_to(line.start)
+                    .total_cmp(&b.distance_to(line.start))
+            }),
+        Bounds2::Line(_) => None,
+    }
+}
+
+fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
+    match hit.target {
+        LaserTarget::Ship(ship) => state.ships[ship].translate_life(-hit.damage),
+        LaserTarget::Debris(debris) => state.debris[debris].translate_life(-hit.damage),
+        LaserTarget::Body(_) => {}
+    }
+}
+
+fn laser_damage(beam: LaserBeamState) -> f32 {
+    LASER_BASE_DAMAGE / beam.length().max(REALLY_SMALL)
 }
 
 fn asteroid_count(state: &SpacewarsState) -> usize {
@@ -1570,6 +1741,7 @@ impl ShipState {
             turn_behavior: TurnBehavior::None,
             laser_firing: false,
             cannon_firing: false,
+            laser_beam: None,
             life,
             life_max: life,
             dead: false,
@@ -1672,6 +1844,26 @@ impl ShipState {
 
         self.cannon_cooldown_remaining = (self.cannon_cooldown_remaining - dt).max(0.0);
         shell
+    }
+
+    fn update_laser(&mut self) {
+        if !self.laser_firing {
+            self.laser_beam = None;
+            return;
+        }
+
+        let head = ship_mount_center(self);
+        let direction = self.direction.normalized();
+        let length = self
+            .laser_beam
+            .map(|beam| beam.length() + LASER_GROWTH_PER_TICK)
+            .unwrap_or(LASER_GROWTH_PER_TICK);
+
+        self.laser_beam = Some(LaserBeamState {
+            head,
+            tail: head + direction * length,
+            direction,
+        });
     }
 
     fn update(&mut self, dt: f32) {
@@ -1874,6 +2066,10 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
         render_ship(&mut frame, ship);
     }
 
+    for ship in &state.ships {
+        render_laser(&mut frame, ship);
+    }
+
     for debris in &state.debris {
         render_debris(&mut frame, debris);
     }
@@ -1915,6 +2111,29 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
             stroke: Some(Stroke::new(RenderColor::rgba(0.74, 0.78, 0.84, 0.85), 0.75)),
         }),
     );
+}
+
+fn render_laser(frame: &mut RenderFrame, ship: &ShipState) {
+    let Some(beam) = ship.laser_beam else {
+        return;
+    };
+
+    let colors = [
+        (RenderColor::rgba(1.0, 0.0, 0.0, 0.9), 0.75),
+        (RenderColor::rgba(150.0 / 255.0, 0.0, 0.0, 0.75), 1.5),
+        (RenderColor::rgba(75.0 / 255.0, 0.0, 0.0, 0.55), 2.0),
+    ];
+
+    for (color, width) in colors {
+        frame.push_primitive(
+            LASER_LAYER,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(beam.head),
+                render_point(beam.tail),
+                Stroke::new(color, width),
+            )),
+        );
+    }
 }
 
 fn render_body(
@@ -2409,6 +2628,7 @@ mod tests {
         assert_eq!(state.players[1].name, "Player 2");
         assert!(state.sun.is_none());
         assert!(state.planets.is_empty());
+        assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
         assert!(state.debris_collisions.is_empty());
@@ -2936,6 +3156,7 @@ mod tests {
         assert_eq!(state.ships[1].position, start_positions[1]);
         assert_eq!(state.ships[0].velocity, Vec2::ZERO);
         assert_eq!(state.ships[1].velocity, Vec2::ZERO);
+        assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
         assert!(state.debris_collisions.is_empty());
@@ -3099,6 +3320,190 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    #[test]
+    fn cannon_shell_damages_other_ship_and_is_removed() {
+        let mut state = init_deathmatch_no_asteroids();
+        let shell_spawn_position = ship_mount_center(&state.ships[0])
+            + state.ships[0].direction * CANNON_SHELL_SPAWN_OFFSET;
+        let target_low_offset =
+            ship_low_bounds(&ship_triangles(&state.ships[1])).center - state.ships[1].position;
+        state.ships[1].position = shell_spawn_position - target_low_offset;
+        let start_life = state.ships[1].life;
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert_eq!(
+            state.ship_debris_collisions,
+            vec![ShipDebrisCollision { ship: 1, debris: 0 }]
+        );
+        assert!(state.ships[1].life < start_life);
+        assert!(
+            state
+                .debris
+                .iter()
+                .all(|debris| debris.kind != DebrisKind::Shell)
+        );
+    }
+
+    #[test]
+    fn cannon_shell_damages_asteroid_and_is_removed() {
+        let mut state = init_deathmatch_no_asteroids();
+        let shell_spawn_position = ship_mount_center(&state.ships[0])
+            + state.ships[0].direction * CANNON_SHELL_SPAWN_OFFSET;
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            shell_spawn_position,
+            Vec2::ZERO,
+            20.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let start_life = state.debris[0].life;
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert_eq!(
+            state.debris_collisions,
+            vec![DebrisCollision { a: 0, b: 1 }]
+        );
+        assert!(start_life > 0.0);
+        assert!(state.debris.is_empty());
+    }
+
+    #[test]
+    fn cannon_shell_hits_body_and_is_removed() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        let shell_position = state.debris[0].position;
+        state.sun = Some(SunState {
+            position: shell_position,
+            radius: 5.0,
+            mass: 0.0,
+            color: Color::YELLOW,
+        });
+
+        step(&mut state, &[]);
+
+        assert_eq!(
+            state.debris_body_collisions,
+            vec![DebrisBodyCollision {
+                debris: 0,
+                body: BodyId::Sun,
+            }]
+        );
+        assert!(state.debris.is_empty());
+    }
+
+    #[test]
+    fn fire_laser_starts_beam_and_hold_extends_it() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        let first = state.ships[0].laser_beam.expect("laser should start");
+        assert_close(first.length(), LASER_GROWTH_PER_TICK);
+        assert_close(
+            laser_damage(first),
+            LASER_BASE_DAMAGE / LASER_GROWTH_PER_TICK,
+        );
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        let second = state.ships[0].laser_beam.expect("laser should continue");
+        assert_close(second.length(), LASER_GROWTH_PER_TICK * 2.0);
+        assert_close(
+            laser_damage(second),
+            LASER_BASE_DAMAGE / (LASER_GROWTH_PER_TICK * 2.0),
+        );
+    }
+
+    #[test]
+    fn fire_laser_halt_clears_beam() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        assert!(state.ships[0].laser_beam.is_some());
+
+        step(&mut state, &[SpacewarsAction::fire_laser_halt(0)]);
+
+        assert!(state.ships[0].laser_beam.is_none());
+        assert!(state.laser_hits.is_empty());
+    }
+
+    #[test]
+    fn laser_hits_nearest_target_and_truncates_beam() {
+        let mut state = init_deathmatch_no_asteroids();
+        let head = ship_mount_center(&state.ships[0]);
+        let asteroid_center = head + state.ships[0].direction * 40.0;
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            asteroid_center,
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let target_low_offset =
+            ship_low_bounds(&ship_triangles(&state.ships[1])).center - state.ships[1].position;
+        state.ships[1].position = head + state.ships[0].direction * 90.0 - target_low_offset;
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+
+        let beam = state.ships[0]
+            .laser_beam
+            .expect("beam should remain active");
+        let expected_hit = Line::new(
+            head,
+            head + state.ships[0].direction * LASER_GROWTH_PER_TICK,
+        )
+        .nearest_circle_intersection(Circle::new(asteroid_center, 5.0))
+        .expect("asteroid should intersect first beam");
+
+        assert_eq!(state.laser_hits.len(), 1);
+        assert_eq!(state.laser_hits[0].target, LaserTarget::Debris(0));
+        assert_vec_close(state.laser_hits[0].point, expected_hit);
+        assert_vec_close(beam.tail, expected_hit);
+        assert!(state.ships[1].life == state.ships[1].life_max);
+    }
+
+    #[test]
+    fn cannon_input_suppresses_laser_for_that_tick() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(
+            &mut state,
+            &[
+                SpacewarsAction::fire_laser(0),
+                SpacewarsAction::fire_cannon(0),
+            ],
+        );
+
+        assert!(state.ships[0].laser_beam.is_none());
+        assert_eq!(
+            state
+                .debris
+                .iter()
+                .filter(|debris| debris.kind == DebrisKind::Shell)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn render_frame_includes_active_laser_lines() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        let frame = SpacewarsScenario::render_frame(&state);
+        let lines = frame
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter(|primitive| matches!(primitive, RenderPrimitive::Line(_)))
+            .count();
+
+        assert_eq!(lines, 3);
     }
 
     #[test]
