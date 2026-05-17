@@ -23,6 +23,7 @@ pub(crate) struct ClientInput {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum GameKey {
+    Reset,
     P1Wing,
     P1Thrust,
     P1Reverse,
@@ -63,6 +64,12 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
 }
 
 impl ClientInput {
+    pub(crate) fn take_reset_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::Reset);
+        self.released.remove(&GameKey::Reset);
+        requested
+    }
+
     pub(crate) fn actions_for_spacewars(&mut self) -> Vec<Action> {
         let mut actions = Vec::new();
 
@@ -180,6 +187,7 @@ fn mapped_key_event(event: &WindowEvent) -> Option<(GameKey, ElementState)> {
 
 fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
     match code {
+        KeyCode::KeyR => Some(GameKey::Reset),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
         KeyCode::KeyS => Some(GameKey::P1Reverse),
@@ -280,5 +288,15 @@ mod tests {
             game_key_from_key_code(KeyCode::End),
             Some(GameKey::P2Cannon)
         );
+    }
+
+    #[test]
+    fn reset_key_is_one_shot_host_control() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::Reset);
+
+        assert!(input.take_reset_requested());
+        assert!(!input.take_reset_requested());
     }
 }

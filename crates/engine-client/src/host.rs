@@ -96,7 +96,8 @@ pub fn start_scenario_loop(
     scenario: &str,
     seed: u64,
 ) -> Result<Timer, HostError> {
-    let mut scenario = HostedScenario::new(scenario, seed)?;
+    let scenario_name = scenario.to_string();
+    let mut scenario = HostedScenario::new(&scenario_name, seed)?;
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
     let input = std::rc::Rc::new(std::cell::RefCell::new(ClientInput::default()));
@@ -119,6 +120,8 @@ pub fn start_scenario_loop(
         let mut input = input.borrow_mut();
         step_scenario(
             &mut scenario,
+            &scenario_name,
+            seed,
             tick_model,
             fixed_dt,
             elapsed,
@@ -134,12 +137,29 @@ pub fn start_scenario_loop(
 
 fn step_scenario(
     scenario: &mut HostedScenario,
+    scenario_name: &str,
+    seed: u64,
     tick_model: TickModel,
     fixed_dt: Option<Duration>,
     elapsed: Duration,
     accumulator: &mut Duration,
     input: &mut ClientInput,
 ) {
+    if input.take_reset_requested() && scenario.is_game_over() {
+        match HostedScenario::new(scenario_name, seed) {
+            Ok(reset) => {
+                *scenario = reset;
+                *accumulator = Duration::ZERO;
+                input.clear();
+                tracing::info!(scenario = scenario_name, seed, "started new game.");
+            }
+            Err(err) => {
+                tracing::error!(error = %err, scenario = scenario_name, "failed to start new game.");
+            }
+        }
+        return;
+    }
+
     match (tick_model, fixed_dt) {
         (TickModel::FixedTimestep { .. }, Some(dt)) => {
             *accumulator += elapsed;
@@ -238,6 +258,13 @@ impl HostedScenario {
         }
     }
 
+    fn is_game_over(&self) -> bool {
+        match self {
+            Self::Null(_) => false,
+            Self::Spacewars(state) => state.winner.is_some(),
+        }
+    }
+
     pub(crate) fn actions_from_input(&self, input: &mut ClientInput) -> Vec<Action> {
         match self {
             Self::Null(_) => Vec::new(),
@@ -294,7 +321,7 @@ fn spacewars_panel_state(state: &SpacewarsState) -> SpacewarsPanelState {
         winner_text: state
             .winner
             .and_then(|winner| state.players.get(winner))
-            .map(|player| format!("Game Over! {} Wins!", player.name)),
+            .map(|player| format!("Game Over: P{} Wins - Press R", player.id + 1)),
     }
 }
 
@@ -478,6 +505,49 @@ mod tests {
 
         assert_eq!(panel.player_1.status, "Eliminated");
         assert_eq!(panel.player_1.status_fraction, 0.0);
-        assert_eq!(panel.winner_text, Some("Game Over! Player 2 Wins!".into()));
+        assert_eq!(
+            panel.winner_text,
+            Some("Game Over: P2 Wins - Press R".into())
+        );
+    }
+
+    #[test]
+    fn reset_key_restarts_game_over_spacewars_with_same_seed() {
+        let mut scenario = HostedScenario::new("spacewars", 42).unwrap();
+        let expected = HostedScenario::new("spacewars", 42).unwrap();
+        let HostedScenario::Spacewars(state) = &mut scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        state.tick = 120;
+        state.winner = Some(1);
+        state.players[0].eliminated = true;
+        state.ships[0].position.x += 50.0;
+
+        let mut input = ClientInput::default();
+        input.press(input::GameKey::Reset);
+        let mut accumulator = Duration::from_secs(1);
+
+        step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+        );
+
+        let HostedScenario::Spacewars(state) = &scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        let HostedScenario::Spacewars(expected) = &expected else {
+            panic!("spacewars scenario should not host null");
+        };
+        assert_eq!(accumulator, Duration::ZERO);
+        assert_eq!(state.tick, 0);
+        assert_eq!(state.winner, None);
+        assert!(!state.players[0].eliminated);
+        assert_eq!(state.ships[0].position, expected.ships[0].position);
     }
 }

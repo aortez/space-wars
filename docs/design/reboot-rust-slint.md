@@ -445,3 +445,11 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M15f: ✅ Add the game-over lifecycle: a ship lost with no owned planets eliminates that player, the surviving player is marked as winner, input/simulation freeze after a winner, and the Slint center panel reports the result.
 - Add enough remaining UI/HUD to support local two-player arcade play.
 - Acceptance: local two-player arcade mode is playable end-to-end with default config.
+
+### M16: Local-play finish pass
+
+- Close the gaps between "playable" and "comfortable to play repeatedly" before opening a larger subsystem.
+- M16a: ✅ Add post-game reset/new-game flow. After game over, the client prompts for `R`; pressing it reinitializes the current scenario with the same CLI seed, clears held input, and resumes local play.
+- M16b: Do a short original-parity/manual sweep: compare the current visible arcade behavior against the Java reference, capture intentional deviations, and fix small rough edges that materially affect local play.
+- M16c: Decide the next major direction after the arcade loop is stable: audio/sounds, Raspberry Pi packaging/runtime work, agent/observation interface, or scenario/menu/settings UI.
+- Acceptance: local play can be run, finished, restarted, and sanity-checked without restarting the process.
