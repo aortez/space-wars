@@ -453,8 +453,8 @@ export component MainWindow inherits Window {
         Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 500px;
-            height: root.launcher-controls-visible ? 540px : 690px;
+            width: root.launcher-controls-visible ? 500px : 580px;
+            height: root.launcher-controls-visible ? 540px : 710px;
             background: #080a12f2;
             border-color: #596273;
             border-width: 1px;
@@ -475,222 +475,303 @@ export component MainWindow inherits Window {
                 font-size: 14px;
             }
 
-            Rectangle {
+            VerticalLayout {
                 visible: !root.launcher-controls-visible;
                 x: 24px;
                 y: 96px;
                 width: parent.width - 48px;
-                height: 468px;
-                background: #00000000;
+                height: parent.height - 118px;
+                spacing: 6px;
 
-                Text {
-                    x: 0px;
-                    y: 5px;
-                    text: "Scenario";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 160px;
-                    y: 0px;
-                    width: parent.width - 160px;
+                HorizontalLayout {
                     height: 34px;
-                    model: ["spacewars", "null"];
-                    current-value <=> root.launcher-scenario;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Scenario";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["spacewars", "null"];
+                        current-value <=> root.launcher-scenario;
+                    }
                 }
 
-                Text {
-                    x: 0px;
-                    y: 55px;
-                    text: "Seed";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                LineEdit {
-                    x: 160px;
-                    y: 48px;
-                    width: parent.width - 160px;
+                HorizontalLayout {
                     height: 34px;
-                    text <=> root.launcher-seed-text;
-                    placeholder-text: "0";
-                    accepted => {
-                        root.launcher-start-game();
+                    spacing: 10px;
+
+                    Text {
+                        text: "Seed";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-seed-text;
+                        placeholder-text: "0";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Renderer";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["vector", "raster"];
+                        current-value <=> root.launcher-renderer;
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Raster Scale";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["1.0", "1.5", "2.0", "3.0"];
+                        current-value <=> root.launcher-raster-scale-text;
                     }
                 }
 
                 Text {
-                    x: 0px;
-                    y: 103px;
-                    text: "Renderer";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 160px;
-                    y: 96px;
-                    width: parent.width - 160px;
-                    height: 34px;
-                    model: ["vector", "raster"];
-                    current-value <=> root.launcher-renderer;
-                }
-
-                Text {
-                    x: 0px;
-                    y: 151px;
-                    text: "Raster Scale";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 160px;
-                    y: 144px;
-                    width: parent.width - 160px;
-                    height: 34px;
-                    model: ["1.0", "1.5", "2.0", "3.0"];
-                    current-value <=> root.launcher-raster-scale-text;
-                }
-
-                Text {
-                    x: 0px;
-                    y: 204px;
                     text: "Game Setup";
                     color: #e6edf7;
                     font-size: 13px;
+                    height: 22px;
+                    vertical-alignment: bottom;
                 }
 
-                Text {
-                    x: 0px;
-                    y: 247px;
-                    text: "Preset";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 160px;
-                    y: 240px;
-                    width: 178px;
+                HorizontalLayout {
                     height: 34px;
-                    model: ["Custom", "Original", "Small Duel", "Dense Asteroids", "Long Game"];
-                    current-value <=> root.launcher-spacewars-preset;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Preset";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["Custom", "Original", "Small Duel", "Dense Asteroids", "Long Game"];
+                        current-value <=> root.launcher-spacewars-preset;
+                    }
+
+                    Button {
+                        width: 150px;
+                        text: "Apply";
+                        clicked => {
+                            root.launcher-apply-preset();
+                        }
+                    }
                 }
 
-                Button {
-                    x: 350px;
-                    y: 240px;
-                    width: parent.width - 350px;
+                HorizontalLayout {
                     height: 34px;
-                    text: "Apply";
-                    clicked => {
-                        root.launcher-apply-preset();
+                    spacing: 10px;
+
+                    Text {
+                        text: "World Radius";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-universe-radius-text;
+                        placeholder-text: "1200";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Planets";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["on", "off"];
+                        current-value <=> root.launcher-use-planets;
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Asteroids";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    ComboBox {
+                        horizontal-stretch: 1;
+                        model: ["on", "off"];
+                        current-value <=> root.launcher-asteroids-enabled;
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Asteroid Rate";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-asteroid-probability-text;
+                        placeholder-text: "20.0";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 34px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Player Health";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-player-health-text;
+                        placeholder-text: "100";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
                     }
                 }
 
                 Text {
-                    x: 0px;
-                    y: 295px;
-                    text: "World Radius";
+                    text: "Setup: " + root.launcher-spacewars-preset + " | radius " + root.launcher-universe-radius-text + " | health " + root.launcher-player-health-text + "%";
                     color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                LineEdit {
-                    x: 160px;
-                    y: 288px;
-                    width: parent.width - 160px;
-                    height: 34px;
-                    text <=> root.launcher-universe-radius-text;
-                    placeholder-text: "1200";
-                    accepted => {
-                        root.launcher-start-game();
-                    }
+                    font-size: 12px;
+                    height: 16px;
                 }
 
                 Text {
-                    x: 0px;
-                    y: 343px;
-                    text: "Planets";
+                    text: "Planets " + root.launcher-use-planets + " | asteroids " + root.launcher-asteroids-enabled + " @ " + root.launcher-asteroid-probability-text + "/s";
                     color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 160px;
-                    y: 336px;
-                    width: 118px;
-                    height: 34px;
-                    model: ["on", "off"];
-                    current-value <=> root.launcher-use-planets;
+                    font-size: 12px;
+                    height: 16px;
                 }
 
                 Text {
-                    x: 300px;
-                    y: 343px;
-                    text: "Asteroids";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                ComboBox {
-                    x: 380px;
-                    y: 336px;
-                    width: parent.width - 380px;
-                    height: 34px;
-                    model: ["on", "off"];
-                    current-value <=> root.launcher-asteroids-enabled;
-                }
-
-                Text {
-                    x: 0px;
-                    y: 391px;
-                    text: "Asteroid Rate";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                LineEdit {
-                    x: 160px;
-                    y: 384px;
-                    width: parent.width - 160px;
-                    height: 34px;
-                    text <=> root.launcher-asteroid-probability-text;
-                    placeholder-text: "20.0";
-                    accepted => {
-                        root.launcher-start-game();
-                    }
-                }
-
-                Text {
-                    x: 0px;
-                    y: 439px;
-                    text: "Player Health";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                }
-
-                LineEdit {
-                    x: 160px;
-                    y: 432px;
-                    width: parent.width - 160px;
-                    height: 34px;
-                    text <=> root.launcher-player-health-text;
-                    placeholder-text: "100";
-                    accepted => {
-                        root.launcher-start-game();
-                    }
-                }
-
-                Text {
-                    x: 0px;
-                    y: 480px;
-                    width: parent.width;
                     text: root.launcher-error-text;
                     color: #ff6f6f;
                     font-size: 13px;
+                    height: 18px;
+                }
+
+                HorizontalLayout {
+                    height: 36px;
+                    spacing: 10px;
+
+                    Button {
+                        width: 140px;
+                        text: "Start Game";
+                        primary: true;
+                        clicked => {
+                            root.launcher-start-game();
+                        }
+                    }
+
+                    Button {
+                        width: 150px;
+                        text: "Start Benchmark";
+                        clicked => {
+                            root.launcher-start-benchmark();
+                        }
+                    }
+
+                    Button {
+                        width: 142px;
+                        text: "Controls";
+                        clicked => {
+                            root.launcher-controls-visible = true;
+                        }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: #00000000;
+                    }
+                }
+
+                HorizontalLayout {
+                    height: 36px;
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        background: #00000000;
+                    }
+
+                    Button {
+                        width: 140px;
+                        text: "Quit";
+                        clicked => {
+                            root.launcher-quit();
+                        }
+                    }
                 }
             }
 
@@ -744,43 +825,6 @@ export component MainWindow inherits Window {
             }
 
             Button {
-                visible: !root.launcher-controls-visible;
-                x: 24px;
-                y: 570px;
-                width: 140px;
-                height: 36px;
-                text: "Start Game";
-                primary: true;
-                clicked => {
-                    root.launcher-start-game();
-                }
-            }
-
-            Button {
-                visible: !root.launcher-controls-visible;
-                x: 174px;
-                y: 570px;
-                width: 150px;
-                height: 36px;
-                text: "Start Benchmark";
-                clicked => {
-                    root.launcher-start-benchmark();
-                }
-            }
-
-            Button {
-                visible: !root.launcher-controls-visible;
-                x: 334px;
-                y: 570px;
-                width: 142px;
-                height: 36px;
-                text: "Controls";
-                clicked => {
-                    root.launcher-controls-visible = true;
-                }
-            }
-
-            Button {
                 visible: root.launcher-controls-visible;
                 x: 24px;
                 y: 456px;
@@ -793,8 +837,9 @@ export component MainWindow inherits Window {
             }
 
             Button {
+                visible: root.launcher-controls-visible;
                 x: parent.width - 164px;
-                y: root.launcher-controls-visible ? 456px : 630px;
+                y: 456px;
                 width: 140px;
                 height: 36px;
                 text: "Quit";
