@@ -29,6 +29,7 @@ const SPACEPORT_LAYER: i32 = -5;
 const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
 const LASER_LAYER: i32 = 2;
+const PARTICLE_LAYER: i32 = 3;
 const BOUNDS_HIGH_LAYER: i32 = 4;
 const BOUNDS_LOW_LAYER: i32 = 5;
 const LABEL_LAYER: i32 = 10;
@@ -86,6 +87,14 @@ const EXHAUST_DECAY: f32 = 0.1;
 const EXHAUST_MOVE_SCALE: f32 = 0.01;
 const EXHAUST_LENGTH_SCALE: f32 = 0.025;
 const SHIP_TURN_EXHAUST_SCALAR: f32 = 50.0;
+const PARTICLE_RNG_SALT: u64 = 0x9A17_1C1E_5EED;
+const MAX_PARTICLES: usize = 5_000;
+const PARTICLE_FADE_RATE: f32 = 0.5882353;
+const PARTICLE_DONE_THRESHOLD: f32 = 0.1;
+const PARTICLE_GRAVITY_FRAME_MODULUS: u64 = 3;
+const PARTICLE_GRAVITY_SCALE: f32 = 3.0;
+const PARTICLE_IMPACT_RANDOM_ANGLE: f32 = 1.5;
+const PARTICLE_IMPACT_SPEED_SCALE: f32 = 20.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -151,6 +160,7 @@ pub struct SpacewarsState {
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
     pub starfield: Option<StarFieldState>,
+    pub particles: Vec<ParticleState>,
     pub laser_hits: Vec<LaserHit>,
     pub ship_collisions: Vec<ShipCollision>,
     pub ship_debris_collisions: Vec<ShipDebrisCollision>,
@@ -376,6 +386,14 @@ pub struct ExhaustTrailState {
     pub decay: f32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParticleState {
+    pub points: [Vec2; 3],
+    pub velocity: Vec2,
+    pub color: Color,
+    pub fade_rate: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum SpacewarsActionKind {
@@ -545,6 +563,7 @@ impl Scenario for SpacewarsScenario {
             sun,
             planets,
             starfield,
+            particles: Vec::new(),
             laser_hits: Vec::new(),
             ship_collisions: Vec::new(),
             ship_debris_collisions: Vec::new(),
@@ -591,6 +610,7 @@ impl Scenario for SpacewarsScenario {
             debris.update(dt);
         }
         remove_finished_debris(state);
+        update_particles(state, dt);
         spawn_random_asteroid(state, dt);
 
         state.tick += 1;
@@ -849,6 +869,7 @@ fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
         if let Some(beam) = &mut state.ships[shooter].laser_beam {
             beam.tail = hit.point;
         }
+        spawn_laser_hit_particles(state, beam.direction, hit);
         apply_laser_hit(state, hit);
         hits.push(hit);
     }
@@ -942,6 +963,98 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
     }
 }
 
+fn spawn_laser_hit_particles(state: &mut SpacewarsState, direction: Vec2, hit: LaserHit) {
+    let Some((center, color, scale)) = impact_target_data(state, hit.target) else {
+        return;
+    };
+    spawn_impact_particles(
+        state,
+        direction,
+        center,
+        hit.point,
+        color,
+        hit.damage,
+        scale,
+        laser_target_salt(hit.target),
+    );
+}
+
+fn impact_target_data(state: &SpacewarsState, target: LaserTarget) -> Option<(Vec2, Color, f32)> {
+    match target {
+        LaserTarget::Ship(ship) => state
+            .ships
+            .get(ship)
+            .map(|ship| (ship.position, ship.color, 10.0)),
+        LaserTarget::Debris(debris) => state
+            .debris
+            .get(debris)
+            .map(|debris| (debris.position, debris.color, 10.0)),
+        LaserTarget::Body(body) => {
+            body_impact_data(state, body).map(|(position, color)| (position, color, 1.0))
+        }
+    }
+}
+
+fn body_impact_data(state: &SpacewarsState, body: BodyId) -> Option<(Vec2, Color)> {
+    match body {
+        BodyId::Sun => state.sun.map(|sun| (sun.position, sun.color)),
+        BodyId::Planet(index) => state
+            .planets
+            .get(index)
+            .map(|planet| (planet.position, planet.color)),
+    }
+}
+
+fn laser_target_salt(target: LaserTarget) -> u64 {
+    match target {
+        LaserTarget::Ship(ship) => 0x5100_0000 ^ ship as u64,
+        LaserTarget::Debris(debris) => 0xDEB0_0000 ^ debris as u64,
+        LaserTarget::Body(BodyId::Sun) => 0x5A00_0000,
+        LaserTarget::Body(BodyId::Planet(index)) => 0xB0D0_0000 ^ index as u64,
+    }
+}
+
+fn spawn_impact_particles(
+    state: &mut SpacewarsState,
+    flack_dir: Vec2,
+    entity_center: Vec2,
+    intercept: Vec2,
+    color: Color,
+    damage: f32,
+    scale: f32,
+    salt: u64,
+) {
+    let flack_count = damage * scale;
+    if flack_count <= 0.0 || state.particles.len() as f32 + flack_count > MAX_PARTICLES as f32 {
+        return;
+    }
+
+    let normal = intercept - entity_center;
+    let laser_theta = flack_dir.y.atan2(flack_dir.x);
+    let normal_theta = normal.y.atan2(normal.x);
+    let flack_theta = core::f32::consts::PI + laser_theta - (laser_theta - normal_theta) * 2.0;
+    let triangle = [
+        intercept + Vec2::from_radians(flack_theta),
+        intercept + Vec2::from_radians(flack_theta + 1.0),
+        intercept + Vec2::from_radians(flack_theta - 1.0),
+    ];
+    let mut rng = particle_rng_for_spawn(state, salt ^ damage.to_bits() as u64);
+
+    for _ in 0..flack_count.ceil() as usize {
+        if state.particles.len() >= MAX_PARTICLES {
+            break;
+        }
+
+        let rand_angle =
+            random_unit_f32(&mut rng) * random_unit_f32(&mut rng) * PARTICLE_IMPACT_RANDOM_ANGLE;
+        let velocity = Vec2::from_radians(flack_theta + rand_angle)
+            * (damage * random_unit_f32(&mut rng) * PARTICLE_IMPACT_SPEED_SCALE);
+        state
+            .particles
+            .push(ParticleState::new(triangle, velocity, color));
+    }
+}
+
 fn laser_damage(beam: LaserBeamState) -> f32 {
     LASER_BASE_DAMAGE / beam.length().max(REALLY_SMALL)
 }
@@ -963,6 +1076,16 @@ fn exhaust_rng_for_tick(seed: u64, tick: u64, owner_id: usize) -> SpacewarsRng {
         seed ^ EXHAUST_RNG_SALT
             ^ tick.wrapping_mul(0xD1B5_4A32_D192_ED03)
             ^ (owner_id as u64).wrapping_mul(0x94D0_49BB_1331_11EB),
+    )
+}
+
+fn particle_rng_for_spawn(state: &SpacewarsState, salt: u64) -> SpacewarsRng {
+    seeded_rng(
+        state.seed
+            ^ PARTICLE_RNG_SALT
+            ^ state.tick.wrapping_mul(0xB5AD_4ECEDA1CE2A9)
+            ^ (state.particles.len() as u64).wrapping_mul(0x94D0_49BB_1331_11EB)
+            ^ salt,
     )
 }
 
@@ -1112,6 +1235,27 @@ fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisC
             state.debris[collision.debris].damage_amount(state.ships[collision.ship].velocity);
         state.ships[collision.ship].translate_life(-damage);
         state.debris[collision.debris].translate_life(-damage);
+
+        let ship = &state.ships[collision.ship];
+        let debris = &state.debris[collision.debris];
+        let normal = collision_normal(ship.position, debris.position);
+        let ship_radius = ship_low_bounds(&ship_triangles(ship)).radius;
+        let intercept = ship.position - normal * ship_radius;
+        let flack_dir = if debris.velocity.length_squared() <= REALLY_SMALL {
+            -normal
+        } else {
+            -debris.velocity.normalized()
+        };
+        spawn_impact_particles(
+            state,
+            flack_dir,
+            ship.position,
+            intercept,
+            ship.color,
+            damage,
+            10.0,
+            0x51DE_BA5E ^ collision.ship as u64 ^ ((collision.debris as u64) << 16),
+        );
     }
 
     collisions
@@ -1181,20 +1325,47 @@ fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision>
     let collisions = detect_debris_collisions(state);
 
     for collision in &collisions {
-        let (a, b) = debris_pair_mut(&mut state.debris, collision.a, collision.b);
-        let damage_to_a = b.damage_amount(a.velocity);
-        a.translate_life(-damage_to_a);
-        let damage_to_b = a.damage_amount(b.velocity);
-        b.translate_life(-damage_to_b);
+        let (a_effect, b_effect) = {
+            let (a, b) = debris_pair_mut(&mut state.debris, collision.a, collision.b);
+            let damage_to_a = b.damage_amount(a.velocity);
+            a.translate_life(-damage_to_a);
+            let damage_to_b = a.damage_amount(b.velocity);
+            b.translate_life(-damage_to_b);
+            let normal = collision_normal(a.position, b.position);
+            let intercept = a.position - normal * a.radius;
+            let a_effect = (
+                normal,
+                b.position,
+                intercept,
+                b.color,
+                damage_to_a,
+                0xDEB1_0000 ^ collision.a as u64 ^ ((collision.b as u64) << 16),
+            );
+            let b_effect = (
+                -normal,
+                a.position,
+                intercept,
+                a.color,
+                damage_to_b,
+                0xDEB2_0000 ^ collision.a as u64 ^ ((collision.b as u64) << 16),
+            );
 
-        let mut a_body = EntityCollisionBody::from_debris(a);
-        let mut b_body = EntityCollisionBody::from_debris(b);
-        collide_entities(&mut a_body, &mut b_body);
+            let mut a_body = EntityCollisionBody::from_debris(a);
+            let mut b_body = EntityCollisionBody::from_debris(b);
+            collide_entities(&mut a_body, &mut b_body);
 
-        a.position = a_body.position;
-        a.velocity = a_body.velocity;
-        b.position = b_body.position;
-        b.velocity = b_body.velocity;
+            a.position = a_body.position;
+            a.velocity = a_body.velocity;
+            b.position = b_body.position;
+            b.velocity = b_body.velocity;
+
+            (a_effect, b_effect)
+        };
+
+        let (dir, center, intercept, color, damage, salt) = a_effect;
+        spawn_impact_particles(state, dir, center, intercept, color, damage, 5.0, salt);
+        let (dir, center, intercept, color, damage, salt) = b_effect;
+        spawn_impact_particles(state, dir, center, intercept, color, damage, 5.0, salt);
     }
 
     collisions
@@ -1242,6 +1413,48 @@ fn apply_debris_gravity(state: &mut SpacewarsState) {
     }
 }
 
+fn update_particles(state: &mut SpacewarsState, dt: f32) {
+    let bodies = body_physics(state);
+    let apply_gravity = state.tick % PARTICLE_GRAVITY_FRAME_MODULUS == 0;
+
+    for particle in &mut state.particles {
+        if apply_gravity {
+            for body in &bodies {
+                apply_gravity_to_velocity(
+                    particle.center(),
+                    &mut particle.velocity,
+                    body.position,
+                    body.mass,
+                    PARTICLE_GRAVITY_SCALE,
+                );
+            }
+        }
+
+        if let Some(body) = bodies
+            .iter()
+            .find(|body| particle.bounds().intersects_circle(body.high))
+        {
+            resolve_particle_body_collision(particle, body.position, body.radius);
+        }
+
+        particle.update(dt);
+    }
+
+    state.particles.retain(|particle| !particle.done());
+}
+
+fn resolve_particle_body_collision(
+    particle: &mut ParticleState,
+    body_position: Vec2,
+    body_radius: f32,
+) {
+    let bounds = particle.bounds();
+    let normal = collision_normal(bounds.center, body_position);
+    let target_center = body_position + normal * (body_radius + bounds.radius);
+    particle.translate(target_center - bounds.center);
+    particle.velocity = (particle.velocity - normal * (2.0 * particle.velocity.dot(normal))) * 0.5;
+}
+
 fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyCollision> {
     let contacts = select_debris_body_contacts(state);
     let mut collisions = Vec::new();
@@ -1252,9 +1465,30 @@ fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyC
             body: contact.body,
         });
 
-        let debris = &mut state.debris[contact.debris];
-        resolve_debris_body_collision(debris, contact.body_position, contact.body_radius);
-        apply_debris_body_collision_damage(debris);
+        let (intercept, color, damage, flack_dir) = {
+            let debris = &mut state.debris[contact.debris];
+            resolve_debris_body_collision(debris, contact.body_position, contact.body_radius);
+            let damage = apply_debris_body_collision_damage(debris);
+            let collision_dir = (contact.body_position - debris.position).normalized();
+            let intercept = contact.body_position - collision_dir * contact.body_radius;
+            let flack_dir = if collision_dir.length_squared() <= REALLY_SMALL {
+                -debris.velocity.normalized()
+            } else {
+                collision_dir
+            };
+            (intercept, debris.color, damage, flack_dir)
+        };
+
+        spawn_impact_particles(
+            state,
+            flack_dir,
+            state.debris[contact.debris].position,
+            intercept,
+            color,
+            damage,
+            5.0,
+            0xDEB0_B0D0 ^ contact.debris as u64 ^ ((contact.body_order as u64) << 16),
+        );
     }
 
     collisions
@@ -1414,14 +1648,29 @@ fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
                 planet: spaceport.planet,
             });
         } else {
-            let ship = &mut state.ships[contact.ship];
-            resolve_ship_body_collision(
-                ship,
-                contact.body_position,
-                contact.body_radius,
-                contact.ship_radius,
+            let (ship_position, ship_color, damage, intercept, flack_dir) = {
+                let ship = &mut state.ships[contact.ship];
+                resolve_ship_body_collision(
+                    ship,
+                    contact.body_position,
+                    contact.body_radius,
+                    contact.ship_radius,
+                );
+                let damage = apply_body_collision_damage(ship);
+                let collision_dir = (contact.body_position - ship.position).normalized();
+                let intercept = contact.body_position - collision_dir * contact.body_radius;
+                (ship.position, ship.color, damage, intercept, collision_dir)
+            };
+            spawn_impact_particles(
+                state,
+                flack_dir,
+                ship_position,
+                intercept,
+                ship_color,
+                damage,
+                5.0,
+                0x51B0_D000 ^ contact.ship as u64 ^ ((contact.body_order as u64) << 16),
             );
-            apply_body_collision_damage(ship);
         }
     }
 
@@ -1842,6 +2091,44 @@ impl ExhaustTrailState {
 
     fn done(self) -> bool {
         self.color.r == 0.0 && self.color.g == 0.0 && self.color.b == 0.0
+    }
+}
+
+impl ParticleState {
+    fn new(points: [Vec2; 3], velocity: Vec2, color: Color) -> Self {
+        Self {
+            points,
+            velocity,
+            color,
+            fade_rate: PARTICLE_FADE_RATE,
+        }
+    }
+
+    fn update(&mut self, dt: f32) {
+        self.translate(self.velocity * dt);
+        self.color.r -= self.fade_rate * dt;
+        self.color.g -= self.fade_rate * dt;
+        self.color.b -= self.fade_rate * dt;
+    }
+
+    fn translate(&mut self, offset: Vec2) {
+        for point in &mut self.points {
+            *point += offset;
+        }
+    }
+
+    fn center(self) -> Vec2 {
+        polygon_center(&self.points)
+    }
+
+    fn bounds(self) -> Circle {
+        polygon_bound(&self.points)
+    }
+
+    fn done(self) -> bool {
+        self.color.r <= PARTICLE_DONE_THRESHOLD
+            && self.color.g <= PARTICLE_DONE_THRESHOLD
+            && self.color.b <= PARTICLE_DONE_THRESHOLD
     }
 }
 
@@ -2268,6 +2555,8 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
         render_debris(&mut frame, debris);
     }
 
+    render_particles(&mut frame, state);
+
     for ship in &state.ships {
         render_ship_label(&mut frame, state, ship);
     }
@@ -2352,6 +2641,28 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
             stroke: Some(Stroke::new(RenderColor::rgba(0.74, 0.78, 0.84, 0.85), 0.75)),
         }),
     );
+}
+
+fn render_particles(frame: &mut RenderFrame, state: &SpacewarsState) {
+    for particle in &state.particles {
+        frame.push_primitive(
+            PARTICLE_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: particle.points.into_iter().map(render_point).collect(),
+                fill: Some(Fill::new(particle_color(particle.color))),
+                stroke: None,
+            }),
+        );
+    }
+}
+
+fn particle_color(color: Color) -> RenderColor {
+    RenderColor::rgba(
+        color.r.clamp(0.0, 1.0),
+        color.g.clamp(0.0, 1.0),
+        color.b.clamp(0.0, 1.0),
+        color.r.max(color.g).max(color.b).clamp(0.0, 0.9),
+    )
 }
 
 fn render_laser(frame: &mut RenderFrame, ship: &ShipState) {
@@ -2635,6 +2946,14 @@ mod tests {
             .count()
     }
 
+    fn test_particle_points(center: Vec2) -> [Vec2; 3] {
+        [
+            center + Vec2::new(0.0, 1.0),
+            center + Vec2::new(-0.8660254, -0.5),
+            center + Vec2::new(0.8660254, -0.5),
+        ]
+    }
+
     fn artifact_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -2888,6 +3207,7 @@ mod tests {
                 .stars
                 .is_empty()
         );
+        assert!(state.particles.is_empty());
         assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
@@ -3457,6 +3777,7 @@ mod tests {
         assert_eq!(state.ships[1].velocity, Vec2::ZERO);
         assert!(state.ships[0].exhaust_trails.is_empty());
         assert!(state.ships[1].exhaust_trails.is_empty());
+        assert!(state.particles.is_empty());
         assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
@@ -3875,6 +4196,103 @@ mod tests {
                 .primitives
                 .iter()
                 .all(|primitive| matches!(primitive, RenderPrimitive::Line(_)))
+        );
+    }
+
+    #[test]
+    fn laser_hit_spawns_deterministic_impact_particles() {
+        let mut first = init_deathmatch_no_asteroids();
+        let mut replay = init_deathmatch_no_asteroids();
+        let head = ship_mount_center(&first.ships[0]);
+        let asteroid_center = head + first.ships[0].direction * 40.0;
+
+        for state in [&mut first, &mut replay] {
+            state.debris.push(DebrisState::new(
+                DebrisKind::Asteroid,
+                asteroid_center,
+                Vec2::ZERO,
+                5.0,
+                ASTEROID_DAMAGE_SCALAR,
+                Color::DIM_GREY,
+            ));
+            step(state, &[SpacewarsAction::fire_laser(0)]);
+        }
+
+        assert_eq!(first.particles, replay.particles);
+        assert_eq!(first.laser_hits.len(), 1);
+        assert_eq!(first.particles.len(), 2);
+        assert!(first.particles.iter().all(|particle| {
+            particle.velocity.length() > 0.0 && particle.color.r < Color::DIM_GREY.r
+        }));
+    }
+
+    #[test]
+    fn particles_get_gravity_every_third_frame() {
+        let mut state = init_deathmatch_no_asteroids();
+        let body_radius = 10.0;
+        let body_mass = body_mass(body_radius);
+        let center = universe_center(state.config.universe_radius as f32);
+        state.sun = Some(SunState {
+            position: center + Vec2::new(100.0, 0.0),
+            radius: body_radius,
+            mass: body_mass,
+            color: Color::YELLOW,
+        });
+        state.particles.push(ParticleState::new(
+            test_particle_points(center),
+            Vec2::ZERO,
+            Color::WHITE,
+        ));
+
+        step(&mut state, &[]);
+        let expected_velocity =
+            Vec2::X * gravity_acceleration_attracted_to(body_mass, 100.0, PARTICLE_GRAVITY_SCALE);
+        assert_vec_close(state.particles[0].velocity, expected_velocity);
+
+        step(&mut state, &[]);
+
+        assert_vec_close(state.particles[0].velocity, expected_velocity);
+    }
+
+    #[test]
+    fn faded_particles_are_removed() {
+        let mut state = init_deathmatch_no_asteroids();
+        let center = universe_center(state.config.universe_radius as f32);
+        state.particles.push(ParticleState::new(
+            test_particle_points(center),
+            Vec2::ZERO,
+            Color::rgb(0.101, 0.101, 0.101),
+        ));
+
+        step(&mut state, &[]);
+
+        assert!(state.particles.is_empty());
+    }
+
+    #[test]
+    fn render_frame_includes_particle_polygons_above_ships() {
+        let mut state = init_deathmatch_no_asteroids();
+        let center = universe_center(state.config.universe_radius as f32);
+        state.particles.push(ParticleState::new(
+            test_particle_points(center),
+            Vec2::ZERO,
+            Color::WHITE,
+        ));
+
+        let frame = SpacewarsScenario::render_frame(&state);
+        let particle_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == PARTICLE_LAYER)
+            .expect("particles should render on their own layer");
+
+        assert_eq!(particle_layer.primitives.len(), 1);
+        assert!(PARTICLE_LAYER > SHIP_LAYER);
+        assert!(
+            particle_layer
+                .primitives
+                .iter()
+                .all(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
         );
     }
 
