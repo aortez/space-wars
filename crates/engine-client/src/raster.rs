@@ -443,7 +443,7 @@ impl<'a> Canvas<'a> {
                 );
             } else {
                 for primitive in &layer.primitives {
-                    self.draw_primitive(frame.camera, viewport, clip, primitive);
+                    self.draw_primitive(layer.z, frame.camera, viewport, clip, primitive);
                 }
             }
             timings.add_player_layer(layer.z, layer_started.elapsed());
@@ -493,7 +493,7 @@ impl<'a> Canvas<'a> {
 
             for primitive in &layer.primitives {
                 if include(layer.z, primitive) {
-                    self.draw_primitive(frame.camera, viewport, clip, primitive);
+                    self.draw_primitive(layer.z, frame.camera, viewport, clip, primitive);
                 }
             }
         }
@@ -516,13 +516,14 @@ impl<'a> Canvas<'a> {
                 continue;
             };
             if include(layer.z, primitive) {
-                self.draw_primitive(camera, viewport, clip, primitive);
+                self.draw_primitive(layer.z, camera, viewport, clip, primitive);
             }
         }
     }
 
     fn draw_primitive(
         &mut self,
+        layer_z: i32,
         camera: Camera2,
         viewport: Viewport,
         clip: PixelClip,
@@ -533,7 +534,9 @@ impl<'a> Canvas<'a> {
         }
 
         match primitive {
-            RenderPrimitive::Circle(circle) => self.draw_circle(camera, viewport, clip, circle),
+            RenderPrimitive::Circle(circle) => {
+                self.draw_circle(layer_z, camera, viewport, clip, circle)
+            }
             RenderPrimitive::Line(line) => self.draw_line(camera, viewport, clip, line),
             RenderPrimitive::Polygon(polygon) => self.draw_polygon(camera, viewport, clip, polygon),
             RenderPrimitive::Text(_) => {}
@@ -542,6 +545,7 @@ impl<'a> Canvas<'a> {
 
     fn draw_circle(
         &mut self,
+        layer_z: i32,
         camera: Camera2,
         viewport: Viewport,
         clip: PixelClip,
@@ -559,6 +563,7 @@ impl<'a> Canvas<'a> {
                 center,
                 radius,
                 fill.color,
+                span_fill_mode_for_layer(layer_z, fill.color),
             );
         }
 
@@ -842,6 +847,12 @@ struct RasterColor {
     opaque: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum SpanFillMode {
+    Normal,
+    BackgroundFastPath { blended_background: Rgba8Pixel },
+}
+
 fn project(camera: Camera2, point: RenderPoint, viewport: Viewport) -> PixelPoint {
     let normalized = camera.world_to_viewport(point, viewport.aspect_ratio());
     PixelPoint {
@@ -957,6 +968,21 @@ fn quantized_cell(value: f32) -> i32 {
     (value / STARFIELD_CACHE_CELL_SIZE).floor() as i32
 }
 
+fn span_fill_mode_for_layer(layer_z: i32, color: RenderColor) -> SpanFillMode {
+    if !matches!(layer_z, SPACEWARS_SUN_LAYER | SPACEWARS_PLANET_LAYER) {
+        return SpanFillMode::Normal;
+    }
+
+    let raster_color = raster_color(color);
+    if raster_color.opaque {
+        return SpanFillMode::Normal;
+    }
+
+    let mut blended_background = BACKGROUND;
+    blend_pixel(&mut blended_background, raster_color);
+    SpanFillMode::BackgroundFastPath { blended_background }
+}
+
 fn clear_pixels(pixels: &mut [Rgba8Pixel]) {
     pixels.fill(BACKGROUND);
 }
@@ -969,6 +995,7 @@ fn fill_circle_pixels(
     center: PixelPoint,
     radius: f32,
     color: RenderColor,
+    fill_mode: SpanFillMode,
 ) {
     if radius <= 0.0 {
         return;
@@ -977,7 +1004,7 @@ fn fill_circle_pixels(
     let radius_sq = radius * radius;
     let raster_color = raster_color(color);
     if circle_covers_clip(center, radius_sq, clip) {
-        fill_rect(pixels, width, clip, raster_color);
+        fill_rect(pixels, width, clip, raster_color, fill_mode);
         return;
     }
 
@@ -1000,6 +1027,7 @@ fn fill_circle_pixels(
             (center.x - span).floor() as i32,
             (center.x + span).ceil() as i32,
             raster_color,
+            fill_mode,
         );
     }
 }
@@ -1050,6 +1078,7 @@ fn stroke_circle_pixels(
                 left_outer,
                 right_outer,
                 raster_color,
+                SpanFillMode::Normal,
             );
             continue;
         }
@@ -1066,6 +1095,7 @@ fn stroke_circle_pixels(
             left_outer,
             left_inner,
             raster_color,
+            SpanFillMode::Normal,
         );
         fill_span(
             pixels,
@@ -1076,6 +1106,7 @@ fn stroke_circle_pixels(
             right_inner,
             right_outer,
             raster_color,
+            SpanFillMode::Normal,
         );
     }
 }
@@ -1150,6 +1181,7 @@ fn fill_triangle(
                 left,
                 right,
                 raster_color,
+                SpanFillMode::Normal,
             );
         }
     }
@@ -1174,7 +1206,16 @@ fn draw_line_pixels(
     let dy = end.y - start.y;
     let len = (dx * dx + dy * dy).sqrt();
     if len <= f32::EPSILON {
-        fill_circle_pixels(pixels, width, height, clip, start, line_width * 0.5, color);
+        fill_circle_pixels(
+            pixels,
+            width,
+            height,
+            clip,
+            start,
+            line_width * 0.5,
+            color,
+            SpanFillMode::Normal,
+        );
         return;
     }
 
@@ -1245,15 +1286,30 @@ fn circle_covers_clip(center: PixelPoint, radius_sq: f32, clip: PixelClip) -> bo
     })
 }
 
-fn fill_rect(pixels: &mut [Rgba8Pixel], width: u32, clip: PixelClip, color: RasterColor) {
+fn fill_rect(
+    pixels: &mut [Rgba8Pixel],
+    width: u32,
+    clip: PixelClip,
+    color: RasterColor,
+    fill_mode: SpanFillMode,
+) {
     for y in clip.min_y..=clip.max_y {
         let start = y as usize * width as usize + clip.min_x as usize;
         let end = y as usize * width as usize + clip.max_x as usize + 1;
         if color.opaque {
             pixels[start..end].fill(color.pixel);
         } else {
-            for pixel in &mut pixels[start..end] {
-                blend_pixel(pixel, color);
+            match fill_mode {
+                SpanFillMode::BackgroundFastPath { blended_background }
+                    if pixels[start..end].iter().all(|pixel| *pixel == BACKGROUND) =>
+                {
+                    pixels[start..end].fill(blended_background);
+                }
+                _ => {
+                    for pixel in &mut pixels[start..end] {
+                        blend_pixel(pixel, color);
+                    }
+                }
             }
         }
     }
@@ -1268,6 +1324,7 @@ fn fill_span(
     left: i32,
     right: i32,
     color: RasterColor,
+    fill_mode: SpanFillMode,
 ) {
     if y < clip.min_y || y > clip.max_y || y < 0 || y >= height as i32 {
         return;
@@ -1284,8 +1341,17 @@ fn fill_span(
     if color.opaque {
         pixels[start..end].fill(color.pixel);
     } else {
-        for pixel in &mut pixels[start..end] {
-            blend_pixel(pixel, color);
+        match fill_mode {
+            SpanFillMode::BackgroundFastPath { blended_background }
+                if pixels[start..end].iter().all(|pixel| *pixel == BACKGROUND) =>
+            {
+                pixels[start..end].fill(blended_background);
+            }
+            _ => {
+                for pixel in &mut pixels[start..end] {
+                    blend_pixel(pixel, color);
+                }
+            }
         }
     }
 }
@@ -1422,6 +1488,64 @@ mod tests {
 
         assert!(pixel.r > BACKGROUND.r);
         assert_eq!(pixel.a, 255);
+    }
+
+    #[test]
+    fn background_fast_path_matches_normal_blend_on_background_span() {
+        let color = RenderColor::rgba(1.0, 0.9, 0.1, 0.85);
+        let raster_color = raster_color(color);
+        let mut expected = vec![BACKGROUND; 8];
+        let mut actual = vec![BACKGROUND; 8];
+        let clip = PixelClip::new(8, 1, 0, 7, 0, 0).expect("clip should be valid");
+        let mode = span_fill_mode_for_layer(SPACEWARS_SUN_LAYER, color);
+
+        fill_span(
+            &mut expected,
+            8,
+            1,
+            clip,
+            0,
+            0,
+            7,
+            raster_color,
+            SpanFillMode::Normal,
+        );
+        fill_span(&mut actual, 8, 1, clip, 0, 0, 7, raster_color, mode);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn background_fast_path_falls_back_on_non_background_span() {
+        let color = RenderColor::rgba(1.0, 0.9, 0.1, 0.85);
+        let raster_color = raster_color(color);
+        let mut expected = vec![BACKGROUND; 8];
+        let mut actual = vec![BACKGROUND; 8];
+        expected[3] = Rgba8Pixel {
+            r: 20,
+            g: 30,
+            b: 40,
+            a: 255,
+        };
+        actual[3] = expected[3];
+        let clip = PixelClip::new(8, 1, 0, 7, 0, 0).expect("clip should be valid");
+        let mode = span_fill_mode_for_layer(SPACEWARS_PLANET_LAYER, color);
+
+        fill_span(
+            &mut expected,
+            8,
+            1,
+            clip,
+            0,
+            0,
+            7,
+            raster_color,
+            SpanFillMode::Normal,
+        );
+        fill_span(&mut actual, 8, 1, clip, 0, 0, 7, raster_color, mode);
+
+        assert_eq!(actual, expected);
+        assert_ne!(actual[3], BACKGROUND);
     }
 
     #[test]
