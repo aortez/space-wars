@@ -430,7 +430,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M14b: ✅ Port `BGStarField` as deterministic scenario state. Generate star triangles within the universe circle from the scenario seed, preserve the low-density fill behavior and subtle color cycling, render it behind sun/planets, and keep star visibility configurable/debuggable without affecting physics replay.
 - M14c: ✅ Port ship exhaust trails. Add per-ship trail state updated each tick, emit trails from thrust, reverse, and turn behavior using the original rough placement/decay rules, remove trails when faded, and render them before ships so the trails sit visually behind the hull.
 - M14d: ✅ Port impact particles. Add a bounded particle list with deterministic random variation, update/fade particles, apply planet gravity every third frame like the original where practical, and spawn particles from laser hits, shell/debris/ship collisions, and body impacts.
-- M14e: Port primitive breakup effects. When a ship or debris body is destroyed, convert the relevant current primitives into `DebrisKind::Fragment` pieces with outward velocity and omega in the style of `Model.destroyPrimatives()`. Keep pod conversion and scoring consequences deferred to M15 unless breakup needs a death hook.
+- M14e: ✅ Port primitive breakup effects. When a ship or debris body is destroyed, convert the relevant current primitives into `DebrisKind::Fragment` pieces with outward velocity and omega in the style of `Model.destroyPrimatives()`. Keep pod conversion and scoring consequences deferred to M15 unless breakup needs a death hook.
 - Acceptance: the game starts to visually resemble the 2008 artifact while preserving the render primitive boundary.
 
 ### M15: Gameplay loop + HUD

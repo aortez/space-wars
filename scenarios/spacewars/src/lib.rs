@@ -95,6 +95,10 @@ const PARTICLE_GRAVITY_FRAME_MODULUS: u64 = 3;
 const PARTICLE_GRAVITY_SCALE: f32 = 3.0;
 const PARTICLE_IMPACT_RANDOM_ANGLE: f32 = 1.5;
 const PARTICLE_IMPACT_SPEED_SCALE: f32 = 20.0;
+const BREAKUP_RNG_SALT: u64 = 0xB2EA_4A9E_5EED;
+const BREAKUP_FRAGMENT_SPEED: f32 = 50.0;
+const BREAKUP_FRAGMENT_OMEGA: f32 = 1.0;
+const BREAKUP_FRAGMENT_DAMAGE_SCALAR: f32 = 0.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -106,6 +110,9 @@ const WING_CLOSED_SPEED: f32 = MAX_SPEED * 5.0;
 const WING_CLOSED_MAX_OMEGA: f32 = BASE_MAX_OMEGA * 0.25;
 const MAX_WING_THETA: f32 = core::f32::consts::FRAC_PI_4;
 const SHIP_BOUNDS_RADIUS: f32 = 6.0;
+const SHIP_LEFT_WING_TRIANGLE_INDEX: usize = 0;
+const SHIP_RIGHT_WING_TRIANGLE_INDEX: usize = 1;
+const SHIP_THRUSTER_TRIANGLE_INDEX: usize = 3;
 const SHIP_BODY_TRIANGLE_INDEX: usize = 4;
 const SHIP_LASER_TRIANGLE_INDEX: usize = 5;
 
@@ -217,12 +224,15 @@ pub struct DebrisState {
     pub position: Vec2,
     pub velocity: Vec2,
     pub radius: f32,
+    pub breakup_radius: f32,
+    pub fragment_shape: Option<[Vec2; 3]>,
     pub rotation_radians: f32,
     pub omega: f32,
     pub damage_scalar: f32,
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
+    pub fragmented: bool,
     pub color: Color,
     pub owner_id: Option<usize>,
     pub spawn_tick: u64,
@@ -343,6 +353,7 @@ pub struct ShipState {
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
+    pub fragmented: bool,
     turn_power: f32,
     thrust_power: f32,
     current_max_omega: f32,
@@ -606,6 +617,7 @@ impl Scenario for SpacewarsScenario {
         }
         state.debris_body_collisions = resolve_debris_body_collisions(state);
         state.debris_collisions = resolve_debris_collisions(state);
+        spawn_breakup_fragments(state);
         for debris in &mut state.debris {
             debris.update(dt);
         }
@@ -1089,6 +1101,10 @@ fn particle_rng_for_spawn(state: &SpacewarsState, salt: u64) -> SpacewarsRng {
     )
 }
 
+fn breakup_rng_for_event(seed: u64, tick: u64, salt: u64) -> SpacewarsRng {
+    seeded_rng(seed ^ BREAKUP_RNG_SALT ^ tick.wrapping_mul(0xA24B_AED4_963E_E407) ^ salt)
+}
+
 fn remove_finished_debris(state: &mut SpacewarsState) {
     let universe = universe_bounds(state.config.universe_radius as f32);
     state
@@ -1453,6 +1469,175 @@ fn resolve_particle_body_collision(
     let target_center = body_position + normal * (body_radius + bounds.radius);
     particle.translate(target_center - bounds.center);
     particle.velocity = (particle.velocity - normal * (2.0 * particle.velocity.dot(normal))) * 0.5;
+}
+
+fn spawn_breakup_fragments(state: &mut SpacewarsState) {
+    let mut fragments = Vec::new();
+
+    for ship in &mut state.ships {
+        if !ship.dead || ship.fragmented {
+            continue;
+        }
+
+        fragments.extend(ship_breakup_fragments(
+            ship,
+            state.seed,
+            state.tick,
+            fragments.len() as u64,
+        ));
+        ship.fragmented = true;
+    }
+
+    for (debris_index, debris) in state.debris.iter_mut().enumerate() {
+        if !debris.dead || debris.fragmented || debris.kind == DebrisKind::Fragment {
+            continue;
+        }
+
+        let source = *debris;
+        debris.fragmented = true;
+        fragments.extend(debris_breakup_fragments(
+            &source,
+            state.seed,
+            state.tick,
+            debris_index,
+            fragments.len() as u64,
+        ));
+    }
+
+    state.debris.extend(fragments);
+}
+
+fn ship_breakup_fragments(ship: &ShipState, seed: u64, tick: u64, salt: u64) -> Vec<DebrisState> {
+    let primitives = ship_fragment_primitives(ship);
+    breakup_fragments(
+        ship.position,
+        ship.velocity,
+        primitives,
+        seed,
+        tick,
+        0x51A9_0000 ^ ship.owner_id as u64 ^ salt,
+    )
+}
+
+fn debris_breakup_fragments(
+    debris: &DebrisState,
+    seed: u64,
+    tick: u64,
+    debris_index: usize,
+    salt: u64,
+) -> Vec<DebrisState> {
+    let primitives = debris_fragment_primitives(debris);
+    breakup_fragments(
+        debris.position,
+        debris.velocity,
+        primitives,
+        seed,
+        tick,
+        0xDEB2_0000 ^ debris_index as u64 ^ salt,
+    )
+}
+
+fn breakup_fragments(
+    position: Vec2,
+    base_velocity: Vec2,
+    primitives: Vec<BreakupPrimitive>,
+    seed: u64,
+    tick: u64,
+    salt: u64,
+) -> Vec<DebrisState> {
+    if primitives.is_empty() {
+        return Vec::new();
+    }
+
+    let mut rng = breakup_rng_for_event(seed, tick, salt);
+    let delta_theta = core::f32::consts::TAU / primitives.len() as f32;
+    let mut theta = random_unit_f32(&mut rng) * core::f32::consts::TAU;
+    let mut fragments = Vec::with_capacity(primitives.len());
+
+    for primitive in primitives {
+        let velocity = Vec2::from_radians(theta) * BREAKUP_FRAGMENT_SPEED + base_velocity;
+        let color = Color::DIM_GREY.random_variation(0.2, &mut rng);
+        fragments.push(DebrisState::new_fragment(
+            position,
+            primitive.local_points,
+            velocity,
+            BREAKUP_FRAGMENT_OMEGA,
+            color,
+        ));
+        theta += delta_theta;
+    }
+
+    fragments
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BreakupPrimitive {
+    local_points: [Vec2; 3],
+}
+
+fn ship_fragment_primitives(ship: &ShipState) -> Vec<BreakupPrimitive> {
+    let triangles = ship_triangles(ship);
+
+    vec![
+        BreakupPrimitive::from_world_triangle(triangles[SHIP_LASER_TRIANGLE_INDEX]),
+        BreakupPrimitive::from_world_triangle(triangles[SHIP_THRUSTER_TRIANGLE_INDEX]),
+        BreakupPrimitive::from_world_triangle(triangles[SHIP_LEFT_WING_TRIANGLE_INDEX]),
+        BreakupPrimitive::from_world_triangle(triangles[SHIP_RIGHT_WING_TRIANGLE_INDEX]),
+        BreakupPrimitive::from_world_triangle(triangles[SHIP_BODY_TRIANGLE_INDEX]),
+    ]
+}
+
+fn debris_fragment_primitives(debris: &DebrisState) -> Vec<BreakupPrimitive> {
+    if let Some(shape) = debris.fragment_shape {
+        return vec![BreakupPrimitive {
+            local_points: shape,
+        }];
+    }
+
+    match debris.kind {
+        DebrisKind::Shell => {
+            let transform = Transform2 {
+                translation: debris.position,
+                scale: Vec2::splat(1.0),
+                rotation_radians: debris.rotation_radians,
+                pivot: Vec2::ZERO,
+            };
+            vec![BreakupPrimitive::from_world_triangle(transform_points(
+                transform, SHELL_BODY,
+            ))]
+        }
+        DebrisKind::Asteroid => asteroid_breakup_primitives(debris),
+        DebrisKind::Fragment => Vec::new(),
+    }
+}
+
+fn asteroid_breakup_primitives(debris: &DebrisState) -> Vec<BreakupPrimitive> {
+    let radius = debris.breakup_radius.max(debris.radius).max(1.0);
+    (0..3)
+        .map(|index| {
+            let a = index as f32 * core::f32::consts::TAU / 3.0;
+            let b = (index + 1) as f32 * core::f32::consts::TAU / 3.0;
+            BreakupPrimitive::from_local_triangle([
+                Vec2::ZERO,
+                Vec2::from_radians(a) * radius,
+                Vec2::from_radians(b) * radius,
+            ])
+        })
+        .collect()
+}
+
+impl BreakupPrimitive {
+    fn from_world_triangle(points: [Vec2; 3]) -> Self {
+        Self {
+            local_points: center_triangle(points),
+        }
+    }
+
+    fn from_local_triangle(points: [Vec2; 3]) -> Self {
+        Self {
+            local_points: center_triangle(points),
+        }
+    }
 }
 
 fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyCollision> {
@@ -1851,6 +2036,11 @@ fn polygon_center(points: &[Vec2]) -> Vec2 {
         / points.len() as f32
 }
 
+fn center_triangle(points: [Vec2; 3]) -> [Vec2; 3] {
+    let center = polygon_center(&points);
+    points.map(|point| point - center)
+}
+
 fn polygon_area(center: Vec2, points: &[Vec2]) -> f32 {
     if points.len() < 3 {
         return 1.0;
@@ -1995,12 +2185,15 @@ impl DebrisState {
             position,
             velocity,
             radius,
+            breakup_radius: radius,
+            fragment_shape: None,
             rotation_radians: 0.0,
             omega: 0.0,
             damage_scalar,
             life,
             life_max: life,
             dead: false,
+            fragmented: false,
             color,
             owner_id: None,
             spawn_tick: 0,
@@ -2031,6 +2224,27 @@ impl DebrisState {
         shell
     }
 
+    pub fn new_fragment(
+        position: Vec2,
+        local_shape: [Vec2; 3],
+        velocity: Vec2,
+        omega: f32,
+        color: Color,
+    ) -> Self {
+        let radius = triangle_low_bound(local_shape).radius.max(1.0);
+        let mut fragment = Self::new(
+            DebrisKind::Fragment,
+            position,
+            velocity,
+            radius,
+            BREAKUP_FRAGMENT_DAMAGE_SCALAR,
+            color,
+        );
+        fragment.fragment_shape = Some(local_shape);
+        fragment.omega = omega;
+        fragment
+    }
+
     pub fn mass(self) -> f32 {
         debris_mass(self.radius)
     }
@@ -2041,6 +2255,9 @@ impl DebrisState {
     }
 
     pub fn translate_life(&mut self, delta: f32) {
+        if delta < 0.0 {
+            self.breakup_radius = self.radius;
+        }
         self.life += delta;
         self.update_size();
     }
@@ -2062,6 +2279,11 @@ impl DebrisState {
 
     fn shrink_to(&mut self, factor: f32) {
         self.radius *= factor;
+        if let Some(shape) = &mut self.fragment_shape {
+            for point in shape {
+                *point *= factor;
+            }
+        }
     }
 }
 
@@ -2165,6 +2387,7 @@ impl ShipState {
             life,
             life_max: life,
             dead: false,
+            fragmented: false,
             turn_power: SHIP_TURN_FORCE / SHIP_MASS * delta_time,
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
@@ -2613,6 +2836,22 @@ fn exhaust_color(color: Color) -> RenderColor {
 
 fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     if debris.dead || debris.radius <= 0.0 {
+        return;
+    }
+
+    if let Some(shape) = debris.fragment_shape {
+        push_filled_polygon(
+            frame,
+            Transform2 {
+                translation: debris.position,
+                scale: Vec2::splat(1.0),
+                rotation_radians: debris.rotation_radians,
+                pivot: Vec2::ZERO,
+            },
+            &shape,
+            render_color(debris.color),
+            RenderColor::rgba(0.74, 0.78, 0.84, 0.85),
+        );
         return;
     }
 
@@ -4016,7 +4255,7 @@ mod tests {
     }
 
     #[test]
-    fn cannon_shell_damages_asteroid_and_is_removed() {
+    fn cannon_shell_damages_asteroid_and_leaves_breakup_fragments() {
         let mut state = init_deathmatch_no_asteroids();
         let shell_spawn_position = ship_mount_center(&state.ships[0])
             + state.ships[0].direction * CANNON_SHELL_SPAWN_OFFSET;
@@ -4037,11 +4276,17 @@ mod tests {
             vec![DebrisCollision { a: 0, b: 1 }]
         );
         assert!(start_life > 0.0);
-        assert!(state.debris.is_empty());
+        assert_eq!(state.debris.len(), 4);
+        assert!(
+            state
+                .debris
+                .iter()
+                .all(|debris| debris.kind == DebrisKind::Fragment)
+        );
     }
 
     #[test]
-    fn cannon_shell_hits_body_and_is_removed() {
+    fn cannon_shell_hits_body_and_leaves_breakup_fragment() {
         let mut state = init_deathmatch_no_asteroids();
 
         step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
@@ -4062,7 +4307,8 @@ mod tests {
                 body: BodyId::Sun,
             }]
         );
-        assert!(state.debris.is_empty());
+        assert_eq!(state.debris.len(), 1);
+        assert_eq!(state.debris[0].kind, DebrisKind::Fragment);
     }
 
     #[test]
@@ -4401,6 +4647,110 @@ mod tests {
         );
 
         assert_close(debris.damage_amount(Vec2::new(6.0, 8.0)), 0.05);
+    }
+
+    #[test]
+    fn dead_ship_spawns_original_primitive_breakup_fragments_once() {
+        let mut state = init_deathmatch_no_asteroids();
+        let mut replay = init_deathmatch_no_asteroids();
+        state.ships[0].velocity = Vec2::new(3.0, -4.0);
+        replay.ships[0].velocity = state.ships[0].velocity;
+        let life = state.ships[0].life;
+        state.ships[0].translate_life(-life);
+        replay.ships[0].translate_life(-life);
+
+        spawn_breakup_fragments(&mut state);
+        spawn_breakup_fragments(&mut replay);
+
+        assert!(state.ships[0].fragmented);
+        assert_eq!(state.debris.len(), 5);
+        assert_eq!(state.debris, replay.debris);
+        assert!(state.debris.iter().all(|fragment| {
+            fragment.kind == DebrisKind::Fragment
+                && fragment.fragment_shape.is_some()
+                && fragment.damage_scalar == BREAKUP_FRAGMENT_DAMAGE_SCALAR
+        }));
+        for fragment in &state.debris {
+            assert_eq!(fragment.position, state.ships[0].position);
+            assert_close(fragment.omega, BREAKUP_FRAGMENT_OMEGA);
+            assert_close(
+                (fragment.velocity - state.ships[0].velocity).length(),
+                BREAKUP_FRAGMENT_SPEED,
+            );
+            assert!((fragment.color.r - Color::DIM_GREY.r).abs() <= 0.1 + EPS);
+            assert!((fragment.color.g - Color::DIM_GREY.g).abs() <= 0.1 + EPS);
+            assert!((fragment.color.b - Color::DIM_GREY.b).abs() <= 0.1 + EPS);
+        }
+
+        let first_fragments = state.debris.clone();
+        spawn_breakup_fragments(&mut state);
+
+        assert_eq!(state.debris, first_fragments);
+    }
+
+    #[test]
+    fn dead_asteroid_spawns_breakup_fragments_before_cleanup() {
+        let mut state = init_deathmatch_no_asteroids();
+        let center = universe_center(state.config.universe_radius as f32);
+        let velocity = Vec2::new(2.0, -3.0);
+        let mut asteroid = DebrisState::new(
+            DebrisKind::Asteroid,
+            center,
+            velocity,
+            12.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        );
+        let life = asteroid.life;
+        asteroid.translate_life(-life);
+
+        assert!(asteroid.dead);
+        assert_close(asteroid.breakup_radius, 12.0);
+        state.debris.push(asteroid);
+
+        spawn_breakup_fragments(&mut state);
+
+        assert!(state.debris[0].fragmented);
+        assert_eq!(state.debris.len(), 4);
+        for fragment in &state.debris[1..] {
+            assert_eq!(fragment.kind, DebrisKind::Fragment);
+            assert!(fragment.fragment_shape.is_some());
+            assert_close(
+                (fragment.velocity - velocity).length(),
+                BREAKUP_FRAGMENT_SPEED,
+            );
+        }
+
+        remove_finished_debris(&mut state);
+
+        assert_eq!(state.debris.len(), 3);
+        assert!(
+            state
+                .debris
+                .iter()
+                .all(|debris| debris.kind == DebrisKind::Fragment && !debris.dead)
+        );
+    }
+
+    #[test]
+    fn render_frame_includes_fragment_polygon() {
+        let mut state = init_deathmatch();
+        let before = polygon_primitive_count(&SpacewarsScenario::render_frame(&state));
+        state.debris.push(DebrisState::new_fragment(
+            Vec2::new(400.0, 450.0),
+            [
+                Vec2::new(0.0, 2.0),
+                Vec2::new(-1.7320508, -1.0),
+                Vec2::new(1.7320508, -1.0),
+            ],
+            Vec2::ZERO,
+            0.0,
+            Color::DIM_GREY,
+        ));
+
+        let frame = SpacewarsScenario::render_frame(&state);
+
+        assert_eq!(polygon_primitive_count(&frame), before + 1);
     }
 
     #[test]
