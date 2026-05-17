@@ -416,7 +416,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - Keep cannon shells representable by the debris model, but do not wire cannon firing here; weapons stay in M13. Keep visual particles, primitive breakup effects, pod conversion, and explosion effects deferred unless they block tests.
 - Acceptance: asteroids spawn deterministically from the seed, render visibly in the player-centered views, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
 
-### M13: Weapons
+### M13: ✅ Weapons
 
 - Port cannon/shell first because it is simpler and exercises moving projectile behavior.
 - Then port laser continuous firing, line bounds, line-vs-body/list intersections, nearest-hit truncation, and damage falloff.
@@ -425,8 +425,12 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 
 ### M14: Particles, exhaust, starfield, and assets
 
-- Port exhaust trails, laser/debris impact particles, primitive breakup effects, and `BGStarField`.
-- Integrate original assets selectively from `reference/rec`, with an explicit asset ownership/layout decision before moving files.
+- M14a: ✅ Reference investigation and asset decision. The original visual effects are mostly procedural: `BGStarField` emits background star triangles, `ExhaustTrail` emits fading short line/polygon trails from ship thrust/turn/reverse, `Particle` emits fading triangles for impacts, and `Model.destroyPrimatives()` converts entity primitives into debris. The first implementation should keep these as render primitives instead of introducing an image/sprite pipeline.
+- Asset decision: do not move files from `reference/rec` yet. The current renderer does not consume textures, and the original gameplay-significant visuals can be reproduced with polygons, circles, and lines. Revisit asset copying when planet/ship texture support or sound support is deliberately added; at that point copy only selected owned assets into an explicit runtime asset directory instead of reading from `reference/rec`.
+- M14b: Port `BGStarField` as deterministic scenario state. Generate star triangles within the universe circle from the scenario seed, preserve the low-density fill behavior and subtle color cycling, render it behind sun/planets, and keep star visibility configurable/debuggable without affecting physics replay.
+- M14c: Port ship exhaust trails. Add per-ship trail state updated each tick, emit trails from thrust, reverse, and turn behavior using the original rough placement/decay rules, remove trails when faded, and render them before ships so the trails sit visually behind the hull.
+- M14d: Port impact particles. Add a bounded particle list with deterministic random variation, update/fade particles, apply planet gravity every third frame like the original where practical, and spawn particles from laser hits, shell/debris/ship collisions, and body impacts.
+- M14e: Port primitive breakup effects. When a ship or debris body is destroyed, convert the relevant current primitives into `DebrisKind::Fragment` pieces with outward velocity and omega in the style of `Model.destroyPrimatives()`. Keep pod conversion and scoring consequences deferred to M15 unless breakup needs a death hook.
 - Acceptance: the game starts to visually resemble the 2008 artifact while preserving the render primitive boundary.
 
 ### M15: Gameplay loop + HUD
