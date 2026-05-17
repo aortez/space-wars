@@ -128,6 +128,7 @@ const SHIP_LASER_TRIANGLE_INDEX: usize = 5;
 const POD_THRUST_FORCE: f32 = 50_000.0;
 const POD_TURN_FORCE: f32 = 10.0;
 const POD_MASS: f32 = 1.0;
+const POD_CRUISE_SPEED: f32 = MAX_SPEED;
 const POD_MAX_SPEED: f32 = 500.0;
 const POD_VELOCITY_DAMPING: f32 = 0.8;
 const POD_TURN_EXHAUST_SCALAR: f32 = 15.0;
@@ -2876,6 +2877,10 @@ impl ShipState {
 
     fn close_wings(&mut self) {
         if self.form == ShipForm::EscapePod {
+            self.wing_state = WingState::Closed;
+            self.wing_behavior = WingBehavior::None;
+            self.wing_theta = MAX_WING_THETA;
+            self.thrust_behavior = ThrustBehavior::None;
             return;
         }
         self.wing_behavior = WingBehavior::Close;
@@ -2883,6 +2888,11 @@ impl ShipState {
 
     fn open_wings(&mut self) {
         if self.form == ShipForm::EscapePod {
+            self.wing_state = WingState::Opened;
+            self.wing_behavior = WingBehavior::None;
+            self.wing_theta = 0.0;
+            self.thrust_behavior = ThrustBehavior::None;
+            self.cap_speed(POD_CRUISE_SPEED);
             return;
         }
         self.wing_behavior = WingBehavior::Open;
@@ -3123,29 +3133,22 @@ impl ShipState {
 
     fn update_pod_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
         match self.thrust_behavior {
-            ThrustBehavior::None => {}
-            ThrustBehavior::Full => {
+            ThrustBehavior::None | ThrustBehavior::Full => {
+                let max_speed = if self.wing_state == WingState::Closed {
+                    POD_MAX_SPEED
+                } else {
+                    POD_CRUISE_SPEED
+                };
                 self.velocity += self.direction * self.thrust_power;
-                self.cap_speed(POD_MAX_SPEED);
+                self.cap_speed(max_speed);
                 self.fire_exhaust(self.direction, rng, tick);
             }
-            ThrustBehavior::Brake => {
-                if self.velocity.length() > POD_MAX_SPEED * 0.25 {
-                    self.velocity -= self.velocity.normalized() * self.thrust_power;
-                } else {
-                    self.velocity *= 0.9;
-                }
-
+            ThrustBehavior::Brake | ThrustBehavior::Reverse => {
                 if self.omega.abs() > 0.01 {
                     self.omega -= self.omega.signum() * self.turn_power;
                 } else {
                     self.omega = 0.0;
                 }
-            }
-            ThrustBehavior::Reverse => {
-                self.velocity -= self.direction * self.thrust_power;
-                self.cap_speed(POD_MAX_SPEED);
-                self.fire_exhaust(self.direction * -10.0, rng, tick);
             }
         }
     }
@@ -3249,6 +3252,11 @@ impl ShipState {
         self.cannon_firing = false;
         self.laser_beam = None;
         self.cannon_cooldown_remaining = 0.0;
+        self.wing_theta = 0.0;
+        self.wing_state = WingState::Opened;
+        self.wing_behavior = WingBehavior::None;
+        self.thrust_behavior = ThrustBehavior::None;
+        self.turn_behavior = TurnBehavior::None;
         self.turn_power = POD_TURN_FORCE / POD_MASS * self.delta_time;
         self.thrust_power = POD_THRUST_FORCE / POD_MASS * self.delta_time;
         self.current_max_omega = BASE_MAX_OMEGA;
@@ -6008,6 +6016,57 @@ mod tests {
         assert_eq!(state.ships[0].form, ShipForm::EscapePod);
         assert!(state.ships[0].velocity.length() > 0.0);
         assert!(state.ships[0].velocity.length() <= POD_MAX_SPEED);
+    }
+
+    #[test]
+    fn escape_pod_cruises_forward_without_thrust_input() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.players[0].planet_count = 1;
+        state.ships[0].change_to_escape_pod();
+
+        step(&mut state, &[]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert_close(state.ships[0].velocity.length(), POD_CRUISE_SPEED);
+        assert!(state.ships[0].velocity.dot(state.ships[0].direction) > 0.0);
+    }
+
+    #[test]
+    fn escape_pod_reverse_damps_velocity_without_flying_backward() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.players[0].planet_count = 1;
+        state.ships[0].change_to_escape_pod();
+        state.ships[0].velocity = state.ships[0].direction * POD_CRUISE_SPEED;
+
+        step(&mut state, &[SpacewarsAction::reverse(0)]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert!(state.ships[0].velocity.length() < POD_CRUISE_SPEED);
+        assert!(state.ships[0].velocity.dot(state.ships[0].direction) > 0.0);
+
+        for _ in 0..30 {
+            step(&mut state, &[SpacewarsAction::reverse(0)]);
+        }
+
+        assert!(state.ships[0].velocity.length() < 0.25);
+    }
+
+    #[test]
+    fn escape_pod_sweep_button_boosts_then_returns_to_cruise_speed() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.players[0].planet_count = 1;
+        state.ships[0].change_to_escape_pod();
+
+        step(&mut state, &[SpacewarsAction::close_wings(0)]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert_eq!(state.ships[0].wing_state, WingState::Closed);
+        assert_close(state.ships[0].velocity.length(), POD_MAX_SPEED);
+
+        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+
+        assert_eq!(state.ships[0].wing_state, WingState::Opened);
+        assert_close(state.ships[0].velocity.length(), POD_CRUISE_SPEED);
     }
 
     #[test]

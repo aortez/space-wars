@@ -489,3 +489,4 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 ### M19: Improve gameplay
 - M19a: ✅ Prevent ship/body collision response from reflecting already-separating velocity back into planets. A ship that has been pushed out of a shallow body overlap can now escape with normal thrust instead of needing sweep-wing speed.
 - M19b: ✅ Make "fast sweep wing" speed apply only while sweep wings are held/closed. Releasing the sweep-wing key clamps back to normal max forward velocity, regardless of whether forward thrust is also held.
+- M19c: ✅ Give escape pods distinct but ship-like controls: they cruise forward automatically at normal ship speed, reverse damps velocity toward zero, and the sweep-wing key temporarily raises the pod cap to full pod speed before release returns to cruise speed.
