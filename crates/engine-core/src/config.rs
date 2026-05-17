@@ -22,6 +22,7 @@ pub const STARTUP_USE_TEXTURES: bool = true;
 pub const STARTUP_USE_STARFIELD: bool = true;
 pub const STARTUP_USE_PLANETS: bool = true;
 pub const STARTUP_USE_SOUNDS: bool = true;
+pub const STARTUP_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerConfig {
@@ -49,6 +50,7 @@ pub struct SpacewarsConfig {
     pub use_planets: bool,
     pub fps: u32,
     pub use_sounds: bool,
+    pub player_view_heights: [f32; PLAYER_COUNT],
     pub players: [PlayerConfig; PLAYER_COUNT],
 }
 
@@ -107,6 +109,7 @@ impl Default for SpacewarsConfig {
             use_planets: STARTUP_USE_PLANETS,
             fps: STARTUP_FPS,
             use_sounds: STARTUP_USE_SOUNDS,
+            player_view_heights: [STARTUP_PLAYER_VIEW_HEIGHT; PLAYER_COUNT],
             players: [
                 PlayerConfig::new("Player 1", STARTUP_PLAYER_HEALTH_PERCENT, Color::RED),
                 PlayerConfig::new("Player 2", STARTUP_PLAYER_HEALTH_PERCENT, Color::GREEN),
@@ -139,6 +142,10 @@ mod tests {
         assert!(config.use_planets);
         assert_eq!(config.fps, 60);
         assert!(config.use_sounds);
+        assert_eq!(
+            config.player_view_heights,
+            [STARTUP_PLAYER_VIEW_HEIGHT; PLAYER_COUNT]
+        );
         assert_eq!(
             config.players[0],
             PlayerConfig::new("Player 1", 100, Color::RED)

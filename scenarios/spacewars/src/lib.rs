@@ -57,7 +57,8 @@ const SPACEPORT_PULL_SCALE: f32 = 3.0;
 const PLANET_CAPTURE_SECS: f32 = 4.0;
 const POD_REBUILD_SECS: f32 = 8.0;
 const OWNED_SPACEPORT_HEAL_PER_SEC: f32 = 3.0;
-const PLAYER_VIEW_HEIGHT: f32 = 320.0;
+const DEFAULT_PLAYER_VIEW_HEIGHT: f32 = 320.0;
+const MIN_PLAYER_VIEW_HEIGHT: f32 = 15.0;
 const PLAYER_VIEW_ASPECT_RATIO: f32 = 640.0 / 417.6;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
@@ -211,6 +212,7 @@ pub struct SpacewarsState {
     pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
+    pub player_view_heights: [f32; 2],
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -482,6 +484,8 @@ pub enum SpacewarsActionKind {
     FireLaserHalt = 12,
     FireCannon = 13,
     FireCannonHalt = 14,
+    ZoomIn = 15,
+    ZoomOut = 16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -571,6 +575,14 @@ impl SpacewarsAction {
     pub fn fire_cannon_halt(player: usize) -> Action {
         Self::new(player, SpacewarsActionKind::FireCannonHalt).encode()
     }
+
+    pub fn zoom_in(player: usize) -> Action {
+        Self::new(player, SpacewarsActionKind::ZoomIn).encode()
+    }
+
+    pub fn zoom_out(player: usize) -> Action {
+        Self::new(player, SpacewarsActionKind::ZoomOut).encode()
+    }
 }
 
 impl SpacewarsActionKind {
@@ -590,6 +602,8 @@ impl SpacewarsActionKind {
             12 => Some(Self::FireLaserHalt),
             13 => Some(Self::FireCannon),
             14 => Some(Self::FireCannonHalt),
+            15 => Some(Self::ZoomIn),
+            16 => Some(Self::ZoomOut),
             _ => None,
         }
     }
@@ -623,6 +637,10 @@ impl Scenario for SpacewarsScenario {
         ];
         let (sun, planets) = build_world(&config, seed);
         let starfield = build_starfield(&config, seed);
+        let player_view_heights = normalize_player_view_heights(
+            config.player_view_heights,
+            config.universe_hypot() as f32,
+        );
 
         SpacewarsState {
             config,
@@ -643,6 +661,7 @@ impl Scenario for SpacewarsScenario {
             debris_body_collisions: Vec::new(),
             body_collisions: Vec::new(),
             spaceport_contacts: Vec::new(),
+            player_view_heights,
         }
     }
 
@@ -717,6 +736,18 @@ impl Scenario for SpacewarsScenario {
 
 impl SpacewarsState {
     fn apply_action(&mut self, action: SpacewarsAction) {
+        match action.kind {
+            SpacewarsActionKind::ZoomIn => {
+                self.zoom_player_in(action.player);
+                return;
+            }
+            SpacewarsActionKind::ZoomOut => {
+                self.zoom_player_out(action.player);
+                return;
+            }
+            _ => {}
+        }
+
         if self
             .players
             .get(action.player)
@@ -745,6 +776,22 @@ impl SpacewarsState {
             SpacewarsActionKind::FireLaserHalt => ship.fire_laser_halt(),
             SpacewarsActionKind::FireCannon => ship.fire_cannon(),
             SpacewarsActionKind::FireCannonHalt => ship.fire_cannon_halt(),
+            SpacewarsActionKind::ZoomIn | SpacewarsActionKind::ZoomOut => unreachable!(),
+        }
+    }
+
+    pub fn zoom_player_in(&mut self, player: usize) {
+        self.adjust_player_zoom(player, -player_zoom_step(&self.config));
+    }
+
+    pub fn zoom_player_out(&mut self, player: usize) {
+        self.adjust_player_zoom(player, player_zoom_step(&self.config));
+    }
+
+    fn adjust_player_zoom(&mut self, player: usize, delta: f32) {
+        let max_height = self.config.universe_hypot() as f32;
+        if let Some(height) = self.player_view_heights.get_mut(player) {
+            *height = normalize_player_view_height(*height + delta, max_height);
         }
     }
 }
@@ -3351,7 +3398,31 @@ fn player_camera(state: &SpacewarsState, player: usize) -> Camera2 {
         .get(player)
         .map(|ship| ship.position)
         .unwrap_or(Vec2::ZERO);
-    Camera2::new(render_point(center), PLAYER_VIEW_HEIGHT)
+    let height = state
+        .player_view_heights
+        .get(player)
+        .copied()
+        .unwrap_or(DEFAULT_PLAYER_VIEW_HEIGHT);
+    Camera2::new(render_point(center), height)
+}
+
+fn normalize_player_view_heights(heights: [f32; 2], max_height: f32) -> [f32; 2] {
+    heights.map(|height| normalize_player_view_height(height, max_height))
+}
+
+fn normalize_player_view_height(height: f32, max_height: f32) -> f32 {
+    if height.is_finite() {
+        height.clamp(
+            MIN_PLAYER_VIEW_HEIGHT,
+            max_height.max(MIN_PLAYER_VIEW_HEIGHT),
+        )
+    } else {
+        DEFAULT_PLAYER_VIEW_HEIGHT
+    }
+}
+
+fn player_zoom_step(config: &SpacewarsConfig) -> f32 {
+    (config.universe_hypot() as f32 / 100.0).max(1.0)
 }
 
 fn render_state_with_camera(
@@ -3505,9 +3576,14 @@ fn render_player_view_rectangle(frame: &mut RenderFrame, state: &SpacewarsState,
         return;
     };
 
-    let view_width = PLAYER_VIEW_HEIGHT * PLAYER_VIEW_ASPECT_RATIO;
+    let view_height = state
+        .player_view_heights
+        .get(player)
+        .copied()
+        .unwrap_or(DEFAULT_PLAYER_VIEW_HEIGHT);
+    let view_width = view_height * PLAYER_VIEW_ASPECT_RATIO;
     let half_width = view_width * 0.5;
-    let half_height = PLAYER_VIEW_HEIGHT * 0.5;
+    let half_height = view_height * 0.5;
 
     let color = state
         .players
@@ -6386,8 +6462,39 @@ mod tests {
 
         assert_eq!(player_1.center, render_point(state.ships[0].position));
         assert_eq!(player_2.center, render_point(state.ships[1].position));
-        assert_eq!(player_1.height, PLAYER_VIEW_HEIGHT);
-        assert_eq!(player_2.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(player_1.height, DEFAULT_PLAYER_VIEW_HEIGHT);
+        assert_eq!(player_2.height, DEFAULT_PLAYER_VIEW_HEIGHT);
+    }
+
+    #[test]
+    fn player_cameras_use_configured_per_player_zoom() {
+        let mut config = SpacewarsConfig::default();
+        config.player_view_heights = [240.0, 640.0];
+        let state = SpacewarsScenario::init(config, 0);
+        let player_1 = player_camera(&state, 0);
+        let player_2 = player_camera(&state, 1);
+
+        assert_eq!(player_1.height, 240.0);
+        assert_eq!(player_2.height, 640.0);
+    }
+
+    #[test]
+    fn zoom_actions_adjust_only_target_player_camera() {
+        let mut state = init_deathmatch();
+        let initial = state.player_view_heights;
+        let step = player_zoom_step(&state.config);
+
+        state.apply_action(SpacewarsAction {
+            player: 0,
+            kind: SpacewarsActionKind::ZoomIn,
+        });
+        state.apply_action(SpacewarsAction {
+            player: 1,
+            kind: SpacewarsActionKind::ZoomOut,
+        });
+
+        assert_eq!(state.player_view_heights[0], initial[0] - step);
+        assert_eq!(state.player_view_heights[1], initial[1] + step);
     }
 
     #[test]
@@ -6404,8 +6511,8 @@ mod tests {
             frames[1].camera.center,
             render_point(state.ships[1].position)
         );
-        assert_eq!(frames[0].camera.height, PLAYER_VIEW_HEIGHT);
-        assert_eq!(frames[1].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[0].camera.height, DEFAULT_PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[1].camera.height, DEFAULT_PLAYER_VIEW_HEIGHT);
     }
 
     #[test]
@@ -6422,8 +6529,8 @@ mod tests {
             frames[1].camera.center,
             render_point(state.ships[1].position)
         );
-        assert_eq!(frames[0].camera.height, PLAYER_VIEW_HEIGHT);
-        assert_eq!(frames[1].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[0].camera.height, DEFAULT_PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[1].camera.height, DEFAULT_PLAYER_VIEW_HEIGHT);
         assert_eq!(frames[2].camera.center, RenderPoint::new(1200.0, 1200.0));
         assert_eq!(frames[3].camera, frames[2].camera);
         assert_eq!(text_values(&frames[2]), Vec::<String>::new());

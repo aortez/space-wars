@@ -17,9 +17,11 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
 use engine_common::{
-    CrashBehavior, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
-    MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
-    MIN_SPACEWARS_PLAYER_HEALTH_PERCENT, MIN_SPACEWARS_UNIVERSE_RADIUS, RendererSetting, Settings,
+    CrashBehavior, DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+    MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+    MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS,
+    MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
+    MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, RendererSetting, Settings,
     SpacewarsSettings,
 };
 use engine_core::SpacewarsConfig;
@@ -306,6 +308,10 @@ fn normalize_spacewars_settings(settings: &mut Settings) -> bool {
         normalized_asteroid_probability_per_sec = normalized.asteroid_probability_per_sec,
         player_health_percent = settings.spacewars.player_health_percent,
         normalized_player_health_percent = normalized.player_health_percent,
+        player_1_view_height = settings.spacewars.player_1_view_height,
+        normalized_player_1_view_height = normalized.player_1_view_height,
+        player_2_view_height = settings.spacewars.player_2_view_height,
+        normalized_player_2_view_height = normalized.player_2_view_height,
         "invalid saved Spacewars setup; using normalized values."
     );
     settings.spacewars = normalized;
@@ -410,6 +416,26 @@ fn install_launcher_callbacks(
         handle_launcher_apply_preset(&weak);
     });
 
+    let weak = window.as_weak();
+    window.on_launcher_p1_zoom_in(move || {
+        handle_launcher_zoom(&weak, 0, true);
+    });
+
+    let weak = window.as_weak();
+    window.on_launcher_p1_zoom_out(move || {
+        handle_launcher_zoom(&weak, 0, false);
+    });
+
+    let weak = window.as_weak();
+    window.on_launcher_p2_zoom_in(move || {
+        handle_launcher_zoom(&weak, 1, true);
+    });
+
+    let weak = window.as_weak();
+    window.on_launcher_p2_zoom_out(move || {
+        handle_launcher_zoom(&weak, 1, false);
+    });
+
     window.on_launcher_quit(move || {
         if let Err(err) = slint::quit_event_loop() {
             tracing::error!(error = %err, "failed to quit event loop.");
@@ -436,6 +462,26 @@ fn install_ingame_menu_callbacks(
     let controls = Rc::clone(&scenario_controls);
     window.on_ingame_start_benchmark(move || {
         controls.borrow_mut().request_benchmark();
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_p1_zoom_in(move || {
+        controls.borrow_mut().request_zoom_in(0);
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_p1_zoom_out(move || {
+        controls.borrow_mut().request_zoom_out(0);
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_p2_zoom_in(move || {
+        controls.borrow_mut().request_zoom_in(1);
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_p2_zoom_out(move || {
+        controls.borrow_mut().request_zoom_out(1);
     });
 
     let weak = window.as_weak();
@@ -475,6 +521,53 @@ fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
         Ok(None) => {}
         Err(message) => window.set_launcher_error_text(SharedString::from(message)),
     }
+}
+
+fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zoom_in: bool) {
+    let Some(window) = weak_window.upgrade() else {
+        return;
+    };
+
+    let universe_radius = match parse_u32_setting(
+        window.get_launcher_universe_radius_text().as_str(),
+        "World radius",
+        MIN_SPACEWARS_UNIVERSE_RADIUS,
+        MAX_SPACEWARS_UNIVERSE_RADIUS,
+    ) {
+        Ok(value) => value,
+        Err(message) => {
+            window.set_launcher_error_text(SharedString::from(message));
+            return;
+        }
+    };
+
+    let current_text = match player {
+        0 => window.get_launcher_p1_zoom_text(),
+        1 => window.get_launcher_p2_zoom_text(),
+        _ => return,
+    };
+    let current = match parse_f32_setting(
+        current_text.as_str(),
+        "Zoom",
+        MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
+        MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
+    ) {
+        Ok(value) => value,
+        Err(message) => {
+            window.set_launcher_error_text(SharedString::from(message));
+            return;
+        }
+    };
+
+    let adjusted = adjust_player_view_height(current, universe_radius, zoom_in);
+    let adjusted = SharedString::from(format_float_setting(adjusted));
+    match player {
+        0 => window.set_launcher_p1_zoom_text(adjusted),
+        1 => window.set_launcher_p2_zoom_text(adjusted),
+        _ => {}
+    }
+    window.set_launcher_spacewars_preset(SharedString::from(PRESET_CUSTOM));
+    window.set_launcher_error_text(SharedString::from(""));
 }
 
 fn handle_launcher_start(
@@ -609,6 +702,7 @@ fn spacewars_config_from_setup(setup: &SpacewarsSettings) -> SpacewarsConfig {
         } else {
             0.0
         },
+        player_view_heights: [setup.player_1_view_height, setup.player_2_view_height],
         ..SpacewarsConfig::default()
     };
 
@@ -631,6 +725,12 @@ fn set_spacewars_setup_fields(window: &MainWindow, setup: &SpacewarsSettings) {
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p1_zoom_text(SharedString::from(format_float_setting(
+        setup.player_1_view_height,
+    )));
+    window.set_launcher_p2_zoom_text(SharedString::from(format_float_setting(
+        setup.player_2_view_height,
+    )));
 }
 
 fn spacewars_preset_from_label(label: &str) -> Result<Option<SpacewarsSettings>, String> {
@@ -670,6 +770,7 @@ fn small_duel_spacewars_preset() -> SpacewarsSettings {
         asteroids_enabled: false,
         asteroid_probability_per_sec: 0.0,
         player_health_percent: 100,
+        ..SpacewarsSettings::default()
     }
 }
 
@@ -680,6 +781,7 @@ fn dense_asteroids_spacewars_preset() -> SpacewarsSettings {
         asteroids_enabled: true,
         asteroid_probability_per_sec: 80.0,
         player_health_percent: 100,
+        ..SpacewarsSettings::default()
     }
 }
 
@@ -690,6 +792,7 @@ fn long_game_spacewars_preset() -> SpacewarsSettings {
         asteroids_enabled: true,
         asteroid_probability_per_sec: 10.0,
         player_health_percent: 250,
+        ..SpacewarsSettings::default()
     }
 }
 
@@ -716,6 +819,8 @@ fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings,
         window.get_launcher_asteroids_enabled().as_str(),
         window.get_launcher_asteroid_probability_text().as_str(),
         window.get_launcher_player_health_text().as_str(),
+        window.get_launcher_p1_zoom_text().as_str(),
+        window.get_launcher_p2_zoom_text().as_str(),
     )
 }
 
@@ -755,6 +860,8 @@ fn spacewars_setup_from_values(
     asteroids_enabled: &str,
     asteroid_probability_per_sec: &str,
     player_health_percent: &str,
+    player_1_view_height: &str,
+    player_2_view_height: &str,
 ) -> Result<SpacewarsSettings, String> {
     let setup = SpacewarsSettings {
         universe_radius: parse_u32_setting(
@@ -776,6 +883,18 @@ fn spacewars_setup_from_values(
             "Player health",
             MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
             MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+        )?,
+        player_1_view_height: parse_f32_setting(
+            player_1_view_height,
+            "Player 1 zoom",
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
+        )?,
+        player_2_view_height: parse_f32_setting(
+            player_2_view_height,
+            "Player 2 zoom",
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
         )?,
     };
 
@@ -802,6 +921,29 @@ fn parse_f32_setting(value: &str, label: &str, min: f32, max: f32) -> Result<f32
             }
         })
         .map_err(|_| format!("{label} must be a number from {min:.0} to {max:.0}."))
+}
+
+fn adjust_player_view_height(current: f32, universe_radius: u32, zoom_in: bool) -> f32 {
+    let step = player_zoom_step(universe_radius);
+    let next = if zoom_in {
+        current - step
+    } else {
+        current + step
+    };
+    let max = player_zoom_max(universe_radius);
+    next.clamp(MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, max)
+}
+
+fn player_zoom_step(universe_radius: u32) -> f32 {
+    (player_zoom_max(universe_radius) / 100.0).max(1.0)
+}
+
+fn player_zoom_max(universe_radius: u32) -> f32 {
+    let diameter = universe_radius.saturating_mul(2) as f32;
+    diameter
+        .hypot(diameter)
+        .min(MAX_SPACEWARS_PLAYER_VIEW_HEIGHT)
+        .max(MIN_SPACEWARS_PLAYER_VIEW_HEIGHT)
 }
 
 fn start_scenario_from_launch(
@@ -1027,15 +1169,19 @@ mod tests {
 
     #[test]
     fn spacewars_setup_values_parse_and_normalize() {
-        let setup = spacewars_setup_from_values("2400", "off", "on", "75.5", "250").unwrap();
+        let setup =
+            spacewars_setup_from_values("2400", "off", "on", "75.5", "250", "420", "640").unwrap();
 
         assert_eq!(setup.universe_radius, 2400);
         assert!(!setup.use_planets);
         assert!(setup.asteroids_enabled);
         assert_eq!(setup.asteroid_probability_per_sec, 75.5);
         assert_eq!(setup.player_health_percent, 250);
+        assert_eq!(setup.player_1_view_height, 420.0);
+        assert_eq!(setup.player_2_view_height, 640.0);
 
-        let clamped = spacewars_setup_from_values("99999", "on", "off", "999", "0").unwrap();
+        let clamped =
+            spacewars_setup_from_values("99999", "on", "off", "999", "0", "1", "99999").unwrap();
         assert_eq!(clamped.universe_radius, MAX_SPACEWARS_UNIVERSE_RADIUS);
         assert!(clamped.use_planets);
         assert!(!clamped.asteroids_enabled);
@@ -1047,15 +1193,40 @@ mod tests {
             clamped.player_health_percent,
             MIN_SPACEWARS_PLAYER_HEALTH_PERCENT
         );
+        assert_eq!(
+            clamped.player_1_view_height,
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT
+        );
+        assert_eq!(
+            clamped.player_2_view_height,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT
+        );
     }
 
     #[test]
     fn spacewars_setup_values_report_invalid_input() {
-        assert!(spacewars_setup_from_values("wide", "on", "on", "20", "100").is_err());
-        assert!(spacewars_setup_from_values("1200", "maybe", "on", "20", "100").is_err());
-        assert!(spacewars_setup_from_values("1200", "on", "sometimes", "20", "100").is_err());
-        assert!(spacewars_setup_from_values("1200", "on", "on", "dense", "100").is_err());
-        assert!(spacewars_setup_from_values("1200", "on", "on", "20", "strong").is_err());
+        assert!(
+            spacewars_setup_from_values("wide", "on", "on", "20", "100", "320", "320").is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "maybe", "on", "20", "100", "320", "320").is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "on", "sometimes", "20", "100", "320", "320")
+                .is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "on", "on", "dense", "100", "320", "320").is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "on", "on", "20", "strong", "320", "320").is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "on", "on", "20", "100", "near", "320").is_err()
+        );
+        assert!(
+            spacewars_setup_from_values("1200", "on", "on", "20", "100", "320", "far").is_err()
+        );
     }
 
     #[test]
@@ -1072,6 +1243,7 @@ mod tests {
                 asteroids_enabled: false,
                 asteroid_probability_per_sec: 0.0,
                 player_health_percent: 100,
+                ..SpacewarsSettings::default()
             })
         );
         assert_eq!(
@@ -1082,6 +1254,7 @@ mod tests {
                 asteroids_enabled: true,
                 asteroid_probability_per_sec: 80.0,
                 player_health_percent: 100,
+                ..SpacewarsSettings::default()
             })
         );
         assert_eq!(
@@ -1092,6 +1265,7 @@ mod tests {
                 asteroids_enabled: true,
                 asteroid_probability_per_sec: 10.0,
                 player_health_percent: 250,
+                ..SpacewarsSettings::default()
             })
         );
         assert_eq!(spacewars_preset_from_label(PRESET_CUSTOM).unwrap(), None);
@@ -1149,6 +1323,8 @@ mod tests {
                 asteroids_enabled: false,
                 asteroid_probability_per_sec: 80.0,
                 player_health_percent: 250,
+                player_1_view_height: 420.0,
+                player_2_view_height: 640.0,
             },
         };
 
@@ -1208,6 +1384,8 @@ mod tests {
             asteroids_enabled: true,
             asteroid_probability_per_sec: 75.0,
             player_health_percent: 250,
+            player_1_view_height: 420.0,
+            player_2_view_height: 640.0,
         };
 
         let config = spacewars_config_from_settings(&settings);
@@ -1217,6 +1395,7 @@ mod tests {
         assert_eq!(config.asteroid_probability_per_sec, 75.0);
         assert_eq!(config.players[0].health_percent, 250);
         assert_eq!(config.players[1].health_percent, 250);
+        assert_eq!(config.player_view_heights, [420.0, 640.0]);
         assert!(config.use_starfield);
         assert!(config.use_textures);
         assert_eq!(config.fps, 60);
@@ -1240,13 +1419,40 @@ mod tests {
         settings.spacewars.universe_radius = 1;
         settings.spacewars.asteroid_probability_per_sec = 999.0;
         settings.spacewars.player_health_percent = 0;
+        settings.spacewars.player_1_view_height = f32::NAN;
+        settings.spacewars.player_2_view_height = 99999.0;
 
         assert!(normalize_spacewars_settings(&mut settings));
         assert_eq!(settings.spacewars.universe_radius, 300);
         assert_eq!(settings.spacewars.asteroid_probability_per_sec, 100.0);
         assert_eq!(settings.spacewars.player_health_percent, 1);
+        assert_eq!(
+            settings.spacewars.player_1_view_height,
+            DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
+        );
+        assert_eq!(
+            settings.spacewars.player_2_view_height,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT
+        );
 
         assert!(!normalize_spacewars_settings(&mut settings));
+    }
+
+    #[test]
+    fn player_zoom_buttons_adjust_view_height_by_original_slider_step() {
+        let zoomed_in = adjust_player_view_height(320.0, 1200, true);
+        let zoomed_out = adjust_player_view_height(320.0, 1200, false);
+
+        assert_eq!(zoomed_in, 320.0 - player_zoom_step(1200));
+        assert_eq!(zoomed_out, 320.0 + player_zoom_step(1200));
+        assert_eq!(
+            adjust_player_view_height(1.0, 1200, true),
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT
+        );
+        assert_eq!(
+            adjust_player_view_height(99999.0, 1200, false),
+            player_zoom_max(1200)
+        );
     }
 
     #[test]

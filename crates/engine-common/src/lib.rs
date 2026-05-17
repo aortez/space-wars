@@ -554,6 +554,9 @@ pub const MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 100.0;
 pub const DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 100;
 pub const MIN_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 1;
 pub const MAX_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 500;
+pub const DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 320.0;
+pub const MIN_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 15.0;
+pub const MAX_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 30_000.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -568,6 +571,10 @@ pub struct SpacewarsSettings {
     pub asteroid_probability_per_sec: f32,
     #[serde(default = "default_spacewars_player_health_percent")]
     pub player_health_percent: u32,
+    #[serde(default = "default_spacewars_player_view_height")]
+    pub player_1_view_height: f32,
+    #[serde(default = "default_spacewars_player_view_height")]
+    pub player_2_view_height: f32,
 }
 
 impl Default for SpacewarsSettings {
@@ -578,6 +585,8 @@ impl Default for SpacewarsSettings {
             asteroids_enabled: DEFAULT_SPACEWARS_ASTEROIDS_ENABLED,
             asteroid_probability_per_sec: DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
             player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
+            player_1_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            player_2_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
         }
     }
 }
@@ -597,6 +606,8 @@ impl SpacewarsSettings {
                 MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
                 MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
             ),
+            player_1_view_height: normalize_spacewars_player_view_height(self.player_1_view_height),
+            player_2_view_height: normalize_spacewars_player_view_height(self.player_2_view_height),
         }
     }
 }
@@ -621,6 +632,10 @@ const fn default_spacewars_player_health_percent() -> u32 {
     DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT
 }
 
+const fn default_spacewars_player_view_height() -> f32 {
+    DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
+}
+
 fn normalize_spacewars_asteroid_probability(value: f32) -> f32 {
     if value.is_finite() {
         value.clamp(
@@ -629,6 +644,17 @@ fn normalize_spacewars_asteroid_probability(value: f32) -> f32 {
         )
     } else {
         DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+    }
+}
+
+fn normalize_spacewars_player_view_height(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
+        )
+    } else {
+        DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
     }
 }
 

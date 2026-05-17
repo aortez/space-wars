@@ -59,6 +59,8 @@ enum ScenarioControlRequest {
     Resume,
     Restart,
     Benchmark,
+    ZoomIn { player: usize },
+    ZoomOut { player: usize },
 }
 
 pub fn new_scenario_controls() -> SharedScenarioControls {
@@ -76,6 +78,14 @@ impl ScenarioControls {
 
     pub fn request_benchmark(&mut self) {
         self.request = Some(ScenarioControlRequest::Benchmark);
+    }
+
+    pub fn request_zoom_in(&mut self, player: usize) {
+        self.request = Some(ScenarioControlRequest::ZoomIn { player });
+    }
+
+    pub fn request_zoom_out(&mut self, player: usize) {
+        self.request = Some(ScenarioControlRequest::ZoomOut { player });
     }
 
     pub fn clear(&mut self) {
@@ -318,6 +328,14 @@ fn step_scenario(
                     paused,
                     benchmark_active,
                 );
+                return 0;
+            }
+            ScenarioControlRequest::ZoomIn { player } => {
+                scenario.zoom_player_in(player);
+                return 0;
+            }
+            ScenarioControlRequest::ZoomOut { player } => {
+                scenario.zoom_player_out(player);
                 return 0;
             }
         }
@@ -890,6 +908,18 @@ impl HostedScenario {
         match self {
             Self::Null(state) => NullScenario::step(state, actions, dt),
             Self::Spacewars(state) => SpacewarsScenario::step(state, actions, dt),
+        }
+    }
+
+    pub(crate) fn zoom_player_in(&mut self, player: usize) {
+        if let Self::Spacewars(state) = self {
+            state.zoom_player_in(player);
+        }
+    }
+
+    pub(crate) fn zoom_player_out(&mut self, player: usize) {
+        if let Self::Spacewars(state) = self {
+            state.zoom_player_out(player);
         }
     }
 

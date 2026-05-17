@@ -121,6 +121,8 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-asteroids-enabled: "on";
     in-out property <string> launcher-asteroid-probability-text: "20.0";
     in-out property <string> launcher-player-health-text: "100";
+    in-out property <string> launcher-p1-zoom-text: "320";
+    in-out property <string> launcher-p2-zoom-text: "320";
     in property <string> launcher-error-text: "";
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
@@ -143,11 +145,19 @@ export component MainWindow inherits Window {
     callback launcher-start-game();
     callback launcher-start-benchmark();
     callback launcher-apply-preset();
+    callback launcher-p1-zoom-in();
+    callback launcher-p1-zoom-out();
+    callback launcher-p2-zoom-in();
+    callback launcher-p2-zoom-out();
     callback launcher-quit();
     callback ingame-resume();
     callback ingame-restart();
     callback ingame-return-launcher();
     callback ingame-start-benchmark();
+    callback ingame-p1-zoom-in();
+    callback ingame-p1-zoom-out();
+    callback ingame-p2-zoom-in();
+    callback ingame-p2-zoom-out();
 
     title: "Space-Wars";
     preferred-width: 1280px;
@@ -294,7 +304,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 500px;
-            height: root.ingame-controls-visible ? 430px : 310px;
+            height: root.ingame-controls-visible ? 470px : 310px;
             background: #080a12f2;
             border-color: #596273;
             border-width: 1px;
@@ -348,6 +358,60 @@ export component MainWindow inherits Window {
                 Text {
                     x: 0px;
                     y: 126px;
+                    width: parent.width;
+                    text: "Zoom: P1 U/I, P2 Insert/Home.";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Button {
+                    x: 0px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P1 In";
+                    clicked => {
+                        root.ingame-p1-zoom-in();
+                    }
+                }
+
+                Button {
+                    x: 114px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P1 Out";
+                    clicked => {
+                        root.ingame-p1-zoom-out();
+                    }
+                }
+
+                Button {
+                    x: 228px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P2 In";
+                    clicked => {
+                        root.ingame-p2-zoom-in();
+                    }
+                }
+
+                Button {
+                    x: 342px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P2 Out";
+                    clicked => {
+                        root.ingame-p2-zoom-out();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 214px;
                     width: parent.width;
                     text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
                     color: #c7d0dc;
@@ -420,7 +484,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: root.ingame-controls-visible;
                 x: 24px;
-                y: 350px;
+                y: 390px;
                 width: 140px;
                 height: 36px;
                 text: "Back";
@@ -432,7 +496,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: root.ingame-controls-visible;
                 x: parent.width - 164px;
-                y: 350px;
+                y: 390px;
                 width: 140px;
                 height: 36px;
                 text: "Resume";
@@ -807,6 +871,60 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 126px;
                     width: parent.width;
+                    text: "Zoom: P1 " + root.launcher-p1-zoom-text + ", P2 " + root.launcher-p2-zoom-text + ". Keys: U/I and Insert/Home.";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Button {
+                    x: 0px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P1 In";
+                    clicked => {
+                        root.launcher-p1-zoom-in();
+                    }
+                }
+
+                Button {
+                    x: 114px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P1 Out";
+                    clicked => {
+                        root.launcher-p1-zoom-out();
+                    }
+                }
+
+                Button {
+                    x: 228px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P2 In";
+                    clicked => {
+                        root.launcher-p2-zoom-in();
+                    }
+                }
+
+                Button {
+                    x: 342px;
+                    y: 154px;
+                    width: 104px;
+                    height: 32px;
+                    text: "P2 Out";
+                    clicked => {
+                        root.launcher-p2-zoom-out();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 214px;
+                    width: parent.width;
                     text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
                     color: #c7d0dc;
                     font-size: 13px;
@@ -815,7 +933,7 @@ export component MainWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 190px;
+                    y: 270px;
                     width: parent.width;
                     text: "Wings use the original hold behavior: hold the wing key to close, release to open.";
                     color: #c7d0dc;

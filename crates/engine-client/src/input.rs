@@ -33,6 +33,8 @@ pub(crate) enum GameKey {
     P1TurnRight,
     P1Laser,
     P1Cannon,
+    P1ZoomIn,
+    P1ZoomOut,
     P2Wing,
     P2Thrust,
     P2Reverse,
@@ -40,6 +42,8 @@ pub(crate) enum GameKey {
     P2TurnRight,
     P2Laser,
     P2Cannon,
+    P2ZoomIn,
+    P2ZoomOut,
 }
 
 pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
@@ -97,6 +101,8 @@ impl ClientInput {
                 turn_right: GameKey::P1TurnRight,
                 laser: GameKey::P1Laser,
                 cannon: GameKey::P1Cannon,
+                zoom_in: GameKey::P1ZoomIn,
+                zoom_out: GameKey::P1ZoomOut,
             },
             &mut actions,
         );
@@ -110,6 +116,8 @@ impl ClientInput {
                 turn_right: GameKey::P2TurnRight,
                 laser: GameKey::P2Laser,
                 cannon: GameKey::P2Cannon,
+                zoom_in: GameKey::P2ZoomIn,
+                zoom_out: GameKey::P2ZoomOut,
             },
             &mut actions,
         );
@@ -170,6 +178,12 @@ impl ClientInput {
         } else {
             actions.push(SpacewarsAction::fire_cannon_halt(controls.player));
         }
+
+        if self.pressed.contains(&controls.zoom_in) {
+            actions.push(SpacewarsAction::zoom_in(controls.player));
+        } else if self.pressed.contains(&controls.zoom_out) {
+            actions.push(SpacewarsAction::zoom_out(controls.player));
+        }
     }
 }
 
@@ -183,6 +197,8 @@ struct PlayerControlMap {
     turn_right: GameKey,
     laser: GameKey,
     cannon: GameKey,
+    zoom_in: GameKey,
+    zoom_out: GameKey,
 }
 
 fn mapped_key_event(event: &WindowEvent) -> Option<(GameKey, ElementState)> {
@@ -211,6 +227,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyD => Some(GameKey::P1TurnRight),
         KeyCode::Space => Some(GameKey::P1Laser),
         KeyCode::KeyK => Some(GameKey::P1Cannon),
+        KeyCode::KeyU => Some(GameKey::P1ZoomIn),
+        KeyCode::KeyI => Some(GameKey::P1ZoomOut),
         KeyCode::PageDown => Some(GameKey::P2Wing),
         KeyCode::Numpad8 => Some(GameKey::P2Thrust),
         KeyCode::Numpad5 => Some(GameKey::P2Reverse),
@@ -218,6 +236,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::Numpad6 => Some(GameKey::P2TurnRight),
         KeyCode::Delete => Some(GameKey::P2Laser),
         KeyCode::End => Some(GameKey::P2Cannon),
+        KeyCode::Insert => Some(GameKey::P2ZoomIn),
+        KeyCode::Home => Some(GameKey::P2ZoomOut),
         _ => None,
     }
 }
@@ -304,6 +324,42 @@ mod tests {
             game_key_from_key_code(KeyCode::End),
             Some(GameKey::P2Cannon)
         );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Insert),
+            Some(GameKey::P2ZoomIn)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Home),
+            Some(GameKey::P2ZoomOut)
+        );
+    }
+
+    #[test]
+    fn zoom_keys_emit_original_per_player_zoom_actions() {
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyU),
+            Some(GameKey::P1ZoomIn)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyI),
+            Some(GameKey::P1ZoomOut)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Insert),
+            Some(GameKey::P2ZoomIn)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Home),
+            Some(GameKey::P2ZoomOut)
+        );
+
+        let mut input = ClientInput::default();
+        input.press(GameKey::P1ZoomIn);
+        input.press(GameKey::P2ZoomOut);
+        let actions = decoded(&input.actions_for_spacewars());
+
+        assert!(has_action(&actions, 0, SpacewarsActionKind::ZoomIn));
+        assert!(has_action(&actions, 1, SpacewarsActionKind::ZoomOut));
     }
 
     #[test]
