@@ -1,8 +1,8 @@
 //! Initial Spacewars scenario port.
 //!
 //! Current slices cover deterministic sun/planet setup, ship controls, gravity,
-//! collision response, damage, debris, asteroids, weapons, and exhaust trails.
-//! Sounds, pods, and scoring land in later slices.
+//! collision response, damage, debris, asteroids, weapons, exhaust trails, and
+//! escape pods. Sounds, scoring, and ownership land in later slices.
 
 use std::time::Duration;
 
@@ -109,12 +109,18 @@ const WING_DELTA_SPEED: f32 = 5.0;
 const WING_CLOSED_SPEED: f32 = MAX_SPEED * 5.0;
 const WING_CLOSED_MAX_OMEGA: f32 = BASE_MAX_OMEGA * 0.25;
 const MAX_WING_THETA: f32 = core::f32::consts::FRAC_PI_4;
-const SHIP_BOUNDS_RADIUS: f32 = 6.0;
 const SHIP_LEFT_WING_TRIANGLE_INDEX: usize = 0;
 const SHIP_RIGHT_WING_TRIANGLE_INDEX: usize = 1;
 const SHIP_THRUSTER_TRIANGLE_INDEX: usize = 3;
 const SHIP_BODY_TRIANGLE_INDEX: usize = 4;
 const SHIP_LASER_TRIANGLE_INDEX: usize = 5;
+const POD_THRUST_FORCE: f32 = 50_000.0;
+const POD_TURN_FORCE: f32 = 10.0;
+const POD_MASS: f32 = 1.0;
+const POD_MAX_SPEED: f32 = 500.0;
+const POD_VELOCITY_DAMPING: f32 = 0.8;
+const POD_TURN_EXHAUST_SCALAR: f32 = 15.0;
+const POD_COCKPIT_RADIUS: f32 = 0.5;
 
 const SHIP_BODY: [Vec2; 3] = [
     Vec2::new(0.0, 0.0),
@@ -151,8 +157,25 @@ const SHELL_BODY: [Vec2; 3] = [
     Vec2::new(1.0, -1.7320508),
     Vec2::new(1.0, 1.7320508),
 ];
+const POD_BODY: [Vec2; 3] = [
+    Vec2::new(0.0, 1.0),
+    Vec2::new(-1.0, 0.0),
+    Vec2::new(1.0, 0.0),
+];
+const POD_THRUSTER: [Vec2; 3] = [
+    Vec2::new(0.0, 1.1),
+    Vec2::new(-1.0, 0.0),
+    Vec2::new(1.0, 0.0),
+];
+const POD_LASER: [Vec2; 3] = [
+    Vec2::new(-0.5, 0.5),
+    Vec2::new(0.0, 2.5),
+    Vec2::new(0.5, 0.5),
+];
 const SHIP_PIVOT: Vec2 = Vec2::new(2.5, 3.5);
 const SHIP_WING_PIVOT: Vec2 = Vec2::new(2.5, 2.0);
+const POD_PIVOT: Vec2 = Vec2::new(0.0, 1.0 / 3.0);
+const POD_COCKPIT_CENTER: Vec2 = POD_PIVOT;
 
 pub struct SpacewarsScenario;
 
@@ -335,6 +358,7 @@ impl BoundsDrawMode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShipState {
     pub owner_id: usize,
+    pub form: ShipForm,
     pub position: Vec2,
     pub velocity: Vec2,
     pub rotation_radians: f32,
@@ -358,6 +382,14 @@ pub struct ShipState {
     thrust_power: f32,
     current_max_omega: f32,
     cannon_cooldown_remaining: f32,
+    delta_time: f32,
+    death_impulse: Vec2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShipForm {
+    Ship,
+    EscapePod,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -605,19 +637,22 @@ impl Scenario for SpacewarsScenario {
         state.debris.extend(new_shells);
         update_ship_lasers(state);
         state.laser_hits = resolve_laser_hits(state);
+        handle_ship_deaths(state);
 
         apply_world_gravity(state);
         state.ship_debris_collisions = resolve_ship_debris_collisions(state);
+        handle_ship_deaths(state);
         state.ship_collisions = resolve_ship_collisions(state);
         let collision_events = resolve_body_collisions(state);
         state.body_collisions = collision_events.body_collisions;
         state.spaceport_contacts = collision_events.spaceport_contacts;
+        handle_ship_deaths(state);
         if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
             apply_debris_gravity(state);
         }
         state.debris_body_collisions = resolve_debris_body_collisions(state);
         state.debris_collisions = resolve_debris_collisions(state);
-        spawn_breakup_fragments(state);
+        spawn_debris_breakup_fragments(state);
         for debris in &mut state.debris {
             debris.update(dt);
         }
@@ -969,7 +1004,10 @@ fn nearest_bounds_intersection(line: Line, bounds: &Bounds2) -> Option<Vec2> {
 
 fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
     match hit.target {
-        LaserTarget::Ship(ship) => state.ships[ship].translate_life(-hit.damage),
+        LaserTarget::Ship(ship) => {
+            let impulse = state.ships[hit.shooter].direction * hit.damage;
+            state.ships[ship].translate_life_with_impulse(-hit.damage, impulse);
+        }
         LaserTarget::Debris(debris) => state.debris[debris].translate_life(-hit.damage),
         LaserTarget::Body(_) => {}
     }
@@ -1216,7 +1254,7 @@ impl EntityCollisionBody {
         Self {
             position: ship.position,
             velocity: ship.velocity,
-            mass: SHIP_MASS,
+            mass: ship.mass(),
             low: ship_low_bounds(&triangles),
         }
     }
@@ -1249,7 +1287,12 @@ fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisC
 
         let damage =
             state.debris[collision.debris].damage_amount(state.ships[collision.ship].velocity);
-        state.ships[collision.ship].translate_life(-damage);
+        let impulse = if state.debris[collision.debris].velocity.length_squared() <= REALLY_SMALL {
+            Vec2::ZERO
+        } else {
+            state.debris[collision.debris].velocity.normalized() * damage
+        };
+        state.ships[collision.ship].translate_life_with_impulse(-damage, impulse);
         state.debris[collision.debris].translate_life(-damage);
 
         let ship = &state.ships[collision.ship];
@@ -1471,11 +1514,11 @@ fn resolve_particle_body_collision(
     particle.velocity = (particle.velocity - normal * (2.0 * particle.velocity.dot(normal))) * 0.5;
 }
 
-fn spawn_breakup_fragments(state: &mut SpacewarsState) {
+fn handle_ship_deaths(state: &mut SpacewarsState) {
     let mut fragments = Vec::new();
 
     for ship in &mut state.ships {
-        if !ship.dead || ship.fragmented {
+        if !ship.dead || ship.fragmented || ship.form != ShipForm::Ship {
             continue;
         }
 
@@ -1486,7 +1529,14 @@ fn spawn_breakup_fragments(state: &mut SpacewarsState) {
             fragments.len() as u64,
         ));
         ship.fragmented = true;
+        ship.change_to_escape_pod();
     }
+
+    state.debris.extend(fragments);
+}
+
+fn spawn_debris_breakup_fragments(state: &mut SpacewarsState) {
+    let mut fragments = Vec::new();
 
     for (debris_index, debris) in state.debris.iter_mut().enumerate() {
         if !debris.dead || debris.fragmented || debris.kind == DebrisKind::Fragment {
@@ -1943,7 +1993,7 @@ fn resolve_debris_body_collision(debris: &mut DebrisState, body_position: Vec2, 
 
 fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
     let damage = ship.velocity.length() * PLANET_DAMAGE_SCALAR;
-    ship.translate_life(-damage);
+    ship.translate_life_with_impulse(-damage, ship.direction * -damage);
     damage
 }
 
@@ -2101,7 +2151,14 @@ fn spaceport_local_points(planet_radius: f32) -> Vec<Vec2> {
 }
 
 fn ship_low_bounds(triangles: &[[Vec2; 3]]) -> Circle {
-    let center = triangle_low_bound(triangles[SHIP_BODY_TRIANGLE_INDEX]).center;
+    let center = triangles
+        .iter()
+        .copied()
+        .max_by(|a, b| {
+            polygon_area(polygon_center(a), a).total_cmp(&polygon_area(polygon_center(b), b))
+        })
+        .map(|triangle| triangle_low_bound(triangle).center)
+        .unwrap_or(Vec2::ZERO);
     let radius = triangles
         .iter()
         .map(|triangle| {
@@ -2123,6 +2180,14 @@ fn ship_high_bounds(triangles: &[[Vec2; 3]]) -> BoundsList {
 
 fn ship_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     let transform = ship_transform(ship);
+    if ship.form == ShipForm::EscapePod {
+        return vec![
+            transform_points(transform, POD_LASER),
+            transform_points(transform, POD_THRUSTER),
+            transform_points(transform, POD_BODY),
+        ];
+    }
+
     vec![
         transform_points(
             transform,
@@ -2140,11 +2205,20 @@ fn ship_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
 }
 
 fn ship_mount_center(ship: &ShipState) -> Vec2 {
+    if ship.form == ShipForm::EscapePod {
+        return triangle_low_bound(transform_points(ship_transform(ship), POD_LASER)).center;
+    }
+
     triangle_low_bound(ship_triangles(ship)[SHIP_LASER_TRIANGLE_INDEX]).center
 }
 
 fn ship_thruster_center(ship: &ShipState) -> Vec2 {
-    triangle_low_bound(transform_points(ship_transform(ship), SHIP_THRUSTER)).center
+    let thruster = if ship.form == ShipForm::EscapePod {
+        POD_THRUSTER
+    } else {
+        SHIP_THRUSTER
+    };
+    triangle_low_bound(transform_points(ship_transform(ship), thruster)).center
 }
 
 fn ship_wing_centers(ship: &ShipState) -> (Vec2, Vec2) {
@@ -2369,6 +2443,7 @@ impl ShipState {
         let life = health_percent as f32;
         Self {
             owner_id,
+            form: ShipForm::Ship,
             position,
             velocity: Vec2::ZERO,
             rotation_radians: 0.0,
@@ -2392,6 +2467,8 @@ impl ShipState {
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
             cannon_cooldown_remaining: 0.0,
+            delta_time,
+            death_impulse: Vec2::ZERO,
         }
     }
 
@@ -2405,18 +2482,35 @@ impl ShipState {
         Self::new(owner_id, position, color, 100, delta_time)
     }
 
+    #[cfg(test)]
     fn translate_life(&mut self, delta: f32) {
+        self.translate_life_with_impulse(delta, Vec2::ZERO);
+    }
+
+    fn translate_life_with_impulse(&mut self, delta: f32, impulse: Vec2) {
+        if self.form == ShipForm::EscapePod {
+            return;
+        }
+
+        let was_dead = self.dead;
         self.life += delta;
-        if self.life <= 0.0 {
+        if !was_dead && self.life <= 0.0 {
             self.dead = true;
+            self.death_impulse = impulse;
         }
     }
 
     fn close_wings(&mut self) {
+        if self.form == ShipForm::EscapePod {
+            return;
+        }
         self.wing_behavior = WingBehavior::Close;
     }
 
     fn open_wings(&mut self) {
+        if self.form == ShipForm::EscapePod {
+            return;
+        }
         self.wing_behavior = WingBehavior::Open;
     }
 
@@ -2453,6 +2547,9 @@ impl ShipState {
     }
 
     fn fire_laser(&mut self) {
+        if self.form == ShipForm::EscapePod {
+            return;
+        }
         self.laser_firing = true;
     }
 
@@ -2461,6 +2558,9 @@ impl ShipState {
     }
 
     fn fire_cannon(&mut self) {
+        if self.form == ShipForm::EscapePod {
+            return;
+        }
         self.cannon_firing = true;
     }
 
@@ -2469,6 +2569,11 @@ impl ShipState {
     }
 
     fn update_cannon(&mut self, dt: f32, tick: u64) -> Option<DebrisState> {
+        if self.form == ShipForm::EscapePod {
+            self.cannon_cooldown_remaining = 0.0;
+            return None;
+        }
+
         let shell = if self.cannon_firing && self.cannon_cooldown_remaining <= 0.0 {
             let mount_center = ship_mount_center(self);
             let shell = DebrisState::new_shell(
@@ -2490,6 +2595,12 @@ impl ShipState {
     }
 
     fn update_laser(&mut self) {
+        if self.form == ShipForm::EscapePod {
+            self.laser_beam = None;
+            self.laser_firing = false;
+            return;
+        }
+
         if !self.laser_firing {
             self.laser_beam = None;
             return;
@@ -2510,10 +2621,15 @@ impl ShipState {
     }
 
     fn update(&mut self, dt: f32, seed: u64, tick: u64) {
+        if self.form == ShipForm::EscapePod {
+            self.update_escape_pod(dt, seed, tick);
+            return;
+        }
+
         self.update_exhaust_trails(dt);
         let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
 
-        self.rotate_ship(&mut exhaust_rng, tick);
+        self.rotate_ship(&mut exhaust_rng, tick, SHIP_TURN_EXHAUST_SCALAR);
         self.position += self.velocity * dt;
         self.rotation_radians += self.omega * dt;
         self.update_wings(dt);
@@ -2521,7 +2637,19 @@ impl ShipState {
         self.update_turn();
     }
 
-    fn rotate_ship(&mut self, rng: &mut SpacewarsRng, tick: u64) {
+    fn update_escape_pod(&mut self, dt: f32, seed: u64, tick: u64) {
+        self.velocity *= POD_VELOCITY_DAMPING;
+        self.update_exhaust_trails(dt);
+        let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
+
+        self.rotate_ship(&mut exhaust_rng, tick, POD_TURN_EXHAUST_SCALAR);
+        self.position += self.velocity * dt;
+        self.rotation_radians += self.omega * dt;
+        self.update_pod_thrust(&mut exhaust_rng, tick);
+        self.update_turn();
+    }
+
+    fn rotate_ship(&mut self, rng: &mut SpacewarsRng, tick: u64, exhaust_scalar: f32) {
         let delta_theta = self.turn_power * self.omega;
         let theta = self.rotation_radians - delta_theta;
         self.rotation_radians = theta;
@@ -2529,7 +2657,7 @@ impl ShipState {
         if delta_theta.abs() > 0.001 {
             self.fire_exhaust(
                 self.direction.rotate_radians(core::f32::consts::FRAC_PI_2)
-                    * (delta_theta * SHIP_TURN_EXHAUST_SCALAR),
+                    * (delta_theta * exhaust_scalar),
                 rng,
                 tick,
             );
@@ -2615,6 +2743,35 @@ impl ShipState {
         }
     }
 
+    fn update_pod_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
+        match self.thrust_behavior {
+            ThrustBehavior::None => {}
+            ThrustBehavior::Full => {
+                self.velocity += self.direction * self.thrust_power;
+                self.cap_speed(POD_MAX_SPEED);
+                self.fire_exhaust(self.direction, rng, tick);
+            }
+            ThrustBehavior::Brake => {
+                if self.velocity.length() > POD_MAX_SPEED * 0.25 {
+                    self.velocity -= self.velocity.normalized() * self.thrust_power;
+                } else {
+                    self.velocity *= 0.9;
+                }
+
+                if self.omega.abs() > 0.01 {
+                    self.omega -= self.omega.signum() * self.turn_power;
+                } else {
+                    self.omega = 0.0;
+                }
+            }
+            ThrustBehavior::Reverse => {
+                self.velocity -= self.direction * self.thrust_power;
+                self.cap_speed(POD_MAX_SPEED);
+                self.fire_exhaust(self.direction * -10.0, rng, tick);
+            }
+        }
+    }
+
     fn update_exhaust_trails(&mut self, dt: f32) {
         for trail in &mut self.exhaust_trails {
             trail.update(dt);
@@ -2624,6 +2781,23 @@ impl ShipState {
 
     fn fire_exhaust(&mut self, direction: Vec2, rng: &mut SpacewarsRng, tick: u64) {
         if direction.length_squared() <= REALLY_SMALL {
+            return;
+        }
+
+        if self.form == ShipForm::EscapePod {
+            let pulse = ((tick % 614) as f32 * 0.001).cos() + core::f32::consts::FRAC_PI_2;
+            let velocity = direction * (self.thrust_power * -0.5 * pulse * 0.001);
+            let thruster = ship_thruster_center(self);
+            self.exhaust_trails.push(ExhaustTrailState::new(
+                thruster,
+                velocity.rotate_radians(-0.01),
+                rng,
+            ));
+            self.exhaust_trails.push(ExhaustTrailState::new(
+                thruster,
+                velocity.rotate_radians(0.01),
+                rng,
+            ));
             return;
         }
 
@@ -2678,6 +2852,29 @@ impl ShipState {
             self.velocity = self.velocity.normalized() * max_speed;
         }
     }
+
+    fn mass(&self) -> f32 {
+        if self.form == ShipForm::EscapePod {
+            POD_MASS
+        } else {
+            SHIP_MASS
+        }
+    }
+
+    fn change_to_escape_pod(&mut self) {
+        self.form = ShipForm::EscapePod;
+        self.dead = false;
+        self.life = 0.0;
+        self.velocity += self.death_impulse;
+        self.death_impulse = Vec2::ZERO;
+        self.laser_firing = false;
+        self.cannon_firing = false;
+        self.laser_beam = None;
+        self.cannon_cooldown_remaining = 0.0;
+        self.turn_power = POD_TURN_FORCE / POD_MASS * self.delta_time;
+        self.thrust_power = POD_THRUST_FORCE / POD_MASS * self.delta_time;
+        self.current_max_omega = BASE_MAX_OMEGA;
+    }
 }
 
 fn direction_from_rotation(rotation_radians: f32) -> Vec2 {
@@ -2687,14 +2884,14 @@ fn direction_from_rotation(rotation_radians: f32) -> Vec2 {
 
 fn contain_ship(ship: &mut ShipState, universe_radius: f32) {
     let universe_center = Vec2::new(universe_radius, universe_radius);
-    let ship_center = ship.position + SHIP_PIVOT;
-    let offset = ship_center - universe_center;
-    let max_distance = (universe_radius - SHIP_BOUNDS_RADIUS).max(0.0);
+    let bounds = ship_low_bounds(&ship_triangles(ship));
+    let offset = bounds.center - universe_center;
+    let max_distance = (universe_radius - bounds.radius).max(0.0);
     let distance = offset.length();
 
     if distance > max_distance {
         let contained_center = universe_center + offset.normalized() * max_distance;
-        ship.position = contained_center - SHIP_PIVOT;
+        ship.position += contained_center - bounds.center;
     }
 }
 
@@ -2961,6 +3158,11 @@ fn render_spaceport(frame: &mut RenderFrame, planet: &PlanetState) {
 }
 
 fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
+    if ship.form == ShipForm::EscapePod {
+        render_escape_pod(frame, ship);
+        return;
+    }
+
     let transform = ship_transform(ship);
     let base = render_color(ship.color);
     let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.9);
@@ -2979,6 +3181,25 @@ fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
     push_filled_polygon(frame, transform, &SHIP_THRUSTER, dim(base, 0.58), outline);
     push_filled_polygon(frame, transform, &SHIP_BODY, base, outline);
     push_filled_polygon(frame, transform, &SHIP_LASER, dim(base, 1.15), outline);
+}
+
+fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
+    let transform = ship_transform(ship);
+    let base = render_color(ship.color);
+    let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.9);
+
+    push_filled_polygon(frame, transform, &POD_THRUSTER, dim(base, 0.72), outline);
+    push_filled_polygon(frame, transform, &POD_BODY, base, outline);
+    push_filled_polygon(frame, transform, &POD_LASER, RenderColor::BLUE, outline);
+    frame.push_primitive(
+        SHIP_LAYER,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(transform.transform_point(POD_COCKPIT_CENTER)),
+            radius: POD_COCKPIT_RADIUS,
+            fill: Some(Fill::new(RenderColor::BLUE)),
+            stroke: Some(Stroke::new(outline, 0.75)),
+        }),
+    );
 }
 
 fn render_ship_bounds(
@@ -3035,7 +3256,11 @@ fn ship_transform(ship: &ShipState) -> Transform2 {
         translation: ship.position,
         scale: Vec2::splat(1.0),
         rotation_radians: ship.rotation_radians,
-        pivot: SHIP_PIVOT,
+        pivot: if ship.form == ShipForm::EscapePod {
+            POD_PIVOT
+        } else {
+            SHIP_PIVOT
+        },
     }
 }
 
@@ -3423,8 +3648,10 @@ mod tests {
         assert_eq!(state.tick, 0);
         assert_eq!(state.config.universe_radius, 300);
         assert_eq!(state.ships[0].owner_id, 0);
+        assert_eq!(state.ships[0].form, ShipForm::Ship);
         assert_eq!(state.ships[0].position, Vec2::new(375.0, 450.0));
         assert_eq!(state.ships[1].owner_id, 1);
+        assert_eq!(state.ships[1].form, ShipForm::Ship);
         assert_eq!(state.ships[1].position, Vec2::new(375.0, 500.0));
         assert_eq!(state.ships[0].life, 50.0);
         assert_eq!(state.ships[0].life_max, 50.0);
@@ -4148,8 +4375,9 @@ mod tests {
         step(&mut state, &[]);
 
         let center = Vec2::new(radius, radius);
-        let distance = (state.ships[0].position + SHIP_PIVOT - center).length();
-        assert!(distance <= radius - SHIP_BOUNDS_RADIUS + EPS);
+        let bounds = ship_low_bounds(&ship_triangles(&state.ships[0]));
+        let distance = (bounds.center - center).length();
+        assert!(distance <= radius - bounds.radius + EPS);
     }
 
     #[test]
@@ -4659,10 +4887,13 @@ mod tests {
         state.ships[0].translate_life(-life);
         replay.ships[0].translate_life(-life);
 
-        spawn_breakup_fragments(&mut state);
-        spawn_breakup_fragments(&mut replay);
+        handle_ship_deaths(&mut state);
+        handle_ship_deaths(&mut replay);
 
         assert!(state.ships[0].fragmented);
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert!(!state.ships[0].dead);
+        assert_eq!(state.ships[0].life, 0.0);
         assert_eq!(state.debris.len(), 5);
         assert_eq!(state.debris, replay.debris);
         assert!(state.debris.iter().all(|fragment| {
@@ -4683,9 +4914,59 @@ mod tests {
         }
 
         let first_fragments = state.debris.clone();
-        spawn_breakup_fragments(&mut state);
+        handle_ship_deaths(&mut state);
 
         assert_eq!(state.debris, first_fragments);
+    }
+
+    #[test]
+    fn escape_pod_ignores_damage_and_weapons() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.ships[0].change_to_escape_pod();
+
+        state.ships[0].translate_life(-100.0);
+        step(
+            &mut state,
+            &[
+                SpacewarsAction::fire_laser(0),
+                SpacewarsAction::fire_cannon(0),
+            ],
+        );
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert_eq!(state.ships[0].life, 0.0);
+        assert!(!state.ships[0].dead);
+        assert!(state.ships[0].laser_beam.is_none());
+        assert!(state.debris.is_empty());
+    }
+
+    #[test]
+    fn escape_pod_uses_pod_motion_limits() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.ships[0].change_to_escape_pod();
+
+        step(&mut state, &[SpacewarsAction::thrust(0)]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert!(state.ships[0].velocity.length() > 0.0);
+        assert!(state.ships[0].velocity.length() <= POD_MAX_SPEED);
+    }
+
+    #[test]
+    fn render_frame_draws_escape_pod_geometry() {
+        let mut state = init_deathmatch();
+        state.ships[0].change_to_escape_pod();
+        let star_count = state
+            .starfield
+            .as_ref()
+            .expect("deathmatch should create a starfield")
+            .stars
+            .len();
+
+        let frame = SpacewarsScenario::render_frame(&state);
+
+        assert_eq!(circle_primitive_count(&frame), 2);
+        assert_eq!(polygon_primitive_count(&frame), 9 + star_count);
     }
 
     #[test]
@@ -4708,7 +4989,7 @@ mod tests {
         assert_close(asteroid.breakup_radius, 12.0);
         state.debris.push(asteroid);
 
-        spawn_breakup_fragments(&mut state);
+        spawn_debris_breakup_fragments(&mut state);
 
         assert!(state.debris[0].fragmented);
         assert_eq!(state.debris.len(), 4);

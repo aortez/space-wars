@@ -437,5 +437,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 
 - Port player ownership, planet capture, escape pods, ship rebuild from spaceports, game-over logic, score display, and final split-view/HUD polish.
 - Complete the gameplay consequences that depend on physics contacts: landing ownership timers, ship healing on owned ports, pod-to-ship rebuild timers, ship-to-pod conversion on death, and associated score/life state.
+- M15a: ✅ Add the ship death lifecycle foundation. A dead ship now emits breakup fragments, swaps into an escape pod, and the pod uses pod-specific geometry, damping, movement limits, no weapons, and no further damage death.
+- M15b: Add planet ownership/capture and owned-spaceport effects: ship healing, escape-pod rebuild progress, and pod-to-ship restoration after the original 8-second build timer.
 - Add enough UI/HUD to support local two-player arcade play.
 - Acceptance: local two-player arcade mode is playable end-to-end with default config.
