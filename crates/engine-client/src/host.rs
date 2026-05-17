@@ -201,6 +201,7 @@ struct SpacewarsPanelState {
     planet_score_label: String,
     player_1_planet_fraction: f32,
     player_2_planet_fraction: f32,
+    winner_text: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -290,12 +291,25 @@ fn spacewars_panel_state(state: &SpacewarsState) -> SpacewarsPanelState {
         ),
         player_1_planet_fraction: player_1_planets as f32 / total_planets,
         player_2_planet_fraction: player_2_planets as f32 / total_planets,
+        winner_text: state
+            .winner
+            .and_then(|winner| state.players.get(winner))
+            .map(|player| format!("Game Over! {} Wins!", player.name)),
     }
 }
 
 fn player_panel_state(state: &SpacewarsState, player_index: usize) -> PlayerPanelState {
     let player = &state.players[player_index];
     let ship = &state.ships[player_index];
+    if player.eliminated {
+        return PlayerPanelState {
+            name: format!("Player {}: {}", player.id + 1, player.name),
+            status: "Eliminated".into(),
+            status_fraction: 0.0,
+            color: player.color,
+        };
+    }
+
     let status_fraction = ship_life_fraction(ship.life, ship.life_max);
     let percent = display_percent(status_fraction);
     let label = match ship.form {
@@ -341,6 +355,7 @@ fn set_spacewars_panel(window: &MainWindow, state: Option<SpacewarsPanelState>) 
     window.set_planet_score_label(SharedString::from(state.planet_score_label));
     window.set_p1_planet_fraction(state.player_1_planet_fraction);
     window.set_p2_planet_fraction(state.player_2_planet_fraction);
+    window.set_winner_text(SharedString::from(state.winner_text.unwrap_or_default()));
 }
 
 fn brush_from_core_color(color: CoreColor) -> Brush {
@@ -441,11 +456,28 @@ mod tests {
         assert_eq!(panel.player_2.name, "Player 2: Player 2");
         assert_eq!(panel.player_2.status, "Pod Rebuild: 25%");
         assert_eq!(panel.player_2.status_fraction, 0.25);
+        assert_eq!(panel.winner_text, None);
         assert_eq!(
             panel.planet_score_label,
             format!("Planets  P1 1 | Free {free_planets} | P2 2")
         );
         assert_eq!(panel.player_1_planet_fraction, 1.0 / total_planets);
         assert_eq!(panel.player_2_planet_fraction, 2.0 / total_planets);
+    }
+
+    #[test]
+    fn spacewars_panel_state_reports_winner_and_eliminated_player() {
+        let mut scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let HostedScenario::Spacewars(state) = &mut scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        state.players[0].eliminated = true;
+        state.winner = Some(1);
+
+        let panel = spacewars_panel_state(state);
+
+        assert_eq!(panel.player_1.status, "Eliminated");
+        assert_eq!(panel.player_1.status_fraction, 0.0);
+        assert_eq!(panel.winner_text, Some("Game Over! Player 2 Wins!".into()));
     }
 }

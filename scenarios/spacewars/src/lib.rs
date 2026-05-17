@@ -187,6 +187,7 @@ pub struct SpacewarsState {
     pub config: SpacewarsConfig,
     pub seed: u64,
     pub tick: u64,
+    pub winner: Option<usize>,
     pub players: [PlayerState; 2],
     pub ships: [ShipState; 2],
     pub debris: Vec<DebrisState>,
@@ -210,6 +211,7 @@ pub struct PlayerState {
     pub health_percent: u32,
     pub color: Color,
     pub planet_count: usize,
+    pub eliminated: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -609,6 +611,7 @@ impl Scenario for SpacewarsScenario {
             config,
             seed,
             tick: 0,
+            winner: None,
             players,
             ships,
             debris: Vec::new(),
@@ -627,6 +630,10 @@ impl Scenario for SpacewarsScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        if state.winner.is_some() {
+            return StepResult::default();
+        }
+
         for action in actions.iter().filter_map(SpacewarsAction::decode) {
             state.apply_action(action);
         }
@@ -670,6 +677,7 @@ impl Scenario for SpacewarsScenario {
         remove_finished_debris(state);
         update_particles(state, dt);
         spawn_random_asteroid(state, dt);
+        update_game_over(state);
 
         state.tick += 1;
         StepResult::default()
@@ -692,6 +700,15 @@ impl Scenario for SpacewarsScenario {
 
 impl SpacewarsState {
     fn apply_action(&mut self, action: SpacewarsAction) {
+        if self
+            .players
+            .get(action.player)
+            .map(|player| player.eliminated)
+            .unwrap_or(true)
+        {
+            return;
+        }
+
         let Some(ship) = self.ships.get_mut(action.player) else {
             return;
         };
@@ -1556,6 +1573,38 @@ fn handle_ship_deaths(state: &mut SpacewarsState) {
     }
 
     state.debris.extend(fragments);
+}
+
+fn update_game_over(state: &mut SpacewarsState) {
+    if state.winner.is_some() {
+        return;
+    }
+
+    for player_index in 0..state.players.len() {
+        if state.ships[player_index].form == ShipForm::Ship {
+            state.players[player_index].eliminated = false;
+            continue;
+        }
+
+        if state.players[player_index].planet_count == 0 {
+            state.players[player_index].eliminated = true;
+        }
+    }
+
+    let eliminated = state
+        .players
+        .iter()
+        .filter(|player| player.eliminated)
+        .count();
+    if eliminated != 1 {
+        return;
+    }
+
+    state.winner = state
+        .players
+        .iter()
+        .find(|player| !player.eliminated)
+        .map(|player| player.id);
 }
 
 fn spawn_debris_breakup_fragments(state: &mut SpacewarsState) {
@@ -3060,6 +3109,7 @@ fn player_state(id: usize, config: &PlayerConfig) -> PlayerState {
         health_percent: config.health_percent,
         color: config.color,
         planet_count: 0,
+        eliminated: false,
     }
 }
 
@@ -3859,6 +3909,7 @@ mod tests {
 
         assert_eq!(state.seed, 123);
         assert_eq!(state.tick, 0);
+        assert_eq!(state.winner, None);
         assert_eq!(state.config.universe_radius, 300);
         assert_eq!(state.ships[0].owner_id, 0);
         assert_eq!(state.ships[0].form, ShipForm::Ship);
@@ -3878,6 +3929,8 @@ mod tests {
         assert_eq!(state.players[1].name, "Player 2");
         assert_eq!(state.players[0].planet_count, 0);
         assert_eq!(state.players[1].planet_count, 0);
+        assert!(!state.players[0].eliminated);
+        assert!(!state.players[1].eliminated);
         assert!(state.sun.is_none());
         assert!(state.planets.is_empty());
         assert!(
@@ -4457,6 +4510,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         state.planets[0].owner_id = Some(0);
+        refresh_player_planet_counts(&mut state);
         state.ships[0].change_to_escape_pod();
         let dt = 1.0 / 60.0;
 
@@ -4476,6 +4530,8 @@ mod tests {
         assert_eq!(state.ships[0].life, state.ships[0].life_max);
         assert!(!state.ships[0].dead);
         assert!(!state.ships[0].fragmented);
+        assert!(!state.players[0].eliminated);
+        assert_eq!(state.winner, None);
         assert_eq!(state.planets[0].building_new_ship_time, 0.0);
     }
 
@@ -4508,6 +4564,51 @@ mod tests {
         assert_close(actual.g, expected.g);
         assert_close(actual.b, expected.b);
         assert_close(actual.a, 0.82);
+    }
+
+    #[test]
+    fn ship_death_with_no_owned_planets_eliminates_player_and_declares_winner() {
+        let mut state = init_deathmatch_no_asteroids();
+        let life = state.ships[0].life;
+        state.ships[0].translate_life(-life);
+
+        step(&mut state, &[]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert!(state.players[0].eliminated);
+        assert!(!state.players[1].eliminated);
+        assert_eq!(state.winner, Some(1));
+    }
+
+    #[test]
+    fn ship_death_with_owned_planet_keeps_player_alive_as_pod() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(100.0, 100.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        refresh_player_planet_counts(&mut state);
+        let life = state.ships[0].life;
+        state.ships[0].translate_life(-life);
+
+        step(&mut state, &[]);
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert!(!state.players[0].eliminated);
+        assert_eq!(state.winner, None);
+    }
+
+    #[test]
+    fn game_over_freezes_step_and_ignores_actions() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.winner = Some(1);
+        let tick = state.tick;
+        let position = state.ships[0].position;
+        let velocity = state.ships[0].velocity;
+
+        step(&mut state, &[SpacewarsAction::thrust(0)]);
+
+        assert_eq!(state.tick, tick);
+        assert_eq!(state.ships[0].position, position);
+        assert_eq!(state.ships[0].velocity, velocity);
     }
 
     #[test]
