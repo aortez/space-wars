@@ -28,10 +28,12 @@ const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
 const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
+const DEBRIS_LAYER: i32 = 1;
 const LASER_LAYER: i32 = 2;
 const PARTICLE_LAYER: i32 = 3;
 const BOUNDS_HIGH_LAYER: i32 = 4;
 const BOUNDS_LOW_LAYER: i32 = 5;
+const VIEW_RECTANGLE_LAYER: i32 = 8;
 const LABEL_LAYER: i32 = 10;
 
 const MAX_PLANETS: usize = 99;
@@ -54,6 +56,7 @@ const PLANET_CAPTURE_SECS: f32 = 4.0;
 const POD_REBUILD_SECS: f32 = 8.0;
 const OWNED_SPACEPORT_HEAL_PER_SEC: f32 = 3.0;
 const PLAYER_VIEW_HEIGHT: f32 = 320.0;
+const PLAYER_VIEW_ASPECT_RATIO: f32 = 640.0 / 417.6;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
 const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
@@ -102,6 +105,9 @@ const BREAKUP_RNG_SALT: u64 = 0xB2EA_4A9E_5EED;
 const BREAKUP_FRAGMENT_SPEED: f32 = 50.0;
 const BREAKUP_FRAGMENT_OMEGA: f32 = 1.0;
 const BREAKUP_FRAGMENT_DAMAGE_SCALAR: f32 = 0.0;
+const BENCHMARK_RNG_SALT: u64 = 0xBE4C_2026_5EED;
+const BENCHMARK_ASTEROIDS: usize = MAX_ASTEROIDS;
+const BENCHMARK_PARTICLES: usize = 1_200;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -202,6 +208,14 @@ pub struct SpacewarsState {
     pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SpacewarsBenchmarkCounts {
+    pub asteroids: usize,
+    pub fragments: usize,
+    pub shells: usize,
+    pub particles: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -733,18 +747,183 @@ impl SpacewarsState {
 }
 
 impl SpacewarsScenario {
+    pub fn init_benchmark(seed: u64) -> SpacewarsState {
+        let mut config = SpacewarsConfig::default();
+        config.asteroid_probability_per_sec = 100.0;
+        config.players[0].health_percent = 500;
+        config.players[1].health_percent = 500;
+
+        let mut state = Self::init(config, seed);
+        prepare_benchmark_state(&mut state);
+        state
+    }
+
+    pub fn benchmark_actions(state: &SpacewarsState) -> Vec<Action> {
+        let mut actions = vec![
+            SpacewarsAction::thrust(0),
+            SpacewarsAction::fire_laser(0),
+            SpacewarsAction::fire_cannon(0),
+            SpacewarsAction::thrust(1),
+            SpacewarsAction::fire_laser(1),
+            SpacewarsAction::fire_cannon(1),
+        ];
+
+        if (state.tick / 90) % 2 == 0 {
+            actions.push(SpacewarsAction::turn_right(0));
+            actions.push(SpacewarsAction::turn_left(1));
+        } else {
+            actions.push(SpacewarsAction::turn_left(0));
+            actions.push(SpacewarsAction::turn_right(1));
+        }
+
+        actions
+    }
+
+    pub fn benchmark_counts(state: &SpacewarsState) -> SpacewarsBenchmarkCounts {
+        state.debris.iter().fold(
+            SpacewarsBenchmarkCounts {
+                particles: state.particles.len(),
+                ..SpacewarsBenchmarkCounts::default()
+            },
+            |mut counts, debris| {
+                match debris.kind {
+                    DebrisKind::Asteroid => counts.asteroids += 1,
+                    DebrisKind::Fragment => counts.fragments += 1,
+                    DebrisKind::Shell => counts.shells += 1,
+                }
+                counts
+            },
+        )
+    }
+
     pub fn render_player_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
         (0..state.ships.len())
-            .map(|player| render_state_with_camera(state, player_camera(state, player), true))
+            .map(|player| {
+                render_state_with_camera(
+                    state,
+                    player_camera(state, player),
+                    RenderOptions::player(),
+                )
+            })
             .collect()
+    }
+
+    pub fn render_raster_local_play_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
+        let mut frames = (0..state.ships.len())
+            .map(|player| {
+                render_state_with_camera(
+                    state,
+                    player_camera(state, player),
+                    RenderOptions::raster_player(),
+                )
+            })
+            .collect::<Vec<_>>();
+        frames.push(render_raster_overview_state(state, 0));
+        frames.push(render_raster_overview_state(state, 1));
+        frames
     }
 
     pub fn render_local_play_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
         let mut frames = Self::render_player_frames(state);
-        frames.push(render_overview_state(state));
-        frames.push(render_overview_state(state));
+        frames.push(render_overview_state(state, 0));
+        frames.push(render_overview_state(state, 1));
         frames
     }
+}
+
+fn prepare_benchmark_state(state: &mut SpacewarsState) {
+    let radius = state.config.universe_radius as f32;
+    let center = universe_center(radius);
+    position_benchmark_ships(state, center);
+    seed_benchmark_debris(state, center, radius);
+    seed_benchmark_particles(state, center, radius);
+}
+
+fn position_benchmark_ships(state: &mut SpacewarsState, center: Vec2) {
+    let positions = [
+        center + Vec2::new(-190.0, -45.0),
+        center + Vec2::new(190.0, 45.0),
+    ];
+
+    for (ship, position) in state.ships.iter_mut().zip(positions) {
+        ship.form = ShipForm::Ship;
+        ship.position = position;
+        ship.velocity = Vec2::ZERO;
+        ship.rotation_radians = rotation_for_direction(center - position);
+        ship.direction = direction_from_rotation(ship.rotation_radians);
+        ship.omega = 0.0;
+        ship.laser_firing = false;
+        ship.cannon_firing = false;
+        ship.laser_beam = None;
+        ship.exhaust_trails.clear();
+        ship.life = ship.life_max;
+        ship.dead = false;
+        ship.fragmented = false;
+        ship.death_impulse = Vec2::ZERO;
+    }
+}
+
+fn seed_benchmark_debris(state: &mut SpacewarsState, center: Vec2, universe_radius: f32) {
+    state.debris.clear();
+    let mut rng = seeded_rng(state.seed ^ BENCHMARK_RNG_SALT);
+    let min_ring = universe_radius * 0.08;
+    let max_ring = universe_radius * 0.55;
+
+    for index in 0..BENCHMARK_ASTEROIDS {
+        let base_angle = core::f32::consts::TAU * index as f32 / BENCHMARK_ASTEROIDS as f32;
+        let angle = base_angle + random_range_f32(&mut rng, -0.06, 0.06);
+        let distance = random_range_f32(&mut rng, min_ring, max_ring);
+        let position = center + Vec2::from_radians(angle) * distance;
+        let inward = (center - position).normalized();
+        let tangent = inward.rotate_radians(core::f32::consts::FRAC_PI_2);
+        let velocity = inward * random_range_f32(&mut rng, 35.0, 140.0)
+            + tangent * random_range_f32(&mut rng, -110.0, 110.0);
+        let radius = random_range_f32(&mut rng, 3.0, 9.0);
+        let color = Color::DIM_GREY.random_variation(0.24, &mut rng);
+        let mut asteroid = DebrisState::new(
+            DebrisKind::Asteroid,
+            position,
+            velocity,
+            radius,
+            ASTEROID_DAMAGE_SCALAR,
+            color,
+        );
+        asteroid.omega = random_range_f32(&mut rng, -ASTEROID_MAX_OMEGA, ASTEROID_MAX_OMEGA);
+        asteroid.spawn_tick = state.tick;
+        state.debris.push(asteroid);
+    }
+}
+
+fn seed_benchmark_particles(state: &mut SpacewarsState, center: Vec2, universe_radius: f32) {
+    state.particles.clear();
+    let mut rng = seeded_rng(state.seed ^ BENCHMARK_RNG_SALT.rotate_left(17));
+    let max_distance = universe_radius * 0.62;
+
+    for _ in 0..BENCHMARK_PARTICLES {
+        let angle = random_unit_f32(&mut rng) * core::f32::consts::TAU;
+        let distance = random_unit_f32(&mut rng).sqrt() * max_distance;
+        let position = center + Vec2::from_radians(angle) * distance;
+        let rotation = random_unit_f32(&mut rng) * core::f32::consts::TAU;
+        let size = random_range_f32(&mut rng, 0.8, 2.6);
+        let points = core::array::from_fn(|index| {
+            position
+                + Vec2::from_radians(
+                    rotation + core::f32::consts::TAU * index as f32 / STARFIELD_POINTS as f32,
+                ) * size
+        });
+        let outward = (position - center).normalized();
+        let velocity = outward * random_range_f32(&mut rng, 5.0, 55.0)
+            + outward.rotate_radians(core::f32::consts::FRAC_PI_2)
+                * random_range_f32(&mut rng, -45.0, 45.0);
+        let color = Color::scale_255(220.0, 145.0, 205.0).random_variation(0.2, &mut rng);
+        state
+            .particles
+            .push(ParticleState::new(points, velocity, color));
+    }
+}
+
+fn rotation_for_direction(direction: Vec2) -> f32 {
+    direction.y.atan2(direction.x) - core::f32::consts::FRAC_PI_2
 }
 
 pub fn render_ship_bounds_debug_frame(ship: &ShipState, mode: BoundsDrawMode) -> RenderFrame {
@@ -3119,17 +3298,27 @@ fn render_state(state: &SpacewarsState) -> RenderFrame {
     render_state_with_camera(
         state,
         Camera2::new(render_point(center), radius * 2.2),
-        true,
+        RenderOptions::player(),
     )
 }
 
-fn render_overview_state(state: &SpacewarsState) -> RenderFrame {
+fn render_overview_state(state: &SpacewarsState, player: usize) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
     render_state_with_camera(
         state,
         Camera2::new(render_point(center), radius * 2.2),
-        false,
+        RenderOptions::overview(player),
+    )
+}
+
+fn render_raster_overview_state(state: &SpacewarsState, player: usize) -> RenderFrame {
+    let radius = state.config.universe_radius as f32;
+    let center = Vec2::new(radius, radius);
+    render_state_with_camera(
+        state,
+        Camera2::new(render_point(center), radius * 2.2),
+        RenderOptions::raster_overview(player),
     )
 }
 
@@ -3145,13 +3334,15 @@ fn player_camera(state: &SpacewarsState, player: usize) -> Camera2 {
 fn render_state_with_camera(
     state: &SpacewarsState,
     camera: Camera2,
-    show_ship_labels: bool,
+    options: RenderOptions,
 ) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
     let mut frame = RenderFrame::new(camera);
 
-    render_starfield(&mut frame, state);
+    if options.show_starfield {
+        render_starfield(&mut frame, state);
+    }
 
     frame.push_primitive(
         WORLD_LAYER,
@@ -3186,8 +3377,10 @@ fn render_state_with_camera(
         render_spaceport(&mut frame, state, planet);
     }
 
-    for ship in &state.ships {
-        render_exhaust(&mut frame, ship);
+    if options.show_exhaust {
+        for ship in &state.ships {
+            render_exhaust(&mut frame, ship);
+        }
     }
 
     for ship in &state.ships {
@@ -3199,18 +3392,120 @@ fn render_state_with_camera(
     }
 
     for debris in &state.debris {
-        render_debris(&mut frame, debris);
+        match options.debris_style {
+            DebrisRenderStyle::Full => render_debris(&mut frame, debris),
+            DebrisRenderStyle::SimpleMarks => render_debris_mark(&mut frame, debris),
+        }
     }
 
-    render_particles(&mut frame, state);
+    if options.show_particles {
+        render_particles(&mut frame, state);
+    }
 
-    if show_ship_labels {
+    if options.show_ship_labels {
         for ship in &state.ships {
             render_ship_label(&mut frame, state, ship);
         }
     }
 
+    if let Some(player) = options.player_view {
+        render_player_view_rectangle(&mut frame, state, player);
+    }
+
     frame
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RenderOptions {
+    show_ship_labels: bool,
+    show_starfield: bool,
+    show_exhaust: bool,
+    show_particles: bool,
+    debris_style: DebrisRenderStyle,
+    player_view: Option<usize>,
+}
+
+impl RenderOptions {
+    fn player() -> Self {
+        Self {
+            show_ship_labels: true,
+            show_starfield: true,
+            show_exhaust: true,
+            show_particles: true,
+            debris_style: DebrisRenderStyle::Full,
+            player_view: None,
+        }
+    }
+
+    fn overview(player: usize) -> Self {
+        Self {
+            show_ship_labels: false,
+            show_starfield: false,
+            show_exhaust: true,
+            show_particles: true,
+            debris_style: DebrisRenderStyle::Full,
+            player_view: Some(player),
+        }
+    }
+
+    fn raster_player() -> Self {
+        Self {
+            show_ship_labels: false,
+            show_starfield: true,
+            show_exhaust: true,
+            show_particles: true,
+            debris_style: DebrisRenderStyle::Full,
+            player_view: None,
+        }
+    }
+
+    fn raster_overview(player: usize) -> Self {
+        Self {
+            show_ship_labels: false,
+            show_starfield: false,
+            show_exhaust: false,
+            show_particles: false,
+            debris_style: DebrisRenderStyle::SimpleMarks,
+            player_view: Some(player),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum DebrisRenderStyle {
+    Full,
+    SimpleMarks,
+}
+
+fn render_player_view_rectangle(frame: &mut RenderFrame, state: &SpacewarsState, player: usize) {
+    let Some(ship) = state.ships.get(player) else {
+        return;
+    };
+
+    let view_width = PLAYER_VIEW_HEIGHT * PLAYER_VIEW_ASPECT_RATIO;
+    let half_width = view_width * 0.5;
+    let half_height = PLAYER_VIEW_HEIGHT * 0.5;
+
+    let color = state
+        .players
+        .get(player)
+        .map(|player| render_color(player.color))
+        .unwrap_or(RenderColor::WHITE);
+    let min = Vec2::new(ship.position.x - half_width, ship.position.y - half_height);
+    let max = Vec2::new(ship.position.x + half_width, ship.position.y + half_height);
+    frame.push_primitive(
+        VIEW_RECTANGLE_LAYER,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: vec![
+                render_point(Vec2::new(min.x, min.y)),
+                render_point(Vec2::new(max.x, min.y)),
+                render_point(Vec2::new(max.x, max.y)),
+                render_point(Vec2::new(min.x, max.y)),
+            ],
+            fill: None,
+            stroke: Some(Stroke::new(with_alpha(color, 0.95), 1.5)),
+        }),
+    );
 }
 
 fn render_starfield(frame: &mut RenderFrame, state: &SpacewarsState) {
@@ -3268,6 +3563,7 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     if let Some(shape) = debris.fragment_shape {
         push_filled_polygon(
             frame,
+            DEBRIS_LAYER,
             Transform2 {
                 translation: debris.position,
                 scale: Vec2::splat(1.0),
@@ -3284,6 +3580,7 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     if debris.kind == DebrisKind::Shell {
         push_filled_polygon(
             frame,
+            DEBRIS_LAYER,
             Transform2 {
                 translation: debris.position,
                 scale: Vec2::splat(1.0),
@@ -3298,13 +3595,33 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     }
 
     frame.push_primitive(
-        SHIP_LAYER,
+        DEBRIS_LAYER,
         RenderPrimitive::Circle(RenderCircle {
             center: render_point(debris.position),
             radius: debris.radius,
             fill: Some(Fill::new(render_color(debris.color))),
             stroke: Some(Stroke::new(RenderColor::rgba(0.74, 0.78, 0.84, 0.85), 0.75)),
         }),
+    );
+}
+
+fn render_debris_mark(frame: &mut RenderFrame, debris: &DebrisState) {
+    if debris.dead || debris.radius <= 0.0 {
+        return;
+    }
+
+    let radius = match debris.kind {
+        DebrisKind::Asteroid => debris.radius.max(2.0),
+        DebrisKind::Fragment => debris.radius.max(1.25),
+        DebrisKind::Shell => 1.5,
+    };
+    frame.push_primitive(
+        DEBRIS_LAYER,
+        RenderPrimitive::Circle(RenderCircle::filled(
+            render_point(debris.position),
+            radius,
+            render_color(debris.color),
+        )),
     );
 }
 
@@ -3406,18 +3723,47 @@ fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
     let left_wing = rotate_points(SHIP_LEFT_WING, SHIP_WING_PIVOT, ship.wing_theta);
     let right_wing = rotate_points(SHIP_RIGHT_WING, SHIP_WING_PIVOT, -ship.wing_theta);
 
-    push_filled_polygon(frame, transform, &left_wing, dim(base, 0.72), outline);
-    push_filled_polygon(frame, transform, &right_wing, dim(base, 0.72), outline);
     push_filled_polygon(
         frame,
+        SHIP_LAYER,
+        transform,
+        &left_wing,
+        dim(base, 0.72),
+        outline,
+    );
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
+        transform,
+        &right_wing,
+        dim(base, 0.72),
+        outline,
+    );
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
         transform,
         &SHIP_WING_MOUNT,
         RenderColor::rgba(10.0 / 255.0, 180.0 / 255.0, 50.0 / 255.0, 1.0),
         outline,
     );
-    push_filled_polygon(frame, transform, &SHIP_THRUSTER, dim(base, 0.58), outline);
-    push_filled_polygon(frame, transform, &SHIP_BODY, base, outline);
-    push_filled_polygon(frame, transform, &SHIP_LASER, dim(base, 1.15), outline);
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
+        transform,
+        &SHIP_THRUSTER,
+        dim(base, 0.58),
+        outline,
+    );
+    push_filled_polygon(frame, SHIP_LAYER, transform, &SHIP_BODY, base, outline);
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
+        transform,
+        &SHIP_LASER,
+        dim(base, 1.15),
+        outline,
+    );
 }
 
 fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
@@ -3425,9 +3771,23 @@ fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
     let base = render_color(ship.color);
     let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.9);
 
-    push_filled_polygon(frame, transform, &POD_THRUSTER, dim(base, 0.72), outline);
-    push_filled_polygon(frame, transform, &POD_BODY, base, outline);
-    push_filled_polygon(frame, transform, &POD_LASER, RenderColor::BLUE, outline);
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
+        transform,
+        &POD_THRUSTER,
+        dim(base, 0.72),
+        outline,
+    );
+    push_filled_polygon(frame, SHIP_LAYER, transform, &POD_BODY, base, outline);
+    push_filled_polygon(
+        frame,
+        SHIP_LAYER,
+        transform,
+        &POD_LASER,
+        RenderColor::BLUE,
+        outline,
+    );
     frame.push_primitive(
         SHIP_LAYER,
         RenderPrimitive::Circle(RenderCircle {
@@ -3519,13 +3879,14 @@ fn render_ship_label(frame: &mut RenderFrame, state: &SpacewarsState, ship: &Shi
 
 fn push_filled_polygon(
     frame: &mut RenderFrame,
+    layer: i32,
     transform: Transform2,
     points: &[Vec2],
     fill: RenderColor,
     outline: RenderColor,
 ) {
     frame.push_primitive(
-        SHIP_LAYER,
+        layer,
         RenderPrimitive::Polygon(RenderPolygon {
             points: points
                 .iter()
@@ -3949,6 +4310,31 @@ mod tests {
         assert!(state.debris_body_collisions.is_empty());
         assert!(state.body_collisions.is_empty());
         assert!(state.spaceport_contacts.is_empty());
+    }
+
+    #[test]
+    fn benchmark_init_seeds_dense_deterministic_workload() {
+        let first = SpacewarsScenario::init_benchmark(77);
+        let replay = SpacewarsScenario::init_benchmark(77);
+        let different = SpacewarsScenario::init_benchmark(78);
+
+        assert_eq!(first.debris.len(), BENCHMARK_ASTEROIDS);
+        assert_eq!(first.particles.len(), BENCHMARK_PARTICLES);
+        assert_eq!(first.debris, replay.debris);
+        assert_eq!(first.particles, replay.particles);
+        assert_ne!(first.debris, different.debris);
+        assert_eq!(
+            SpacewarsScenario::benchmark_counts(&first),
+            SpacewarsBenchmarkCounts {
+                asteroids: BENCHMARK_ASTEROIDS,
+                fragments: 0,
+                shells: 0,
+                particles: BENCHMARK_PARTICLES,
+            }
+        );
+        assert_eq!(first.config.asteroid_probability_per_sec, 100.0);
+        assert_eq!(first.ships[0].life_max, 500.0);
+        assert_eq!(first.ships[1].life_max, 500.0);
     }
 
     #[test]
@@ -5178,6 +5564,8 @@ mod tests {
             .expect("particles should render on their own layer");
 
         assert_eq!(particle_layer.primitives.len(), 1);
+        assert!(DEBRIS_LAYER > SHIP_LAYER);
+        assert!(DEBRIS_LAYER < LASER_LAYER);
         assert!(PARTICLE_LAYER > SHIP_LAYER);
         assert!(
             particle_layer
@@ -5447,8 +5835,19 @@ mod tests {
         ));
 
         let frame = SpacewarsScenario::render_frame(&state);
+        let debris_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == DEBRIS_LAYER)
+            .expect("fragment should render on the debris layer");
 
         assert_eq!(polygon_primitive_count(&frame), before + 1);
+        assert!(
+            debris_layer
+                .primitives
+                .iter()
+                .any(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+        );
     }
 
     #[test]
@@ -5651,6 +6050,11 @@ mod tests {
         ));
 
         let frame = SpacewarsScenario::render_frame(&state);
+        let debris_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == DEBRIS_LAYER)
+            .expect("asteroid should render on the debris layer");
         let circles = frame
             .layers
             .iter()
@@ -5659,6 +6063,7 @@ mod tests {
             .count();
 
         assert_eq!(circles, 2);
+        assert_eq!(debris_layer.primitives.len(), 1);
     }
 
     #[test]
@@ -5711,6 +6116,50 @@ mod tests {
         assert_eq!(frames[3].camera, frames[2].camera);
         assert_eq!(text_values(&frames[2]), Vec::<String>::new());
         assert_eq!(text_values(&frames[3]), Vec::<String>::new());
+        for (player, frame) in frames[2..].iter().enumerate() {
+            assert!(frame.layers.iter().all(|layer| layer.z != STARFIELD_LAYER));
+            let view_layer = frame
+                .layers
+                .iter()
+                .find(|layer| layer.z == VIEW_RECTANGLE_LAYER)
+                .expect("overview should draw a player view rectangle");
+            assert_eq!(view_layer.primitives.len(), 1);
+            let RenderPrimitive::Polygon(rectangle) = &view_layer.primitives[0] else {
+                panic!("view rectangle should render as a polygon");
+            };
+            assert_eq!(rectangle.fill, None);
+            assert_eq!(
+                rectangle.stroke,
+                Some(Stroke::new(
+                    with_alpha(render_color(state.players[player].color), 0.95),
+                    1.5
+                ))
+            );
+        }
+    }
+
+    #[test]
+    fn raster_local_play_frames_use_simplified_overviews() {
+        let state = SpacewarsScenario::init_benchmark(123);
+        let frames = SpacewarsScenario::render_raster_local_play_frames(&state);
+
+        assert_eq!(frames.len(), 4);
+        assert_eq!(text_values(&frames[0]), Vec::<String>::new());
+        assert_eq!(text_values(&frames[1]), Vec::<String>::new());
+        for frame in &frames[2..] {
+            assert!(frame.layers.iter().all(|layer| {
+                !matches!(layer.z, STARFIELD_LAYER | EXHAUST_LAYER | PARTICLE_LAYER)
+            }));
+            assert!(text_values(frame).is_empty());
+            assert!(
+                frame
+                    .layers
+                    .iter()
+                    .flat_map(|layer| &layer.primitives)
+                    .any(|primitive| matches!(primitive, RenderPrimitive::Circle(_))),
+                "simplified overview should retain circular body/debris marks"
+            );
+        }
     }
 
     #[test]

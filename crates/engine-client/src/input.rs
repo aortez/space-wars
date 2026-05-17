@@ -24,6 +24,8 @@ pub(crate) struct ClientInput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum GameKey {
     Reset,
+    Pause,
+    Benchmark,
     P1Wing,
     P1Thrust,
     P1Reverse,
@@ -67,6 +69,18 @@ impl ClientInput {
     pub(crate) fn take_reset_requested(&mut self) -> bool {
         let requested = self.pressed.remove(&GameKey::Reset);
         self.released.remove(&GameKey::Reset);
+        requested
+    }
+
+    pub(crate) fn take_pause_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::Pause);
+        self.released.remove(&GameKey::Pause);
+        requested
+    }
+
+    pub(crate) fn take_benchmark_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::Benchmark);
+        self.released.remove(&GameKey::Benchmark);
         requested
     }
 
@@ -188,6 +202,8 @@ fn mapped_key_event(event: &WindowEvent) -> Option<(GameKey, ElementState)> {
 fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
     match code {
         KeyCode::KeyR => Some(GameKey::Reset),
+        KeyCode::KeyP => Some(GameKey::Pause),
+        KeyCode::KeyB => Some(GameKey::Benchmark),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
         KeyCode::KeyS => Some(GameKey::P1Reverse),
@@ -298,5 +314,25 @@ mod tests {
 
         assert!(input.take_reset_requested());
         assert!(!input.take_reset_requested());
+    }
+
+    #[test]
+    fn pause_key_is_one_shot_host_control() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::Pause);
+
+        assert!(input.take_pause_requested());
+        assert!(!input.take_pause_requested());
+    }
+
+    #[test]
+    fn benchmark_key_is_one_shot_host_control() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::Benchmark);
+
+        assert!(input.take_benchmark_requested());
+        assert!(!input.take_benchmark_requested());
     }
 }

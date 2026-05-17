@@ -72,7 +72,7 @@ impl Viewport {
             .collect()
     }
 
-    fn with_default_if_empty(self) -> Self {
+    pub(crate) fn with_default_if_empty(self) -> Self {
         if self.width <= 0.0 || self.height <= 0.0 {
             Self::with_origin(
                 self.x,
@@ -87,6 +87,7 @@ impl Viewport {
 }
 
 /// Convert scenario frames into ordered Slint scene primitives.
+#[cfg(test)]
 pub fn scene_primitives_from_frames(
     frames: &[RenderFrame],
     viewport: Viewport,
@@ -119,7 +120,11 @@ pub fn scene_primitives_from_frames_with_layout(
         .collect()
 }
 
-fn frame_viewports(viewport: Viewport, count: usize, layout: FrameLayout) -> Vec<Viewport> {
+pub(crate) fn frame_viewports(
+    viewport: Viewport,
+    count: usize,
+    layout: FrameLayout,
+) -> Vec<Viewport> {
     match layout {
         FrameLayout::EqualHorizontal => viewport.split_horizontally(count),
         FrameLayout::SpacewarsLocalPlay => {

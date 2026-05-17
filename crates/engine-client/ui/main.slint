@@ -103,6 +103,8 @@ component PlayerStatusPanel inherits Rectangle {
 
 export component MainWindow inherits Window {
     in property <[ScenePrimitive]> primitives;
+    in property <bool> raster-visible: false;
+    in property <image> raster-frame;
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
     in property <string> p1-status: "";
@@ -115,12 +117,20 @@ export component MainWindow inherits Window {
     in property <string> planet-score-label: "";
     in property <float> p1-planet-fraction: 0;
     in property <float> p2-planet-fraction: 0;
-    in property <string> winner-text: "";
+    in property <string> spacewars-message-text: "";
+    in property <string> spacewars-performance-text: "";
 
     title: "Space-Wars";
     preferred-width: 1280px;
     preferred-height: 720px;
     background: #050514;
+
+    Image {
+        visible: root.raster-visible;
+        width: parent.width;
+        height: parent.height;
+        source: root.raster-frame;
+    }
 
     for primitive in root.primitives: ScenePrimitiveItem {
         primitive: primitive;
@@ -195,9 +205,17 @@ export component MainWindow inherits Window {
         Text {
             x: 12px;
             y: 194px;
-            text: root.winner-text;
+            text: root.spacewars-message-text;
             color: #f6f2a6;
             font-size: 16px;
+        }
+
+        Text {
+            x: 12px;
+            y: 220px;
+            text: root.spacewars-performance-text;
+            color: #c7d0dc;
+            font-size: 12px;
         }
     }
 }

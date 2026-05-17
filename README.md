@@ -1,12 +1,13 @@
 # Space-Wars
 
-A reboot of a 2008 UW Bothell CSS 450 school project (Allan + Chris, JOGL/Java)
+A reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
 as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
 
 ## Status
 
-Skeleton. See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md)
-for the design doc that drives this work.
+Initial implementation mostly complete.  Textures and sounds have yet to be done.
+
+See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
 
 ## History
 
