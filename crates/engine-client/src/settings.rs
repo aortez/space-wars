@@ -250,7 +250,7 @@ fn sync_parent_dir(_parent: &Path) -> io::Result<()> {
 mod tests {
     use std::sync::Mutex;
 
-    use engine_common::{AudioSettings, VideoSettings};
+    use engine_common::{AudioSettings, LaunchSettings, RendererSetting, VideoSettings};
 
     use super::*;
 
@@ -266,6 +266,10 @@ mod tests {
         assert!(loaded.status.needs_writeback());
         assert_eq!(loaded.settings.last_scenario, None);
         assert_eq!(loaded.settings.video.width, 1280);
+        assert_eq!(loaded.settings.launch.scenario, "spacewars");
+        assert_eq!(loaded.settings.launch.seed, 0);
+        assert_eq!(loaded.settings.launch.renderer, RendererSetting::Vector);
+        assert_eq!(loaded.settings.launch.raster_scale, 1.0);
         assert!(!path.exists(), "load should not create the file.");
     }
 
@@ -280,6 +284,7 @@ mod tests {
         assert_eq!(loaded.settings.video.width, 1920);
         assert_eq!(loaded.settings.video.height, 720);
         assert_eq!(loaded.settings.audio.master_volume, 0.8);
+        assert_eq!(loaded.settings.launch.scenario, "spacewars");
         assert_eq!(loaded.settings.runtime.log_level, "info");
 
         save_settings(&loaded.settings, &path).unwrap();
@@ -288,7 +293,31 @@ mod tests {
         assert!(migrated.contains("width = 1920"));
         assert!(migrated.contains("height = 720"));
         assert!(migrated.contains("[audio]"));
+        assert!(migrated.contains("[launch]"));
         assert!(migrated.contains("[runtime]"));
+    }
+
+    #[test]
+    fn invalid_launch_fields_fall_back_and_migrate_without_recovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(
+            &path,
+            "[launch]\nscenario = 99\nseed = -7\nrenderer = \"gpu\"\nraster_scale = \"wide\"\n",
+        )
+        .unwrap();
+
+        let loaded = load_settings(&path).unwrap();
+
+        assert_eq!(loaded.status, LoadStatus::Migrated);
+        assert_eq!(loaded.settings.launch.scenario, "spacewars");
+        assert_eq!(loaded.settings.launch.seed, 0);
+        assert_eq!(loaded.settings.launch.renderer, RendererSetting::Vector);
+        assert_eq!(loaded.settings.launch.raster_scale, 1.0);
+        assert!(
+            !path.with_file_name("settings.toml.bad").exists(),
+            "launch field validation should not trigger malformed-file recovery"
+        );
     }
 
     #[test]
@@ -306,6 +335,12 @@ mod tests {
                 muted: true,
                 ..Default::default()
             },
+            launch: LaunchSettings {
+                scenario: "spacewars".into(),
+                seed: 42,
+                renderer: RendererSetting::Raster,
+                raster_scale: 2.0,
+            },
             ..Default::default()
         };
         save_settings(&settings, &path).unwrap();
@@ -318,6 +353,10 @@ mod tests {
         );
         assert_eq!(reloaded.settings.video.width, 1920);
         assert!(reloaded.settings.audio.muted);
+        assert_eq!(reloaded.settings.launch.scenario, "spacewars");
+        assert_eq!(reloaded.settings.launch.seed, 42);
+        assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
+        assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
     }
 
     #[test]

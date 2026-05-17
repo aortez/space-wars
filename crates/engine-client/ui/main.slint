@@ -1,5 +1,7 @@
 // Root window for the engine-client.
 
+import { Button, ComboBox, LineEdit } from "std-widgets.slint";
+
 export enum PrimitiveKind {
     path,
     text,
@@ -105,6 +107,15 @@ export component MainWindow inherits Window {
     in property <[ScenePrimitive]> primitives;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
+    in-out property <bool> launcher-visible: false;
+    in-out property <bool> launcher-controls-visible: false;
+    in-out property <bool> ingame-menu-visible: false;
+    in-out property <bool> ingame-controls-visible: false;
+    in-out property <string> launcher-scenario: "spacewars";
+    in-out property <string> launcher-seed-text: "0";
+    in-out property <string> launcher-renderer: "vector";
+    in-out property <string> launcher-raster-scale-text: "1.0";
+    in property <string> launcher-error-text: "";
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
     in property <string> p1-status: "";
@@ -122,6 +133,14 @@ export component MainWindow inherits Window {
     in property <string> p2-planet-score-text: "";
     in property <string> spacewars-message-text: "";
     in property <string> spacewars-performance-text: "";
+
+    callback launcher-start-game();
+    callback launcher-start-benchmark();
+    callback launcher-quit();
+    callback ingame-resume();
+    callback ingame-restart();
+    callback ingame-return-launcher();
+    callback ingame-start-benchmark();
 
     title: "Space-Wars";
     preferred-width: 1280px;
@@ -255,6 +274,397 @@ export component MainWindow inherits Window {
             text: root.spacewars-performance-text;
             color: #c7d0dc;
             font-size: 12px;
+        }
+    }
+
+    Rectangle {
+        visible: root.ingame-menu-visible;
+        width: parent.width;
+        height: parent.height;
+        background: #050514bb;
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 500px;
+            height: root.ingame-controls-visible ? 430px : 310px;
+            background: #080a12f2;
+            border-color: #596273;
+            border-width: 1px;
+
+            Text {
+                x: 24px;
+                y: 22px;
+                text: root.ingame-controls-visible ? "Controls" : "Paused";
+                color: #e6edf7;
+                font-size: 24px;
+            }
+
+            Text {
+                visible: !root.ingame-controls-visible;
+                x: 24px;
+                y: 66px;
+                width: parent.width - 48px;
+                text: "P resumes from the keyboard.";
+                color: #c7d0dc;
+                font-size: 13px;
+            }
+
+            Rectangle {
+                visible: root.ingame-controls-visible;
+                x: 24px;
+                y: 74px;
+                width: parent.width - 48px;
+                height: 250px;
+                background: #00000000;
+
+                Text {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    text: "Player 1: W thrust, S reverse, A/D turn, J wings, Space laser, K cannon";
+                    color: #e6edf7;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 54px;
+                    width: parent.width;
+                    text: "Player 2: Numpad 8 thrust, Numpad 5 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
+                    color: #e6edf7;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 126px;
+                    width: parent.width;
+                    text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+
+            Button {
+                visible: !root.ingame-controls-visible;
+                x: 24px;
+                y: 106px;
+                width: 140px;
+                height: 36px;
+                text: "Resume";
+                primary: true;
+                clicked => {
+                    root.ingame-resume();
+                }
+            }
+
+            Button {
+                visible: !root.ingame-controls-visible;
+                x: 174px;
+                y: 106px;
+                width: 140px;
+                height: 36px;
+                text: "Restart";
+                clicked => {
+                    root.ingame-restart();
+                }
+            }
+
+            Button {
+                visible: !root.ingame-controls-visible;
+                x: 324px;
+                y: 106px;
+                width: 152px;
+                height: 36px;
+                text: "Benchmark";
+                clicked => {
+                    root.ingame-start-benchmark();
+                }
+            }
+
+            Button {
+                visible: !root.ingame-controls-visible;
+                x: 24px;
+                y: 158px;
+                width: 216px;
+                height: 36px;
+                text: "Return to Launcher";
+                clicked => {
+                    root.ingame-return-launcher();
+                }
+            }
+
+            Button {
+                visible: !root.ingame-controls-visible;
+                x: 260px;
+                y: 158px;
+                width: 216px;
+                height: 36px;
+                text: "Controls";
+                clicked => {
+                    root.ingame-controls-visible = true;
+                }
+            }
+
+            Button {
+                visible: root.ingame-controls-visible;
+                x: 24px;
+                y: 350px;
+                width: 140px;
+                height: 36px;
+                text: "Back";
+                clicked => {
+                    root.ingame-controls-visible = false;
+                }
+            }
+
+            Button {
+                visible: root.ingame-controls-visible;
+                x: parent.width - 164px;
+                y: 350px;
+                width: 140px;
+                height: 36px;
+                text: "Resume";
+                primary: true;
+                clicked => {
+                    root.ingame-resume();
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.launcher-visible;
+        width: parent.width;
+        height: parent.height;
+        background: #050514f4;
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 500px;
+            height: root.launcher-controls-visible ? 540px : 430px;
+            background: #080a12f2;
+            border-color: #596273;
+            border-width: 1px;
+
+            Text {
+                x: 24px;
+                y: 22px;
+                text: "Space-Wars";
+                color: #e6edf7;
+                font-size: 28px;
+            }
+
+            Text {
+                x: 24px;
+                y: 62px;
+                text: root.launcher-controls-visible ? "Controls" : "Launch";
+                color: #c7d0dc;
+                font-size: 14px;
+            }
+
+            Rectangle {
+                visible: !root.launcher-controls-visible;
+                x: 24px;
+                y: 96px;
+                width: parent.width - 48px;
+                height: 226px;
+                background: #00000000;
+
+                Text {
+                    x: 0px;
+                    y: 5px;
+                    text: "Scenario";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 160px;
+                    y: 0px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    model: ["spacewars", "null"];
+                    current-value <=> root.launcher-scenario;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 55px;
+                    text: "Seed";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                LineEdit {
+                    x: 160px;
+                    y: 48px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    text <=> root.launcher-seed-text;
+                    placeholder-text: "0";
+                    accepted => {
+                        root.launcher-start-game();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 103px;
+                    text: "Renderer";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 160px;
+                    y: 96px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    model: ["vector", "raster"];
+                    current-value <=> root.launcher-renderer;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 151px;
+                    text: "Raster Scale";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 160px;
+                    y: 144px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    model: ["1.0", "1.5", "2.0", "3.0"];
+                    current-value <=> root.launcher-raster-scale-text;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 204px;
+                    width: parent.width;
+                    text: root.launcher-error-text;
+                    color: #ff6f6f;
+                    font-size: 13px;
+                }
+            }
+
+            Rectangle {
+                visible: root.launcher-controls-visible;
+                x: 24px;
+                y: 100px;
+                width: parent.width - 48px;
+                height: 330px;
+                background: #00000000;
+
+                Text {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    text: "Player 1: W thrust, S reverse, A/D turn, J wings, Space laser, K cannon";
+                    color: #e6edf7;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 54px;
+                    width: parent.width;
+                    text: "Player 2: Numpad 8 thrust, Numpad 5 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
+                    color: #e6edf7;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 126px;
+                    width: parent.width;
+                    text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 190px;
+                    width: parent.width;
+                    text: "Wings use the original hold behavior: hold the wing key to close, release to open.";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+            }
+
+            Button {
+                visible: !root.launcher-controls-visible;
+                x: 24px;
+                y: 330px;
+                width: 140px;
+                height: 36px;
+                text: "Start Game";
+                primary: true;
+                clicked => {
+                    root.launcher-start-game();
+                }
+            }
+
+            Button {
+                visible: !root.launcher-controls-visible;
+                x: 174px;
+                y: 330px;
+                width: 150px;
+                height: 36px;
+                text: "Start Benchmark";
+                clicked => {
+                    root.launcher-start-benchmark();
+                }
+            }
+
+            Button {
+                visible: !root.launcher-controls-visible;
+                x: 334px;
+                y: 330px;
+                width: 142px;
+                height: 36px;
+                text: "Controls";
+                clicked => {
+                    root.launcher-controls-visible = true;
+                }
+            }
+
+            Button {
+                visible: root.launcher-controls-visible;
+                x: 24px;
+                y: 456px;
+                width: 140px;
+                height: 36px;
+                text: "Back";
+                clicked => {
+                    root.launcher-controls-visible = false;
+                }
+            }
+
+            Button {
+                x: parent.width - 164px;
+                y: root.launcher-controls-visible ? 456px : 378px;
+                width: 140px;
+                height: 36px;
+                text: "Quit";
+                clicked => {
+                    root.launcher-quit();
+                }
+            }
         }
     }
 }
