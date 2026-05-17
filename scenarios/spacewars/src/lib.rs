@@ -1224,20 +1224,14 @@ fn nearest_laser_hit(
         }
 
         let bounds = debris_bounds(debris);
-        if !line.intersects_circle(bounds) {
-            continue;
-        }
-        if let Some(point) = line.nearest_circle_intersection(bounds) {
+        if let Some(point) = nearest_laser_circle_intersection(line, bounds) {
             consider_hit(LaserTarget::Debris(debris_index), point);
         }
     }
 
     for body in bodies {
         let bounds = Circle::new(body.position, body.radius);
-        if !line.intersects_circle(bounds) {
-            continue;
-        }
-        if let Some(point) = line.nearest_circle_intersection(bounds) {
+        if let Some(point) = nearest_laser_circle_intersection(line, bounds) {
             consider_hit(LaserTarget::Body(body.id), point);
         }
     }
@@ -1249,7 +1243,7 @@ fn nearest_laser_hit(
         if !Bounds2::Line(line).intersects(&Bounds2::Circle(*low)) {
             continue;
         }
-        if let Some(point) = nearest_bounds_intersection(line, high) {
+        if let Some(point) = nearest_laser_bounds_intersection(line, high) {
             consider_hit(LaserTarget::Ship(target), point);
         }
     }
@@ -1257,18 +1251,58 @@ fn nearest_laser_hit(
     nearest
 }
 
-fn nearest_bounds_intersection(line: Line, bounds: &Bounds2) -> Option<Vec2> {
+fn nearest_laser_bounds_intersection(line: Line, bounds: &Bounds2) -> Option<Vec2> {
     match bounds {
-        Bounds2::Circle(circle) => line.nearest_circle_intersection(*circle),
+        Bounds2::Circle(circle) => nearest_laser_circle_intersection(line, *circle),
         Bounds2::List(list) => list
             .iter()
-            .filter_map(|bounds| nearest_bounds_intersection(line, bounds))
+            .filter_map(|bounds| nearest_laser_bounds_intersection(line, bounds))
             .min_by(|a, b| {
                 a.distance_to(line.start)
                     .total_cmp(&b.distance_to(line.start))
             }),
         Bounds2::Line(_) => None,
     }
+}
+
+fn nearest_laser_circle_intersection(line: Line, circle: Circle) -> Option<Vec2> {
+    let delta = line.end - line.start;
+    let a = delta.length_squared();
+    if a <= REALLY_SMALL {
+        return None;
+    }
+
+    let start_to_center = line.start - circle.center;
+    let b = 2.0 * delta.dot(start_to_center);
+    let c = start_to_center.length_squared() - circle.radius * circle.radius;
+    let det = b * b - 4.0 * a * c;
+    if det < 0.0 {
+        return None;
+    }
+
+    let point_at = |t: f32| line.start + delta * t;
+    let mut nearest: Option<(f32, Vec2)> = None;
+    let mut consider = |t: f32| {
+        if !(0.0..=1.0).contains(&t) {
+            return;
+        }
+
+        let point = point_at(t);
+        match nearest {
+            Some((current_t, _)) if current_t <= t => {}
+            _ => nearest = Some((t, point)),
+        }
+    };
+
+    if det == 0.0 {
+        consider(-b / (2.0 * a));
+    } else {
+        let sqrt_det = det.sqrt();
+        consider((-b - sqrt_det) / (2.0 * a));
+        consider((-b + sqrt_det) / (2.0 * a));
+    }
+
+    nearest.map(|(_, point)| point)
 }
 
 fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
@@ -5747,6 +5781,50 @@ mod tests {
         assert_vec_close(state.laser_hits[0].point, expected_hit);
         assert_vec_close(beam.tail, expected_hit);
         assert!(state.ships[1].life == state.ships[1].life_max);
+    }
+
+    #[test]
+    fn laser_started_inside_planet_hits_only_forward_surface() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.ships[0].rotation_radians = core::f32::consts::FRAC_PI_2;
+        state.ships[0].direction = direction_from_rotation(state.ships[0].rotation_radians);
+        state.ships[0].velocity = Vec2::ZERO;
+
+        let planet_center = state.planets[0].position;
+        let desired_head = planet_center + Vec2::X * 20.0;
+        let head_offset = desired_head - ship_mount_center(&state.ships[0]);
+        state.ships[0].position += head_offset;
+        let direction = state.ships[0].direction;
+
+        state.apply_action(SpacewarsAction {
+            player: 0,
+            kind: SpacewarsActionKind::FireLaser,
+        });
+        update_ship_lasers(&mut state);
+        state.laser_hits = resolve_laser_hits(&mut state);
+
+        let first = state.ships[0].laser_beam.expect("laser should start");
+        assert_vec_close(first.head, desired_head);
+        assert!(state.laser_hits.is_empty());
+        assert!((first.tail - first.head).dot(direction) > 0.0);
+
+        update_ship_lasers(&mut state);
+        state.laser_hits = resolve_laser_hits(&mut state);
+
+        let beam = state.ships[0]
+            .laser_beam
+            .expect("beam should remain active");
+        let expected_forward_exit = planet_center - Vec2::X * state.planets[0].radius;
+        assert_eq!(state.laser_hits.len(), 1);
+        assert_eq!(
+            state.laser_hits[0].target,
+            LaserTarget::Body(BodyId::Planet(0))
+        );
+        assert_vec_close(state.laser_hits[0].point, expected_forward_exit);
+        assert_vec_close(beam.tail, expected_forward_exit);
+        assert!((beam.tail - beam.head).dot(direction) > 0.0);
     }
 
     #[test]
