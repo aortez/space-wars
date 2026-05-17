@@ -14,7 +14,8 @@ use engine_common::{
 use engine_core::{
     Bounds2, BoundsList, Circle, Color, Line, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
     constants::{
-        COLLISION_TRANSLATION_SCALAR, DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, REALLY_SMALL,
+        COLLISION_TRANSLATION_SCALAR, DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, PLANET_ELASTICITY,
+        REALLY_SMALL,
     },
     physics::gravity_acceleration_attracted_to,
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
@@ -2234,13 +2235,22 @@ fn resolve_ship_body_collision(
 ) {
     let normal = collision_normal(ship.position, body_position);
     ship.position = body_position + normal * (ship_radius + body_radius);
-    ship.velocity = (ship.velocity - normal * (2.0 * ship.velocity.dot(normal))) * 0.5;
+    ship.velocity = reflect_inward_velocity(ship.velocity, normal, PLANET_ELASTICITY);
 }
 
 fn resolve_debris_body_collision(debris: &mut DebrisState, body_position: Vec2, body_radius: f32) {
     let normal = collision_normal(debris.position, body_position);
     debris.position = body_position + normal * (debris.radius + body_radius);
-    debris.velocity = (debris.velocity - normal * (2.0 * debris.velocity.dot(normal))) * 0.5;
+    debris.velocity = reflect_inward_velocity(debris.velocity, normal, PLANET_ELASTICITY);
+}
+
+fn reflect_inward_velocity(velocity: Vec2, normal: Vec2, elasticity: f32) -> Vec2 {
+    let normal_velocity = velocity.dot(normal);
+    if normal_velocity >= 0.0 {
+        velocity
+    } else {
+        (velocity - normal * (2.0 * normal_velocity)) * elasticity
+    }
 }
 
 fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
@@ -4867,6 +4877,58 @@ mod tests {
 
         assert_eq!(ship.position, Vec2::new(15.0, 0.0));
         assert_eq!(ship.velocity, Vec2::new(10.0, 0.0));
+    }
+
+    #[test]
+    fn body_collision_response_preserves_separating_velocity() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let normal = Vec2::new(-1.0, 0.0);
+        let ship_radius = ship_low_bounds(&ship_triangles(&state.ships[0])).radius;
+        state.ships[0].position = state.planets[0].position + normal * (50.0 + ship_radius - 1.0);
+        state.ships[0].velocity = normal * 20.0;
+
+        assert_eq!(
+            detect_body_collisions(&state),
+            vec![BodyCollision {
+                ship: 0,
+                body: BodyId::Planet(0),
+            }]
+        );
+
+        let events = resolve_body_collisions(&mut state);
+
+        assert!(events.spaceport_contacts.is_empty());
+        assert!(
+            state.ships[0].velocity.dot(normal) > 0.0,
+            "outward velocity should not be reflected back into the planet: {:?}",
+            state.ships[0].velocity
+        );
+    }
+
+    #[test]
+    fn normal_thrust_extracts_ship_from_shallow_body_overlap() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let normal = Vec2::new(-1.0, 0.0);
+        let ship_radius = ship_low_bounds(&ship_triangles(&state.ships[0])).radius;
+        state.ships[0].position = state.planets[0].position + normal * (50.0 + ship_radius - 1.0);
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = core::f32::consts::FRAC_PI_2;
+        state.ships[0].direction = normal;
+
+        for _ in 0..4 {
+            step(&mut state, &[SpacewarsAction::thrust(0)]);
+        }
+
+        assert!(detect_body_collisions(&state).is_empty());
+        assert!(
+            state.ships[0].velocity.dot(normal) > 0.0,
+            "normal thrust should carry the ship away from the planet: {:?}",
+            state.ships[0].velocity
+        );
     }
 
     #[test]
