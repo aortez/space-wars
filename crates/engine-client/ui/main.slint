@@ -115,6 +115,11 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-seed-text: "0";
     in-out property <string> launcher-renderer: "vector";
     in-out property <string> launcher-raster-scale-text: "1.0";
+    in-out property <string> launcher-universe-radius-text: "1200";
+    in-out property <string> launcher-use-planets: "on";
+    in-out property <string> launcher-asteroids-enabled: "on";
+    in-out property <string> launcher-asteroid-probability-text: "20.0";
+    in-out property <string> launcher-player-health-text: "100";
     in property <string> launcher-error-text: "";
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
@@ -447,7 +452,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 500px;
-            height: root.launcher-controls-visible ? 540px : 430px;
+            height: root.launcher-controls-visible ? 540px : 640px;
             background: #080a12f2;
             border-color: #596273;
             border-width: 1px;
@@ -473,7 +478,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 96px;
                 width: parent.width - 48px;
-                height: 226px;
+                height: 418px;
                 background: #00000000;
 
                 Text {
@@ -550,6 +555,108 @@ export component MainWindow inherits Window {
                 Text {
                     x: 0px;
                     y: 204px;
+                    text: "Game Setup";
+                    color: #e6edf7;
+                    font-size: 13px;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 247px;
+                    text: "World Radius";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                LineEdit {
+                    x: 160px;
+                    y: 240px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    text <=> root.launcher-universe-radius-text;
+                    placeholder-text: "1200";
+                    accepted => {
+                        root.launcher-start-game();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 295px;
+                    text: "Planets";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 160px;
+                    y: 288px;
+                    width: 118px;
+                    height: 34px;
+                    model: ["on", "off"];
+                    current-value <=> root.launcher-use-planets;
+                }
+
+                Text {
+                    x: 300px;
+                    y: 295px;
+                    text: "Asteroids";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                ComboBox {
+                    x: 380px;
+                    y: 288px;
+                    width: parent.width - 380px;
+                    height: 34px;
+                    model: ["on", "off"];
+                    current-value <=> root.launcher-asteroids-enabled;
+                }
+
+                Text {
+                    x: 0px;
+                    y: 343px;
+                    text: "Asteroid Rate";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                LineEdit {
+                    x: 160px;
+                    y: 336px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    text <=> root.launcher-asteroid-probability-text;
+                    placeholder-text: "20.0";
+                    accepted => {
+                        root.launcher-start-game();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 391px;
+                    text: "Player Health";
+                    color: #c7d0dc;
+                    font-size: 13px;
+                }
+
+                LineEdit {
+                    x: 160px;
+                    y: 384px;
+                    width: parent.width - 160px;
+                    height: 34px;
+                    text <=> root.launcher-player-health-text;
+                    placeholder-text: "100";
+                    accepted => {
+                        root.launcher-start-game();
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 432px;
                     width: parent.width;
                     text: root.launcher-error-text;
                     color: #ff6f6f;
@@ -609,7 +716,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 24px;
-                y: 330px;
+                y: 522px;
                 width: 140px;
                 height: 36px;
                 text: "Start Game";
@@ -622,7 +729,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 174px;
-                y: 330px;
+                y: 522px;
                 width: 150px;
                 height: 36px;
                 text: "Start Benchmark";
@@ -634,7 +741,7 @@ export component MainWindow inherits Window {
             Button {
                 visible: !root.launcher-controls-visible;
                 x: 334px;
-                y: 330px;
+                y: 522px;
                 width: 142px;
                 height: 36px;
                 text: "Controls";
@@ -657,7 +764,7 @@ export component MainWindow inherits Window {
 
             Button {
                 x: parent.width - 164px;
-                y: root.launcher-controls-visible ? 456px : 378px;
+                y: root.launcher-controls-visible ? 456px : 582px;
                 width: 140px;
                 height: 36px;
                 text: "Quit";

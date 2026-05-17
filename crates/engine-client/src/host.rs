@@ -32,6 +32,7 @@ pub struct ScenarioLoopOptions {
     pub renderer: RenderBackend,
     pub raster_scale: f32,
     pub controls: Option<SharedScenarioControls>,
+    pub spacewars_config: SpacewarsConfig,
 }
 
 impl Default for ScenarioLoopOptions {
@@ -41,6 +42,7 @@ impl Default for ScenarioLoopOptions {
             renderer: RenderBackend::default(),
             raster_scale: 1.0,
             controls: None,
+            spacewars_config: SpacewarsConfig::default(),
         }
     }
 }
@@ -200,12 +202,13 @@ pub fn start_scenario_loop(
         renderer,
         raster_scale,
         controls,
+        spacewars_config,
     } = options;
     let scenario_name = scenario.to_string();
     let mut scenario = if start_benchmark {
         HostedScenario::new_spacewars_benchmark(seed)
     } else {
-        HostedScenario::new(&scenario_name, seed)?
+        HostedScenario::new(&scenario_name, seed, spacewars_config.clone())?
     };
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
@@ -248,6 +251,7 @@ pub fn start_scenario_loop(
             &mut controls.borrow_mut(),
             &mut paused,
             &mut benchmark_active,
+            &spacewars_config,
         );
         performance.record_frame(now, updates);
         let performance_text = performance.display_text();
@@ -281,6 +285,7 @@ fn step_scenario(
     controls: &mut ScenarioControls,
     paused: &mut bool,
     benchmark_active: &mut bool,
+    spacewars_config: &SpacewarsConfig,
 ) -> usize {
     if let Some(request) = controls.take_request() {
         match request {
@@ -300,6 +305,7 @@ fn step_scenario(
                     input,
                     paused,
                     benchmark_active,
+                    spacewars_config,
                 );
                 return 0;
             }
@@ -331,6 +337,7 @@ fn step_scenario(
             input,
             paused,
             benchmark_active,
+            spacewars_config,
         );
         return 0;
     }
@@ -383,8 +390,9 @@ fn restart_scenario(
     input: &mut ClientInput,
     paused: &mut bool,
     benchmark_active: &mut bool,
+    spacewars_config: &SpacewarsConfig,
 ) {
-    match HostedScenario::new(scenario_name, seed) {
+    match HostedScenario::new(scenario_name, seed, spacewars_config.clone()) {
         Ok(reset) => {
             *scenario = reset;
             *accumulator = Duration::ZERO;
@@ -852,11 +860,15 @@ struct PlayerPanelState {
 }
 
 impl HostedScenario {
-    pub(crate) fn new(name: &str, seed: u64) -> Result<Self, HostError> {
+    pub(crate) fn new(
+        name: &str,
+        seed: u64,
+        spacewars_config: SpacewarsConfig,
+    ) -> Result<Self, HostError> {
         match name {
             "null" => Ok(Self::Null(NullScenario::init(NullConfig, seed))),
             "spacewars" => Ok(Self::Spacewars(Box::new(SpacewarsScenario::init(
-                SpacewarsConfig::default(),
+                spacewars_config,
                 seed,
             )))),
             _ => Err(HostError::UnknownScenario { name: name.into() }),
@@ -1079,9 +1091,26 @@ fn brush_from_core_color(color: CoreColor) -> Brush {
 mod tests {
     use super::*;
 
+    fn hosted_scenario(name: &str, seed: u64) -> Result<HostedScenario, HostError> {
+        HostedScenario::new(name, seed, SpacewarsConfig::default())
+    }
+
+    fn small_duel_config() -> SpacewarsConfig {
+        SpacewarsConfig {
+            universe_radius: 600,
+            asteroid_probability_per_sec: 0.0,
+            use_planets: false,
+            players: [
+                engine_core::PlayerConfig::new("Player 1", 250, CoreColor::RED),
+                engine_core::PlayerConfig::new("Player 2", 250, CoreColor::GREEN),
+            ],
+            ..SpacewarsConfig::default()
+        }
+    }
+
     #[test]
     fn unknown_scenario_is_rejected() {
-        let err = match HostedScenario::new("bogus", 0) {
+        let err = match hosted_scenario("bogus", 0) {
             Ok(_) => panic!("bogus scenario should fail"),
             Err(err) => err,
         };
@@ -1106,7 +1135,7 @@ mod tests {
 
     #[test]
     fn null_scenario_renders_empty_frame() {
-        let scenario = HostedScenario::new("null", 0).unwrap();
+        let scenario = hosted_scenario("null", 0).unwrap();
 
         assert!(scenario.render_frame().layers.is_empty());
         assert_eq!(scenario.spacewars_panel_state(false, false, ""), None);
@@ -1114,7 +1143,7 @@ mod tests {
 
     #[test]
     fn spacewars_scenario_renders_initial_world() {
-        let scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let scenario = hosted_scenario("spacewars", 0).unwrap();
         let frame = scenario.render_frame();
 
         match &scenario {
@@ -1133,8 +1162,23 @@ mod tests {
     }
 
     #[test]
+    fn spacewars_scenario_uses_supplied_config() {
+        let config = small_duel_config();
+        let scenario = HostedScenario::new("spacewars", 0, config.clone()).unwrap();
+
+        match &scenario {
+            HostedScenario::Spacewars(state) => {
+                assert_eq!(state.config, config);
+                assert!(state.sun.is_none());
+                assert!(state.planets.is_empty());
+            }
+            HostedScenario::Null(_) => panic!("spacewars scenario should not host null"),
+        }
+    }
+
+    #[test]
     fn spacewars_scenario_renders_original_style_local_play_frames_for_client() {
-        let scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let scenario = hosted_scenario("spacewars", 0).unwrap();
         let frames = scenario.render_frames(RenderBackend::Vector);
 
         let HostedScenario::Spacewars(state) = &scenario else {
@@ -1158,7 +1202,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_health_pod_and_planet_score() {
-        let mut scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
         let HostedScenario::Spacewars(state) = &mut scenario else {
             panic!("spacewars scenario should not host null");
         };
@@ -1193,7 +1237,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_winner_and_eliminated_player() {
-        let mut scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
         let HostedScenario::Spacewars(state) = &mut scenario else {
             panic!("spacewars scenario should not host null");
         };
@@ -1210,7 +1254,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_pause_message() {
-        let mut scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
         let HostedScenario::Spacewars(state) = &mut scenario else {
             panic!("spacewars scenario should not host null");
         };
@@ -1239,8 +1283,9 @@ mod tests {
 
     #[test]
     fn reset_key_restarts_spacewars_with_same_seed() {
-        let mut scenario = HostedScenario::new("spacewars", 42).unwrap();
-        let expected = HostedScenario::new("spacewars", 42).unwrap();
+        let config = small_duel_config();
+        let mut scenario = HostedScenario::new("spacewars", 42, config.clone()).unwrap();
+        let expected = HostedScenario::new("spacewars", 42, config.clone()).unwrap();
         let HostedScenario::Spacewars(state) = &mut scenario else {
             panic!("spacewars scenario should not host null");
         };
@@ -1266,6 +1311,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &config,
         );
 
         let HostedScenario::Spacewars(state) = &scenario else {
@@ -1278,6 +1324,7 @@ mod tests {
         assert!(!paused);
         assert!(!benchmark_active);
         assert_eq!(state.tick, 0);
+        assert_eq!(state.config, config);
         assert_eq!(state.winner, None);
         assert!(!state.players[0].eliminated);
         assert_eq!(state.ships[0].position, expected.ships[0].position);
@@ -1285,7 +1332,7 @@ mod tests {
 
     #[test]
     fn pause_key_toggles_and_freezes_spacewars_steps() {
-        let mut scenario = HostedScenario::new("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::ZERO;
         let mut controls = ScenarioControls::default();
@@ -1305,6 +1352,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         assert!(paused);
 
@@ -1320,6 +1368,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         let HostedScenario::Spacewars(state) = &scenario else {
             panic!("spacewars scenario should not host null");
@@ -1340,13 +1389,14 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         assert!(!paused);
     }
 
     #[test]
     fn benchmark_key_starts_dense_spacewars_workload() {
-        let mut scenario = HostedScenario::new("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -1366,6 +1416,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
 
         let counts = scenario.benchmark_counts();
@@ -1378,7 +1429,7 @@ mod tests {
 
     #[test]
     fn scenario_controls_resume_restart_and_start_benchmark() {
-        let mut scenario = HostedScenario::new("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -1398,6 +1449,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         assert!(!paused);
         assert_eq!(accumulator, Duration::ZERO);
@@ -1424,6 +1476,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         let HostedScenario::Spacewars(state) = &scenario else {
             panic!("spacewars scenario should not host null");
@@ -1445,6 +1498,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            &SpacewarsConfig::default(),
         );
         assert!(benchmark_active);
         assert_eq!(scenario.benchmark_counts().asteroids, 100);

@@ -16,7 +16,13 @@ use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
-use engine_common::{CrashBehavior, RendererSetting, Settings};
+use engine_common::{
+    CrashBehavior, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+    MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+    MIN_SPACEWARS_PLAYER_HEALTH_PERCENT, MIN_SPACEWARS_UNIVERSE_RADIUS, RendererSetting, Settings,
+    SpacewarsSettings,
+};
+use engine_core::SpacewarsConfig;
 use settings::LoadStatus;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
 use tracing_subscriber::EnvFilter;
@@ -137,6 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_tracing(&loaded);
     log_settings_load_status(&settings_path, &loaded_settings.status);
     needs_writeback |= normalize_launch_settings(&mut loaded);
+    needs_writeback |= normalize_spacewars_settings(&mut loaded);
     let effective_launch = effective_launch_options(&args, &loaded);
 
     if !args.uses_debug_render() {
@@ -211,14 +218,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             effective_launch.renderer,
         ));
     } else if launch_directly {
+        let spacewars_config = spacewars_config_from_settings(&settings.read().unwrap());
         *render_timer.borrow_mut() = Some(start_scenario_from_launch(
             &window,
             &effective_launch,
             args.benchmark,
             Rc::clone(&scenario_controls),
+            spacewars_config,
         )?);
     } else {
-        show_launcher(&window, &effective_launch);
+        show_launcher(
+            &window,
+            &effective_launch,
+            &settings.read().unwrap().spacewars,
+        );
     }
 
     window.run()?;
@@ -275,6 +288,25 @@ fn normalize_launch_settings(settings: &mut Settings) -> bool {
     changed
 }
 
+fn normalize_spacewars_settings(settings: &mut Settings) -> bool {
+    let normalized = settings.spacewars.normalized();
+    if normalized == settings.spacewars {
+        return false;
+    }
+
+    tracing::warn!(
+        universe_radius = settings.spacewars.universe_radius,
+        normalized_universe_radius = normalized.universe_radius,
+        asteroid_probability_per_sec = settings.spacewars.asteroid_probability_per_sec,
+        normalized_asteroid_probability_per_sec = normalized.asteroid_probability_per_sec,
+        player_health_percent = settings.spacewars.player_health_percent,
+        normalized_player_health_percent = normalized.player_health_percent,
+        "invalid saved Spacewars setup; using normalized values."
+    );
+    settings.spacewars = normalized;
+    true
+}
+
 fn normalize_raster_scale(value: f32) -> f32 {
     if value.is_finite() {
         value.clamp(MIN_RASTER_SCALE, MAX_RASTER_SCALE)
@@ -287,7 +319,7 @@ fn should_launch_directly(args: &Args) -> bool {
     args.uses_debug_render() || args.uses_benchmark() || args.has_launch_override()
 }
 
-fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch) {
+fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, setup: &SpacewarsSettings) {
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
     window.set_raster_visible(false);
     window.set_spacewars_ui_visible(false);
@@ -299,6 +331,16 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch) {
     window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
         launch.raster_scale,
     )));
+    let setup = setup.normalized();
+    window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
+    window.set_launcher_use_planets(SharedString::from(bool_label(setup.use_planets)));
+    window.set_launcher_asteroids_enabled(SharedString::from(bool_label(setup.asteroids_enabled)));
+    window.set_launcher_asteroid_probability_text(SharedString::from(format_float_setting(
+        setup.asteroid_probability_per_sec,
+    )));
+    window.set_launcher_player_health_text(SharedString::from(
+        setup.player_health_percent.to_string(),
+    ));
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_controls_visible(false);
     window.set_launcher_visible(true);
@@ -405,8 +447,9 @@ fn handle_return_to_launcher(
         timer.stop();
     }
     scenario_controls.borrow_mut().clear();
-    let launch = launch_from_settings(&settings.read().unwrap());
-    show_launcher(&window, &launch);
+    let settings = settings.read().unwrap();
+    let launch = launch_from_settings(&settings);
+    show_launcher(&window, &launch, &settings.spacewars);
 }
 
 fn handle_launcher_start(
@@ -422,31 +465,33 @@ fn handle_launcher_start(
     };
     window.set_launcher_error_text(SharedString::from(""));
 
-    let launch = match launch_options_from_window(&window) {
-        Ok(launch) => launch,
+    let selections = match launcher_selections_from_window(&window) {
+        Ok(selections) => selections,
         Err(message) => {
             window.set_launcher_error_text(SharedString::from(message));
             return;
         }
     };
-    if start_benchmark && launch.scenario != "spacewars" {
+    if start_benchmark && selections.launch.scenario != "spacewars" {
         window.set_launcher_error_text(SharedString::from(
             "Benchmark mode currently supports only spacewars.",
         ));
         return;
     }
-    if let Err(err) = persist_launch_settings(settings, settings_path, &launch) {
+    if let Err(err) = persist_launcher_settings(settings, settings_path, &selections) {
         window.set_launcher_error_text(SharedString::from(format!(
             "Could not save settings: {err}"
         )));
         return;
     }
+    let spacewars_config = spacewars_config_from_settings(&settings.read().unwrap());
 
     match start_scenario_from_launch(
         &window,
-        &launch,
+        &selections.launch,
         start_benchmark,
         Rc::clone(scenario_controls),
+        spacewars_config,
     ) {
         Ok(timer) => {
             let mut timer_slot = render_timer.borrow_mut();
@@ -466,14 +511,22 @@ fn handle_launcher_start(
     }
 }
 
-fn persist_launch_settings(
+#[derive(Debug, Clone, PartialEq)]
+struct LauncherSelections {
+    launch: EffectiveLaunch,
+    spacewars: SpacewarsSettings,
+}
+
+fn persist_launcher_settings(
     settings: &Arc<RwLock<Settings>>,
     settings_path: &Path,
-    launch: &EffectiveLaunch,
+    selections: &LauncherSelections,
 ) -> Result<bool, settings::SettingsError> {
     let mut settings = settings.write().unwrap();
+    let launch = &selections.launch;
     let renderer = renderer_setting(launch.renderer);
     let raster_scale = normalize_raster_scale(launch.raster_scale);
+    let spacewars = selections.spacewars.normalized();
     let mut changed = false;
 
     if settings.launch.scenario != launch.scenario {
@@ -496,6 +549,10 @@ fn persist_launch_settings(
         settings.last_scenario = Some(launch.scenario.clone());
         changed = true;
     }
+    if settings.spacewars != spacewars {
+        settings.spacewars = spacewars;
+        changed = true;
+    }
 
     if changed {
         settings::save_settings(&settings, settings_path)?;
@@ -514,12 +571,52 @@ fn launch_from_settings(settings: &Settings) -> EffectiveLaunch {
     }
 }
 
+fn spacewars_config_from_settings(settings: &Settings) -> SpacewarsConfig {
+    spacewars_config_from_setup(&settings.spacewars.normalized())
+}
+
+fn spacewars_config_from_setup(setup: &SpacewarsSettings) -> SpacewarsConfig {
+    let mut config = SpacewarsConfig {
+        universe_radius: setup.universe_radius,
+        use_planets: setup.use_planets,
+        asteroid_probability_per_sec: if setup.asteroids_enabled {
+            setup.asteroid_probability_per_sec
+        } else {
+            0.0
+        },
+        ..SpacewarsConfig::default()
+    };
+
+    for player in &mut config.players {
+        player.health_percent = setup.player_health_percent;
+    }
+
+    config
+}
+
+fn launcher_selections_from_window(window: &MainWindow) -> Result<LauncherSelections, String> {
+    Ok(LauncherSelections {
+        launch: launch_options_from_window(window)?,
+        spacewars: spacewars_setup_from_window(window)?,
+    })
+}
+
 fn launch_options_from_window(window: &MainWindow) -> Result<EffectiveLaunch, String> {
     launch_options_from_values(
         window.get_launcher_scenario().as_str(),
         window.get_launcher_seed_text().as_str(),
         window.get_launcher_renderer().as_str(),
         window.get_launcher_raster_scale_text().as_str(),
+    )
+}
+
+fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings, String> {
+    spacewars_setup_from_values(
+        window.get_launcher_universe_radius_text().as_str(),
+        window.get_launcher_use_planets().as_str(),
+        window.get_launcher_asteroids_enabled().as_str(),
+        window.get_launcher_asteroid_probability_text().as_str(),
+        window.get_launcher_player_health_text().as_str(),
     )
 }
 
@@ -553,11 +650,67 @@ fn launch_options_from_values(
     })
 }
 
+fn spacewars_setup_from_values(
+    universe_radius: &str,
+    use_planets: &str,
+    asteroids_enabled: &str,
+    asteroid_probability_per_sec: &str,
+    player_health_percent: &str,
+) -> Result<SpacewarsSettings, String> {
+    let setup = SpacewarsSettings {
+        universe_radius: parse_u32_setting(
+            universe_radius,
+            "World radius",
+            MIN_SPACEWARS_UNIVERSE_RADIUS,
+            MAX_SPACEWARS_UNIVERSE_RADIUS,
+        )?,
+        use_planets: bool_from_label(use_planets)?,
+        asteroids_enabled: bool_from_label(asteroids_enabled)?,
+        asteroid_probability_per_sec: parse_f32_setting(
+            asteroid_probability_per_sec,
+            "Asteroid rate",
+            MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+            MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+        )?,
+        player_health_percent: parse_u32_setting(
+            player_health_percent,
+            "Player health",
+            MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
+            MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+        )?,
+    };
+
+    Ok(setup.normalized())
+}
+
+fn parse_u32_setting(value: &str, label: &str, min: u32, max: u32) -> Result<u32, String> {
+    value
+        .trim()
+        .parse::<u32>()
+        .map(|value| value.clamp(min, max))
+        .map_err(|_| format!("{label} must be an integer from {min} to {max}."))
+}
+
+fn parse_f32_setting(value: &str, label: &str, min: f32, max: f32) -> Result<f32, String> {
+    value
+        .trim()
+        .parse::<f32>()
+        .map(|value| {
+            if value.is_finite() {
+                value.clamp(min, max)
+            } else {
+                min
+            }
+        })
+        .map_err(|_| format!("{label} must be a number from {min:.0} to {max:.0}."))
+}
+
 fn start_scenario_from_launch(
     window: &MainWindow,
     launch: &EffectiveLaunch,
     start_benchmark: bool,
     controls: host::SharedScenarioControls,
+    spacewars_config: SpacewarsConfig,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
     host::start_scenario_loop(
@@ -569,6 +722,7 @@ fn start_scenario_from_launch(
             renderer: launch.renderer,
             raster_scale: launch.raster_scale,
             controls: Some(controls),
+            spacewars_config,
         },
     )
 }
@@ -597,6 +751,26 @@ fn renderer_setting(renderer: host::RenderBackend) -> RendererSetting {
 
 fn format_raster_scale(value: f32) -> String {
     format!("{:.1}", normalize_raster_scale(value))
+}
+
+fn format_float_setting(value: f32) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.1}")
+    } else {
+        format!("{value:.2}")
+    }
+}
+
+fn bool_label(value: bool) -> &'static str {
+    if value { "on" } else { "off" }
+}
+
+fn bool_from_label(label: &str) -> Result<bool, String> {
+    match label.trim().to_ascii_lowercase().as_str() {
+        "on" | "true" | "yes" | "1" => Ok(true),
+        "off" | "false" | "no" | "0" => Ok(false),
+        _ => Err(format!("Expected on or off, got {label:?}.")),
+    }
 }
 
 fn select_slint_backend() -> Result<(), Box<dyn std::error::Error>> {
@@ -753,6 +927,39 @@ mod tests {
     }
 
     #[test]
+    fn spacewars_setup_values_parse_and_normalize() {
+        let setup = spacewars_setup_from_values("2400", "off", "on", "75.5", "250").unwrap();
+
+        assert_eq!(setup.universe_radius, 2400);
+        assert!(!setup.use_planets);
+        assert!(setup.asteroids_enabled);
+        assert_eq!(setup.asteroid_probability_per_sec, 75.5);
+        assert_eq!(setup.player_health_percent, 250);
+
+        let clamped = spacewars_setup_from_values("99999", "on", "off", "999", "0").unwrap();
+        assert_eq!(clamped.universe_radius, MAX_SPACEWARS_UNIVERSE_RADIUS);
+        assert!(clamped.use_planets);
+        assert!(!clamped.asteroids_enabled);
+        assert_eq!(
+            clamped.asteroid_probability_per_sec,
+            MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+        );
+        assert_eq!(
+            clamped.player_health_percent,
+            MIN_SPACEWARS_PLAYER_HEALTH_PERCENT
+        );
+    }
+
+    #[test]
+    fn spacewars_setup_values_report_invalid_input() {
+        assert!(spacewars_setup_from_values("wide", "on", "on", "20", "100").is_err());
+        assert!(spacewars_setup_from_values("1200", "maybe", "on", "20", "100").is_err());
+        assert!(spacewars_setup_from_values("1200", "on", "sometimes", "20", "100").is_err());
+        assert!(spacewars_setup_from_values("1200", "on", "on", "dense", "100").is_err());
+        assert!(spacewars_setup_from_values("1200", "on", "on", "20", "strong").is_err());
+    }
+
+    #[test]
     fn launch_directly_only_when_cli_or_special_mode_requests_it() {
         let mut args = base_args();
         assert!(!should_launch_directly(&args));
@@ -770,25 +977,35 @@ mod tests {
     }
 
     #[test]
-    fn persist_launch_settings_updates_defaults_and_last_scenario() {
+    fn persist_launcher_settings_updates_defaults_setup_and_last_scenario() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
-        let launch = EffectiveLaunch {
-            scenario: "spacewars".into(),
-            seed: 123,
-            renderer: host::RenderBackend::Raster,
-            raster_scale: 2.0,
+        let selections = LauncherSelections {
+            launch: EffectiveLaunch {
+                scenario: "spacewars".into(),
+                seed: 123,
+                renderer: host::RenderBackend::Raster,
+                raster_scale: 2.0,
+            },
+            spacewars: SpacewarsSettings {
+                universe_radius: 2400,
+                use_planets: false,
+                asteroids_enabled: false,
+                asteroid_probability_per_sec: 80.0,
+                player_health_percent: 250,
+            },
         };
 
-        assert!(persist_launch_settings(&settings, &path, &launch).unwrap());
-        assert!(!persist_launch_settings(&settings, &path, &launch).unwrap());
+        assert!(persist_launcher_settings(&settings, &path, &selections).unwrap());
+        assert!(!persist_launcher_settings(&settings, &path, &selections).unwrap());
 
         let stored = settings.read().unwrap();
         assert_eq!(stored.launch.scenario, "spacewars");
         assert_eq!(stored.launch.seed, 123);
         assert_eq!(stored.launch.renderer, RendererSetting::Raster);
         assert_eq!(stored.launch.raster_scale, 2.0);
+        assert_eq!(stored.spacewars, selections.spacewars);
         assert_eq!(stored.last_scenario.as_deref(), Some("spacewars"));
         drop(stored);
 
@@ -797,6 +1014,7 @@ mod tests {
         assert_eq!(reloaded.settings.launch.seed, 123);
         assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
+        assert_eq!(reloaded.settings.spacewars, selections.spacewars);
         assert_eq!(
             reloaded.settings.last_scenario.as_deref(),
             Some("spacewars")
@@ -816,6 +1034,64 @@ mod tests {
         let reloaded = settings::load_settings(&path).unwrap();
         assert_eq!(reloaded.status, settings::LoadStatus::Existing);
         assert_eq!(reloaded.settings.last_scenario, None);
+    }
+
+    #[test]
+    fn default_spacewars_settings_map_to_default_config() {
+        assert_eq!(
+            spacewars_config_from_settings(&Settings::default()),
+            SpacewarsConfig::default()
+        );
+    }
+
+    #[test]
+    fn spacewars_settings_map_to_scenario_config() {
+        let mut settings = Settings::default();
+        settings.spacewars = SpacewarsSettings {
+            universe_radius: 2400,
+            use_planets: false,
+            asteroids_enabled: true,
+            asteroid_probability_per_sec: 75.0,
+            player_health_percent: 250,
+        };
+
+        let config = spacewars_config_from_settings(&settings);
+
+        assert_eq!(config.universe_radius, 2400);
+        assert!(!config.use_planets);
+        assert_eq!(config.asteroid_probability_per_sec, 75.0);
+        assert_eq!(config.players[0].health_percent, 250);
+        assert_eq!(config.players[1].health_percent, 250);
+        assert!(config.use_starfield);
+        assert!(config.use_textures);
+        assert_eq!(config.fps, 60);
+    }
+
+    #[test]
+    fn disabled_asteroids_keep_density_setting_but_disable_scenario_spawn() {
+        let mut settings = Settings::default();
+        settings.spacewars.asteroids_enabled = false;
+        settings.spacewars.asteroid_probability_per_sec = 75.0;
+
+        let config = spacewars_config_from_settings(&settings);
+
+        assert_eq!(settings.spacewars.asteroid_probability_per_sec, 75.0);
+        assert_eq!(config.asteroid_probability_per_sec, 0.0);
+    }
+
+    #[test]
+    fn spacewars_settings_normalization_clamps_saved_values() {
+        let mut settings = Settings::default();
+        settings.spacewars.universe_radius = 1;
+        settings.spacewars.asteroid_probability_per_sec = 999.0;
+        settings.spacewars.player_health_percent = 0;
+
+        assert!(normalize_spacewars_settings(&mut settings));
+        assert_eq!(settings.spacewars.universe_radius, 300);
+        assert_eq!(settings.spacewars.asteroid_probability_per_sec, 100.0);
+        assert_eq!(settings.spacewars.player_health_percent, 1);
+
+        assert!(!normalize_spacewars_settings(&mut settings));
     }
 
     #[test]

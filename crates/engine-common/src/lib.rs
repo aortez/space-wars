@@ -97,6 +97,7 @@ pub struct Settings {
     pub audio: AudioSettings,
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
+    pub spacewars: SpacewarsSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
 }
@@ -539,6 +540,95 @@ impl<'de> Visitor<'de> for LaunchRasterScaleVisitor {
     {
         while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
         Ok(default_launch_raster_scale())
+    }
+}
+
+pub const DEFAULT_SPACEWARS_UNIVERSE_RADIUS: u32 = 1200;
+pub const MIN_SPACEWARS_UNIVERSE_RADIUS: u32 = 300;
+pub const MAX_SPACEWARS_UNIVERSE_RADIUS: u32 = 10_000;
+pub const DEFAULT_SPACEWARS_USE_PLANETS: bool = true;
+pub const DEFAULT_SPACEWARS_ASTEROIDS_ENABLED: bool = true;
+pub const DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 20.0;
+pub const MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 0.0;
+pub const MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 100.0;
+pub const DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 100;
+pub const MIN_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 1;
+pub const MAX_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 500;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SpacewarsSettings {
+    #[serde(default = "default_spacewars_universe_radius")]
+    pub universe_radius: u32,
+    #[serde(default = "default_spacewars_use_planets")]
+    pub use_planets: bool,
+    #[serde(default = "default_spacewars_asteroids_enabled")]
+    pub asteroids_enabled: bool,
+    #[serde(default = "default_spacewars_asteroid_probability_per_sec")]
+    pub asteroid_probability_per_sec: f32,
+    #[serde(default = "default_spacewars_player_health_percent")]
+    pub player_health_percent: u32,
+}
+
+impl Default for SpacewarsSettings {
+    fn default() -> Self {
+        Self {
+            universe_radius: DEFAULT_SPACEWARS_UNIVERSE_RADIUS,
+            use_planets: DEFAULT_SPACEWARS_USE_PLANETS,
+            asteroids_enabled: DEFAULT_SPACEWARS_ASTEROIDS_ENABLED,
+            asteroid_probability_per_sec: DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+            player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
+        }
+    }
+}
+
+impl SpacewarsSettings {
+    pub fn normalized(&self) -> Self {
+        Self {
+            universe_radius: self
+                .universe_radius
+                .clamp(MIN_SPACEWARS_UNIVERSE_RADIUS, MAX_SPACEWARS_UNIVERSE_RADIUS),
+            use_planets: self.use_planets,
+            asteroids_enabled: self.asteroids_enabled,
+            asteroid_probability_per_sec: normalize_spacewars_asteroid_probability(
+                self.asteroid_probability_per_sec,
+            ),
+            player_health_percent: self.player_health_percent.clamp(
+                MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
+                MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+            ),
+        }
+    }
+}
+
+const fn default_spacewars_universe_radius() -> u32 {
+    DEFAULT_SPACEWARS_UNIVERSE_RADIUS
+}
+
+const fn default_spacewars_use_planets() -> bool {
+    DEFAULT_SPACEWARS_USE_PLANETS
+}
+
+const fn default_spacewars_asteroids_enabled() -> bool {
+    DEFAULT_SPACEWARS_ASTEROIDS_ENABLED
+}
+
+const fn default_spacewars_asteroid_probability_per_sec() -> f32 {
+    DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+}
+
+const fn default_spacewars_player_health_percent() -> u32 {
+    DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT
+}
+
+fn normalize_spacewars_asteroid_probability(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(
+            MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+            MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+        )
+    } else {
+        DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
     }
 }
 

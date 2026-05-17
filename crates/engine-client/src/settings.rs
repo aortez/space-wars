@@ -250,7 +250,9 @@ fn sync_parent_dir(_parent: &Path) -> io::Result<()> {
 mod tests {
     use std::sync::Mutex;
 
-    use engine_common::{AudioSettings, LaunchSettings, RendererSetting, VideoSettings};
+    use engine_common::{
+        AudioSettings, LaunchSettings, RendererSetting, SpacewarsSettings, VideoSettings,
+    };
 
     use super::*;
 
@@ -270,6 +272,7 @@ mod tests {
         assert_eq!(loaded.settings.launch.seed, 0);
         assert_eq!(loaded.settings.launch.renderer, RendererSetting::Vector);
         assert_eq!(loaded.settings.launch.raster_scale, 1.0);
+        assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
         assert!(!path.exists(), "load should not create the file.");
     }
 
@@ -285,6 +288,7 @@ mod tests {
         assert_eq!(loaded.settings.video.height, 720);
         assert_eq!(loaded.settings.audio.master_volume, 0.8);
         assert_eq!(loaded.settings.launch.scenario, "spacewars");
+        assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
         assert_eq!(loaded.settings.runtime.log_level, "info");
 
         save_settings(&loaded.settings, &path).unwrap();
@@ -294,6 +298,7 @@ mod tests {
         assert!(migrated.contains("height = 720"));
         assert!(migrated.contains("[audio]"));
         assert!(migrated.contains("[launch]"));
+        assert!(migrated.contains("[spacewars]"));
         assert!(migrated.contains("[runtime]"));
     }
 
@@ -341,6 +346,13 @@ mod tests {
                 renderer: RendererSetting::Raster,
                 raster_scale: 2.0,
             },
+            spacewars: SpacewarsSettings {
+                universe_radius: 2400,
+                asteroids_enabled: false,
+                asteroid_probability_per_sec: 80.0,
+                player_health_percent: 250,
+                ..Default::default()
+            },
             ..Default::default()
         };
         save_settings(&settings, &path).unwrap();
@@ -357,6 +369,13 @@ mod tests {
         assert_eq!(reloaded.settings.launch.seed, 42);
         assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
+        assert_eq!(reloaded.settings.spacewars.universe_radius, 2400);
+        assert!(!reloaded.settings.spacewars.asteroids_enabled);
+        assert_eq!(
+            reloaded.settings.spacewars.asteroid_probability_per_sec,
+            80.0
+        );
+        assert_eq!(reloaded.settings.spacewars.player_health_percent, 250);
     }
 
     #[test]
