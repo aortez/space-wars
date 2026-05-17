@@ -1,8 +1,8 @@
 //! Initial Spacewars scenario port.
 //!
 //! Current slices cover deterministic sun/planet setup, ship controls, gravity,
-//! collision response, damage, debris, asteroids, and weapons. Exhaust trails,
-//! sounds, pods, and scoring land in later slices.
+//! collision response, damage, debris, asteroids, weapons, and exhaust trails.
+//! Sounds, pods, and scoring land in later slices.
 
 use std::time::Duration;
 
@@ -26,6 +26,7 @@ const WORLD_LAYER: i32 = -20;
 const SUN_LAYER: i32 = -15;
 const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
+const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
 const LASER_LAYER: i32 = 2;
 const BOUNDS_HIGH_LAYER: i32 = 4;
@@ -80,6 +81,11 @@ const STARFIELD_COLOR_ROTATE_RATE: f32 = 0.02;
 const STARFIELD_COLOR_ROTATE_RANGE: f32 = 0.2;
 const STARFIELD_MAX_STARS: usize = 100_000;
 const STARFIELD_POINTS: usize = 3;
+const EXHAUST_RNG_SALT: u64 = 0xE7A7_5A11_5EED;
+const EXHAUST_DECAY: f32 = 0.1;
+const EXHAUST_MOVE_SCALE: f32 = 0.01;
+const EXHAUST_LENGTH_SCALE: f32 = 0.025;
+const SHIP_TURN_EXHAUST_SCALAR: f32 = 50.0;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -306,7 +312,7 @@ impl BoundsDrawMode {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ShipState {
     pub owner_id: usize,
     pub position: Vec2,
@@ -323,6 +329,7 @@ pub struct ShipState {
     pub laser_firing: bool,
     pub cannon_firing: bool,
     pub laser_beam: Option<LaserBeamState>,
+    pub exhaust_trails: Vec<ExhaustTrailState>,
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
@@ -358,6 +365,15 @@ pub enum TurnBehavior {
     None,
     Left,
     Right,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ExhaustTrailState {
+    pub start: Vec2,
+    pub end: Vec2,
+    pub velocity: Vec2,
+    pub color: Color,
+    pub decay: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -552,7 +568,7 @@ impl Scenario for SpacewarsScenario {
         }
 
         for ship in &mut state.ships {
-            ship.update(dt);
+            ship.update(dt, state.seed, state.tick);
             contain_ship(ship, state.config.universe_radius as f32);
         }
         let new_shells = spawn_cannon_shells(state, dt);
@@ -940,6 +956,14 @@ fn asteroid_count(state: &SpacewarsState) -> usize {
 
 fn asteroid_rng_for_tick(seed: u64, tick: u64) -> SpacewarsRng {
     seeded_rng(seed ^ ASTEROID_RNG_SALT ^ tick.wrapping_mul(0x9E37_79B9_7F4A_7C15))
+}
+
+fn exhaust_rng_for_tick(seed: u64, tick: u64, owner_id: usize) -> SpacewarsRng {
+    seeded_rng(
+        seed ^ EXHAUST_RNG_SALT
+            ^ tick.wrapping_mul(0xD1B5_4A32_D192_ED03)
+            ^ (owner_id as u64).wrapping_mul(0x94D0_49BB_1331_11EB),
+    )
 }
 
 fn remove_finished_debris(state: &mut SpacewarsState) {
@@ -1680,6 +1704,21 @@ fn ship_mount_center(ship: &ShipState) -> Vec2 {
     triangle_low_bound(ship_triangles(ship)[SHIP_LASER_TRIANGLE_INDEX]).center
 }
 
+fn ship_thruster_center(ship: &ShipState) -> Vec2 {
+    triangle_low_bound(transform_points(ship_transform(ship), SHIP_THRUSTER)).center
+}
+
+fn ship_wing_centers(ship: &ShipState) -> (Vec2, Vec2) {
+    let transform = ship_transform(ship);
+    let left = rotate_points(SHIP_LEFT_WING, SHIP_WING_PIVOT, ship.wing_theta);
+    let right = rotate_points(SHIP_RIGHT_WING, SHIP_WING_PIVOT, -ship.wing_theta);
+
+    (
+        triangle_low_bound(transform_points(transform, left)).center,
+        triangle_low_bound(transform_points(transform, right)).center,
+    )
+}
+
 fn transform_points(transform: Transform2, points: [Vec2; 3]) -> [Vec2; 3] {
     points.map(|point| transform.transform_point(point))
 }
@@ -1777,6 +1816,35 @@ impl DebrisState {
     }
 }
 
+impl ExhaustTrailState {
+    fn new(position: Vec2, velocity: Vec2, rng: &mut SpacewarsRng) -> Self {
+        Self {
+            start: position,
+            end: position + velocity * EXHAUST_LENGTH_SCALE,
+            velocity,
+            color: Color::scale_255(
+                255.0,
+                random_unit_f32(rng) * 50.0,
+                random_unit_f32(rng) * 50.0,
+            ),
+            decay: EXHAUST_DECAY,
+        }
+    }
+
+    fn update(&mut self, dt: f32) {
+        let movement = self.velocity * (dt * EXHAUST_MOVE_SCALE);
+        self.start += movement;
+        self.end += movement;
+        self.color.r = (self.color.r - self.decay).max(0.0);
+        self.color.g = (self.color.g - self.decay).max(0.0);
+        self.color.b = (self.color.b - self.decay).max(0.0);
+    }
+
+    fn done(self) -> bool {
+        self.color.r == 0.0 && self.color.g == 0.0 && self.color.b == 0.0
+    }
+}
+
 fn debris_mass(radius: f32) -> f32 {
     core::f32::consts::TAU * radius
 }
@@ -1806,6 +1874,7 @@ impl ShipState {
             laser_firing: false,
             cannon_firing: false,
             laser_beam: None,
+            exhaust_trails: Vec::new(),
             life,
             life_max: life,
             dead: false,
@@ -1930,19 +1999,31 @@ impl ShipState {
         });
     }
 
-    fn update(&mut self, dt: f32) {
-        self.rotate_ship();
+    fn update(&mut self, dt: f32, seed: u64, tick: u64) {
+        self.update_exhaust_trails(dt);
+        let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
+
+        self.rotate_ship(&mut exhaust_rng, tick);
         self.position += self.velocity * dt;
         self.rotation_radians += self.omega * dt;
         self.update_wings(dt);
-        self.update_thrust();
+        self.update_thrust(&mut exhaust_rng, tick);
         self.update_turn();
     }
 
-    fn rotate_ship(&mut self) {
-        let theta = self.rotation_radians - self.turn_power * self.omega;
+    fn rotate_ship(&mut self, rng: &mut SpacewarsRng, tick: u64) {
+        let delta_theta = self.turn_power * self.omega;
+        let theta = self.rotation_radians - delta_theta;
         self.rotation_radians = theta;
         self.direction = direction_from_rotation(theta);
+        if delta_theta.abs() > 0.001 {
+            self.fire_exhaust(
+                self.direction.rotate_radians(core::f32::consts::FRAC_PI_2)
+                    * (delta_theta * SHIP_TURN_EXHAUST_SCALAR),
+                rng,
+                tick,
+            );
+        }
     }
 
     fn update_wings(&mut self, dt: f32) {
@@ -1987,7 +2068,7 @@ impl ShipState {
         self.thrust_behavior = ThrustBehavior::Full;
     }
 
-    fn update_thrust(&mut self) {
+    fn update_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
         match self.thrust_behavior {
             ThrustBehavior::None => {}
             ThrustBehavior::Full => {
@@ -1999,6 +2080,7 @@ impl ShipState {
                 } else {
                     self.cap_speed(MAX_SPEED);
                 }
+                self.fire_exhaust(self.direction, rng, tick);
             }
             ThrustBehavior::Brake => {
                 if self.wing_state == WingState::Opened {
@@ -2018,8 +2100,50 @@ impl ShipState {
             ThrustBehavior::Reverse => {
                 self.velocity -= self.direction * self.thrust_power;
                 self.cap_speed(MAX_SPEED);
+                self.fire_exhaust(self.direction * -10.0, rng, tick);
             }
         }
+    }
+
+    fn update_exhaust_trails(&mut self, dt: f32) {
+        for trail in &mut self.exhaust_trails {
+            trail.update(dt);
+        }
+        self.exhaust_trails.retain(|trail| !trail.done());
+    }
+
+    fn fire_exhaust(&mut self, direction: Vec2, rng: &mut SpacewarsRng, tick: u64) {
+        if direction.length_squared() <= REALLY_SMALL {
+            return;
+        }
+
+        if self.velocity.length() > MAX_SPEED {
+            let (left_wing, right_wing) = ship_wing_centers(self);
+            let variance = ((tick % 621) as f32 * 0.001 * 0.09).sin();
+            let random = random_unit_f32(rng);
+            let left_velocity = (self.velocity
+                + direction * (self.thrust_power * -0.5 * 0.00025 * (0.5 + random_unit_f32(rng))))
+            .rotate_radians(variance)
+            .rotate_radians(2.5);
+            let right_velocity = (self.velocity
+                + direction * (self.thrust_power * -0.5 * 0.00025 * (1.5 - random)))
+                .rotate_radians(-variance)
+                .rotate_radians(-2.5);
+
+            self.exhaust_trails
+                .push(ExhaustTrailState::new(left_wing, left_velocity, rng));
+            self.exhaust_trails
+                .push(ExhaustTrailState::new(right_wing, right_velocity, rng));
+        }
+
+        let pulse = ((tick as f32 + self.owner_id as f32 * 17.0) * 0.073).sin()
+            + core::f32::consts::FRAC_PI_2;
+        let velocity = direction * (self.thrust_power * -0.5 * pulse * 0.03);
+        let thruster = ship_thruster_center(self);
+        self.exhaust_trails
+            .push(ExhaustTrailState::new(thruster, velocity, rng));
+        self.exhaust_trails
+            .push(ExhaustTrailState::new(thruster, velocity, rng));
     }
 
     fn update_turn(&mut self) {
@@ -2129,6 +2253,10 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
     }
 
     for ship in &state.ships {
+        render_exhaust(&mut frame, ship);
+    }
+
+    for ship in &state.ships {
         render_ship(&mut frame, ship);
     }
 
@@ -2170,6 +2298,28 @@ fn starfield_color(starfield: &StarFieldState, tick: u64) -> RenderColor {
         + (starfield.color_theta + tick as f32 * STARFIELD_COLOR_ROTATE_RATE).sin()
             * STARFIELD_COLOR_ROTATE_RANGE;
     render_color(starfield.base_color.with_intensity(intensity))
+}
+
+fn render_exhaust(frame: &mut RenderFrame, ship: &ShipState) {
+    for trail in &ship.exhaust_trails {
+        frame.push_primitive(
+            EXHAUST_LAYER,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(trail.start),
+                render_point(trail.end),
+                Stroke::new(exhaust_color(trail.color), 1.15),
+            )),
+        );
+    }
+}
+
+fn exhaust_color(color: Color) -> RenderColor {
+    RenderColor::rgba(
+        color.r.clamp(0.0, 1.0),
+        color.g.clamp(0.0, 1.0),
+        color.b.clamp(0.0, 1.0),
+        color.r.clamp(0.0, 0.85),
+    )
 }
 
 fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
@@ -2724,6 +2874,8 @@ mod tests {
         assert_eq!(state.ships[1].life_max, 50.0);
         assert!(!state.ships[0].dead);
         assert!(!state.ships[1].dead);
+        assert!(state.ships[0].exhaust_trails.is_empty());
+        assert!(state.ships[1].exhaust_trails.is_empty());
         assert_eq!(state.players[0].name, "Player 1");
         assert_eq!(state.players[1].name, "Player 2");
         assert!(state.sun.is_none());
@@ -3303,6 +3455,8 @@ mod tests {
         assert_eq!(state.ships[1].position, start_positions[1]);
         assert_eq!(state.ships[0].velocity, Vec2::ZERO);
         assert_eq!(state.ships[1].velocity, Vec2::ZERO);
+        assert!(state.ships[0].exhaust_trails.is_empty());
+        assert!(state.ships[1].exhaust_trails.is_empty());
         assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
@@ -3327,6 +3481,52 @@ mod tests {
             state.ships[0].position.y,
             450.0 + (SHIP_THRUST_FORCE / SHIP_MASS / 60.0) / 60.0,
         );
+    }
+
+    #[test]
+    fn thrust_emits_deterministic_exhaust_trails() {
+        let mut first = init_deathmatch_no_asteroids();
+        let mut replay = init_deathmatch_no_asteroids();
+
+        step(&mut first, &[SpacewarsAction::thrust(0)]);
+        step(&mut replay, &[SpacewarsAction::thrust(0)]);
+
+        assert_eq!(
+            first.ships[0].exhaust_trails,
+            replay.ships[0].exhaust_trails
+        );
+        assert_eq!(first.ships[0].exhaust_trails.len(), 2);
+        for trail in &first.ships[0].exhaust_trails {
+            assert_vec_close(trail.start, ship_thruster_center(&first.ships[0]));
+            assert!(trail.end.y < trail.start.y);
+            assert_close(trail.color.r, 1.0);
+        }
+    }
+
+    #[test]
+    fn turn_emits_exhaust_after_rotation_begins() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::turn_right(0)]);
+        assert!(state.ships[0].exhaust_trails.is_empty());
+
+        step(&mut state, &[SpacewarsAction::turn_right(0)]);
+
+        assert_eq!(state.ships[0].exhaust_trails.len(), 2);
+    }
+
+    #[test]
+    fn exhaust_trails_fade_and_are_removed() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        assert_eq!(state.ships[0].exhaust_trails.len(), 2);
+
+        for _ in 0..12 {
+            step(&mut state, &[SpacewarsAction::thrust_halt(0)]);
+        }
+
+        assert!(state.ships[0].exhaust_trails.is_empty());
     }
 
     #[test]
@@ -3395,7 +3595,7 @@ mod tests {
     #[test]
     fn invalid_actions_are_ignored() {
         let mut state = init_deathmatch();
-        let start = state.ships[0];
+        let start = state.ships[0].clone();
         let invalid = Action {
             kind: 999,
             payload: vec![0],
@@ -3409,7 +3609,7 @@ mod tests {
     #[test]
     fn fire_cannon_spawns_original_shell_and_recoil() {
         let mut state = init_deathmatch_no_asteroids();
-        let start_ship = state.ships[0];
+        let start_ship = state.ships[0].clone();
         let mount_center = ship_mount_center(&start_ship);
 
         step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
@@ -3651,6 +3851,31 @@ mod tests {
             .count();
 
         assert_eq!(lines, 3);
+    }
+
+    #[test]
+    fn render_frame_includes_exhaust_lines_behind_ships() {
+        let mut state = init_deathmatch_no_asteroids();
+
+        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        let frame = SpacewarsScenario::render_frame(&state);
+        let exhaust_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == EXHAUST_LAYER)
+            .expect("exhaust should render on its own layer");
+
+        assert_eq!(
+            exhaust_layer.primitives.len(),
+            state.ships[0].exhaust_trails.len()
+        );
+        assert!(EXHAUST_LAYER < SHIP_LAYER);
+        assert!(
+            exhaust_layer
+                .primitives
+                .iter()
+                .all(|primitive| matches!(primitive, RenderPrimitive::Line(_)))
+        );
     }
 
     #[test]
