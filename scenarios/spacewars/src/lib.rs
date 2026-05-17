@@ -26,6 +26,7 @@ const WORLD_LAYER: i32 = -20;
 const SUN_LAYER: i32 = -15;
 const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
+const SPACEPORT_FEEDBACK_LAYER: i32 = -4;
 const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
 const DEBRIS_LAYER: i32 = 1;
@@ -3690,25 +3691,101 @@ fn render_body(
 }
 
 fn render_spaceport(frame: &mut RenderFrame, state: &SpacewarsState, planet: &PlanetState) {
+    let points = spaceport_points(planet)
+        .into_iter()
+        .map(render_point)
+        .collect::<Vec<_>>();
+
     frame.push_primitive(
         SPACEPORT_LAYER,
         RenderPrimitive::Polygon(RenderPolygon {
-            points: spaceport_points(planet)
-                .into_iter()
-                .map(render_point)
-                .collect(),
+            points: points.clone(),
             fill: Some(Fill::new(spaceport_color(state, planet))),
             stroke: Some(Stroke::new(RenderColor::rgba(0.05, 0.08, 0.1, 0.8), 0.75)),
+        }),
+    );
+
+    let Some(stroke) = spaceport_feedback_stroke(state, planet) else {
+        return;
+    };
+    frame.push_primitive(
+        SPACEPORT_FEEDBACK_LAYER,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points,
+            fill: None,
+            stroke: Some(stroke),
         }),
     );
 }
 
 fn spaceport_color(state: &SpacewarsState, planet: &PlanetState) -> RenderColor {
+    if let Some(ship) = landing_ship(state, planet) {
+        let player_color = render_color(state.players[ship.owner_id].color);
+        if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {
+            let progress = capture_progress(planet);
+            if progress > 0.0 {
+                return blend_color(
+                    RenderColor::rgba(1.0, 1.0, 1.0, 0.82),
+                    with_alpha(player_color, 0.82),
+                    progress,
+                );
+            }
+        } else if planet.owner_id == Some(ship.owner_id) && ship.form == ShipForm::EscapePod {
+            let progress = rebuild_progress(planet);
+            if progress > 0.0 {
+                return blend_color(
+                    with_alpha(dim(player_color, 0.55), 0.82),
+                    with_alpha(player_color, 0.92),
+                    progress,
+                );
+            }
+        }
+    }
+
     planet
         .owner_id
         .and_then(|owner| state.players.get(owner))
         .map(|player| with_alpha(render_color(player.color), 0.82))
         .unwrap_or(RenderColor::rgba(1.0, 1.0, 1.0, 0.82))
+}
+
+fn spaceport_feedback_stroke(state: &SpacewarsState, planet: &PlanetState) -> Option<Stroke> {
+    let ship = landing_ship(state, planet)?;
+    let player_color = render_color(state.players[ship.owner_id].color);
+    let progress = if planet.owner_id == Some(ship.owner_id) && ship.form == ShipForm::EscapePod {
+        rebuild_progress(planet)
+    } else if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {
+        capture_progress(planet)
+    } else {
+        0.0
+    };
+
+    let width = 1.25 + progress * 1.25;
+    Some(Stroke::new(with_alpha(player_color, 0.95), width))
+}
+
+fn landing_ship<'a>(state: &'a SpacewarsState, planet: &PlanetState) -> Option<&'a ShipState> {
+    planet
+        .landing_ship
+        .and_then(|ship_index| state.ships.get(ship_index))
+}
+
+fn capture_progress(planet: &PlanetState) -> f32 {
+    (planet.taking_ownership_time / PLANET_CAPTURE_SECS).clamp(0.0, 1.0)
+}
+
+fn rebuild_progress(planet: &PlanetState) -> f32 {
+    (planet.building_new_ship_time / POD_REBUILD_SECS).clamp(0.0, 1.0)
+}
+
+fn blend_color(from: RenderColor, to: RenderColor, t: f32) -> RenderColor {
+    let t = t.clamp(0.0, 1.0);
+    RenderColor::rgba(
+        from.r + (to.r - from.r) * t,
+        from.g + (to.g - from.g) * t,
+        from.b + (to.b - from.b) * t,
+        from.a + (to.a - from.a) * t,
+    )
 }
 
 fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
@@ -4950,6 +5027,78 @@ mod tests {
         assert_close(actual.g, expected.g);
         assert_close(actual.b, expected.b);
         assert_close(actual.a, 0.82);
+    }
+
+    #[test]
+    fn capturing_spaceport_tints_toward_landing_player_color() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].landing_ship = Some(0);
+        state.planets[0].taking_ownership_time = PLANET_CAPTURE_SECS * 0.5;
+        let player_color = render_color(state.players[0].color);
+        let expected = blend_color(
+            RenderColor::rgba(1.0, 1.0, 1.0, 0.82),
+            with_alpha(player_color, 0.82),
+            0.5,
+        );
+
+        let actual = spaceport_color(&state, &state.planets[0]);
+
+        assert_close(actual.r, expected.r);
+        assert_close(actual.g, expected.g);
+        assert_close(actual.b, expected.b);
+        assert_close(actual.a, expected.a);
+    }
+
+    #[test]
+    fn rebuilding_pod_tints_owned_spaceport_by_rebuild_progress() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        state.planets[0].landing_ship = Some(0);
+        state.planets[0].building_new_ship_time = POD_REBUILD_SECS * 0.5;
+        state.ships[0].change_to_escape_pod();
+        let player_color = render_color(state.players[0].color);
+        let expected = blend_color(
+            with_alpha(dim(player_color, 0.55), 0.82),
+            with_alpha(player_color, 0.92),
+            0.5,
+        );
+
+        let actual = spaceport_color(&state, &state.planets[0]);
+
+        assert_close(actual.r, expected.r);
+        assert_close(actual.g, expected.g);
+        assert_close(actual.b, expected.b);
+        assert_close(actual.a, expected.a);
+    }
+
+    #[test]
+    fn landed_spaceport_renders_feedback_outline() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].landing_ship = Some(0);
+        let frame = SpacewarsScenario::render_frame(&state);
+        let feedback_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == SPACEPORT_FEEDBACK_LAYER)
+            .expect("landing feedback layer should be present");
+
+        assert_eq!(feedback_layer.primitives.len(), 1);
+        let RenderPrimitive::Polygon(polygon) = &feedback_layer.primitives[0] else {
+            panic!("feedback primitive should be a polygon");
+        };
+        let stroke = polygon
+            .stroke
+            .expect("feedback polygon should render as an outline");
+
+        assert!(polygon.fill.is_none());
+        assert_close(stroke.color.r, state.players[0].color.r);
+        assert_close(stroke.color.g, state.players[0].color.g);
+        assert_close(stroke.color.b, state.players[0].color.b);
+        assert_close(stroke.color.a, 0.95);
+        assert_close(stroke.width, 1.25);
     }
 
     #[test]

@@ -117,6 +117,9 @@ export component MainWindow inherits Window {
     in property <string> planet-score-label: "";
     in property <float> p1-planet-fraction: 0;
     in property <float> p2-planet-fraction: 0;
+    in property <string> p1-planet-score-text: "";
+    in property <string> free-planet-score-text: "";
+    in property <string> p2-planet-score-text: "";
     in property <string> spacewars-message-text: "";
     in property <string> spacewars-performance-text: "";
 
@@ -199,6 +202,42 @@ export component MainWindow inherits Window {
                 x: parent.width - self.width - 1px;
                 height: parent.height - 2px;
                 background: root.p2-color;
+            }
+
+            Text {
+                x: 1px;
+                y: 0px;
+                width: (parent.width - 2px) * root.p1-planet-fraction;
+                height: parent.height;
+                text: root.p1-planet-score-text;
+                color: #050514;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 1px + (parent.width - 2px) * root.p1-planet-fraction;
+                y: 0px;
+                width: (parent.width - 2px) * (1.0 - root.p1-planet-fraction - root.p2-planet-fraction);
+                height: parent.height;
+                text: root.free-planet-score-text;
+                color: #050514;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                y: 0px;
+                width: (parent.width - 2px) * root.p2-planet-fraction;
+                x: parent.width - self.width - 1px;
+                height: parent.height;
+                text: root.p2-planet-score-text;
+                color: #050514;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
         }
 

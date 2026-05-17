@@ -708,6 +708,9 @@ struct SpacewarsPanelState {
     planet_score_label: String,
     player_1_planet_fraction: f32,
     player_2_planet_fraction: f32,
+    player_1_planet_score: String,
+    free_planet_score: String,
+    player_2_planet_score: String,
     message_text: String,
     performance_text: String,
 }
@@ -839,8 +842,19 @@ fn spacewars_panel_state(
         ),
         player_1_planet_fraction: player_1_planets as f32 / total_planets,
         player_2_planet_fraction: player_2_planets as f32 / total_planets,
+        player_1_planet_score: planet_score_text(player_1_planets),
+        free_planet_score: planet_score_text(free_planets),
+        player_2_planet_score: planet_score_text(player_2_planets),
         message_text: spacewars_panel_message(state, paused, benchmark_active),
         performance_text: performance_text.into(),
+    }
+}
+
+fn planet_score_text(count: usize) -> String {
+    if count == 0 {
+        String::new()
+    } else {
+        count.to_string()
     }
 }
 
@@ -917,6 +931,9 @@ fn set_spacewars_panel(window: &MainWindow, state: Option<SpacewarsPanelState>) 
     window.set_planet_score_label(SharedString::from(state.planet_score_label));
     window.set_p1_planet_fraction(state.player_1_planet_fraction);
     window.set_p2_planet_fraction(state.player_2_planet_fraction);
+    window.set_p1_planet_score_text(SharedString::from(state.player_1_planet_score));
+    window.set_free_planet_score_text(SharedString::from(state.free_planet_score));
+    window.set_p2_planet_score_text(SharedString::from(state.player_2_planet_score));
     window.set_spacewars_message_text(SharedString::from(state.message_text));
     window.set_spacewars_performance_text(SharedString::from(state.performance_text));
 }
@@ -1041,6 +1058,9 @@ mod tests {
         );
         assert_eq!(panel.player_1_planet_fraction, 1.0 / total_planets);
         assert_eq!(panel.player_2_planet_fraction, 2.0 / total_planets);
+        assert_eq!(panel.player_1_planet_score, "1");
+        assert_eq!(panel.free_planet_score, free_planets.to_string());
+        assert_eq!(panel.player_2_planet_score, "2");
     }
 
     #[test]
