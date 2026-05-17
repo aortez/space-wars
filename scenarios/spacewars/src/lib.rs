@@ -33,7 +33,6 @@ const PARTICLE_LAYER: i32 = 3;
 const BOUNDS_HIGH_LAYER: i32 = 4;
 const BOUNDS_LOW_LAYER: i32 = 5;
 const LABEL_LAYER: i32 = 10;
-const HUD_LAYER: i32 = 20;
 
 const MAX_PLANETS: usize = 99;
 const SUN_RADIUS: f32 = 200.0;
@@ -55,12 +54,6 @@ const PLANET_CAPTURE_SECS: f32 = 4.0;
 const POD_REBUILD_SECS: f32 = 8.0;
 const OWNED_SPACEPORT_HEAL_PER_SEC: f32 = 3.0;
 const PLAYER_VIEW_HEIGHT: f32 = 320.0;
-const HUD_TOP_MARGIN: f32 = 8.0;
-const HUD_LINE_GAP: f32 = 9.0;
-const HUD_PANEL_WIDTH: f32 = 92.0;
-const HUD_TEXT_BACKDROP_HEIGHT: f32 = 5.5;
-const HUD_BAR_WIDTH: f32 = 72.0;
-const HUD_BAR_HEIGHT: f32 = 3.0;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
 const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
@@ -725,10 +718,15 @@ impl SpacewarsState {
 impl SpacewarsScenario {
     pub fn render_player_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
         (0..state.ships.len())
-            .map(|player| {
-                render_state_with_camera(state, player_camera(state, player), Some(player))
-            })
+            .map(|player| render_state_with_camera(state, player_camera(state, player), true))
             .collect()
+    }
+
+    pub fn render_local_play_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
+        let mut frames = Self::render_player_frames(state);
+        frames.push(render_overview_state(state));
+        frames.push(render_overview_state(state));
+        frames
     }
 }
 
@@ -3071,7 +3069,17 @@ fn render_state(state: &SpacewarsState) -> RenderFrame {
     render_state_with_camera(
         state,
         Camera2::new(render_point(center), radius * 2.2),
-        None,
+        true,
+    )
+}
+
+fn render_overview_state(state: &SpacewarsState) -> RenderFrame {
+    let radius = state.config.universe_radius as f32;
+    let center = Vec2::new(radius, radius);
+    render_state_with_camera(
+        state,
+        Camera2::new(render_point(center), radius * 2.2),
+        false,
     )
 }
 
@@ -3087,7 +3095,7 @@ fn player_camera(state: &SpacewarsState, player: usize) -> Camera2 {
 fn render_state_with_camera(
     state: &SpacewarsState,
     camera: Camera2,
-    hud_player: Option<usize>,
+    show_ship_labels: bool,
 ) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
@@ -3146,12 +3154,10 @@ fn render_state_with_camera(
 
     render_particles(&mut frame, state);
 
-    for ship in &state.ships {
-        render_ship_label(&mut frame, state, ship);
-    }
-
-    if let Some(player) = hud_player {
-        render_player_hud(&mut frame, state, player);
+    if show_ship_labels {
+        for ship in &state.ships {
+            render_ship_label(&mut frame, state, ship);
+        }
     }
 
     frame
@@ -3459,209 +3465,6 @@ fn render_ship_label(frame: &mut RenderFrame, state: &SpacewarsState, ship: &Shi
     text.size = 14.0;
     text.anchor = TextAnchor::Center;
     frame.push_primitive(LABEL_LAYER, RenderPrimitive::Text(text));
-}
-
-fn render_player_hud(frame: &mut RenderFrame, state: &SpacewarsState, player_index: usize) {
-    let Some(player) = state.players.get(player_index) else {
-        return;
-    };
-    let Some(ship) = state.ships.get(player_index) else {
-        return;
-    };
-
-    let center = Vec2::new(frame.camera.center.x, frame.camera.center.y);
-    let top = center.y + frame.camera.height * 0.5 - HUD_TOP_MARGIN;
-    let status_position = Vec2::new(center.x, top);
-    let bar_position = Vec2::new(center.x, top - HUD_LINE_GAP);
-    let score_position = Vec2::new(center.x, top - HUD_LINE_GAP * 2.0);
-    let score_bar_position = Vec2::new(center.x, top - HUD_LINE_GAP * 3.0);
-
-    render_hud_text_backdrop(frame, status_position);
-    push_hud_text(
-        frame,
-        status_position,
-        format!(
-            "{} | {} | Planets {}",
-            player.name,
-            ship_status_text(ship),
-            player.planet_count
-        ),
-        with_alpha(render_color(player.color), 0.95),
-        14.0,
-    );
-    render_hud_bar(
-        frame,
-        bar_position,
-        HUD_BAR_WIDTH,
-        HUD_BAR_HEIGHT,
-        ship_life_fraction(ship),
-        with_alpha(render_color(player.color), 0.85),
-    );
-
-    let player_1_planets = state.players[0].planet_count;
-    let player_2_planets = state.players[1].planet_count;
-    let free_planets = state
-        .planets
-        .len()
-        .saturating_sub(player_1_planets + player_2_planets);
-    render_hud_text_backdrop(frame, score_position);
-    push_hud_text(
-        frame,
-        score_position,
-        format!("Planets P1 {player_1_planets} | Free {free_planets} | P2 {player_2_planets}"),
-        RenderColor::rgba(0.9, 0.94, 0.98, 0.9),
-        12.0,
-    );
-    render_planet_score_bar(frame, state, score_bar_position);
-}
-
-fn ship_status_text(ship: &ShipState) -> String {
-    let percent = display_percent(ship_life_fraction(ship));
-
-    match ship.form {
-        ShipForm::Ship => format!("Ship {percent}%"),
-        ShipForm::EscapePod => format!("Pod rebuild {percent}%"),
-    }
-}
-
-fn ship_life_fraction(ship: &ShipState) -> f32 {
-    if ship.life_max <= 0.0 {
-        return 0.0;
-    }
-
-    (ship.life / ship.life_max).clamp(0.0, 1.0)
-}
-
-fn display_percent(fraction: f32) -> u32 {
-    (fraction.clamp(0.0, 1.0) * 100.0).round() as u32
-}
-
-fn push_hud_text(
-    frame: &mut RenderFrame,
-    position: Vec2,
-    label: impl Into<String>,
-    color: RenderColor,
-    size: f32,
-) {
-    let mut text = RenderText::new(render_point(position), label);
-    text.color = color;
-    text.size = size;
-    text.anchor = TextAnchor::Center;
-    frame.push_primitive(HUD_LAYER, RenderPrimitive::Text(text));
-}
-
-fn render_hud_text_backdrop(frame: &mut RenderFrame, center: Vec2) {
-    let half_width = HUD_PANEL_WIDTH * 0.5;
-    let half_height = HUD_TEXT_BACKDROP_HEIGHT * 0.5;
-    push_rect(
-        frame,
-        Vec2::new(center.x - half_width, center.y - half_height),
-        Vec2::new(center.x + half_width, center.y + half_height),
-        Some(RenderColor::rgba(0.02, 0.025, 0.035, 0.58)),
-        None,
-    );
-}
-
-fn render_hud_bar(
-    frame: &mut RenderFrame,
-    center: Vec2,
-    width: f32,
-    height: f32,
-    fraction: f32,
-    fill: RenderColor,
-) {
-    let left = center.x - width * 0.5;
-    let right = center.x + width * 0.5;
-    let bottom = center.y - height * 0.5;
-    let top = center.y + height * 0.5;
-    let fill_right = left + width * fraction.clamp(0.0, 1.0);
-
-    push_rect(
-        frame,
-        Vec2::new(left, bottom),
-        Vec2::new(right, top),
-        Some(RenderColor::rgba(0.03, 0.04, 0.05, 0.72)),
-        None,
-    );
-    push_rect(
-        frame,
-        Vec2::new(left, bottom),
-        Vec2::new(fill_right, top),
-        Some(fill),
-        None,
-    );
-    push_rect(
-        frame,
-        Vec2::new(left, bottom),
-        Vec2::new(right, top),
-        None,
-        Some(Stroke::new(RenderColor::rgba(0.9, 0.94, 0.98, 0.9), 0.75)),
-    );
-}
-
-fn render_planet_score_bar(frame: &mut RenderFrame, state: &SpacewarsState, center: Vec2) {
-    let total_planets = state.planets.len().max(1) as f32;
-    let left = center.x - HUD_BAR_WIDTH * 0.5;
-    let right = center.x + HUD_BAR_WIDTH * 0.5;
-    let bottom = center.y - HUD_BAR_HEIGHT * 0.5;
-    let top = center.y + HUD_BAR_HEIGHT * 0.5;
-    let player_1_width = HUD_BAR_WIDTH * state.players[0].planet_count as f32 / total_planets;
-    let player_2_width = HUD_BAR_WIDTH * state.players[1].planet_count as f32 / total_planets;
-
-    push_rect(
-        frame,
-        Vec2::new(left, bottom),
-        Vec2::new(right, top),
-        Some(RenderColor::rgba(0.35, 0.37, 0.4, 0.78)),
-        None,
-    );
-    if player_1_width > 0.0 {
-        push_rect(
-            frame,
-            Vec2::new(left, bottom),
-            Vec2::new(left + player_1_width, top),
-            Some(with_alpha(render_color(state.players[0].color), 0.85)),
-            None,
-        );
-    }
-    if player_2_width > 0.0 {
-        push_rect(
-            frame,
-            Vec2::new(right - player_2_width, bottom),
-            Vec2::new(right, top),
-            Some(with_alpha(render_color(state.players[1].color), 0.85)),
-            None,
-        );
-    }
-    push_rect(
-        frame,
-        Vec2::new(left, bottom),
-        Vec2::new(right, top),
-        None,
-        Some(Stroke::new(RenderColor::rgba(0.9, 0.94, 0.98, 0.9), 0.75)),
-    );
-}
-
-fn push_rect(
-    frame: &mut RenderFrame,
-    min: Vec2,
-    max: Vec2,
-    fill: Option<RenderColor>,
-    stroke: Option<Stroke>,
-) {
-    frame.push_primitive(
-        HUD_LAYER,
-        RenderPrimitive::Polygon(RenderPolygon {
-            points: vec![
-                render_point(Vec2::new(min.x, min.y)),
-                render_point(Vec2::new(max.x, min.y)),
-                render_point(Vec2::new(max.x, max.y)),
-                render_point(Vec2::new(min.x, max.y)),
-            ],
-            fill: fill.map(Fill::new),
-            stroke,
-        }),
-    );
 }
 
 fn push_filled_polygon(
@@ -5785,61 +5588,28 @@ mod tests {
         );
         assert_eq!(frames[0].camera.height, PLAYER_VIEW_HEIGHT);
         assert_eq!(frames[1].camera.height, PLAYER_VIEW_HEIGHT);
-        assert!(frames[0].layers.iter().any(|layer| layer.z == HUD_LAYER));
-        assert!(
-            SpacewarsScenario::render_frame(&state)
-                .layers
-                .iter()
-                .all(|layer| layer.z != HUD_LAYER)
-        );
     }
 
     #[test]
-    fn player_render_frames_include_status_hud() {
-        let mut state = init_deathmatch_no_asteroids();
-        state.planets = vec![
-            test_planet(Vec2::new(420.0, 450.0), 50.0),
-            test_planet(Vec2::new(500.0, 450.0), 50.0),
-        ];
-        state.planets[0].owner_id = Some(0);
-        state.planets[1].owner_id = Some(1);
-        refresh_player_planet_counts(&mut state);
-        state.ships[0].life = 25.0;
+    fn local_play_frames_include_player_views_and_world_overviews() {
+        let state = init_default(123);
+        let frames = SpacewarsScenario::render_local_play_frames(&state);
 
-        let frames = SpacewarsScenario::render_player_frames(&state);
-        let labels = text_values(&frames[0]);
-        let hud_layer = frames[0]
-            .layers
-            .iter()
-            .find(|layer| layer.z == HUD_LAYER)
-            .expect("player frame should include HUD layer");
-
-        assert!(labels.contains(&"Player 1 | Ship 50% | Planets 1".to_string()));
-        assert!(labels.contains(&"Planets P1 1 | Free 0 | P2 1".to_string()));
-        assert!(
-            hud_layer
-                .primitives
-                .iter()
-                .any(|primitive| matches!(primitive, RenderPrimitive::Text(_)))
+        assert_eq!(frames.len(), 4);
+        assert_eq!(
+            frames[0].camera.center,
+            render_point(state.ships[0].position)
         );
-        assert!(
-            hud_layer
-                .primitives
-                .iter()
-                .any(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+        assert_eq!(
+            frames[1].camera.center,
+            render_point(state.ships[1].position)
         );
-    }
-
-    #[test]
-    fn player_hud_shows_escape_pod_rebuild_progress() {
-        let mut state = init_deathmatch_no_asteroids();
-        state.ships[0].change_to_escape_pod();
-        state.ships[0].set_escape_pod_rebuild_progress(0.25);
-
-        let frames = SpacewarsScenario::render_player_frames(&state);
-        let labels = text_values(&frames[0]);
-
-        assert!(labels.contains(&"Player 1 | Pod rebuild 25% | Planets 0".to_string()));
+        assert_eq!(frames[0].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[1].camera.height, PLAYER_VIEW_HEIGHT);
+        assert_eq!(frames[2].camera.center, RenderPoint::new(1200.0, 1200.0));
+        assert_eq!(frames[3].camera, frames[2].camera);
+        assert_eq!(text_values(&frames[2]), Vec::<String>::new());
+        assert_eq!(text_values(&frames[3]), Vec::<String>::new());
     }
 
     #[test]

@@ -19,6 +19,14 @@ use crate::{PrimitiveKind, ScenePrimitive};
 const TRANSPARENT: RenderColor = RenderColor::CLEAR;
 const DEFAULT_VIEWPORT_WIDTH: f32 = 1280.0;
 const DEFAULT_VIEWPORT_HEIGHT: f32 = 720.0;
+const SPACEWARS_TOP_ROW_HEIGHT_RATIO: f32 = 0.58;
+const SPACEWARS_CENTER_PANEL_WIDTH_RATIO: f32 = 0.28;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameLayout {
+    EqualHorizontal,
+    SpacewarsLocalPlay,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Viewport {
@@ -83,6 +91,15 @@ pub fn scene_primitives_from_frames(
     frames: &[RenderFrame],
     viewport: Viewport,
 ) -> Vec<ScenePrimitive> {
+    scene_primitives_from_frames_with_layout(frames, viewport, FrameLayout::EqualHorizontal)
+}
+
+/// Convert scenario frames into ordered Slint scene primitives using a client layout.
+pub fn scene_primitives_from_frames_with_layout(
+    frames: &[RenderFrame],
+    viewport: Viewport,
+    layout: FrameLayout,
+) -> Vec<ScenePrimitive> {
     if frames.is_empty() {
         return Vec::new();
     }
@@ -93,13 +110,61 @@ pub fn scene_primitives_from_frames(
 
     frames
         .iter()
-        .zip(
-            viewport
-                .with_default_if_empty()
-                .split_horizontally(frames.len()),
-        )
+        .zip(frame_viewports(
+            viewport.with_default_if_empty(),
+            frames.len(),
+            layout,
+        ))
         .flat_map(|(frame, viewport)| scene_primitives_from_frame(frame, viewport))
         .collect()
+}
+
+fn frame_viewports(viewport: Viewport, count: usize, layout: FrameLayout) -> Vec<Viewport> {
+    match layout {
+        FrameLayout::EqualHorizontal => viewport.split_horizontally(count),
+        FrameLayout::SpacewarsLocalPlay => {
+            if count < 4 {
+                return viewport.split_horizontally(count);
+            }
+
+            let top_height = viewport.height * SPACEWARS_TOP_ROW_HEIGHT_RATIO;
+            let bottom_height = viewport.height - top_height;
+            let top_width = viewport.width * 0.5;
+            let center_width = viewport.width * SPACEWARS_CENTER_PANEL_WIDTH_RATIO;
+            let side_width = (viewport.width - center_width) * 0.5;
+            let bottom_y = viewport.y + top_height;
+
+            let mut viewports = vec![
+                Viewport::with_origin(viewport.x, viewport.y, top_width, top_height),
+                Viewport::with_origin(viewport.x + top_width, viewport.y, top_width, top_height),
+                Viewport::with_origin(viewport.x, bottom_y, side_width, bottom_height),
+                Viewport::with_origin(
+                    viewport.x + side_width + center_width,
+                    bottom_y,
+                    side_width,
+                    bottom_height,
+                ),
+            ];
+
+            if count > viewports.len() {
+                viewports.extend(
+                    viewport
+                        .split_horizontally(count - viewports.len())
+                        .into_iter()
+                        .map(|extra| {
+                            Viewport::with_origin(
+                                extra.x,
+                                extra.y + viewport.height,
+                                extra.width,
+                                extra.height,
+                            )
+                        }),
+                );
+            }
+
+            viewports
+        }
+    }
 }
 
 /// Convert a scenario frame into ordered Slint scene primitives.
@@ -505,6 +570,46 @@ mod tests {
         assert_close(primitives[1].y, 0.0);
         assert_close(primitives[1].width, 100.0);
         assert_close(primitives[1].height, 100.0);
+    }
+
+    #[test]
+    fn spacewars_local_play_layout_uses_original_style_viewport_bands() {
+        let frames = [
+            frame_with_triangle(RenderColor::RED),
+            frame_with_triangle(RenderColor::GREEN),
+            frame_with_triangle(RenderColor::BLUE),
+            frame_with_triangle(RenderColor::YELLOW),
+        ];
+
+        let primitives = scene_primitives_from_frames_with_layout(
+            &frames,
+            Viewport::new(1000.0, 700.0),
+            FrameLayout::SpacewarsLocalPlay,
+        );
+
+        assert_eq!(primitives.len(), 4);
+        assert_close(primitives[0].x, 0.0);
+        assert_close(primitives[0].y, 0.0);
+        assert_close(primitives[0].width, 500.0);
+        assert_close(primitives[0].height, 406.0);
+        assert_close(primitives[1].x, 500.0);
+        assert_close(primitives[1].y, 0.0);
+        assert_close(primitives[1].width, 500.0);
+        assert_close(primitives[1].height, 406.0);
+        assert_close(primitives[2].x, 0.0);
+        assert_close(primitives[2].y, 406.0);
+        assert_close(primitives[2].width, 360.0);
+        assert_close(primitives[2].height, 294.0);
+        assert_close(primitives[3].x, 640.0);
+        assert_close(primitives[3].y, 406.0);
+        assert_close(primitives[3].width, 360.0);
+        assert_close(primitives[3].height, 294.0);
+    }
+
+    fn frame_with_triangle(color: RenderColor) -> RenderFrame {
+        let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        frame.push_primitive(0, triangle_at(0.0, color));
+        frame
     }
 
     #[test]

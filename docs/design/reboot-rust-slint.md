@@ -440,5 +440,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M15a: ✅ Add the ship death lifecycle foundation. A dead ship now emits breakup fragments, swaps into an escape pod, and the pod uses pod-specific geometry, damping, movement limits, no weapons, and no further damage death.
 - M15b: ✅ Add planet ownership/capture and owned-spaceport effects: ship healing, escape-pod rebuild progress, and pod-to-ship restoration after the original 8-second build timer.
 - M15c: ✅ Add player-visible status HUD in the split-screen render frames: ship health or pod rebuild progress, owned planet count, and an original-style three-part planet score bar.
+- M15d: ✅ Add the original-style local-play layout foundation in the client: two large player views across the top, two smaller world overview views below, and a reserved center-bottom panel area for later Slint health/score controls.
+- M15e: ✅ Move player health/rebuild and planet score out of scenario render frames into the reserved Slint center panel, leaving scenario frames focused on world rendering.
 - Add enough remaining UI/HUD to support local two-player arcade play.
 - Acceptance: local two-player arcade mode is playable end-to-end with default config.

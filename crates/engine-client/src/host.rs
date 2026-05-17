@@ -4,10 +4,12 @@ use std::fmt;
 use std::time::{Duration, Instant};
 
 use engine_common::{Action, RenderFrame, Scenario, StepResult, TickModel};
-use engine_core::SpacewarsConfig;
+use engine_core::{Color as CoreColor, SpacewarsConfig};
 use scenario_null::{NullConfig, NullScenario};
-use scenario_spacewars::SpacewarsScenario;
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use scenario_spacewars::{ShipForm, SpacewarsScenario, SpacewarsState};
+use slint::{
+    Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
+};
 
 use crate::MainWindow;
 use crate::input::{self, ClientInput};
@@ -59,6 +61,8 @@ pub fn is_known_scenario(name: &str) -> bool {
 }
 
 pub fn start_debug_render_loop(window: &MainWindow, stress_triangles: usize) -> Timer {
+    set_spacewars_panel(window, None);
+
     let timer = Timer::default();
     let weak_window = window.as_weak();
     let start = Instant::now();
@@ -121,7 +125,8 @@ pub fn start_scenario_loop(
             &mut accumulator,
             &mut input,
         );
-        present_frames(&window, scenario.render_frames());
+        set_spacewars_panel(&window, scenario.spacewars_panel_state());
+        present_frames(&window, scenario.render_frames(), scenario.frame_layout());
     });
 
     Ok(timer)
@@ -165,12 +170,19 @@ fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
 }
 
 fn present_frame(window: &MainWindow, frame: RenderFrame) -> usize {
-    present_frames(window, vec![frame])
+    present_frames(window, vec![frame], render::FrameLayout::EqualHorizontal)
 }
 
-fn present_frames(window: &MainWindow, frames: Vec<RenderFrame>) -> usize {
-    let primitives =
-        render::scene_primitives_from_frames(&frames, Viewport::from_window(window.window()));
+fn present_frames(
+    window: &MainWindow,
+    frames: Vec<RenderFrame>,
+    layout: render::FrameLayout,
+) -> usize {
+    let primitives = render::scene_primitives_from_frames_with_layout(
+        &frames,
+        Viewport::from_window(window.window()),
+        layout,
+    );
     let scene_item_count = primitives.len();
     window.set_primitives(ModelRc::new(VecModel::from(primitives)));
     window.window().request_redraw();
@@ -180,6 +192,23 @@ fn present_frames(window: &MainWindow, frames: Vec<RenderFrame>) -> usize {
 pub(crate) enum HostedScenario {
     Null(<NullScenario as Scenario>::State),
     Spacewars(Box<<SpacewarsScenario as Scenario>::State>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct SpacewarsPanelState {
+    player_1: PlayerPanelState,
+    player_2: PlayerPanelState,
+    planet_score_label: String,
+    player_1_planet_fraction: f32,
+    player_2_planet_fraction: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct PlayerPanelState {
+    name: String,
+    status: String,
+    status_fraction: f32,
+    color: CoreColor,
 }
 
 impl HostedScenario {
@@ -225,9 +254,102 @@ impl HostedScenario {
     pub(crate) fn render_frames(&self) -> Vec<RenderFrame> {
         match self {
             Self::Null(state) => vec![NullScenario::render_frame(state)],
-            Self::Spacewars(state) => SpacewarsScenario::render_player_frames(state),
+            Self::Spacewars(state) => SpacewarsScenario::render_local_play_frames(state),
         }
     }
+
+    pub(crate) fn frame_layout(&self) -> render::FrameLayout {
+        match self {
+            Self::Null(_) => render::FrameLayout::EqualHorizontal,
+            Self::Spacewars(_) => render::FrameLayout::SpacewarsLocalPlay,
+        }
+    }
+
+    fn spacewars_panel_state(&self) -> Option<SpacewarsPanelState> {
+        match self {
+            Self::Null(_) => None,
+            Self::Spacewars(state) => Some(spacewars_panel_state(state)),
+        }
+    }
+}
+
+fn spacewars_panel_state(state: &SpacewarsState) -> SpacewarsPanelState {
+    let player_1_planets = state.players[0].planet_count;
+    let player_2_planets = state.players[1].planet_count;
+    let free_planets = state
+        .planets
+        .len()
+        .saturating_sub(player_1_planets + player_2_planets);
+    let total_planets = state.planets.len().max(1) as f32;
+
+    SpacewarsPanelState {
+        player_1: player_panel_state(state, 0),
+        player_2: player_panel_state(state, 1),
+        planet_score_label: format!(
+            "Planets  P1 {player_1_planets} | Free {free_planets} | P2 {player_2_planets}"
+        ),
+        player_1_planet_fraction: player_1_planets as f32 / total_planets,
+        player_2_planet_fraction: player_2_planets as f32 / total_planets,
+    }
+}
+
+fn player_panel_state(state: &SpacewarsState, player_index: usize) -> PlayerPanelState {
+    let player = &state.players[player_index];
+    let ship = &state.ships[player_index];
+    let status_fraction = ship_life_fraction(ship.life, ship.life_max);
+    let percent = display_percent(status_fraction);
+    let label = match ship.form {
+        ShipForm::Ship => "Ship Health",
+        ShipForm::EscapePod => "Pod Rebuild",
+    };
+
+    PlayerPanelState {
+        name: format!("Player {}: {}", player.id + 1, player.name),
+        status: format!("{label}: {percent}%"),
+        status_fraction,
+        color: player.color,
+    }
+}
+
+fn ship_life_fraction(life: f32, life_max: f32) -> f32 {
+    if life_max <= 0.0 {
+        return 0.0;
+    }
+
+    (life / life_max).clamp(0.0, 1.0)
+}
+
+fn display_percent(fraction: f32) -> u32 {
+    (fraction.clamp(0.0, 1.0) * 100.0).round() as u32
+}
+
+fn set_spacewars_panel(window: &MainWindow, state: Option<SpacewarsPanelState>) {
+    let Some(state) = state else {
+        window.set_spacewars_ui_visible(false);
+        return;
+    };
+
+    window.set_spacewars_ui_visible(true);
+    window.set_p1_name(SharedString::from(state.player_1.name));
+    window.set_p1_status(SharedString::from(state.player_1.status));
+    window.set_p1_status_fraction(state.player_1.status_fraction);
+    window.set_p1_color(brush_from_core_color(state.player_1.color));
+    window.set_p2_name(SharedString::from(state.player_2.name));
+    window.set_p2_status(SharedString::from(state.player_2.status));
+    window.set_p2_status_fraction(state.player_2.status_fraction);
+    window.set_p2_color(brush_from_core_color(state.player_2.color));
+    window.set_planet_score_label(SharedString::from(state.planet_score_label));
+    window.set_p1_planet_fraction(state.player_1_planet_fraction);
+    window.set_p2_planet_fraction(state.player_2_planet_fraction);
+}
+
+fn brush_from_core_color(color: CoreColor) -> Brush {
+    Brush::SolidColor(SlintColor::from_argb_f32(
+        color.a.clamp(0.0, 1.0),
+        color.r.clamp(0.0, 1.0),
+        color.g.clamp(0.0, 1.0),
+        color.b.clamp(0.0, 1.0),
+    ))
 }
 
 #[cfg(test)]
@@ -250,6 +372,7 @@ mod tests {
         let scenario = HostedScenario::new("null", 0).unwrap();
 
         assert!(scenario.render_frame().layers.is_empty());
+        assert_eq!(scenario.spacewars_panel_state(), None);
     }
 
     #[test]
@@ -273,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn spacewars_scenario_renders_player_centered_frames_for_client() {
+    fn spacewars_scenario_renders_original_style_local_play_frames_for_client() {
         let scenario = HostedScenario::new("spacewars", 0).unwrap();
         let frames = scenario.render_frames();
 
@@ -281,11 +404,48 @@ mod tests {
             panic!("spacewars scenario should not host null");
         };
 
-        assert_eq!(frames.len(), 2);
+        assert_eq!(frames.len(), 4);
         assert_eq!(frames[0].camera.center.x, state.ships[0].position.x);
         assert_eq!(frames[0].camera.center.y, state.ships[0].position.y);
         assert_eq!(frames[1].camera.center.x, state.ships[1].position.x);
         assert_eq!(frames[1].camera.center.y, state.ships[1].position.y);
         assert_eq!(frames[0].camera.height, frames[1].camera.height);
+        assert_eq!(frames[2].camera.center.x, 1200.0);
+        assert_eq!(frames[2].camera.center.y, 1200.0);
+        assert_eq!(frames[3].camera, frames[2].camera);
+        assert_eq!(
+            scenario.frame_layout(),
+            render::FrameLayout::SpacewarsLocalPlay
+        );
+    }
+
+    #[test]
+    fn spacewars_panel_state_reports_health_pod_and_planet_score() {
+        let mut scenario = HostedScenario::new("spacewars", 0).unwrap();
+        let HostedScenario::Spacewars(state) = &mut scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        let total_planets = state.planets.len().max(1) as f32;
+        state.ships[0].life = state.ships[0].life_max * 0.5;
+        state.ships[1].form = ShipForm::EscapePod;
+        state.ships[1].life = state.ships[1].life_max * 0.25;
+        state.players[0].planet_count = 1;
+        state.players[1].planet_count = 2;
+        let free_planets = state.planets.len().saturating_sub(3);
+
+        let panel = spacewars_panel_state(state);
+
+        assert_eq!(panel.player_1.name, "Player 1: Player 1");
+        assert_eq!(panel.player_1.status, "Ship Health: 50%");
+        assert_eq!(panel.player_1.status_fraction, 0.5);
+        assert_eq!(panel.player_2.name, "Player 2: Player 2");
+        assert_eq!(panel.player_2.status, "Pod Rebuild: 25%");
+        assert_eq!(panel.player_2.status_fraction, 0.25);
+        assert_eq!(
+            panel.planet_score_label,
+            format!("Planets  P1 1 | Free {free_planets} | P2 2")
+        );
+        assert_eq!(panel.player_1_planet_fraction, 1.0 / total_planets);
+        assert_eq!(panel.player_2_planet_fraction, 2.0 / total_planets);
     }
 }
