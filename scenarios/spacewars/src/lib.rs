@@ -1,8 +1,8 @@
 //! Initial Spacewars scenario port.
 //!
 //! Current slices cover deterministic sun/planet setup, ship controls, gravity,
-//! collision response, damage, debris, and asteroid spawning. Exhaust trails,
-//! weapons, sounds, pods, and scoring land in later slices.
+//! collision response, damage, debris, asteroids, and weapons. Exhaust trails,
+//! sounds, pods, and scoring land in later slices.
 
 use std::time::Duration;
 
@@ -21,6 +21,7 @@ use engine_core::{
     triangle_high_bounds, triangle_low_bound,
 };
 
+const STARFIELD_LAYER: i32 = -30;
 const WORLD_LAYER: i32 = -20;
 const SUN_LAYER: i32 = -15;
 const PLANET_LAYER: i32 = -10;
@@ -73,6 +74,12 @@ const ASTEROID_DAMAGE_SCALAR: f32 = 0.01;
 const ASTEROID_MAX_OMEGA: f32 = 10.0;
 const ASTEROID_GRAVITY_FRAME_MODULUS: u64 = 7;
 const ASTEROID_GRAVITY_SCALE: f32 = 7.0;
+const STARFIELD_RNG_SALT: u64 = 0x57A2_F13D_5EED_BA5E;
+const STARFIELD_DENSITY: f32 = 0.0025;
+const STARFIELD_COLOR_ROTATE_RATE: f32 = 0.02;
+const STARFIELD_COLOR_ROTATE_RANGE: f32 = 0.2;
+const STARFIELD_MAX_STARS: usize = 100_000;
+const STARFIELD_POINTS: usize = 3;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -137,6 +144,7 @@ pub struct SpacewarsState {
     pub debris: Vec<DebrisState>,
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
+    pub starfield: Option<StarFieldState>,
     pub laser_hits: Vec<LaserHit>,
     pub ship_collisions: Vec<ShipCollision>,
     pub ship_debris_collisions: Vec<ShipDebrisCollision>,
@@ -173,6 +181,18 @@ pub struct PlanetState {
     pub orbit_omega: f32,
     pub wrapper_angle: f32,
     pub wrapper_omega: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StarFieldState {
+    pub stars: Vec<StarState>,
+    pub base_color: Color,
+    pub color_theta: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StarState {
+    pub points: [Vec2; STARFIELD_POINTS],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -497,6 +517,7 @@ impl Scenario for SpacewarsScenario {
             ),
         ];
         let (sun, planets) = build_world(&config, seed);
+        let starfield = build_starfield(&config, seed);
 
         SpacewarsState {
             config,
@@ -507,6 +528,7 @@ impl Scenario for SpacewarsScenario {
             debris: Vec::new(),
             sun,
             planets,
+            starfield,
             laser_hits: Vec::new(),
             ship_collisions: Vec::new(),
             ship_debris_collisions: Vec::new(),
@@ -671,6 +693,48 @@ fn build_world(config: &SpacewarsConfig, seed: u64) -> (Option<SunState>, Vec<Pl
     }
 
     (Some(sun), planets)
+}
+
+fn build_starfield(config: &SpacewarsConfig, seed: u64) -> Option<StarFieldState> {
+    if !config.use_starfield {
+        return None;
+    }
+
+    let radius = config.universe_radius as f32;
+    let center = universe_center(radius);
+    let total_area = core::f32::consts::PI * radius * radius;
+    let mut area_filled = 0.0;
+    let mut rng = seeded_rng(seed ^ STARFIELD_RNG_SALT);
+    let base_color = Color::scale_255(
+        255.0,
+        150.0 + random_unit_f32(&mut rng) * 100.0,
+        150.0 + random_unit_f32(&mut rng) * 100.0,
+    )
+    .with_intensity(random_unit_f32(&mut rng) * 0.5 + 0.5);
+    let mut stars = Vec::new();
+
+    while area_filled / total_area < STARFIELD_DENSITY && stars.len() < STARFIELD_MAX_STARS {
+        let size = random_unit_f32(&mut rng).powf(3.0) * 0.5 + 1.2;
+        let angle = random_unit_f32(&mut rng) * core::f32::consts::TAU;
+        let distance = random_unit_f32(&mut rng) * (radius - size).max(0.0);
+        let position = center + Vec2::from_radians(angle) * distance;
+        let rotation = random_unit_f32(&mut rng) * core::f32::consts::PI;
+        let points = core::array::from_fn(|index| {
+            position
+                + Vec2::from_radians(
+                    rotation + core::f32::consts::TAU / STARFIELD_POINTS as f32 * index as f32,
+                ) * size
+        });
+
+        stars.push(StarState { points });
+        area_filled += core::f32::consts::TAU * size;
+    }
+
+    Some(StarFieldState {
+        stars,
+        base_color,
+        color_theta: 1.0,
+    })
 }
 
 fn random_color(rng: &mut SpacewarsRng) -> Color {
@@ -2029,6 +2093,8 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
     let center = Vec2::new(radius, radius);
     let mut frame = RenderFrame::new(camera);
 
+    render_starfield(&mut frame, state);
+
     frame.push_primitive(
         WORLD_LAYER,
         RenderPrimitive::Circle(RenderCircle {
@@ -2079,6 +2145,31 @@ fn render_state_with_camera(state: &SpacewarsState, camera: Camera2) -> RenderFr
     }
 
     frame
+}
+
+fn render_starfield(frame: &mut RenderFrame, state: &SpacewarsState) {
+    let Some(starfield) = &state.starfield else {
+        return;
+    };
+    let color = starfield_color(starfield, state.tick);
+
+    for star in &starfield.stars {
+        frame.push_primitive(
+            STARFIELD_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: star.points.into_iter().map(render_point).collect(),
+                fill: Some(Fill::new(color)),
+                stroke: None,
+            }),
+        );
+    }
+}
+
+fn starfield_color(starfield: &StarFieldState, tick: u64) -> RenderColor {
+    let intensity = 1.0 - STARFIELD_COLOR_ROTATE_RANGE * 0.5
+        + (starfield.color_theta + tick as f32 * STARFIELD_COLOR_ROTATE_RATE).sin()
+            * STARFIELD_COLOR_ROTATE_RANGE;
+    render_color(starfield.base_color.with_intensity(intensity))
 }
 
 fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
@@ -2385,6 +2476,15 @@ mod tests {
             .count()
     }
 
+    fn polygon_primitive_count(frame: &RenderFrame) -> usize {
+        frame
+            .layers
+            .iter()
+            .flat_map(|layer| &layer.primitives)
+            .filter(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+            .count()
+    }
+
     fn artifact_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -2628,6 +2728,14 @@ mod tests {
         assert_eq!(state.players[1].name, "Player 2");
         assert!(state.sun.is_none());
         assert!(state.planets.is_empty());
+        assert!(
+            !state
+                .starfield
+                .as_ref()
+                .expect("deathmatch keeps the original startup starfield enabled")
+                .stars
+                .is_empty()
+        );
         assert!(state.laser_hits.is_empty());
         assert!(state.ship_collisions.is_empty());
         assert!(state.ship_debris_collisions.is_empty());
@@ -2653,6 +2761,14 @@ mod tests {
         assert_close(sun.mass, body_mass(SUN_RADIUS));
         assert!(!state.planets.is_empty());
         assert!(state.planets.len() <= MAX_PLANETS);
+        assert!(
+            !state
+                .starfield
+                .as_ref()
+                .expect("default config should create a starfield")
+                .stars
+                .is_empty()
+        );
 
         for planet in &state.planets {
             assert!(planet.radius >= MIN_PLANET_RADIUS);
@@ -2674,7 +2790,38 @@ mod tests {
 
         assert_eq!(first.sun, replay.sun);
         assert_eq!(first.planets, replay.planets);
+        assert_eq!(first.starfield, replay.starfield);
         assert_ne!(first.planets, different.planets);
+        assert_ne!(first.starfield, different.starfield);
+    }
+
+    #[test]
+    fn starfield_generation_stays_inside_universe() {
+        let state = init_deathmatch();
+        let starfield = state
+            .starfield
+            .as_ref()
+            .expect("deathmatch should create a starfield");
+        let universe_radius = state.config.universe_radius as f32;
+        let center = universe_center(universe_radius);
+
+        assert!(!starfield.stars.is_empty());
+        assert!(starfield.stars.len() <= STARFIELD_MAX_STARS);
+        for star in &starfield.stars {
+            for point in star.points {
+                assert!(point.distance_to(center) <= universe_radius + EPS);
+            }
+        }
+    }
+
+    #[test]
+    fn starfield_respects_config_flag() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.use_starfield = false;
+
+        let state = SpacewarsScenario::init(config, 123);
+
+        assert!(state.starfield.is_none());
     }
 
     #[test]
@@ -3763,6 +3910,12 @@ mod tests {
     fn render_frame_contains_world_two_ships_and_labels() {
         let state = init_deathmatch();
         let frame = SpacewarsScenario::render_frame(&state);
+        let star_count = state
+            .starfield
+            .as_ref()
+            .expect("deathmatch should create a starfield")
+            .stars
+            .len();
 
         let circles = frame
             .layers
@@ -3794,7 +3947,7 @@ mod tests {
 
         assert_eq!(frame.camera.center, RenderPoint::new(300.0, 300.0));
         assert_eq!(circles, 1);
-        assert_eq!(polygons, 12);
+        assert_eq!(polygons, 12 + star_count);
         assert_eq!(text, 2);
         assert_eq!(labels, ["Player 1 50.0", "Player 2 50.0"]);
     }
@@ -3857,9 +4010,44 @@ mod tests {
     }
 
     #[test]
+    fn render_frame_draws_starfield_behind_world() {
+        let state = init_deathmatch();
+        let star_count = state
+            .starfield
+            .as_ref()
+            .expect("deathmatch should create a starfield")
+            .stars
+            .len();
+        let frame = SpacewarsScenario::render_frame(&state);
+        let starfield_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == STARFIELD_LAYER)
+            .expect("starfield should render on its own layer");
+
+        assert_eq!(
+            frame.ordered_layers().first().map(|layer| layer.z),
+            Some(STARFIELD_LAYER)
+        );
+        assert_eq!(starfield_layer.primitives.len(), star_count);
+        assert!(
+            starfield_layer
+                .primitives
+                .iter()
+                .all(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+        );
+    }
+
+    #[test]
     fn render_frame_contains_default_sun_and_planets() {
         let state = init_default(123);
         let frame = SpacewarsScenario::render_frame(&state);
+        let star_count = state
+            .starfield
+            .as_ref()
+            .expect("default config should create a starfield")
+            .stars
+            .len();
 
         let circles = frame
             .layers
@@ -3867,15 +4055,10 @@ mod tests {
             .flat_map(|layer| &layer.primitives)
             .filter(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
             .count();
-        let polygons = frame
-            .layers
-            .iter()
-            .flat_map(|layer| &layer.primitives)
-            .filter(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
-            .count();
+        let polygons = polygon_primitive_count(&frame);
 
         assert_eq!(frame.camera.center, RenderPoint::new(1200.0, 1200.0));
         assert_eq!(circles, 2 + state.planets.len());
-        assert_eq!(polygons, 12 + state.planets.len());
+        assert_eq!(polygons, 12 + state.planets.len() + star_count);
     }
 }
