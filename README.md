@@ -3,6 +3,10 @@
 A reboot of a 2008 UW Bothell CSS 450 school project (Allan + CK, JOGL/Java)
 as a cross-platform (Linux / Windows / Raspberry Pi) AI testbed in Rust + Slint.
 
+# On target hardware
+Below is a zoomed out view of a CTF game mode.
+![Gameplay example](./space-wars.webp "Gameplay example")
+
 ## Status
 
 Initial implementation mostly complete.  Textures and sounds have yet to be done.
