@@ -1,0 +1,64 @@
+#!/bin/sh
+set -eu
+
+DATA_SSH_DIR="/data/ssh"
+
+has_data_host_keys() {
+    [ -f "$DATA_SSH_DIR/ssh_host_ed25519_key" ] || \
+    [ -f "$DATA_SSH_DIR/ssh_host_ecdsa_key" ] || \
+    [ -f "$DATA_SSH_DIR/ssh_host_rsa_key" ]
+}
+
+copy_host_keys_from_dir() {
+    src_dir="$1"
+    [ -d "$src_dir" ] || return 1
+
+    copied=0
+    for key_type in rsa ecdsa ed25519; do
+        for suffix in "" ".pub"; do
+            name="ssh_host_${key_type}_key${suffix}"
+            if [ -f "$src_dir/$name" ] && [ ! -f "$DATA_SSH_DIR/$name" ]; then
+                cp -p "$src_dir/$name" "$DATA_SSH_DIR/$name"
+                copied=1
+            fi
+        done
+    done
+
+    [ "$copied" -eq 1 ]
+}
+
+import_from_inactive_slot() {
+    command -v ab-boot-manager >/dev/null 2>&1 || return 1
+
+    inactive_dev="$(ab-boot-manager inactive-device 2>/dev/null || true)"
+    [ -n "$inactive_dev" ] && [ -b "$inactive_dev" ] || return 1
+
+    mount_point="$(mktemp -d)"
+    if ! mount -o ro "$inactive_dev" "$mount_point"; then
+        rmdir "$mount_point"
+        return 1
+    fi
+
+    if copy_host_keys_from_dir "$mount_point/etc/ssh"; then
+        echo "Imported SSH host keys from inactive slot $inactive_dev"
+        umount "$mount_point"
+        rmdir "$mount_point"
+        return 0
+    fi
+
+    umount "$mount_point"
+    rmdir "$mount_point"
+    return 1
+}
+
+mkdir -p "$DATA_SSH_DIR"
+chmod 700 "$DATA_SSH_DIR"
+
+if ! has_data_host_keys; then
+    copy_host_keys_from_dir "/etc/ssh" || import_from_inactive_slot || true
+fi
+
+chown root:root "$DATA_SSH_DIR" "$DATA_SSH_DIR"/ssh_host_* 2>/dev/null || true
+chmod 700 "$DATA_SSH_DIR"
+chmod 600 "$DATA_SSH_DIR"/ssh_host_*_key 2>/dev/null || true
+chmod 644 "$DATA_SSH_DIR"/ssh_host_*_key.pub 2>/dev/null || true

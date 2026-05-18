@@ -1,0 +1,23 @@
+# Yocto build artifacts and downloaded layers.
+build/
+downloads/
+sstate-cache/
+.ccache/
+.hosttools/
+node_modules/
+
+# KAS checkouts.
+poky/
+meta-openembedded/
+meta-pi-base/
+meta-raspberrypi/
+meta-rust-bin/
+
+# Local machine configuration.
+.flash-config.json
+wifi-creds.local
+
+# Temporary mount points and old source layouts.
+sda/
+sda1/
+sources/

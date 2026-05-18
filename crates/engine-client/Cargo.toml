@@ -17,7 +17,7 @@ scenario-null = { workspace = true }
 scenario-spacewars = { workspace = true }
 clap = { workspace = true }
 directories = { workspace = true }
-slint = { workspace = true, features = ["unstable-winit-030"] }
+slint = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -25,3 +25,22 @@ tracing-subscriber = { workspace = true }
 
 [build-dependencies]
 slint-build = { workspace = true }
+
+[features]
+default = ["desktop"]
+desktop = [
+    "slint/accessibility",
+    "slint/backend-winit",
+    "slint/compat-1-2",
+    "slint/renderer-femtovg",
+    "slint/renderer-software",
+    "slint/unstable-winit-030",
+]
+pi-kiosk = [
+    "slint/backend-linuxkms",
+    "slint/compat-1-2",
+    "slint/software-renderer-systemfonts",
+    # Game input currently uses Slint's Winit physical-key event adapter.
+    # Keep this until Pi validation confirms a backend-neutral replacement.
+    "slint/unstable-winit-030",
+]

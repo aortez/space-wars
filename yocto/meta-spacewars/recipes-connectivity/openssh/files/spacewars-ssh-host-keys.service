@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare persistent Space-Wars SSH host keys
+Requires=data.mount
+After=data.mount
+Before=sshdgenkeys.service sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/spacewars-ssh-host-keys
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -22,7 +22,7 @@ Slint backend run instead of forcing the desktop `winit` backend. The same
 settings directory can also be selected with `SPACEWARS_CONFIG_DIR`.
 
 See [`docs/pi-kiosk.md`](docs/pi-kiosk.md) for the current Pi runbook and
-example systemd service.
+example systemd service. The Yocto image scaffold is under [`yocto/`](yocto/).
 
 ## History
 
