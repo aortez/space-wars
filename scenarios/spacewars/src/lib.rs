@@ -85,6 +85,13 @@ const ASTEROID_DAMAGE_SCALAR: f32 = 0.01;
 const ASTEROID_MAX_OMEGA: f32 = 10.0;
 const ASTEROID_GRAVITY_FRAME_MODULUS: u64 = 7;
 const ASTEROID_GRAVITY_SCALE: f32 = 7.0;
+const ASTEROID_CHIP_MAX: u8 = 3;
+const ASTEROID_CHIP_DAMAGE_FACTOR: f32 = 0.05;
+const ASTEROID_CHIP_MIN_DAMAGE: f32 = 0.25;
+const ASTEROID_CHIP_RADIUS_STEP: f32 = 0.08;
+const ASTEROID_CHIP_SPEED: f32 = 30.0;
+const ASTEROID_CHIP_OMEGA: f32 = 1.5;
+const ASTEROID_CHIP_ANGLE_VARIANCE: f32 = 0.35;
 const STARFIELD_RNG_SALT: u64 = 0x57A2_F13D_5EED_BA5E;
 const STARFIELD_DENSITY: f32 = 0.0025;
 const STARFIELD_COLOR_ROTATE_RATE: f32 = 0.02;
@@ -280,11 +287,14 @@ pub struct DebrisState {
     pub position: Vec2,
     pub velocity: Vec2,
     pub radius: f32,
+    pub base_radius: f32,
     pub breakup_radius: f32,
     pub fragment_shape: Option<[Vec2; 3]>,
     pub rotation_radians: f32,
     pub omega: f32,
     pub damage_scalar: f32,
+    pub chip_damage: f32,
+    pub chip_count: u8,
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
@@ -1314,7 +1324,10 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
             let impulse = state.ships[hit.shooter].direction * hit.damage;
             state.ships[ship].translate_life_with_impulse(-hit.damage, impulse);
         }
-        LaserTarget::Debris(debris) => state.debris[debris].translate_life(-hit.damage),
+        LaserTarget::Debris(debris) => {
+            let impact_direction = hit.point - state.debris[debris].position;
+            damage_debris(state, debris, hit.damage, impact_direction, 0x1A5E_0000);
+        }
         LaserTarget::Body(_) => {}
     }
 }
@@ -1409,6 +1422,113 @@ fn spawn_impact_particles(
             .particles
             .push(ParticleState::new(triangle, velocity, color));
     }
+}
+
+fn damage_debris(
+    state: &mut SpacewarsState,
+    debris_index: usize,
+    amount: f32,
+    impact_direction: Vec2,
+    salt: u64,
+) {
+    let Some(debris) = state.debris.get_mut(debris_index) else {
+        return;
+    };
+    let chips = debris.apply_damage(amount);
+    let source = *debris;
+    spawn_asteroid_chip_fragments(state, debris_index, source, chips, impact_direction, salt);
+}
+
+fn spawn_asteroid_chip_fragments(
+    state: &mut SpacewarsState,
+    debris_index: usize,
+    source: DebrisState,
+    chips: u8,
+    impact_direction: Vec2,
+    salt: u64,
+) {
+    if chips == 0 || source.kind != DebrisKind::Asteroid || source.dead {
+        return;
+    }
+
+    let fragments = asteroid_chip_fragments(
+        &source,
+        chips,
+        impact_direction,
+        state.seed,
+        state.tick,
+        debris_index,
+        salt,
+    );
+    state.debris.extend(fragments);
+}
+
+fn asteroid_chip_fragments(
+    source: &DebrisState,
+    chips: u8,
+    impact_direction: Vec2,
+    seed: u64,
+    tick: u64,
+    debris_index: usize,
+    salt: u64,
+) -> Vec<DebrisState> {
+    let mut rng = breakup_rng_for_event(
+        seed,
+        tick,
+        0xA57E_C111 ^ debris_index as u64 ^ ((source.chip_count as u64) << 24) ^ salt,
+    );
+    let base_direction = if impact_direction.length_squared() <= REALLY_SMALL {
+        Vec2::from_radians(random_unit_f32(&mut rng) * core::f32::consts::TAU)
+    } else {
+        impact_direction.normalized()
+    };
+    let first_stage = source.chip_count.saturating_sub(chips) + 1;
+    let mut fragments = Vec::with_capacity(chips as usize);
+
+    for offset in 0..chips {
+        let stage = first_stage + offset;
+        let angle = random_range_f32(
+            &mut rng,
+            -ASTEROID_CHIP_ANGLE_VARIANCE,
+            ASTEROID_CHIP_ANGLE_VARIANCE,
+        ) + offset as f32 * ASTEROID_CHIP_ANGLE_VARIANCE;
+        let outward = base_direction.rotate_radians(angle).normalized();
+        let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
+        let pre_chip_factor = 1.0 - (stage.saturating_sub(1) as f32 * ASTEROID_CHIP_RADIUS_STEP);
+        let radius = (source.base_radius * pre_chip_factor).max(1.0);
+        let depth = (source.base_radius * ASTEROID_CHIP_RADIUS_STEP * 1.4)
+            .max(0.75)
+            .min(radius * 0.45);
+        let half_width = (radius * 0.2).max(0.6);
+        let inner_radius = (radius - depth).max(radius * 0.35);
+        let points = [
+            outward * radius,
+            outward * inner_radius + tangent * half_width,
+            outward * inner_radius - tangent * half_width,
+        ];
+        let center = polygon_center(&points);
+        let local_shape = points.map(|point| point - center);
+        let velocity = source.velocity
+            + outward * random_range_f32(&mut rng, ASTEROID_CHIP_SPEED * 0.7, ASTEROID_CHIP_SPEED)
+            + tangent
+                * random_range_f32(
+                    &mut rng,
+                    -ASTEROID_CHIP_SPEED * 0.2,
+                    ASTEROID_CHIP_SPEED * 0.2,
+                );
+        let omega = random_range_f32(&mut rng, -ASTEROID_CHIP_OMEGA, ASTEROID_CHIP_OMEGA);
+        let color = source.color.random_variation(0.12, &mut rng);
+
+        fragments.push(DebrisState::new_fragment(
+            source.position + center,
+            local_shape,
+            velocity,
+            omega,
+            color,
+        ));
+    }
+
+    fragments
 }
 
 fn laser_damage(beam: LaserBeamState) -> f32 {
@@ -1599,11 +1719,19 @@ fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisC
             state.debris[collision.debris].velocity.normalized() * damage
         };
         state.ships[collision.ship].translate_life_with_impulse(-damage, impulse);
-        state.debris[collision.debris].translate_life(-damage);
 
         let ship = &state.ships[collision.ship];
         let debris = &state.debris[collision.debris];
         let normal = collision_normal(ship.position, debris.position);
+        damage_debris(
+            state,
+            collision.debris,
+            damage,
+            normal,
+            0x51DE_0000 ^ collision.ship as u64,
+        );
+        let ship = &state.ships[collision.ship];
+        let debris = &state.debris[collision.debris];
         let ship_radius = ship_low_bounds(&ship_triangles(ship)).radius;
         let intercept = ship.position - normal * ship_radius;
         let flack_dir = if debris.velocity.length_squared() <= REALLY_SMALL {
@@ -1690,12 +1818,14 @@ fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision>
     let collisions = detect_debris_collisions(state);
 
     for collision in &collisions {
-        let (a_effect, b_effect) = {
+        let (a_effect, b_effect, a_chip, b_chip) = {
             let (a, b) = debris_pair_mut(&mut state.debris, collision.a, collision.b);
             let damage_to_a = b.damage_amount(a.velocity);
-            a.translate_life(-damage_to_a);
+            let damage_a_direction = b.position - a.position;
+            let a_chips = a.apply_damage(damage_to_a);
             let damage_to_b = a.damage_amount(b.velocity);
-            b.translate_life(-damage_to_b);
+            let damage_b_direction = a.position - b.position;
+            let b_chips = b.apply_damage(damage_to_b);
             let normal = collision_normal(a.position, b.position);
             let intercept = a.position - normal * a.radius;
             let a_effect = (
@@ -1724,8 +1854,15 @@ fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision>
             b.position = b_body.position;
             b.velocity = b_body.velocity;
 
-            (a_effect, b_effect)
+            let a_chip = (*a, a_chips, damage_a_direction);
+            let b_chip = (*b, b_chips, damage_b_direction);
+            (a_effect, b_effect, a_chip, b_chip)
         };
+
+        let (source, chips, direction) = a_chip;
+        spawn_asteroid_chip_fragments(state, collision.a, source, chips, direction, 0xDEB1_0000);
+        let (source, chips, direction) = b_chip;
+        spawn_asteroid_chip_fragments(state, collision.b, source, chips, direction, 0xDEB2_0000);
 
         let (dir, center, intercept, color, damage, salt) = a_effect;
         spawn_impact_particles(state, dir, center, intercept, color, damage, 5.0, salt);
@@ -2038,10 +2175,9 @@ fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyC
             body: contact.body,
         });
 
-        let (intercept, color, damage, flack_dir) = {
+        let (intercept, color, damage, flack_dir, impact_damage, body_damage) = {
             let debris = &mut state.debris[contact.debris];
             resolve_debris_body_collision(debris, contact.body_position, contact.body_radius);
-            let damage = apply_debris_body_collision_damage(debris);
             let collision_dir = (contact.body_position - debris.position).normalized();
             let intercept = contact.body_position - collision_dir * contact.body_radius;
             let flack_dir = if collision_dir.length_squared() <= REALLY_SMALL {
@@ -2049,8 +2185,33 @@ fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyC
             } else {
                 collision_dir
             };
-            (intercept, debris.color, damage, flack_dir)
+            let speed = debris.velocity.length();
+            let impact_damage = speed * DEBRIS_BODY_DAMAGE_SCALAR;
+            let body_damage = speed * PLANET_DAMAGE_SCALAR;
+            let damage = impact_damage + body_damage;
+            (
+                intercept,
+                debris.color,
+                damage,
+                flack_dir,
+                impact_damage,
+                body_damage,
+            )
         };
+        damage_debris(
+            state,
+            contact.debris,
+            impact_damage,
+            flack_dir,
+            0xDEB0_B0D0 ^ contact.debris as u64 ^ ((contact.body_order as u64) << 16),
+        );
+        damage_debris(
+            state,
+            contact.debris,
+            body_damage,
+            flack_dir,
+            0xDEB0_B0D1 ^ contact.debris as u64 ^ ((contact.body_order as u64) << 16),
+        );
 
         spawn_impact_particles(
             state,
@@ -2342,14 +2503,6 @@ fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
     let damage = ship.velocity.length() * PLANET_DAMAGE_SCALAR;
     ship.translate_life_with_impulse(-damage, ship.direction * -damage);
     damage
-}
-
-fn apply_debris_body_collision_damage(debris: &mut DebrisState) -> f32 {
-    let impact_damage = debris.velocity.length() * DEBRIS_BODY_DAMAGE_SCALAR;
-    debris.translate_life(-impact_damage);
-    let body_damage = debris.velocity.length() * PLANET_DAMAGE_SCALAR;
-    debris.translate_life(-body_damage);
-    impact_damage + body_damage
 }
 
 fn resolve_spaceport_contact(ship: &mut ShipState, spaceport_center: Vec2) {
@@ -2702,11 +2855,14 @@ impl DebrisState {
             position,
             velocity,
             radius,
+            base_radius: radius,
             breakup_radius: radius,
             fragment_shape: None,
             rotation_radians: 0.0,
             omega: 0.0,
             damage_scalar,
+            chip_damage: 0.0,
+            chip_count: 0,
             life,
             life_max: life,
             dead: false,
@@ -2772,11 +2928,62 @@ impl DebrisState {
     }
 
     pub fn translate_life(&mut self, delta: f32) {
+        if delta < 0.0 && self.kind == DebrisKind::Asteroid {
+            self.apply_asteroid_damage(-delta);
+            return;
+        }
+
         if delta < 0.0 {
             self.breakup_radius = self.radius;
         }
         self.life += delta;
         self.update_size();
+    }
+
+    fn apply_damage(&mut self, amount: f32) -> u8 {
+        if amount <= 0.0 || self.dead {
+            return 0;
+        }
+
+        if self.kind == DebrisKind::Asteroid {
+            self.apply_asteroid_damage(amount)
+        } else {
+            self.translate_life(-amount);
+            0
+        }
+    }
+
+    fn apply_asteroid_damage(&mut self, amount: f32) -> u8 {
+        self.breakup_radius = self.radius;
+        self.life -= amount;
+
+        if self.life / self.life_max < DEBRIS_DEATH_LIFE_FACTOR {
+            self.life = 0.0;
+            self.dead = true;
+            self.chip_damage = 0.0;
+            self.radius = (self.base_radius * DEBRIS_DEATH_SHRINK_FACTOR).max(REALLY_SMALL);
+            return 0;
+        }
+
+        self.chip_damage += amount;
+        let threshold = self.asteroid_chip_damage_threshold();
+        let mut chips = 0;
+        while self.chip_damage >= threshold && self.chip_count < ASTEROID_CHIP_MAX {
+            self.chip_damage -= threshold;
+            self.chip_count += 1;
+            chips += 1;
+        }
+
+        if chips > 0 {
+            self.radius =
+                self.base_radius * (1.0 - self.chip_count as f32 * ASTEROID_CHIP_RADIUS_STEP);
+        }
+
+        chips
+    }
+
+    fn asteroid_chip_damage_threshold(self) -> f32 {
+        (self.life_max * ASTEROID_CHIP_DAMAGE_FACTOR).max(ASTEROID_CHIP_MIN_DAMAGE)
     }
 
     pub fn damage_amount(self, relative_velocity: Vec2) -> f32 {
@@ -6110,6 +6317,115 @@ mod tests {
         assert_eq!(debris.life, 0.0);
         assert!(debris.dead);
         assert_close(debris.radius, 0.1);
+    }
+
+    #[test]
+    fn asteroid_damage_accumulates_before_chipping() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(100.0, 100.0),
+            Vec2::ZERO,
+            10.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let start_life = state.debris[0].life;
+        let threshold = state.debris[0].asteroid_chip_damage_threshold();
+
+        damage_debris(&mut state, 0, threshold * 0.5, Vec2::X, 0x1234);
+
+        assert_eq!(state.debris.len(), 1);
+        assert_eq!(state.debris[0].chip_count, 0);
+        assert_close(state.debris[0].chip_damage, threshold * 0.5);
+        assert_close(state.debris[0].life, start_life - threshold * 0.5);
+        assert_close(state.debris[0].radius, 10.0);
+    }
+
+    #[test]
+    fn asteroid_damage_threshold_spawns_chip_fragment_and_step_shrinks() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(100.0, 100.0),
+            Vec2::ZERO,
+            10.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let threshold = state.debris[0].asteroid_chip_damage_threshold();
+
+        damage_debris(&mut state, 0, threshold, Vec2::X, 0x1234);
+
+        assert_eq!(state.debris.len(), 2);
+        assert_eq!(state.debris[0].chip_count, 1);
+        assert_close(state.debris[0].chip_damage, 0.0);
+        assert_close(
+            state.debris[0].radius,
+            10.0 * (1.0 - ASTEROID_CHIP_RADIUS_STEP),
+        );
+        assert_eq!(state.debris[1].kind, DebrisKind::Fragment);
+        assert!(state.debris[1].fragment_shape.is_some());
+        assert!((state.debris[1].position - state.debris[0].position).dot(Vec2::X) > 0.0);
+        assert!(state.debris[1].velocity.dot(Vec2::X) > 0.0);
+    }
+
+    #[test]
+    fn asteroid_large_nonfatal_damage_can_spawn_multiple_chip_fragments() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(100.0, 100.0),
+            Vec2::ZERO,
+            10.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let threshold = state.debris[0].asteroid_chip_damage_threshold();
+
+        damage_debris(&mut state, 0, threshold * 2.25, Vec2::X, 0x1234);
+
+        assert_eq!(state.debris.len(), 3);
+        assert_eq!(state.debris[0].chip_count, 2);
+        assert_close(state.debris[0].chip_damage, threshold * 0.25);
+        assert_close(
+            state.debris[0].radius,
+            10.0 * (1.0 - ASTEROID_CHIP_RADIUS_STEP * 2.0),
+        );
+        assert!(
+            state.debris[1..]
+                .iter()
+                .all(|debris| debris.kind == DebrisKind::Fragment)
+        );
+    }
+
+    #[test]
+    fn fatal_asteroid_damage_uses_death_breakup_without_chip_fragments() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(100.0, 100.0),
+            Vec2::ZERO,
+            10.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        let fatal_damage = state.debris[0].life_max * (1.0 - DEBRIS_DEATH_LIFE_FACTOR + 0.01);
+
+        damage_debris(&mut state, 0, fatal_damage, Vec2::X, 0x1234);
+
+        assert_eq!(state.debris.len(), 1);
+        assert!(state.debris[0].dead);
+        assert_eq!(state.debris[0].chip_count, 0);
+
+        spawn_debris_breakup_fragments(&mut state);
+
+        assert_eq!(state.debris.len(), 4);
+        assert!(
+            state.debris[1..]
+                .iter()
+                .all(|debris| debris.kind == DebrisKind::Fragment)
+        );
     }
 
     #[test]
