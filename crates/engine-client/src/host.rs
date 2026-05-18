@@ -429,7 +429,11 @@ fn step_scenario(
         *paused = true;
         *accumulator = Duration::ZERO;
         input.clear();
-        tracing::info!(paused = *paused, benchmark = *benchmark_active, "toggled pause.");
+        tracing::info!(
+            paused = *paused,
+            benchmark = *benchmark_active,
+            "toggled pause."
+        );
         return HostStepResult::default();
     }
 
@@ -1407,10 +1411,7 @@ mod tests {
 
         let panel = spacewars_panel_state(state, false, true, "Target 60 Hz | FPS 42 | UPS 60");
 
-        assert_eq!(
-            panel.message_text,
-            "Bench | P/Esc Pause | B Reset | R Game"
-        );
+        assert_eq!(panel.message_text, "Bench | P/Esc Pause | B Reset | R Game");
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 42 | UPS 60");
     }
 

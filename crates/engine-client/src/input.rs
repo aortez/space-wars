@@ -424,10 +424,7 @@ mod tests {
 
         assert!(input.take_back_requested());
         assert!(!input.take_back_requested());
-        assert_eq!(
-            game_key_from_key_code(KeyCode::Escape),
-            Some(GameKey::Back)
-        );
+        assert_eq!(game_key_from_key_code(KeyCode::Escape), Some(GameKey::Back));
     }
 
     #[test]
@@ -438,7 +435,10 @@ mod tests {
 
         assert!(input.take_controls_requested());
         assert!(!input.take_controls_requested());
-        assert_eq!(game_key_from_key_code(KeyCode::KeyC), Some(GameKey::Controls));
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyC),
+            Some(GameKey::Controls)
+        );
         assert_eq!(game_key_from_key_code(KeyCode::F1), Some(GameKey::Controls));
     }
 
