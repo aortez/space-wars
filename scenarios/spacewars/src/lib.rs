@@ -2450,9 +2450,10 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
             }
 
             if ship_high.intersects(&Bounds2::Circle(body.high)) {
-                let spaceport = body
-                    .spaceport
-                    .filter(|spaceport| ship_high.intersects(&Bounds2::Circle(spaceport.bounds)));
+                let spaceport = body.spaceport.filter(|spaceport| {
+                    spaceport_accepts_ship(state, ship_index, *spaceport)
+                        && ship_high.intersects(&Bounds2::Circle(spaceport.bounds))
+                });
 
                 contacts.push(BodyContact {
                     ship: ship_index,
@@ -2471,6 +2472,22 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
     }
 
     contacts
+}
+
+fn spaceport_accepts_ship(
+    state: &SpacewarsState,
+    ship_index: usize,
+    spaceport: SpaceportPhysics,
+) -> bool {
+    let ship = &state.ships[ship_index];
+    if ship.form != ShipForm::EscapePod {
+        return true;
+    }
+
+    state
+        .planets
+        .get(spaceport.planet)
+        .is_some_and(|planet| planet.owner_id == Some(ship.owner_id))
 }
 
 fn resolve_ship_body_collision(
@@ -5350,6 +5367,54 @@ mod tests {
     }
 
     #[test]
+    fn unowned_spaceport_does_not_hold_escape_pod() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let spaceport = spaceport_physics(0, &state.planets[0]);
+        let start_position = spaceport.bounds.center - Vec2::X;
+        state.ships[0].change_to_escape_pod();
+        state.ships[0].position = start_position;
+        state.ships[0].velocity = Vec2::ZERO;
+
+        let events = resolve_body_collisions(&mut state);
+
+        assert_eq!(
+            events.body_collisions,
+            vec![BodyCollision {
+                ship: 0,
+                body: BodyId::Planet(0),
+            }]
+        );
+        assert!(events.spaceport_contacts.is_empty());
+        assert!(
+            state.ships[0]
+                .position
+                .distance_to(state.planets[0].position)
+                > 50.0
+        );
+    }
+
+    #[test]
+    fn owned_spaceport_accepts_escape_pod_for_rebuild() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        let spaceport = spaceport_physics(0, &state.planets[0]);
+        let start_position = spaceport.bounds.center - Vec2::X;
+        state.ships[0].change_to_escape_pod();
+        state.ships[0].position = start_position;
+        state.ships[0].velocity = Vec2::ZERO;
+
+        let events = resolve_body_collisions(&mut state);
+
+        assert_eq!(
+            events.spaceport_contacts,
+            vec![SpaceportContact { ship: 0, planet: 0 }]
+        );
+        assert_eq!(state.ships[0].position, start_position);
+    }
+
+    #[test]
     fn landed_ship_captures_planet_after_original_hold_time() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -6566,6 +6631,42 @@ mod tests {
 
         assert_eq!(state.ships[0].wing_state, WingState::Opened);
         assert_close(state.ships[0].velocity.length(), POD_CRUISE_SPEED);
+    }
+
+    #[test]
+    fn escape_pod_can_fly_away_from_unowned_spaceport() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![
+            test_planet(Vec2::new(420.0, 450.0), 50.0),
+            test_planet(Vec2::new(700.0, 700.0), 40.0),
+        ];
+        state.planets[1].owner_id = Some(0);
+        refresh_player_planet_counts(&mut state);
+        let spaceport = spaceport_physics(0, &state.planets[0]);
+        let start_position = spaceport.bounds.center - Vec2::X;
+        let outward = (spaceport.bounds.center - state.planets[0].position).normalized();
+        state.ships[0].change_to_escape_pod();
+        state.ships[0].position = start_position;
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = rotation_for_direction(outward);
+        state.ships[0].direction = outward;
+        let start_distance = state.ships[0]
+            .position
+            .distance_to(state.planets[0].position);
+
+        for _ in 0..30 {
+            step(&mut state, &[]);
+            assert!(state.spaceport_contacts.is_empty());
+        }
+
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert_eq!(state.winner, None);
+        assert!(
+            state.ships[0]
+                .position
+                .distance_to(state.planets[0].position)
+                > start_distance
+        );
     }
 
     #[test]
