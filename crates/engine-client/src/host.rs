@@ -17,10 +17,10 @@ use slint::{
     Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
 };
 
-use crate::MainWindow;
 use crate::input::{self, ClientInput};
 use crate::raster;
 use crate::render::{self, Viewport};
+use crate::{MainWindow, ScenePrimitive};
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
@@ -243,13 +243,16 @@ pub fn start_scenario_loop(
         let Some(window) = weak_window.upgrade() else {
             return;
         };
+        if window.get_launcher_visible() {
+            return;
+        }
 
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
 
         let mut input = input.borrow_mut();
-        let updates = step_scenario(
+        let step_result = step_scenario(
             &mut scenario,
             &scenario_name,
             seed,
@@ -261,9 +264,21 @@ pub fn start_scenario_loop(
             &mut controls.borrow_mut(),
             &mut paused,
             &mut benchmark_active,
+            window.get_ingame_controls_visible(),
             &spacewars_config,
         );
-        performance.record_frame(now, updates);
+        if step_result.return_to_launcher {
+            show_running_launcher(&window);
+            return;
+        }
+        if let Some(visible) = step_result.ingame_controls_visible {
+            window.set_ingame_controls_visible(visible);
+        }
+        if window.get_launcher_visible() {
+            return;
+        }
+
+        performance.record_frame(now, step_result.updates);
         let performance_text = performance.display_text();
         set_spacewars_panel(
             &window,
@@ -283,6 +298,39 @@ pub fn start_scenario_loop(
     Ok(timer)
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct HostStepResult {
+    updates: usize,
+    return_to_launcher: bool,
+    ingame_controls_visible: Option<bool>,
+}
+
+impl HostStepResult {
+    fn updates(updates: usize) -> Self {
+        Self {
+            updates,
+            return_to_launcher: false,
+            ingame_controls_visible: None,
+        }
+    }
+
+    fn return_to_launcher() -> Self {
+        Self {
+            updates: 0,
+            return_to_launcher: true,
+            ingame_controls_visible: None,
+        }
+    }
+
+    fn set_ingame_controls_visible(visible: bool) -> Self {
+        Self {
+            updates: 0,
+            return_to_launcher: false,
+            ingame_controls_visible: Some(visible),
+        }
+    }
+}
+
 fn step_scenario(
     scenario: &mut HostedScenario,
     scenario_name: &str,
@@ -295,8 +343,9 @@ fn step_scenario(
     controls: &mut ScenarioControls,
     paused: &mut bool,
     benchmark_active: &mut bool,
+    ingame_controls_visible: bool,
     spacewars_config: &SpacewarsConfig,
-) -> usize {
+) -> HostStepResult {
     if let Some(request) = controls.take_request() {
         match request {
             ScenarioControlRequest::Resume => {
@@ -304,7 +353,7 @@ fn step_scenario(
                 *accumulator = Duration::ZERO;
                 input.clear();
                 tracing::info!(benchmark = *benchmark_active, "resumed from in-game menu.");
-                return 0;
+                return HostStepResult::default();
             }
             ScenarioControlRequest::Restart => {
                 restart_scenario(
@@ -317,7 +366,7 @@ fn step_scenario(
                     benchmark_active,
                     spacewars_config,
                 );
-                return 0;
+                return HostStepResult::default();
             }
             ScenarioControlRequest::Benchmark => {
                 start_benchmark_scenario(
@@ -328,22 +377,22 @@ fn step_scenario(
                     paused,
                     benchmark_active,
                 );
-                return 0;
+                return HostStepResult::default();
             }
             ScenarioControlRequest::ZoomIn { player } => {
                 scenario.zoom_player_in(player);
-                return 0;
+                return HostStepResult::default();
             }
             ScenarioControlRequest::ZoomOut { player } => {
                 scenario.zoom_player_out(player);
-                return 0;
+                return HostStepResult::default();
             }
         }
     }
 
     if input.take_benchmark_requested() {
         start_benchmark_scenario(scenario, seed, accumulator, input, paused, benchmark_active);
-        return 0;
+        return HostStepResult::default();
     }
 
     if input.take_reset_requested() {
@@ -357,7 +406,44 @@ fn step_scenario(
             benchmark_active,
             spacewars_config,
         );
-        return 0;
+        return HostStepResult::default();
+    }
+
+    if input.take_back_requested() {
+        if scenario.is_game_over() {
+            *paused = false;
+            *accumulator = Duration::ZERO;
+            input.clear();
+            return HostStepResult::return_to_launcher();
+        }
+        if *paused {
+            *accumulator = Duration::ZERO;
+            input.clear();
+            if ingame_controls_visible {
+                return HostStepResult::set_ingame_controls_visible(false);
+            }
+            *paused = false;
+            return HostStepResult::default();
+        }
+
+        *paused = true;
+        *accumulator = Duration::ZERO;
+        input.clear();
+        tracing::info!(paused = *paused, benchmark = *benchmark_active, "toggled pause.");
+        return HostStepResult::default();
+    }
+
+    if input.take_controls_requested() && *paused && !scenario.is_game_over() {
+        *accumulator = Duration::ZERO;
+        input.clear();
+        return HostStepResult::set_ingame_controls_visible(!ingame_controls_visible);
+    }
+
+    if input.take_return_launcher_requested() && (*paused || scenario.is_game_over()) {
+        *paused = false;
+        *accumulator = Duration::ZERO;
+        input.clear();
+        return HostStepResult::return_to_launcher();
     }
 
     if input.take_pause_requested() && !scenario.is_game_over() {
@@ -369,11 +455,11 @@ fn step_scenario(
             benchmark = *benchmark_active,
             "toggled pause."
         );
-        return 0;
+        return HostStepResult::default();
     }
 
     if *paused || scenario.is_game_over() {
-        return 0;
+        return HostStepResult::default();
     }
 
     match (tick_model, fixed_dt) {
@@ -389,15 +475,26 @@ fn step_scenario(
             if steps == MAX_FIXED_STEPS_PER_TICK {
                 *accumulator = Duration::ZERO;
             }
-            steps
+            HostStepResult::updates(steps)
         }
         (TickModel::Variable | TickModel::EmulatorClock, _) => {
             let actions = scenario.actions(input, *benchmark_active);
             scenario.step(&actions, elapsed);
-            1
+            HostStepResult::updates(1)
         }
-        (TickModel::FixedTimestep { .. }, None) => 0,
+        (TickModel::FixedTimestep { .. }, None) => HostStepResult::default(),
     }
+}
+
+fn show_running_launcher(window: &MainWindow) {
+    window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
+    window.set_raster_visible(false);
+    window.set_spacewars_ui_visible(false);
+    window.set_ingame_menu_visible(false);
+    window.set_ingame_controls_visible(false);
+    window.set_launcher_error_text(SharedString::from(""));
+    window.set_launcher_controls_visible(false);
+    window.set_launcher_visible(true);
 }
 
 fn restart_scenario(
@@ -1030,17 +1127,17 @@ fn planet_score_text(count: usize) -> String {
 
 fn spacewars_panel_message(state: &SpacewarsState, paused: bool, benchmark_active: bool) -> String {
     if let Some(winner) = state.winner.and_then(|winner| state.players.get(winner)) {
-        return format!("P{} Wins | R Restart | B Bench", winner.id + 1);
+        return format!("P{} Wins | R Restart | B Bench | Esc Launch", winner.id + 1);
     }
 
     if benchmark_active && paused {
-        "Bench Paused | P Resume | B Reset".into()
+        "Bench Paused | P/Esc Resume | B Reset | Q Launch".into()
     } else if benchmark_active {
-        "Bench | P Pause | B Reset | R Game".into()
+        "Bench | P/Esc Pause | B Reset | R Game".into()
     } else if paused {
-        "Paused | P Resume | R Restart | B Bench".into()
+        "Paused | P/Esc Resume | R Restart | B Bench | Q Launch".into()
     } else {
-        "P Pause | R Restart | B Bench".into()
+        "P/Esc Pause | R Restart | B Bench".into()
     }
 }
 
@@ -1252,7 +1349,7 @@ mod tests {
         assert_eq!(panel.player_2.name, "Player 2: Player 2");
         assert_eq!(panel.player_2.status, "Pod Rebuild: 25%");
         assert_eq!(panel.player_2.status_fraction, 0.25);
-        assert_eq!(panel.message_text, "P Pause | R Restart | B Bench");
+        assert_eq!(panel.message_text, "P/Esc Pause | R Restart | B Bench");
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 60 | UPS 60");
         assert_eq!(
             panel.planet_score_label,
@@ -1278,7 +1375,10 @@ mod tests {
 
         assert_eq!(panel.player_1.status, "Eliminated");
         assert_eq!(panel.player_1.status_fraction, 0.0);
-        assert_eq!(panel.message_text, "P2 Wins | R Restart | B Bench");
+        assert_eq!(
+            panel.message_text,
+            "P2 Wins | R Restart | B Bench | Esc Launch"
+        );
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 60 | UPS 0");
     }
 
@@ -1293,7 +1393,7 @@ mod tests {
 
         assert_eq!(
             panel.message_text,
-            "Paused | P Resume | R Restart | B Bench"
+            "Paused | P/Esc Resume | R Restart | B Bench | Q Launch"
         );
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 60 | UPS 0");
     }
@@ -1307,7 +1407,10 @@ mod tests {
 
         let panel = spacewars_panel_state(state, false, true, "Target 60 Hz | FPS 42 | UPS 60");
 
-        assert_eq!(panel.message_text, "Bench | P Pause | B Reset | R Game");
+        assert_eq!(
+            panel.message_text,
+            "Bench | P/Esc Pause | B Reset | R Game"
+        );
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 42 | UPS 60");
     }
 
@@ -1341,6 +1444,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &config,
         );
 
@@ -1382,6 +1486,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
         assert!(paused);
@@ -1398,6 +1503,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
         let HostedScenario::Spacewars(state) = &scenario else {
@@ -1419,8 +1525,153 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
+        assert!(!paused);
+    }
+
+    #[test]
+    fn escape_toggles_pause_and_backs_out_of_controls() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::Back);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::from_secs(1),
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &SpacewarsConfig::default(),
+        );
+        assert!(paused);
+        assert_eq!(result.ingame_controls_visible, None);
+        assert_eq!(accumulator, Duration::ZERO);
+
+        input.press(input::GameKey::Back);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            true,
+            &SpacewarsConfig::default(),
+        );
+        assert!(paused);
+        assert_eq!(result.ingame_controls_visible, Some(false));
+
+        input.press(input::GameKey::Back);
+        step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &SpacewarsConfig::default(),
+        );
+        assert!(!paused);
+    }
+
+    #[test]
+    fn menu_controls_key_toggles_controls_screen_while_paused() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::Controls);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &SpacewarsConfig::default(),
+        );
+        assert_eq!(result.ingame_controls_visible, Some(true));
+        assert_eq!(accumulator, Duration::ZERO);
+
+        input.press(input::GameKey::Controls);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            true,
+            &SpacewarsConfig::default(),
+        );
+        assert_eq!(result.ingame_controls_visible, Some(false));
+    }
+
+    #[test]
+    fn q_returns_to_launcher_from_pause_menu() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::ReturnLauncher);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &SpacewarsConfig::default(),
+        );
+        assert!(result.return_to_launcher);
+        assert_eq!(accumulator, Duration::ZERO);
         assert!(!paused);
     }
 
@@ -1446,6 +1697,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
 
@@ -1455,6 +1707,48 @@ mod tests {
         assert_eq!(accumulator, Duration::ZERO);
         assert_eq!(counts.asteroids, 100);
         assert_eq!(counts.particles, 1_200);
+    }
+
+    #[test]
+    fn escape_after_game_over_returns_to_launcher_without_stepping() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let HostedScenario::Spacewars(state) = &mut scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        state.winner = Some(1);
+        let tick_before = state.tick;
+
+        let mut input = ClientInput::default();
+        input.press(input::GameKey::Back);
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::from_secs(1),
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &SpacewarsConfig::default(),
+        );
+
+        let HostedScenario::Spacewars(state) = &scenario else {
+            panic!("spacewars scenario should not host null");
+        };
+        assert!(result.return_to_launcher);
+        assert_eq!(result.updates, 0);
+        assert_eq!(accumulator, Duration::ZERO);
+        assert!(!paused);
+        assert_eq!(state.tick, tick_before);
     }
 
     #[test]
@@ -1479,6 +1773,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
         assert!(!paused);
@@ -1506,6 +1801,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
         let HostedScenario::Spacewars(state) = &scenario else {
@@ -1528,6 +1824,7 @@ mod tests {
             &mut controls,
             &mut paused,
             &mut benchmark_active,
+            false,
             &SpacewarsConfig::default(),
         );
         assert!(benchmark_active);

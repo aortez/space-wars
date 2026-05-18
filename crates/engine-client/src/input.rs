@@ -26,6 +26,9 @@ pub(crate) enum GameKey {
     Reset,
     Pause,
     Benchmark,
+    Back,
+    Controls,
+    ReturnLauncher,
     P1Wing,
     P1Thrust,
     P1Reverse,
@@ -85,6 +88,24 @@ impl ClientInput {
     pub(crate) fn take_benchmark_requested(&mut self) -> bool {
         let requested = self.pressed.remove(&GameKey::Benchmark);
         self.released.remove(&GameKey::Benchmark);
+        requested
+    }
+
+    pub(crate) fn take_back_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::Back);
+        self.released.remove(&GameKey::Back);
+        requested
+    }
+
+    pub(crate) fn take_controls_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::Controls);
+        self.released.remove(&GameKey::Controls);
+        requested
+    }
+
+    pub(crate) fn take_return_launcher_requested(&mut self) -> bool {
+        let requested = self.pressed.remove(&GameKey::ReturnLauncher);
+        self.released.remove(&GameKey::ReturnLauncher);
         requested
     }
 
@@ -220,6 +241,9 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyR => Some(GameKey::Reset),
         KeyCode::KeyP => Some(GameKey::Pause),
         KeyCode::KeyB => Some(GameKey::Benchmark),
+        KeyCode::Escape => Some(GameKey::Back),
+        KeyCode::KeyC | KeyCode::F1 => Some(GameKey::Controls),
+        KeyCode::KeyQ => Some(GameKey::ReturnLauncher),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
         KeyCode::KeyS => Some(GameKey::P1Reverse),
@@ -390,5 +414,45 @@ mod tests {
 
         assert!(input.take_benchmark_requested());
         assert!(!input.take_benchmark_requested());
+    }
+
+    #[test]
+    fn escape_key_is_one_shot_back_control() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::Back);
+
+        assert!(input.take_back_requested());
+        assert!(!input.take_back_requested());
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Escape),
+            Some(GameKey::Back)
+        );
+    }
+
+    #[test]
+    fn controls_keys_are_one_shot_menu_controls() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::Controls);
+
+        assert!(input.take_controls_requested());
+        assert!(!input.take_controls_requested());
+        assert_eq!(game_key_from_key_code(KeyCode::KeyC), Some(GameKey::Controls));
+        assert_eq!(game_key_from_key_code(KeyCode::F1), Some(GameKey::Controls));
+    }
+
+    #[test]
+    fn q_key_is_one_shot_return_launcher_control() {
+        let mut input = ClientInput::default();
+
+        input.press(GameKey::ReturnLauncher);
+
+        assert!(input.take_return_launcher_requested());
+        assert!(!input.take_return_launcher_requested());
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyQ),
+            Some(GameKey::ReturnLauncher)
+        );
     }
 }

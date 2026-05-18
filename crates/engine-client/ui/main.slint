@@ -159,6 +159,20 @@ export component MainWindow inherits Window {
     callback ingame-p2-zoom-in();
     callback ingame-p2-zoom-out();
 
+    forward-focus: launcher-shortcuts;
+
+    changed launcher-visible => {
+        if (root.launcher-visible) {
+            launcher-shortcuts.focus();
+        }
+    }
+
+    changed launcher-controls-visible => {
+        if (root.launcher-visible) {
+            launcher-shortcuts.focus();
+        }
+    }
+
     title: "Space-Wars";
     preferred-width: 1280px;
     preferred-height: 720px;
@@ -303,7 +317,7 @@ export component MainWindow inherits Window {
         Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 500px;
+            width: 560px;
             height: root.ingame-controls-visible ? 470px : 310px;
             background: #080a12f2;
             border-color: #596273;
@@ -322,7 +336,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 66px;
                 width: parent.width - 48px;
-                text: "P resumes from the keyboard.";
+                text: "P or Esc resumes from the keyboard. Q returns to the launcher.";
                 color: #c7d0dc;
                 font-size: 13px;
             }
@@ -413,7 +427,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 214px;
                     width: parent.width;
-                    text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
+                    text: "Global: P/Esc pause/resume, R restart, B benchmark, Q launcher, C or F1 controls/back. Losing window focus clears held keys.";
                     color: #c7d0dc;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -424,9 +438,9 @@ export component MainWindow inherits Window {
                 visible: !root.ingame-controls-visible;
                 x: 24px;
                 y: 106px;
-                width: 140px;
+                width: 160px;
                 height: 36px;
-                text: "Resume";
+                text: "Resume (P/Esc)";
                 primary: true;
                 clicked => {
                     root.ingame-resume();
@@ -435,11 +449,11 @@ export component MainWindow inherits Window {
 
             Button {
                 visible: !root.ingame-controls-visible;
-                x: 174px;
+                x: 194px;
                 y: 106px;
-                width: 140px;
+                width: 150px;
                 height: 36px;
-                text: "Restart";
+                text: "Restart (R)";
                 clicked => {
                     root.ingame-restart();
                 }
@@ -447,11 +461,11 @@ export component MainWindow inherits Window {
 
             Button {
                 visible: !root.ingame-controls-visible;
-                x: 324px;
+                x: 354px;
                 y: 106px;
-                width: 152px;
+                width: 160px;
                 height: 36px;
-                text: "Benchmark";
+                text: "Benchmark (B)";
                 clicked => {
                     root.ingame-start-benchmark();
                 }
@@ -461,9 +475,9 @@ export component MainWindow inherits Window {
                 visible: !root.ingame-controls-visible;
                 x: 24px;
                 y: 158px;
-                width: 216px;
+                width: 246px;
                 height: 36px;
-                text: "Return to Launcher";
+                text: "Return to Launcher (Q)";
                 clicked => {
                     root.ingame-return-launcher();
                 }
@@ -471,11 +485,11 @@ export component MainWindow inherits Window {
 
             Button {
                 visible: !root.ingame-controls-visible;
-                x: 260px;
+                x: 290px;
                 y: 158px;
-                width: 216px;
+                width: 246px;
                 height: 36px;
-                text: "Controls";
+                text: "Controls (F1)";
                 clicked => {
                     root.ingame-controls-visible = true;
                 }
@@ -487,7 +501,7 @@ export component MainWindow inherits Window {
                 y: 390px;
                 width: 140px;
                 height: 36px;
-                text: "Back";
+                text: "Back (Esc)";
                 clicked => {
                     root.ingame-controls-visible = false;
                 }
@@ -499,7 +513,7 @@ export component MainWindow inherits Window {
                 y: 390px;
                 width: 140px;
                 height: 36px;
-                text: "Resume";
+                text: "Resume (P)";
                 primary: true;
                 clicked => {
                     root.ingame-resume();
@@ -508,20 +522,72 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
+    launcher-shortcuts := FocusScope {
         visible: root.launcher-visible;
         width: parent.width;
         height: parent.height;
-        background: #050514f4;
+        enabled: root.launcher-visible;
+        focus-on-click: true;
+        focus-on-tab-navigation: false;
+
+        capture-key-pressed(event) => {
+            if (!root.launcher-visible) {
+                return reject;
+            }
+
+            if (event.text == Key.Escape) {
+                if (root.launcher-controls-visible) {
+                    root.launcher-controls-visible = false;
+                } else {
+                    root.launcher-quit();
+                }
+                return accept;
+            }
+
+            if (event.text == Key.F1) {
+                root.launcher-controls-visible = !root.launcher-controls-visible;
+                return accept;
+            }
+
+            if (root.launcher-controls-visible) {
+                if (event.text == "c" || event.text == "C") {
+                    root.launcher-controls-visible = false;
+                    return accept;
+                }
+                return reject;
+            }
+
+            if (seed-edit.has-focus || universe-radius-edit.has-focus || asteroid-rate-edit.has-focus || player-health-edit.has-focus) {
+                return reject;
+            }
+
+            if (event.text == Key.Return) {
+                root.launcher-start-game();
+                return accept;
+            } else if (event.text == "b" || event.text == "B") {
+                root.launcher-start-benchmark();
+                return accept;
+            } else if (event.text == "c" || event.text == "C") {
+                root.launcher-controls-visible = true;
+                return accept;
+            }
+
+            return reject;
+        }
 
         Rectangle {
-            x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
-            width: root.launcher-controls-visible ? 500px : 580px;
-            height: root.launcher-controls-visible ? 540px : 710px;
-            background: #080a12f2;
-            border-color: #596273;
-            border-width: 1px;
+            width: parent.width;
+            height: parent.height;
+            background: #050514f4;
+
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: root.launcher-controls-visible ? 500px : 580px;
+                height: root.launcher-controls-visible ? 540px : 710px;
+                background: #080a12f2;
+                border-color: #596273;
+                border-width: 1px;
 
             Text {
                 x: 24px;
@@ -578,7 +644,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                     }
 
-                    LineEdit {
+                    seed-edit := LineEdit {
                         horizontal-stretch: 1;
                         text <=> root.launcher-seed-text;
                         placeholder-text: "0";
@@ -673,7 +739,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                     }
 
-                    LineEdit {
+                    universe-radius-edit := LineEdit {
                         horizontal-stretch: 1;
                         text <=> root.launcher-universe-radius-text;
                         placeholder-text: "1200";
@@ -733,7 +799,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                     }
 
-                    LineEdit {
+                    asteroid-rate-edit := LineEdit {
                         horizontal-stretch: 1;
                         text <=> root.launcher-asteroid-probability-text;
                         placeholder-text: "20.0";
@@ -755,7 +821,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                     }
 
-                    LineEdit {
+                    player-health-edit := LineEdit {
                         horizontal-stretch: 1;
                         text <=> root.launcher-player-health-text;
                         placeholder-text: "100";
@@ -791,8 +857,8 @@ export component MainWindow inherits Window {
                     spacing: 10px;
 
                     Button {
-                        width: 140px;
-                        text: "Start Game";
+                        width: 170px;
+                        text: "Start Game (Enter)";
                         primary: true;
                         clicked => {
                             root.launcher-start-game();
@@ -801,15 +867,15 @@ export component MainWindow inherits Window {
 
                     Button {
                         width: 150px;
-                        text: "Start Benchmark";
+                        text: "Benchmark (B)";
                         clicked => {
                             root.launcher-start-benchmark();
                         }
                     }
 
                     Button {
-                        width: 142px;
-                        text: "Controls";
+                        width: 150px;
+                        text: "Controls (F1)";
                         clicked => {
                             root.launcher-controls-visible = true;
                         }
@@ -831,7 +897,7 @@ export component MainWindow inherits Window {
 
                     Button {
                         width: 140px;
-                        text: "Quit";
+                        text: "Quit (Esc)";
                         clicked => {
                             root.launcher-quit();
                         }
@@ -925,7 +991,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 214px;
                     width: parent.width;
-                    text: "Global: P pause, R restart, B benchmark. Losing window focus clears held keys.";
+                    text: "Launcher: Enter start, B benchmark, C or F1 controls/back, Esc back/quit.";
                     color: #c7d0dc;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -935,7 +1001,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 270px;
                     width: parent.width;
-                    text: "Wings use the original hold behavior: hold the wing key to close, release to open.";
+                    text: "In game: P pause, R restart, B benchmark. Wings close while held and open on release.";
                     color: #c7d0dc;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -948,7 +1014,7 @@ export component MainWindow inherits Window {
                 y: 456px;
                 width: 140px;
                 height: 36px;
-                text: "Back";
+                text: "Back (Esc)";
                 clicked => {
                     root.launcher-controls-visible = false;
                 }
@@ -960,10 +1026,11 @@ export component MainWindow inherits Window {
                 y: 456px;
                 width: 140px;
                 height: 36px;
-                text: "Quit";
+                text: "Quit (Esc)";
                 clicked => {
                     root.launcher-quit();
                 }
+            }
             }
         }
     }

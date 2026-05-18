@@ -73,7 +73,7 @@ const CANNON_SHELL_RADIUS: f32 = 2.0;
 const LASER_GROWTH_PER_TICK: f32 = 50.0;
 const LASER_BASE_DAMAGE: f32 = 10.0;
 const ASTEROID_RNG_SALT: u64 = 0xA57E_201D_5EED;
-const MAX_ASTEROIDS: usize = 100;
+const MAX_ASTEROIDS: usize = 1_000;
 const ASTEROID_SPAWN_RADIUS_FACTOR: f32 = 0.99;
 const ASTEROID_MIN_RADIUS: f32 = 2.5;
 const ASTEROID_RADIUS_VARIATION: f32 = 5.0;
@@ -119,7 +119,7 @@ const BREAKUP_FRAGMENT_SPEED: f32 = 50.0;
 const BREAKUP_FRAGMENT_OMEGA: f32 = 1.0;
 const BREAKUP_FRAGMENT_DAMAGE_SCALAR: f32 = 0.0;
 const BENCHMARK_RNG_SALT: u64 = 0xBE4C_2026_5EED;
-const BENCHMARK_ASTEROIDS: usize = MAX_ASTEROIDS;
+const BENCHMARK_ASTEROIDS: usize = 100;
 const BENCHMARK_PARTICLES: usize = 1_200;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
@@ -1111,7 +1111,7 @@ fn random_color(rng: &mut SpacewarsRng) -> Color {
 }
 
 fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
-    if asteroid_count(state) > MAX_ASTEROIDS {
+    if asteroid_count(state) >= MAX_ASTEROIDS {
         return;
     }
 
@@ -6800,6 +6800,31 @@ mod tests {
         step(&mut state, &[]);
 
         assert!(state.debris.is_empty());
+    }
+
+    #[test]
+    fn asteroid_spawn_respects_live_asteroid_cap() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 1000.0;
+        let mut state = SpacewarsScenario::init(config, 123);
+        let center = universe_center(state.config.universe_radius as f32);
+        state.debris = (0..MAX_ASTEROIDS)
+            .map(|_| {
+                DebrisState::new(
+                    DebrisKind::Asteroid,
+                    center,
+                    Vec2::ZERO,
+                    ASTEROID_MIN_RADIUS,
+                    ASTEROID_DAMAGE_SCALAR,
+                    Color::DIM_GREY,
+                )
+            })
+            .collect();
+
+        spawn_random_asteroid(&mut state, 1.0 / 60.0);
+
+        assert_eq!(asteroid_count(&state), MAX_ASTEROIDS);
+        assert_eq!(state.debris.len(), MAX_ASTEROIDS);
     }
 
     #[test]

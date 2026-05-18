@@ -1181,7 +1181,7 @@ mod tests {
         assert_eq!(setup.player_2_view_height, 640.0);
 
         let clamped =
-            spacewars_setup_from_values("99999", "on", "off", "999", "0", "1", "99999").unwrap();
+            spacewars_setup_from_values("99999", "on", "off", "9999", "0", "1", "99999").unwrap();
         assert_eq!(clamped.universe_radius, MAX_SPACEWARS_UNIVERSE_RADIUS);
         assert!(clamped.use_planets);
         assert!(!clamped.asteroids_enabled);
@@ -1417,14 +1417,17 @@ mod tests {
     fn spacewars_settings_normalization_clamps_saved_values() {
         let mut settings = Settings::default();
         settings.spacewars.universe_radius = 1;
-        settings.spacewars.asteroid_probability_per_sec = 999.0;
+        settings.spacewars.asteroid_probability_per_sec = 9999.0;
         settings.spacewars.player_health_percent = 0;
         settings.spacewars.player_1_view_height = f32::NAN;
         settings.spacewars.player_2_view_height = 99999.0;
 
         assert!(normalize_spacewars_settings(&mut settings));
         assert_eq!(settings.spacewars.universe_radius, 300);
-        assert_eq!(settings.spacewars.asteroid_probability_per_sec, 100.0);
+        assert_eq!(
+            settings.spacewars.asteroid_probability_per_sec,
+            MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+        );
         assert_eq!(settings.spacewars.player_health_percent, 1);
         assert_eq!(
             settings.spacewars.player_1_view_height,
