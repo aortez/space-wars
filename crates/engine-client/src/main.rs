@@ -78,6 +78,10 @@ struct Args {
     #[arg(long)]
     benchmark_report: Option<PathBuf>,
 
+    /// Settings directory override. Useful for Pi/systemd services.
+    #[arg(long)]
+    config_dir: Option<PathBuf>,
+
     /// Presentation renderer to use for game frames.
     #[arg(long, value_enum)]
     renderer: Option<RendererArg>,
@@ -85,6 +89,18 @@ struct Args {
     /// Internal resolution scale for --renderer raster.
     #[arg(long)]
     raster_scale: Option<f32>,
+
+    /// Request fullscreen presentation for this run.
+    #[arg(long, conflicts_with = "windowed")]
+    fullscreen: bool,
+
+    /// Force windowed presentation even if settings request fullscreen.
+    #[arg(long)]
+    windowed: bool,
+
+    /// Pi/kiosk launch mode: fullscreen, direct launch, and no forced desktop backend.
+    #[arg(long, conflicts_with = "windowed")]
+    kiosk: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
@@ -126,6 +142,7 @@ impl Args {
             || self.seed.is_some()
             || self.renderer.is_some()
             || self.raster_scale.is_some()
+            || self.kiosk
     }
 }
 
@@ -140,7 +157,7 @@ struct EffectiveLaunch {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    let settings_path = settings::settings_path()?;
+    let settings_path = settings_path_from_args(&args)?;
     let loaded_settings = settings::load_settings(&settings_path)?;
     let mut loaded = loaded_settings.settings;
     let mut needs_writeback = loaded_settings.status.needs_writeback();
@@ -199,7 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let settings = Arc::new(RwLock::new(loaded));
     save_startup_settings_if_needed(&settings, &settings_path, needs_writeback)?;
 
-    select_slint_backend()?;
+    select_slint_backend(&args)?;
     let window = MainWindow::new()?;
     let render_timer = Rc::new(RefCell::new(None));
     let scenario_controls = host::new_scenario_controls();
@@ -216,6 +233,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Arc::clone(&settings),
     );
+    apply_video_settings(&window, &args, &settings.read().unwrap());
 
     if args.uses_debug_render() {
         *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
@@ -370,6 +388,26 @@ fn save_startup_settings_if_needed(
     settings::save_settings(&settings, settings_path)?;
     tracing::info!(path = %settings_path.display(), "saved settings.");
     Ok(true)
+}
+
+fn settings_path_from_args(args: &Args) -> Result<PathBuf, settings::SettingsError> {
+    if let Some(config_dir) = &args.config_dir {
+        Ok(config_dir.join(settings::SETTINGS_FILENAME))
+    } else {
+        settings::settings_path()
+    }
+}
+
+fn apply_video_settings(window: &MainWindow, args: &Args, settings: &Settings) {
+    window.set_app_full_screen(effective_fullscreen(args, settings));
+}
+
+fn effective_fullscreen(args: &Args, settings: &Settings) -> bool {
+    if args.windowed {
+        false
+    } else {
+        args.kiosk || args.fullscreen || settings.video.fullscreen
+    }
 }
 
 fn install_launcher_callbacks(
@@ -1013,14 +1051,27 @@ fn bool_from_label(label: &str) -> Result<bool, String> {
     }
 }
 
-fn select_slint_backend() -> Result<(), Box<dyn std::error::Error>> {
+fn select_slint_backend(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let selector = slint::BackendSelector::new();
-    if env::var_os("SLINT_BACKEND").is_some() {
-        selector.select()?;
+    let selector = if let Some(backend_name) = forced_slint_backend(args) {
+        selector.backend_name(backend_name.into())
     } else {
-        selector.backend_name("winit".into()).select()?;
-    }
+        selector
+    };
+    selector.select()?;
     Ok(())
+}
+
+fn forced_slint_backend(args: &Args) -> Option<&'static str> {
+    forced_slint_backend_for_env(args, env::var_os("SLINT_BACKEND").is_some())
+}
+
+fn forced_slint_backend_for_env(args: &Args, slint_backend_is_set: bool) -> Option<&'static str> {
+    if slint_backend_is_set || args.kiosk {
+        None
+    } else {
+        Some("winit")
+    }
 }
 
 fn normalize_log_level(settings: &mut Settings) -> bool {
@@ -1095,8 +1146,12 @@ mod tests {
             benchmark_headless: false,
             benchmark_seconds: 30,
             benchmark_report: None,
+            config_dir: None,
             renderer: None,
             raster_scale: None,
+            fullscreen: false,
+            windowed: false,
+            kiosk: false,
         }
     }
 
@@ -1303,6 +1358,58 @@ mod tests {
         let mut args = base_args();
         args.debug_render = true;
         assert!(should_launch_directly(&args));
+
+        let mut args = base_args();
+        args.kiosk = true;
+        assert!(should_launch_directly(&args));
+
+        let mut args = base_args();
+        args.fullscreen = true;
+        assert!(!should_launch_directly(&args));
+    }
+
+    #[test]
+    fn settings_path_from_args_uses_config_dir_override() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut args = base_args();
+        args.config_dir = Some(dir.path().to_path_buf());
+
+        assert_eq!(
+            settings_path_from_args(&args).unwrap(),
+            dir.path().join(settings::SETTINGS_FILENAME)
+        );
+    }
+
+    #[test]
+    fn effective_fullscreen_uses_cli_and_settings_precedence() {
+        let mut settings = Settings::default();
+        let mut args = base_args();
+        assert!(!effective_fullscreen(&args, &settings));
+
+        settings.video.fullscreen = true;
+        assert!(effective_fullscreen(&args, &settings));
+
+        args.windowed = true;
+        assert!(!effective_fullscreen(&args, &settings));
+
+        args.windowed = false;
+        args.fullscreen = true;
+        settings.video.fullscreen = false;
+        assert!(effective_fullscreen(&args, &settings));
+
+        args.fullscreen = false;
+        args.kiosk = true;
+        assert!(effective_fullscreen(&args, &settings));
+    }
+
+    #[test]
+    fn kiosk_mode_does_not_force_desktop_slint_backend() {
+        let mut args = base_args();
+        assert_eq!(forced_slint_backend_for_env(&args, false), Some("winit"));
+        assert_eq!(forced_slint_backend_for_env(&args, true), None);
+
+        args.kiosk = true;
+        assert_eq!(forced_slint_backend_for_env(&args, false), None);
     }
 
     #[test]

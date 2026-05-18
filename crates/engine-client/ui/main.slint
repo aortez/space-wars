@@ -104,6 +104,7 @@ component PlayerStatusPanel inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
+    in property <bool> app-full-screen: false;
     in property <[ScenePrimitive]> primitives;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
@@ -174,6 +175,7 @@ export component MainWindow inherits Window {
     }
 
     title: "Space-Wars";
+    full-screen: root.app-full-screen;
     preferred-width: 1280px;
     preferred-height: 720px;
     background: #050514;

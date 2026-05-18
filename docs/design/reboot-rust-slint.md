@@ -491,3 +491,12 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M19b: ✅ Make "fast sweep wing" speed apply only while sweep wings are held/closed. Releasing the sweep-wing key clamps back to normal max forward velocity, regardless of whether forward thrust is also held.
 - M19c: ✅ Give escape pods distinct but ship-like controls: they cruise forward automatically at normal ship speed, reverse damps velocity toward zero, and the sweep-wing key temporarily raises the pod cap to full pod speed before release returns to cruise speed.
 - M19d: ✅ Add per-player zoom controls. Match the original key pairs (`U`/`I` for player 1 and `Insert`/`Home` for player 2), keep the current equal default zoom, and expose launcher/pause-menu buttons so zoom can be adjusted without remembering the shortcuts. Persist launcher zoom defaults through the existing settings write path.
+
+### M20: Raspberry Pi readiness
+
+- Get the current local-play build into a shape that can be launched from a Pi image or service without desktop-specific assumptions.
+- M20a: ✅ Add first-pass kiosk/runtime plumbing. `engine-client --kiosk` launches the saved/default scenario directly, requests fullscreen, and stops forcing Slint's desktop `winit` backend so the Pi image can select its configured backend. Add orthogonal `--fullscreen`, `--windowed`, and `--config-dir DIR` options, plus a persisted `video.fullscreen` setting that migrates through the existing safe settings path.
+- M20b: Add a Pi runbook/service slice: document the expected `/var/lib/spacewars/settings.toml` location, the service command, the backend environment chosen by the image, and writable-directory ownership.
+- M20c: Validate on Raspberry Pi 5 hardware with the raster renderer: confirm display backend startup, fullscreen behavior, keyboard input, settings writeback, quit/restart flow, and benchmark FPS at useful raster scales.
+- M20d: Wire crash/restart policy deliberately. The settings model already has `runtime.crash_behavior`; the Pi service should use `Reboot` or process restart behavior explicitly, while desktop/debug runs keep `Freeze`/`--dev` behavior.
+- Acceptance: a Pi image or manual Pi session can start Spacewars in fullscreen local-play mode with persistent settings, stable input, and a known renderer/backend configuration.

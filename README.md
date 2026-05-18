@@ -9,6 +9,18 @@ Initial implementation mostly complete.  Textures and sounds have yet to be done
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
 
+## Raspberry Pi / kiosk launch
+
+The first-pass Pi launch mode is:
+
+```sh
+engine-client --kiosk --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+```
+
+`--kiosk` launches directly, requests fullscreen, and lets the image-selected
+Slint backend run instead of forcing the desktop `winit` backend. The same
+settings directory can also be selected with `SPACEWARS_CONFIG_DIR`.
+
 ## History
 
 - **2008**: Original Java + JOGL game. Binary, assets, and report preserved under

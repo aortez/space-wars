@@ -268,6 +268,7 @@ mod tests {
         assert!(loaded.status.needs_writeback());
         assert_eq!(loaded.settings.last_scenario, None);
         assert_eq!(loaded.settings.video.width, 1280);
+        assert!(!loaded.settings.video.fullscreen);
         assert_eq!(loaded.settings.launch.scenario, "spacewars");
         assert_eq!(loaded.settings.launch.seed, 0);
         assert_eq!(loaded.settings.launch.renderer, RendererSetting::Vector);
@@ -286,6 +287,7 @@ mod tests {
         assert_eq!(loaded.status, LoadStatus::Migrated);
         assert_eq!(loaded.settings.video.width, 1920);
         assert_eq!(loaded.settings.video.height, 720);
+        assert!(!loaded.settings.video.fullscreen);
         assert_eq!(loaded.settings.audio.master_volume, 0.8);
         assert_eq!(loaded.settings.launch.scenario, "spacewars");
         assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
@@ -296,6 +298,7 @@ mod tests {
         assert!(migrated.contains("[video]"));
         assert!(migrated.contains("width = 1920"));
         assert!(migrated.contains("height = 720"));
+        assert!(migrated.contains("fullscreen = false"));
         assert!(migrated.contains("[audio]"));
         assert!(migrated.contains("[launch]"));
         assert!(migrated.contains("[spacewars]"));
@@ -334,6 +337,7 @@ mod tests {
             last_scenario: Some("spacewars".into()),
             video: VideoSettings {
                 width: 1920,
+                fullscreen: true,
                 ..Default::default()
             },
             audio: AudioSettings {
@@ -364,6 +368,7 @@ mod tests {
             Some("spacewars")
         );
         assert_eq!(reloaded.settings.video.width, 1920);
+        assert!(reloaded.settings.video.fullscreen);
         assert!(reloaded.settings.audio.muted);
         assert_eq!(reloaded.settings.launch.scenario, "spacewars");
         assert_eq!(reloaded.settings.launch.seed, 42);

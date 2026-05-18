@@ -107,6 +107,7 @@ pub struct Settings {
 pub struct VideoSettings {
     pub width: u32,
     pub height: u32,
+    pub fullscreen: bool,
     pub vsync: bool,
 }
 
@@ -115,6 +116,7 @@ impl Default for VideoSettings {
         Self {
             width: 1280,
             height: 720,
+            fullscreen: false,
             vsync: true,
         }
     }
