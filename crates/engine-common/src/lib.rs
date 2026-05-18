@@ -14,6 +14,8 @@ pub mod render;
 
 pub use render::*;
 
+pub const DEFAULT_CONTROL_SOCKET: &str = "/tmp/spacewars-control.sock";
+
 // -- Scenario trait -----------------------------------------------------------
 
 /// A scenario is a runnable world hosted by the client or agent.

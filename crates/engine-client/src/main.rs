@@ -5,6 +5,7 @@
 
 mod host;
 mod input;
+mod ipc;
 mod raster;
 mod render;
 mod settings;
@@ -218,6 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    let _control_server = ipc::start_control_server(&window, ipc::control_socket_path());
     let render_timer = Rc::new(RefCell::new(None));
     let scenario_controls = host::new_scenario_controls();
     install_launcher_callbacks(

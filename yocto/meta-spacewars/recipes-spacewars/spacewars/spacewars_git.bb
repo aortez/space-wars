@@ -62,6 +62,7 @@ python () {
 do_install() {
     install -d ${D}${bindir}
     install -m 0755 ${CARGO_BINDIR}/engine-client ${D}${bindir}/engine-client
+    install -m 0755 ${CARGO_BINDIR}/spacewars-cli ${D}${bindir}/spacewars-cli
     install -m 0755 ${CARGO_BINDIR}/engine-agent ${D}${bindir}/engine-agent
     install -m 0755 ${CARGO_BINDIR}/engine-os-manager ${D}${bindir}/engine-os-manager
     install -m 0755 ${WORKDIR}/spacewars-data-init.sh ${D}${bindir}/spacewars-data-init
@@ -86,6 +87,7 @@ SYSTEMD_AUTO_ENABLE = "enable"
 
 FILES:${PN} = " \
     ${bindir}/engine-client \
+    ${bindir}/spacewars-cli \
     ${bindir}/engine-agent \
     ${bindir}/engine-os-manager \
     ${bindir}/spacewars-data-init \

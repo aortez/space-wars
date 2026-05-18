@@ -1328,6 +1328,7 @@ dependencies = [
  "directories",
  "engine-common",
  "engine-core",
+ "png 0.17.16",
  "scenario-null",
  "scenario-spacewars",
  "slint",
@@ -4452,6 +4453,14 @@ dependencies = [
  "web-sys",
  "windows-sys 0.61.2",
  "x11rb",
+]
+
+[[package]]
+name = "spacewars-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "engine-common",
 ]
 
 [[package]]

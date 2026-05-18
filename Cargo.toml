@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-client",
+    "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/null",
@@ -21,6 +22,7 @@ rust-version = "1.85"
 clap = { version = "4", features = ["derive"] }
 directories = "6"
 rand = { version = "0.9", features = ["std_rng"] }
+png = "0.17"
 serde = { version = "1", features = ["derive"] }
 slint = { version = "1", default-features = false }
 slint-build = { version = "1" }

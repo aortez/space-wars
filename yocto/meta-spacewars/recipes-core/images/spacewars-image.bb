@@ -45,6 +45,31 @@ disable_text_console_for_kiosk() {
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " disable_text_console_for_kiosk;"
 
+setup_boot_mount() {
+    install -d ${IMAGE_ROOTFS}/boot
+    install -d ${IMAGE_ROOTFS}/etc/systemd/system/local-fs.target.wants
+
+    cat > ${IMAGE_ROOTFS}/etc/systemd/system/boot.mount << 'EOF'
+[Unit]
+Description=Boot partition
+DefaultDependencies=no
+After=local-fs-pre.target
+Before=local-fs.target
+
+[Mount]
+What=/dev/disk/by-label/boot
+Where=/boot
+Type=vfat
+Options=defaults
+
+[Install]
+WantedBy=local-fs.target
+EOF
+
+    ln -sf ../boot.mount ${IMAGE_ROOTFS}/etc/systemd/system/local-fs.target.wants/boot.mount
+}
+ROOTFS_POSTPROCESS_COMMAND:append = " setup_boot_mount;"
+
 setup_hyperpixel_backlight() {
     install -d ${IMAGE_ROOTFS}/etc/systemd/system
 
