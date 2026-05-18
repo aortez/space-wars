@@ -166,6 +166,7 @@ pub struct Settings {
     pub video:         VideoSettings,     // resolution, backend, vsync — restart-required.
     pub audio:         AudioSettings,     // master volume, mute — live.
     pub controls:      ControlBindings,   // keymap — live.
+    pub launch:        LaunchSettings,    // default scenario, seed, renderer choices.
     pub runtime:       RuntimeSettings,   // crash_behavior live; log_level startup-applied.
     pub last_scenario: Option<String>,    // resume hint.
 }
@@ -327,4 +328,177 @@ Space-Wars/
 4. ✅ Wire Slint into `engine-client`; get an empty window rendering on Linux desktop.
 5. ✅ Cross-compile `engine-client` to `x86_64-pc-windows-gnu` via `cargo zigbuild` (zig + cargo-zigbuild — no MinGW).
 6. ✅ Wire up the settings file: load/save via `directories` crate with `SPACEWARS_CONFIG_DIR` env override, serde-default migration, atomic writes, `Arc<RwLock<Settings>>` sharing, and startup logging config from `runtime.log_level` with `RUST_LOG` override. (`CrashBehavior` persists in the file but the panic handler that consumes it lands with the Pi work.)
-7. First scenario: `scenarios/spacewars` with a `Ship` entity that moves with input, using the 2008 physics constants.
+7. Begin the initial `scenarios/spacewars` port. This is split into the milestones below; the first playable target is **deathmatch-lite**: two ships, keyboard input, fixed timestep, simple vector rendering, no planets, no asteroids, and no weapons until the core loop is proven.
+
+## Initial Spacewars port milestones
+
+The 2008 `Model` couples world generation, entity lists, gravity/collision/update loops, players, planets, projectiles, particles, sounds, and split-view state. The reboot should port it as vertical slices instead of treating "ship moves" as a single step.
+
+Physics fidelity should follow the 2008 behavior, even though the reboot should not port `UWBGL_SceneNode` directly:
+
+- Preserve the fixed 60 Hz update shape from `Model.doPhysics()`: update planets, update each player entity, contain it within the universe, apply planet/sun gravity, then resolve deterministic body contacts. The reboot intentionally avoids the original loop-order artifact where a collision skipped gravity for the collided body and all later bodies.
+- Model collision as the original did: a cheap Low bounds pass followed by a finer High bounds pass. Low bounds were generally coarse spheres. High bounds were still approximate bounding volumes, not exact polygon/SAT tests: circles stayed spheres, laser beams stayed lines, triangle primitives expanded into a `BoundingList` of small spheres over corners/edges/subdivisions, and lists intersected when any nested bound intersected. The reboot can represent this with simple engine-core bounds primitives (`Circle`, `Line`, and lists of circles/lines) instead of the original scene graph.
+- Reproduce triangle High bounds from `UWBGL_PrimitiveTriangle.getTriangleBoundsRecursive()`: seed tiny corner circles inset toward the centroid; compute a recursive circle at each triangle centroid with radius equal to the nearest distance from that centroid to an edge; add it unless its center is already inside an existing circle; subdivide into the three corner subtriangles and the center subtriangle while vertex distance/radius exceeds the original `min_circle_size` threshold (`max(avg_midpoint_distance * 0.15, 2.0)`).
+- Keep planet/sun gravity as the original immediate velocity impulse, without multiplying by `dt` a second time.
+- Port collision response formulas exactly where practical: planet body bounce pushes the entity to the surface, reflects velocity around the body normal, and damps speed to 50%; entity/entity collision uses the original mass-weighted velocity exchange, 90% damping, and overlap separation.
+- Treat spaceports as their own physics path: contact with the spaceport damps velocity and pulls the ship/pod toward the port rather than doing a normal body bounce. Ownership, repair, pod rebuild, sounds, and particles can layer on after the contact behavior exists.
+- Keep deterministic tests at each slice for update order, replay from seed/tick count, collision detection, and collision response.
+
+### M7: ✅ Reference map + core math
+
+- Port gameplay constants from `reference/src-decompiled/Common.java`.
+- Add core math/data primitives in `engine-core`: `Vec2`, angle helpers, color, transform, bounds, and deterministic RNG plumbing.
+- Add `SpacewarsConfig` from `GameConfig.java`; keep the scenario seed explicit rather than hidden in global randomness.
+- Acceptance: `engine-core` has tested pure math/config primitives and keeps the no-UI/no-filesystem boundary.
+
+### M8a: ✅ Render primitive contract
+
+- Expand `engine-common::RenderFrame` beyond empty layers: polygons, circles, lines, text, and later sprite/image handles.
+- Define the camera and world-coordinate conventions shared by scenarios and the client.
+- Do not port `UWBGL_SceneNode` directly. Replace it with simple transforms plus emitted render primitives.
+- Keep this slice free of Slint/client renderer work and scenario visual output.
+- Acceptance: `RenderFrame` can represent circles, lines, polygons, and text; tests cover camera mapping, layer ordering, and frame construction.
+
+### M8b: ✅ Client proof renderer
+
+- Add an `engine-client` renderer adapter boundary from `RenderFrame` to Slint presentation state.
+- Use a batched Slint `Path` proof backend for vector primitives, so adjacent same-style triangles can be drawn as one scene item instead of one UI item per primitive.
+- Add a debug/stress render source behind client flags; this is for renderer proofing only and does not replace M9 scenario hosting.
+- Keep lower-level OpenGL/WGPU or software-raster backends as optimization options if Slint path batching cannot hit the RPi 5 target.
+- Acceptance: `engine-client --debug-render` visibly renders circles, lines, polygons, and text; `--debug-triangles N` exercises thousands of batched triangles; tests cover coordinate projection, z-order flattening, batching, and order preservation around text/style changes.
+
+### M9: ✅ `spacewars` scenario skeleton
+
+- Add `scenarios/spacewars`.
+- Implement `Scenario` with fixed 60 Hz tick.
+- Build initial world state from the original deathmatch preset with universe bounds, two players, and two ships. No planets, weapons, asteroids, particles, pods, or scoring yet.
+- Wire `engine-client --scenario spacewars` to select the new scenario.
+- Keep client scenario selection as a concrete host enum for now; defer dynamic registry/plugin work until more scenarios need it.
+- Acceptance: the client hosts the real scenario, steps it with a fixed timestep, and draws two deterministic ships.
+
+### M10: ✅ Ship flight slice
+
+- Port ship thrust, reverse, turn, wing open/close, wing speed cap, internal brake behavior, and ship bounds from `Ship.java`.
+- Wire the original hard-coded controls from `FinalDlg.handleKeys()`; the 2008 source does not have key remapping.
+- Select Slint's winit backend by default so the client can observe physical `Numpad*` keys for Player 2; still honor an explicit `SLINT_BACKEND` override.
+- Preserve original wing semantics: hold the wing key to close, release it to open. Do not turn this into a toggle.
+- Define scenario actions for thrust, reverse, turn left/right, wing open/close, internal brake, and placeholder weapon actions.
+- Keep brake unbound in the client for now; `Ship.brake()` exists in the original source, but no keyboard caller was found.
+- Keep exhaust trails, weapons, collision, and damage out of this slice.
+- Acceptance: two ships can fly inside a bounded universe with deterministic state tests for thrust, turn, wing transitions, and max-speed behavior.
+
+### M11: World + planets
+
+- M11a: ✅ Port deterministic sun/planet setup from `Model.java` and `Planet.java`, render sun/planets as simple circles, and host `spacewars` with the original default config instead of the temporary deathmatch preset.
+- M11b: ✅ Add planet orbit/update behavior from `Planet.update()`.
+- M11c: ✅ Add planet/sun gravity on ships.
+- M11d: ✅ Add planet/sun body bounds and ship/body collision detection using the original Low/High bounds pattern: circular bodies as spheres/circles and ships as a coarse Low circle plus High lists derived from current ship triangle primitives.
+- M11e: ✅ Add body collision response: apply gravity from all bodies, choose the deepest contact per ship with deterministic body-order tie-breaking, push ship out to `ship_radius + body_radius`, reflect velocity around the body normal, and damp to 50%.
+- M11f: ✅ Add minimal spaceport contact physics and debug rendering: rotating spaceport polygon/bound, landing contact detection, velocity damping, and pull toward the port center. Defer ownership, capture timers, healing, pod rebuild, sounds, and particles.
+- Defer ownership/capture visuals unless needed for debugging.
+- Acceptance: default config creates a recognizable world; ships are pulled by planets, bounce from planet/sun bodies, and settle at spaceports plausibly.
+
+### M11g: Player-centered viewport slice
+
+- Pull player-centered camera work forward before damage/debris/asteroids, because the current whole-universe camera makes manual physics testing too zoomed out to judge.
+- Match the original structure closely enough for testing: `Model.doPhysics()` moves each player's view rectangle to that player's current hero, and `FinalDlg` renders two hero canvases from those rectangles while also keeping smaller world views with visible view rectangles.
+- Add a client/scenario presentation path that can render two equal player-centered views from the same scenario state. Discard the original asymmetric initial view-rectangle sizes; use one shared fixed zoom derived from the reference behavior, then tune the exact zoom after visual comparison.
+- Aim the first pass at the final two-player split layout rather than a temporary single-camera/debug-only view. The small world overview panes can remain deferred until they are useful, but the main player panes should already be structured like the final local-play UI.
+- Keep the world overview/debug camera available behind an explicit debug mode; normal `spacewars` should default to the player-centered view so local testing sees ship/body/debris contacts clearly.
+- Acceptance: `engine-client --scenario spacewars` presents two equal zoomed player-centered views that follow both ships; tests cover camera centers, zoom size, projection behavior, and deterministic frame generation for each player view.
+
+### M12: Damage, debris, and asteroids
+
+- M12a: Add entity life/damage primitives. Ships should carry `life`, `life_max`, and `dead`, initialized from the original `100 * playerHealthPercent / 100` rule. Body contacts should use the original planet damage formula, `velocity.length() * 0.01`, but default to applying it once unless we explicitly decide to retain the Java ship/body double-subtraction quirk.
+- M12b: Port `collideEntities()` as a focused physics helper and use it for ship/ship first: mass-weighted full-vector velocity exchange, 90% damping, and overlap separation based on each body's share of total speed.
+- M12c: Add debris/asteroid entity core. In the original, asteroids, shell-like projectiles, and primitive breakup fragments are all `Debris` variants with position, velocity, radius, omega, damage scalar, life, and mass. Preserve the odd original debris mass/life behavior: mass is `2πr`, life starts at half mass, and damage below 80% life kills/shrinks the debris.
+- M12d: Add ship/debris and debris/debris collision/damage ordering. Ship/debris collision first runs `collideEntities()`, then damages the ship from debris relative velocity and subtracts the same damage from the debris. Debris/debris applies mutual damage before running `collideEntities()`.
+- M12e: Add asteroid spawning, asteroid gravity cadence, and cleanup. Spawn at the end of the tick from deterministic RNG; use the original probability-per-second check, edge-of-universe spawn, roughly inward randomized aim, max speed 200, damage scalar 0.01, and rare huge-asteroid size multiplier. Apply asteroid gravity every 7th frame with scale 7, then remove dead/out-of-bounds debris.
+- Keep cannon shells representable by the debris model, but do not wire cannon firing here; weapons stay in M13. Keep visual particles, primitive breakup effects, pod conversion, and explosion effects deferred unless they block tests.
+- Acceptance: asteroids spawn deterministically from the seed, render visibly in the player-centered views, collide with ships/debris/planets, apply damage, and clean up dead/out-of-bounds entities.
+
+### M13: ✅ Weapons
+
+- Port cannon/shell first because it is simpler and exercises moving projectile behavior.
+- Then port laser continuous firing, line bounds, line-vs-body/list intersections, nearest-hit truncation, and damage falloff.
+- Preserve original munition update order: active weapon updates before ship/debris/planet collision checks, and laser hits truncate the beam at the first intersection.
+- Acceptance: ships can damage each other and debris with cannon and laser fire; weapon behavior is covered by deterministic scenario tests.
+
+### M14: Particles, exhaust, starfield, and assets
+
+- M14a: ✅ Reference investigation and asset decision. The original visual effects are mostly procedural: `BGStarField` emits background star triangles, `ExhaustTrail` emits fading short line/polygon trails from ship thrust/turn/reverse, `Particle` emits fading triangles for impacts, and `Model.destroyPrimatives()` converts entity primitives into debris. The first implementation should keep these as render primitives instead of introducing an image/sprite pipeline.
+- Asset decision: do not move files from `reference/rec` yet. The current renderer does not consume textures, and the original gameplay-significant visuals can be reproduced with polygons, circles, and lines. Revisit asset copying when planet/ship texture support or sound support is deliberately added; at that point copy only selected owned assets into an explicit runtime asset directory instead of reading from `reference/rec`.
+- M14b: ✅ Port `BGStarField` as deterministic scenario state. Generate star triangles within the universe circle from the scenario seed, preserve the low-density fill behavior and subtle color cycling, render it behind sun/planets, and keep star visibility configurable/debuggable without affecting physics replay.
+- M14c: ✅ Port ship exhaust trails. Add per-ship trail state updated each tick, emit trails from thrust, reverse, and turn behavior using the original rough placement/decay rules, remove trails when faded, and render them before ships so the trails sit visually behind the hull.
+- M14d: ✅ Port impact particles. Add a bounded particle list with deterministic random variation, update/fade particles, apply planet gravity every third frame like the original where practical, and spawn particles from laser hits, shell/debris/ship collisions, and body impacts.
+- M14e: ✅ Port primitive breakup effects. When a ship or debris body is destroyed, convert the relevant current primitives into `DebrisKind::Fragment` pieces with outward velocity and omega in the style of `Model.destroyPrimatives()`. Keep pod conversion and scoring consequences deferred to M15 unless breakup needs a death hook.
+- Acceptance: the game starts to visually resemble the 2008 artifact while preserving the render primitive boundary.
+
+### M15: Gameplay loop + HUD
+
+- Port player ownership, planet capture, escape pods, ship rebuild from spaceports, game-over logic, score display, and final split-view/HUD polish.
+- Complete the gameplay consequences that depend on physics contacts: landing ownership timers, ship healing on owned ports, pod-to-ship rebuild timers, ship-to-pod conversion on death, and associated score/life state.
+- M15a: ✅ Add the ship death lifecycle foundation. A dead ship now emits breakup fragments, swaps into an escape pod, and the pod uses pod-specific geometry, damping, movement limits, no weapons, and no further damage death.
+- M15b: ✅ Add planet ownership/capture and owned-spaceport effects: ship healing, escape-pod rebuild progress, and pod-to-ship restoration after the original 8-second build timer.
+- M15c: ✅ Add player-visible status HUD in the split-screen render frames: ship health or pod rebuild progress, owned planet count, and an original-style three-part planet score bar.
+- M15d: ✅ Add the original-style local-play layout foundation in the client: two large player views across the top, two smaller world overview views below, and a reserved center-bottom panel area for later Slint health/score controls.
+- M15e: ✅ Move player health/rebuild and planet score out of scenario render frames into the reserved Slint center panel, leaving scenario frames focused on world rendering.
+- M15f: ✅ Add the game-over lifecycle: a ship lost with no owned planets eliminates that player, the surviving player is marked as winner, input/simulation freeze after a winner, and the Slint center panel reports the result.
+- Add enough remaining UI/HUD to support local two-player arcade play.
+- Acceptance: local two-player arcade mode is playable end-to-end with default config.
+
+### M16: Local-play finish pass
+
+- Close the gaps between "playable" and "comfortable to play repeatedly" before opening a larger subsystem.
+- M16a: ✅ Add post-game reset/new-game flow. After game over, the client prompts for `R`; pressing it reinitializes the current scenario with the same CLI seed, clears held input, and resumes local play.
+- M16b: ✅ Do a source-aided local-play parity sweep. The Java reference is not assumed to be playable; use the decompiled source and preserved assets as the reference, then validate changes manually in the Rust build.
+  - Source findings: `FinalDlg.timerEvent()` updates hero canvases every tick, updates small world canvases periodically, hides the starfield in the world canvases, and shows each player's view rectangle there. The Rust overview panes are useful but do not yet draw player view rectangles or suppress overview starfield noise.
+  - Source findings: `FinalDlg` has Pause and New Game controls. The Rust client now supports post-game reset, but there is no pause or in-game restart control for repeated local testing.
+  - Source findings: `Planet.updateLandingProgress()` gives visible capture feedback by tinting the flag while ownership is being taken and showing the spaceport bounds while a ship is landed. The Rust port changes owned spaceport color after capture, but does not yet expose capture/rebuild progress visibly in the world.
+  - Source findings: `ThreePartScorePanel` draws the free/left/right planet counts inside a three-part bar. The Rust HUD has equivalent counts and fractions, but can be made closer and easier to read.
+  - Intentional deviations for now: keep the fixed final split layout instead of porting `U/I` and `Insert/Home` zoom sliders; keep sounds/textures deferred to a deliberate asset/audio milestone even though the source plays `complete`, `hourglass`, `laser`, `explode`, and `slideoops`.
+- M16c: ✅ Add the most useful local-play polish from the sweep: pause/in-game restart controls, overview player view rectangles, and reduced overview clutter.
+- M16d: ✅ Add capture/rebuild visibility polish: spaceports now tint toward the active player during capture/rebuild progress, draw a landed-spaceport outline while a ship is in contact, and the center HUD planet score bar now shows the three count values inside the bar like the original `ThreePartScorePanel`.
+- M16e: ✅ Add timing/performance visibility. Preserve the original concepts of target FPS/update rate and benchmark-style measured updates-per-second, and add a Rust runtime FPS/UPS display. First pass shows the target rate, measured render FPS, and measured simulation UPS in the center console all the time; if it proves noisy, move it behind a runtime toggle.
+- M16f: ✅ Add a reproducible performance benchmark for the late-game slowdown. The benchmark seeds a deterministic dense Spacewars workload with asteroids, particles, weapons, collisions, and the local-play frame layout. It can be started visually from the UI with `B`, launched directly with `--benchmark`, or measured without a window with `--benchmark-headless --benchmark-seconds N [--benchmark-report path.csv]`.
+- M16g: ✅ Add a renderer investigation spike. Keep Slint-vector rendering as the default, but add `--renderer raster [--raster-scale N]` as an experimental single-image software raster path so benchmark runs can separate Slint scene-item conversion cost from software raster/fill cost. The raster path reuses pixel buffers, caches overview background/mark layers, keeps overview overlays live, uses a starfield visibility cache for player panes, clips rasterization to each pane, and asks Spacewars for raster-specific frames that omit labels and simplify overview debris/particles. `--raster-scale` currently clamps to `0.1..3.0` for low- and high-resolution experiments. Current one-second headless release-build results on the development host after pane clipping and strict background-span body fill fast paths: vector 1.00 reports about 71.2 throughput FPS / 13.5 ms present; raster 1.00 about 579.2 FPS / 1.3 ms present; raster 1.50 about 344.4 FPS / 2.5 ms present; raster 2.00 about 219.7 FPS / 4.2 ms present; raster 3.00 about 100.0 FPS / 9.6 ms present. The body sub-timing still shows sun/planet fills dominate the remaining player-pane body cost, while the world boundary is small after clipped stroke spans. Starfield, effects, ships, debris, and particles remain much smaller in this workload.
+- M16h: ✅ Decide the next major direction after the arcade loop is stable. Chosen direction: scenario/menu/settings UI, because it improves repeated manual testing immediately and gives Pi/runtime work a real settings surface to consume later.
+- Acceptance: local play can be run, finished, restarted, and sanity-checked without restarting the process.
+
+### M17: Launch + settings UX
+
+- Add a practical launcher/settings layer so players can start the game and choose runtime options without remembering CLI flags. Keep CLI flags available for automation and debugging.
+- M17a: ✅ Add persisted launch defaults: scenario, seed, renderer, and raster scale. Old settings files migrate through serde defaults, normalized writeback fills the new group, and startup resolves options with precedence `CLI args > saved launch settings > defaults`.
+- M17b: ✅ Add an initial launcher screen before the game starts. First version offers Start Game, Start Benchmark, scenario selection limited to compiled scenarios, seed, renderer, raster scale, controls/help, and Quit. Explicit CLI launch/debug/benchmark flags still bypass the launcher for automation.
+- M17c: ✅ Wire launcher selections into scenario startup and persist user-selected launch defaults using the existing safe settings write pattern. Starting from the launcher updates `settings.launch` and `last_scenario`; explicit CLI launches remain one-shot overrides.
+- M17d: ✅ Add an in-game pause/menu overlay with Resume, Restart, Return to Launcher, Start Benchmark, and Controls. Keyboard pause now surfaces a clickable menu, while the buttons feed the same host-side restart/benchmark/resume paths as keyboard controls.
+- M17e: ✅ Add a controls/help view that documents the current hard-coded original-style player controls. The same control reference is available from the launcher and the in-game pause menu.
+- M17f: ✅ Polish CLI/settings behavior: CLI launch/debug/benchmark flags remain one-shot overrides and do not rewrite `settings.launch` or `last_scenario`; launcher starts persist through the safe settings write path; invalid saved launch field values fall back field-by-field and get normalized instead of forcing whole-file recovery.
+- Acceptance: a player can launch, configure, play, benchmark, restart, and return to setup from the UI without editing command lines or restarting the process.
+
+### M18: Spacewars game setup UX
+
+- Add a player-facing setup layer for the world/gameplay knobs that make manual testing and local play practical without command-line flags or hand-edited config files. Keep defaults true to the original startup game config unless the player chooses otherwise.
+- M18a: ✅ Add persisted Spacewars setup settings and wire them into scenario startup/restart. Old settings files migrate through serde defaults and normalized writeback. The first persisted setup surface covers values already represented by `SpacewarsConfig`: universe radius, planets on/off, asteroids on/off via spawn probability, asteroid spawn probability, and shared player health.
+- M18b: ✅ Add launcher controls for the persisted Spacewars setup fields. The controls persist through the existing safe settings write path and only apply to normal Spacewars games; benchmark launches keep the deterministic benchmark workload.
+- M18c: ✅ Add a small preset layer once the raw controls exist. Presets cover Original, Small Duel, Dense Asteroids, and Long Game, and write the same settings fields rather than adding a separate scenario fork.
+- M18d: ✅ Add a compact setup summary on the launcher and pause/return flow so it is clear what will start before the player presses Start.
+- M18e: Investigate exact planet count as a separate generator change. The current Rust config follows the original startup shape where planet creation is derived from universe radius and `use_planets`; exposing `num_planets` should wait until the generator can cap or choose planets deliberately without accidentally drifting from source behavior.
+- Acceptance: a player can configure the common Spacewars world setup from the UI, restart with the same setup, and return to the launcher to alter it without editing `settings.toml` or using CLI flags.
+
+### M19: Improve gameplay
+- M19a: ✅ Prevent ship/body collision response from reflecting already-separating velocity back into planets. A ship that has been pushed out of a shallow body overlap can now escape with normal thrust instead of needing sweep-wing speed.
+- M19b: ✅ Make "fast sweep wing" speed apply only while sweep wings are held/closed. Releasing the sweep-wing key clamps back to normal max forward velocity, regardless of whether forward thrust is also held.
+- M19c: ✅ Give escape pods distinct but ship-like controls: they cruise forward automatically at normal ship speed, reverse damps velocity toward zero, and the sweep-wing key temporarily raises the pod cap to full pod speed before release returns to cruise speed.
+- M19d: ✅ Add per-player zoom controls. Match the original key pairs (`U`/`I` for player 1 and `Insert`/`Home` for player 2), keep the current equal default zoom, and expose launcher/pause-menu buttons so zoom can be adjusted without remembering the shortcuts. Persist launcher zoom defaults through the existing settings write path.
+
+### M20: Raspberry Pi readiness
+
+- Get the current local-play build into a shape that can be launched from a Pi image or service without desktop-specific assumptions.
+- M20a: ✅ Add first-pass kiosk/runtime plumbing. `engine-client --kiosk` launches the saved/default scenario directly, requests fullscreen, and stops forcing Slint's desktop `winit` backend so the Pi image can select its configured backend. Add orthogonal `--fullscreen`, `--windowed`, and `--config-dir DIR` options, plus a persisted `video.fullscreen` setting that migrates through the existing safe settings path.
+- M20b: ✅ Add a Pi runbook/service slice: document the expected `/var/lib/spacewars/settings.toml` location, the service command, the backend environment chosen by the image, writable-directory ownership, host dry-run command, and a USB flashing guard. Include an example systemd unit, but keep it image-adjustable until hardware validation confirms the runtime user, binary path, and Slint backend.
+- M20c: ✅ Add initial Yocto image scaffolding. Create `yocto/meta-spacewars`, a KAS config, a `spacewars-image` recipe using the shared `pi-base-image`, a Rust `spacewars` recipe built through `externalsrc cargo_bin`, a Pi-only `engine-client/pi-kiosk` feature for Slint `linuxkms` plus software rendering, and systemd units for persistent data init and kiosk launch.
+- M20d: Build and flash the first image. Expected artifact is `/home/data/workspace/.space-wars-yocto-build/tmp/deploy/images/raspberrypi5/spacewars-image-raspberrypi5.rootfs.wic.gz`; flash with `cd yocto && npm run flash -- --device /dev/sdb` only after confirming `/dev/sdb` is still the intended removable target. The first pass is destructive; later mirror DirtSim's mature data-preserving flash path. The build wrapper keeps `KAS_BUILD_DIR` outside the Rust workspace so Yocto's Rust bootstrap does not discover Space-Wars' `Cargo.toml`.
+- M20e: Validate on Raspberry Pi 5 hardware with the raster renderer: confirm display backend startup, fullscreen behavior, keyboard input, settings writeback, quit/restart flow, and benchmark FPS at useful raster scales.
+- M20f: Wire crash/restart policy deliberately. The settings model already has `runtime.crash_behavior`; the Pi service should use `Reboot` or process restart behavior explicitly, while desktop/debug runs keep `Freeze`/`--dev` behavior.
+- Acceptance: a Pi image or manual Pi session can start Spacewars in fullscreen local-play mode with persistent settings, stable input, and a known renderer/backend configuration.

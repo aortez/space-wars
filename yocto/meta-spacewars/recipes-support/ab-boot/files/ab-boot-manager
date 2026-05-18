@@ -1,0 +1,183 @@
+#!/bin/sh
+# A/B Boot Slot Manager
+# Manages which rootfs partition to boot from.
+
+BOOT_MOUNT="/boot"
+BOOT_LABEL_DEV="/dev/disk/by-label/boot"
+CMDLINE_NAME="cmdline.txt"
+BOOT_FLAG_NAME="boot_slot"
+
+get_root_device() {
+    cat /proc/cmdline | grep -o 'root=[^ ]*' | cut -d= -f2
+}
+
+get_base_device() {
+    root_device=$(get_root_device)
+    echo "$root_device" | sed 's/[0-9]*$//'
+}
+
+# Get current active slot from where we're running.
+get_current_slot() {
+    root_device=$(get_root_device)
+    case "$root_device" in
+        *2|*p2) echo "a" ;;
+        *3|*p3) echo "b" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# Get inactive slot (the one to update).
+get_inactive_slot() {
+    current=$(get_current_slot)
+    if [ "$current" = "a" ]; then
+        echo "b"
+    elif [ "$current" = "b" ]; then
+        echo "a"
+    else
+        echo "error: unknown current slot" >&2
+        return 1
+    fi
+}
+
+# Get device path for a slot.
+get_slot_device() {
+    slot="$1"
+    base_device=$(get_base_device)
+
+    case "$slot" in
+        a) echo "${base_device}2" ;;
+        b) echo "${base_device}3" ;;
+        *) echo "error: invalid slot $slot" >&2; return 1 ;;
+    esac
+}
+
+prepare_boot_dir() {
+    if [ -f "$BOOT_MOUNT/$CMDLINE_NAME" ]; then
+        BOOT_DIR="$BOOT_MOUNT"
+        BOOT_TEMP_DIR=""
+        return 0
+    fi
+
+    if [ ! -e "$BOOT_LABEL_DEV" ]; then
+        echo "error: $BOOT_LABEL_DEV not found" >&2
+        return 1
+    fi
+
+    BOOT_TEMP_DIR=$(mktemp -d)
+    if ! mount "$BOOT_LABEL_DEV" "$BOOT_TEMP_DIR"; then
+        rmdir "$BOOT_TEMP_DIR"
+        BOOT_TEMP_DIR=""
+        return 1
+    fi
+
+    BOOT_DIR="$BOOT_TEMP_DIR"
+    if [ -f "$BOOT_DIR/$CMDLINE_NAME" ]; then
+        return 0
+    fi
+
+    echo "error: $CMDLINE_NAME not found on boot partition" >&2
+    cleanup_boot_dir
+    return 1
+}
+
+cleanup_boot_dir() {
+    if [ -n "${BOOT_TEMP_DIR:-}" ]; then
+        umount "$BOOT_TEMP_DIR"
+        rmdir "$BOOT_TEMP_DIR"
+        BOOT_TEMP_DIR=""
+    fi
+}
+
+# Switch boot to specified slot.
+switch_boot_slot() {
+    new_slot="$1"
+    device=$(get_slot_device "$new_slot")
+
+    if ! prepare_boot_dir; then
+        return 1
+    fi
+    cmdline="$BOOT_DIR/$CMDLINE_NAME"
+    boot_flag="$BOOT_DIR/$BOOT_FLAG_NAME"
+
+    # Replace root= parameter (handle both sda2/sda3 and mmcblk0p2/mmcblk0p3 patterns).
+    sed -i "s|root=/dev/[^[:space:]]*|root=${device}|" "$cmdline"
+
+    # Write slot marker.
+    echo "$new_slot" > "$boot_flag"
+
+    sync "$cmdline" "$boot_flag" 2>/dev/null || sync
+    cleanup_boot_dir
+
+    echo "Boot slot switched to $new_slot ($device)"
+}
+
+# Get data partition device.
+get_data_device() {
+    base_device=$(get_base_device)
+    echo "${base_device}4"
+}
+
+read_boot_flag() {
+    if [ -f "$BOOT_MOUNT/$BOOT_FLAG_NAME" ]; then
+        cat "$BOOT_MOUNT/$BOOT_FLAG_NAME"
+        return 0
+    fi
+
+    if prepare_boot_dir 2>/dev/null; then
+        if [ -f "$BOOT_DIR/$BOOT_FLAG_NAME" ]; then
+            cat "$BOOT_DIR/$BOOT_FLAG_NAME"
+        fi
+        cleanup_boot_dir
+    fi
+}
+
+# Show status.
+show_status() {
+    current=$(get_current_slot)
+    inactive=$(get_inactive_slot)
+    current_dev=$(get_slot_device "$current")
+    inactive_dev=$(get_slot_device "$inactive")
+    data_dev=$(get_data_device)
+
+    echo "Current slot:  $current ($current_dev)"
+    echo "Inactive slot: $inactive ($inactive_dev)"
+    echo "Data partition: $data_dev (persistent)"
+
+    flag=$(read_boot_flag)
+    if [ -n "$flag" ]; then
+        echo "Boot flag:     $flag"
+    fi
+
+    if mountpoint -q /data 2>/dev/null; then
+        echo "Data mount:    mounted"
+    else
+        echo "Data mount:    not mounted"
+    fi
+}
+
+# Main command dispatcher.
+case "$1" in
+    current)
+        get_current_slot
+        ;;
+    inactive)
+        get_inactive_slot
+        ;;
+    inactive-device)
+        slot=$(get_inactive_slot) && get_slot_device "$slot"
+        ;;
+    switch)
+        if [ -z "$2" ]; then
+            echo "usage: $0 switch {a|b}" >&2
+            exit 1
+        fi
+        switch_boot_slot "$2"
+        ;;
+    status)
+        show_status
+        ;;
+    *)
+        echo "usage: $0 {current|inactive|inactive-device|switch|status} [slot]" >&2
+        exit 1
+        ;;
+esac

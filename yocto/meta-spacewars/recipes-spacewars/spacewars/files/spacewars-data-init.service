@@ -1,0 +1,12 @@
+[Unit]
+Description=Initialize Space-Wars persistent data
+After=data.mount persistent-data-init.service
+Requires=data.mount persistent-data-init.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/spacewars-data-init
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

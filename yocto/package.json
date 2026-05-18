@@ -1,0 +1,13 @@
+{
+  "name": "spacewars-yocto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Yocto build and flash tools for Space-Wars",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "flash": "node scripts/flash.mjs",
+    "update": "node scripts/update.mjs",
+    "yolo": "node scripts/yolo-update.mjs"
+  }
+}

@@ -4,9 +4,11 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-client",
+    "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/null",
+    "scenarios/spacewars",
 ]
 
 [workspace.package]
@@ -20,8 +22,9 @@ rust-version = "1.85"
 clap = { version = "4", features = ["derive"] }
 directories = "6"
 rand = { version = "0.9", features = ["std_rng"] }
+png = "0.17"
 serde = { version = "1", features = ["derive"] }
-slint = { version = "1", default-features = true }
+slint = { version = "1", default-features = false }
 slint-build = { version = "1" }
 tempfile = "3"
 toml = "0.9"
@@ -32,3 +35,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 scenario-null = { path = "scenarios/null" }
+scenario-spacewars = { path = "scenarios/spacewars" }

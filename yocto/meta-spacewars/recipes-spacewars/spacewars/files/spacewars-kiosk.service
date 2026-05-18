@@ -1,0 +1,23 @@
+[Unit]
+Description=Space-Wars kiosk
+Requires=spacewars-data-init.service
+Wants=spacewars-seatd.service
+After=spacewars-data-init.service spacewars-seatd.service systemd-user-sessions.service
+
+[Service]
+Type=simple
+User=spacewars
+Group=spacewars
+SupplementaryGroups=input video audio
+Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
+Environment=SLINT_BACKEND=linuxkms-software
+Environment=SLINT_DRM_OUTPUT=DPI-1
+Environment=SLINT_KMS_ROTATION=90
+WorkingDirectory=/data/spacewars
+ExecStart=/usr/bin/engine-client --kiosk --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

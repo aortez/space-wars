@@ -5,7 +5,16 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Serialize,
+    de::{IgnoredAny, MapAccess, SeqAccess, Visitor},
+};
+
+pub mod render;
+
+pub use render::*;
+
+pub const DEFAULT_CONTROL_SOCKET: &str = "/tmp/spacewars-control.sock";
 
 // -- Scenario trait -----------------------------------------------------------
 
@@ -61,22 +70,6 @@ pub struct Observation {
     pub payload: Vec<u8>,
 }
 
-// -- Render frame -------------------------------------------------------------
-
-/// Draw list emitted by a scenario's `render_frame`. The client translates to
-/// Slint draw calls.
-#[derive(Debug, Clone, Default)]
-pub struct RenderFrame {
-    pub layers: Vec<RenderLayer>,
-}
-
-/// Ordered 2D layer within a [`RenderFrame`].
-#[derive(Debug, Clone, Default)]
-pub struct RenderLayer {
-    pub z: i32,
-    // Primitives (sprites, shapes, text) land here once defined.
-}
-
 // -- Errors -------------------------------------------------------------------
 
 /// Expected simulation failures. Invariant violations should `panic!`, not
@@ -105,6 +98,8 @@ pub struct Settings {
     pub video: VideoSettings,
     pub audio: AudioSettings,
     pub controls: ControlBindings,
+    pub launch: LaunchSettings,
+    pub spacewars: SpacewarsSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
 }
@@ -114,6 +109,7 @@ pub struct Settings {
 pub struct VideoSettings {
     pub width: u32,
     pub height: u32,
+    pub fullscreen: bool,
     pub vsync: bool,
 }
 
@@ -122,6 +118,7 @@ impl Default for VideoSettings {
         Self {
             width: 1280,
             height: 720,
+            fullscreen: false,
             vsync: true,
         }
     }
@@ -147,6 +144,522 @@ impl Default for AudioSettings {
 #[serde(default)]
 pub struct ControlBindings {
     // Keymap lands here once the input schema is defined.
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LaunchSettings {
+    #[serde(
+        default = "default_launch_scenario",
+        deserialize_with = "deserialize_launch_scenario"
+    )]
+    pub scenario: String,
+    #[serde(
+        default = "default_launch_seed",
+        deserialize_with = "deserialize_launch_seed"
+    )]
+    pub seed: u64,
+    #[serde(default = "default_launch_renderer")]
+    pub renderer: RendererSetting,
+    #[serde(
+        default = "default_launch_raster_scale",
+        deserialize_with = "deserialize_launch_raster_scale"
+    )]
+    pub raster_scale: f32,
+}
+
+impl Default for LaunchSettings {
+    fn default() -> Self {
+        Self {
+            scenario: "spacewars".into(),
+            seed: 0,
+            renderer: RendererSetting::Vector,
+            raster_scale: 1.0,
+        }
+    }
+}
+
+fn default_launch_scenario() -> String {
+    "spacewars".into()
+}
+
+const fn default_launch_seed() -> u64 {
+    0
+}
+
+const fn default_launch_renderer() -> RendererSetting {
+    RendererSetting::Vector
+}
+
+const fn default_launch_raster_scale() -> f32 {
+    1.0
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RendererSetting {
+    #[default]
+    Vector,
+    Raster,
+}
+
+impl<'de> Deserialize<'de> for RendererSetting {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(RendererSettingVisitor)
+    }
+}
+
+struct RendererSettingVisitor;
+
+impl<'de> Visitor<'de> for RendererSettingVisitor {
+    type Value = RendererSetting;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a renderer name")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(match value {
+            "vector" => RendererSetting::Vector,
+            "raster" => RendererSetting::Raster,
+            _ => default_launch_renderer(),
+        })
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_str(value.as_str())
+    }
+
+    fn visit_bool<E>(self, _value: bool) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_i64<E>(self, _value: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_u64<E>(self, _value: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_f64<E>(self, _value: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        while seq.next_element::<IgnoredAny>()?.is_some() {}
+        Ok(default_launch_renderer())
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+        Ok(default_launch_renderer())
+    }
+}
+
+fn deserialize_launch_scenario<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserializer.deserialize_any(LaunchScenarioVisitor)
+}
+
+struct LaunchScenarioVisitor;
+
+impl<'de> Visitor<'de> for LaunchScenarioVisitor {
+    type Value = String;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a scenario name")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value.into())
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value)
+    }
+
+    fn visit_bool<E>(self, _value: bool) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_i64<E>(self, _value: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_u64<E>(self, _value: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_f64<E>(self, _value: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        while seq.next_element::<IgnoredAny>()?.is_some() {}
+        Ok(default_launch_scenario())
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+        Ok(default_launch_scenario())
+    }
+}
+
+fn deserialize_launch_seed<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserializer.deserialize_any(LaunchSeedVisitor)
+}
+
+struct LaunchSeedVisitor;
+
+impl<'de> Visitor<'de> for LaunchSeedVisitor {
+    type Value = u64;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a non-negative integer seed")
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value)
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(u64::try_from(value).unwrap_or_else(|_| default_launch_seed()))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        if value.is_finite() && value >= 0.0 && value.fract() == 0.0 && value <= u64::MAX as f64 {
+            Ok(value as u64)
+        } else {
+            Ok(default_launch_seed())
+        }
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| default_launch_seed()))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_str(value.as_str())
+    }
+
+    fn visit_bool<E>(self, _value: bool) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_seed())
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_seed())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        while seq.next_element::<IgnoredAny>()?.is_some() {}
+        Ok(default_launch_seed())
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+        Ok(default_launch_seed())
+    }
+}
+
+fn deserialize_launch_raster_scale<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserializer.deserialize_any(LaunchRasterScaleVisitor)
+}
+
+struct LaunchRasterScaleVisitor;
+
+impl<'de> Visitor<'de> for LaunchRasterScaleVisitor {
+    type Value = f32;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a raster scale number")
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value as f32)
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value as f32)
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value as f32)
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(value
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| default_launch_raster_scale()))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        self.visit_str(value.as_str())
+    }
+
+    fn visit_bool<E>(self, _value: bool) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_raster_scale())
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(default_launch_raster_scale())
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        while seq.next_element::<IgnoredAny>()?.is_some() {}
+        Ok(default_launch_raster_scale())
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+        Ok(default_launch_raster_scale())
+    }
+}
+
+pub const DEFAULT_SPACEWARS_UNIVERSE_RADIUS: u32 = 1200;
+pub const MIN_SPACEWARS_UNIVERSE_RADIUS: u32 = 300;
+pub const MAX_SPACEWARS_UNIVERSE_RADIUS: u32 = 10_000;
+pub const DEFAULT_SPACEWARS_USE_PLANETS: bool = true;
+pub const DEFAULT_SPACEWARS_ASTEROIDS_ENABLED: bool = true;
+pub const DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 20.0;
+pub const MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 0.0;
+pub const MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC: f32 = 1000.0;
+pub const DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 100;
+pub const MIN_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 1;
+pub const MAX_SPACEWARS_PLAYER_HEALTH_PERCENT: u32 = 500;
+pub const DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 320.0;
+pub const MIN_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 15.0;
+pub const MAX_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 30_000.0;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SpacewarsSettings {
+    #[serde(default = "default_spacewars_universe_radius")]
+    pub universe_radius: u32,
+    #[serde(default = "default_spacewars_use_planets")]
+    pub use_planets: bool,
+    #[serde(default = "default_spacewars_asteroids_enabled")]
+    pub asteroids_enabled: bool,
+    #[serde(default = "default_spacewars_asteroid_probability_per_sec")]
+    pub asteroid_probability_per_sec: f32,
+    #[serde(default = "default_spacewars_player_health_percent")]
+    pub player_health_percent: u32,
+    #[serde(default = "default_spacewars_player_view_height")]
+    pub player_1_view_height: f32,
+    #[serde(default = "default_spacewars_player_view_height")]
+    pub player_2_view_height: f32,
+}
+
+impl Default for SpacewarsSettings {
+    fn default() -> Self {
+        Self {
+            universe_radius: DEFAULT_SPACEWARS_UNIVERSE_RADIUS,
+            use_planets: DEFAULT_SPACEWARS_USE_PLANETS,
+            asteroids_enabled: DEFAULT_SPACEWARS_ASTEROIDS_ENABLED,
+            asteroid_probability_per_sec: DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+            player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
+            player_1_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            player_2_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+        }
+    }
+}
+
+impl SpacewarsSettings {
+    pub fn normalized(&self) -> Self {
+        Self {
+            universe_radius: self
+                .universe_radius
+                .clamp(MIN_SPACEWARS_UNIVERSE_RADIUS, MAX_SPACEWARS_UNIVERSE_RADIUS),
+            use_planets: self.use_planets,
+            asteroids_enabled: self.asteroids_enabled,
+            asteroid_probability_per_sec: normalize_spacewars_asteroid_probability(
+                self.asteroid_probability_per_sec,
+            ),
+            player_health_percent: self.player_health_percent.clamp(
+                MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
+                MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+            ),
+            player_1_view_height: normalize_spacewars_player_view_height(self.player_1_view_height),
+            player_2_view_height: normalize_spacewars_player_view_height(self.player_2_view_height),
+        }
+    }
+}
+
+const fn default_spacewars_universe_radius() -> u32 {
+    DEFAULT_SPACEWARS_UNIVERSE_RADIUS
+}
+
+const fn default_spacewars_use_planets() -> bool {
+    DEFAULT_SPACEWARS_USE_PLANETS
+}
+
+const fn default_spacewars_asteroids_enabled() -> bool {
+    DEFAULT_SPACEWARS_ASTEROIDS_ENABLED
+}
+
+const fn default_spacewars_asteroid_probability_per_sec() -> f32 {
+    DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+}
+
+const fn default_spacewars_player_health_percent() -> u32 {
+    DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT
+}
+
+const fn default_spacewars_player_view_height() -> f32 {
+    DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
+}
+
+fn normalize_spacewars_asteroid_probability(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(
+            MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+            MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+        )
+    } else {
+        DEFAULT_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC
+    }
+}
+
+fn normalize_spacewars_player_view_height(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(
+            MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
+        )
+    } else {
+        DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
