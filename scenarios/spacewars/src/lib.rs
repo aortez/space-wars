@@ -28,6 +28,7 @@ const SUN_LAYER: i32 = -15;
 const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
 const SPACEPORT_FEEDBACK_LAYER: i32 = -4;
+const PLANET_OWNERSHIP_LAYER: i32 = -3;
 const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
 const DEBRIS_LAYER: i32 = 1;
@@ -54,6 +55,13 @@ const SPACEPORT_OUTER_POINTS: usize = 15;
 const SPACEPORT_INNER_POINTS: usize = 7;
 const SPACEPORT_DAMPING: f32 = 0.94;
 const SPACEPORT_PULL_SCALE: f32 = 3.0;
+const FLAG_CENTER_RADIUS: f32 = 6.0;
+const FLAG_SCALE_FACTOR: f32 = 0.6;
+const FLAG_HEIGHT_FACTOR: f32 = 0.3;
+const FLAG_WIDTH_FACTOR: f32 = 0.45;
+const FLAG_STEM_FACTOR: f32 = 0.7;
+const FLAG_RADIUS_DIVISOR: f32 = 15.0;
+const OVERVIEW_OWNERSHIP_STROKE_WIDTH: f32 = 2.25;
 const PLANET_CAPTURE_SECS: f32 = 4.0;
 const POD_REBUILD_SECS: f32 = 8.0;
 const OWNED_SPACEPORT_HEAL_PER_SEC: f32 = 3.0;
@@ -3729,7 +3737,11 @@ fn render_state_with_camera(
             with_alpha(render_color(planet.color), 1.0),
             RenderColor::rgba(0.72, 0.78, 0.84, 1.0),
         );
+        if options.show_planet_ownership_halo {
+            render_planet_ownership_halo(&mut frame, state, planet);
+        }
         render_spaceport(&mut frame, state, planet);
+        render_planet_flags(&mut frame, state, planet);
     }
 
     if options.show_exhaust {
@@ -3776,6 +3788,7 @@ struct RenderOptions {
     show_starfield: bool,
     show_exhaust: bool,
     show_particles: bool,
+    show_planet_ownership_halo: bool,
     debris_style: DebrisRenderStyle,
     player_view: Option<usize>,
 }
@@ -3787,6 +3800,7 @@ impl RenderOptions {
             show_starfield: true,
             show_exhaust: true,
             show_particles: true,
+            show_planet_ownership_halo: false,
             debris_style: DebrisRenderStyle::Full,
             player_view: None,
         }
@@ -3796,9 +3810,10 @@ impl RenderOptions {
         Self {
             show_ship_labels: false,
             show_starfield: false,
-            show_exhaust: true,
-            show_particles: true,
-            debris_style: DebrisRenderStyle::Full,
+            show_exhaust: false,
+            show_particles: false,
+            show_planet_ownership_halo: true,
+            debris_style: DebrisRenderStyle::SimpleMarks,
             player_view: Some(player),
         }
     }
@@ -3809,6 +3824,7 @@ impl RenderOptions {
             show_starfield: true,
             show_exhaust: true,
             show_particles: true,
+            show_planet_ownership_halo: false,
             debris_style: DebrisRenderStyle::Full,
             player_view: None,
         }
@@ -3820,6 +3836,7 @@ impl RenderOptions {
             show_starfield: false,
             show_exhaust: false,
             show_particles: false,
+            show_planet_ownership_halo: true,
             debris_style: DebrisRenderStyle::SimpleMarks,
             player_view: Some(player),
         }
@@ -4069,6 +4086,105 @@ fn render_body(
             stroke: Some(Stroke::new(stroke, 1.25)),
         }),
     );
+}
+
+fn render_planet_ownership_halo(
+    frame: &mut RenderFrame,
+    state: &SpacewarsState,
+    planet: &PlanetState,
+) {
+    let Some(color) = planet
+        .owner_id
+        .and_then(|owner| state.players.get(owner))
+        .map(|player| with_alpha(render_color(player.color), 0.95))
+    else {
+        return;
+    };
+
+    frame.push_primitive(
+        PLANET_OWNERSHIP_LAYER,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(planet.position),
+            radius: planet.radius,
+            fill: None,
+            stroke: Some(Stroke::new(color, OVERVIEW_OWNERSHIP_STROKE_WIDTH)),
+        }),
+    );
+}
+
+fn render_planet_flags(frame: &mut RenderFrame, state: &SpacewarsState, planet: &PlanetState) {
+    let Some(color) = planet_flag_color(state, planet) else {
+        return;
+    };
+
+    frame.push_primitive(
+        PLANET_OWNERSHIP_LAYER,
+        RenderPrimitive::Circle(RenderCircle::filled(
+            render_point(planet.position),
+            FLAG_CENTER_RADIUS,
+            color,
+        )),
+    );
+
+    let flag_count = (planet.radius / FLAG_RADIUS_DIVISOR).floor() as usize;
+    if flag_count == 0 {
+        return;
+    }
+
+    let scale = planet.radius * FLAG_SCALE_FACTOR;
+    let stem_length = scale * FLAG_STEM_FACTOR;
+    let flag_height = scale * FLAG_HEIGHT_FACTOR;
+    let flag_width = scale * FLAG_WIDTH_FACTOR;
+
+    for index in 0..flag_count {
+        let theta = planet.wrapper_angle - core::f32::consts::FRAC_PI_4
+            + index as f32 * core::f32::consts::TAU / flag_count as f32;
+        let radial = Vec2::from_radians(theta);
+        let tangent = radial.rotate_radians(core::f32::consts::FRAC_PI_2);
+        let stem = planet.position + radial * stem_length;
+        let tip = stem + radial * flag_height;
+        let outer_side = tip + tangent * flag_width;
+        let inner_side = stem + tangent * flag_width;
+
+        frame.push_primitive(
+            PLANET_OWNERSHIP_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon::filled(
+                vec![
+                    render_point(stem),
+                    render_point(tip),
+                    render_point(outer_side),
+                    render_point(inner_side),
+                ],
+                color,
+            )),
+        );
+        frame.push_primitive(
+            PLANET_OWNERSHIP_LAYER,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(planet.position),
+                render_point(stem),
+                Stroke::new(color, 1.0),
+            )),
+        );
+    }
+}
+
+fn planet_flag_color(state: &SpacewarsState, planet: &PlanetState) -> Option<RenderColor> {
+    if let Some(ship) = landing_ship(state, planet)
+        && planet.owner_id != Some(ship.owner_id)
+        && ship.form != ShipForm::EscapePod
+    {
+        let progress = capture_progress(planet);
+        if progress > 0.0 {
+            let player = state.players.get(ship.owner_id)?;
+            return Some(with_intensity(render_color(player.color), progress));
+        }
+    }
+
+    planet
+        .owner_id
+        .and_then(|owner| state.players.get(owner))
+        .map(|player| render_color(player.color))
 }
 
 fn render_spaceport(frame: &mut RenderFrame, state: &SpacewarsState, planet: &PlanetState) {
@@ -4374,6 +4490,16 @@ fn dim(color: RenderColor, scale: f32) -> RenderColor {
         (color.g * scale).clamp(0.0, 1.0),
         (color.b * scale).clamp(0.0, 1.0),
         color.a,
+    )
+}
+
+fn with_intensity(color: RenderColor, intensity: f32) -> RenderColor {
+    let intensity = intensity.clamp(0.0, 1.0);
+    RenderColor::rgba(
+        color.r * intensity,
+        color.g * intensity,
+        color.b * intensity,
+        color.a * intensity,
     )
 }
 
@@ -5512,6 +5638,93 @@ mod tests {
         assert_close(actual.g, expected.g);
         assert_close(actual.b, expected.b);
         assert_close(actual.a, 0.82);
+    }
+
+    #[test]
+    fn owned_planet_renders_original_flags_and_overview_halo() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        let expected_color = render_color(state.players[0].color);
+        let flag_count = (state.planets[0].radius / FLAG_RADIUS_DIVISOR).floor() as usize;
+
+        let player_frame = SpacewarsScenario::render_frame(&state);
+        let player_layer = player_frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == PLANET_OWNERSHIP_LAYER)
+            .expect("owned planet should render an ownership layer");
+
+        assert_eq!(player_layer.primitives.len(), 1 + flag_count * 2);
+        let RenderPrimitive::Circle(center) = &player_layer.primitives[0] else {
+            panic!("first ownership primitive should be the flag center");
+        };
+        assert_eq!(center.radius, FLAG_CENTER_RADIUS);
+        assert_eq!(center.fill, Some(Fill::new(expected_color)));
+        assert!(center.stroke.is_none());
+
+        let overview = render_overview_state(&state, 0);
+        let overview_layer = overview
+            .layers
+            .iter()
+            .find(|layer| layer.z == PLANET_OWNERSHIP_LAYER)
+            .expect("owned planet overview should render ownership");
+
+        assert_eq!(overview_layer.primitives.len(), 2 + flag_count * 2);
+        let RenderPrimitive::Circle(halo) = &overview_layer.primitives[0] else {
+            panic!("first overview ownership primitive should be the halo");
+        };
+        assert!(halo.fill.is_none());
+        assert_eq!(
+            halo.stroke,
+            Some(Stroke::new(
+                with_alpha(expected_color, 0.95),
+                OVERVIEW_OWNERSHIP_STROKE_WIDTH
+            ))
+        );
+    }
+
+    #[test]
+    fn capturing_planet_fades_challenger_flags_without_owned_halo() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].landing_ship = Some(0);
+        state.planets[0].taking_ownership_time = PLANET_CAPTURE_SECS * 0.5;
+        let expected_color = with_intensity(render_color(state.players[0].color), 0.5);
+
+        let overview = render_overview_state(&state, 0);
+        let ownership_layer = overview
+            .layers
+            .iter()
+            .find(|layer| layer.z == PLANET_OWNERSHIP_LAYER)
+            .expect("capturing planet should render flags");
+
+        let circles = ownership_layer
+            .primitives
+            .iter()
+            .filter_map(|primitive| match primitive {
+                RenderPrimitive::Circle(circle) => Some(circle),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(circles.len(), 1, "unowned planet should not have a halo");
+        assert_eq!(circles[0].fill, Some(Fill::new(expected_color)));
+        assert_close(circles[0].fill.unwrap().color.a, 0.5);
+    }
+
+    #[test]
+    fn unowned_planet_does_not_render_ownership_primitives() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+
+        let overview = render_overview_state(&state, 0);
+
+        assert!(
+            overview
+                .layers
+                .iter()
+                .all(|layer| layer.z != PLANET_OWNERSHIP_LAYER)
+        );
     }
 
     #[test]
@@ -7073,7 +7286,15 @@ mod tests {
 
     #[test]
     fn local_play_frames_include_player_views_and_world_overviews() {
-        let state = init_default(123);
+        let mut state = init_default(123);
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(100.0, 100.0),
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
         let frames = SpacewarsScenario::render_local_play_frames(&state);
 
         assert_eq!(frames.len(), 4);
@@ -7092,7 +7313,20 @@ mod tests {
         assert_eq!(text_values(&frames[2]), Vec::<String>::new());
         assert_eq!(text_values(&frames[3]), Vec::<String>::new());
         for (player, frame) in frames[2..].iter().enumerate() {
-            assert!(frame.layers.iter().all(|layer| layer.z != STARFIELD_LAYER));
+            assert!(frame.layers.iter().all(|layer| {
+                !matches!(layer.z, STARFIELD_LAYER | EXHAUST_LAYER | PARTICLE_LAYER)
+            }));
+            let debris_layer = frame
+                .layers
+                .iter()
+                .find(|layer| layer.z == DEBRIS_LAYER)
+                .expect("overview should retain simplified debris marks");
+            assert!(
+                debris_layer
+                    .primitives
+                    .iter()
+                    .all(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
+            );
             let view_layer = frame
                 .layers
                 .iter()

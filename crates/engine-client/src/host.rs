@@ -660,7 +660,7 @@ fn present_frames(
                 &frames,
                 scaled_viewport(viewport, raster_scale),
                 layout,
-                raster::RasterOptions::default(),
+                raster::RasterOptions::for_scale(raster_scale),
             );
             window.set_primitives(ModelRc::new(VecModel::from(Vec::new())));
             window.set_raster_frame(image);
@@ -770,7 +770,7 @@ fn present_frames_for_benchmark(
                 frames,
                 scaled_viewport(BENCHMARK_VIEWPORT, raster_scale),
                 layout,
-                raster::RasterOptions::default(),
+                raster::RasterOptions::for_scale(raster_scale),
             );
             black_box(result.image);
             PresentationStats {
