@@ -19,9 +19,13 @@ use crate::{PrimitiveKind, ScenePrimitive};
 const TRANSPARENT: RenderColor = RenderColor::CLEAR;
 const DEFAULT_VIEWPORT_WIDTH: f32 = 1280.0;
 const DEFAULT_VIEWPORT_HEIGHT: f32 = 720.0;
-const SPACEWARS_TOP_ROW_HEIGHT_RATIO: f32 = 0.58;
-const SPACEWARS_CENTER_PANEL_WIDTH_RATIO: f32 = 0.28;
+const SPACEWARS_MINIMAP_HEIGHT_RATIO: f32 = 0.3;
+const SPACEWARS_MINIMAP_HALF_WIDTH_RATIO: f32 = 0.4;
+const SPACEWARS_MINIMAP_MARGIN_RATIO: f32 = 0.02;
+const SPACEWARS_MINIMAP_MIN_MARGIN: f32 = 4.0;
+const SPACEWARS_MINIMAP_MAX_MARGIN: f32 = 16.0;
 const SPACEWARS_DEBRIS_LAYER: i32 = 1;
+pub(crate) const SPACEWARS_MINIMAP_OPACITY: f32 = 0.74;
 pub(crate) const MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,7 +127,24 @@ pub fn scene_primitives_from_frames_with_layout(
             let minimum_object_diameter = (layout == FrameLayout::SpacewarsLocalPlay
                 && (2..4).contains(&index))
             .then_some(MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER);
+            let opacity = if layout == FrameLayout::SpacewarsLocalPlay && (2..4).contains(&index) {
+                SPACEWARS_MINIMAP_OPACITY
+            } else {
+                1.0
+            };
+            let clip_radius =
+                if layout == FrameLayout::SpacewarsLocalPlay && (2..4).contains(&index) {
+                    viewport.width * 0.5
+                } else {
+                    0.0
+                };
             scene_primitives_from_frame_with_minimum_size(frame, viewport, minimum_object_diameter)
+                .into_iter()
+                .map(move |mut primitive| {
+                    primitive.opacity = opacity;
+                    primitive.clip_radius = clip_radius;
+                    primitive
+                })
         })
         .collect()
 }
@@ -140,22 +161,33 @@ pub(crate) fn frame_viewports(
                 return viewport.split_horizontally(count);
             }
 
-            let top_height = viewport.height * SPACEWARS_TOP_ROW_HEIGHT_RATIO;
-            let bottom_height = viewport.height - top_height;
-            let top_width = viewport.width * 0.5;
-            let center_width = viewport.width * SPACEWARS_CENTER_PANEL_WIDTH_RATIO;
-            let side_width = (viewport.width - center_width) * 0.5;
-            let bottom_y = viewport.y + top_height;
+            let player_width = viewport.width * 0.5;
+            let minimap_size = (viewport.height * SPACEWARS_MINIMAP_HEIGHT_RATIO)
+                .min(player_width * SPACEWARS_MINIMAP_HALF_WIDTH_RATIO);
+            let minimap_margin = (viewport.height * SPACEWARS_MINIMAP_MARGIN_RATIO)
+                .clamp(SPACEWARS_MINIMAP_MIN_MARGIN, SPACEWARS_MINIMAP_MAX_MARGIN)
+                .min(((player_width - minimap_size) * 0.5).max(0.0));
+            let minimap_y = viewport.y + viewport.height - minimap_size - minimap_margin;
 
             let mut viewports = vec![
-                Viewport::with_origin(viewport.x, viewport.y, top_width, top_height),
-                Viewport::with_origin(viewport.x + top_width, viewport.y, top_width, top_height),
-                Viewport::with_origin(viewport.x, bottom_y, side_width, bottom_height),
+                Viewport::with_origin(viewport.x, viewport.y, player_width, viewport.height),
                 Viewport::with_origin(
-                    viewport.x + side_width + center_width,
-                    bottom_y,
-                    side_width,
-                    bottom_height,
+                    viewport.x + player_width,
+                    viewport.y,
+                    player_width,
+                    viewport.height,
+                ),
+                Viewport::with_origin(
+                    viewport.x + minimap_margin,
+                    minimap_y,
+                    minimap_size,
+                    minimap_size,
+                ),
+                Viewport::with_origin(
+                    viewport.x + viewport.width - minimap_size - minimap_margin,
+                    minimap_y,
+                    minimap_size,
+                    minimap_size,
                 ),
             ];
 
@@ -541,6 +573,8 @@ fn text_primitive(text: &RenderText, camera: Camera2, viewport: Viewport) -> Sce
         font_size: text.size,
         text_x: x,
         text_y: y,
+        opacity: 1.0,
+        clip_radius: 0.0,
     }
 }
 
@@ -562,6 +596,8 @@ fn path_primitive(commands: String, style: PathStyle, viewport: Viewport) -> Sce
         font_size: 0.0,
         text_x: 0.0,
         text_y: 0.0,
+        opacity: 1.0,
+        clip_radius: 0.0,
     }
 }
 
@@ -655,7 +691,7 @@ mod tests {
     }
 
     #[test]
-    fn spacewars_local_play_layout_uses_original_style_viewport_bands() {
+    fn spacewars_local_play_layout_uses_full_height_views_and_floating_minimaps() {
         let frames = [
             frame_with_triangle(RenderColor::RED),
             frame_with_triangle(RenderColor::GREEN),
@@ -673,19 +709,23 @@ mod tests {
         assert_close(primitives[0].x, 0.0);
         assert_close(primitives[0].y, 0.0);
         assert_close(primitives[0].width, 500.0);
-        assert_close(primitives[0].height, 406.0);
+        assert_close(primitives[0].height, 700.0);
         assert_close(primitives[1].x, 500.0);
         assert_close(primitives[1].y, 0.0);
         assert_close(primitives[1].width, 500.0);
-        assert_close(primitives[1].height, 406.0);
-        assert_close(primitives[2].x, 0.0);
-        assert_close(primitives[2].y, 406.0);
-        assert_close(primitives[2].width, 360.0);
-        assert_close(primitives[2].height, 294.0);
-        assert_close(primitives[3].x, 640.0);
-        assert_close(primitives[3].y, 406.0);
-        assert_close(primitives[3].width, 360.0);
-        assert_close(primitives[3].height, 294.0);
+        assert_close(primitives[1].height, 700.0);
+        assert_close(primitives[2].x, 14.0);
+        assert_close(primitives[2].y, 486.0);
+        assert_close(primitives[2].width, 200.0);
+        assert_close(primitives[2].height, 200.0);
+        assert_close(primitives[2].opacity, SPACEWARS_MINIMAP_OPACITY);
+        assert_close(primitives[2].clip_radius, 100.0);
+        assert_close(primitives[3].x, 786.0);
+        assert_close(primitives[3].y, 486.0);
+        assert_close(primitives[3].width, 200.0);
+        assert_close(primitives[3].height, 200.0);
+        assert_close(primitives[3].opacity, SPACEWARS_MINIMAP_OPACITY);
+        assert_close(primitives[3].clip_radius, 100.0);
     }
 
     #[test]
