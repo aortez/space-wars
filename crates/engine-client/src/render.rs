@@ -9,8 +9,8 @@ use std::fmt::Write as _;
 use std::time::Duration;
 
 use engine_common::{
-    Camera2, Fill, RenderCircle, RenderColor, RenderFrame, RenderLine, RenderPoint, RenderPolygon,
-    RenderPrimitive, RenderText, Stroke, TextAnchor,
+    Camera2, Fill, PointerAction, PointerPhase, RenderCircle, RenderColor, RenderFrame, RenderLine,
+    RenderPoint, RenderPolygon, RenderPrimitive, RenderText, Stroke, TextAnchor,
 };
 use slint::{Brush, Color, SharedString};
 
@@ -56,6 +56,12 @@ pub struct VectorMinimap {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FrameProjection {
+    pub viewport: Viewport,
+    pub camera: Camera2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Viewport {
     pub x: f32,
     pub y: f32,
@@ -87,6 +93,13 @@ impl Viewport {
 
     pub fn aspect_ratio(self) -> f32 {
         self.width / self.height
+    }
+
+    pub fn contains(self, point: RenderPoint) -> bool {
+        point.x >= self.x
+            && point.x <= self.x + self.width
+            && point.y >= self.y
+            && point.y <= self.y + self.height
     }
 
     pub fn split_horizontally(self, count: usize) -> Vec<Self> {
@@ -225,6 +238,46 @@ pub(crate) fn frame_viewports(
             viewports
         }
     }
+}
+
+pub(crate) fn frame_projections(
+    frames: &[RenderFrame],
+    viewport: Viewport,
+    layout: FrameLayout,
+) -> Vec<FrameProjection> {
+    frames
+        .iter()
+        .zip(frame_viewports(viewport, frames.len(), layout))
+        .map(|(frame, viewport)| FrameProjection {
+            viewport,
+            camera: frame.camera,
+        })
+        .collect()
+}
+
+pub(crate) fn unproject_pointer(
+    projections: &[FrameProjection],
+    screen_position: RenderPoint,
+    phase: PointerPhase,
+) -> Option<PointerAction> {
+    let projection = projections
+        .iter()
+        .rev()
+        .find(|projection| projection.viewport.contains(screen_position))?;
+    let viewport = projection.viewport;
+    if viewport.width <= 0.0 || viewport.height <= 0.0 {
+        return None;
+    }
+    let normalized = RenderPoint::new(
+        (screen_position.x - viewport.x) / viewport.width,
+        (screen_position.y - viewport.y) / viewport.height,
+    );
+    Some(PointerAction {
+        position: projection
+            .camera
+            .viewport_to_world(normalized, viewport.aspect_ratio()),
+        phase,
+    })
 }
 
 /// Convert a scenario frame into ordered Slint scene primitives.
@@ -679,6 +732,64 @@ mod tests {
         let bottom_right = project_point(camera, viewport, RenderPoint::new(100.0, -50.0));
         assert_close(bottom_right.x, 200.0);
         assert_close(bottom_right.y, 100.0);
+    }
+
+    #[test]
+    fn pointer_unprojection_uses_the_matching_frame_camera() {
+        let projection = FrameProjection {
+            viewport: Viewport::with_origin(50.0, 25.0, 200.0, 100.0),
+            camera: Camera2::new(RenderPoint::new(10.0, 20.0), 100.0),
+        };
+
+        let center = unproject_pointer(
+            &[projection],
+            RenderPoint::new(150.0, 75.0),
+            PointerPhase::Drag,
+        )
+        .unwrap();
+        assert_close(center.position.x, 10.0);
+        assert_close(center.position.y, 20.0);
+        assert_eq!(center.phase, PointerPhase::Drag);
+
+        let top_left = unproject_pointer(
+            &[projection],
+            RenderPoint::new(50.0, 25.0),
+            PointerPhase::Press,
+        )
+        .unwrap();
+        assert_close(top_left.position.x, -90.0);
+        assert_close(top_left.position.y, 70.0);
+        assert!(
+            unproject_pointer(
+                &[projection],
+                RenderPoint::new(49.0, 25.0),
+                PointerPhase::Release,
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn pointer_unprojection_prefers_the_topmost_overlapping_frame() {
+        let viewport = Viewport::new(100.0, 100.0);
+        let projections = [
+            FrameProjection {
+                viewport,
+                camera: Camera2::new(RenderPoint::ZERO, 100.0),
+            },
+            FrameProjection {
+                viewport,
+                camera: Camera2::new(RenderPoint::new(200.0, 300.0), 20.0),
+            },
+        ];
+
+        let pointer = unproject_pointer(
+            &projections,
+            RenderPoint::new(50.0, 50.0),
+            PointerPhase::Press,
+        )
+        .unwrap();
+        assert_eq!(pointer.position, RenderPoint::new(200.0, 300.0));
     }
 
     #[test]

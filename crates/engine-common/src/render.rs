@@ -122,6 +122,17 @@ impl Camera2 {
             (bounds.max.y - point.y) / height,
         )
     }
+
+    /// Convert normalized viewport coordinates back into world coordinates.
+    ///
+    /// The input uses `[0, 1]` coordinates with `(0, 0)` at the top left.
+    pub fn viewport_to_world(self, point: RenderPoint, aspect_ratio: f32) -> RenderPoint {
+        let bounds = self.world_bounds(aspect_ratio);
+        RenderPoint::new(
+            bounds.min.x + point.x * bounds.width(),
+            bounds.max.y - point.y * bounds.height(),
+        )
+    }
 }
 
 impl Default for Camera2 {

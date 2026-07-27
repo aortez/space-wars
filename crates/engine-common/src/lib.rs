@@ -55,12 +55,34 @@ pub struct StepResult {
 
 // -- Actions & observations ---------------------------------------------------
 
-/// A player or agent action. Per-scenario schemas extend this via the `kind`
-/// discriminant and scenario-local wrappers.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Action {
-    pub kind: u32,
-    pub payload: Vec<u8>,
+/// A player, pointer, or agent action.
+///
+/// Scenario-specific actions retain the compact discriminant/payload shape.
+/// Pointer input is shared so clients can unproject it once without teaching
+/// simulations about window-system events.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Action {
+    Scenario { kind: u32, payload: Vec<u8> },
+    Pointer(PointerAction),
+}
+
+impl Action {
+    pub fn scenario(kind: u32, payload: Vec<u8>) -> Self {
+        Self::Scenario { kind, payload }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PointerAction {
+    pub position: RenderPoint,
+    pub phase: PointerPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PointerPhase {
+    Press,
+    Drag,
+    Release,
 }
 
 /// What a scenario hands to an agent each tick. Shape is per-scenario; the
@@ -100,6 +122,7 @@ pub struct Settings {
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
     pub spacewars: SpacewarsSettings,
+    pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
 }
@@ -659,6 +682,55 @@ fn normalize_spacewars_player_view_height(value: f32) -> f32 {
         )
     } else {
         DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT
+    }
+}
+
+pub const DEFAULT_PIZZA_DESIRED_BALLS: u32 = 24;
+pub const MAX_PIZZA_DESIRED_BALLS: u32 = 500;
+pub const DEFAULT_PIZZA_BALL_SPAWN_RATE: f32 = 0.10;
+pub const MIN_PIZZA_BALL_SPAWN_RATE: f32 = 0.01;
+pub const MAX_PIZZA_BALL_SPAWN_RATE: f32 = 0.99;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PizzaSettings {
+    #[serde(default = "default_pizza_desired_balls")]
+    pub desired_balls: u32,
+    #[serde(default = "default_pizza_ball_spawn_rate")]
+    pub ball_spawn_rate: f32,
+}
+
+impl Default for PizzaSettings {
+    fn default() -> Self {
+        Self {
+            desired_balls: DEFAULT_PIZZA_DESIRED_BALLS,
+            ball_spawn_rate: DEFAULT_PIZZA_BALL_SPAWN_RATE,
+        }
+    }
+}
+
+impl PizzaSettings {
+    pub fn normalized(&self) -> Self {
+        Self {
+            desired_balls: self.desired_balls.min(MAX_PIZZA_DESIRED_BALLS),
+            ball_spawn_rate: normalize_pizza_ball_spawn_rate(self.ball_spawn_rate),
+        }
+    }
+}
+
+const fn default_pizza_desired_balls() -> u32 {
+    DEFAULT_PIZZA_DESIRED_BALLS
+}
+
+const fn default_pizza_ball_spawn_rate() -> f32 {
+    DEFAULT_PIZZA_BALL_SPAWN_RATE
+}
+
+fn normalize_pizza_ball_spawn_rate(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(MIN_PIZZA_BALL_SPAWN_RATE, MAX_PIZZA_BALL_SPAWN_RATE)
+    } else {
+        DEFAULT_PIZZA_BALL_SPAWN_RATE
     }
 }
 

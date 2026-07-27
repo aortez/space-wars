@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use engine_common::Action;
+use engine_common::{Action, PointerPhase, RenderPoint};
 use scenario_spacewars::SpacewarsAction;
 use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
@@ -19,6 +19,13 @@ pub(crate) type SharedInput = Rc<RefCell<ClientInput>>;
 pub(crate) struct ClientInput {
     pressed: BTreeSet<GameKey>,
     released: BTreeSet<GameKey>,
+    pointer_events: Vec<ScreenPointerEvent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct ScreenPointerEvent {
+    pub position: RenderPoint,
+    pub phase: PointerPhase,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -55,9 +62,10 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
     // `has_winit_window()` stays false until the native window is created during
     // `run()`. The event filter only needs the winit adapter, so install it
     // before the event loop starts.
+    let keyboard_input = Rc::clone(&input);
     window.window().on_winit_window_event(move |_, event| {
         if matches!(event, WindowEvent::Focused(false)) {
-            input.borrow_mut().clear();
+            keyboard_input.borrow_mut().clear();
             return EventResult::Propagate;
         }
 
@@ -66,11 +74,24 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
         };
 
         match state {
-            ElementState::Pressed => input.borrow_mut().press(key),
-            ElementState::Released => input.borrow_mut().release(key),
+            ElementState::Pressed => keyboard_input.borrow_mut().press(key),
+            ElementState::Released => keyboard_input.borrow_mut().release(key),
         }
 
         EventResult::Propagate
+    });
+
+    window.on_scenario_pointer(move |x, y, phase| {
+        let phase = match phase {
+            0 => PointerPhase::Press,
+            1 => PointerPhase::Drag,
+            2 => PointerPhase::Release,
+            _ => return,
+        };
+        input.borrow_mut().pointer_events.push(ScreenPointerEvent {
+            position: RenderPoint::new(x, y),
+            phase,
+        });
     });
 }
 
@@ -154,6 +175,20 @@ impl ClientInput {
     pub(crate) fn clear(&mut self) {
         self.pressed.clear();
         self.released.clear();
+        self.pointer_events.clear();
+    }
+
+    pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
+        std::mem::take(&mut self.pointer_events)
+    }
+
+    pub(crate) fn discard_pointer_events(&mut self) {
+        self.pointer_events.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn push_pointer_event(&mut self, event: ScreenPointerEvent) {
+        self.pointer_events.push(event);
     }
 
     pub(crate) fn press(&mut self, key: GameKey) {

@@ -285,6 +285,7 @@ Space-Wars/
 │   └── engine-sim-server/        # BINARY (Phase 2). Remote scenario host.
 ├── scenarios/
 │   ├── spacewars/                # 2008 arcade port. Uses engine-core.
+│   ├── pizza/                    # Interactive gravity/collision ball simulation.
 │   ├── clock/                    # Uses engine-core.
 │   ├── planetary/                # Uses engine-core.
 │   └── nes-<rom>/                # One per ROM. Uses engine-nes.
@@ -502,3 +503,14 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M20e: Validate on Raspberry Pi 5 hardware with the raster renderer: confirm display backend startup, fullscreen behavior, keyboard input, settings writeback, quit/restart flow, and benchmark FPS at useful raster scales.
 - M20f: Wire crash/restart policy deliberately. The settings model already has `runtime.crash_behavior`; the Pi service should use `Reboot` or process restart behavior explicitly, while desktop/debug runs keep `Freeze`/`--dev` behavior.
 - Acceptance: a Pi image or manual Pi session can start Spacewars in fullscreen local-play mode with persistent settings, stable input, and a known renderer/backend configuration.
+
+### M21: Multiple-scenario framework + Pizza
+
+- Move the client from a Spacewars-specific host to a small compile-time scenario framework, then prove the boundary with a second interactive scenario. The JavaScript implementation in [`aortez.github.io`](https://github.com/aortez/aortez.github.io) is the living behavioral reference for Pizza.
+- M21a: ✅ Replace the hand-written hosted-scenario enum dispatch with an object-safe `ClientScenario` adapter and compile-time registry. Each adapter owns construction from settings, input mapping, frame layout, and optional capabilities. `null` remains hostable for tests but hidden from the launcher; `pizza` and `spacewars` are launcher-visible.
+- M21b: ✅ Add generic pointer actions with world-space position and press/drag/release phases. Slint captures pointer events over the render surface, and the client unprojects them through the matching frame viewport and camera before dispatch.
+- M21c: ✅ Add the deterministic `scenarios/pizza` core at a fixed 60 Hz: seeded capped spawning, containment, exact capped O(n²) gravity/collisions, mass-share overlap correction, 0.9 elasticity, impact damage, and fragment explosions.
+- M21d: ✅ Port Pizza interaction through the generic pointer path: press empty space to create and hold a ball, press an existing ball to grab it, rubber-band toward the cursor while held, and release to fling it.
+- M21e: ✅ Populate the launcher from the registry, show scenario-specific setup/help/capabilities, persist Pizza desired-count and spawn-rate settings through the existing safe write path, and allow either scenario to be selected and started without restarting the client.
+- Deliberately deferred: quadtree broad-phase collision lookup, Barnes–Hut gravity, particle optimization, and related telemetry. Those should follow the JavaScript optimization work only after this exact capped implementation supplies a correctness baseline and useful measurements.
+- Acceptance: the launcher lists Pizza and Spacewars; both can be selected and played in one process; and a future scenario requires a scenario crate, one client adapter, and one registry entry.
