@@ -9,18 +9,22 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use engine_common::{Action, RenderFrame, Scenario, StepResult, TickModel};
-use engine_core::{Color as CoreColor, SpacewarsConfig};
-use scenario_null::{NullConfig, NullScenario};
-use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, SpacewarsState};
+use engine_common::{Action, RenderFrame, Settings, StepResult, TickModel};
+use engine_core::Color as CoreColor;
+use scenario_spacewars::SpacewarsBenchmarkCounts;
 use slint::{
     Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
 };
 
+use crate::MainWindow;
+pub use crate::client_scenarios::RenderBackend;
+use crate::client_scenarios::{
+    self, CenterPanelState, ClientScenario, ScenarioCreateError, ScenarioRegistration,
+    ScenarioStartMode,
+};
 use crate::input::{self, ClientInput};
 use crate::raster;
 use crate::render::{self, Viewport};
-use crate::{MainWindow, ScenePrimitive};
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
@@ -32,7 +36,7 @@ pub struct ScenarioLoopOptions {
     pub renderer: RenderBackend,
     pub raster_scale: f32,
     pub controls: Option<SharedScenarioControls>,
-    pub spacewars_config: SpacewarsConfig,
+    pub settings: Settings,
 }
 
 impl Default for ScenarioLoopOptions {
@@ -42,7 +46,7 @@ impl Default for ScenarioLoopOptions {
             renderer: RenderBackend::default(),
             raster_scale: 1.0,
             controls: None,
-            spacewars_config: SpacewarsConfig::default(),
+            settings: Settings::default(),
         }
     }
 }
@@ -106,24 +110,9 @@ pub struct BenchmarkOptions {
     pub raster_scale: f32,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum RenderBackend {
-    #[default]
-    Vector,
-    Raster,
-}
-
-impl RenderBackend {
-    fn label(self) -> &'static str {
-        match self {
-            Self::Vector => "vector",
-            Self::Raster => "raster",
-        }
-    }
-}
-
 pub enum HostError {
     UnknownScenario { name: String },
+    BenchmarkUnsupported { name: String },
 }
 
 impl fmt::Debug for HostError {
@@ -142,6 +131,9 @@ impl fmt::Display for HostError {
                     scenario_names().join(", ")
                 )
             }
+            HostError::BenchmarkUnsupported { name } => {
+                write!(f, "scenario {name:?} does not support benchmark mode")
+            }
         }
     }
 }
@@ -156,12 +148,25 @@ pub fn validate_scenario(name: &str) -> Result<(), HostError> {
     }
 }
 
-pub fn scenario_names() -> &'static [&'static str] {
-    &["null", "spacewars"]
+pub fn scenario_names() -> Vec<&'static str> {
+    client_scenarios::registrations()
+        .iter()
+        .map(|registration| registration.id)
+        .collect()
+}
+
+pub fn launcher_scenario_names() -> Vec<&'static str> {
+    client_scenarios::launcher_registrations()
+        .map(|registration| registration.id)
+        .collect()
 }
 
 pub fn is_known_scenario(name: &str) -> bool {
-    scenario_names().contains(&name)
+    client_scenarios::registration(name).is_some()
+}
+
+pub fn scenario_registration(name: &str) -> Option<&'static ScenarioRegistration> {
+    client_scenarios::registration(name)
 }
 
 pub fn start_debug_render_loop(
@@ -169,7 +174,8 @@ pub fn start_debug_render_loop(
     stress_triangles: usize,
     renderer: RenderBackend,
 ) -> Timer {
-    set_spacewars_panel(window, None);
+    set_center_panel(window, None);
+    window.set_scenario_pointer_enabled(false);
 
     let timer = Timer::default();
     let weak_window = window.as_weak();
@@ -212,14 +218,23 @@ pub fn start_scenario_loop(
         renderer,
         raster_scale,
         controls,
-        spacewars_config,
+        settings,
     } = options;
     let scenario_name = scenario.to_string();
-    let mut scenario = if start_benchmark {
-        HostedScenario::new_spacewars_benchmark(seed)
+    let initial_viewport = Viewport::from_window(window.window());
+    let start_mode = if start_benchmark {
+        ScenarioStartMode::Benchmark
     } else {
-        HostedScenario::new(&scenario_name, seed, spacewars_config.clone())?
+        ScenarioStartMode::Normal
     };
+    let mut scenario = HostedScenario::new(
+        &scenario_name,
+        seed,
+        &settings,
+        initial_viewport,
+        start_mode,
+    )?;
+    scenario.set_viewport(initial_viewport);
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
     let input = std::rc::Rc::new(std::cell::RefCell::new(ClientInput::default()));
@@ -234,6 +249,11 @@ pub fn start_scenario_loop(
     let mut benchmark_active = start_benchmark;
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let mut raster_renderer = raster::RasterRenderer::new();
+    let initial_frames = scenario.render_frames(renderer, initial_viewport);
+    let mut input_projections =
+        render::frame_projections(&initial_frames, initial_viewport, scenario.frame_layout());
+    let mut projection_viewport = initial_viewport;
+    window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
 
     if benchmark_active {
         tracing::info!(seed, "started visual Spacewars benchmark.");
@@ -250,6 +270,14 @@ pub fn start_scenario_loop(
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        let viewport = Viewport::from_window(window.window());
+        scenario.set_viewport(viewport);
+        if viewport != projection_viewport {
+            let projection_frames = scenario.render_frames(renderer, viewport);
+            input_projections =
+                render::frame_projections(&projection_frames, viewport, scenario.frame_layout());
+            projection_viewport = viewport;
+        }
 
         let mut input = input.borrow_mut();
         let step_result = step_scenario(
@@ -265,10 +293,12 @@ pub fn start_scenario_loop(
             &mut paused,
             &mut benchmark_active,
             window.get_ingame_controls_visible(),
-            &spacewars_config,
+            &settings,
+            viewport,
+            &input_projections,
         );
         if step_result.return_to_launcher {
-            show_running_launcher(&window);
+            window.invoke_ingame_return_launcher();
             return;
         }
         if let Some(visible) = step_result.ingame_controls_visible {
@@ -280,15 +310,18 @@ pub fn start_scenario_loop(
 
         performance.record_frame(now, step_result.updates);
         let performance_text = performance.display_text();
-        set_spacewars_panel(
+        set_center_panel(
             &window,
-            scenario.spacewars_panel_state(paused, benchmark_active, &performance_text),
+            scenario.center_panel_state(paused, benchmark_active, &performance_text),
         );
         set_ingame_menu(&window, paused);
-        let viewport = Viewport::from_window(window.window());
+        window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
+        let frames = scenario.render_frames(renderer, viewport);
+        input_projections = render::frame_projections(&frames, viewport, scenario.frame_layout());
+        projection_viewport = viewport;
         present_frames(
             &window,
-            scenario.render_frames(renderer, viewport),
+            frames,
             scenario.frame_layout(),
             renderer,
             raster_scale,
@@ -345,13 +378,20 @@ fn step_scenario(
     paused: &mut bool,
     benchmark_active: &mut bool,
     ingame_controls_visible: bool,
-    spacewars_config: &SpacewarsConfig,
+    settings: &Settings,
+    viewport: Viewport,
+    input_projections: &[render::FrameProjection],
 ) -> HostStepResult {
+    if input.has_pointer_cancellation() {
+        deliver_pointer_cancellation(scenario, input, input_projections);
+    }
+
     if let Some(request) = controls.take_request() {
         match request {
             ScenarioControlRequest::Resume => {
                 *paused = false;
                 *accumulator = Duration::ZERO;
+                deliver_pointer_cancellation(scenario, input, input_projections);
                 input.clear();
                 tracing::info!(benchmark = *benchmark_active, "resumed from in-game menu.");
                 return HostStepResult::default();
@@ -365,19 +405,25 @@ fn step_scenario(
                     input,
                     paused,
                     benchmark_active,
-                    spacewars_config,
+                    settings,
+                    viewport,
                 );
                 return HostStepResult::default();
             }
             ScenarioControlRequest::Benchmark => {
-                start_benchmark_scenario(
-                    scenario,
-                    seed,
-                    accumulator,
-                    input,
-                    paused,
-                    benchmark_active,
-                );
+                if scenario.registration().capabilities.benchmark {
+                    start_benchmark_scenario(
+                        scenario,
+                        scenario_name,
+                        seed,
+                        accumulator,
+                        input,
+                        paused,
+                        benchmark_active,
+                        settings,
+                        viewport,
+                    );
+                }
                 return HostStepResult::default();
             }
             ScenarioControlRequest::ZoomIn { player } => {
@@ -392,7 +438,19 @@ fn step_scenario(
     }
 
     if input.take_benchmark_requested() {
-        start_benchmark_scenario(scenario, seed, accumulator, input, paused, benchmark_active);
+        if scenario.registration().capabilities.benchmark {
+            start_benchmark_scenario(
+                scenario,
+                scenario_name,
+                seed,
+                accumulator,
+                input,
+                paused,
+                benchmark_active,
+                settings,
+                viewport,
+            );
+        }
         return HostStepResult::default();
     }
 
@@ -405,7 +463,8 @@ fn step_scenario(
             input,
             paused,
             benchmark_active,
-            spacewars_config,
+            settings,
+            viewport,
         );
         return HostStepResult::default();
     }
@@ -429,6 +488,7 @@ fn step_scenario(
 
         *paused = true;
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         tracing::info!(
             paused = *paused,
@@ -440,6 +500,7 @@ fn step_scenario(
 
     if input.take_controls_requested() && *paused && !scenario.is_game_over() {
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         return HostStepResult::set_ingame_controls_visible(!ingame_controls_visible);
     }
@@ -454,6 +515,7 @@ fn step_scenario(
     if input.take_pause_requested() && !scenario.is_game_over() {
         *paused = !*paused;
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         tracing::info!(
             paused = *paused,
@@ -472,7 +534,7 @@ fn step_scenario(
             *accumulator += elapsed;
             let mut steps = 0;
             while *accumulator >= dt && steps < MAX_FIXED_STEPS_PER_TICK {
-                let actions = scenario.actions(input, *benchmark_active);
+                let actions = scenario.actions(input, *benchmark_active, input_projections);
                 scenario.step(&actions, dt);
                 *accumulator -= dt;
                 steps += 1;
@@ -483,7 +545,7 @@ fn step_scenario(
             HostStepResult::updates(steps)
         }
         (TickModel::Variable | TickModel::EmulatorClock, _) => {
-            let actions = scenario.actions(input, *benchmark_active);
+            let actions = scenario.actions(input, *benchmark_active, input_projections);
             scenario.step(&actions, elapsed);
             HostStepResult::updates(1)
         }
@@ -491,16 +553,16 @@ fn step_scenario(
     }
 }
 
-fn show_running_launcher(window: &MainWindow) {
-    window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
-    window.set_vector_minimaps_visible(false);
-    window.set_raster_visible(false);
-    window.set_spacewars_ui_visible(false);
-    window.set_ingame_menu_visible(false);
-    window.set_ingame_controls_visible(false);
-    window.set_launcher_error_text(SharedString::from(""));
-    window.set_launcher_controls_visible(false);
-    window.set_launcher_visible(true);
+fn deliver_pointer_cancellation(
+    scenario: &mut HostedScenario,
+    input: &mut ClientInput,
+    input_projections: &[render::FrameProjection],
+) {
+    input.cancel_pointer();
+    let actions = scenario.pointer_actions(input, input_projections);
+    if !actions.is_empty() {
+        scenario.step(&actions, Duration::ZERO);
+    }
 }
 
 fn restart_scenario(
@@ -511,9 +573,16 @@ fn restart_scenario(
     input: &mut ClientInput,
     paused: &mut bool,
     benchmark_active: &mut bool,
-    spacewars_config: &SpacewarsConfig,
+    settings: &Settings,
+    viewport: Viewport,
 ) {
-    match HostedScenario::new(scenario_name, seed, spacewars_config.clone()) {
+    match HostedScenario::new(
+        scenario_name,
+        seed,
+        settings,
+        viewport,
+        ScenarioStartMode::Normal,
+    ) {
         Ok(reset) => {
             *scenario = reset;
             *accumulator = Duration::ZERO;
@@ -530,13 +599,25 @@ fn restart_scenario(
 
 fn start_benchmark_scenario(
     scenario: &mut HostedScenario,
+    scenario_name: &str,
     seed: u64,
     accumulator: &mut Duration,
     input: &mut ClientInput,
     paused: &mut bool,
     benchmark_active: &mut bool,
+    settings: &Settings,
+    viewport: Viewport,
 ) {
-    *scenario = HostedScenario::new_spacewars_benchmark(seed);
+    let Ok(benchmark) = HostedScenario::new(
+        scenario_name,
+        seed,
+        settings,
+        viewport,
+        ScenarioStartMode::Benchmark,
+    ) else {
+        return;
+    };
+    *scenario = benchmark;
     *accumulator = Duration::ZERO;
     *paused = false;
     *benchmark_active = true;
@@ -704,7 +785,14 @@ pub fn run_spacewars_benchmark(
     options: BenchmarkOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let seconds = options.seconds.max(1);
-    let mut scenario = HostedScenario::new_spacewars_benchmark(options.seed);
+    let mut scenario = HostedScenario::new(
+        "spacewars",
+        options.seed,
+        &Settings::default(),
+        BENCHMARK_VIEWPORT,
+        ScenarioStartMode::Benchmark,
+    )
+    .expect("registered Spacewars benchmark should construct");
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model).unwrap_or(Duration::from_secs_f64(1.0 / 60.0));
     let mut input = ClientInput::default();
@@ -729,7 +817,7 @@ pub fn run_spacewars_benchmark(
             let frame_started = Instant::now();
 
             let step_started = Instant::now();
-            let actions = scenario.actions(&mut input, true);
+            let actions = scenario.actions(&mut input, true, &[]);
             scenario.step(&actions, fixed_dt);
             sample.step_time += step_started.elapsed();
 
@@ -979,109 +1067,95 @@ fn duration_ms(duration: Duration) -> f64 {
     duration.as_secs_f64() * 1000.0
 }
 
-pub(crate) enum HostedScenario {
-    Null(<NullScenario as Scenario>::State),
-    Spacewars(Box<<SpacewarsScenario as Scenario>::State>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct SpacewarsPanelState {
-    player_1: PlayerPanelState,
-    player_2: PlayerPanelState,
-    planet_score_label: String,
-    player_1_planet_fraction: f32,
-    player_2_planet_fraction: f32,
-    player_1_planet_score: String,
-    free_planet_score: String,
-    player_2_planet_score: String,
-    message_text: String,
-    performance_text: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct PlayerPanelState {
-    name: String,
-    status: String,
-    status_fraction: f32,
-    color: CoreColor,
+pub(crate) struct HostedScenario {
+    inner: Box<dyn ClientScenario>,
 }
 
 impl HostedScenario {
     pub(crate) fn new(
         name: &str,
         seed: u64,
-        spacewars_config: SpacewarsConfig,
+        settings: &Settings,
+        viewport: Viewport,
+        mode: ScenarioStartMode,
     ) -> Result<Self, HostError> {
-        match name {
-            "null" => Ok(Self::Null(NullScenario::init(NullConfig, seed))),
-            "spacewars" => Ok(Self::Spacewars(Box::new(SpacewarsScenario::init(
-                spacewars_config,
-                seed,
-            )))),
-            _ => Err(HostError::UnknownScenario { name: name.into() }),
-        }
+        let registration = client_scenarios::registration(name)
+            .ok_or_else(|| HostError::UnknownScenario { name: name.into() })?;
+        let inner = registration
+            .create(seed, settings, viewport, mode)
+            .map_err(|error| match error {
+                ScenarioCreateError::BenchmarkUnsupported { .. } => {
+                    HostError::BenchmarkUnsupported { name: name.into() }
+                }
+            })?;
+        Ok(Self { inner })
     }
 
-    pub(crate) fn new_spacewars_benchmark(seed: u64) -> Self {
-        Self::Spacewars(Box::new(SpacewarsScenario::init_benchmark(seed)))
+    pub(crate) fn registration(&self) -> &'static ScenarioRegistration {
+        self.inner.registration()
     }
 
     pub(crate) fn tick_model(&self) -> TickModel {
-        match self {
-            Self::Null(_) => NullScenario::tick_model(),
-            Self::Spacewars(_) => SpacewarsScenario::tick_model(),
-        }
+        self.inner.tick_model()
     }
 
     pub(crate) fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        match self {
-            Self::Null(state) => NullScenario::step(state, actions, dt),
-            Self::Spacewars(state) => SpacewarsScenario::step(state, actions, dt),
-        }
+        self.inner.step(actions, dt)
     }
 
     pub(crate) fn zoom_player_in(&mut self, player: usize) {
-        if let Self::Spacewars(state) = self {
-            state.zoom_player_in(player);
-        }
+        self.inner.zoom_player_in(player);
     }
 
     pub(crate) fn zoom_player_out(&mut self, player: usize) {
-        if let Self::Spacewars(state) = self {
-            state.zoom_player_out(player);
-        }
+        self.inner.zoom_player_out(player);
     }
 
     fn is_game_over(&self) -> bool {
-        match self {
-            Self::Null(_) => false,
-            Self::Spacewars(state) => state.winner.is_some(),
-        }
+        self.inner.is_game_over()
     }
 
-    pub(crate) fn actions(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
-        match self {
-            Self::Null(_) => Vec::new(),
-            Self::Spacewars(state) if benchmark_active => {
-                SpacewarsScenario::benchmark_actions(state)
-            }
-            Self::Spacewars(_) => input.actions_for_spacewars(),
+    pub(crate) fn actions(
+        &self,
+        input: &mut ClientInput,
+        benchmark_active: bool,
+        input_projections: &[render::FrameProjection],
+    ) -> Vec<Action> {
+        let mut actions = self.inner.map_keyboard_input(input, benchmark_active);
+        actions.extend(self.pointer_actions(input, input_projections));
+        actions
+    }
+
+    fn pointer_actions(
+        &self,
+        input: &mut ClientInput,
+        input_projections: &[render::FrameProjection],
+    ) -> Vec<Action> {
+        if self.registration().capabilities.pointer_input {
+            input
+                .take_pointer_events()
+                .into_iter()
+                .filter_map(|event| {
+                    render::unproject_pointer(input_projections, event.position, event.phase)
+                })
+                .map(Action::Pointer)
+                .collect()
+        } else {
+            input.discard_pointer_events();
+            Vec::new()
         }
     }
 
     pub(crate) fn benchmark_counts(&self) -> SpacewarsBenchmarkCounts {
-        match self {
-            Self::Null(_) => SpacewarsBenchmarkCounts::default(),
-            Self::Spacewars(state) => SpacewarsScenario::benchmark_counts(state),
-        }
+        self.inner.benchmark_counts().unwrap_or_default()
     }
 
     #[cfg(test)]
     pub(crate) fn render_frame(&self) -> RenderFrame {
-        match self {
-            Self::Null(state) => NullScenario::render_frame(state),
-            Self::Spacewars(state) => SpacewarsScenario::render_frame(state),
-        }
+        self.render_frames(RenderBackend::Vector, BENCHMARK_VIEWPORT)
+            .into_iter()
+            .next()
+            .unwrap_or_default()
     }
 
     pub(crate) fn render_frames(
@@ -1089,139 +1163,39 @@ impl HostedScenario {
         renderer: RenderBackend,
         viewport: Viewport,
     ) -> Vec<RenderFrame> {
-        let player_view_aspect_ratio =
-            render::frame_viewports(viewport, 4, render::FrameLayout::SpacewarsLocalPlay)[0]
-                .aspect_ratio();
-        match self {
-            Self::Null(state) => vec![NullScenario::render_frame(state)],
-            Self::Spacewars(state) if renderer == RenderBackend::Raster => {
-                SpacewarsScenario::render_raster_local_play_frames(state, player_view_aspect_ratio)
-            }
-            Self::Spacewars(state) => {
-                SpacewarsScenario::render_local_play_frames(state, player_view_aspect_ratio)
-            }
-        }
+        self.inner.render_frames(renderer, viewport)
     }
 
     pub(crate) fn frame_layout(&self) -> render::FrameLayout {
-        match self {
-            Self::Null(_) => render::FrameLayout::EqualHorizontal,
-            Self::Spacewars(_) => render::FrameLayout::SpacewarsLocalPlay,
-        }
+        self.inner.frame_layout()
     }
 
-    fn spacewars_panel_state(
+    fn set_viewport(&mut self, viewport: Viewport) {
+        self.inner.set_viewport(viewport);
+    }
+
+    fn center_panel_state(
         &self,
         paused: bool,
         benchmark_active: bool,
         performance_text: &str,
-    ) -> Option<SpacewarsPanelState> {
-        match self {
-            Self::Null(_) => None,
-            Self::Spacewars(state) => Some(spacewars_panel_state(
-                state,
-                paused,
-                benchmark_active,
-                performance_text,
-            )),
-        }
+    ) -> Option<CenterPanelState> {
+        self.inner
+            .center_panel_state(paused, benchmark_active, performance_text)
+    }
+
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self.inner.as_any()
+    }
+
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self.inner.as_any_mut()
     }
 }
 
-fn spacewars_panel_state(
-    state: &SpacewarsState,
-    paused: bool,
-    benchmark_active: bool,
-    performance_text: &str,
-) -> SpacewarsPanelState {
-    let player_1_planets = state.players[0].planet_count;
-    let player_2_planets = state.players[1].planet_count;
-    let free_planets = state
-        .planets
-        .len()
-        .saturating_sub(player_1_planets + player_2_planets);
-    let total_planets = state.planets.len().max(1) as f32;
-
-    SpacewarsPanelState {
-        player_1: player_panel_state(state, 0),
-        player_2: player_panel_state(state, 1),
-        planet_score_label: format!(
-            "Planets  P1 {player_1_planets} | Free {free_planets} | P2 {player_2_planets}"
-        ),
-        player_1_planet_fraction: player_1_planets as f32 / total_planets,
-        player_2_planet_fraction: player_2_planets as f32 / total_planets,
-        player_1_planet_score: planet_score_text(player_1_planets),
-        free_planet_score: planet_score_text(free_planets),
-        player_2_planet_score: planet_score_text(player_2_planets),
-        message_text: spacewars_panel_message(state, paused, benchmark_active),
-        performance_text: performance_text.into(),
-    }
-}
-
-fn planet_score_text(count: usize) -> String {
-    if count == 0 {
-        String::new()
-    } else {
-        count.to_string()
-    }
-}
-
-fn spacewars_panel_message(state: &SpacewarsState, paused: bool, benchmark_active: bool) -> String {
-    if let Some(winner) = state.winner.and_then(|winner| state.players.get(winner)) {
-        return format!("P{} Wins | R Restart | B Bench | Esc Launch", winner.id + 1);
-    }
-
-    if benchmark_active && paused {
-        "Bench Paused | P/Esc Resume | B Reset | Q Launch".into()
-    } else if benchmark_active {
-        "Bench | P/Esc Pause | B Reset | R Game".into()
-    } else if paused {
-        "Paused | P/Esc Resume | R Restart | B Bench | Q Launch".into()
-    } else {
-        "P/Esc Pause | R Restart | B Bench".into()
-    }
-}
-
-fn player_panel_state(state: &SpacewarsState, player_index: usize) -> PlayerPanelState {
-    let player = &state.players[player_index];
-    let ship = &state.ships[player_index];
-    if player.eliminated {
-        return PlayerPanelState {
-            name: format!("Player {}: {}", player.id + 1, player.name),
-            status: "Eliminated".into(),
-            status_fraction: 0.0,
-            color: player.color,
-        };
-    }
-
-    let status_fraction = ship_life_fraction(ship.life, ship.life_max);
-    let percent = display_percent(status_fraction);
-    let label = match ship.form {
-        ShipForm::Ship => "Ship Health",
-        ShipForm::EscapePod => "Pod Rebuild",
-    };
-
-    PlayerPanelState {
-        name: format!("Player {}: {}", player.id + 1, player.name),
-        status: format!("{label}: {percent}%"),
-        status_fraction,
-        color: player.color,
-    }
-}
-
-fn ship_life_fraction(life: f32, life_max: f32) -> f32 {
-    if life_max <= 0.0 {
-        return 0.0;
-    }
-
-    (life / life_max).clamp(0.0, 1.0)
-}
-
-fn display_percent(fraction: f32) -> u32 {
-    (fraction.clamp(0.0, 1.0) * 100.0).round() as u32
-}
-
-fn set_spacewars_panel(window: &MainWindow, state: Option<SpacewarsPanelState>) {
+fn set_center_panel(window: &MainWindow, state: Option<CenterPanelState>) {
     let Some(state) = state else {
         window.set_spacewars_ui_visible(false);
         return;
@@ -1258,9 +1232,66 @@ fn brush_from_core_color(color: CoreColor) -> Brush {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine_common::RenderPoint;
+    use engine_core::SpacewarsConfig;
+    use scenario_spacewars::{ShipForm, SpacewarsState};
+
+    use crate::client_scenarios::{PizzaClientScenario, SpacewarsClientScenario};
+    use crate::input::ScreenPointerEvent;
+
+    const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 
     fn hosted_scenario(name: &str, seed: u64) -> Result<HostedScenario, HostError> {
-        HostedScenario::new(name, seed, SpacewarsConfig::default())
+        HostedScenario::new(
+            name,
+            seed,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+    }
+
+    fn settings_from_config(config: &SpacewarsConfig) -> Settings {
+        let mut settings = Settings::default();
+        settings.spacewars.universe_radius = config.universe_radius;
+        settings.spacewars.use_planets = config.use_planets;
+        settings.spacewars.asteroids_enabled = config.asteroid_probability_per_sec > 0.0;
+        settings.spacewars.asteroid_probability_per_sec = config.asteroid_probability_per_sec;
+        settings.spacewars.player_health_percent = config.players[0].health_percent;
+        settings.spacewars.player_1_view_height = config.player_view_heights[0];
+        settings.spacewars.player_2_view_height = config.player_view_heights[1];
+        settings
+    }
+
+    fn hosted_spacewars_with_config(
+        seed: u64,
+        config: &SpacewarsConfig,
+    ) -> Result<HostedScenario, HostError> {
+        HostedScenario::new(
+            "spacewars",
+            seed,
+            &settings_from_config(config),
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+    }
+
+    fn spacewars_state(scenario: &HostedScenario) -> &SpacewarsState {
+        scenario
+            .as_any()
+            .downcast_ref::<SpacewarsClientScenario>()
+            .expect("scenario should host Spacewars")
+            .state
+            .as_ref()
+    }
+
+    fn spacewars_state_mut(scenario: &mut HostedScenario) -> &mut SpacewarsState {
+        scenario
+            .as_any_mut()
+            .downcast_mut::<SpacewarsClientScenario>()
+            .expect("scenario should host Spacewars")
+            .state
+            .as_mut()
     }
 
     fn small_duel_config() -> SpacewarsConfig {
@@ -1306,22 +1337,122 @@ mod tests {
         let scenario = hosted_scenario("null", 0).unwrap();
 
         assert!(scenario.render_frame().layers.is_empty());
-        assert_eq!(scenario.spacewars_panel_state(false, false, ""), None);
+        assert_eq!(scenario.center_panel_state(false, false, ""), None);
+        assert_eq!(scenario.registration().id, "null");
+    }
+
+    #[test]
+    fn pizza_scenario_receives_unprojected_pointer_actions() {
+        let mut settings = Settings::default();
+        settings.pizza.desired_balls = 0;
+        let mut scenario = HostedScenario::new(
+            "pizza",
+            7,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        let projections =
+            render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
+        let mut input = ClientInput::default();
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.5, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Press,
+        });
+
+        let actions = scenario.actions(&mut input, false, &projections);
+        assert_eq!(
+            actions,
+            vec![Action::Pointer(engine_common::PointerAction {
+                position: RenderPoint::new(0.5, 0.28125),
+                phase: engine_common::PointerPhase::Press,
+            })]
+        );
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+
+        let pizza = scenario
+            .as_any()
+            .downcast_ref::<PizzaClientScenario>()
+            .expect("scenario should host Pizza");
+        assert_eq!(pizza.state.balls.len(), 1);
+        assert!(pizza.state.held_ball_id.is_some());
+    }
+
+    #[test]
+    fn pausing_cancels_pizza_pointer_interaction() {
+        let mut settings = Settings::default();
+        settings.pizza.desired_balls = 0;
+        let mut scenario = HostedScenario::new(
+            "pizza",
+            7,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        let projections =
+            render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
+        let mut input = ClientInput::default();
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.5, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Press,
+        });
+        let actions = scenario.actions(&mut input, false, &projections);
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.6, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Drag,
+        });
+        let actions = scenario.actions(&mut input, false, &projections);
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+        input.press(input::GameKey::Pause);
+
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+        step_scenario(
+            &mut scenario,
+            "pizza",
+            7,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &settings,
+            TEST_VIEWPORT,
+            &projections,
+        );
+
+        let pizza = scenario
+            .as_any()
+            .downcast_ref::<PizzaClientScenario>()
+            .expect("scenario should host Pizza");
+        assert!(paused);
+        assert!(pizza.state.held_ball_id.is_none());
+        assert!(!pizza.state.balls[0].invincible);
+        assert!(pizza.state.balls[0].moving);
+        assert_eq!(pizza.state.balls[0].velocity, engine_core::Vec2::ZERO);
     }
 
     #[test]
     fn spacewars_scenario_renders_initial_world() {
         let scenario = hosted_scenario("spacewars", 0).unwrap();
         let frame = scenario.render_frame();
+        let state = spacewars_state(&scenario);
 
-        match &scenario {
-            HostedScenario::Spacewars(state) => {
-                assert_eq!(state.config, SpacewarsConfig::default());
-                assert!(state.sun.is_some());
-                assert!(!state.planets.is_empty());
-            }
-            HostedScenario::Null(_) => panic!("spacewars scenario should not host null"),
-        }
+        assert_eq!(state.config, SpacewarsConfig::default());
+        assert!(state.sun.is_some());
+        assert!(!state.planets.is_empty());
         assert!(!frame.layers.is_empty());
         assert!(matches!(
             scenario.tick_model(),
@@ -1332,16 +1463,12 @@ mod tests {
     #[test]
     fn spacewars_scenario_uses_supplied_config() {
         let config = small_duel_config();
-        let scenario = HostedScenario::new("spacewars", 0, config.clone()).unwrap();
+        let scenario = hosted_spacewars_with_config(0, &config).unwrap();
+        let state = spacewars_state(&scenario);
 
-        match &scenario {
-            HostedScenario::Spacewars(state) => {
-                assert_eq!(state.config, config);
-                assert!(state.sun.is_none());
-                assert!(state.planets.is_empty());
-            }
-            HostedScenario::Null(_) => panic!("spacewars scenario should not host null"),
-        }
+        assert_eq!(state.config, config);
+        assert!(state.sun.is_none());
+        assert!(state.planets.is_empty());
     }
 
     #[test]
@@ -1350,9 +1477,7 @@ mod tests {
         let viewport = Viewport::new(1000.0, 700.0);
         let frames = scenario.render_frames(RenderBackend::Vector, viewport);
 
-        let HostedScenario::Spacewars(state) = &scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state(&scenario);
 
         assert_eq!(frames.len(), 4);
         assert_eq!(frames[0].camera.center.x, state.ships[0].position.x);
@@ -1385,18 +1510,20 @@ mod tests {
     #[test]
     fn spacewars_panel_state_reports_health_pod_and_planet_score() {
         let mut scenario = hosted_scenario("spacewars", 0).unwrap();
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
+        let (total_planets, free_planets) = {
+            let state = spacewars_state_mut(&mut scenario);
+            let total_planets = state.planets.len().max(1) as f32;
+            state.ships[0].life = state.ships[0].life_max * 0.5;
+            state.ships[1].form = ShipForm::EscapePod;
+            state.ships[1].life = state.ships[1].life_max * 0.25;
+            state.players[0].planet_count = 1;
+            state.players[1].planet_count = 2;
+            (total_planets, state.planets.len().saturating_sub(3))
         };
-        let total_planets = state.planets.len().max(1) as f32;
-        state.ships[0].life = state.ships[0].life_max * 0.5;
-        state.ships[1].form = ShipForm::EscapePod;
-        state.ships[1].life = state.ships[1].life_max * 0.25;
-        state.players[0].planet_count = 1;
-        state.players[1].planet_count = 2;
-        let free_planets = state.planets.len().saturating_sub(3);
 
-        let panel = spacewars_panel_state(state, false, false, "Target 60 Hz | FPS 60 | UPS 60");
+        let panel = scenario
+            .center_panel_state(false, false, "Target 60 Hz | FPS 60 | UPS 60")
+            .unwrap();
 
         assert_eq!(panel.player_1.name, "Player 1: Player 1");
         assert_eq!(panel.player_1.status, "Ship Health: 50%");
@@ -1420,13 +1547,13 @@ mod tests {
     #[test]
     fn spacewars_panel_state_reports_winner_and_eliminated_player() {
         let mut scenario = hosted_scenario("spacewars", 0).unwrap();
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state_mut(&mut scenario);
         state.players[0].eliminated = true;
         state.winner = Some(1);
 
-        let panel = spacewars_panel_state(state, false, false, "Target 60 Hz | FPS 60 | UPS 0");
+        let panel = scenario
+            .center_panel_state(false, false, "Target 60 Hz | FPS 60 | UPS 0")
+            .unwrap();
 
         assert_eq!(panel.player_1.status, "Eliminated");
         assert_eq!(panel.player_1.status_fraction, 0.0);
@@ -1439,12 +1566,11 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_pause_message() {
-        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let scenario = hosted_scenario("spacewars", 0).unwrap();
 
-        let panel = spacewars_panel_state(state, true, false, "Target 60 Hz | FPS 60 | UPS 0");
+        let panel = scenario
+            .center_panel_state(true, false, "Target 60 Hz | FPS 60 | UPS 0")
+            .unwrap();
 
         assert_eq!(
             panel.message_text,
@@ -1455,12 +1581,18 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_benchmark_message() {
-        let mut scenario = HostedScenario::new_spacewars_benchmark(0);
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let scenario = HostedScenario::new(
+            "spacewars",
+            0,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            ScenarioStartMode::Benchmark,
+        )
+        .unwrap();
 
-        let panel = spacewars_panel_state(state, false, true, "Target 60 Hz | FPS 42 | UPS 60");
+        let panel = scenario
+            .center_panel_state(false, true, "Target 60 Hz | FPS 42 | UPS 60")
+            .unwrap();
 
         assert_eq!(panel.message_text, "Bench | P/Esc Pause | B Reset | R Game");
         assert_eq!(panel.performance_text, "Target 60 Hz | FPS 42 | UPS 60");
@@ -1469,11 +1601,10 @@ mod tests {
     #[test]
     fn reset_key_restarts_spacewars_with_same_seed() {
         let config = small_duel_config();
-        let mut scenario = HostedScenario::new("spacewars", 42, config.clone()).unwrap();
-        let expected = HostedScenario::new("spacewars", 42, config.clone()).unwrap();
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let settings = settings_from_config(&config);
+        let mut scenario = hosted_spacewars_with_config(42, &config).unwrap();
+        let expected = hosted_spacewars_with_config(42, &config).unwrap();
+        let state = spacewars_state_mut(&mut scenario);
         state.tick = 120;
         state.ships[0].position.x += 50.0;
 
@@ -1497,15 +1628,13 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &config,
+            &settings,
+            TEST_VIEWPORT,
+            &[],
         );
 
-        let HostedScenario::Spacewars(state) = &scenario else {
-            panic!("spacewars scenario should not host null");
-        };
-        let HostedScenario::Spacewars(expected) = &expected else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state(&scenario);
+        let expected = spacewars_state(&expected);
         assert_eq!(accumulator, Duration::ZERO);
         assert!(!paused);
         assert!(!benchmark_active);
@@ -1539,7 +1668,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(paused);
 
@@ -1556,11 +1687,11 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
-        let HostedScenario::Spacewars(state) = &scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state(&scenario);
         assert_eq!(state.tick, 0);
         assert_eq!(accumulator, Duration::ZERO);
 
@@ -1578,7 +1709,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(!paused);
     }
@@ -1606,7 +1739,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(paused);
         assert_eq!(result.ingame_controls_visible, None);
@@ -1626,7 +1761,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             true,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(paused);
         assert_eq!(result.ingame_controls_visible, Some(false));
@@ -1645,7 +1782,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(!paused);
     }
@@ -1673,7 +1812,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert_eq!(result.ingame_controls_visible, Some(true));
         assert_eq!(accumulator, Duration::ZERO);
@@ -1692,7 +1833,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             true,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert_eq!(result.ingame_controls_visible, Some(false));
     }
@@ -1720,7 +1863,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(result.return_to_launcher);
         assert_eq!(accumulator, Duration::ZERO);
@@ -1750,7 +1895,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
 
         let counts = scenario.benchmark_counts();
@@ -1764,9 +1911,7 @@ mod tests {
     #[test]
     fn escape_after_game_over_returns_to_launcher_without_stepping() {
         let mut scenario = hosted_scenario("spacewars", 42).unwrap();
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state_mut(&mut scenario);
         state.winner = Some(1);
         let tick_before = state.tick;
 
@@ -1790,12 +1935,12 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
 
-        let HostedScenario::Spacewars(state) = &scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state(&scenario);
         assert!(result.return_to_launcher);
         assert_eq!(result.updates, 0);
         assert_eq!(accumulator, Duration::ZERO);
@@ -1826,14 +1971,14 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(!paused);
         assert_eq!(accumulator, Duration::ZERO);
 
-        let HostedScenario::Spacewars(state) = &mut scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state_mut(&mut scenario);
         state.tick = 120;
         state.ships[0].position.x += 50.0;
         paused = true;
@@ -1854,11 +1999,11 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
-        let HostedScenario::Spacewars(state) = &scenario else {
-            panic!("spacewars scenario should not host null");
-        };
+        let state = spacewars_state(&scenario);
         assert_eq!(state.tick, 0);
         assert!(!paused);
         assert!(!benchmark_active);
@@ -1877,7 +2022,9 @@ mod tests {
             &mut paused,
             &mut benchmark_active,
             false,
-            &SpacewarsConfig::default(),
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
         );
         assert!(benchmark_active);
         assert_eq!(scenario.benchmark_counts().asteroids, 100);

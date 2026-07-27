@@ -9,9 +9,32 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-Initial implementation mostly complete.  Textures and sounds have yet to be done.
+The local launcher currently hosts two playable scenarios:
+
+- **Spacewars** — the two-player arcade reboot.
+- **Pizza** — a seeded interactive gravity-and-collision ball simulation. Click
+  empty space to make a ball, or grab and fling an existing one.
+
+Textures and sounds for Spacewars have yet to be done. The Pizza implementation
+starts with capped exact collision/gravity loops; quadtree and Barnes–Hut
+optimizations are intentionally deferred.
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
+
+## Run locally
+
+Start the launcher:
+
+```sh
+cargo run -p engine-client
+```
+
+Or start a scenario directly:
+
+```sh
+cargo run -p engine-client -- --scenario pizza
+cargo run -p engine-client -- --scenario spacewars
+```
 
 ## Raspberry Pi / kiosk launch
 

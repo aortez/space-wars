@@ -1,8 +1,9 @@
-//! Spacewars client: Slint UI + custom drawing + input + audio + scenario host.
+//! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
-//! M9 state: opens a Slint window, loads/saves user settings, hosts null or
-//! Spacewars scenarios, and renders their `RenderFrame`s.
+//! The compile-time registry currently hosts Pizza and Spacewars from the
+//! launcher, with Null retained as a hidden test scenario.
 
+mod client_scenarios;
 mod host;
 mod input;
 mod ipc;
@@ -18,12 +19,14 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
 use engine_common::{
-    CrashBehavior, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
-    MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS,
+    CrashBehavior, MAX_PIZZA_BALL_SPAWN_RATE, MAX_PIZZA_DESIRED_BALLS,
+    MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
+    MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_PIZZA_BALL_SPAWN_RATE,
     MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
-    MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, RendererSetting, Settings,
-    SpacewarsSettings,
+    MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, PizzaSettings,
+    RendererSetting, Settings, SpacewarsSettings,
 };
+#[cfg(test)]
 use engine_core::SpacewarsConfig;
 use settings::LoadStatus;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
@@ -168,13 +171,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log_settings_load_status(&settings_path, &loaded_settings.status);
     needs_writeback |= normalize_launch_settings(&mut loaded);
     needs_writeback |= normalize_spacewars_settings(&mut loaded);
+    needs_writeback |= normalize_pizza_settings(&mut loaded);
     let effective_launch = effective_launch_options(&args, &loaded);
 
     if !args.uses_debug_render() {
         host::validate_scenario(effective_launch.scenario.as_str())?;
     }
-    if args.uses_benchmark() && effective_launch.scenario != "spacewars" {
-        return Err("benchmark mode currently supports only the spacewars scenario".into());
+    if args.uses_benchmark()
+        && !host::scenario_registration(effective_launch.scenario.as_str())
+            .is_some_and(|registration| registration.capabilities.benchmark)
+    {
+        return Err(format!(
+            "scenario {:?} does not support benchmark mode",
+            effective_launch.scenario
+        )
+        .into());
     }
     tracing::info!(
         path = %settings_path.display(),
@@ -244,20 +255,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             effective_launch.renderer,
         ));
     } else if launch_directly {
-        let spacewars_config = spacewars_config_from_settings(&settings.read().unwrap());
+        let scenario_settings = settings.read().unwrap().clone();
         *render_timer.borrow_mut() = Some(start_scenario_from_launch(
             &window,
             &effective_launch,
             args.benchmark,
             Rc::clone(&scenario_controls),
-            spacewars_config,
+            scenario_settings,
         )?);
     } else {
-        show_launcher(
-            &window,
-            &effective_launch,
-            &settings.read().unwrap().spacewars,
-        );
+        show_launcher(&window, &effective_launch, &settings.read().unwrap());
     }
 
     window.run()?;
@@ -289,9 +296,10 @@ fn effective_launch_options(args: &Args, settings: &Settings) -> EffectiveLaunch
 fn normalize_launch_settings(settings: &mut Settings) -> bool {
     let mut changed = false;
 
-    if settings.launch.scenario.trim().is_empty()
-        || !host::is_known_scenario(settings.launch.scenario.as_str())
-    {
+    let saved_scenario_is_launchable =
+        host::scenario_registration(settings.launch.scenario.as_str())
+            .is_some_and(|registration| registration.launcher_visible);
+    if settings.launch.scenario.trim().is_empty() || !saved_scenario_is_launchable {
         tracing::warn!(
             scenario = %settings.launch.scenario,
             "invalid saved launch scenario; falling back to spacewars."
@@ -337,6 +345,22 @@ fn normalize_spacewars_settings(settings: &mut Settings) -> bool {
     true
 }
 
+fn normalize_pizza_settings(settings: &mut Settings) -> bool {
+    let normalized = settings.pizza.normalized();
+    if normalized == settings.pizza {
+        return false;
+    }
+    tracing::warn!(
+        desired_balls = settings.pizza.desired_balls,
+        normalized_desired_balls = normalized.desired_balls,
+        ball_spawn_rate = settings.pizza.ball_spawn_rate,
+        normalized_ball_spawn_rate = normalized.ball_spawn_rate,
+        "invalid Pizza setup; using normalized values."
+    );
+    settings.pizza = normalized;
+    true
+}
+
 fn normalize_raster_scale(value: f32) -> f32 {
     if value.is_finite() {
         value.clamp(MIN_RASTER_SCALE, MAX_RASTER_SCALE)
@@ -349,20 +373,27 @@ fn should_launch_directly(args: &Args) -> bool {
     args.uses_debug_render() || args.uses_benchmark() || args.has_launch_override()
 }
 
-fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, setup: &SpacewarsSettings) {
+fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Settings) {
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
     window.set_vector_minimaps_visible(false);
     window.set_raster_visible(false);
     window.set_spacewars_ui_visible(false);
+    window.set_scenario_pointer_enabled(false);
     window.set_ingame_menu_visible(false);
     window.set_ingame_controls_visible(false);
+    let scenario_names = host::launcher_scenario_names()
+        .into_iter()
+        .map(SharedString::from)
+        .collect::<Vec<_>>();
+    window.set_launcher_scenarios(ModelRc::new(VecModel::from(scenario_names)));
     window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
+    apply_scenario_metadata(window, launch.scenario.as_str());
     window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
     window.set_launcher_renderer(SharedString::from(renderer_label(launch.renderer)));
     window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
         launch.raster_scale,
     )));
-    let setup = setup.normalized();
+    let setup = settings.spacewars.normalized();
     window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
     window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
     window.set_launcher_use_planets(SharedString::from(bool_label(setup.use_planets)));
@@ -373,9 +404,27 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, setup: &Spacewar
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    let pizza = settings.pizza.normalized();
+    window
+        .set_launcher_pizza_desired_balls_text(SharedString::from(pizza.desired_balls.to_string()));
+    window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
+        pizza.ball_spawn_rate,
+    )));
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_controls_visible(false);
     window.set_launcher_visible(true);
+}
+
+fn apply_scenario_metadata(window: &MainWindow, scenario: &str) {
+    let Some(registration) = host::scenario_registration(scenario) else {
+        window.set_scenario_benchmark_available(false);
+        window.set_scenario_player_zoom_available(false);
+        window.set_scenario_controls_help(SharedString::from(""));
+        return;
+    };
+    window.set_scenario_benchmark_available(registration.capabilities.benchmark);
+    window.set_scenario_player_zoom_available(registration.capabilities.player_zoom);
+    window.set_scenario_controls_help(SharedString::from(registration.controls_help));
 }
 
 fn save_startup_settings_if_needed(
@@ -449,6 +498,14 @@ fn install_launcher_callbacks(
             &settings_path,
             true,
         );
+    });
+
+    let weak = window.as_weak();
+    window.on_launcher_scenario_selected(move |scenario| {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        apply_scenario_metadata(&window, scenario.as_str());
     });
 
     let weak = window.as_weak();
@@ -546,7 +603,7 @@ fn handle_return_to_launcher(
     scenario_controls.borrow_mut().clear();
     let settings = settings.read().unwrap();
     let launch = launch_from_settings(&settings);
-    show_launcher(&window, &launch, &settings.spacewars);
+    show_launcher(&window, &launch, &settings);
 }
 
 fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
@@ -623,16 +680,20 @@ fn handle_launcher_start(
     };
     window.set_launcher_error_text(SharedString::from(""));
 
-    let selections = match launcher_selections_from_window(&window) {
+    let current_settings = settings.read().unwrap().clone();
+    let selections = match launcher_selections_from_window(&window, &current_settings) {
         Ok(selections) => selections,
         Err(message) => {
             window.set_launcher_error_text(SharedString::from(message));
             return;
         }
     };
-    if start_benchmark && selections.launch.scenario != "spacewars" {
+    if start_benchmark
+        && !host::scenario_registration(selections.launch.scenario.as_str())
+            .is_some_and(|registration| registration.capabilities.benchmark)
+    {
         window.set_launcher_error_text(SharedString::from(
-            "Benchmark mode currently supports only spacewars.",
+            "The selected scenario does not support benchmark mode.",
         ));
         return;
     }
@@ -642,14 +703,14 @@ fn handle_launcher_start(
         )));
         return;
     }
-    let spacewars_config = spacewars_config_from_settings(&settings.read().unwrap());
+    let scenario_settings = settings.read().unwrap().clone();
 
     match start_scenario_from_launch(
         &window,
         &selections.launch,
         start_benchmark,
         Rc::clone(scenario_controls),
-        spacewars_config,
+        scenario_settings,
     ) {
         Ok(timer) => {
             let mut timer_slot = render_timer.borrow_mut();
@@ -673,6 +734,7 @@ fn handle_launcher_start(
 struct LauncherSelections {
     launch: EffectiveLaunch,
     spacewars: SpacewarsSettings,
+    pizza: PizzaSettings,
 }
 
 fn persist_launcher_settings(
@@ -685,6 +747,7 @@ fn persist_launcher_settings(
     let renderer = renderer_setting(launch.renderer);
     let raster_scale = normalize_raster_scale(launch.raster_scale);
     let spacewars = selections.spacewars.normalized();
+    let pizza = selections.pizza.normalized();
     let mut changed = false;
 
     if settings.launch.scenario != launch.scenario {
@@ -711,6 +774,10 @@ fn persist_launcher_settings(
         settings.spacewars = spacewars;
         changed = true;
     }
+    if settings.pizza != pizza {
+        settings.pizza = pizza;
+        changed = true;
+    }
 
     if changed {
         settings::save_settings(&settings, settings_path)?;
@@ -729,10 +796,12 @@ fn launch_from_settings(settings: &Settings) -> EffectiveLaunch {
     }
 }
 
+#[cfg(test)]
 fn spacewars_config_from_settings(settings: &Settings) -> SpacewarsConfig {
     spacewars_config_from_setup(&settings.spacewars.normalized())
 }
 
+#[cfg(test)]
 fn spacewars_config_from_setup(setup: &SpacewarsSettings) -> SpacewarsConfig {
     let mut config = SpacewarsConfig {
         universe_radius: setup.universe_radius,
@@ -836,10 +905,29 @@ fn long_game_spacewars_preset() -> SpacewarsSettings {
     }
 }
 
-fn launcher_selections_from_window(window: &MainWindow) -> Result<LauncherSelections, String> {
+fn launcher_selections_from_window(
+    window: &MainWindow,
+    current_settings: &Settings,
+) -> Result<LauncherSelections, String> {
+    let launch = launch_options_from_window(window)?;
+    let (spacewars, pizza) = match launch.scenario.as_str() {
+        "spacewars" => (
+            spacewars_setup_from_window(window)?,
+            current_settings.pizza.clone(),
+        ),
+        "pizza" => (
+            current_settings.spacewars.clone(),
+            pizza_setup_from_window(window)?,
+        ),
+        _ => (
+            current_settings.spacewars.clone(),
+            current_settings.pizza.clone(),
+        ),
+    };
     Ok(LauncherSelections {
-        launch: launch_options_from_window(window)?,
-        spacewars: spacewars_setup_from_window(window)?,
+        launch,
+        spacewars,
+        pizza,
     })
 }
 
@@ -861,6 +949,13 @@ fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings,
         window.get_launcher_player_health_text().as_str(),
         window.get_launcher_p1_zoom_text().as_str(),
         window.get_launcher_p2_zoom_text().as_str(),
+    )
+}
+
+fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String> {
+    pizza_setup_from_values(
+        window.get_launcher_pizza_desired_balls_text().as_str(),
+        window.get_launcher_pizza_spawn_rate_text().as_str(),
     )
 }
 
@@ -941,6 +1036,26 @@ fn spacewars_setup_from_values(
     Ok(setup.normalized())
 }
 
+fn pizza_setup_from_values(
+    desired_balls: &str,
+    ball_spawn_rate: &str,
+) -> Result<PizzaSettings, String> {
+    Ok(PizzaSettings {
+        desired_balls: parse_u32_setting(
+            desired_balls,
+            "Desired balls",
+            0,
+            MAX_PIZZA_DESIRED_BALLS,
+        )?,
+        ball_spawn_rate: parse_f32_setting(
+            ball_spawn_rate,
+            "Spawn rate",
+            MIN_PIZZA_BALL_SPAWN_RATE,
+            MAX_PIZZA_BALL_SPAWN_RATE,
+        )?,
+    })
+}
+
 fn parse_u32_setting(value: &str, label: &str, min: u32, max: u32) -> Result<u32, String> {
     value
         .trim()
@@ -991,9 +1106,10 @@ fn start_scenario_from_launch(
     launch: &EffectiveLaunch,
     start_benchmark: bool,
     controls: host::SharedScenarioControls,
-    spacewars_config: SpacewarsConfig,
+    settings: Settings,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
+    apply_scenario_metadata(window, launch.scenario.as_str());
     host::start_scenario_loop(
         window,
         launch.scenario.as_str(),
@@ -1003,7 +1119,7 @@ fn start_scenario_from_launch(
             renderer: launch.renderer,
             raster_scale: launch.raster_scale,
             controls: Some(controls),
-            spacewars_config,
+            settings,
         },
     )
 }
@@ -1436,6 +1552,10 @@ mod tests {
                 player_1_view_height: 420.0,
                 player_2_view_height: 640.0,
             },
+            pizza: PizzaSettings {
+                desired_balls: 321,
+                ball_spawn_rate: 0.42,
+            },
         };
 
         assert!(persist_launcher_settings(&settings, &path, &selections).unwrap());
@@ -1447,6 +1567,7 @@ mod tests {
         assert_eq!(stored.launch.renderer, RendererSetting::Raster);
         assert_eq!(stored.launch.raster_scale, 2.0);
         assert_eq!(stored.spacewars, selections.spacewars);
+        assert_eq!(stored.pizza, selections.pizza);
         assert_eq!(stored.last_scenario.as_deref(), Some("spacewars"));
         drop(stored);
 
@@ -1456,6 +1577,7 @@ mod tests {
         assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
         assert_eq!(reloaded.settings.spacewars, selections.spacewars);
+        assert_eq!(reloaded.settings.pizza, selections.pizza);
         assert_eq!(
             reloaded.settings.last_scenario.as_deref(),
             Some("spacewars")
@@ -1549,6 +1671,41 @@ mod tests {
         );
 
         assert!(!normalize_spacewars_settings(&mut settings));
+    }
+
+    #[test]
+    fn pizza_settings_normalization_clamps_saved_values() {
+        let mut settings = Settings::default();
+        settings.pizza.desired_balls = MAX_PIZZA_DESIRED_BALLS + 1;
+        settings.pizza.ball_spawn_rate = f32::NAN;
+
+        assert!(normalize_pizza_settings(&mut settings));
+        assert_eq!(settings.pizza.desired_balls, MAX_PIZZA_DESIRED_BALLS);
+        assert_eq!(
+            settings.pizza.ball_spawn_rate,
+            engine_common::DEFAULT_PIZZA_BALL_SPAWN_RATE
+        );
+        assert!(!normalize_pizza_settings(&mut settings));
+    }
+
+    #[test]
+    fn pizza_setup_values_parse_and_validate_caps() {
+        assert_eq!(
+            pizza_setup_from_values("321", "0.42").unwrap(),
+            PizzaSettings {
+                desired_balls: 321,
+                ball_spawn_rate: 0.42,
+            }
+        );
+        assert_eq!(
+            pizza_setup_from_values("501", "1.0").unwrap(),
+            PizzaSettings {
+                desired_balls: MAX_PIZZA_DESIRED_BALLS,
+                ball_spawn_rate: MAX_PIZZA_BALL_SPAWN_RATE,
+            }
+        );
+        assert!(pizza_setup_from_values("many", "0.42").is_err());
+        assert!(pizza_setup_from_values("24", "often").is_err());
     }
 
     #[test]

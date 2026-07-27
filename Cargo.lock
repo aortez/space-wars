@@ -1330,6 +1330,7 @@ dependencies = [
  "engine-core",
  "png 0.17.16",
  "scenario-null",
+ "scenario-pizza",
  "scenario-spacewars",
  "slint",
  "slint-build",
@@ -4056,6 +4057,15 @@ name = "scenario-null"
 version = "0.1.0"
 dependencies = [
  "engine-common",
+]
+
+[[package]]
+name = "scenario-pizza"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "engine-core",
+ "rand",
 ]
 
 [[package]]

@@ -556,14 +556,14 @@ impl SpacewarsAction {
     }
 
     pub fn encode(self) -> Action {
-        Action {
-            kind: self.kind as u32,
-            payload: vec![self.player as u8],
-        }
+        Action::scenario(self.kind as u32, vec![self.player as u8])
     }
 
     pub fn decode(action: &Action) -> Option<Self> {
-        let [player] = action.payload.as_slice() else {
+        let Action::Scenario { kind, payload } = action else {
+            return None;
+        };
+        let [player] = payload.as_slice() else {
             return None;
         };
         let player = *player as usize;
@@ -572,7 +572,7 @@ impl SpacewarsAction {
         }
         Some(Self {
             player,
-            kind: SpacewarsActionKind::from_u32(action.kind)?,
+            kind: SpacewarsActionKind::from_u32(*kind)?,
         })
     }
 
@@ -6935,10 +6935,7 @@ mod tests {
     fn invalid_actions_are_ignored() {
         let mut state = init_deathmatch();
         let start = state.ships[0].clone();
-        let invalid = Action {
-            kind: 999,
-            payload: vec![0],
-        };
+        let invalid = Action::scenario(999, vec![0]);
 
         step(&mut state, &[invalid]);
 

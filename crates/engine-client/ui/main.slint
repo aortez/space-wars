@@ -128,10 +128,12 @@ export component MainWindow inherits Window {
     in property <length> p2-minimap-size: 0px;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
+    in property <bool> scenario-pointer-enabled: false;
     in-out property <bool> launcher-visible: false;
     in-out property <bool> launcher-controls-visible: false;
     in-out property <bool> ingame-menu-visible: false;
     in-out property <bool> ingame-controls-visible: false;
+    in property <[string]> launcher-scenarios;
     in-out property <string> launcher-scenario: "spacewars";
     in-out property <string> launcher-seed-text: "0";
     in-out property <string> launcher-renderer: "vector";
@@ -144,7 +146,12 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-player-health-text: "100";
     in-out property <string> launcher-p1-zoom-text: "320";
     in-out property <string> launcher-p2-zoom-text: "320";
+    in-out property <string> launcher-pizza-desired-balls-text: "24";
+    in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in property <string> launcher-error-text: "";
+    in property <bool> scenario-benchmark-available: false;
+    in property <bool> scenario-player-zoom-available: false;
+    in property <string> scenario-controls-help: "";
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
     in property <string> p1-status: "";
@@ -170,6 +177,7 @@ export component MainWindow inherits Window {
     callback launcher-p1-zoom-out();
     callback launcher-p2-zoom-in();
     callback launcher-p2-zoom-out();
+    callback launcher-scenario-selected(string);
     callback launcher-quit();
     callback ingame-resume();
     callback ingame-restart();
@@ -179,6 +187,7 @@ export component MainWindow inherits Window {
     callback ingame-p1-zoom-out();
     callback ingame-p2-zoom-in();
     callback ingame-p2-zoom-out();
+    callback scenario-pointer(float, float, int);
 
     forward-focus: launcher-shortcuts;
 
@@ -230,6 +239,34 @@ export component MainWindow inherits Window {
         height: root.p2-minimap-size;
         opacity: root.minimap-opacity;
         primitives: root.p2-minimap-primitives;
+    }
+
+    scenario-pointer-area := TouchArea {
+        enabled: root.scenario-pointer-enabled && !root.launcher-visible && !root.ingame-menu-visible;
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: crosshair;
+
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.cancel) {
+                root.scenario-pointer(self.mouse-x / 1px, self.mouse-y / 1px, 3);
+                return;
+            }
+            if (event.button != PointerEventButton.left) {
+                return;
+            }
+            if (event.kind == PointerEventKind.down) {
+                root.scenario-pointer(self.mouse-x / 1px, self.mouse-y / 1px, 0);
+            } else if (event.kind == PointerEventKind.up) {
+                root.scenario-pointer(self.mouse-x / 1px, self.mouse-y / 1px, 2);
+            }
+        }
+
+        moved => {
+            if (self.pressed) {
+                root.scenario-pointer(self.mouse-x / 1px, self.mouse-y / 1px, 1);
+            }
+        }
     }
 
     Rectangle {
@@ -416,13 +453,15 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    text: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon";
+                    height: 132px;
+                    text: root.scenario-controls-help;
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;
                 }
 
                 Text {
+                    visible: false;
                     x: 0px;
                     y: 54px;
                     width: parent.width;
@@ -433,6 +472,7 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
+                    visible: root.scenario-player-zoom-available;
                     x: 0px;
                     y: 126px;
                     width: parent.width;
@@ -443,6 +483,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 0px;
                     y: 154px;
                     width: 104px;
@@ -454,6 +495,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 114px;
                     y: 154px;
                     width: 104px;
@@ -465,6 +507,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 228px;
                     y: 154px;
                     width: 104px;
@@ -476,6 +519,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 342px;
                     y: 154px;
                     width: 104px;
@@ -490,7 +534,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 214px;
                     width: parent.width;
-                    text: "Global: P/Esc pause/resume, R restart, B benchmark, Q launcher, C or F1 controls/back. Losing window focus clears held keys.";
+                    text: "Global: P/Esc pause/resume, R restart, " + (root.scenario-benchmark-available ? "B benchmark, " : "") + "Q launcher, C or F1 controls/back. Losing window focus clears held input.";
                     color: #c7d0dc;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -523,7 +567,7 @@ export component MainWindow inherits Window {
             }
 
             Button {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && root.scenario-benchmark-available;
                 x: 354px;
                 y: 106px;
                 width: 160px;
@@ -620,7 +664,7 @@ export component MainWindow inherits Window {
                 return reject;
             }
 
-            if (seed-edit.has-focus || universe-radius-edit.has-focus || asteroid-rate-edit.has-focus || player-health-edit.has-focus) {
+            if (seed-edit.has-focus || universe-radius-edit.has-focus || asteroid-rate-edit.has-focus || player-health-edit.has-focus || pizza-balls-edit.has-focus || pizza-spawn-rate-edit.has-focus) {
                 return reject;
             }
 
@@ -647,7 +691,7 @@ export component MainWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: root.launcher-controls-visible ? 500px : 580px;
-                height: root.launcher-controls-visible ? 540px : 710px;
+                height: root.launcher-controls-visible ? 540px : root.launcher-scenario == "pizza" ? 560px : 710px;
                 background: #080a12f2;
                 border-color: #596273;
                 border-width: 1px;
@@ -690,8 +734,11 @@ export component MainWindow inherits Window {
 
                     ComboBox {
                         horizontal-stretch: 1;
-                        model: ["spacewars", "null"];
+                        model: root.launcher-scenarios;
                         current-value <=> root.launcher-scenario;
+                        selected(value) => {
+                            root.launcher-scenario-selected(value);
+                        }
                     }
                 }
 
@@ -756,15 +803,17 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 22px : 0px;
                     text: "Game Setup";
                     color: #e6edf7;
                     font-size: 13px;
-                    height: 22px;
                     vertical-alignment: bottom;
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -791,7 +840,8 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -813,7 +863,8 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -832,7 +883,8 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -851,7 +903,8 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -873,7 +926,8 @@ export component MainWindow inherits Window {
                 }
 
                 HorizontalLayout {
-                    height: 34px;
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
                     spacing: 10px;
 
                     Text {
@@ -895,17 +949,82 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 16px : 0px;
                     text: "Setup: " + root.launcher-spacewars-preset + " | radius " + root.launcher-universe-radius-text + " | health " + root.launcher-player-health-text + "%";
                     color: #c7d0dc;
                     font-size: 12px;
-                    height: 16px;
                 }
 
                 Text {
+                    visible: root.launcher-scenario == "spacewars";
+                    height: root.launcher-scenario == "spacewars" ? 16px : 0px;
                     text: "Planets " + root.launcher-use-planets + " | asteroids " + root.launcher-asteroids-enabled + " @ " + root.launcher-asteroid-probability-text + "/s";
                     color: #c7d0dc;
                     font-size: 12px;
-                    height: 16px;
+                }
+
+                Text {
+                    visible: root.launcher-scenario == "pizza";
+                    height: root.launcher-scenario == "pizza" ? 22px : 0px;
+                    text: "Pizza Setup";
+                    color: #e6edf7;
+                    font-size: 13px;
+                    vertical-alignment: bottom;
+                }
+
+                HorizontalLayout {
+                    visible: root.launcher-scenario == "pizza";
+                    height: root.launcher-scenario == "pizza" ? 34px : 0px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Desired Balls";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    pizza-balls-edit := LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-pizza-desired-balls-text;
+                        placeholder-text: "24";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    visible: root.launcher-scenario == "pizza";
+                    height: root.launcher-scenario == "pizza" ? 34px : 0px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Spawn Rate";
+                        color: #c7d0dc;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        width: 150px;
+                    }
+
+                    pizza-spawn-rate-edit := LineEdit {
+                        horizontal-stretch: 1;
+                        text <=> root.launcher-pizza-spawn-rate-text;
+                        placeholder-text: "0.10";
+                        accepted => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                Text {
+                    visible: root.launcher-scenario == "pizza";
+                    height: root.launcher-scenario == "pizza" ? 16px : 0px;
+                    text: "Spawns up to " + root.launcher-pizza-desired-balls-text + " balls at " + root.launcher-pizza-spawn-rate-text + " chance/tick.";
+                    color: #c7d0dc;
+                    font-size: 12px;
                 }
 
                 Text {
@@ -929,6 +1048,7 @@ export component MainWindow inherits Window {
                     }
 
                     Button {
+                        visible: root.scenario-benchmark-available;
                         width: 150px;
                         text: "Benchmark (B)";
                         clicked => {
@@ -980,13 +1100,15 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    text: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon";
+                    height: 132px;
+                    text: root.scenario-controls-help;
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;
                 }
 
                 Text {
+                    visible: false;
                     x: 0px;
                     y: 54px;
                     width: parent.width;
@@ -997,6 +1119,7 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
+                    visible: root.scenario-player-zoom-available;
                     x: 0px;
                     y: 126px;
                     width: parent.width;
@@ -1007,6 +1130,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 0px;
                     y: 154px;
                     width: 104px;
@@ -1018,6 +1142,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 114px;
                     y: 154px;
                     width: 104px;
@@ -1029,6 +1154,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 228px;
                     y: 154px;
                     width: 104px;
@@ -1040,6 +1166,7 @@ export component MainWindow inherits Window {
                 }
 
                 Button {
+                    visible: root.scenario-player-zoom-available;
                     x: 342px;
                     y: 154px;
                     width: 104px;
