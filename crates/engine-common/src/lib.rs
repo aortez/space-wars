@@ -83,6 +83,7 @@ pub enum PointerPhase {
     Press,
     Drag,
     Release,
+    Cancel,
 }
 
 /// What a scenario hands to an agent each tick. Shape is per-scenario; the

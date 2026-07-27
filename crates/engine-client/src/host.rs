@@ -16,6 +16,7 @@ use slint::{
     Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
 };
 
+use crate::MainWindow;
 pub use crate::client_scenarios::RenderBackend;
 use crate::client_scenarios::{
     self, CenterPanelState, ClientScenario, ScenarioCreateError, ScenarioRegistration,
@@ -24,7 +25,6 @@ use crate::client_scenarios::{
 use crate::input::{self, ClientInput};
 use crate::raster;
 use crate::render::{self, Viewport};
-use crate::{MainWindow, ScenePrimitive};
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
@@ -298,7 +298,7 @@ pub fn start_scenario_loop(
             &input_projections,
         );
         if step_result.return_to_launcher {
-            show_running_launcher(&window);
+            window.invoke_ingame_return_launcher();
             return;
         }
         if let Some(visible) = step_result.ingame_controls_visible {
@@ -382,11 +382,16 @@ fn step_scenario(
     viewport: Viewport,
     input_projections: &[render::FrameProjection],
 ) -> HostStepResult {
+    if input.has_pointer_cancellation() {
+        deliver_pointer_cancellation(scenario, input, input_projections);
+    }
+
     if let Some(request) = controls.take_request() {
         match request {
             ScenarioControlRequest::Resume => {
                 *paused = false;
                 *accumulator = Duration::ZERO;
+                deliver_pointer_cancellation(scenario, input, input_projections);
                 input.clear();
                 tracing::info!(benchmark = *benchmark_active, "resumed from in-game menu.");
                 return HostStepResult::default();
@@ -483,6 +488,7 @@ fn step_scenario(
 
         *paused = true;
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         tracing::info!(
             paused = *paused,
@@ -494,6 +500,7 @@ fn step_scenario(
 
     if input.take_controls_requested() && *paused && !scenario.is_game_over() {
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         return HostStepResult::set_ingame_controls_visible(!ingame_controls_visible);
     }
@@ -508,6 +515,7 @@ fn step_scenario(
     if input.take_pause_requested() && !scenario.is_game_over() {
         *paused = !*paused;
         *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
         tracing::info!(
             paused = *paused,
@@ -545,17 +553,16 @@ fn step_scenario(
     }
 }
 
-fn show_running_launcher(window: &MainWindow) {
-    window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
-    window.set_vector_minimaps_visible(false);
-    window.set_raster_visible(false);
-    window.set_spacewars_ui_visible(false);
-    window.set_scenario_pointer_enabled(false);
-    window.set_ingame_menu_visible(false);
-    window.set_ingame_controls_visible(false);
-    window.set_launcher_error_text(SharedString::from(""));
-    window.set_launcher_controls_visible(false);
-    window.set_launcher_visible(true);
+fn deliver_pointer_cancellation(
+    scenario: &mut HostedScenario,
+    input: &mut ClientInput,
+    input_projections: &[render::FrameProjection],
+) {
+    input.cancel_pointer();
+    let actions = scenario.pointer_actions(input, input_projections);
+    if !actions.is_empty() {
+        scenario.step(&actions, Duration::ZERO);
+    }
 }
 
 fn restart_scenario(
@@ -1115,20 +1122,28 @@ impl HostedScenario {
         input_projections: &[render::FrameProjection],
     ) -> Vec<Action> {
         let mut actions = self.inner.map_keyboard_input(input, benchmark_active);
+        actions.extend(self.pointer_actions(input, input_projections));
+        actions
+    }
+
+    fn pointer_actions(
+        &self,
+        input: &mut ClientInput,
+        input_projections: &[render::FrameProjection],
+    ) -> Vec<Action> {
         if self.registration().capabilities.pointer_input {
-            actions.extend(
-                input
-                    .take_pointer_events()
-                    .into_iter()
-                    .filter_map(|event| {
-                        render::unproject_pointer(input_projections, event.position, event.phase)
-                    })
-                    .map(Action::Pointer),
-            );
+            input
+                .take_pointer_events()
+                .into_iter()
+                .filter_map(|event| {
+                    render::unproject_pointer(input_projections, event.position, event.phase)
+                })
+                .map(Action::Pointer)
+                .collect()
         } else {
             input.discard_pointer_events();
+            Vec::new()
         }
-        actions
     }
 
     pub(crate) fn benchmark_counts(&self) -> SpacewarsBenchmarkCounts {
@@ -1363,6 +1378,70 @@ mod tests {
             .expect("scenario should host Pizza");
         assert_eq!(pizza.state.balls.len(), 1);
         assert!(pizza.state.held_ball_id.is_some());
+    }
+
+    #[test]
+    fn pausing_cancels_pizza_pointer_interaction() {
+        let mut settings = Settings::default();
+        settings.pizza.desired_balls = 0;
+        let mut scenario = HostedScenario::new(
+            "pizza",
+            7,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        let projections =
+            render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
+        let mut input = ClientInput::default();
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.5, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Press,
+        });
+        let actions = scenario.actions(&mut input, false, &projections);
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.6, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Drag,
+        });
+        let actions = scenario.actions(&mut input, false, &projections);
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+        input.press(input::GameKey::Pause);
+
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+        step_scenario(
+            &mut scenario,
+            "pizza",
+            7,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &settings,
+            TEST_VIEWPORT,
+            &projections,
+        );
+
+        let pizza = scenario
+            .as_any()
+            .downcast_ref::<PizzaClientScenario>()
+            .expect("scenario should host Pizza");
+        assert!(paused);
+        assert!(pizza.state.held_ball_id.is_none());
+        assert!(!pizza.state.balls[0].invincible);
+        assert!(pizza.state.balls[0].moving);
+        assert_eq!(pizza.state.balls[0].velocity, engine_core::Vec2::ZERO);
     }
 
     #[test]

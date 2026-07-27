@@ -199,6 +199,7 @@ impl PizzaState {
             PointerPhase::Press => self.press_pointer(),
             PointerPhase::Drag => {}
             PointerPhase::Release => self.release_pointer(),
+            PointerPhase::Cancel => self.cancel_pointer(),
         }
     }
 
@@ -245,6 +246,19 @@ impl PizzaState {
         if let Some(ball) = self.ball_mut(id) {
             ball.hp = ball.radius;
             ball.velocity = cursor_velocity;
+            ball.moving = true;
+            ball.invincible = false;
+        }
+        self.cursor_velocity = Vec2::ZERO;
+    }
+
+    fn cancel_pointer(&mut self) {
+        let Some(id) = self.held_ball_id.take() else {
+            return;
+        };
+        if let Some(ball) = self.ball_mut(id) {
+            ball.hp = ball.radius;
+            ball.velocity = Vec2::ZERO;
             ball.moving = true;
             ball.invincible = false;
         }
@@ -320,6 +334,10 @@ impl Scenario for PizzaScenario {
             if let Action::Pointer(pointer) = action {
                 state.apply_pointer_action(*pointer);
             }
+        }
+
+        if dt.is_zero() {
+            return StepResult::default();
         }
 
         let dt = dt.as_secs_f32();
@@ -606,6 +624,33 @@ mod tests {
         assert!(!state.balls[0].invincible);
         assert!(state.balls[0].moving);
         assert!(state.balls[0].velocity.x > 0.0);
+    }
+
+    #[test]
+    fn pointer_cancel_releases_without_throwing_the_ball() {
+        let mut state = PizzaScenario::init(
+            PizzaConfig {
+                desired_ball_count: 0,
+                ..PizzaConfig::default()
+            },
+            7,
+        );
+        step(&mut state, &[pointer(0.5, 0.25, PointerPhase::Press)]);
+        step(&mut state, &[pointer(0.7, 0.25, PointerPhase::Drag)]);
+        assert!(state.balls[0].velocity.x > 0.0);
+        let tick = state.tick;
+
+        PizzaScenario::step(
+            &mut state,
+            &[pointer(0.7, 0.25, PointerPhase::Cancel)],
+            Duration::ZERO,
+        );
+
+        assert_eq!(state.tick, tick);
+        assert!(state.held_ball_id.is_none());
+        assert!(!state.balls[0].invincible);
+        assert!(state.balls[0].moving);
+        assert_eq!(state.balls[0].velocity, Vec2::ZERO);
     }
 
     #[test]

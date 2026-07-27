@@ -248,6 +248,10 @@ export component MainWindow inherits Window {
         mouse-cursor: crosshair;
 
         pointer-event(event) => {
+            if (event.kind == PointerEventKind.cancel) {
+                root.scenario-pointer(self.mouse-x / 1px, self.mouse-y / 1px, 3);
+                return;
+            }
             if (event.button != PointerEventButton.left) {
                 return;
             }

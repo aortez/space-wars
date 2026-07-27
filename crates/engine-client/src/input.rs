@@ -20,6 +20,7 @@ pub(crate) struct ClientInput {
     pressed: BTreeSet<GameKey>,
     released: BTreeSet<GameKey>,
     pointer_events: Vec<ScreenPointerEvent>,
+    active_pointer: Option<RenderPoint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -65,7 +66,9 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
     let keyboard_input = Rc::clone(&input);
     window.window().on_winit_window_event(move |_, event| {
         if matches!(event, WindowEvent::Focused(false)) {
-            keyboard_input.borrow_mut().clear();
+            let mut input = keyboard_input.borrow_mut();
+            input.cancel_pointer();
+            input.clear_keyboard();
             return EventResult::Propagate;
         }
 
@@ -86,9 +89,10 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
             0 => PointerPhase::Press,
             1 => PointerPhase::Drag,
             2 => PointerPhase::Release,
+            3 => PointerPhase::Cancel,
             _ => return,
         };
-        input.borrow_mut().pointer_events.push(ScreenPointerEvent {
+        input.borrow_mut().push_pointer_event(ScreenPointerEvent {
             position: RenderPoint::new(x, y),
             phase,
         });
@@ -173,22 +177,62 @@ impl ClientInput {
     }
 
     pub(crate) fn clear(&mut self) {
+        self.clear_keyboard();
+        self.pointer_events.clear();
+        self.active_pointer = None;
+    }
+
+    fn clear_keyboard(&mut self) {
         self.pressed.clear();
         self.released.clear();
-        self.pointer_events.clear();
     }
 
     pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
         std::mem::take(&mut self.pointer_events)
     }
 
-    pub(crate) fn discard_pointer_events(&mut self) {
-        self.pointer_events.clear();
+    pub(crate) fn has_pointer_cancellation(&self) -> bool {
+        self.pointer_events
+            .iter()
+            .any(|event| event.phase == PointerPhase::Cancel)
     }
 
-    #[cfg(test)]
+    pub(crate) fn cancel_pointer(&mut self) {
+        let Some(position) = self.active_pointer.take() else {
+            return;
+        };
+        self.pointer_events.push(ScreenPointerEvent {
+            position,
+            phase: PointerPhase::Cancel,
+        });
+    }
+
+    pub(crate) fn discard_pointer_events(&mut self) {
+        self.pointer_events.clear();
+        self.active_pointer = None;
+    }
+
     pub(crate) fn push_pointer_event(&mut self, event: ScreenPointerEvent) {
-        self.pointer_events.push(event);
+        match event.phase {
+            PointerPhase::Press => {
+                self.active_pointer = Some(event.position);
+                self.pointer_events.push(event);
+            }
+            PointerPhase::Drag => {
+                if self.active_pointer.is_some() {
+                    self.active_pointer = Some(event.position);
+                    self.pointer_events.push(event);
+                }
+            }
+            PointerPhase::Release => {
+                if self.active_pointer.take().is_some() {
+                    self.pointer_events.push(event);
+                }
+            }
+            PointerPhase::Cancel => {
+                self.cancel_pointer();
+            }
+        }
     }
 
     pub(crate) fn press(&mut self, key: GameKey) {
@@ -333,6 +377,48 @@ mod tests {
         actions
             .iter()
             .any(|action| action.player == player && action.kind == kind)
+    }
+
+    #[test]
+    fn pointer_cancel_uses_the_last_active_position_once() {
+        let mut input = ClientInput::default();
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(10.0, 20.0),
+            phase: PointerPhase::Press,
+        });
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(30.0, 40.0),
+            phase: PointerPhase::Drag,
+        });
+        input.take_pointer_events();
+
+        input.cancel_pointer();
+        input.cancel_pointer();
+
+        assert_eq!(
+            input.take_pointer_events(),
+            vec![ScreenPointerEvent {
+                position: RenderPoint::new(30.0, 40.0),
+                phase: PointerPhase::Cancel,
+            }]
+        );
+    }
+
+    #[test]
+    fn clearing_keyboard_state_preserves_pointer_cancellation() {
+        let mut input = ClientInput::default();
+        input.press(GameKey::P1Thrust);
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(10.0, 20.0),
+            phase: PointerPhase::Press,
+        });
+        input.take_pointer_events();
+        input.cancel_pointer();
+
+        input.clear_keyboard();
+
+        assert!(!input.pressed.contains(&GameKey::P1Thrust));
+        assert!(input.has_pointer_cancellation());
     }
 
     #[test]
