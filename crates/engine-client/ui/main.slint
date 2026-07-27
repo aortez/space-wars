@@ -60,35 +60,45 @@ component ScenePrimitiveItem inherits Rectangle {
     }
 }
 
+component MinimapPanel inherits Rectangle {
+    in property <[ScenePrimitive]> primitives;
+
+    background: #050514;
+    clip: true;
+    border-radius: self.width / 2;
+
+    for primitive in root.primitives: ScenePrimitiveItem {
+        primitive: primitive;
+    }
+}
+
 component PlayerStatusPanel inherits Rectangle {
     in property <string> player-name;
     in property <string> status-text;
     in property <float> status-fraction;
     in property <brush> player-color;
+    in property <bool> align-right: false;
 
-    background: #00000000;
+    background: #080a12d8;
+    border-color: root.player-color;
+    border-width: 1px;
 
     Text {
-        x: 0px;
-        y: 0px;
-        text: root.player-name;
+        x: 12px;
+        y: 8px;
+        width: parent.width - 24px;
+        height: 20px;
+        text: root.player-name + "  ·  " + root.status-text;
         color: root.player-color;
-        font-size: 14px;
-    }
-
-    Text {
-        x: 0px;
-        y: 20px;
-        text: root.status-text;
-        color: #e6edf7;
-        font-size: 12px;
+        font-size: 13px;
+        horizontal-alignment: root.align-right ? right : left;
     }
 
     Rectangle {
-        x: 0px;
-        y: 40px;
-        width: parent.width;
-        height: 8px;
+        x: 12px;
+        y: 34px;
+        width: parent.width - 24px;
+        height: 10px;
         background: #242733;
         border-color: #7d8494;
         border-width: 1px;
@@ -106,6 +116,16 @@ component PlayerStatusPanel inherits Rectangle {
 export component MainWindow inherits Window {
     in property <bool> app-full-screen: false;
     in property <[ScenePrimitive]> primitives;
+    in property <[ScenePrimitive]> p1-minimap-primitives;
+    in property <[ScenePrimitive]> p2-minimap-primitives;
+    in property <bool> vector-minimaps-visible: false;
+    in property <float> minimap-opacity: 0.74;
+    in property <length> p1-minimap-x: 0px;
+    in property <length> p1-minimap-y: 0px;
+    in property <length> p1-minimap-size: 0px;
+    in property <length> p2-minimap-x: 0px;
+    in property <length> p2-minimap-y: 0px;
+    in property <length> p2-minimap-size: 0px;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
     in-out property <bool> launcher-visible: false;
@@ -191,50 +211,85 @@ export component MainWindow inherits Window {
         primitive: primitive;
     }
 
+    MinimapPanel {
+        visible: root.vector-minimaps-visible;
+        x: root.p1-minimap-x;
+        y: root.p1-minimap-y;
+        width: root.p1-minimap-size;
+        height: root.p1-minimap-size;
+        // Group opacity makes Slint composite the backdrop and all primitives once.
+        opacity: root.minimap-opacity;
+        primitives: root.p1-minimap-primitives;
+    }
+
+    MinimapPanel {
+        visible: root.vector-minimaps-visible;
+        x: root.p2-minimap-x;
+        y: root.p2-minimap-y;
+        width: root.p2-minimap-size;
+        height: root.p2-minimap-size;
+        opacity: root.minimap-opacity;
+        primitives: root.p2-minimap-primitives;
+    }
+
     Rectangle {
         visible: root.spacewars-ui-visible;
-        x: root.width * 0.36;
-        y: root.height * 0.58;
-        width: root.width * 0.28;
-        height: root.height * 0.42;
-        background: #080a12dd;
-        border-color: #596273;
+        x: root.width / 2 - 1px;
+        width: 2px;
+        height: root.height;
+        background: #59627388;
+    }
+
+    PlayerStatusPanel {
+        visible: root.spacewars-ui-visible;
+        x: 16px;
+        y: 16px;
+        width: root.width * 0.31;
+        height: 54px;
+        player-name: root.p1-name;
+        status-text: root.p1-status;
+        status-fraction: root.p1-status-fraction;
+        player-color: root.p1-color;
+    }
+
+    PlayerStatusPanel {
+        visible: root.spacewars-ui-visible;
+        x: root.width - self.width - 16px;
+        y: 16px;
+        width: root.width * 0.31;
+        height: 54px;
+        player-name: root.p2-name;
+        status-text: root.p2-status;
+        status-fraction: root.p2-status-fraction;
+        player-color: root.p2-color;
+        align-right: true;
+    }
+
+    Rectangle {
+        visible: root.spacewars-ui-visible;
+        x: root.width * 0.37;
+        y: root.height - self.height - 14px;
+        width: root.width * 0.26;
+        height: 82px;
+        background: #080a12d0;
+        border-color: #596273aa;
         border-width: 1px;
 
-        PlayerStatusPanel {
-            x: 12px;
-            y: 12px;
-            width: parent.width - 24px;
-            height: 54px;
-            player-name: root.p1-name;
-            status-text: root.p1-status;
-            status-fraction: root.p1-status-fraction;
-            player-color: root.p1-color;
-        }
-
-        PlayerStatusPanel {
-            x: 12px;
-            y: 74px;
-            width: parent.width - 24px;
-            height: 54px;
-            player-name: root.p2-name;
-            status-text: root.p2-status;
-            status-fraction: root.p2-status-fraction;
-            player-color: root.p2-color;
-        }
-
         Text {
-            x: 12px;
-            y: 142px;
+            x: 10px;
+            y: 6px;
+            width: parent.width - 20px;
+            height: 18px;
             text: root.planet-score-label;
             color: #e6edf7;
             font-size: 12px;
+            horizontal-alignment: center;
         }
 
         Rectangle {
-            x: 12px;
-            y: 164px;
-            width: parent.width - 24px;
+            x: 10px;
+            y: 27px;
+            width: parent.width - 20px;
             height: 12px;
             background: #666b76;
             border-color: #a0a6b2;
@@ -294,19 +349,25 @@ export component MainWindow inherits Window {
         }
 
         Text {
-            x: 12px;
-            y: 194px;
+            x: 8px;
+            y: 44px;
+            width: parent.width - 16px;
+            height: 17px;
             text: root.spacewars-message-text;
             color: #f6f2a6;
-            font-size: 16px;
+            font-size: 11px;
+            horizontal-alignment: center;
         }
 
         Text {
-            x: 12px;
-            y: 220px;
+            x: 8px;
+            y: 62px;
+            width: parent.width - 16px;
+            height: 14px;
             text: root.spacewars-performance-text;
             color: #c7d0dc;
-            font-size: 12px;
+            font-size: 9px;
+            horizontal-alignment: center;
         }
     }
 
@@ -355,7 +416,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    text: "Player 1: W thrust, S reverse, A/D turn, J wings, Space laser, K cannon";
+                    text: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon";
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -365,7 +426,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 54px;
                     width: parent.width;
-                    text: "Player 2: Numpad 8 thrust, Numpad 5 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
+                    text: "Player 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -919,7 +980,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    text: "Player 1: W thrust, S reverse, A/D turn, J wings, Space laser, K cannon";
+                    text: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon";
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;
@@ -929,7 +990,7 @@ export component MainWindow inherits Window {
                     x: 0px;
                     y: 54px;
                     width: parent.width;
-                    text: "Player 2: Numpad 8 thrust, Numpad 5 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
+                    text: "Player 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
                     color: #e6edf7;
                     font-size: 13px;
                     wrap: word-wrap;

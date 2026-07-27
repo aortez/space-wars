@@ -351,6 +351,7 @@ fn should_launch_directly(args: &Args) -> bool {
 
 fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, setup: &SpacewarsSettings) {
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
+    window.set_vector_minimaps_visible(false);
     window.set_raster_visible(false);
     window.set_spacewars_ui_visible(false);
     window.set_ingame_menu_visible(false);

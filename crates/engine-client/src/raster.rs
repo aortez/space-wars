@@ -39,15 +39,32 @@ const BACKGROUND: Rgba8Pixel = Rgba8Pixel {
     a: 255,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RasterOptions {
     pub overview_cache_period: u64,
+    pub overview_minimum_object_diameter: f32,
 }
 
 impl Default for RasterOptions {
     fn default() -> Self {
         Self {
             overview_cache_period: DEFAULT_OVERVIEW_CACHE_PERIOD,
+            overview_minimum_object_diameter: render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER,
+        }
+    }
+}
+
+impl RasterOptions {
+    pub fn for_scale(output_scale: f32) -> Self {
+        let output_scale = if output_scale.is_finite() {
+            output_scale.clamp(0.1, 3.0)
+        } else {
+            1.0
+        };
+        Self {
+            overview_minimum_object_diameter: render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER
+                * output_scale,
+            ..Self::default()
         }
     }
 }
@@ -132,7 +149,7 @@ pub struct RasterRenderer {
     height: u32,
     active_buffer: usize,
     frame_index: u64,
-    overview_cache: [Option<CachedRaster>; 2],
+    overview_buffers: OverviewBuffers,
     starfield_cache: StarfieldVisibilityCache,
 }
 
@@ -144,7 +161,7 @@ impl RasterRenderer {
             height: 0,
             active_buffer: 0,
             frame_index: 0,
-            overview_cache: [None, None],
+            overview_buffers: OverviewBuffers::default(),
             starfield_cache: StarfieldVisibilityCache::default(),
         }
     }
@@ -178,7 +195,7 @@ impl RasterRenderer {
 
         {
             let frame_index = self.frame_index;
-            let overview_cache = &mut self.overview_cache;
+            let overview_buffers = &mut self.overview_buffers;
             let starfield_cache = &mut self.starfield_cache;
             let pixels = self.buffers[buffer_index].make_mut_slice();
             let started = Instant::now();
@@ -198,7 +215,7 @@ impl RasterRenderer {
                     height,
                     options,
                     frame_index,
-                    overview_cache,
+                    overview_buffers,
                     starfield_cache,
                     &mut timings,
                 );
@@ -234,7 +251,7 @@ impl RasterRenderer {
         self.buffers = (0..BUFFER_COUNT)
             .map(|_| SharedPixelBuffer::new(width, height))
             .collect();
-        self.overview_cache = [None, None];
+        self.overview_buffers = OverviewBuffers::default();
         self.starfield_cache.clear();
     }
 }
@@ -243,6 +260,12 @@ impl Default for RasterRenderer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+#[derive(Debug, Default)]
+struct OverviewBuffers {
+    cached: [Option<CachedRaster>; 2],
+    composite: [Option<CachedRaster>; 2],
 }
 
 #[derive(Debug)]
@@ -271,7 +294,7 @@ fn draw_spacewars_layout(
     height: u32,
     options: RasterOptions,
     frame_index: u64,
-    overview_cache: &mut [Option<CachedRaster>; 2],
+    overview_buffers: &mut OverviewBuffers,
     starfield_cache: &mut StarfieldVisibilityCache,
     timings: &mut RasterTimings,
 ) {
@@ -298,7 +321,7 @@ fn draw_spacewars_layout(
             overview,
             options,
             frame_index,
-            overview_cache,
+            overview_buffers,
             timings,
         );
     }
@@ -317,7 +340,7 @@ fn draw_cached_overview(
     overview: usize,
     options: RasterOptions,
     frame_index: u64,
-    overview_cache: &mut [Option<CachedRaster>; 2],
+    overview_buffers: &mut OverviewBuffers,
     timings: &mut RasterTimings,
 ) {
     let width = viewport.width.ceil().max(1.0) as u32;
@@ -325,7 +348,8 @@ fn draw_cached_overview(
     let period = options.overview_cache_period.max(1);
     let should_refresh = frame_index % period == 0;
 
-    let cache = overview_cache[overview].get_or_insert_with(|| CachedRaster::new(width, height));
+    let cache =
+        overview_buffers.cached[overview].get_or_insert_with(|| CachedRaster::new(width, height));
     if cache.width != width || cache.height != height {
         *cache = CachedRaster::new(width, height);
     }
@@ -334,28 +358,61 @@ fn draw_cached_overview(
         let started = Instant::now();
         let pixels = cache.pixels.make_mut_slice();
         clear_pixels(pixels);
+        let cache_viewport = Viewport::new(width as f32, height as f32);
         Canvas::new(width, height, pixels).draw_frame_filtered(
             frame,
-            Viewport::new(width as f32, height as f32),
-            is_cached_overview_primitive,
+            cache_viewport,
+            |z, primitive| {
+                is_cached_overview_primitive(z, primitive)
+                    && render::spacewars_overview_primitive_visible(
+                        frame.camera,
+                        cache_viewport,
+                        z,
+                        primitive,
+                        options.overview_minimum_object_diameter,
+                    )
+            },
         );
         cache.valid = true;
         timings.overview_refresh += started.elapsed();
     }
 
     let started = Instant::now();
-    canvas.blit(
-        cache.pixels.as_slice(),
-        cache.width,
-        cache.height,
-        viewport.x.round() as i32,
-        viewport.y.round() as i32,
+    let overlay = overview_buffers.composite[overview]
+        .get_or_insert_with(|| CachedRaster::new(width, height));
+    if overlay.width != width || overlay.height != height {
+        *overlay = CachedRaster::new(width, height);
+    }
+    overlay
+        .pixels
+        .make_mut_slice()
+        .copy_from_slice(cache.pixels.as_slice());
+    Canvas::new(width, height, overlay.pixels.make_mut_slice()).draw_frame_filtered(
+        frame,
+        Viewport::new(width as f32, height as f32),
+        |z, primitive| {
+            is_live_overview_primitive(z, primitive)
+                && render::spacewars_overview_primitive_visible(
+                    frame.camera,
+                    Viewport::new(width as f32, height as f32),
+                    z,
+                    primitive,
+                    options.overview_minimum_object_diameter,
+                )
+        },
     );
-    timings.overview_blit += started.elapsed();
+    timings.overview_live += started.elapsed();
 
     let started = Instant::now();
-    canvas.draw_frame_filtered(frame, viewport, is_live_overview_primitive);
-    timings.overview_live += started.elapsed();
+    canvas.blit_circle_with_opacity(
+        overlay.pixels.as_slice(),
+        overlay.width,
+        overlay.height,
+        viewport.x.round() as i32,
+        viewport.y.round() as i32,
+        render::SPACEWARS_MINIMAP_OPACITY,
+    );
+    timings.overview_blit += started.elapsed();
 }
 
 fn is_cached_overview_primitive(z: i32, primitive: &RenderPrimitive) -> bool {
@@ -659,13 +716,14 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    fn blit(
+    fn blit_circle_with_opacity(
         &mut self,
         source: &[Rgba8Pixel],
         source_width: u32,
         source_height: u32,
         x: i32,
         y: i32,
+        opacity: f32,
     ) {
         if x >= self.width as i32 || y >= self.height as i32 {
             return;
@@ -681,13 +739,38 @@ impl<'a> Canvas<'a> {
         let copy_height = source_height
             .saturating_sub(source_y)
             .min(self.height.saturating_sub(start_y));
+        let center_x = source_width as f32 * 0.5;
+        let center_y = source_height as f32 * 0.5;
+        let radius_squared = center_x.min(center_y).powi(2);
 
         for row in 0..copy_height {
             let src_start = ((source_y + row) * source_width + source_x) as usize;
             let dst_start = ((start_y + row) * self.width + start_x) as usize;
             let len = copy_width as usize;
-            self.pixels[dst_start..dst_start + len]
-                .copy_from_slice(&source[src_start..src_start + len]);
+            for (column, (destination, source)) in self.pixels[dst_start..dst_start + len]
+                .iter_mut()
+                .zip(&source[src_start..src_start + len])
+                .enumerate()
+            {
+                let source_pixel_x = source_x as f32 + column as f32 + 0.5;
+                let source_pixel_y = source_y as f32 + row as f32 + 0.5;
+                let distance_x = source_pixel_x - center_x;
+                let distance_y = source_pixel_y - center_y;
+                if distance_x * distance_x + distance_y * distance_y > radius_squared {
+                    continue;
+                }
+                let alpha = (source.a as f32 * opacity.clamp(0.0, 1.0)).round() as u8;
+                blend_pixel(
+                    destination,
+                    RasterColor {
+                        pixel: Rgba8Pixel {
+                            a: alpha,
+                            ..*source
+                        },
+                        opaque: alpha >= 250,
+                    },
+                );
+            }
         }
     }
 }
@@ -1647,5 +1730,112 @@ mod tests {
         );
 
         assert_eq!(primitive_count(&[frame]), 2);
+    }
+
+    #[test]
+    fn raster_scale_preserves_logical_overview_cutoff() {
+        assert_eq!(
+            RasterOptions::for_scale(2.0).overview_minimum_object_diameter,
+            render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER * 2.0
+        );
+        assert_eq!(
+            RasterOptions::for_scale(f32::NAN).overview_minimum_object_diameter,
+            render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER
+        );
+    }
+
+    #[test]
+    fn spacewars_raster_overview_skips_tiny_debris() {
+        let player_frames = [
+            RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0)),
+            RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0)),
+        ];
+        let mut tiny_overview = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        tiny_overview.push_primitive(
+            SPACEWARS_DEBRIS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                0.1,
+                RenderColor::RED,
+            )),
+        );
+        let mut visible_overview = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        visible_overview.push_primitive(
+            SPACEWARS_DEBRIS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                10.0,
+                RenderColor::BLUE,
+            )),
+        );
+        let frames = [
+            player_frames[0].clone(),
+            player_frames[1].clone(),
+            tiny_overview,
+            visible_overview,
+        ];
+
+        let image = image_from_frames_with_layout(
+            &frames,
+            Viewport::new(100.0, 100.0),
+            FrameLayout::SpacewarsLocalPlay,
+        );
+        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let viewports = render::frame_viewports(
+            Viewport::new(100.0, 100.0),
+            frames.len(),
+            FrameLayout::SpacewarsLocalPlay,
+        );
+        let overview_center = |viewport: Viewport| {
+            let x = (viewport.x + viewport.width * 0.5).round() as usize;
+            let y = (viewport.y + viewport.height * 0.5).round() as usize;
+            pixels.as_slice()[y * 100 + x]
+        };
+        let left_overview_center = overview_center(viewports[2]);
+        let right_overview_center = overview_center(viewports[3]);
+
+        assert_eq!(left_overview_center, BACKGROUND);
+        assert!(right_overview_center.b > BACKGROUND.b);
+    }
+
+    #[test]
+    fn spacewars_raster_minimap_blends_over_player_view() {
+        let mut player = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        player.push_primitive(
+            0,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                100.0,
+                RenderColor::RED,
+            )),
+        );
+        let frames = [
+            player.clone(),
+            player,
+            RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0)),
+            RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0)),
+        ];
+
+        let image = image_from_frames_with_layout(
+            &frames,
+            Viewport::new(100.0, 100.0),
+            FrameLayout::SpacewarsLocalPlay,
+        );
+        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let minimap = render::frame_viewports(
+            Viewport::new(100.0, 100.0),
+            frames.len(),
+            FrameLayout::SpacewarsLocalPlay,
+        )[2];
+        let x = (minimap.x + minimap.width * 0.5).round() as usize;
+        let y = (minimap.y + minimap.height * 0.5).round() as usize;
+        let blended = pixels.as_slice()[y * 100 + x];
+        let corner_x = minimap.x.ceil() as usize;
+        let corner_y = minimap.y.ceil() as usize;
+        let unobscured_corner = pixels.as_slice()[corner_y * 100 + corner_x];
+
+        assert!(blended.r > BACKGROUND.r);
+        assert!(blended.r < 255);
+        assert_eq!(unobscured_corner.r, 255);
     }
 }

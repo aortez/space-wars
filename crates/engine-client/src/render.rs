@@ -19,13 +19,40 @@ use crate::{PrimitiveKind, ScenePrimitive};
 const TRANSPARENT: RenderColor = RenderColor::CLEAR;
 const DEFAULT_VIEWPORT_WIDTH: f32 = 1280.0;
 const DEFAULT_VIEWPORT_HEIGHT: f32 = 720.0;
-const SPACEWARS_TOP_ROW_HEIGHT_RATIO: f32 = 0.58;
-const SPACEWARS_CENTER_PANEL_WIDTH_RATIO: f32 = 0.28;
+const SPACEWARS_MINIMAP_HEIGHT_RATIO: f32 = 0.3;
+const SPACEWARS_MINIMAP_HALF_WIDTH_RATIO: f32 = 0.4;
+const SPACEWARS_MINIMAP_MARGIN_RATIO: f32 = 0.02;
+const SPACEWARS_MINIMAP_MIN_MARGIN: f32 = 4.0;
+const SPACEWARS_MINIMAP_MAX_MARGIN: f32 = 16.0;
+const SPACEWARS_DEBRIS_LAYER: i32 = 1;
+pub(crate) const SPACEWARS_MINIMAP_OPACITY: f32 = 0.74;
+pub(crate) const MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameLayout {
     EqualHorizontal,
     SpacewarsLocalPlay,
+}
+
+pub struct VectorPresentation {
+    pub main_primitives: Vec<ScenePrimitive>,
+    pub minimaps: Vec<VectorMinimap>,
+}
+
+impl VectorPresentation {
+    pub fn scene_item_count(&self) -> usize {
+        self.main_primitives.len()
+            + self
+                .minimaps
+                .iter()
+                .map(|minimap| minimap.primitives.len())
+                .sum::<usize>()
+    }
+}
+
+pub struct VectorMinimap {
+    pub viewport: Viewport,
+    pub primitives: Vec<ScenePrimitive>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -92,32 +119,49 @@ pub fn scene_primitives_from_frames(
     frames: &[RenderFrame],
     viewport: Viewport,
 ) -> Vec<ScenePrimitive> {
-    scene_primitives_from_frames_with_layout(frames, viewport, FrameLayout::EqualHorizontal)
+    scene_presentation_from_frames_with_layout(frames, viewport, FrameLayout::EqualHorizontal)
+        .main_primitives
 }
 
-/// Convert scenario frames into ordered Slint scene primitives using a client layout.
-pub fn scene_primitives_from_frames_with_layout(
+/// Convert scenario frames into Slint scene primitives and grouped minimaps.
+pub fn scene_presentation_from_frames_with_layout(
     frames: &[RenderFrame],
     viewport: Viewport,
     layout: FrameLayout,
-) -> Vec<ScenePrimitive> {
-    if frames.is_empty() {
-        return Vec::new();
-    }
+) -> VectorPresentation {
+    let viewport = viewport.with_default_if_empty();
+    let mut presentation = VectorPresentation {
+        main_primitives: Vec::new(),
+        minimaps: Vec::new(),
+    };
+    let uses_minimap_groups = layout == FrameLayout::SpacewarsLocalPlay && frames.len() >= 4;
 
-    if frames.len() == 1 {
-        return scene_primitives_from_frame(&frames[0], viewport);
-    }
-
-    frames
+    for (index, (frame, frame_viewport)) in frames
         .iter()
-        .zip(frame_viewports(
-            viewport.with_default_if_empty(),
-            frames.len(),
-            layout,
-        ))
-        .flat_map(|(frame, viewport)| scene_primitives_from_frame(frame, viewport))
-        .collect()
+        .zip(frame_viewports(viewport, frames.len(), layout))
+        .enumerate()
+    {
+        if uses_minimap_groups && (2..4).contains(&index) {
+            let minimum_object_diameter = (layout == FrameLayout::SpacewarsLocalPlay
+                && (2..4).contains(&index))
+            .then_some(MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER);
+            let local_viewport = Viewport::new(frame_viewport.width, frame_viewport.height);
+            presentation.minimaps.push(VectorMinimap {
+                viewport: frame_viewport,
+                primitives: scene_primitives_from_frame_with_minimum_size(
+                    frame,
+                    local_viewport,
+                    minimum_object_diameter,
+                ),
+            });
+        } else {
+            presentation
+                .main_primitives
+                .extend(scene_primitives_from_frame(frame, frame_viewport));
+        }
+    }
+
+    presentation
 }
 
 pub(crate) fn frame_viewports(
@@ -132,22 +176,33 @@ pub(crate) fn frame_viewports(
                 return viewport.split_horizontally(count);
             }
 
-            let top_height = viewport.height * SPACEWARS_TOP_ROW_HEIGHT_RATIO;
-            let bottom_height = viewport.height - top_height;
-            let top_width = viewport.width * 0.5;
-            let center_width = viewport.width * SPACEWARS_CENTER_PANEL_WIDTH_RATIO;
-            let side_width = (viewport.width - center_width) * 0.5;
-            let bottom_y = viewport.y + top_height;
+            let player_width = viewport.width * 0.5;
+            let minimap_size = (viewport.height * SPACEWARS_MINIMAP_HEIGHT_RATIO)
+                .min(player_width * SPACEWARS_MINIMAP_HALF_WIDTH_RATIO);
+            let minimap_margin = (viewport.height * SPACEWARS_MINIMAP_MARGIN_RATIO)
+                .clamp(SPACEWARS_MINIMAP_MIN_MARGIN, SPACEWARS_MINIMAP_MAX_MARGIN)
+                .min(((player_width - minimap_size) * 0.5).max(0.0));
+            let minimap_y = viewport.y + viewport.height - minimap_size - minimap_margin;
 
             let mut viewports = vec![
-                Viewport::with_origin(viewport.x, viewport.y, top_width, top_height),
-                Viewport::with_origin(viewport.x + top_width, viewport.y, top_width, top_height),
-                Viewport::with_origin(viewport.x, bottom_y, side_width, bottom_height),
+                Viewport::with_origin(viewport.x, viewport.y, player_width, viewport.height),
                 Viewport::with_origin(
-                    viewport.x + side_width + center_width,
-                    bottom_y,
-                    side_width,
-                    bottom_height,
+                    viewport.x + player_width,
+                    viewport.y,
+                    player_width,
+                    viewport.height,
+                ),
+                Viewport::with_origin(
+                    viewport.x + minimap_margin,
+                    minimap_y,
+                    minimap_size,
+                    minimap_size,
+                ),
+                Viewport::with_origin(
+                    viewport.x + viewport.width - minimap_size - minimap_margin,
+                    minimap_y,
+                    minimap_size,
+                    minimap_size,
                 ),
             ];
 
@@ -174,12 +229,32 @@ pub(crate) fn frame_viewports(
 
 /// Convert a scenario frame into ordered Slint scene primitives.
 pub fn scene_primitives_from_frame(frame: &RenderFrame, viewport: Viewport) -> Vec<ScenePrimitive> {
+    scene_primitives_from_frame_with_minimum_size(frame, viewport, None)
+}
+
+fn scene_primitives_from_frame_with_minimum_size(
+    frame: &RenderFrame,
+    viewport: Viewport,
+    minimum_object_diameter: Option<f32>,
+) -> Vec<ScenePrimitive> {
     let viewport = viewport.with_default_if_empty();
     let mut output = Vec::new();
     let mut batch = PathBatch::default();
 
     for layer in frame.ordered_layers() {
         for primitive in &layer.primitives {
+            if minimum_object_diameter.is_some_and(|minimum| {
+                !spacewars_overview_primitive_visible(
+                    frame.camera,
+                    viewport,
+                    layer.z,
+                    primitive,
+                    minimum,
+                )
+            }) {
+                continue;
+            }
+
             match primitive {
                 RenderPrimitive::Circle(circle) => {
                     if let Some(fragment) = circle_fragment(circle, frame.camera, viewport) {
@@ -206,6 +281,55 @@ pub fn scene_primitives_from_frame(frame: &RenderFrame, viewport: Viewport) -> V
     }
 
     output
+}
+
+pub(crate) fn spacewars_overview_primitive_visible(
+    camera: Camera2,
+    viewport: Viewport,
+    layer: i32,
+    primitive: &RenderPrimitive,
+    minimum_object_diameter: f32,
+) -> bool {
+    if layer != SPACEWARS_DEBRIS_LAYER || minimum_object_diameter <= 0.0 {
+        return true;
+    }
+
+    projected_primitive_extent(camera, viewport, primitive) >= minimum_object_diameter
+}
+
+fn projected_primitive_extent(
+    camera: Camera2,
+    viewport: Viewport,
+    primitive: &RenderPrimitive,
+) -> f32 {
+    if camera.height <= 0.0 {
+        return 0.0;
+    }
+    let scale = viewport.with_default_if_empty().height / camera.height;
+    let world_extent = match primitive {
+        RenderPrimitive::Circle(circle) => circle.radius.max(0.0) * 2.0,
+        RenderPrimitive::Line(line) => {
+            let dx = line.end.x - line.start.x;
+            let dy = line.end.y - line.start.y;
+            (dx * dx + dy * dy).sqrt()
+        }
+        RenderPrimitive::Polygon(polygon) => {
+            let Some(first) = polygon.points.first() else {
+                return 0.0;
+            };
+            let (mut min_x, mut max_x) = (first.x, first.x);
+            let (mut min_y, mut max_y) = (first.y, first.y);
+            for point in &polygon.points[1..] {
+                min_x = min_x.min(point.x);
+                max_x = max_x.max(point.x);
+                min_y = min_y.min(point.y);
+                max_y = max_y.max(point.y);
+            }
+            (max_x - min_x).max(max_y - min_y)
+        }
+        RenderPrimitive::Text(_) => f32::INFINITY,
+    };
+    world_extent * scale
 }
 
 pub fn debug_frame(elapsed: Duration, stress_triangles: usize) -> RenderFrame {
@@ -578,7 +702,7 @@ mod tests {
     }
 
     #[test]
-    fn spacewars_local_play_layout_uses_original_style_viewport_bands() {
+    fn spacewars_local_play_layout_uses_full_height_views_and_floating_minimaps() {
         let frames = [
             frame_with_triangle(RenderColor::RED),
             frame_with_triangle(RenderColor::GREEN),
@@ -586,29 +710,135 @@ mod tests {
             frame_with_triangle(RenderColor::YELLOW),
         ];
 
-        let primitives = scene_primitives_from_frames_with_layout(
+        let presentation = scene_presentation_from_frames_with_layout(
             &frames,
             Viewport::new(1000.0, 700.0),
             FrameLayout::SpacewarsLocalPlay,
         );
 
-        assert_eq!(primitives.len(), 4);
-        assert_close(primitives[0].x, 0.0);
-        assert_close(primitives[0].y, 0.0);
-        assert_close(primitives[0].width, 500.0);
-        assert_close(primitives[0].height, 406.0);
-        assert_close(primitives[1].x, 500.0);
-        assert_close(primitives[1].y, 0.0);
-        assert_close(primitives[1].width, 500.0);
-        assert_close(primitives[1].height, 406.0);
-        assert_close(primitives[2].x, 0.0);
-        assert_close(primitives[2].y, 406.0);
-        assert_close(primitives[2].width, 360.0);
-        assert_close(primitives[2].height, 294.0);
-        assert_close(primitives[3].x, 640.0);
-        assert_close(primitives[3].y, 406.0);
-        assert_close(primitives[3].width, 360.0);
-        assert_close(primitives[3].height, 294.0);
+        assert_eq!(presentation.main_primitives.len(), 2);
+        assert_eq!(presentation.minimaps.len(), 2);
+        assert_close(presentation.main_primitives[0].x, 0.0);
+        assert_close(presentation.main_primitives[0].y, 0.0);
+        assert_close(presentation.main_primitives[0].width, 500.0);
+        assert_close(presentation.main_primitives[0].height, 700.0);
+        assert_close(presentation.main_primitives[1].x, 500.0);
+        assert_close(presentation.main_primitives[1].y, 0.0);
+        assert_close(presentation.main_primitives[1].width, 500.0);
+        assert_close(presentation.main_primitives[1].height, 700.0);
+
+        let left = &presentation.minimaps[0];
+        assert_close(left.viewport.x, 14.0);
+        assert_close(left.viewport.y, 486.0);
+        assert_close(left.viewport.width, 200.0);
+        assert_close(left.viewport.height, 200.0);
+        assert_close(left.primitives[0].x, 0.0);
+        assert_close(left.primitives[0].y, 0.0);
+        assert_close(left.primitives[0].width, 200.0);
+        assert_close(left.primitives[0].height, 200.0);
+
+        let right = &presentation.minimaps[1];
+        assert_close(right.viewport.x, 786.0);
+        assert_close(right.viewport.y, 486.0);
+        assert_close(right.viewport.width, 200.0);
+        assert_close(right.viewport.height, 200.0);
+        assert_close(right.primitives[0].x, 0.0);
+        assert_close(right.primitives[0].y, 0.0);
+        assert_close(right.primitives[0].width, 200.0);
+        assert_close(right.primitives[0].height, 200.0);
+    }
+
+    #[test]
+    fn spacewars_overview_culls_only_subpixel_debris() {
+        let camera = Camera2::new(RenderPoint::ZERO, 100.0);
+        let viewport = Viewport::new(100.0, 100.0);
+        let tiny_debris = RenderPrimitive::Circle(RenderCircle::filled(
+            RenderPoint::ZERO,
+            0.9,
+            RenderColor::WHITE,
+        ));
+        let visible_debris = RenderPrimitive::Circle(RenderCircle::filled(
+            RenderPoint::ZERO,
+            1.0,
+            RenderColor::WHITE,
+        ));
+
+        assert!(!spacewars_overview_primitive_visible(
+            camera,
+            viewport,
+            SPACEWARS_DEBRIS_LAYER,
+            &tiny_debris,
+            MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER,
+        ));
+        assert!(spacewars_overview_primitive_visible(
+            camera,
+            viewport,
+            SPACEWARS_DEBRIS_LAYER,
+            &visible_debris,
+            MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER,
+        ));
+        assert!(spacewars_overview_primitive_visible(
+            camera,
+            viewport,
+            0,
+            &tiny_debris,
+            MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER,
+        ));
+    }
+
+    #[test]
+    fn spacewars_layout_applies_debris_cutoff_only_to_overviews() {
+        let mut player = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        player.push_primitive(
+            SPACEWARS_DEBRIS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                0.1,
+                RenderColor::RED,
+            )),
+        );
+        let mut tiny_overview = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        tiny_overview.push_primitive(
+            SPACEWARS_DEBRIS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                0.1,
+                RenderColor::GREEN,
+            )),
+        );
+        let mut visible_overview = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+        visible_overview.push_primitive(
+            SPACEWARS_DEBRIS_LAYER,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                1.0,
+                RenderColor::BLUE,
+            )),
+        );
+        let frames = [
+            player,
+            RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0)),
+            tiny_overview,
+            visible_overview,
+        ];
+
+        let presentation = scene_presentation_from_frames_with_layout(
+            &frames,
+            Viewport::new(1000.0, 700.0),
+            FrameLayout::SpacewarsLocalPlay,
+        );
+
+        assert_eq!(presentation.main_primitives.len(), 1);
+        assert_eq!(
+            presentation.main_primitives[0].fill,
+            brush(RenderColor::RED)
+        );
+        assert!(presentation.minimaps[0].primitives.is_empty());
+        assert_eq!(presentation.minimaps[1].primitives.len(), 1);
+        assert_eq!(
+            presentation.minimaps[1].primitives[0].fill,
+            brush(RenderColor::BLUE)
+        );
     }
 
     fn frame_with_triangle(color: RenderColor) -> RenderFrame {

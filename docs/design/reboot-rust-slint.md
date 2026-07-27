@@ -383,7 +383,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - Select Slint's winit backend by default so the client can observe physical `Numpad*` keys for Player 2; still honor an explicit `SLINT_BACKEND` override.
 - Preserve original wing semantics: hold the wing key to close, release it to open. Do not turn this into a toggle.
 - Define scenario actions for thrust, reverse, turn left/right, wing open/close, internal brake, and placeholder weapon actions.
-- Keep brake unbound in the client for now; `Ship.brake()` exists in the original source, but no keyboard caller was found.
+- Expose braking separately from reverse thrust: Player 1 uses `S` to brake and `X` to reverse, while Player 2 uses Numpad 5 to brake and Numpad 2 to reverse.
 - Keep exhaust trails, weapons, collision, and damage out of this slice.
 - Acceptance: two ships can fly inside a bounded universe with deterministic state tests for thrust, turn, wing transitions, and max-speed behavior.
 
