@@ -31,6 +31,7 @@ pub(crate) enum GameKey {
     ReturnLauncher,
     P1Wing,
     P1Thrust,
+    P1Brake,
     P1Reverse,
     P1TurnLeft,
     P1TurnRight,
@@ -40,6 +41,7 @@ pub(crate) enum GameKey {
     P1ZoomOut,
     P2Wing,
     P2Thrust,
+    P2Brake,
     P2Reverse,
     P2TurnLeft,
     P2TurnRight,
@@ -117,6 +119,7 @@ impl ClientInput {
                 player: 0,
                 wing: GameKey::P1Wing,
                 thrust: GameKey::P1Thrust,
+                brake: GameKey::P1Brake,
                 reverse: GameKey::P1Reverse,
                 turn_left: GameKey::P1TurnLeft,
                 turn_right: GameKey::P1TurnRight,
@@ -132,6 +135,7 @@ impl ClientInput {
                 player: 1,
                 wing: GameKey::P2Wing,
                 thrust: GameKey::P2Thrust,
+                brake: GameKey::P2Brake,
                 reverse: GameKey::P2Reverse,
                 turn_left: GameKey::P2TurnLeft,
                 turn_right: GameKey::P2TurnRight,
@@ -164,18 +168,30 @@ impl ClientInput {
     }
 
     fn append_player_actions(&self, controls: PlayerControlMap, actions: &mut Vec<Action>) {
-        if self.pressed.contains(&controls.wing) {
+        let wing_control_active = if self.pressed.contains(&controls.wing) {
             actions.push(SpacewarsAction::close_wings(controls.player));
+            true
         } else if self.released.contains(&controls.wing) {
             actions.push(SpacewarsAction::open_wings(controls.player));
-        } else if self.pressed.contains(&controls.thrust) {
-            actions.push(SpacewarsAction::thrust(controls.player));
-        } else if self.pressed.contains(&controls.reverse) {
-            actions.push(SpacewarsAction::reverse(controls.player));
-        } else if self.released.contains(&controls.thrust)
-            || self.released.contains(&controls.reverse)
-        {
-            actions.push(SpacewarsAction::thrust_halt(controls.player));
+            true
+        } else {
+            false
+        };
+
+        if self.pressed.contains(&controls.brake) {
+            actions.push(SpacewarsAction::brake(controls.player));
+        } else if self.released.contains(&controls.brake) {
+            actions.push(SpacewarsAction::brake_halt(controls.player));
+        } else if !wing_control_active {
+            if self.pressed.contains(&controls.thrust) {
+                actions.push(SpacewarsAction::thrust(controls.player));
+            } else if self.pressed.contains(&controls.reverse) {
+                actions.push(SpacewarsAction::reverse(controls.player));
+            } else if self.released.contains(&controls.thrust)
+                || self.released.contains(&controls.reverse)
+            {
+                actions.push(SpacewarsAction::thrust_halt(controls.player));
+            }
         }
 
         if self.pressed.contains(&controls.turn_left) {
@@ -213,6 +229,7 @@ struct PlayerControlMap {
     player: usize,
     wing: GameKey,
     thrust: GameKey,
+    brake: GameKey,
     reverse: GameKey,
     turn_left: GameKey,
     turn_right: GameKey,
@@ -246,7 +263,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyQ => Some(GameKey::ReturnLauncher),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
-        KeyCode::KeyS => Some(GameKey::P1Reverse),
+        KeyCode::KeyS => Some(GameKey::P1Brake),
+        KeyCode::KeyX => Some(GameKey::P1Reverse),
         KeyCode::KeyA => Some(GameKey::P1TurnLeft),
         KeyCode::KeyD => Some(GameKey::P1TurnRight),
         KeyCode::Space => Some(GameKey::P1Laser),
@@ -255,7 +273,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyI => Some(GameKey::P1ZoomOut),
         KeyCode::PageDown => Some(GameKey::P2Wing),
         KeyCode::Numpad8 => Some(GameKey::P2Thrust),
-        KeyCode::Numpad5 => Some(GameKey::P2Reverse),
+        KeyCode::Numpad5 => Some(GameKey::P2Brake),
+        KeyCode::Numpad2 => Some(GameKey::P2Reverse),
         KeyCode::Numpad4 => Some(GameKey::P2TurnLeft),
         KeyCode::Numpad6 => Some(GameKey::P2TurnRight),
         KeyCode::Delete => Some(GameKey::P2Laser),
@@ -319,7 +338,57 @@ mod tests {
     }
 
     #[test]
-    fn p2_controls_use_original_numpad_and_navigation_keys() {
+    fn brake_and_reverse_keys_use_distinct_keyboard_rows() {
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyS),
+            Some(GameKey::P1Brake)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyX),
+            Some(GameKey::P1Reverse)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Numpad5),
+            Some(GameKey::P2Brake)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Numpad2),
+            Some(GameKey::P2Reverse)
+        );
+    }
+
+    #[test]
+    fn brake_has_propulsion_priority_and_remains_available_with_wings() {
+        let mut input = ClientInput::default();
+        input.press(GameKey::P1Wing);
+        input.press(GameKey::P1Thrust);
+        input.press(GameKey::P1Reverse);
+        input.press(GameKey::P1Brake);
+
+        let actions = decoded(&input.actions_for_spacewars());
+
+        assert!(has_action(&actions, 0, SpacewarsActionKind::CloseWings));
+        assert!(has_action(&actions, 0, SpacewarsActionKind::Brake));
+        assert!(!has_action(&actions, 0, SpacewarsActionKind::Thrust));
+        assert!(!has_action(&actions, 0, SpacewarsActionKind::Reverse));
+    }
+
+    #[test]
+    fn brake_release_emits_one_tick_brake_halt() {
+        let mut input = ClientInput::default();
+        input.press(GameKey::P1Brake);
+        input.actions_for_spacewars();
+
+        input.release(GameKey::P1Brake);
+        let actions = decoded(&input.actions_for_spacewars());
+        assert!(has_action(&actions, 0, SpacewarsActionKind::BrakeHalt));
+
+        let actions = decoded(&input.actions_for_spacewars());
+        assert!(!has_action(&actions, 0, SpacewarsActionKind::BrakeHalt));
+    }
+
+    #[test]
+    fn p2_controls_use_numpad_and_navigation_keys() {
         assert_eq!(
             game_key_from_key_code(KeyCode::PageDown),
             Some(GameKey::P2Wing)
@@ -330,6 +399,10 @@ mod tests {
         );
         assert_eq!(
             game_key_from_key_code(KeyCode::Numpad5),
+            Some(GameKey::P2Brake)
+        );
+        assert_eq!(
+            game_key_from_key_code(KeyCode::Numpad2),
             Some(GameKey::P2Reverse)
         );
         assert_eq!(

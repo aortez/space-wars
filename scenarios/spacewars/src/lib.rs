@@ -3690,6 +3690,7 @@ impl ShipState {
     }
 
     fn update_wings(&mut self, dt: f32) {
+        let braking = self.thrust_behavior == ThrustBehavior::Brake;
         match self.wing_behavior {
             WingBehavior::None => {}
             WingBehavior::Close => {
@@ -3700,7 +3701,9 @@ impl ShipState {
                     self.wing_theta = MAX_WING_THETA;
                 }
                 self.update_wing_position();
-                self.thrust_behavior = ThrustBehavior::Full;
+                if !braking {
+                    self.thrust_behavior = ThrustBehavior::Full;
+                }
             }
             WingBehavior::Open => {
                 self.wing_theta -= dt * WING_DELTA_SPEED;
@@ -3712,22 +3715,27 @@ impl ShipState {
                 }
                 self.update_wing_position();
                 self.cap_speed(MAX_SPEED);
-                if self.wing_behavior == WingBehavior::None {
+                if self.wing_behavior == WingBehavior::None && !braking {
                     self.thrust_behavior = ThrustBehavior::None;
                 }
             }
         }
 
-        if self.wing_state == WingState::Closed && self.wing_behavior != WingBehavior::Open {
+        if self.wing_state == WingState::Closed
+            && self.wing_behavior != WingBehavior::Open
+            && !braking
+        {
             self.thrust_behavior = ThrustBehavior::Full;
         }
     }
 
     fn update_wing_position(&mut self) {
-        let max_velocity =
-            (self.wing_theta + 0.46) / MAX_WING_THETA * WING_CLOSED_SPEED + MAX_SPEED;
-        let speed = self.velocity.length();
-        self.velocity = self.velocity.normalized() * (speed * 0.8 + max_velocity * 0.15);
+        if self.thrust_behavior != ThrustBehavior::Brake {
+            let max_velocity =
+                (self.wing_theta + 0.46) / MAX_WING_THETA * WING_CLOSED_SPEED + MAX_SPEED;
+            let speed = self.velocity.length();
+            self.velocity = self.velocity.normalized() * (speed * 0.8 + max_velocity * 0.15);
+        }
         self.current_max_omega =
             ((1.0 - self.wing_theta / MAX_WING_THETA) * BASE_MAX_OMEGA).max(WING_CLOSED_MAX_OMEGA);
     }
@@ -3748,18 +3756,16 @@ impl ShipState {
                 self.fire_exhaust(self.direction, rng, tick);
             }
             ThrustBehavior::Brake => {
-                if self.wing_state == WingState::Opened {
-                    if self.velocity.length() > MAX_SPEED * 0.25 {
-                        self.velocity -= self.velocity.normalized() * self.thrust_power;
-                    } else {
-                        self.velocity *= 0.9;
-                    }
+                if self.velocity.length() > MAX_SPEED * 0.25 {
+                    self.velocity -= self.velocity.normalized() * self.thrust_power;
+                } else {
+                    self.velocity *= 0.9;
+                }
 
-                    if self.omega.abs() > 0.01 {
-                        self.omega -= self.omega.signum() * self.turn_power;
-                    } else {
-                        self.omega = 0.0;
-                    }
+                if self.omega.abs() > 0.01 {
+                    self.omega -= self.omega.signum() * self.turn_power;
+                } else {
+                    self.omega = 0.0;
                 }
             }
             ThrustBehavior::Reverse => {
@@ -6701,6 +6707,49 @@ mod tests {
             state.ships[0].position.y,
             450.0 + (SHIP_THRUST_FORCE / SHIP_MASS / 60.0) / 60.0,
         );
+    }
+
+    #[test]
+    fn brake_opposes_velocity_without_turning_into_reverse_thrust() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets.clear();
+        state.ships[0].velocity = Vec2::new(100.0, 0.0);
+        state.ships[0].direction = Vec2::Y;
+        let speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
+
+        step(&mut state, &[SpacewarsAction::brake(0)]);
+
+        assert_vec_close(state.ships[0].velocity, Vec2::new(100.0 - speed_delta, 0.0));
+        for _ in 0..180 {
+            step(&mut state, &[SpacewarsAction::brake(0)]);
+        }
+        assert!(state.ships[0].velocity.x >= 0.0);
+        assert_close(state.ships[0].velocity.y, 0.0);
+        assert!(state.ships[0].velocity.length() < 0.001);
+    }
+
+    #[test]
+    fn brake_decelerates_with_sweep_wings_closed() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets.clear();
+        state.ships[0].wing_state = WingState::Closed;
+        state.ships[0].wing_behavior = WingBehavior::None;
+        state.ships[0].wing_theta = MAX_WING_THETA;
+        state.ships[0].velocity = Vec2::Y * WING_CLOSED_SPEED;
+        let speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
+
+        step(
+            &mut state,
+            &[SpacewarsAction::close_wings(0), SpacewarsAction::brake(0)],
+        );
+
+        assert_close(
+            state.ships[0].velocity.length(),
+            WING_CLOSED_SPEED - speed_delta,
+        );
+        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::Brake);
     }
 
     #[test]
