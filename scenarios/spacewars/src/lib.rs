@@ -63,8 +63,14 @@ const FLAG_STEM_FACTOR: f32 = 0.7;
 const FLAG_RADIUS_DIVISOR: f32 = 15.0;
 const OVERVIEW_OWNERSHIP_STROKE_WIDTH: f32 = 2.25;
 const PLANET_CAPTURE_SECS: f32 = 4.0;
+const PLANET_CAPTURE_DECAY_RATE: f32 = 0.5;
 const POD_REBUILD_SECS: f32 = 8.0;
 const OWNED_SPACEPORT_HEAL_PER_SEC: f32 = 3.0;
+const SPACEPORT_CONTEST_EJECT_DELAY_SECS: f32 = 0.25;
+const SPACEPORT_EJECT_MARGIN: f32 = 5.0;
+const SPACEPORT_EJECT_SPEED: f32 = 120.0;
+const SPACEPORT_EJECT_TANGENTIAL_SPEED: f32 = 60.0;
+const SPACEPORT_REENTRY_LOCKOUT_SECS: f32 = 0.75;
 const DEFAULT_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const MIN_PLAYER_VIEW_HEIGHT: f32 = 15.0;
 const PLAYER_VIEW_ASPECT_RATIO: f32 = 640.0 / 417.6;
@@ -266,8 +272,9 @@ pub struct PlanetState {
     pub mass: f32,
     pub color: Color,
     pub owner_id: Option<usize>,
-    pub landing_ship: Option<usize>,
-    pub landing_ship_prev_round: Option<usize>,
+    pub capturing_player_id: Option<usize>,
+    pub previous_docked_ship: Option<usize>,
+    pub dock_contest_time: f32,
     pub taking_ownership_time: f32,
     pub building_new_ship_time: f32,
     pub orbit_radius: f32,
@@ -389,6 +396,19 @@ pub struct SpaceportContact {
     pub planet: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct SpaceportOccupancy {
+    ships: Vec<usize>,
+    owner_pods: Vec<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpaceportStatus {
+    Empty,
+    Active(usize),
+    Contested,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundsDrawMode {
     High,
@@ -433,6 +453,7 @@ pub struct ShipState {
     thrust_power: f32,
     current_max_omega: f32,
     cannon_cooldown_remaining: f32,
+    spaceport_reentry_lockout: f32,
     delta_time: f32,
     death_impulse: Vec2,
 }
@@ -701,7 +722,7 @@ impl Scenario for SpacewarsScenario {
                 planet.update_orbit(sun.position, dt);
             }
         }
-        update_planet_landing_progress(state, dt);
+        update_spaceports(state, dt);
 
         for ship in &mut state.ships {
             ship.update(dt, state.seed, state.tick);
@@ -720,7 +741,6 @@ impl Scenario for SpacewarsScenario {
         let collision_events = resolve_body_collisions(state);
         state.body_collisions = collision_events.body_collisions;
         state.spaceport_contacts = collision_events.spaceport_contacts;
-        record_spaceport_landings(state);
         handle_ship_deaths(state);
         if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
             apply_debris_gravity(state);
@@ -1051,8 +1071,9 @@ fn build_world(config: &SpacewarsConfig, seed: u64) -> (Option<SunState>, Vec<Pl
             mass: body_mass(radius),
             color: random_color(&mut rng),
             owner_id: None,
-            landing_ship: None,
-            landing_ship_prev_round: None,
+            capturing_player_id: None,
+            previous_docked_ship: None,
+            dock_contest_time: 0.0,
             taking_ownership_time: 0.0,
             building_new_ship_time: 0.0,
             orbit_radius,
@@ -2488,6 +2509,9 @@ fn spaceport_accepts_ship(
     spaceport: SpaceportPhysics,
 ) -> bool {
     let ship = &state.ships[ship_index];
+    if ship.spaceport_reentry_lockout > 0.0 {
+        return false;
+    }
     if ship.form != ShipForm::EscapePod {
         return true;
     }
@@ -2537,56 +2561,104 @@ fn resolve_spaceport_contact(ship: &mut ShipState, spaceport_center: Vec2) {
     ship.velocity += offset * (force / ship.mass());
 }
 
-fn update_planet_landing_progress(state: &mut SpacewarsState, dt: f32) {
+/// Process contacts saved by the previous physics tick before movement and weapons update.
+fn update_spaceports(state: &mut SpacewarsState, dt: f32) {
+    let occupancies = (0..state.planets.len())
+        .map(|planet| spaceport_occupancy(state, planet))
+        .collect::<Vec<_>>();
     let mut planet_counts_dirty = false;
 
-    for planet_index in 0..state.planets.len() {
-        let landing_ship = state.planets[planet_index].landing_ship;
-        let Some(ship_index) = landing_ship else {
-            state.planets[planet_index].landing_ship_prev_round = None;
-            state.planets[planet_index].taking_ownership_time = 0.0;
+    for (planet_index, occupancy) in occupancies.into_iter().enumerate() {
+        let firing_ships = occupancy
+            .ships
+            .iter()
+            .copied()
+            .filter(|ship| {
+                state
+                    .ships
+                    .get(*ship)
+                    .is_some_and(|ship| ship.laser_firing || ship.cannon_firing)
+            })
+            .collect::<Vec<_>>();
+        // Releasing here moves the muzzle beyond the planet before this tick spawns weapons.
+        if !firing_ships.is_empty() {
+            eject_ships_from_spaceport(state, planet_index, &firing_ships);
+            let planet = &mut state.planets[planet_index];
+            planet.previous_docked_ship = None;
+            planet.dock_contest_time = 0.0;
+            decay_planet_capture(planet, dt);
             continue;
-        };
+        }
 
-        let landed_continuously =
-            state.planets[planet_index].landing_ship_prev_round == landing_ship;
-        if landed_continuously && ship_index < state.ships.len() {
+        if spaceport_is_contested(state, &occupancy) {
+            let should_eject = {
+                let planet = &mut state.planets[planet_index];
+                planet.previous_docked_ship = None;
+                planet.dock_contest_time += dt;
+                decay_planet_capture(planet, dt);
+                planet.dock_contest_time >= SPACEPORT_CONTEST_EJECT_DELAY_SECS
+            };
+            if should_eject {
+                eject_ships_from_spaceport(state, planet_index, &occupancy.ships);
+                state.planets[planet_index].dock_contest_time = 0.0;
+            }
+            continue;
+        }
+
+        state.planets[planet_index].dock_contest_time = 0.0;
+
+        if let Some(&ship_index) = occupancy.ships.first() {
             let ship_owner_id = state.ships[ship_index].owner_id;
             let owned_by_ship = state.planets[planet_index].owner_id == Some(ship_owner_id);
-            let is_escape_pod = state.ships[ship_index].form == ShipForm::EscapePod;
+            if !owned_by_ship && !occupancy.owner_pods.is_empty() {
+                eject_ships_from_spaceport(state, planet_index, &occupancy.owner_pods);
+            }
 
-            if owned_by_ship && is_escape_pod {
+            let landed_continuously =
+                state.planets[planet_index].previous_docked_ship == Some(ship_index);
+            state.planets[planet_index].previous_docked_ship = Some(ship_index);
+
+            if owned_by_ship {
+                decay_planet_capture(&mut state.planets[planet_index], dt);
+                if landed_continuously {
+                    state.ships[ship_index].heal(OWNED_SPACEPORT_HEAL_PER_SEC * dt);
+                }
+            } else {
+                planet_counts_dirty |= advance_planet_capture(
+                    &mut state.planets[planet_index],
+                    ship_owner_id,
+                    landed_continuously,
+                    dt,
+                );
+            }
+            continue;
+        }
+
+        if let Some(&pod_index) = occupancy.owner_pods.first() {
+            let landed_continuously =
+                state.planets[planet_index].previous_docked_ship == Some(pod_index);
+            state.planets[planet_index].previous_docked_ship = Some(pod_index);
+            decay_planet_capture(&mut state.planets[planet_index], dt);
+
+            if landed_continuously {
                 let rebuild_progress = {
                     let planet = &mut state.planets[planet_index];
                     planet.building_new_ship_time += dt;
                     planet.building_new_ship_time / POD_REBUILD_SECS
                 };
-                state.ships[ship_index].set_escape_pod_rebuild_progress(rebuild_progress);
+                state.ships[pod_index].set_escape_pod_rebuild_progress(rebuild_progress);
 
                 if rebuild_progress >= 1.0 {
                     state.planets[planet_index].building_new_ship_time = 0.0;
-                    state.ships[ship_index].restore_from_escape_pod();
+                    state.ships[pod_index].restore_from_escape_pod();
                 }
-            } else if owned_by_ship {
-                state.ships[ship_index].heal(OWNED_SPACEPORT_HEAL_PER_SEC * dt);
-            } else if !is_escape_pod {
-                let captured = {
-                    let planet = &mut state.planets[planet_index];
-                    planet.taking_ownership_time += dt;
-                    if planet.taking_ownership_time >= PLANET_CAPTURE_SECS {
-                        planet.owner_id = Some(ship_owner_id);
-                        planet.taking_ownership_time = 0.0;
-                        true
-                    } else {
-                        false
-                    }
-                };
-                planet_counts_dirty |= captured;
             }
+            continue;
         }
 
-        state.planets[planet_index].landing_ship_prev_round = landing_ship;
-        state.planets[planet_index].landing_ship = None;
+        let planet = &mut state.planets[planet_index];
+        planet.previous_docked_ship = None;
+        decay_planet_capture(planet, dt);
     }
 
     if planet_counts_dirty {
@@ -2594,17 +2666,146 @@ fn update_planet_landing_progress(state: &mut SpacewarsState, dt: f32) {
     }
 }
 
-fn record_spaceport_landings(state: &mut SpacewarsState) {
-    let contacts = state.spaceport_contacts.clone();
+fn spaceport_occupancy(state: &SpacewarsState, planet_index: usize) -> SpaceportOccupancy {
+    let Some(planet) = state.planets.get(planet_index) else {
+        return SpaceportOccupancy::default();
+    };
+    let mut occupancy = SpaceportOccupancy::default();
 
-    for contact in contacts {
+    for contact in state
+        .spaceport_contacts
+        .iter()
+        .filter(|contact| contact.planet == planet_index)
+    {
         let Some(ship) = state.ships.get(contact.ship) else {
             continue;
         };
-        let Some(planet) = state.planets.get_mut(contact.planet) else {
+        if ship.spaceport_reentry_lockout > 0.0 {
             continue;
+        }
+
+        match ship.form {
+            ShipForm::Ship => occupancy.ships.push(contact.ship),
+            ShipForm::EscapePod if planet.owner_id == Some(ship.owner_id) => {
+                occupancy.owner_pods.push(contact.ship);
+            }
+            ShipForm::EscapePod => {}
+        }
+    }
+
+    let ship_key = |ship_index: &usize| (state.ships[*ship_index].owner_id, *ship_index);
+    occupancy.ships.sort_by_key(ship_key);
+    occupancy.ships.dedup();
+    occupancy.owner_pods.sort_by_key(ship_key);
+    occupancy.owner_pods.dedup();
+    occupancy
+}
+
+fn spaceport_is_contested(state: &SpacewarsState, occupancy: &SpaceportOccupancy) -> bool {
+    let Some(first) = occupancy.ships.first() else {
+        return false;
+    };
+    let first_owner = state.ships[*first].owner_id;
+    occupancy
+        .ships
+        .iter()
+        .skip(1)
+        .any(|ship| state.ships[*ship].owner_id != first_owner)
+}
+
+fn spaceport_status(state: &SpacewarsState, planet_index: usize) -> SpaceportStatus {
+    let occupancy = spaceport_occupancy(state, planet_index);
+    if spaceport_is_contested(state, &occupancy) {
+        SpaceportStatus::Contested
+    } else if let Some(ship) = occupancy.ships.first().or(occupancy.owner_pods.first()) {
+        SpaceportStatus::Active(*ship)
+    } else {
+        SpaceportStatus::Empty
+    }
+}
+
+fn decay_planet_capture(planet: &mut PlanetState, dt: f32) {
+    planet.taking_ownership_time =
+        (planet.taking_ownership_time - dt * PLANET_CAPTURE_DECAY_RATE).max(0.0);
+    if planet.taking_ownership_time <= REALLY_SMALL {
+        planet.taking_ownership_time = 0.0;
+        planet.capturing_player_id = None;
+    }
+}
+
+fn advance_planet_capture(
+    planet: &mut PlanetState,
+    player: usize,
+    landed_continuously: bool,
+    dt: f32,
+) -> bool {
+    if planet.capturing_player_id != Some(player) {
+        planet.capturing_player_id = Some(player);
+        planet.taking_ownership_time = 0.0;
+        return false;
+    }
+    if !landed_continuously {
+        return false;
+    }
+
+    planet.taking_ownership_time += dt;
+    if planet.taking_ownership_time < PLANET_CAPTURE_SECS {
+        return false;
+    }
+
+    planet.owner_id = Some(player);
+    planet.capturing_player_id = None;
+    planet.taking_ownership_time = 0.0;
+    planet.building_new_ship_time = 0.0;
+    true
+}
+
+fn eject_ships_from_spaceport(
+    state: &mut SpacewarsState,
+    planet_index: usize,
+    ship_indices: &[usize],
+) {
+    let Some(planet) = state.planets.get(planet_index).copied() else {
+        return;
+    };
+    let port_center = spaceport_physics(planet_index, &planet).bounds.center;
+    let outward_offset = port_center - planet.position;
+    let outward = if outward_offset.length_squared() <= REALLY_SMALL {
+        Vec2::X
+    } else {
+        outward_offset.normalized()
+    };
+    let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
+    let mut ships = ship_indices
+        .iter()
+        .copied()
+        .filter(|ship| *ship < state.ships.len())
+        .collect::<Vec<_>>();
+    // Stable owner ordering makes the separation independent of collision iteration order.
+    ships.sort_by_key(|ship| (state.ships[*ship].owner_id, *ship));
+    ships.dedup();
+    let ship_count = ships.len();
+
+    for (rank, ship_index) in ships.into_iter().enumerate() {
+        let side = if ship_count <= 1 {
+            0.0
+        } else {
+            rank as f32 * 2.0 / (ship_count - 1) as f32 - 1.0
         };
-        planet.set_landing_ship(contact.ship, ship.owner_id);
+        let ship = &mut state.ships[ship_index];
+        let bounds = ship_low_bounds(&ship_triangles(ship));
+        let center_offset = bounds.center - ship.position;
+        let target_center = planet.position
+            + outward
+                * (planet.radius * BODY_BOUNDS_RADIUS_SCALE
+                    + bounds.radius
+                    + SPACEPORT_EJECT_MARGIN)
+            + tangent * (side * bounds.radius * 1.5);
+
+        ship.position = target_center - center_offset;
+        ship.velocity =
+            outward * SPACEPORT_EJECT_SPEED + tangent * (side * SPACEPORT_EJECT_TANGENTIAL_SPEED);
+        ship.spaceport_reentry_lockout = SPACEPORT_REENTRY_LOCKOUT_SECS;
     }
 }
 
@@ -2847,21 +3048,6 @@ impl PlanetState {
         self.orbit_angle += self.orbit_omega * dt;
         self.wrapper_angle += self.wrapper_omega * dt;
         self.position = sun_position + Vec2::from_radians(self.orbit_angle) * self.orbit_radius;
-    }
-
-    fn set_landing_ship(&mut self, ship_index: usize, ship_owner_id: usize) {
-        if self.landing_ship.is_none() {
-            self.landing_ship = Some(ship_index);
-        }
-
-        if self.owner_id == Some(ship_owner_id) {
-            self.landing_ship = Some(ship_index);
-            self.taking_ownership_time = 0.0;
-        }
-
-        if self.landing_ship_prev_round == Some(ship_index) {
-            self.landing_ship = Some(ship_index);
-        }
     }
 }
 
@@ -3142,6 +3328,7 @@ impl ShipState {
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
             cannon_cooldown_remaining: 0.0,
+            spaceport_reentry_lockout: 0.0,
             delta_time,
             death_impulse: Vec2::ZERO,
         }
@@ -3323,6 +3510,8 @@ impl ShipState {
     }
 
     fn update(&mut self, dt: f32, seed: u64, tick: u64) {
+        self.spaceport_reentry_lockout = (self.spaceport_reentry_lockout - dt).max(0.0);
+
         if self.form == ShipForm::EscapePod {
             self.update_escape_pod(dt, seed, tick);
             return;
@@ -3728,7 +3917,7 @@ fn render_state_with_camera(
         );
     }
 
-    for planet in &state.planets {
+    for (planet_index, planet) in state.planets.iter().enumerate() {
         render_body(
             &mut frame,
             PLANET_LAYER,
@@ -3740,7 +3929,7 @@ fn render_state_with_camera(
         if options.show_planet_ownership_halo {
             render_planet_ownership_halo(&mut frame, state, planet);
         }
-        render_spaceport(&mut frame, state, planet);
+        render_spaceport(&mut frame, state, planet_index, planet);
         render_planet_flags(&mut frame, state, planet);
     }
 
@@ -4170,13 +4359,12 @@ fn render_planet_flags(frame: &mut RenderFrame, state: &SpacewarsState, planet: 
 }
 
 fn planet_flag_color(state: &SpacewarsState, planet: &PlanetState) -> Option<RenderColor> {
-    if let Some(ship) = landing_ship(state, planet)
-        && planet.owner_id != Some(ship.owner_id)
-        && ship.form != ShipForm::EscapePod
+    if let Some(capturing_player) = planet.capturing_player_id
+        && planet.owner_id != Some(capturing_player)
     {
         let progress = capture_progress(planet);
         if progress > 0.0 {
-            let player = state.players.get(ship.owner_id)?;
+            let player = state.players.get(capturing_player)?;
             return Some(with_intensity(render_color(player.color), progress));
         }
     }
@@ -4187,7 +4375,12 @@ fn planet_flag_color(state: &SpacewarsState, planet: &PlanetState) -> Option<Ren
         .map(|player| render_color(player.color))
 }
 
-fn render_spaceport(frame: &mut RenderFrame, state: &SpacewarsState, planet: &PlanetState) {
+fn render_spaceport(
+    frame: &mut RenderFrame,
+    state: &SpacewarsState,
+    planet_index: usize,
+    planet: &PlanetState,
+) {
     let points = spaceport_points(planet)
         .into_iter()
         .map(render_point)
@@ -4197,12 +4390,12 @@ fn render_spaceport(frame: &mut RenderFrame, state: &SpacewarsState, planet: &Pl
         SPACEPORT_LAYER,
         RenderPrimitive::Polygon(RenderPolygon {
             points: points.clone(),
-            fill: Some(Fill::new(spaceport_color(state, planet))),
+            fill: Some(Fill::new(spaceport_color(state, planet_index, planet))),
             stroke: Some(Stroke::new(RenderColor::rgba(0.05, 0.08, 0.1, 0.8), 0.75)),
         }),
     );
 
-    let Some(stroke) = spaceport_feedback_stroke(state, planet) else {
+    let Some(stroke) = spaceport_feedback_stroke(state, planet_index, planet) else {
         return;
     };
     frame.push_primitive(
@@ -4215,8 +4408,22 @@ fn render_spaceport(frame: &mut RenderFrame, state: &SpacewarsState, planet: &Pl
     );
 }
 
-fn spaceport_color(state: &SpacewarsState, planet: &PlanetState) -> RenderColor {
-    if let Some(ship) = landing_ship(state, planet) {
+fn spaceport_color(
+    state: &SpacewarsState,
+    planet_index: usize,
+    planet: &PlanetState,
+) -> RenderColor {
+    if spaceport_status(state, planet_index) == SpaceportStatus::Contested {
+        return blend_color(
+            base_spaceport_color(state, planet),
+            RenderColor::rgba(1.0, 0.6, 0.08, 0.9),
+            0.35,
+        );
+    }
+
+    if let SpaceportStatus::Active(ship_index) = spaceport_status(state, planet_index)
+        && let Some(ship) = state.ships.get(ship_index)
+    {
         let player_color = render_color(state.players[ship.owner_id].color);
         if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {
             let progress = capture_progress(planet);
@@ -4239,6 +4446,10 @@ fn spaceport_color(state: &SpacewarsState, planet: &PlanetState) -> RenderColor 
         }
     }
 
+    base_spaceport_color(state, planet)
+}
+
+fn base_spaceport_color(state: &SpacewarsState, planet: &PlanetState) -> RenderColor {
     planet
         .owner_id
         .and_then(|owner| state.players.get(owner))
@@ -4246,8 +4457,26 @@ fn spaceport_color(state: &SpacewarsState, planet: &PlanetState) -> RenderColor 
         .unwrap_or(RenderColor::rgba(1.0, 1.0, 1.0, 0.82))
 }
 
-fn spaceport_feedback_stroke(state: &SpacewarsState, planet: &PlanetState) -> Option<Stroke> {
-    let ship = landing_ship(state, planet)?;
+fn spaceport_feedback_stroke(
+    state: &SpacewarsState,
+    planet_index: usize,
+    planet: &PlanetState,
+) -> Option<Stroke> {
+    let status = spaceport_status(state, planet_index);
+    if status == SpaceportStatus::Contested {
+        let pulse = ((state.tick as f32 * 0.35).sin() + 1.0) * 0.5;
+        let color = blend_color(
+            RenderColor::rgba(1.0, 0.48, 0.02, 0.95),
+            RenderColor::rgba(1.0, 0.95, 0.7, 1.0),
+            pulse,
+        );
+        return Some(Stroke::new(color, 2.0 + pulse));
+    }
+
+    let SpaceportStatus::Active(ship_index) = status else {
+        return None;
+    };
+    let ship = state.ships.get(ship_index)?;
     let player_color = render_color(state.players[ship.owner_id].color);
     let progress = if planet.owner_id == Some(ship.owner_id) && ship.form == ShipForm::EscapePod {
         rebuild_progress(planet)
@@ -4259,12 +4488,6 @@ fn spaceport_feedback_stroke(state: &SpacewarsState, planet: &PlanetState) -> Op
 
     let width = 1.25 + progress * 1.25;
     Some(Stroke::new(with_alpha(player_color, 0.95), width))
-}
-
-fn landing_ship<'a>(state: &'a SpacewarsState, planet: &PlanetState) -> Option<&'a ShipState> {
-    planet
-        .landing_ship
-        .and_then(|ship_index| state.ships.get(ship_index))
 }
 
 fn capture_progress(planet: &PlanetState) -> f32 {
@@ -4571,8 +4794,9 @@ mod tests {
             mass: 0.0,
             color: Color::GREEN,
             owner_id: None,
-            landing_ship: None,
-            landing_ship_prev_round: None,
+            capturing_player_id: None,
+            previous_docked_ship: None,
+            dock_contest_time: 0.0,
             taking_ownership_time: 0.0,
             building_new_ship_time: 0.0,
             orbit_radius: 0.0,
@@ -4584,8 +4808,15 @@ mod tests {
     }
 
     fn land_ship_on_planet(state: &mut SpacewarsState, ship: usize, planet: usize) {
-        let ship_owner_id = state.ships[ship].owner_id;
-        state.planets[planet].set_landing_ship(ship, ship_owner_id);
+        state.spaceport_contacts = vec![SpaceportContact { ship, planet }];
+    }
+
+    fn land_ships_on_planet(state: &mut SpacewarsState, ships: &[usize], planet: usize) {
+        state.spaceport_contacts = ships
+            .iter()
+            .copied()
+            .map(|ship| SpaceportContact { ship, planet })
+            .collect();
     }
 
     fn circle_primitive_count(frame: &RenderFrame) -> usize {
@@ -4950,8 +5181,9 @@ mod tests {
             assert!(planet.radius >= MIN_PLANET_RADIUS);
             assert!(planet.radius < MAX_PLANET_RADIUS);
             assert_eq!(planet.owner_id, None);
-            assert_eq!(planet.landing_ship, None);
-            assert_eq!(planet.landing_ship_prev_round, None);
+            assert_eq!(planet.capturing_player_id, None);
+            assert_eq!(planet.previous_docked_ship, None);
+            assert_eq!(planet.dock_contest_time, 0.0);
             assert!(planet.orbit_radius + planet.radius < universe_radius);
             assert_close(
                 planet.position.distance_to(sun.position),
@@ -5489,7 +5721,7 @@ mod tests {
             offset * (offset.length() * SPACEPORT_PULL_SCALE / SHIP_MASS),
         );
         assert_eq!(state.ships[0].life, start_life);
-        assert_eq!(state.planets[0].landing_ship, Some(0));
+        assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Active(0));
     }
 
     #[test]
@@ -5541,20 +5773,238 @@ mod tests {
     }
 
     #[test]
+    fn contested_spaceport_is_contact_order_independent_and_pauses_services() {
+        let mut forward = init_deathmatch_no_asteroids();
+        forward.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        forward.planets[0].owner_id = Some(0);
+        forward.planets[0].capturing_player_id = Some(1);
+        forward.planets[0].taking_ownership_time = 2.0;
+        forward.planets[0].building_new_ship_time = 3.0;
+        forward.ships[0].life = 10.0;
+        land_ships_on_planet(&mut forward, &[0, 1], 0);
+        let mut reverse = forward.clone();
+        land_ships_on_planet(&mut reverse, &[1, 0], 0);
+
+        update_spaceports(&mut forward, 0.1);
+        update_spaceports(&mut reverse, 0.1);
+
+        assert_eq!(forward.planets, reverse.planets);
+        assert_eq!(forward.ships, reverse.ships);
+        assert_eq!(spaceport_status(&forward, 0), SpaceportStatus::Contested);
+        assert_eq!(forward.planets[0].previous_docked_ship, None);
+        assert_close(forward.planets[0].dock_contest_time, 0.1);
+        assert_close(forward.planets[0].taking_ownership_time, 1.95);
+        assert_close(forward.planets[0].building_new_ship_time, 3.0);
+        assert_close(forward.ships[0].life, 10.0);
+    }
+
+    #[test]
+    fn contested_spaceport_ejects_both_ships_without_damage() {
+        let mut forward = init_deathmatch_no_asteroids();
+        forward.sun = None;
+        forward.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        forward.planets[0].owner_id = Some(0);
+        forward.planets[0].capturing_player_id = Some(1);
+        forward.planets[0].taking_ownership_time = 2.0;
+        let port_center = spaceport_physics(0, &forward.planets[0]).bounds.center;
+        for ship in &mut forward.ships {
+            ship.position = port_center;
+            ship.velocity = Vec2::ZERO;
+        }
+        land_ships_on_planet(&mut forward, &[0, 1], 0);
+        let mut reverse = forward.clone();
+        land_ships_on_planet(&mut reverse, &[1, 0], 0);
+        let starting_life = forward
+            .ships
+            .iter()
+            .map(|ship| ship.life)
+            .collect::<Vec<_>>();
+
+        update_spaceports(&mut forward, SPACEPORT_CONTEST_EJECT_DELAY_SECS);
+        update_spaceports(&mut reverse, SPACEPORT_CONTEST_EJECT_DELAY_SECS);
+
+        assert_eq!(forward.planets, reverse.planets);
+        assert_eq!(forward.ships, reverse.ships);
+        assert_eq!(forward.planets[0].previous_docked_ship, None);
+        assert_eq!(forward.planets[0].dock_contest_time, 0.0);
+        assert_close(forward.planets[0].taking_ownership_time, 1.875);
+
+        let planet = forward.planets[0];
+        let outward = (port_center - planet.position).normalized();
+        let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
+        for (ship_index, ship) in forward.ships.iter().enumerate() {
+            let bounds = ship_low_bounds(&ship_triangles(ship));
+            assert!(
+                bounds.center.distance_to(planet.position)
+                    > planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius
+            );
+            assert_close(ship.life, starting_life[ship_index]);
+            assert_close(
+                ship.spaceport_reentry_lockout,
+                SPACEPORT_REENTRY_LOCKOUT_SECS,
+            );
+            assert_close(ship.velocity.dot(outward), SPACEPORT_EJECT_SPEED);
+        }
+        assert!(forward.ships[0].velocity.dot(tangent) < 0.0);
+        assert!(forward.ships[1].velocity.dot(tangent) > 0.0);
+    }
+
+    #[test]
+    fn contested_spaceport_ejects_after_grace_period_in_full_steps() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let outward = (port_center - state.planets[0].position).normalized();
+        let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
+        for (index, ship) in state.ships.iter_mut().enumerate() {
+            let side = if index == 0 { -1.0 } else { 1.0 };
+            ship.position = port_center + tangent * (side * 8.0);
+            ship.velocity = Vec2::ZERO;
+        }
+        land_ships_on_planet(&mut state, &[0, 1], 0);
+
+        for _ in 0..20 {
+            step(&mut state, &[]);
+        }
+
+        assert!(state.spaceport_contacts.is_empty());
+        for ship in &state.ships {
+            let bounds = ship_low_bounds(&ship_triangles(ship));
+            assert!(
+                bounds.center.distance_to(state.planets[0].position)
+                    > state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius
+            );
+            assert!(ship.spaceport_reentry_lockout > 0.0);
+        }
+    }
+
+    #[test]
+    fn firing_laser_while_docked_ejects_before_beam_spawns() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let outward = (port_center - state.planets[0].position).normalized();
+        state.ships[0].position = port_center;
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = rotation_for_direction(outward);
+        state.ships[0].direction = outward;
+        state.ships[1].position = Vec2::new(900.0, 900.0);
+        land_ship_on_planet(&mut state, 0, 0);
+
+        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+
+        let beam = state.ships[0]
+            .laser_beam
+            .expect("released ship should fire its laser");
+        assert!(beam.head.distance_to(state.planets[0].position) > state.planets[0].radius);
+        assert!(
+            state
+                .laser_hits
+                .iter()
+                .all(|hit| hit.target != LaserTarget::Body(BodyId::Planet(0)))
+        );
+        assert!(state.ships[0].spaceport_reentry_lockout > 0.0);
+        assert!(state.spaceport_contacts.is_empty());
+    }
+
+    #[test]
+    fn firing_cannon_while_docked_ejects_before_shell_spawns() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let outward = (port_center - state.planets[0].position).normalized();
+        state.ships[0].position = port_center;
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = rotation_for_direction(outward);
+        state.ships[0].direction = outward;
+        state.ships[1].position = Vec2::new(900.0, 900.0);
+        land_ship_on_planet(&mut state, 0, 0);
+
+        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        let shell = state
+            .debris
+            .iter()
+            .find(|debris| debris.kind == DebrisKind::Shell)
+            .expect("released ship should retain its cannon shell");
+        assert!(shell.position.distance_to(state.planets[0].position) > state.planets[0].radius);
+        assert!(
+            state
+                .debris_body_collisions
+                .iter()
+                .all(|contact| contact.body != BodyId::Planet(0))
+        );
+        assert!(state.ships[0].spaceport_reentry_lockout > 0.0);
+        assert!(state.spaceport_contacts.is_empty());
+    }
+
+    #[test]
+    fn owner_pod_does_not_block_hostile_capture_and_does_not_rebuild() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        state.planets[0].capturing_player_id = Some(1);
+        state.planets[0].previous_docked_ship = Some(1);
+        state.planets[0].taking_ownership_time = 1.0;
+        state.planets[0].building_new_ship_time = 2.0;
+        state.ships[0].change_to_escape_pod();
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        state.ships[0].position = port_center;
+        state.ships[1].position = port_center;
+        land_ships_on_planet(&mut state, &[0, 1], 0);
+
+        update_spaceports(&mut state, 1.0);
+
+        assert_eq!(state.planets[0].owner_id, Some(0));
+        assert_close(state.planets[0].taking_ownership_time, 2.0);
+        assert_close(state.planets[0].building_new_ship_time, 2.0);
+        assert_eq!(state.ships[0].form, ShipForm::EscapePod);
+        assert_close(
+            state.ships[0].spaceport_reentry_lockout,
+            SPACEPORT_REENTRY_LOCKOUT_SECS,
+        );
+        assert_eq!(state.ships[1].spaceport_reentry_lockout, 0.0);
+        assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Active(1));
+    }
+
+    #[test]
+    fn interrupted_capture_progress_decays_and_eventually_clears() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].capturing_player_id = Some(1);
+        state.planets[0].taking_ownership_time = 2.0;
+
+        update_spaceports(&mut state, 1.0);
+
+        assert_close(state.planets[0].taking_ownership_time, 1.5);
+        assert_eq!(state.planets[0].capturing_player_id, Some(1));
+
+        update_spaceports(&mut state, 3.0);
+
+        assert_eq!(state.planets[0].taking_ownership_time, 0.0);
+        assert_eq!(state.planets[0].capturing_player_id, None);
+    }
+
+    #[test]
     fn landed_ship_captures_planet_after_original_hold_time() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
 
         for _ in 0..4 {
             land_ship_on_planet(&mut state, 0, 0);
-            update_planet_landing_progress(&mut state, 1.0);
+            update_spaceports(&mut state, 1.0);
         }
 
         assert_eq!(state.planets[0].owner_id, None);
         assert_eq!(state.players[0].planet_count, 0);
 
         land_ship_on_planet(&mut state, 0, 0);
-        update_planet_landing_progress(&mut state, 1.0);
+        update_spaceports(&mut state, 1.0);
 
         assert_eq!(state.planets[0].owner_id, Some(0));
         assert_eq!(state.players[0].planet_count, 1);
@@ -5570,11 +6020,11 @@ mod tests {
         state.ships[0].life = 10.0;
 
         land_ship_on_planet(&mut state, 0, 0);
-        update_planet_landing_progress(&mut state, 1.0);
+        update_spaceports(&mut state, 1.0);
         assert_eq!(state.ships[0].life, 10.0);
 
         land_ship_on_planet(&mut state, 0, 0);
-        update_planet_landing_progress(&mut state, 1.0);
+        update_spaceports(&mut state, 1.0);
 
         assert_close(state.ships[0].life, 13.0);
     }
@@ -5590,7 +6040,7 @@ mod tests {
 
         for _ in 0..480 {
             land_ship_on_planet(&mut state, 0, 0);
-            update_planet_landing_progress(&mut state, dt);
+            update_spaceports(&mut state, dt);
         }
 
         assert_eq!(state.ships[0].form, ShipForm::EscapePod);
@@ -5598,7 +6048,7 @@ mod tests {
         assert!(state.ships[0].life < state.ships[0].life_max);
 
         land_ship_on_planet(&mut state, 0, 0);
-        update_planet_landing_progress(&mut state, dt);
+        update_spaceports(&mut state, dt);
 
         assert_eq!(state.ships[0].form, ShipForm::Ship);
         assert_eq!(state.ships[0].life, state.ships[0].life_max);
@@ -5618,7 +6068,7 @@ mod tests {
 
         for _ in 0..360 {
             land_ship_on_planet(&mut state, 0, 0);
-            update_planet_landing_progress(&mut state, dt);
+            update_spaceports(&mut state, dt);
         }
 
         assert_eq!(state.planets[0].owner_id, None);
@@ -5632,7 +6082,7 @@ mod tests {
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         state.planets[0].owner_id = Some(0);
         let expected = render_color(state.players[0].color);
-        let actual = spaceport_color(&state, &state.planets[0]);
+        let actual = spaceport_color(&state, 0, &state.planets[0]);
 
         assert_close(actual.r, expected.r);
         assert_close(actual.g, expected.g);
@@ -5688,7 +6138,7 @@ mod tests {
     fn capturing_planet_fades_challenger_flags_without_owned_halo() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        state.planets[0].landing_ship = Some(0);
+        state.planets[0].capturing_player_id = Some(0);
         state.planets[0].taking_ownership_time = PLANET_CAPTURE_SECS * 0.5;
         let expected_color = with_intensity(render_color(state.players[0].color), 0.5);
 
@@ -5731,8 +6181,9 @@ mod tests {
     fn capturing_spaceport_tints_toward_landing_player_color() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        state.planets[0].landing_ship = Some(0);
+        state.planets[0].capturing_player_id = Some(0);
         state.planets[0].taking_ownership_time = PLANET_CAPTURE_SECS * 0.5;
+        land_ship_on_planet(&mut state, 0, 0);
         let player_color = render_color(state.players[0].color);
         let expected = blend_color(
             RenderColor::rgba(1.0, 1.0, 1.0, 0.82),
@@ -5740,7 +6191,7 @@ mod tests {
             0.5,
         );
 
-        let actual = spaceport_color(&state, &state.planets[0]);
+        let actual = spaceport_color(&state, 0, &state.planets[0]);
 
         assert_close(actual.r, expected.r);
         assert_close(actual.g, expected.g);
@@ -5753,9 +6204,9 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         state.planets[0].owner_id = Some(0);
-        state.planets[0].landing_ship = Some(0);
         state.planets[0].building_new_ship_time = POD_REBUILD_SECS * 0.5;
         state.ships[0].change_to_escape_pod();
+        land_ship_on_planet(&mut state, 0, 0);
         let player_color = render_color(state.players[0].color);
         let expected = blend_color(
             with_alpha(dim(player_color, 0.55), 0.82),
@@ -5763,7 +6214,7 @@ mod tests {
             0.5,
         );
 
-        let actual = spaceport_color(&state, &state.planets[0]);
+        let actual = spaceport_color(&state, 0, &state.planets[0]);
 
         assert_close(actual.r, expected.r);
         assert_close(actual.g, expected.g);
@@ -5775,7 +6226,7 @@ mod tests {
     fn landed_spaceport_renders_feedback_outline() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        state.planets[0].landing_ship = Some(0);
+        land_ship_on_planet(&mut state, 0, 0);
         let frame = SpacewarsScenario::render_frame(&state);
         let feedback_layer = frame
             .layers
@@ -5797,6 +6248,36 @@ mod tests {
         assert_close(stroke.color.b, state.players[0].color.b);
         assert_close(stroke.color.a, 0.95);
         assert_close(stroke.width, 1.25);
+    }
+
+    #[test]
+    fn contested_spaceport_renders_pulsing_neutral_feedback() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        land_ships_on_planet(&mut state, &[1, 0], 0);
+
+        let frame = SpacewarsScenario::render_frame(&state);
+        let feedback_layer = frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == SPACEPORT_FEEDBACK_LAYER)
+            .expect("contested spaceport should render feedback");
+        let RenderPrimitive::Polygon(polygon) = &feedback_layer.primitives[0] else {
+            panic!("feedback primitive should be a polygon");
+        };
+        let stroke = polygon
+            .stroke
+            .expect("contested feedback should render an outline");
+        let expected_color = blend_color(
+            RenderColor::rgba(1.0, 0.48, 0.02, 0.95),
+            RenderColor::rgba(1.0, 0.95, 0.7, 1.0),
+            0.5,
+        );
+
+        assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Contested);
+        assert_eq!(stroke.color, expected_color);
+        assert_close(stroke.width, 2.5);
     }
 
     #[test]
