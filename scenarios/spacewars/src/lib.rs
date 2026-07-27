@@ -70,6 +70,9 @@ const SPACEPORT_CONTEST_EJECT_DELAY_SECS: f32 = 0.25;
 const SPACEPORT_EJECT_MARGIN: f32 = 5.0;
 const SPACEPORT_EJECT_SPEED: f32 = 120.0;
 const SPACEPORT_EJECT_TANGENTIAL_SPEED: f32 = 60.0;
+const SPACEPORT_EJECT_TARGET_SECS: f32 = 0.3;
+const SPACEPORT_EJECT_TIMEOUT_SECS: f32 = 0.5;
+const SPACEPORT_EJECT_MAX_SPEED: f32 = 200.0;
 const SPACEPORT_REENTRY_LOCKOUT_SECS: f32 = 0.75;
 const DEFAULT_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const MIN_PLAYER_VIEW_HEIGHT: f32 = 15.0;
@@ -409,6 +412,15 @@ enum SpaceportStatus {
     Contested,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SpaceportEjection {
+    planet: usize,
+    outward: Vec2,
+    target_outward_speed: f32,
+    minimum_tangential_speed: f32,
+    elapsed: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundsDrawMode {
     High,
@@ -454,6 +466,9 @@ pub struct ShipState {
     current_max_omega: f32,
     cannon_cooldown_remaining: f32,
     spaceport_reentry_lockout: f32,
+    spaceport_ejection: Option<SpaceportEjection>,
+    queued_laser_fire: bool,
+    queued_cannon_fire: bool,
     delta_time: f32,
     death_impulse: Vec2,
 }
@@ -728,6 +743,7 @@ impl Scenario for SpacewarsScenario {
             ship.update(dt, state.seed, state.tick);
             contain_ship(ship, state.config.universe_radius as f32);
         }
+        finish_spaceport_ejections(state, dt);
         let new_shells = spawn_cannon_shells(state, dt);
         state.debris.extend(new_shells);
         update_ship_lasers(state);
@@ -2323,6 +2339,13 @@ fn detect_ship_collisions(state: &SpacewarsState) -> Vec<ShipCollision> {
 
     for a in 0..state.ships.len() {
         for b in a + 1..state.ships.len() {
+            // Dock occupants overlap by design; their launch vectors separate them while clearing.
+            if state.ships[a].spaceport_ejection.is_some()
+                || state.ships[b].spaceport_ejection.is_some()
+            {
+                continue;
+            }
+
             let (a_low, a_high) = &ship_bounds[a];
             let (b_low, b_high) = &ship_bounds[b];
             if !Bounds2::Circle(*a_low).intersects(&Bounds2::Circle(*b_low)) {
@@ -2474,6 +2497,17 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
         let ship_high = Bounds2::List(ship_high_bounds(&triangles));
 
         for body in &bodies {
+            // The port is a temporary collision-safe corridor through its planet's body.
+            if matches!(
+                body.id,
+                BodyId::Planet(planet)
+                    if ship
+                        .spaceport_ejection
+                        .is_some_and(|ejection| ejection.planet == planet)
+            ) {
+                continue;
+            }
+
             if !ship_low.intersects(&Bounds2::Circle(body.low)) {
                 continue;
             }
@@ -2775,7 +2809,6 @@ fn eject_ships_from_spaceport(
     } else {
         outward_offset.normalized()
     };
-    let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
     let mut ships = ship_indices
         .iter()
         .copied()
@@ -2794,18 +2827,67 @@ fn eject_ships_from_spaceport(
         };
         let ship = &mut state.ships[ship_index];
         let bounds = ship_low_bounds(&ship_triangles(ship));
-        let center_offset = bounds.center - ship.position;
-        let target_center = planet.position
-            + outward
-                * (planet.radius * BODY_BOUNDS_RADIUS_SCALE
-                    + bounds.radius
-                    + SPACEPORT_EJECT_MARGIN)
-            + tangent * (side * bounds.radius * 1.5);
+        let clearance_radius =
+            planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius + SPACEPORT_EJECT_MARGIN;
+        let outward_distance = (bounds.center - planet.position).dot(outward);
+        let distance_to_clear = (clearance_radius - outward_distance).max(0.0);
+        let target_outward_speed = (distance_to_clear / SPACEPORT_EJECT_TARGET_SECS)
+            .clamp(SPACEPORT_EJECT_SPEED, SPACEPORT_EJECT_MAX_SPEED);
 
-        ship.position = target_center - center_offset;
-        ship.velocity =
-            outward * SPACEPORT_EJECT_SPEED + tangent * (side * SPACEPORT_EJECT_TANGENTIAL_SPEED);
+        ship.queued_laser_fire |= ship.laser_firing;
+        ship.queued_cannon_fire |= ship.cannon_firing;
+        ship.laser_beam = None;
+        ship.spaceport_ejection = Some(SpaceportEjection {
+            planet: planet_index,
+            outward,
+            target_outward_speed,
+            minimum_tangential_speed: side * SPACEPORT_EJECT_TANGENTIAL_SPEED,
+            elapsed: 0.0,
+        });
         ship.spaceport_reentry_lockout = SPACEPORT_REENTRY_LOCKOUT_SECS;
+        ship.maintain_spaceport_ejection_velocity();
+    }
+}
+
+fn finish_spaceport_ejections(state: &mut SpacewarsState, dt: f32) {
+    for ship_index in 0..state.ships.len() {
+        let Some(mut ejection) = state.ships[ship_index].spaceport_ejection else {
+            continue;
+        };
+        let Some(planet) = state.planets.get(ejection.planet).copied() else {
+            state.ships[ship_index].spaceport_ejection = None;
+            continue;
+        };
+
+        ejection.elapsed += dt;
+        let ship = &mut state.ships[ship_index];
+        ship.maintain_spaceport_ejection_velocity();
+        let bounds = ship_low_bounds(&ship_triangles(ship));
+        let clearance_radius =
+            planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius + SPACEPORT_EJECT_MARGIN;
+        let cleared = bounds.center.distance_to(planet.position) >= clearance_radius;
+
+        if cleared {
+            ship.spaceport_ejection = None;
+            ship.spaceport_reentry_lockout = SPACEPORT_REENTRY_LOCKOUT_SECS;
+            continue;
+        }
+
+        if ejection.elapsed >= SPACEPORT_EJECT_TIMEOUT_SECS {
+            // Preserve lateral travel and correct only the remaining outward clearance.
+            let tangent = ejection
+                .outward
+                .rotate_radians(core::f32::consts::FRAC_PI_2);
+            let tangential_offset = (bounds.center - planet.position).dot(tangent);
+            let target_center =
+                planet.position + ejection.outward * clearance_radius + tangent * tangential_offset;
+            ship.position += target_center - bounds.center;
+            ship.spaceport_ejection = None;
+            ship.spaceport_reentry_lockout = SPACEPORT_REENTRY_LOCKOUT_SECS;
+            continue;
+        }
+
+        ship.spaceport_ejection = Some(ejection);
     }
 }
 
@@ -3329,6 +3411,9 @@ impl ShipState {
             current_max_omega: BASE_MAX_OMEGA,
             cannon_cooldown_remaining: 0.0,
             spaceport_reentry_lockout: 0.0,
+            spaceport_ejection: None,
+            queued_laser_fire: false,
+            queued_cannon_fire: false,
             delta_time,
             death_impulse: Vec2::ZERO,
         }
@@ -3460,10 +3545,18 @@ impl ShipState {
     fn update_cannon(&mut self, dt: f32, tick: u64) -> Option<DebrisState> {
         if self.form == ShipForm::EscapePod {
             self.cannon_cooldown_remaining = 0.0;
+            self.queued_cannon_fire = false;
             return None;
         }
 
-        let shell = if self.cannon_firing && self.cannon_cooldown_remaining <= 0.0 {
+        if self.spaceport_ejection.is_some() {
+            self.queued_cannon_fire |= self.cannon_firing;
+            self.cannon_cooldown_remaining = (self.cannon_cooldown_remaining - dt).max(0.0);
+            return None;
+        }
+
+        let should_fire = self.cannon_firing || self.queued_cannon_fire;
+        let shell = if should_fire && self.cannon_cooldown_remaining <= 0.0 {
             let mount_center = ship_mount_center(self);
             let shell = DebrisState::new_shell(
                 self.owner_id,
@@ -3474,6 +3567,7 @@ impl ShipState {
             );
             self.velocity -= self.direction * CANNON_RECOIL_SPEED;
             self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
+            self.queued_cannon_fire = false;
             Some(shell)
         } else {
             None
@@ -3487,10 +3581,19 @@ impl ShipState {
         if self.form == ShipForm::EscapePod {
             self.laser_beam = None;
             self.laser_firing = false;
+            self.queued_laser_fire = false;
             return;
         }
 
-        if !self.laser_firing {
+        if self.spaceport_ejection.is_some() {
+            self.queued_laser_fire |= self.laser_firing;
+            self.laser_beam = None;
+            return;
+        }
+
+        let should_fire = self.laser_firing || self.queued_laser_fire;
+        self.queued_laser_fire = false;
+        if !should_fire {
             self.laser_beam = None;
             return;
         }
@@ -3511,6 +3614,7 @@ impl ShipState {
 
     fn update(&mut self, dt: f32, seed: u64, tick: u64) {
         self.spaceport_reentry_lockout = (self.spaceport_reentry_lockout - dt).max(0.0);
+        self.maintain_spaceport_ejection_velocity();
 
         if self.form == ShipForm::EscapePod {
             self.update_escape_pod(dt, seed, tick);
@@ -3529,7 +3633,9 @@ impl ShipState {
     }
 
     fn update_escape_pod(&mut self, dt: f32, seed: u64, tick: u64) {
-        self.velocity *= POD_VELOCITY_DAMPING;
+        if self.spaceport_ejection.is_none() {
+            self.velocity *= POD_VELOCITY_DAMPING;
+        }
         self.update_exhaust_trails(dt);
         let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
 
@@ -3538,6 +3644,34 @@ impl ShipState {
         self.rotation_radians += self.omega * dt;
         self.update_pod_thrust(&mut exhaust_rng, tick);
         self.update_turn();
+    }
+
+    fn maintain_spaceport_ejection_velocity(&mut self) {
+        let Some(ejection) = self.spaceport_ejection else {
+            return;
+        };
+
+        let tangent = ejection
+            .outward
+            .rotate_radians(core::f32::consts::FRAC_PI_2);
+        let outward_speed = self
+            .velocity
+            .dot(ejection.outward)
+            .max(ejection.target_outward_speed)
+            .min(SPACEPORT_EJECT_MAX_SPEED);
+        let mut tangential_speed = self.velocity.dot(tangent);
+        if ejection.minimum_tangential_speed > 0.0 {
+            tangential_speed = tangential_speed.max(ejection.minimum_tangential_speed);
+        } else if ejection.minimum_tangential_speed < 0.0 {
+            tangential_speed = tangential_speed.min(ejection.minimum_tangential_speed);
+        }
+
+        let tangential_limit = (SPACEPORT_EJECT_MAX_SPEED * SPACEPORT_EJECT_MAX_SPEED
+            - outward_speed * outward_speed)
+            .max(0.0)
+            .sqrt();
+        tangential_speed = tangential_speed.clamp(-tangential_limit, tangential_limit);
+        self.velocity = ejection.outward * outward_speed + tangent * tangential_speed;
     }
 
     fn rotate_ship(&mut self, rng: &mut SpacewarsRng, tick: u64, exhaust_scalar: f32) {
@@ -3756,6 +3890,8 @@ impl ShipState {
         self.laser_firing = false;
         self.cannon_firing = false;
         self.laser_beam = None;
+        self.queued_laser_fire = false;
+        self.queued_cannon_fire = false;
         self.cannon_cooldown_remaining = 0.0;
         self.wing_theta = 0.0;
         self.wing_state = WingState::Opened;
@@ -3779,6 +3915,8 @@ impl ShipState {
         self.laser_firing = false;
         self.cannon_firing = false;
         self.laser_beam = None;
+        self.queued_laser_fire = false;
+        self.queued_cannon_fire = false;
         self.cannon_cooldown_remaining = 0.0;
         self.wing_theta = 0.0;
         self.wing_state = WingState::Opened;
@@ -4819,6 +4957,17 @@ mod tests {
             .collect();
     }
 
+    fn step_until_spaceport_ejection_finishes(state: &mut SpacewarsState, ship: usize) {
+        for _ in 0..60 {
+            if state.ships[ship].spaceport_ejection.is_none() {
+                return;
+            }
+            step(state, &[]);
+        }
+
+        panic!("ship {ship} did not finish its spaceport ejection");
+    }
+
     fn circle_primitive_count(frame: &RenderFrame) -> usize {
         frame
             .layers
@@ -5799,7 +5948,7 @@ mod tests {
     }
 
     #[test]
-    fn contested_spaceport_ejects_both_ships_without_damage() {
+    fn contested_spaceport_starts_both_ships_ejecting_without_teleporting() {
         let mut forward = init_deathmatch_no_asteroids();
         forward.sun = None;
         forward.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -5819,6 +5968,7 @@ mod tests {
             .iter()
             .map(|ship| ship.life)
             .collect::<Vec<_>>();
+        let starting_positions = forward.ships.each_ref().map(|ship| ship.position);
 
         update_spaceports(&mut forward, SPACEPORT_CONTEST_EJECT_DELAY_SECS);
         update_spaceports(&mut reverse, SPACEPORT_CONTEST_EJECT_DELAY_SECS);
@@ -5836,17 +5986,132 @@ mod tests {
             let bounds = ship_low_bounds(&ship_triangles(ship));
             assert!(
                 bounds.center.distance_to(planet.position)
-                    > planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius
+                    < planet.radius * BODY_BOUNDS_RADIUS_SCALE
+                        + bounds.radius
+                        + SPACEPORT_EJECT_MARGIN
             );
+            assert_eq!(ship.position, starting_positions[ship_index]);
             assert_close(ship.life, starting_life[ship_index]);
             assert_close(
                 ship.spaceport_reentry_lockout,
                 SPACEPORT_REENTRY_LOCKOUT_SECS,
             );
             assert_close(ship.velocity.dot(outward), SPACEPORT_EJECT_SPEED);
+            assert_eq!(
+                ship.spaceport_ejection.map(|ejection| ejection.planet),
+                Some(0)
+            );
         }
         assert!(forward.ships[0].velocity.dot(tangent) < 0.0);
         assert!(forward.ships[1].velocity.dot(tangent) > 0.0);
+    }
+
+    #[test]
+    fn spaceport_ejection_normalizes_ship_and_pod_outward_speed() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        refresh_player_planet_counts(&mut state);
+        state.ships[0].change_to_escape_pod();
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let outward = (port_center - state.planets[0].position).normalized();
+        let starting_positions = [port_center, port_center];
+        for (ship, position) in state.ships.iter_mut().zip(starting_positions) {
+            ship.position = position;
+            ship.velocity = -outward * SPACEPORT_EJECT_MAX_SPEED;
+        }
+
+        eject_ships_from_spaceport(&mut state, 0, &[0, 1]);
+
+        for (ship, starting_position) in state.ships.iter().zip(starting_positions) {
+            assert_eq!(ship.position, starting_position);
+            assert_close(ship.velocity.dot(outward), SPACEPORT_EJECT_SPEED);
+            assert_close(
+                ship.spaceport_ejection
+                    .expect("ship should be ejecting")
+                    .target_outward_speed,
+                SPACEPORT_EJECT_SPEED,
+            );
+        }
+    }
+
+    #[test]
+    fn escape_pod_clears_spaceport_without_velocity_damping() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].owner_id = Some(0);
+        refresh_player_planet_counts(&mut state);
+        state.ships[0].change_to_escape_pod();
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        state.ships[0].position = port_center;
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[1].position = port_center;
+        land_ships_on_planet(&mut state, &[0, 1], 0);
+
+        update_spaceports(&mut state, 1.0 / 60.0);
+
+        assert!(state.ships[0].spaceport_ejection.is_some());
+        assert_eq!(state.ships[0].position, port_center);
+        let mut ejection_steps = 0;
+        while state.ships[0].spaceport_ejection.is_some() && ejection_steps < 60 {
+            step(&mut state, &[]);
+            ejection_steps += 1;
+        }
+
+        assert!(
+            ejection_steps < (SPACEPORT_EJECT_TIMEOUT_SECS * 60.0) as usize,
+            "pod should clear under the normalized launch velocity"
+        );
+        let pod = &state.ships[0];
+        let bounds = ship_low_bounds(&ship_triangles(pod));
+        assert!(
+            bounds.center.distance_to(state.planets[0].position)
+                >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
+                    + bounds.radius
+                    + SPACEPORT_EJECT_MARGIN
+        );
+        assert_close(
+            pod.velocity
+                .dot((port_center - state.planets[0].position).normalized()),
+            SPACEPORT_EJECT_SPEED,
+        );
+    }
+
+    #[test]
+    fn spaceport_ejection_timeout_only_corrects_remaining_clearance() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let outward = (port_center - state.planets[0].position).normalized();
+        let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
+        state.ships[0].position = port_center + tangent * 7.0;
+
+        eject_ships_from_spaceport(&mut state, 0, &[0]);
+        let start_bounds = ship_low_bounds(&ship_triangles(&state.ships[0]));
+        let start_tangential_offset =
+            (start_bounds.center - state.planets[0].position).dot(tangent);
+        finish_spaceport_ejections(&mut state, SPACEPORT_EJECT_TIMEOUT_SECS);
+
+        let ship = &state.ships[0];
+        let bounds = ship_low_bounds(&ship_triangles(ship));
+        assert_eq!(ship.spaceport_ejection, None);
+        assert!(
+            bounds.center.distance_to(state.planets[0].position)
+                >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
+                    + bounds.radius
+                    + SPACEPORT_EJECT_MARGIN
+        );
+        assert_close(
+            (bounds.center - state.planets[0].position).dot(tangent),
+            start_tangential_offset,
+        );
+        assert_close(
+            ship.spaceport_reentry_lockout,
+            SPACEPORT_REENTRY_LOCKOUT_SECS,
+        );
     }
 
     #[test]
@@ -5865,23 +6130,45 @@ mod tests {
         }
         land_ships_on_planet(&mut state, &[0, 1], 0);
 
-        for _ in 0..20 {
+        let starting_life = state.ships.each_ref().map(|ship| ship.life);
+        let mut saw_ejection = false;
+        let mut ejection_steps = 0;
+        for _ in 0..60 {
             step(&mut state, &[]);
+            if state
+                .ships
+                .iter()
+                .any(|ship| ship.spaceport_ejection.is_some())
+            {
+                saw_ejection = true;
+                ejection_steps += 1;
+            } else if saw_ejection {
+                break;
+            }
         }
 
+        assert!(saw_ejection);
+        assert!(
+            ejection_steps < (SPACEPORT_EJECT_TIMEOUT_SECS * 60.0) as usize,
+            "normal ejection should clear without the timeout fallback"
+        );
         assert!(state.spaceport_contacts.is_empty());
-        for ship in &state.ships {
+        for (ship_index, ship) in state.ships.iter().enumerate() {
             let bounds = ship_low_bounds(&ship_triangles(ship));
             assert!(
                 bounds.center.distance_to(state.planets[0].position)
-                    > state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius
+                    >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
+                        + bounds.radius
+                        + SPACEPORT_EJECT_MARGIN
             );
+            assert_eq!(ship.spaceport_ejection, None);
             assert!(ship.spaceport_reentry_lockout > 0.0);
+            assert_close(ship.life, starting_life[ship_index]);
         }
     }
 
     #[test]
-    fn firing_laser_while_docked_ejects_before_beam_spawns() {
+    fn firing_laser_while_docked_queues_beam_until_ejection_finishes() {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -5895,6 +6182,11 @@ mod tests {
         land_ship_on_planet(&mut state, 0, 0);
 
         step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+
+        assert!(state.ships[0].spaceport_ejection.is_some());
+        assert_eq!(state.ships[0].laser_beam, None);
+        step(&mut state, &[SpacewarsAction::fire_laser_halt(0)]);
+        step_until_spaceport_ejection_finishes(&mut state, 0);
 
         let beam = state.ships[0]
             .laser_beam
@@ -5911,7 +6203,7 @@ mod tests {
     }
 
     #[test]
-    fn firing_cannon_while_docked_ejects_before_shell_spawns() {
+    fn firing_cannon_while_docked_queues_shell_until_ejection_finishes() {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -5925,6 +6217,16 @@ mod tests {
         land_ship_on_planet(&mut state, 0, 0);
 
         step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+
+        assert!(state.ships[0].spaceport_ejection.is_some());
+        assert!(
+            state
+                .debris
+                .iter()
+                .all(|debris| debris.kind != DebrisKind::Shell)
+        );
+        step(&mut state, &[SpacewarsAction::fire_cannon_halt(0)]);
+        step_until_spaceport_ejection_finishes(&mut state, 0);
 
         let shell = state
             .debris
