@@ -24,8 +24,6 @@ export struct ScenePrimitive {
     font-size: length,
     text-x: length,
     text-y: length,
-    opacity: float,
-    clip-radius: length,
 }
 
 component ScenePrimitiveItem inherits Rectangle {
@@ -37,8 +35,6 @@ component ScenePrimitiveItem inherits Rectangle {
     height: primitive.height;
     clip: true;
     background: #00000000;
-    opacity: primitive.opacity;
-    border-radius: primitive.clip-radius;
 
     Path {
         visible: primitive.kind == PrimitiveKind.path;
@@ -61,6 +57,18 @@ component ScenePrimitiveItem inherits Rectangle {
         text: primitive.text;
         color: primitive.color;
         font-size: primitive.font-size;
+    }
+}
+
+component MinimapPanel inherits Rectangle {
+    in property <[ScenePrimitive]> primitives;
+
+    background: #050514;
+    clip: true;
+    border-radius: self.width / 2;
+
+    for primitive in root.primitives: ScenePrimitiveItem {
+        primitive: primitive;
     }
 }
 
@@ -108,6 +116,16 @@ component PlayerStatusPanel inherits Rectangle {
 export component MainWindow inherits Window {
     in property <bool> app-full-screen: false;
     in property <[ScenePrimitive]> primitives;
+    in property <[ScenePrimitive]> p1-minimap-primitives;
+    in property <[ScenePrimitive]> p2-minimap-primitives;
+    in property <bool> vector-minimaps-visible: false;
+    in property <float> minimap-opacity: 0.74;
+    in property <length> p1-minimap-x: 0px;
+    in property <length> p1-minimap-y: 0px;
+    in property <length> p1-minimap-size: 0px;
+    in property <length> p2-minimap-x: 0px;
+    in property <length> p2-minimap-y: 0px;
+    in property <length> p2-minimap-size: 0px;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
     in-out property <bool> launcher-visible: false;
@@ -191,6 +209,27 @@ export component MainWindow inherits Window {
 
     for primitive in root.primitives: ScenePrimitiveItem {
         primitive: primitive;
+    }
+
+    MinimapPanel {
+        visible: root.vector-minimaps-visible;
+        x: root.p1-minimap-x;
+        y: root.p1-minimap-y;
+        width: root.p1-minimap-size;
+        height: root.p1-minimap-size;
+        // Group opacity makes Slint composite the backdrop and all primitives once.
+        opacity: root.minimap-opacity;
+        primitives: root.p1-minimap-primitives;
+    }
+
+    MinimapPanel {
+        visible: root.vector-minimaps-visible;
+        x: root.p2-minimap-x;
+        y: root.p2-minimap-y;
+        width: root.p2-minimap-size;
+        height: root.p2-minimap-size;
+        opacity: root.minimap-opacity;
+        primitives: root.p2-minimap-primitives;
     }
 
     Rectangle {

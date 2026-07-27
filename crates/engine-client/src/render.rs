@@ -34,6 +34,27 @@ pub enum FrameLayout {
     SpacewarsLocalPlay,
 }
 
+pub struct VectorPresentation {
+    pub main_primitives: Vec<ScenePrimitive>,
+    pub minimaps: Vec<VectorMinimap>,
+}
+
+impl VectorPresentation {
+    pub fn scene_item_count(&self) -> usize {
+        self.main_primitives.len()
+            + self
+                .minimaps
+                .iter()
+                .map(|minimap| minimap.primitives.len())
+                .sum::<usize>()
+    }
+}
+
+pub struct VectorMinimap {
+    pub viewport: Viewport,
+    pub primitives: Vec<ScenePrimitive>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Viewport {
     pub x: f32,
@@ -98,55 +119,49 @@ pub fn scene_primitives_from_frames(
     frames: &[RenderFrame],
     viewport: Viewport,
 ) -> Vec<ScenePrimitive> {
-    scene_primitives_from_frames_with_layout(frames, viewport, FrameLayout::EqualHorizontal)
+    scene_presentation_from_frames_with_layout(frames, viewport, FrameLayout::EqualHorizontal)
+        .main_primitives
 }
 
-/// Convert scenario frames into ordered Slint scene primitives using a client layout.
-pub fn scene_primitives_from_frames_with_layout(
+/// Convert scenario frames into Slint scene primitives and grouped minimaps.
+pub fn scene_presentation_from_frames_with_layout(
     frames: &[RenderFrame],
     viewport: Viewport,
     layout: FrameLayout,
-) -> Vec<ScenePrimitive> {
-    if frames.is_empty() {
-        return Vec::new();
-    }
+) -> VectorPresentation {
+    let viewport = viewport.with_default_if_empty();
+    let mut presentation = VectorPresentation {
+        main_primitives: Vec::new(),
+        minimaps: Vec::new(),
+    };
+    let uses_minimap_groups = layout == FrameLayout::SpacewarsLocalPlay && frames.len() >= 4;
 
-    if frames.len() == 1 {
-        return scene_primitives_from_frame(&frames[0], viewport);
-    }
-
-    frames
+    for (index, (frame, frame_viewport)) in frames
         .iter()
-        .zip(frame_viewports(
-            viewport.with_default_if_empty(),
-            frames.len(),
-            layout,
-        ))
+        .zip(frame_viewports(viewport, frames.len(), layout))
         .enumerate()
-        .flat_map(|(index, (frame, viewport))| {
+    {
+        if uses_minimap_groups && (2..4).contains(&index) {
             let minimum_object_diameter = (layout == FrameLayout::SpacewarsLocalPlay
                 && (2..4).contains(&index))
             .then_some(MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER);
-            let opacity = if layout == FrameLayout::SpacewarsLocalPlay && (2..4).contains(&index) {
-                SPACEWARS_MINIMAP_OPACITY
-            } else {
-                1.0
-            };
-            let clip_radius =
-                if layout == FrameLayout::SpacewarsLocalPlay && (2..4).contains(&index) {
-                    viewport.width * 0.5
-                } else {
-                    0.0
-                };
-            scene_primitives_from_frame_with_minimum_size(frame, viewport, minimum_object_diameter)
-                .into_iter()
-                .map(move |mut primitive| {
-                    primitive.opacity = opacity;
-                    primitive.clip_radius = clip_radius;
-                    primitive
-                })
-        })
-        .collect()
+            let local_viewport = Viewport::new(frame_viewport.width, frame_viewport.height);
+            presentation.minimaps.push(VectorMinimap {
+                viewport: frame_viewport,
+                primitives: scene_primitives_from_frame_with_minimum_size(
+                    frame,
+                    local_viewport,
+                    minimum_object_diameter,
+                ),
+            });
+        } else {
+            presentation
+                .main_primitives
+                .extend(scene_primitives_from_frame(frame, frame_viewport));
+        }
+    }
+
+    presentation
 }
 
 pub(crate) fn frame_viewports(
@@ -573,8 +588,6 @@ fn text_primitive(text: &RenderText, camera: Camera2, viewport: Viewport) -> Sce
         font_size: text.size,
         text_x: x,
         text_y: y,
-        opacity: 1.0,
-        clip_radius: 0.0,
     }
 }
 
@@ -596,8 +609,6 @@ fn path_primitive(commands: String, style: PathStyle, viewport: Viewport) -> Sce
         font_size: 0.0,
         text_x: 0.0,
         text_y: 0.0,
-        opacity: 1.0,
-        clip_radius: 0.0,
     }
 }
 
@@ -699,33 +710,42 @@ mod tests {
             frame_with_triangle(RenderColor::YELLOW),
         ];
 
-        let primitives = scene_primitives_from_frames_with_layout(
+        let presentation = scene_presentation_from_frames_with_layout(
             &frames,
             Viewport::new(1000.0, 700.0),
             FrameLayout::SpacewarsLocalPlay,
         );
 
-        assert_eq!(primitives.len(), 4);
-        assert_close(primitives[0].x, 0.0);
-        assert_close(primitives[0].y, 0.0);
-        assert_close(primitives[0].width, 500.0);
-        assert_close(primitives[0].height, 700.0);
-        assert_close(primitives[1].x, 500.0);
-        assert_close(primitives[1].y, 0.0);
-        assert_close(primitives[1].width, 500.0);
-        assert_close(primitives[1].height, 700.0);
-        assert_close(primitives[2].x, 14.0);
-        assert_close(primitives[2].y, 486.0);
-        assert_close(primitives[2].width, 200.0);
-        assert_close(primitives[2].height, 200.0);
-        assert_close(primitives[2].opacity, SPACEWARS_MINIMAP_OPACITY);
-        assert_close(primitives[2].clip_radius, 100.0);
-        assert_close(primitives[3].x, 786.0);
-        assert_close(primitives[3].y, 486.0);
-        assert_close(primitives[3].width, 200.0);
-        assert_close(primitives[3].height, 200.0);
-        assert_close(primitives[3].opacity, SPACEWARS_MINIMAP_OPACITY);
-        assert_close(primitives[3].clip_radius, 100.0);
+        assert_eq!(presentation.main_primitives.len(), 2);
+        assert_eq!(presentation.minimaps.len(), 2);
+        assert_close(presentation.main_primitives[0].x, 0.0);
+        assert_close(presentation.main_primitives[0].y, 0.0);
+        assert_close(presentation.main_primitives[0].width, 500.0);
+        assert_close(presentation.main_primitives[0].height, 700.0);
+        assert_close(presentation.main_primitives[1].x, 500.0);
+        assert_close(presentation.main_primitives[1].y, 0.0);
+        assert_close(presentation.main_primitives[1].width, 500.0);
+        assert_close(presentation.main_primitives[1].height, 700.0);
+
+        let left = &presentation.minimaps[0];
+        assert_close(left.viewport.x, 14.0);
+        assert_close(left.viewport.y, 486.0);
+        assert_close(left.viewport.width, 200.0);
+        assert_close(left.viewport.height, 200.0);
+        assert_close(left.primitives[0].x, 0.0);
+        assert_close(left.primitives[0].y, 0.0);
+        assert_close(left.primitives[0].width, 200.0);
+        assert_close(left.primitives[0].height, 200.0);
+
+        let right = &presentation.minimaps[1];
+        assert_close(right.viewport.x, 786.0);
+        assert_close(right.viewport.y, 486.0);
+        assert_close(right.viewport.width, 200.0);
+        assert_close(right.viewport.height, 200.0);
+        assert_close(right.primitives[0].x, 0.0);
+        assert_close(right.primitives[0].y, 0.0);
+        assert_close(right.primitives[0].width, 200.0);
+        assert_close(right.primitives[0].height, 200.0);
     }
 
     #[test]
@@ -802,15 +822,23 @@ mod tests {
             visible_overview,
         ];
 
-        let primitives = scene_primitives_from_frames_with_layout(
+        let presentation = scene_presentation_from_frames_with_layout(
             &frames,
             Viewport::new(1000.0, 700.0),
             FrameLayout::SpacewarsLocalPlay,
         );
 
-        assert_eq!(primitives.len(), 2);
-        assert_eq!(primitives[0].fill, brush(RenderColor::RED));
-        assert_eq!(primitives[1].fill, brush(RenderColor::BLUE));
+        assert_eq!(presentation.main_primitives.len(), 1);
+        assert_eq!(
+            presentation.main_primitives[0].fill,
+            brush(RenderColor::RED)
+        );
+        assert!(presentation.minimaps[0].primitives.is_empty());
+        assert_eq!(presentation.minimaps[1].primitives.len(), 1);
+        assert_eq!(
+            presentation.minimaps[1].primitives[0].fill,
+            brush(RenderColor::BLUE)
+        );
     }
 
     fn frame_with_triangle(color: RenderColor) -> RenderFrame {

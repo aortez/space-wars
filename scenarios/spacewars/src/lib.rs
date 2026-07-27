@@ -76,7 +76,6 @@ const SPACEPORT_EJECT_MAX_SPEED: f32 = 200.0;
 const SPACEPORT_REENTRY_LOCKOUT_SECS: f32 = 0.75;
 const DEFAULT_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const MIN_PLAYER_VIEW_HEIGHT: f32 = 15.0;
-const PLAYER_VIEW_ASPECT_RATIO: f32 = 640.0 / 417.6;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
 const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
@@ -915,7 +914,10 @@ impl SpacewarsScenario {
             .collect()
     }
 
-    pub fn render_raster_local_play_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
+    pub fn render_raster_local_play_frames(
+        state: &SpacewarsState,
+        player_view_aspect_ratio: f32,
+    ) -> Vec<RenderFrame> {
         let mut frames = (0..state.ships.len())
             .map(|player| {
                 render_state_with_camera(
@@ -925,15 +927,26 @@ impl SpacewarsScenario {
                 )
             })
             .collect::<Vec<_>>();
-        frames.push(render_raster_overview_state(state, 0));
-        frames.push(render_raster_overview_state(state, 1));
+        frames.push(render_raster_overview_state(
+            state,
+            0,
+            player_view_aspect_ratio,
+        ));
+        frames.push(render_raster_overview_state(
+            state,
+            1,
+            player_view_aspect_ratio,
+        ));
         frames
     }
 
-    pub fn render_local_play_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
+    pub fn render_local_play_frames(
+        state: &SpacewarsState,
+        player_view_aspect_ratio: f32,
+    ) -> Vec<RenderFrame> {
         let mut frames = Self::render_player_frames(state);
-        frames.push(render_overview_state(state, 0));
-        frames.push(render_overview_state(state, 1));
+        frames.push(render_overview_state(state, 0, player_view_aspect_ratio));
+        frames.push(render_overview_state(state, 1, player_view_aspect_ratio));
         frames
     }
 }
@@ -3974,23 +3987,31 @@ fn render_state(state: &SpacewarsState) -> RenderFrame {
     )
 }
 
-fn render_overview_state(state: &SpacewarsState, player: usize) -> RenderFrame {
+fn render_overview_state(
+    state: &SpacewarsState,
+    player: usize,
+    player_view_aspect_ratio: f32,
+) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
     render_state_with_camera(
         state,
         Camera2::new(render_point(center), radius * 2.2),
-        RenderOptions::overview(player),
+        RenderOptions::overview(player, player_view_aspect_ratio),
     )
 }
 
-fn render_raster_overview_state(state: &SpacewarsState, player: usize) -> RenderFrame {
+fn render_raster_overview_state(
+    state: &SpacewarsState,
+    player: usize,
+    player_view_aspect_ratio: f32,
+) -> RenderFrame {
     let radius = state.config.universe_radius as f32;
     let center = Vec2::new(radius, radius);
     render_state_with_camera(
         state,
         Camera2::new(render_point(center), radius * 2.2),
-        RenderOptions::raster_overview(player),
+        RenderOptions::raster_overview(player, player_view_aspect_ratio),
     )
 }
 
@@ -4108,8 +4129,8 @@ fn render_state_with_camera(
         }
     }
 
-    if let Some(player) = options.player_view {
-        render_player_view_rectangle(&mut frame, state, player);
+    if let Some((player, aspect_ratio)) = options.player_view {
+        render_player_view_rectangle(&mut frame, state, player, aspect_ratio);
     }
 
     frame
@@ -4123,7 +4144,7 @@ struct RenderOptions {
     show_particles: bool,
     show_planet_ownership_halo: bool,
     debris_style: DebrisRenderStyle,
-    player_view: Option<usize>,
+    player_view: Option<(usize, f32)>,
 }
 
 impl RenderOptions {
@@ -4139,7 +4160,7 @@ impl RenderOptions {
         }
     }
 
-    fn overview(player: usize) -> Self {
+    fn overview(player: usize, player_view_aspect_ratio: f32) -> Self {
         Self {
             show_ship_labels: false,
             show_starfield: false,
@@ -4147,7 +4168,7 @@ impl RenderOptions {
             show_particles: false,
             show_planet_ownership_halo: true,
             debris_style: DebrisRenderStyle::SimpleMarks,
-            player_view: Some(player),
+            player_view: Some((player, player_view_aspect_ratio)),
         }
     }
 
@@ -4163,7 +4184,7 @@ impl RenderOptions {
         }
     }
 
-    fn raster_overview(player: usize) -> Self {
+    fn raster_overview(player: usize, player_view_aspect_ratio: f32) -> Self {
         Self {
             show_ship_labels: false,
             show_starfield: false,
@@ -4171,7 +4192,7 @@ impl RenderOptions {
             show_particles: false,
             show_planet_ownership_halo: true,
             debris_style: DebrisRenderStyle::SimpleMarks,
-            player_view: Some(player),
+            player_view: Some((player, player_view_aspect_ratio)),
         }
     }
 }
@@ -4182,7 +4203,12 @@ enum DebrisRenderStyle {
     SimpleMarks,
 }
 
-fn render_player_view_rectangle(frame: &mut RenderFrame, state: &SpacewarsState, player: usize) {
+fn render_player_view_rectangle(
+    frame: &mut RenderFrame,
+    state: &SpacewarsState,
+    player: usize,
+    aspect_ratio: f32,
+) {
     let Some(ship) = state.ships.get(player) else {
         return;
     };
@@ -4192,7 +4218,12 @@ fn render_player_view_rectangle(frame: &mut RenderFrame, state: &SpacewarsState,
         .get(player)
         .copied()
         .unwrap_or(DEFAULT_PLAYER_VIEW_HEIGHT);
-    let view_width = view_height * PLAYER_VIEW_ASPECT_RATIO;
+    let aspect_ratio = if aspect_ratio.is_finite() && aspect_ratio > 0.0 {
+        aspect_ratio
+    } else {
+        1.0
+    };
+    let view_width = view_height * aspect_ratio;
     let half_width = view_width * 0.5;
     let half_height = view_height * 0.5;
 
@@ -4503,13 +4534,13 @@ fn render_planet_flags(frame: &mut RenderFrame, state: &SpacewarsState, planet: 
 }
 
 fn planet_flag_color(state: &SpacewarsState, planet: &PlanetState) -> Option<RenderColor> {
-    if let Some(capturing_player) = planet.capturing_player_id
-        && planet.owner_id != Some(capturing_player)
-    {
-        let progress = capture_progress(planet);
-        if progress > 0.0 {
-            let player = state.players.get(capturing_player)?;
-            return Some(with_intensity(render_color(player.color), progress));
+    if let Some(capturing_player) = planet.capturing_player_id {
+        if planet.owner_id != Some(capturing_player) {
+            let progress = capture_progress(planet);
+            if progress > 0.0 {
+                let player = state.players.get(capturing_player)?;
+                return Some(with_intensity(render_color(player.color), progress));
+            }
         }
     }
 
@@ -4565,27 +4596,27 @@ fn spaceport_color(
         );
     }
 
-    if let SpaceportStatus::Active(ship_index) = spaceport_status(state, planet_index)
-        && let Some(ship) = state.ships.get(ship_index)
-    {
-        let player_color = render_color(state.players[ship.owner_id].color);
-        if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {
-            let progress = capture_progress(planet);
-            if progress > 0.0 {
-                return blend_color(
-                    RenderColor::rgba(1.0, 1.0, 1.0, 0.82),
-                    with_alpha(player_color, 0.82),
-                    progress,
-                );
-            }
-        } else if planet.owner_id == Some(ship.owner_id) && ship.form == ShipForm::EscapePod {
-            let progress = rebuild_progress(planet);
-            if progress > 0.0 {
-                return blend_color(
-                    with_alpha(dim(player_color, 0.55), 0.82),
-                    with_alpha(player_color, 0.92),
-                    progress,
-                );
+    if let SpaceportStatus::Active(ship_index) = spaceport_status(state, planet_index) {
+        if let Some(ship) = state.ships.get(ship_index) {
+            let player_color = render_color(state.players[ship.owner_id].color);
+            if planet.owner_id != Some(ship.owner_id) && ship.form != ShipForm::EscapePod {
+                let progress = capture_progress(planet);
+                if progress > 0.0 {
+                    return blend_color(
+                        RenderColor::rgba(1.0, 1.0, 1.0, 0.82),
+                        with_alpha(player_color, 0.82),
+                        progress,
+                    );
+                }
+            } else if planet.owner_id == Some(ship.owner_id) && ship.form == ShipForm::EscapePod {
+                let progress = rebuild_progress(planet);
+                if progress > 0.0 {
+                    return blend_color(
+                        with_alpha(dim(player_color, 0.55), 0.82),
+                        with_alpha(player_color, 0.92),
+                        progress,
+                    );
+                }
             }
         }
     }
@@ -5058,16 +5089,16 @@ mod tests {
                 let dy = y as f32 + 0.5 - cy;
                 let distance = (dx * dx + dy * dy).sqrt();
 
-                if let Some(fill) = circle.fill
-                    && distance <= radius
-                {
-                    blend_pixel(image, x, y, fill.color);
+                if let Some(fill) = circle.fill {
+                    if distance <= radius {
+                        blend_pixel(image, x, y, fill.color);
+                    }
                 }
 
-                if let Some(stroke) = circle.stroke
-                    && (distance - radius).abs() <= stroke_width * 0.5
-                {
-                    blend_pixel(image, x, y, stroke.color);
+                if let Some(stroke) = circle.stroke {
+                    if (distance - radius).abs() <= stroke_width * 0.5 {
+                        blend_pixel(image, x, y, stroke.color);
+                    }
                 }
             }
         }
@@ -6421,7 +6452,7 @@ mod tests {
         assert_eq!(center.fill, Some(Fill::new(expected_color)));
         assert!(center.stroke.is_none());
 
-        let overview = render_overview_state(&state, 0);
+        let overview = render_overview_state(&state, 0, 1.0);
         let overview_layer = overview
             .layers
             .iter()
@@ -6450,7 +6481,7 @@ mod tests {
         state.planets[0].taking_ownership_time = PLANET_CAPTURE_SECS * 0.5;
         let expected_color = with_intensity(render_color(state.players[0].color), 0.5);
 
-        let overview = render_overview_state(&state, 0);
+        let overview = render_overview_state(&state, 0, 1.0);
         let ownership_layer = overview
             .layers
             .iter()
@@ -6475,7 +6506,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
 
-        let overview = render_overview_state(&state, 0);
+        let overview = render_overview_state(&state, 0, 1.0);
 
         assert!(
             overview
@@ -8119,6 +8150,7 @@ mod tests {
     #[test]
     fn local_play_frames_include_player_views_and_world_overviews() {
         let mut state = init_default(123);
+        let player_view_aspect_ratio = 0.75;
         state.debris.push(DebrisState::new(
             DebrisKind::Asteroid,
             Vec2::new(100.0, 100.0),
@@ -8127,7 +8159,7 @@ mod tests {
             ASTEROID_DAMAGE_SCALAR,
             Color::DIM_GREY,
         ));
-        let frames = SpacewarsScenario::render_local_play_frames(&state);
+        let frames = SpacewarsScenario::render_local_play_frames(&state, player_view_aspect_ratio);
 
         assert_eq!(frames.len(), 4);
         assert_eq!(
@@ -8176,13 +8208,16 @@ mod tests {
                     1.5
                 ))
             );
+            let width = rectangle.points[1].x - rectangle.points[0].x;
+            let height = rectangle.points[2].y - rectangle.points[1].y;
+            assert_close(width / height, player_view_aspect_ratio);
         }
     }
 
     #[test]
     fn raster_local_play_frames_use_simplified_overviews() {
         let state = SpacewarsScenario::init_benchmark(123);
-        let frames = SpacewarsScenario::render_raster_local_play_frames(&state);
+        let frames = SpacewarsScenario::render_raster_local_play_frames(&state, 0.75);
 
         assert_eq!(frames.len(), 4);
         assert_eq!(text_values(&frames[0]), Vec::<String>::new());

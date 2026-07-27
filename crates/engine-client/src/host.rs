@@ -285,9 +285,10 @@ pub fn start_scenario_loop(
             scenario.spacewars_panel_state(paused, benchmark_active, &performance_text),
         );
         set_ingame_menu(&window, paused);
+        let viewport = Viewport::from_window(window.window());
         present_frames(
             &window,
-            scenario.render_frames(renderer),
+            scenario.render_frames(renderer, viewport),
             scenario.frame_layout(),
             renderer,
             raster_scale,
@@ -492,6 +493,7 @@ fn step_scenario(
 
 fn show_running_launcher(window: &MainWindow) {
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
+    window.set_vector_minimaps_visible(false);
     window.set_raster_visible(false);
     window.set_spacewars_ui_visible(false);
     window.set_ingame_menu_visible(false);
@@ -647,11 +649,11 @@ fn present_frames(
     let viewport = Viewport::from_window(window.window());
     let scene_item_count = match renderer {
         RenderBackend::Vector => {
-            let primitives =
-                render::scene_primitives_from_frames_with_layout(&frames, viewport, layout);
-            let scene_item_count = primitives.len();
+            let presentation =
+                render::scene_presentation_from_frames_with_layout(&frames, viewport, layout);
+            let scene_item_count = presentation.scene_item_count();
             window.set_raster_visible(false);
-            window.set_primitives(ModelRc::new(VecModel::from(primitives)));
+            set_vector_presentation(window, presentation);
             scene_item_count
         }
         RenderBackend::Raster => {
@@ -663,6 +665,7 @@ fn present_frames(
                 raster::RasterOptions::for_scale(raster_scale),
             );
             window.set_primitives(ModelRc::new(VecModel::from(Vec::new())));
+            window.set_vector_minimaps_visible(false);
             window.set_raster_frame(image);
             window.set_raster_visible(true);
             primitive_count
@@ -670,6 +673,31 @@ fn present_frames(
     };
     window.window().request_redraw();
     scene_item_count
+}
+
+fn set_vector_presentation(window: &MainWindow, presentation: render::VectorPresentation) {
+    window.set_primitives(ModelRc::new(VecModel::from(presentation.main_primitives)));
+    window.set_minimap_opacity(render::SPACEWARS_MINIMAP_OPACITY);
+
+    let mut minimaps = presentation.minimaps.into_iter();
+    let Some(player_1) = minimaps.next() else {
+        window.set_vector_minimaps_visible(false);
+        return;
+    };
+    let Some(player_2) = minimaps.next() else {
+        window.set_vector_minimaps_visible(false);
+        return;
+    };
+
+    window.set_p1_minimap_x(player_1.viewport.x);
+    window.set_p1_minimap_y(player_1.viewport.y);
+    window.set_p1_minimap_size(player_1.viewport.width);
+    window.set_p1_minimap_primitives(ModelRc::new(VecModel::from(player_1.primitives)));
+    window.set_p2_minimap_x(player_2.viewport.x);
+    window.set_p2_minimap_y(player_2.viewport.y);
+    window.set_p2_minimap_size(player_2.viewport.width);
+    window.set_p2_minimap_primitives(ModelRc::new(VecModel::from(player_2.primitives)));
+    window.set_vector_minimaps_visible(true);
 }
 
 pub fn run_spacewars_benchmark(
@@ -706,7 +734,7 @@ pub fn run_spacewars_benchmark(
             sample.step_time += step_started.elapsed();
 
             let render_started = Instant::now();
-            let frames = scenario.render_frames(options.renderer);
+            let frames = scenario.render_frames(options.renderer, BENCHMARK_VIEWPORT);
             sample.render_time += render_started.elapsed();
 
             let present_started = Instant::now();
@@ -752,13 +780,13 @@ fn present_frames_for_benchmark(
 ) -> PresentationStats {
     match renderer {
         RenderBackend::Vector => {
-            let primitives = render::scene_primitives_from_frames_with_layout(
+            let presentation = render::scene_presentation_from_frames_with_layout(
                 frames,
                 BENCHMARK_VIEWPORT,
                 layout,
             );
-            let scene_item_count = primitives.len();
-            black_box(primitives);
+            let scene_item_count = presentation.scene_item_count();
+            black_box(presentation);
             PresentationStats {
                 scene_items: scene_item_count,
                 raster_timings: raster::RasterTimings::default(),
@@ -1056,13 +1084,22 @@ impl HostedScenario {
         }
     }
 
-    pub(crate) fn render_frames(&self, renderer: RenderBackend) -> Vec<RenderFrame> {
+    pub(crate) fn render_frames(
+        &self,
+        renderer: RenderBackend,
+        viewport: Viewport,
+    ) -> Vec<RenderFrame> {
+        let player_view_aspect_ratio =
+            render::frame_viewports(viewport, 4, render::FrameLayout::SpacewarsLocalPlay)[0]
+                .aspect_ratio();
         match self {
             Self::Null(state) => vec![NullScenario::render_frame(state)],
             Self::Spacewars(state) if renderer == RenderBackend::Raster => {
-                SpacewarsScenario::render_raster_local_play_frames(state)
+                SpacewarsScenario::render_raster_local_play_frames(state, player_view_aspect_ratio)
             }
-            Self::Spacewars(state) => SpacewarsScenario::render_local_play_frames(state),
+            Self::Spacewars(state) => {
+                SpacewarsScenario::render_local_play_frames(state, player_view_aspect_ratio)
+            }
         }
     }
 
@@ -1310,7 +1347,8 @@ mod tests {
     #[test]
     fn spacewars_scenario_renders_original_style_local_play_frames_for_client() {
         let scenario = hosted_scenario("spacewars", 0).unwrap();
-        let frames = scenario.render_frames(RenderBackend::Vector);
+        let viewport = Viewport::new(1000.0, 700.0);
+        let frames = scenario.render_frames(RenderBackend::Vector, viewport);
 
         let HostedScenario::Spacewars(state) = &scenario else {
             panic!("spacewars scenario should not host null");
@@ -1325,6 +1363,19 @@ mod tests {
         assert_eq!(frames[2].camera.center.x, 1200.0);
         assert_eq!(frames[2].camera.center.y, 1200.0);
         assert_eq!(frames[3].camera, frames[2].camera);
+        let view_rectangle = frames[2]
+            .layers
+            .iter()
+            .find(|layer| layer.z == 8)
+            .and_then(|layer| layer.primitives.first())
+            .expect("overview should contain the player view rectangle");
+        let engine_common::RenderPrimitive::Polygon(view_rectangle) = view_rectangle else {
+            panic!("player view rectangle should be a polygon");
+        };
+        let visible_width = view_rectangle.points[1].x - view_rectangle.points[0].x;
+        let visible_height = view_rectangle.points[2].y - view_rectangle.points[1].y;
+        let expected_aspect_ratio = (viewport.width * 0.5) / viewport.height;
+        assert!((visible_width / visible_height - expected_aspect_ratio).abs() <= 1.0e-5);
         assert_eq!(
             scenario.frame_layout(),
             render::FrameLayout::SpacewarsLocalPlay
