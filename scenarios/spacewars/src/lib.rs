@@ -4,7 +4,12 @@
 //! collision response, damage, debris, asteroids, weapons, exhaust trails, and
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
-use std::time::Duration;
+mod physics;
+
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    time::{Duration, Instant},
+};
 
 use engine_common::{
     Action, Camera2, Fill, Observation, RenderCircle, RenderColor, RenderFrame, RenderPoint,
@@ -12,15 +17,19 @@ use engine_common::{
     TickModel,
 };
 use engine_core::{
-    Bounds2, BoundsList, Circle, Color, Line, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
-    constants::{
-        COLLISION_TRANSLATION_SCALAR, DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, PLANET_ELASTICITY,
-        REALLY_SMALL,
-    },
+    Bounds2, BoundsList, Circle, Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
+    constants::{DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, PLANET_ELASTICITY, REALLY_SMALL},
     physics::gravity_acceleration_attracted_to,
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
     triangle_high_bounds, triangle_low_bound,
 };
+use engine_rapier::world::PhysicsStepMetrics;
+use physics::{MechanicalContact, MechanicalEntity};
+
+#[cfg(test)]
+use engine_core::Line;
+#[cfg(test)]
+use engine_core::constants::COLLISION_TRANSLATION_SCALAR;
 
 const STARFIELD_LAYER: i32 = -30;
 const WORLD_LAYER: i32 = -20;
@@ -239,6 +248,8 @@ pub struct SpacewarsState {
     pub body_collisions: Vec<BodyCollision>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
+    pub last_step_metrics: SpacewarsStepMetrics,
+    physics: physics::SpacewarsPhysics,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -247,6 +258,23 @@ pub struct SpacewarsBenchmarkCounts {
     pub fragments: usize,
     pub shells: usize,
     pub particles: usize,
+    pub active_bodies: usize,
+    pub sleeping_bodies: usize,
+    pub candidate_pairs: usize,
+    pub contact_pairs: usize,
+    pub contacts: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct SpacewarsStepMetrics {
+    pub workload_time: Duration,
+    pub lifecycle_time: Duration,
+    pub gravity_time: Duration,
+    pub collision_time: Duration,
+    pub physics_time: Duration,
+    pub added: usize,
+    pub removed: usize,
+    pub rapier: PhysicsStepMetrics,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -319,6 +347,7 @@ pub struct DebrisState {
     pub color: Color,
     pub owner_id: Option<usize>,
     pub spawn_tick: u64,
+    physics_id: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -347,7 +376,7 @@ pub struct BodyCollision {
     pub body: BodyId,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BodyId {
     Sun,
     Planet(usize),
@@ -697,6 +726,8 @@ impl Scenario for SpacewarsScenario {
             config.player_view_heights,
             config.universe_hypot() as f32,
         );
+        let physics =
+            physics::SpacewarsPhysics::new(config.universe_radius as f32, &ships, sun, &planets);
 
         SpacewarsState {
             config,
@@ -718,13 +749,17 @@ impl Scenario for SpacewarsScenario {
             body_collisions: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
+            last_step_metrics: SpacewarsStepMetrics::default(),
+            physics,
         }
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        state.last_step_metrics = SpacewarsStepMetrics::default();
         if state.winner.is_some() {
             return StepResult::default();
         }
+        let step_started = Instant::now();
 
         for action in actions.iter().filter_map(SpacewarsAction::decode) {
             state.apply_action(action);
@@ -738,40 +773,61 @@ impl Scenario for SpacewarsScenario {
         }
         update_spaceports(state, dt);
 
+        let universe_radius = state.config.universe_radius as f32;
         for ship in &mut state.ships {
             ship.update(dt, state.seed, state.tick);
-            contain_ship(ship, state.config.universe_radius as f32);
+            recover_ship_outside_universe(ship, universe_radius);
         }
         finish_spaceport_ejections(state, dt);
         let new_shells = spawn_cannon_shells(state, dt);
         state.debris.extend(new_shells);
+        handle_ship_deaths(state);
+
+        let gravity_started = Instant::now();
+        apply_world_gravity(state);
+        if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
+            apply_debris_gravity(state);
+        }
+        let gravity_time = gravity_started.elapsed();
+
+        let lifecycle_started = Instant::now();
+        let lifecycle = reconcile_physics(state);
+        let lifecycle_time = lifecycle_started.elapsed();
+        let rapier = state.physics.step(dt);
+        state
+            .physics
+            .synchronize_motion(&mut state.ships, &mut state.debris);
+
+        let collision_started = Instant::now();
         update_ship_lasers(state);
         state.laser_hits = resolve_laser_hits(state);
         handle_ship_deaths(state);
 
-        apply_world_gravity(state);
-        state.ship_debris_collisions = resolve_ship_debris_collisions(state);
+        let contacts = state.physics.contacts();
+        let port_intersections = state.physics.spaceport_contacts();
+        let accepted_ports = resolve_physics_spaceport_contacts(state, &port_intersections);
+        resolve_physics_collisions(state, &contacts, &accepted_ports);
         handle_ship_deaths(state);
-        state.ship_collisions = resolve_ship_collisions(state);
-        let collision_events = resolve_body_collisions(state);
-        state.body_collisions = collision_events.body_collisions;
-        state.spaceport_contacts = collision_events.spaceport_contacts;
-        handle_ship_deaths(state);
-        if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
-            apply_debris_gravity(state);
-        }
-        state.debris_body_collisions = resolve_debris_body_collisions(state);
-        state.debris_collisions = resolve_debris_collisions(state);
+
         spawn_debris_breakup_fragments(state);
-        for debris in &mut state.debris {
-            debris.update(dt);
-        }
+        let collision_time = collision_started.elapsed();
         remove_finished_debris(state);
         update_particles(state, dt);
         spawn_random_asteroid(state, dt);
         update_game_over(state);
 
         state.tick += 1;
+        let accounted = lifecycle_time + gravity_time + collision_time + rapier.wall_time;
+        state.last_step_metrics = SpacewarsStepMetrics {
+            workload_time: step_started.elapsed().saturating_sub(accounted),
+            lifecycle_time,
+            gravity_time,
+            collision_time,
+            physics_time: rapier.wall_time,
+            added: lifecycle.added,
+            removed: lifecycle.removed,
+            rapier,
+        };
         StepResult::default()
     }
 
@@ -886,9 +942,15 @@ impl SpacewarsScenario {
     }
 
     pub fn benchmark_counts(state: &SpacewarsState) -> SpacewarsBenchmarkCounts {
+        let rapier = state.last_step_metrics.rapier;
         state.debris.iter().fold(
             SpacewarsBenchmarkCounts {
                 particles: state.particles.len(),
+                active_bodies: rapier.active_bodies,
+                sleeping_bodies: rapier.sleeping_bodies,
+                candidate_pairs: rapier.candidate_pairs,
+                contact_pairs: rapier.contact_pairs,
+                contacts: rapier.contacts,
                 ..SpacewarsBenchmarkCounts::default()
             },
             |mut counts, debris| {
@@ -1207,6 +1269,7 @@ fn spawn_random_asteroid(state: &mut SpacewarsState, dt: f32) {
         color,
     );
     asteroid.omega = random_unit_f32(&mut rng) * ASTEROID_MAX_OMEGA;
+    asteroid.spawn_tick = state.tick;
     state.debris.push(asteroid);
 }
 
@@ -1230,150 +1293,56 @@ fn update_ship_lasers(state: &mut SpacewarsState) {
 }
 
 fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
-    let bodies = body_physics(state);
-    let ship_bounds = state
+    let traces = state
         .ships
         .iter()
-        .map(|ship| {
-            let triangles = ship_triangles(ship);
-            (
-                ship_low_bounds(&triangles),
-                Bounds2::List(ship_high_bounds(&triangles)),
-            )
+        .enumerate()
+        .filter_map(|(shooter, ship)| {
+            let beam = ship.laser_beam?;
+            let trace =
+                state
+                    .physics
+                    .cast_laser(shooter, beam.head, beam.direction, beam.length())?;
+            Some((shooter, beam, trace))
         })
         .collect::<Vec<_>>();
     let mut hits = Vec::new();
 
-    for shooter in 0..state.ships.len() {
-        let Some(beam) = state.ships[shooter].laser_beam else {
-            continue;
-        };
-
-        let Some(hit) = nearest_laser_hit(state, shooter, beam, &ship_bounds, &bodies) else {
-            continue;
-        };
-
-        if let Some(beam) = &mut state.ships[shooter].laser_beam {
-            beam.tail = hit.point;
+    for (shooter, beam, trace) in traces {
+        if let Some(current) = &mut state.ships[shooter].laser_beam {
+            current.tail = trace.point;
         }
+        let target = match trace.target {
+            Some(MechanicalEntity::Body(body)) => LaserTarget::Body(body),
+            Some(MechanicalEntity::Ship(ship)) => LaserTarget::Ship(ship),
+            Some(MechanicalEntity::Debris(id)) => {
+                let Some(debris) = state
+                    .debris
+                    .iter()
+                    .position(|debris| debris.physics_id == id)
+                else {
+                    continue;
+                };
+                LaserTarget::Debris(debris)
+            }
+            Some(MechanicalEntity::World) | None => continue,
+        };
+        let hit = LaserHit {
+            shooter,
+            target,
+            point: trace.point,
+            damage: laser_damage(beam),
+        };
+        if matches!(target, LaserTarget::Ship(ship) if ship == shooter) {
+            continue;
+        }
+
         spawn_laser_hit_particles(state, beam.direction, hit);
         apply_laser_hit(state, hit);
         hits.push(hit);
     }
 
     hits
-}
-
-fn nearest_laser_hit(
-    state: &SpacewarsState,
-    shooter: usize,
-    beam: LaserBeamState,
-    ship_bounds: &[(Circle, Bounds2)],
-    bodies: &[BodyPhysics],
-) -> Option<LaserHit> {
-    let line = Line::new(beam.head, beam.tail);
-    let damage = laser_damage(beam);
-    let mut nearest: Option<LaserHit> = None;
-
-    let mut consider_hit = |target: LaserTarget, point: Vec2| {
-        let hit = LaserHit {
-            shooter,
-            target,
-            point,
-            damage,
-        };
-        match nearest {
-            Some(current)
-                if current.point.distance_to(beam.head) <= hit.point.distance_to(beam.head) => {}
-            _ => nearest = Some(hit),
-        }
-    };
-
-    for (debris_index, debris) in state.debris.iter().enumerate() {
-        if debris.dead {
-            continue;
-        }
-
-        let bounds = debris_bounds(debris);
-        if let Some(point) = nearest_laser_circle_intersection(line, bounds) {
-            consider_hit(LaserTarget::Debris(debris_index), point);
-        }
-    }
-
-    for body in bodies {
-        let bounds = Circle::new(body.position, body.radius);
-        if let Some(point) = nearest_laser_circle_intersection(line, bounds) {
-            consider_hit(LaserTarget::Body(body.id), point);
-        }
-    }
-
-    for (target, (low, high)) in ship_bounds.iter().enumerate() {
-        if target == shooter {
-            continue;
-        }
-        if !Bounds2::Line(line).intersects(&Bounds2::Circle(*low)) {
-            continue;
-        }
-        if let Some(point) = nearest_laser_bounds_intersection(line, high) {
-            consider_hit(LaserTarget::Ship(target), point);
-        }
-    }
-
-    nearest
-}
-
-fn nearest_laser_bounds_intersection(line: Line, bounds: &Bounds2) -> Option<Vec2> {
-    match bounds {
-        Bounds2::Circle(circle) => nearest_laser_circle_intersection(line, *circle),
-        Bounds2::List(list) => list
-            .iter()
-            .filter_map(|bounds| nearest_laser_bounds_intersection(line, bounds))
-            .min_by(|a, b| {
-                a.distance_to(line.start)
-                    .total_cmp(&b.distance_to(line.start))
-            }),
-        Bounds2::Line(_) => None,
-    }
-}
-
-fn nearest_laser_circle_intersection(line: Line, circle: Circle) -> Option<Vec2> {
-    let delta = line.end - line.start;
-    let a = delta.length_squared();
-    if a <= REALLY_SMALL {
-        return None;
-    }
-
-    let start_to_center = line.start - circle.center;
-    let b = 2.0 * delta.dot(start_to_center);
-    let c = start_to_center.length_squared() - circle.radius * circle.radius;
-    let det = b * b - 4.0 * a * c;
-    if det < 0.0 {
-        return None;
-    }
-
-    let point_at = |t: f32| line.start + delta * t;
-    let mut nearest: Option<(f32, Vec2)> = None;
-    let mut consider = |t: f32| {
-        if !(0.0..=1.0).contains(&t) {
-            return;
-        }
-
-        let point = point_at(t);
-        match nearest {
-            Some((current_t, _)) if current_t <= t => {}
-            _ => nearest = Some((t, point)),
-        }
-    };
-
-    if det == 0.0 {
-        consider(-b / (2.0 * a));
-    } else {
-        let sqrt_det = det.sqrt();
-        consider((-b - sqrt_det) / (2.0 * a));
-        consider((-b + sqrt_det) / (2.0 * a));
-    }
-
-    nearest.map(|(_, point)| point)
 }
 
 fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
@@ -1577,13 +1546,15 @@ fn asteroid_chip_fragments(
         let omega = random_range_f32(&mut rng, -ASTEROID_CHIP_OMEGA, ASTEROID_CHIP_OMEGA);
         let color = source.color.random_variation(0.12, &mut rng);
 
-        fragments.push(DebrisState::new_fragment(
+        let mut fragment = DebrisState::new_fragment(
             source.position + center,
             local_shape,
             velocity,
             omega,
             color,
-        ));
+        );
+        fragment.spawn_tick = tick;
+        fragments.push(fragment);
     }
 
     fragments
@@ -1679,6 +1650,313 @@ fn apply_gravity_to_velocity(
     *velocity += offset.normalized() * acceleration;
 }
 
+fn reconcile_physics(state: &mut SpacewarsState) -> physics::PhysicsLifecycle {
+    let mut docked_ships = [false; 2];
+    for contact in &state.spaceport_contacts {
+        if let Some(docked) = docked_ships.get_mut(contact.ship) {
+            *docked = true;
+        }
+    }
+
+    state.physics.reconcile(
+        state.tick,
+        &mut state.ships,
+        &mut state.debris,
+        state.sun,
+        &state.planets,
+        &docked_ships,
+    )
+}
+
+fn resolve_physics_spaceport_contacts(
+    state: &mut SpacewarsState,
+    intersections: &[(usize, usize)],
+) -> BTreeSet<(usize, usize)> {
+    let mut accepted = BTreeSet::new();
+    state.spaceport_contacts.clear();
+
+    for &(ship_index, planet_index) in intersections {
+        let Some(planet) = state.planets.get(planet_index).copied() else {
+            continue;
+        };
+        if ship_index >= state.ships.len() {
+            continue;
+        }
+        let spaceport = spaceport_physics(planet_index, &planet);
+        if !spaceport_accepts_ship(state, ship_index, spaceport) {
+            continue;
+        }
+
+        resolve_spaceport_contact(&mut state.ships[ship_index], spaceport.bounds.center);
+        accepted.insert((ship_index, planet_index));
+        state.spaceport_contacts.push(SpaceportContact {
+            ship: ship_index,
+            planet: planet_index,
+        });
+    }
+
+    accepted
+}
+
+fn resolve_physics_collisions(
+    state: &mut SpacewarsState,
+    contacts: &[MechanicalContact],
+    accepted_ports: &BTreeSet<(usize, usize)>,
+) {
+    state.ship_collisions.clear();
+    state.ship_debris_collisions.clear();
+    state.debris_collisions.clear();
+    state.debris_body_collisions.clear();
+    state.body_collisions = accepted_ports
+        .iter()
+        .map(|&(ship, planet)| BodyCollision {
+            ship,
+            body: BodyId::Planet(planet),
+        })
+        .collect();
+
+    let bodies = body_physics(state)
+        .into_iter()
+        .map(|body| (body.id, body))
+        .collect::<BTreeMap<_, _>>();
+    let debris_indices = state
+        .debris
+        .iter()
+        .enumerate()
+        .filter(|(_, debris)| debris.physics_id != 0)
+        .map(|(index, debris)| (debris.physics_id, index))
+        .collect::<BTreeMap<_, _>>();
+
+    for contact in strongest_entity_contacts(contacts).into_values() {
+        match (contact.a, contact.b) {
+            (MechanicalEntity::Body(body_id), MechanicalEntity::Ship(ship)) => {
+                if matches!(
+                    body_id,
+                    BodyId::Planet(planet) if accepted_ports.contains(&(ship, planet))
+                ) {
+                    continue;
+                }
+                let Some(body) = bodies.get(&body_id) else {
+                    continue;
+                };
+                let Some(ship_state) = state.ships.get(ship) else {
+                    continue;
+                };
+                let damage = impact_speed(contact.impulse_magnitude, ship_state.mass(), None)
+                    * PLANET_DAMAGE_SCALAR;
+                let ship_position = ship_state.position;
+                let ship_color = ship_state.color;
+                let normal = contact.normal;
+                let intercept = contact
+                    .point
+                    .unwrap_or(body.position + normal * body.radius);
+
+                state.ships[ship].translate_life_with_impulse(-damage, normal * damage);
+                state.body_collisions.push(BodyCollision {
+                    ship,
+                    body: body_id,
+                });
+                spawn_impact_particles(
+                    state,
+                    -normal,
+                    ship_position,
+                    intercept,
+                    ship_color,
+                    damage,
+                    5.0,
+                    0x51B0_D000 ^ ship as u64 ^ ((body.order as u64) << 16),
+                );
+            }
+            (MechanicalEntity::Ship(a), MechanicalEntity::Ship(b)) => {
+                state.ship_collisions.push(ShipCollision { a, b });
+            }
+            (MechanicalEntity::Ship(ship), MechanicalEntity::Debris(debris_id)) => {
+                let Some(&debris_index) = debris_indices.get(&debris_id) else {
+                    continue;
+                };
+                if ship >= state.ships.len() || debris_index >= state.debris.len() {
+                    continue;
+                }
+                let ship_mass = state.ships[ship].mass();
+                let debris_mass = state.debris[debris_index].mass();
+                let damage = impact_speed(contact.impulse_magnitude, ship_mass, Some(debris_mass))
+                    * state.debris[debris_index].damage_scalar;
+                let normal = contact.normal;
+                let ship_position = state.ships[ship].position;
+                let ship_color = state.ships[ship].color;
+                let intercept = contact.point.unwrap_or(ship_position);
+
+                state.ships[ship].translate_life_with_impulse(-damage, -normal * damage);
+                damage_debris(
+                    state,
+                    debris_index,
+                    damage,
+                    normal,
+                    0x51DE_0000 ^ ship as u64,
+                );
+                state.ship_debris_collisions.push(ShipDebrisCollision {
+                    ship,
+                    debris: debris_index,
+                });
+                spawn_impact_particles(
+                    state,
+                    -normal,
+                    ship_position,
+                    intercept,
+                    ship_color,
+                    damage,
+                    10.0,
+                    0x51DE_BA5E ^ ship as u64 ^ ((debris_index as u64) << 16),
+                );
+            }
+            (MechanicalEntity::Body(body_id), MechanicalEntity::Debris(debris_id)) => {
+                let Some(body) = bodies.get(&body_id) else {
+                    continue;
+                };
+                let Some(&debris_index) = debris_indices.get(&debris_id) else {
+                    continue;
+                };
+                let Some(debris) = state.debris.get(debris_index).copied() else {
+                    continue;
+                };
+                let speed = impact_speed(contact.impulse_magnitude, debris.mass(), None);
+                let impact_damage = speed * DEBRIS_BODY_DAMAGE_SCALAR;
+                let body_damage = speed * PLANET_DAMAGE_SCALAR;
+                let damage = impact_damage + body_damage;
+                let normal = contact.normal;
+                let intercept = contact
+                    .point
+                    .unwrap_or(body.position + normal * body.radius);
+
+                damage_debris(
+                    state,
+                    debris_index,
+                    impact_damage,
+                    normal,
+                    0xDEB0_B0D0 ^ debris_index as u64 ^ ((body.order as u64) << 16),
+                );
+                damage_debris(
+                    state,
+                    debris_index,
+                    body_damage,
+                    normal,
+                    0xDEB0_B0D1 ^ debris_index as u64 ^ ((body.order as u64) << 16),
+                );
+                state.debris_body_collisions.push(DebrisBodyCollision {
+                    debris: debris_index,
+                    body: body_id,
+                });
+                spawn_impact_particles(
+                    state,
+                    normal,
+                    debris.position,
+                    intercept,
+                    debris.color,
+                    damage,
+                    5.0,
+                    0xDEB0_B0D0 ^ debris_index as u64 ^ ((body.order as u64) << 16),
+                );
+            }
+            (MechanicalEntity::Debris(a_id), MechanicalEntity::Debris(b_id)) => {
+                let (Some(&a), Some(&b)) = (debris_indices.get(&a_id), debris_indices.get(&b_id))
+                else {
+                    continue;
+                };
+                if a == b || a >= state.debris.len() || b >= state.debris.len() {
+                    continue;
+                }
+                let a_state = state.debris[a];
+                let b_state = state.debris[b];
+                let speed = impact_speed(
+                    contact.impulse_magnitude,
+                    a_state.mass(),
+                    Some(b_state.mass()),
+                );
+                let damage_to_a = speed * b_state.damage_scalar;
+                let damage_to_b = speed * a_state.damage_scalar;
+                let normal = contact.normal;
+                let intercept = contact.point.unwrap_or(a_state.position);
+
+                damage_debris(
+                    state,
+                    a,
+                    damage_to_a,
+                    normal,
+                    0xDEB1_0000 ^ a as u64 ^ ((b as u64) << 16),
+                );
+                damage_debris(
+                    state,
+                    b,
+                    damage_to_b,
+                    -normal,
+                    0xDEB2_0000 ^ a as u64 ^ ((b as u64) << 16),
+                );
+                state.debris_collisions.push(DebrisCollision { a, b });
+                spawn_impact_particles(
+                    state,
+                    normal,
+                    b_state.position,
+                    intercept,
+                    b_state.color,
+                    damage_to_a,
+                    5.0,
+                    0xDEB1_0000 ^ a as u64 ^ ((b as u64) << 16),
+                );
+                spawn_impact_particles(
+                    state,
+                    -normal,
+                    a_state.position,
+                    intercept,
+                    a_state.color,
+                    damage_to_b,
+                    5.0,
+                    0xDEB2_0000 ^ a as u64 ^ ((b as u64) << 16),
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+fn strongest_entity_contacts(
+    contacts: &[MechanicalContact],
+) -> BTreeMap<(MechanicalEntity, MechanicalEntity), MechanicalContact> {
+    let mut strongest: BTreeMap<(MechanicalEntity, MechanicalEntity), MechanicalContact> =
+        BTreeMap::new();
+    for contact in contacts {
+        let normalized = if contact.a <= contact.b {
+            *contact
+        } else {
+            MechanicalContact {
+                a: contact.b,
+                b: contact.a,
+                point: contact.point,
+                normal: -contact.normal,
+                impulse_magnitude: contact.impulse_magnitude,
+            }
+        };
+        let key = (normalized.a, normalized.b);
+        match strongest.get(&key) {
+            Some(current) if current.impulse_magnitude >= normalized.impulse_magnitude => {}
+            _ => {
+                strongest.insert(key, normalized);
+            }
+        }
+    }
+    strongest
+}
+
+fn impact_speed(impulse: f32, mass_a: f32, mass_b: Option<f32>) -> f32 {
+    if !impulse.is_finite() || impulse <= 0.0 || !mass_a.is_finite() || mass_a <= 0.0 {
+        return 0.0;
+    }
+    let effective_mass = mass_b
+        .filter(|mass| mass.is_finite() && *mass > 0.0)
+        .map(|mass| mass_a * mass / (mass_a + mass))
+        .unwrap_or(mass_a);
+    impulse / effective_mass.max(REALLY_SMALL)
+}
+
 #[derive(Debug, Clone, Copy)]
 struct BodyPhysics {
     id: BodyId,
@@ -1686,8 +1964,10 @@ struct BodyPhysics {
     position: Vec2,
     radius: f32,
     mass: f32,
+    #[cfg(test)]
     low: Circle,
     high: Circle,
+    #[cfg(test)]
     spaceport: Option<SpaceportPhysics>,
 }
 
@@ -1697,6 +1977,7 @@ struct SpaceportPhysics {
     bounds: Circle,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 struct BodyContact {
     ship: usize,
@@ -1709,6 +1990,7 @@ struct BodyContact {
     spaceport: Option<SpaceportPhysics>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 struct DebrisBodyContact {
     debris: usize,
@@ -1718,12 +2000,14 @@ struct DebrisBodyContact {
     body_radius: f32,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CollisionEvents {
     body_collisions: Vec<BodyCollision>,
     spaceport_contacts: Vec<SpaceportContact>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 struct EntityCollisionBody {
     position: Vec2,
@@ -1732,6 +2016,7 @@ struct EntityCollisionBody {
     low: Circle,
 }
 
+#[cfg(test)]
 impl EntityCollisionBody {
     fn from_ship(ship: &ShipState) -> Self {
         let triangles = ship_triangles(ship);
@@ -1753,6 +2038,7 @@ impl EntityCollisionBody {
     }
 }
 
+#[cfg(test)]
 fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisCollision> {
     let collisions = detect_ship_debris_collisions(state);
 
@@ -1812,6 +2098,7 @@ fn resolve_ship_debris_collisions(state: &mut SpacewarsState) -> Vec<ShipDebrisC
     collisions
 }
 
+#[cfg(test)]
 fn detect_ship_debris_collisions(state: &SpacewarsState) -> Vec<ShipDebrisCollision> {
     let ship_bounds = state
         .ships
@@ -1853,6 +2140,7 @@ fn detect_ship_debris_collisions(state: &SpacewarsState) -> Vec<ShipDebrisCollis
     collisions
 }
 
+#[cfg(test)]
 fn resolve_ship_collisions(state: &mut SpacewarsState) -> Vec<ShipCollision> {
     let collisions = detect_ship_collisions(state);
 
@@ -1872,6 +2160,7 @@ fn resolve_ship_collisions(state: &mut SpacewarsState) -> Vec<ShipCollision> {
     collisions
 }
 
+#[cfg(test)]
 fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision> {
     let collisions = detect_debris_collisions(state);
 
@@ -1931,6 +2220,7 @@ fn resolve_debris_collisions(state: &mut SpacewarsState) -> Vec<DebrisCollision>
     collisions
 }
 
+#[cfg(test)]
 fn detect_debris_collisions(state: &SpacewarsState) -> Vec<DebrisCollision> {
     let mut collisions = Vec::new();
 
@@ -2140,13 +2430,15 @@ fn breakup_fragments(
     for primitive in primitives {
         let velocity = Vec2::from_radians(theta) * BREAKUP_FRAGMENT_SPEED + base_velocity;
         let color = Color::DIM_GREY.random_variation(0.2, &mut rng);
-        fragments.push(DebrisState::new_fragment(
+        let mut fragment = DebrisState::new_fragment(
             position,
             primitive.local_points,
             velocity,
             BREAKUP_FRAGMENT_OMEGA,
             color,
-        ));
+        );
+        fragment.spawn_tick = tick;
+        fragments.push(fragment);
         theta += delta_theta;
     }
 
@@ -2223,6 +2515,7 @@ impl BreakupPrimitive {
     }
 }
 
+#[cfg(test)]
 fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyCollision> {
     let contacts = select_debris_body_contacts(state);
     let mut collisions = Vec::new();
@@ -2286,6 +2579,7 @@ fn resolve_debris_body_collisions(state: &mut SpacewarsState) -> Vec<DebrisBodyC
     collisions
 }
 
+#[cfg(test)]
 fn select_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact> {
     let contacts = detect_debris_body_contacts(state);
     let mut selected = Vec::new();
@@ -2305,6 +2599,7 @@ fn select_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact>
     selected
 }
 
+#[cfg(test)]
 fn detect_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact> {
     let bodies = body_physics(state);
     let mut contacts = Vec::new();
@@ -2336,6 +2631,7 @@ fn detect_debris_body_contacts(state: &SpacewarsState) -> Vec<DebrisBodyContact>
     contacts
 }
 
+#[cfg(test)]
 fn detect_ship_collisions(state: &SpacewarsState) -> Vec<ShipCollision> {
     let ship_bounds = state
         .ships
@@ -2375,6 +2671,7 @@ fn detect_ship_collisions(state: &SpacewarsState) -> Vec<ShipCollision> {
     collisions
 }
 
+#[cfg(test)]
 fn collide_entities(a: &mut EntityCollisionBody, b: &mut EntityCollisionBody) {
     let angle = collision_normal(a.position, b.position);
     let v1 = a.velocity;
@@ -2396,6 +2693,7 @@ fn collide_entities(a: &mut EntityCollisionBody, b: &mut EntityCollisionBody) {
     b.position += angle * (b_velocity_percent * overlap * COLLISION_TRANSLATION_SCALAR);
 }
 
+#[cfg(test)]
 fn ship_pair_mut(
     ships: &mut [ShipState; 2],
     a: usize,
@@ -2406,6 +2704,7 @@ fn ship_pair_mut(
     (&mut left[a], &mut right[0])
 }
 
+#[cfg(test)]
 fn debris_pair_mut(
     debris: &mut [DebrisState],
     a: usize,
@@ -2427,6 +2726,7 @@ fn detect_body_collisions(state: &SpacewarsState) -> Vec<BodyCollision> {
         .collect()
 }
 
+#[cfg(test)]
 fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
     let contacts = select_body_contacts(state);
     let mut events = CollisionEvents {
@@ -2476,6 +2776,7 @@ fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
     events
 }
 
+#[cfg(test)]
 fn select_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
     let contacts = detect_body_contacts(state);
     let mut selected = Vec::new();
@@ -2499,6 +2800,7 @@ fn select_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
     selected
 }
 
+#[cfg(test)]
 fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
     let bodies = body_physics(state);
     let mut contacts = Vec::new();
@@ -2569,6 +2871,7 @@ fn spaceport_accepts_ship(
         .is_some_and(|planet| planet.owner_id == Some(ship.owner_id))
 }
 
+#[cfg(test)]
 fn resolve_ship_body_collision(
     ship: &mut ShipState,
     body_position: Vec2,
@@ -2580,12 +2883,14 @@ fn resolve_ship_body_collision(
     ship.velocity = reflect_inward_velocity(ship.velocity, normal, PLANET_ELASTICITY);
 }
 
+#[cfg(test)]
 fn resolve_debris_body_collision(debris: &mut DebrisState, body_position: Vec2, body_radius: f32) {
     let normal = collision_normal(debris.position, body_position);
     debris.position = body_position + normal * (debris.radius + body_radius);
     debris.velocity = reflect_inward_velocity(debris.velocity, normal, PLANET_ELASTICITY);
 }
 
+#[cfg(test)]
 fn reflect_inward_velocity(velocity: Vec2, normal: Vec2, elasticity: f32) -> Vec2 {
     let normal_velocity = velocity.dot(normal);
     if normal_velocity >= 0.0 {
@@ -2595,6 +2900,7 @@ fn reflect_inward_velocity(velocity: Vec2, normal: Vec2, elasticity: f32) -> Vec
     }
 }
 
+#[cfg(test)]
 fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
     let damage = ship.velocity.length() * PLANET_DAMAGE_SCALAR;
     ship.translate_life_with_impulse(-damage, ship.direction * -damage);
@@ -2937,8 +3243,10 @@ fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
                 position: planet.position,
                 radius: planet.radius,
                 mass: planet.mass,
+                #[cfg(test)]
                 low: body_circle(planet.position, planet.radius),
                 high: body_circle(planet.position, planet.radius),
+                #[cfg(test)]
                 spaceport: Some(spaceport_physics(index, planet)),
             }),
     );
@@ -2950,8 +3258,10 @@ fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
             position: sun.position,
             radius: sun.radius,
             mass: sun.mass,
+            #[cfg(test)]
             low: body_circle(sun.position, sun.radius),
             high: body_circle(sun.position, sun.radius),
+            #[cfg(test)]
             spaceport: None,
         });
     }
@@ -3176,6 +3486,7 @@ impl DebrisState {
             color,
             owner_id: None,
             spawn_tick: 0,
+            physics_id: 0,
         }
     }
 
@@ -3228,6 +3539,7 @@ impl DebrisState {
         debris_mass(self.radius)
     }
 
+    #[cfg(test)]
     pub fn update(&mut self, dt: f32) {
         self.rotation_radians += self.omega * dt;
         self.position += self.velocity * dt;
@@ -3638,8 +3950,6 @@ impl ShipState {
         let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
 
         self.rotate_ship(&mut exhaust_rng, tick, SHIP_TURN_EXHAUST_SCALAR);
-        self.position += self.velocity * dt;
-        self.rotation_radians += self.omega * dt;
         self.update_wings(dt);
         self.update_thrust(&mut exhaust_rng, tick);
         self.update_turn();
@@ -3653,8 +3963,6 @@ impl ShipState {
         let mut exhaust_rng = exhaust_rng_for_tick(seed, tick, self.owner_id);
 
         self.rotate_ship(&mut exhaust_rng, tick, POD_TURN_EXHAUST_SCALAR);
-        self.position += self.velocity * dt;
-        self.rotation_radians += self.omega * dt;
         self.update_pod_thrust(&mut exhaust_rng, tick);
         self.update_turn();
     }
@@ -3689,9 +3997,7 @@ impl ShipState {
 
     fn rotate_ship(&mut self, rng: &mut SpacewarsRng, tick: u64, exhaust_scalar: f32) {
         let delta_theta = self.turn_power * self.omega;
-        let theta = self.rotation_radians - delta_theta;
-        self.rotation_radians = theta;
-        self.direction = direction_from_rotation(theta);
+        self.direction = direction_from_rotation(self.rotation_radians);
         if delta_theta.abs() > 0.001 {
             self.fire_exhaust(
                 self.direction.rotate_radians(core::f32::consts::FRAC_PI_2)
@@ -3963,6 +4269,14 @@ fn contain_ship(ship: &mut ShipState, universe_radius: f32) {
     if distance > max_distance {
         let contained_center = universe_center + offset.normalized() * max_distance;
         ship.position += contained_center - bounds.center;
+    }
+}
+
+fn recover_ship_outside_universe(ship: &mut ShipState, universe_radius: f32) {
+    let center = universe_center(universe_radius);
+    let bounds = ship_low_bounds(&ship_triangles(ship));
+    if bounds.center.distance_to(center) > universe_radius {
+        contain_ship(ship, universe_radius);
     }
 }
 
@@ -5331,6 +5645,7 @@ mod tests {
                 fragments: 0,
                 shells: 0,
                 particles: BENCHMARK_PARTICLES,
+                ..SpacewarsBenchmarkCounts::default()
             }
         );
         assert_eq!(first.config.asteroid_probability_per_sec, 100.0);
@@ -5477,15 +5792,18 @@ mod tests {
     }
 
     #[test]
-    fn world_gravity_applies_original_post_update_impulse() {
+    fn world_gravity_accelerates_and_moves_ship_in_the_same_physics_tick() {
         let mut state = init_default(123);
         let start_position = state.ships[0].position;
 
         step(&mut state, &[]);
 
         let expected_velocity = expected_gravity_delta(&state, start_position);
-        assert_eq!(state.ships[0].position, start_position);
         assert_vec_close(state.ships[0].velocity, expected_velocity);
+        assert_vec_close(
+            state.ships[0].position,
+            start_position + expected_velocity / 60.0,
+        );
         assert!(
             state.ships[0].velocity.dot(
                 state
@@ -5498,19 +5816,22 @@ mod tests {
     }
 
     #[test]
-    fn world_gravity_moves_ships_on_following_tick() {
+    fn world_gravity_uses_the_new_velocity_for_each_physics_step() {
         let mut state = init_default(123);
-        let start_position = state.ships[0].position;
 
         step(&mut state, &[]);
-        let velocity_after_first_gravity = state.ships[0].velocity;
+        let position_after_first_step = state.ships[0].position;
+        let velocity_after_first_step = state.ships[0].velocity;
         step(&mut state, &[]);
 
         assert_vec_close(
             state.ships[0].position,
-            start_position + velocity_after_first_gravity / 60.0,
+            position_after_first_step + state.ships[0].velocity / 60.0,
         );
-        assert!(state.ships[0].velocity.length() > velocity_after_first_gravity.length());
+        assert!(
+            state.ships[0].velocity.length() > velocity_after_first_step.length(),
+            "gravity should continue accelerating the ship"
+        );
     }
 
     #[test]
@@ -5827,7 +6148,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_thrust_extracts_ship_from_shallow_body_overlap() {
+    fn normal_thrust_moves_ship_outward_from_a_shallow_body_overlap() {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -5837,16 +6158,43 @@ mod tests {
         state.ships[0].velocity = Vec2::ZERO;
         state.ships[0].rotation_radians = core::f32::consts::FRAC_PI_2;
         state.ships[0].direction = normal;
+        let start_position = state.ships[0].position;
 
         for _ in 0..4 {
             step(&mut state, &[SpacewarsAction::thrust(0)]);
         }
 
-        assert!(detect_body_collisions(&state).is_empty());
+        assert!((state.ships[0].position - start_position).dot(normal) > 0.0);
         assert!(
             state.ships[0].velocity.dot(normal) > 0.0,
             "normal thrust should carry the ship away from the planet: {:?}",
             state.ships[0].velocity
+        );
+    }
+
+    #[test]
+    fn ship_fully_inside_solid_planet_generates_rapier_contact() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].mass = 0.0;
+        state.ships[0].position = state.planets[0].position - SHIP_PIVOT;
+        state.ships[0].velocity = Vec2::new(-10.0, 0.0);
+
+        step(&mut state, &[]);
+
+        assert_eq!(
+            state.body_collisions,
+            vec![BodyCollision {
+                ship: 0,
+                body: BodyId::Planet(0),
+            }]
+        );
+        assert!(
+            state.ships[0]
+                .position
+                .distance_to(state.planets[0].position)
+                > SHIP_PIVOT.length()
         );
     }
 
@@ -6665,17 +7013,13 @@ mod tests {
     }
 
     #[test]
-    fn step_applies_gravity_before_resolving_body_collision() {
+    fn step_applies_gravity_before_rapier_resolves_body_collision() {
         let mut state = init_deathmatch();
         let body_position = state.ships[0].position + Vec2::new(8.0, 0.0);
         let body_radius = 20.0;
         let body_mass = body_mass(body_radius);
-        let ship_radius = ship_low_bounds(&ship_triangles(&state.ships[0])).radius;
         let normal = (state.ships[0].position - body_position).normalized();
-        let gravity = gravity_delta(state.ships[0].position, body_position, body_mass);
-        let expected_velocity = (gravity - normal * (2.0 * gravity.dot(normal))) * 0.5;
-        let expected_position = body_position + normal * (ship_radius + body_radius);
-        let expected_life = state.ships[0].life - expected_velocity.length() * PLANET_DAMAGE_SCALAR;
+        let start_life = state.ships[0].life;
 
         state.sun = Some(SunState {
             position: body_position,
@@ -6693,9 +7037,11 @@ mod tests {
                 body: BodyId::Sun,
             }]
         );
-        assert_vec_close(state.ships[0].position, expected_position);
-        assert_vec_close(state.ships[0].velocity, expected_velocity);
-        assert_close(state.ships[0].life, expected_life);
+        assert!(
+            state.ships[0].velocity.dot(normal) > 0.0,
+            "Rapier should resolve the gravity-driven impact outward"
+        );
+        assert!(state.ships[0].life < start_life);
     }
 
     #[test]
@@ -6722,22 +7068,20 @@ mod tests {
     }
 
     #[test]
-    fn thrust_and_reverse_match_original_per_tick_power() {
+    fn thrust_and_reverse_apply_before_each_rapier_step() {
         let mut state = init_deathmatch();
+        let speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
 
         step(&mut state, &[SpacewarsAction::thrust(0)]);
         assert_vec_close(
             state.ships[0].velocity,
-            direction_from_rotation(0.0) * (SHIP_THRUST_FORCE / SHIP_MASS / 60.0),
+            direction_from_rotation(0.0) * speed_delta,
         );
-        assert_eq!(state.ships[0].position, Vec2::new(375.0, 450.0));
+        assert!((state.ships[0].position.y - (450.0 + speed_delta / 60.0)).abs() < 0.001);
 
         step(&mut state, &[SpacewarsAction::reverse(0)]);
         assert_vec_close(state.ships[0].velocity, Vec2::ZERO);
-        assert_close(
-            state.ships[0].position.y,
-            450.0 + (SHIP_THRUST_FORCE / SHIP_MASS / 60.0) / 60.0,
-        );
+        assert!((state.ships[0].position.y - (450.0 + speed_delta / 60.0)).abs() < 0.001);
     }
 
     #[test]
@@ -6787,6 +7131,7 @@ mod tests {
     fn thrust_emits_deterministic_exhaust_trails() {
         let mut first = init_deathmatch_no_asteroids();
         let mut replay = init_deathmatch_no_asteroids();
+        let start_thruster = ship_thruster_center(&first.ships[0]);
 
         step(&mut first, &[SpacewarsAction::thrust(0)]);
         step(&mut replay, &[SpacewarsAction::thrust(0)]);
@@ -6797,7 +7142,7 @@ mod tests {
         );
         assert_eq!(first.ships[0].exhaust_trails.len(), 2);
         for trail in &first.ships[0].exhaust_trails {
-            assert_vec_close(trail.start, ship_thruster_center(&first.ships[0]));
+            assert_vec_close(trail.start, start_thruster);
             assert!(trail.end.y < trail.start.y);
             assert_close(trail.color.r, 1.0);
         }
@@ -6830,13 +7175,13 @@ mod tests {
     }
 
     #[test]
-    fn held_turn_sets_omega_then_rotation_advances_next_tick() {
+    fn held_turn_is_integrated_by_rapier_in_the_same_tick() {
         let mut state = init_deathmatch();
         let turn_power = SHIP_TURN_FORCE / SHIP_MASS / 60.0;
 
         step(&mut state, &[SpacewarsAction::turn_right(0)]);
         assert_close(state.ships[0].omega, turn_power);
-        assert_close(state.ships[0].rotation_radians, 0.0);
+        assert_close(state.ships[0].rotation_radians, -0.0096);
 
         step(&mut state, &[]);
         assert_close(state.ships[0].omega, 0.0);
@@ -7158,7 +7503,7 @@ mod tests {
     }
 
     #[test]
-    fn laser_started_inside_planet_hits_only_forward_surface() {
+    fn laser_fired_from_spaceport_bay_hits_the_solid_inner_wall() {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -7171,6 +7516,8 @@ mod tests {
         let head_offset = desired_head - ship_mount_center(&state.ships[0]);
         state.ships[0].position += head_offset;
         let direction = state.ships[0].direction;
+        reconcile_physics(&mut state);
+        state.physics.step(1.0 / 60.0);
 
         state.apply_action(SpacewarsAction {
             player: 0,
@@ -7179,25 +7526,20 @@ mod tests {
         update_ship_lasers(&mut state);
         state.laser_hits = resolve_laser_hits(&mut state);
 
-        let first = state.ships[0].laser_beam.expect("laser should start");
-        assert_vec_close(first.head, desired_head);
-        assert!(state.laser_hits.is_empty());
-        assert!((first.tail - first.head).dot(direction) > 0.0);
-
-        update_ship_lasers(&mut state);
-        state.laser_hits = resolve_laser_hits(&mut state);
-
         let beam = state.ships[0]
             .laser_beam
             .expect("beam should remain active");
-        let expected_forward_exit = planet_center - Vec2::X * state.planets[0].radius;
+        let expected_inner_wall = planet_center
+            + Vec2::X
+                * (state.planets[0].radius * SPACEPORT_DEPTH_FACTOR * BODY_BOUNDS_RADIUS_SCALE);
+        assert_vec_close(beam.head, desired_head);
         assert_eq!(state.laser_hits.len(), 1);
         assert_eq!(
             state.laser_hits[0].target,
             LaserTarget::Body(BodyId::Planet(0))
         );
-        assert_vec_close(state.laser_hits[0].point, expected_forward_exit);
-        assert_vec_close(beam.tail, expected_forward_exit);
+        assert!(state.laser_hits[0].point.distance_to(expected_inner_wall) < 0.02);
+        assert!(beam.tail.distance_to(expected_inner_wall) < 0.02);
         assert!((beam.tail - beam.head).dot(direction) > 0.0);
     }
 
@@ -8286,5 +8628,101 @@ mod tests {
         assert_eq!(frame.camera.center, RenderPoint::new(1200.0, 1200.0));
         assert_eq!(circles, 2 + state.planets.len() + star_count);
         assert_eq!(polygons, 12 + state.planets.len());
+    }
+
+    #[test]
+    fn rapier_spacewars_replays_identical_actions_bit_for_bit() {
+        let mut first = init_deathmatch_no_asteroids();
+        let mut replay = init_deathmatch_no_asteroids();
+
+        for tick in 0..120 {
+            let mut actions = vec![SpacewarsAction::thrust(0), SpacewarsAction::thrust(1)];
+            if tick % 4 < 2 {
+                actions.push(SpacewarsAction::turn_right(0));
+                actions.push(SpacewarsAction::turn_left(1));
+            } else {
+                actions.push(SpacewarsAction::turn_left(0));
+                actions.push(SpacewarsAction::turn_right(1));
+            }
+            if tick % 30 == 0 {
+                actions.push(SpacewarsAction::fire_cannon(0));
+                actions.push(SpacewarsAction::fire_cannon(1));
+            }
+
+            step(&mut first, &actions);
+            step(&mut replay, &actions);
+
+            assert_eq!(first.ships, replay.ships);
+            assert_eq!(first.debris, replay.debris);
+            assert_eq!(first.ship_collisions, replay.ship_collisions);
+            assert_eq!(first.ship_debris_collisions, replay.ship_debris_collisions);
+            assert_eq!(first.debris_collisions, replay.debris_collisions);
+            assert_eq!(first.debris_body_collisions, replay.debris_body_collisions);
+            assert_eq!(first.body_collisions, replay.body_collisions);
+            assert_eq!(first.spaceport_contacts, replay.spaceport_contacts);
+            assert_eq!(
+                first.physics.snapshot_bytes(),
+                replay.physics.snapshot_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn debris_lifecycle_removes_rapier_body_and_stable_mapping() {
+        let mut state = init_deathmatch_no_asteroids();
+        let baseline_bodies = state.physics.body_count();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(600.0, 600.0),
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+
+        step(&mut state, &[]);
+        assert_eq!(state.physics.body_count(), baseline_bodies + 1);
+        assert_ne!(state.debris[0].physics_id, 0);
+
+        let removed_id = state.debris[0].physics_id;
+        state.debris[0].dead = true;
+        step(&mut state, &[]);
+
+        assert_eq!(state.physics.body_count(), baseline_bodies);
+        assert!(
+            state
+                .debris
+                .iter()
+                .all(|debris| debris.physics_id != removed_id)
+        );
+        assert_eq!(state.last_step_metrics.removed, 1);
+    }
+
+    #[test]
+    fn debris_lifecycle_reports_simultaneous_addition_and_removal() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(600.0, 600.0),
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        step(&mut state, &[]);
+
+        state.debris[0].dead = true;
+        state.debris.push(DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::new(800.0, 800.0),
+            Vec2::ZERO,
+            5.0,
+            ASTEROID_DAMAGE_SCALAR,
+            Color::DIM_GREY,
+        ));
+        step(&mut state, &[]);
+
+        assert_eq!(state.last_step_metrics.added, 1);
+        assert_eq!(state.last_step_metrics.removed, 1);
     }
 }

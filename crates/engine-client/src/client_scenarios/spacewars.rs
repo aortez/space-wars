@@ -5,8 +5,8 @@ use engine_core::SpacewarsConfig;
 use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, SpacewarsState};
 
 use super::{
-    BenchmarkCounts, CenterPanelState, ClientScenario, PlayerPanelState, RenderBackend,
-    ScenarioCapabilities, ScenarioRegistration, ScenarioStartMode,
+    BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario, PlayerPanelState,
+    RenderBackend, ScenarioCapabilities, ScenarioRegistration, ScenarioStartMode,
 };
 use crate::input::ClientInput;
 use crate::render::{self, FrameLayout, Viewport};
@@ -115,13 +115,45 @@ impl ClientScenario for SpacewarsClientScenario {
             fragments,
             shells,
             particles,
+            active_bodies,
+            sleeping_bodies,
+            candidate_pairs,
+            contact_pairs,
+            contacts,
         } = SpacewarsScenario::benchmark_counts(&self.state);
         Some(BenchmarkCounts {
             asteroids,
             fragments,
             shells,
             particles,
+            active_bodies,
+            sleeping_bodies,
+            candidate_pairs,
+            contact_pairs,
+            contacts,
+            added: self.state.last_step_metrics.added,
+            removed: self.state.last_step_metrics.removed,
             ..BenchmarkCounts::default()
+        })
+    }
+
+    fn benchmark_step_metrics(&self) -> Option<BenchmarkStepMetrics> {
+        let metrics = self.state.last_step_metrics;
+        Some(BenchmarkStepMetrics {
+            workload_time: metrics.workload_time,
+            lifecycle_time: metrics.lifecycle_time,
+            gravity_time: metrics.gravity_time,
+            collision_time: metrics.collision_time,
+            physics_time: metrics.physics_time,
+            rapier_step_time: metrics.rapier.rapier_step_time,
+            rapier_broad_phase_time: metrics.rapier.broad_phase_time,
+            rapier_narrow_phase_time: metrics.rapier.narrow_phase_time,
+            rapier_island_time: metrics.rapier.island_time,
+            rapier_solver_time: metrics.rapier.solver_time,
+            rapier_ccd_time: metrics.rapier.ccd_time,
+            added: metrics.added,
+            removed: metrics.removed,
+            ..BenchmarkStepMetrics::default()
         })
     }
 

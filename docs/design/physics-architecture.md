@@ -1,6 +1,6 @@
 # Physics architecture
 
-Status: accepted for implementation.
+Status: implemented for Pizza, Rover Lab, and Spacewars.
 
 ## Decision
 
@@ -139,7 +139,7 @@ These scenarios share the canonical world rather than maintaining specialized
 Rapier owners. Domain builders may assemble common objects, but assembly
 construction and gameplay policy remain separate from the physics kernel.
 
-Spacewars' intended mapping is:
+Spacewars' implemented mapping is:
 
 - planets and orbiting spaceports: fixed or kinematic bodies;
 - ships, escape pods, asteroids, and collision-relevant debris: dynamic bodies;
@@ -150,9 +150,23 @@ Spacewars' intended mapping is:
 - damage: a deterministic rule over normalized contact impulse events;
 - visual particles and trails: lightweight scenario storage.
 
+Planets are kinematic assemblies rather than hollow circle outlines. A solid
+inner disk and convex annular sectors leave one physical spaceport cavity. The
+port is a sensor, the inner bay wall remains solid, and an ownership-aware gate
+prevents an unauthorized escape pod from crossing the opening. This lets a
+normal ship dock through geometry while also resolving objects that spawn or
+teleport wholly inside planet material.
+
+Spacewars keeps motion fields in its public scenario state as a post-step
+presentation snapshot and as an explicit command staging surface for controls,
+scripted ejection, and tests. Reconciliation only writes deliberate changes
+back to Rapier; no scenario code advances a registered body's position or
+rotation. Rapier advances every rigid body once and its normalized, stable-ID
+contact impulses drive gameplay damage.
+
 ## Acceptance criteria
 
-The architecture is established when:
+The architecture is established:
 
 - Pizza and Rover Lab use the same `PhysicsWorld` and no specialized world
   owns a second Rapier pipeline;
@@ -165,3 +179,8 @@ The architecture is established when:
 - the existing dense and churn benchmark counters remain available;
 - Spacewars can express ships, planets, ports, and their contact roles without
   exposing Rapier handles to scenario code.
+
+The acceptance suite additionally verifies deterministic Spacewars continuation
+for identical actions, same-build physics snapshot equality, debris
+spawn/removal mapping cleanup, a solid planet interior, a real port cavity, and
+the ownership-aware pod gate.

@@ -469,6 +469,35 @@ pub struct PhysicsWorld {
     collect_events: bool,
 }
 
+impl Clone for PhysicsWorld {
+    fn clone(&self) -> Self {
+        let snapshot = self
+            .snapshot_bytes()
+            .expect("an in-memory physics world must serialize");
+        let mut clone =
+            Self::from_snapshot_bytes(&snapshot).expect("a same-build physics snapshot must load");
+        if clone.collect_events {
+            clone.rebuild_events();
+        }
+        clone
+    }
+}
+
+impl std::fmt::Debug for PhysicsWorld {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PhysicsWorld")
+            .field("entities", &self.entities.len())
+            .field("bodies", &self.bodies.len())
+            .field("colliders", &self.colliders.len())
+            .field("joints", &self.joints.len())
+            .field("contacts", &self.contact_events.len())
+            .field("sensor_intersections", &self.sensor_intersections.len())
+            .field("collect_events", &self.collect_events)
+            .finish()
+    }
+}
+
 #[derive(Serialize)]
 struct PhysicsSnapshotRef<'a> {
     version: u32,

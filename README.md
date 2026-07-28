@@ -11,7 +11,10 @@ Below is a zoomed out view of a CTF game mode.
 
 The local launcher currently hosts three playable scenarios:
 
-- **Spacewars** — the two-player arcade reboot.
+- **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
+  asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
+  and laser queries share the canonical Rapier mechanics world; gameplay still
+  owns gravity fields, damage, capture, rebuilding, and effects.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation.
   Rapier owns rigid-body motion and contacts while the scenario supplies mutual
   gravity and gameplay damage. Click empty space to make a ball, or grab and
