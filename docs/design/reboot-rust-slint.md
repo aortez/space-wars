@@ -517,7 +517,10 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M21c: ✅ Add the deterministic `scenarios/pizza` core at a fixed 60 Hz: seeded capped spawning, containment, exact capped O(n²) gravity/collisions, mass-share overlap correction, 0.9 elasticity, impact damage, and fragment explosions.
 - M21d: ✅ Port Pizza interaction through the generic pointer path: press empty space to create and hold a ball, press an existing ball to grab it, rubber-band toward the cursor while held, and release to fling it.
 - M21e: ✅ Populate the launcher from the registry, show scenario-specific setup/help/capabilities, persist Pizza desired-count and spawn-rate settings through the existing safe write path, and allow either scenario to be selected and started without restarting the client.
-- Deliberately deferred: quadtree broad-phase collision lookup, Barnes–Hut gravity, particle optimization, and related telemetry. Those should follow the JavaScript optimization work only after this exact capped implementation supplies a correctness baseline and useful measurements.
+- Deliberately deferred at M21: quadtree broad-phase collision lookup, Barnes–Hut
+  gravity, particle optimization, and related telemetry. M24 subsequently
+  completes the Barnes–Hut gravity and gravity telemetry portions against this
+  exact capped correctness baseline.
 - Acceptance: the launcher lists Pizza and Spacewars; both can be selected and played in one process; and a future scenario requires a scenario crate, one client adapter, and one registry entry.
 
 ### M22: Rapier rover feasibility
@@ -540,3 +543,12 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M23e: ✅ Extend the existing Spacewars benchmark CSV with Rapier body, broad-phase, contact, solver, CCD, lifecycle, and timing counters so later broad-phase, gravity, and renderer work can be measured independently.
 - M23f: ✅ Record a migration checkpoint on the development host with the release raster renderer at 2× scale. Over matching five-second seeded runs, the specialized solver averaged 224.50 frames/s, 0.122 ms scenario steps, and 4.434 ms total frames; the canonical Rapier build averaged 191.29 frames/s, 0.621 ms scenario steps (0.449 ms in physics), and 5.167 ms total frames while averaging 320 active bodies. The roughly 15% throughput cost is accepted for the canonical model and better scaling path. Because the physical outcomes produce different debris populations, this is a directional end-to-end comparison rather than a solver microbenchmark.
 - Acceptance: all physical scenarios use one mechanics owner; no registered body is integrated twice; identical Spacewars seeds/actions replay identically; docking remains possible through a physical bay; and benchmark reports separate physics from rendering.
+
+### M24: Scalable external gravity
+
+- M24a: ✅ Add a reusable `engine-gravity` kernel independent of Rapier. Support stable source+target, source-only, target-only, hierarchical, and direct-source participants; a symmetric exact oracle; deterministic Barnes-Hut monopole traversal; Plummer softening; self-force exclusion; reusable storage; and structural/timing telemetry.
+- M24b: ✅ Port the accuracy and performance discipline from allan.pizza. Test conservation, order determinism, exact-oracle error bounds, coincident bodies, source/target policy, and population churn. Add a release benchmark covering 300 through 50,000 bodies with jittered, uniform, clustered, and coincident fixtures.
+- M24c: ✅ Give Pizza independent mechanics and gravity selections. Classic and Rapier now consume the same exact, Barnes-Hut full (θ=0.5), or Barnes-Hut fast (θ=0.7) gravity result. Visual/headless runs expose gravity structure and stage timings alongside Rapier and rendering telemetry.
+- M24d: ✅ Route Spacewars celestial gravity through the same system and apply its velocity deltas to authoritative Rapier bodies. Preserve gameplay policy by treating suns/planets as exact direct sources and ships/debris/particles as targets; preserve asteroid and particle update cadences.
+- M24e: ✅ Generalize Rover Lab from its planet-specific constant radial field to a scenario-owned list of direct or hierarchical gravity sources. Feed the chassis and both wheels through the shared solver, retain the tuned surface acceleration by deriving the planet's gravitational parameter at wheel height, and add arbitrary-pose rover construction plus tests with multiple sources, no sources, and no planet body.
+- Acceptance: the exact backend remains a practical oracle; Barnes-Hut accuracy is bounded and deterministic for stable inputs; 10,000-body gravity is measurable separately from contacts/rendering; Pizza behavior remains visually credible; and Spacewars replay/gameplay tests remain unchanged.

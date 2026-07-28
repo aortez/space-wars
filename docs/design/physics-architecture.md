@@ -77,9 +77,27 @@ Every fixed physics tick follows this order:
 10. Render and observe the authoritative post-step state.
 
 Constant gravity may use Rapier's global gravity vector. Position-dependent or
-mutual gravity is computed by an engine force system and applied as
-`mass * acceleration` before the Rapier step. Collision broad-phase remains
-Rapier's responsibility; a Barnes-Hut tree accelerates gravity, not collision.
+mutual gravity is computed by `engine-gravity` as a per-tick velocity delta.
+`PhysicsWorld::apply_velocity_delta` converts that into a center-of-mass impulse
+using Rapier's inertial mass before the Rapier step. Collision broad-phase
+remains Rapier's responsibility; the Barnes-Hut tree accelerates gravity, not
+collision.
+
+The gravity participant model is deliberately independent of rigid bodies. A
+stable-ID participant may be:
+
+- a normal source+target mass;
+- a source-only scripted body;
+- a target-only effect or gameplay body;
+- a hierarchical source eligible for Barnes-Hut approximation; or
+- a direct source evaluated exactly for every target.
+
+The exact symmetric all-pairs backend is the correctness oracle. The
+Barnes-Hut backend uses a deterministic point-region quadtree, f64 mass and
+center-of-mass aggregation, Plummer softening, stable-ID ordering, and explicit
+self-path exclusion. Dominant suns and planets can remain direct sources while
+large populations use the hierarchy. The opening angle θ controls the
+speed/accuracy tradeoff.
 
 ## Physical entity tiers
 
@@ -119,8 +137,8 @@ world.
 
 The hot API supports reserved capacity, batch lifecycle changes, allocation-free
 motion access, collision filtering, sleeping, and selective CCD. Profiling
-keeps broad-phase, narrow-phase, island, solver, lifecycle, projection, and
-presentation costs separate.
+keeps gravity validation/build/aggregation/traversal, broad-phase, narrow-phase,
+island, solver, lifecycle, projection, and presentation costs separate.
 
 The portable baseline is single-threaded, non-SIMD Rapier. Stable SIMD and
 parallel features are benchmark variants, introduced independently and only
@@ -149,6 +167,15 @@ Spacewars' implemented mapping is:
 - lasers: ray casts;
 - damage: a deterministic rule over normalized contact impulse events;
 - visual particles and trails: lightweight scenario storage.
+
+Pizza balls opt into both sourcing and responding to gravity. Spacewars keeps
+its established gameplay policy: suns and planets are direct source-only
+bodies, while ships, debris, and visual particles are target-only. Rover Lab
+owns a mutable list of direct or hierarchical sources and sends its chassis and
+two wheels through the same field. The rover assembly can also be inserted at
+an arbitrary pose with no planet or gravity. These are scenario policies rather
+than solver limitations; a game mode can opt selected dynamic entities into
+hierarchical source mass without changing Rapier ownership.
 
 Planets are kinematic assemblies rather than hollow circle outlines. A solid
 inner disk and convex annular sectors leave one physical spaceport cavity. The

@@ -779,6 +779,29 @@ impl PhysicsWorld {
         true
     }
 
+    /// Apply a mass-independent linear velocity change as a center-of-mass
+    /// impulse.
+    ///
+    /// This is the natural binding for gravity and other acceleration models:
+    /// the model computes `delta_velocity`, while Rapier retains authority over
+    /// inertial mass, locked axes, body kind, sleeping, and joint response.
+    pub fn apply_velocity_delta(
+        &mut self,
+        id: BodyId,
+        delta_velocity: Vec2,
+        wake_up: bool,
+    ) -> bool {
+        if !finite_vec2(delta_velocity) {
+            return false;
+        }
+        let Some(body) = self.body_mut(id) else {
+            return false;
+        };
+        let impulse = to_rapier(delta_velocity) * body.mass();
+        body.apply_impulse(impulse, wake_up);
+        true
+    }
+
     pub fn set_gravity(&mut self, gravity: Vec2) -> bool {
         if !finite_vec2(gravity) {
             return false;
@@ -1383,6 +1406,27 @@ mod tests {
             world.motions().map(|motion| motion.id).collect::<Vec<_>>(),
             vec![first, third]
         );
+    }
+
+    #[test]
+    fn velocity_delta_binding_is_mass_independent() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (_, light_body, light_collider_id) = ball_ids(1);
+        let light_collider = ColliderSpec::ball(light_collider_id, 0.25);
+        assert!(world.insert_body(light_body, BodySpec::default(), &[light_collider]));
+
+        let (_, heavy_body, heavy_collider_id) = ball_ids(2);
+        let mut heavy_collider = ColliderSpec::ball(heavy_collider_id, 0.25);
+        heavy_collider.density = 20.0;
+        assert!(world.insert_body(heavy_body, BodySpec::default(), &[heavy_collider]));
+
+        let delta = Vec2::new(2.5, -3.0);
+        assert!(world.apply_velocity_delta(light_body, delta, true));
+        assert!(world.apply_velocity_delta(heavy_body, delta, true));
+
+        assert_eq!(world.motion(light_body).unwrap().linear_velocity, delta);
+        assert_eq!(world.motion(heavy_body).unwrap().linear_velocity, delta);
+        assert!(!world.apply_velocity_delta(light_body, Vec2::new(f32::NAN, 0.0), true));
     }
 
     #[test]

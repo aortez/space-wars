@@ -23,8 +23,9 @@ The local launcher currently hosts three playable scenarios:
   independently driven pin-slot suspension wheels on a rotating circular planet.
 
 Textures and sounds for Spacewars have yet to be done. Pizza retains its
-Classic exact implementation as a benchmark reference; Barnes-Hut gravity is
-intentionally deferred until the canonical Rapier mechanics path is established.
+Classic collision implementation as a benchmark reference. Mutual gravity is
+shared by both mechanics backends and can use the exact oracle or deterministic
+Barnes-Hut `full`/`fast` presets.
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
 The deterministic Classic/Rapier Pizza benchmark is documented in

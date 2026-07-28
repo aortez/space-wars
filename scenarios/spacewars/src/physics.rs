@@ -217,6 +217,16 @@ impl SpacewarsPhysics {
         self.world.step(dt_seconds)
     }
 
+    pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
+        let entity = match entity {
+            MechanicalEntity::Ship(index) => ship_entity(index),
+            MechanicalEntity::Debris(id) => PhysicsId::new(id),
+            MechanicalEntity::World | MechanicalEntity::Body(_) => return false,
+        };
+        self.world
+            .apply_velocity_delta(primary_body(entity), delta_velocity, true)
+    }
+
     #[cfg(test)]
     pub fn body_count(&self) -> usize {
         self.world.body_count()

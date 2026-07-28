@@ -1394,6 +1394,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine-gravity"
+version = "0.1.0"
+dependencies = [
+ "engine-core",
+]
+
+[[package]]
 name = "engine-os-manager"
 version = "0.1.0"
 dependencies = [
@@ -4295,6 +4302,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "engine-gravity",
  "engine-rapier",
  "rand",
 ]
@@ -4305,6 +4313,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "engine-gravity",
  "engine-rapier",
 ]
 
@@ -4314,6 +4323,7 @@ version = "0.1.0"
 dependencies = [
  "engine-common",
  "engine-core",
+ "engine-gravity",
  "engine-rapier",
  "image",
 ]

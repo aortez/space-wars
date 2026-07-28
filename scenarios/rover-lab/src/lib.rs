@@ -8,6 +8,10 @@ use engine_common::{
     TextAnchor, TickModel,
 };
 use engine_core::Vec2;
+use engine_gravity::{
+    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver,
+    GravitySourcePolicy, GravityStepMetrics,
+};
 use engine_rapier::{
     rover::{
         BumpSpec, PlanetAssembly, PlanetSpec, RoverAssembly, RoverControl, RoverSnapshot, RoverSpec,
@@ -19,6 +23,10 @@ const FIXED_HZ: u32 = 60;
 const DRIVE_ACTION_KIND: u32 = 1;
 const PLANET_ID: PhysicsId = PhysicsId::new(1);
 const ROVER_ID: PhysicsId = PhysicsId::new(2);
+const PLANET_GRAVITY_ID: u64 = 1;
+const GRAVITY_SOURCE_TAG: u64 = 1 << 60;
+const GRAVITY_ROVER_BODY_TAG: u64 = 2 << 60;
+const GRAVITY_ID_MASK: u64 = (1 << 60) - 1;
 const PLANET_RADIUS: f32 = 20.0;
 const CAMERA_HEIGHT: f32 = 54.0;
 const GRAVITY_ACCELERATION: f32 = 18.0;
@@ -56,15 +64,28 @@ impl Default for RoverLabConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoverGravitySource {
+    pub id: u64,
+    pub position: Vec2,
+    /// `G * mass` in Rover Lab units.
+    pub gravitational_parameter: f32,
+    pub policy: GravitySourcePolicy,
+}
+
 pub struct RoverLabState {
     pub config: RoverLabConfig,
     pub tick: u64,
     pub planet: PlanetSpec,
     pub rover_spec: RoverSpec,
     pub control: RoverControl,
+    pub gravity_sources: Vec<RoverGravitySource>,
+    pub last_gravity_metrics: GravityStepMetrics,
     planet_assembly: PlanetAssembly,
     rover: RoverAssembly,
     physics: PhysicsWorld,
+    gravity_solver: GravitySolver,
+    gravity_participants: Vec<GravityParticipant>,
 }
 
 impl RoverLabState {
@@ -127,6 +148,15 @@ impl Scenario for RoverLabScenario {
         let rover =
             RoverAssembly::insert(&mut physics, ROVER_ID, &planet_assembly, planet, rover_spec)
                 .expect("rover lab rover specification must be valid");
+        let gravity_reference_distance = planet.radius + rover_spec.wheel_radius;
+        let gravity_sources = vec![RoverGravitySource {
+            id: PLANET_GRAVITY_ID,
+            position: planet.center,
+            gravitational_parameter: config.gravity_acceleration
+                * gravity_reference_distance
+                * gravity_reference_distance,
+            policy: GravitySourcePolicy::Direct,
+        }];
 
         RoverLabState {
             config,
@@ -134,9 +164,13 @@ impl Scenario for RoverLabScenario {
             planet,
             rover_spec,
             control: RoverControl::default(),
+            gravity_sources,
+            last_gravity_metrics: GravityStepMetrics::default(),
             planet_assembly,
             rover,
             physics,
+            gravity_solver: GravitySolver::new(),
+            gravity_participants: Vec::new(),
         }
     }
 
@@ -167,20 +201,15 @@ impl Scenario for RoverLabScenario {
         );
         state.rover.set_control(&mut state.physics, state.control);
 
-        let center = state.planet.center;
-        let gravity_acceleration = state.config.gravity_acceleration;
+        if let Some(planet_source) = state
+            .gravity_sources
+            .iter_mut()
+            .find(|source| source.id == PLANET_GRAVITY_ID)
+        {
+            planet_source.position = state.planet.center;
+        }
         state.physics.clear_forces();
-        state
-            .rover
-            .apply_acceleration_field(&mut state.physics, move |position| {
-                let toward_center = center - position;
-                let distance = toward_center.length();
-                if distance > f32::EPSILON {
-                    toward_center * (gravity_acceleration / distance)
-                } else {
-                    Vec2::ZERO
-                }
-            });
+        state.last_gravity_metrics = apply_rover_gravity(state, dt_seconds);
         state.physics.step(dt_seconds);
         state.tick += 1;
         StepResult::default()
@@ -210,6 +239,58 @@ impl Scenario for RoverLabScenario {
     fn tick_model() -> TickModel {
         TickModel::FixedTimestep { hz: FIXED_HZ }
     }
+}
+
+fn apply_rover_gravity(state: &mut RoverLabState, dt_seconds: f32) -> GravityStepMetrics {
+    let RoverLabState {
+        gravity_sources,
+        rover,
+        physics,
+        gravity_solver,
+        gravity_participants,
+        ..
+    } = state;
+    gravity_participants.clear();
+    gravity_participants.extend(gravity_sources.iter().map(|source| GravityParticipant {
+        id: tagged_gravity_id(GRAVITY_SOURCE_TAG, source.id),
+        position: source.position,
+        source_mass: source.gravitational_parameter,
+        response_scale: 0.0,
+        source_policy: source.policy,
+    }));
+
+    let bodies = rover.bodies();
+    for body in bodies {
+        let motion = physics
+            .motion(body)
+            .expect("rover gravity bodies remain in the canonical world");
+        gravity_participants.push(GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_ROVER_BODY_TAG, u64::from(body.role.value())),
+            motion.position,
+            1.0,
+        ));
+    }
+
+    let target_offset = gravity_sources.len();
+    let outputs = gravity_solver
+        .solve(
+            gravity_participants,
+            GravityConfig {
+                backend: GravityBackend::BarnesHut { theta: 0.7 },
+                softening: 0.05,
+                interaction_scale: dt_seconds,
+            },
+        )
+        .expect("Rover Lab gravity sources are valid");
+    for (body, output) in bodies.into_iter().zip(&outputs[target_offset..]) {
+        assert!(physics.apply_velocity_delta(body, output.velocity_delta, true));
+    }
+    gravity_solver.metrics()
+}
+
+fn tagged_gravity_id(tag: u64, payload: u64) -> GravityId {
+    debug_assert_eq!(payload & !GRAVITY_ID_MASK, 0);
+    GravityId::new(tag | payload)
 }
 
 fn normalized_config(config: RoverLabConfig) -> RoverLabConfig {
@@ -420,5 +501,28 @@ mod tests {
                 .any(|layer| !layer.primitives.is_empty())
         );
         assert!(!RoverLabScenario::observe(&state).payload.is_empty());
+    }
+
+    #[test]
+    fn rover_field_accepts_multiple_sources_or_no_sources() {
+        let mut state = RoverLabScenario::init(RoverLabConfig::default(), 9);
+        state.gravity_sources.push(RoverGravitySource {
+            id: 2,
+            position: Vec2::new(80.0, 30.0),
+            gravitational_parameter: 250.0,
+            policy: GravitySourcePolicy::Hierarchical,
+        });
+
+        RoverLabScenario::step(&mut state, &[], Duration::from_secs_f32(1.0 / 60.0));
+        assert_eq!(state.last_gravity_metrics.source_count, 2);
+        assert_eq!(state.last_gravity_metrics.direct_source_count, 1);
+        assert_eq!(state.last_gravity_metrics.hierarchical_source_count, 1);
+        assert_eq!(state.last_gravity_metrics.target_count, 3);
+
+        state.gravity_sources.clear();
+        RoverLabScenario::step(&mut state, &[], Duration::from_secs_f32(1.0 / 60.0));
+        assert_eq!(state.last_gravity_metrics.source_count, 0);
+        assert_eq!(state.last_gravity_metrics.target_count, 3);
+        assert_eq!(state.last_gravity_metrics.applied_sources, 0);
     }
 }

@@ -18,18 +18,22 @@ use engine_common::{
 };
 use engine_core::{
     Bounds2, BoundsList, Circle, Color, PlayerConfig, SpacewarsConfig, Transform2, Vec2,
-    constants::{DEFAULT_ELASTICITY, PLANET_DAMAGE_SCALAR, PLANET_ELASTICITY, REALLY_SMALL},
-    physics::gravity_acceleration_attracted_to,
+    constants::{
+        DEFAULT_ELASTICITY, GRAVITY, PLANET_DAMAGE_SCALAR, PLANET_ELASTICITY, REALLY_SMALL,
+    },
     rng::{SpacewarsRng, random_range_f32, random_unit_f32, seeded_rng},
     triangle_high_bounds, triangle_low_bound,
+};
+use engine_gravity::{
+    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
 };
 use engine_rapier::world::PhysicsStepMetrics;
 use physics::{MechanicalContact, MechanicalEntity};
 
 #[cfg(test)]
-use engine_core::Line;
-#[cfg(test)]
 use engine_core::constants::COLLISION_TRANSLATION_SCALAR;
+#[cfg(test)]
+use engine_core::{Line, physics::gravity_acceleration_attracted_to};
 
 const STARFIELD_LAYER: i32 = -30;
 const WORLD_LAYER: i32 = -20;
@@ -146,6 +150,13 @@ const BREAKUP_FRAGMENT_DAMAGE_SCALAR: f32 = 0.0;
 const BENCHMARK_RNG_SALT: u64 = 0xBE4C_2026_5EED;
 const BENCHMARK_ASTEROIDS: usize = 100;
 const BENCHMARK_PARTICLES: usize = 1_200;
+const GRAVITY_SOFTENING: f32 = 0.0;
+const GRAVITY_TAG_SHIFT: u32 = 60;
+const GRAVITY_PAYLOAD_MASK: u64 = (1_u64 << GRAVITY_TAG_SHIFT) - 1;
+const GRAVITY_BODY_TAG: u64 = 1;
+const GRAVITY_SHIP_TAG: u64 = 2;
+const GRAVITY_DEBRIS_TAG: u64 = 3;
+const GRAVITY_PARTICLE_TAG: u64 = 4;
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -250,6 +261,8 @@ pub struct SpacewarsState {
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
     physics: physics::SpacewarsPhysics,
+    gravity_solver: GravitySolver,
+    gravity_participants: Vec<GravityParticipant>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -274,6 +287,7 @@ pub struct SpacewarsStepMetrics {
     pub physics_time: Duration,
     pub added: usize,
     pub removed: usize,
+    pub gravity: GravityStepMetrics,
     pub rapier: PhysicsStepMetrics,
 }
 
@@ -751,6 +765,8 @@ impl Scenario for SpacewarsScenario {
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
             physics,
+            gravity_solver: GravitySolver::new(),
+            gravity_participants: Vec::new(),
         }
     }
 
@@ -783,16 +799,14 @@ impl Scenario for SpacewarsScenario {
         state.debris.extend(new_shells);
         handle_ship_deaths(state);
 
-        let gravity_started = Instant::now();
-        apply_world_gravity(state);
-        if state.tick % ASTEROID_GRAVITY_FRAME_MODULUS == 0 {
-            apply_debris_gravity(state);
-        }
-        let gravity_time = gravity_started.elapsed();
-
         let lifecycle_started = Instant::now();
         let lifecycle = reconcile_physics(state);
         let lifecycle_time = lifecycle_started.elapsed();
+
+        let gravity_started = Instant::now();
+        let gravity = apply_world_gravity(state);
+        let gravity_time = gravity_started.elapsed();
+
         let rapier = state.physics.step(dt);
         state
             .physics
@@ -826,6 +840,7 @@ impl Scenario for SpacewarsScenario {
             physics_time: rapier.wall_time,
             added: lifecycle.added,
             removed: lifecycle.removed,
+            gravity,
             rapier,
         };
         StepResult::default()
@@ -1617,37 +1632,117 @@ fn body_mass(radius: f32) -> f32 {
     core::f32::consts::PI * radius * radius * PLANET_MASS_DENSITY
 }
 
-fn apply_world_gravity(state: &mut SpacewarsState) {
-    let bodies = body_physics(state);
+fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
+    let SpacewarsState {
+        tick,
+        ships,
+        debris,
+        sun,
+        planets,
+        particles,
+        physics,
+        gravity_solver,
+        gravity_participants,
+        ..
+    } = state;
+    gravity_participants.clear();
 
-    for ship in &mut state.ships {
-        for body in &bodies {
-            apply_gravity(ship, body.position, body.mass, 1.0);
+    if let Some(sun) = *sun {
+        gravity_participants.push(GravityParticipant::direct_source(
+            tagged_gravity_id(GRAVITY_BODY_TAG, 0),
+            sun.position,
+            sun.mass,
+        ));
+    }
+    gravity_participants.extend(planets.iter().enumerate().map(|(index, planet)| {
+        GravityParticipant::direct_source(
+            tagged_gravity_id(GRAVITY_BODY_TAG, index as u64 + 1),
+            planet.position,
+            planet.mass,
+        )
+    }));
+    gravity_participants.extend(ships.iter().enumerate().map(|(index, ship)| {
+        GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_SHIP_TAG, index as u64),
+            ship.position,
+            1.0,
+        )
+    }));
+
+    let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
+    gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
+        GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_DEBRIS_TAG, debris.physics_id),
+            debris.position,
+            if debris_responds {
+                ASTEROID_GRAVITY_SCALE
+            } else {
+                0.0
+            },
+        )
+    }));
+
+    if tick.is_multiple_of(PARTICLE_GRAVITY_FRAME_MODULUS) {
+        gravity_participants.extend(particles.iter().enumerate().map(|(index, particle)| {
+            GravityParticipant::target(
+                tagged_gravity_id(GRAVITY_PARTICLE_TAG, index as u64),
+                particle.center(),
+                PARTICLE_GRAVITY_SCALE,
+            )
+        }));
+    }
+
+    let outputs = gravity_solver
+        .solve(
+            gravity_participants,
+            GravityConfig {
+                backend: GravityBackend::BarnesHut { theta: 0.7 },
+                softening: GRAVITY_SOFTENING,
+                interaction_scale: GRAVITY,
+            },
+        )
+        .expect("Spacewars mechanics produce valid gravity participants");
+    for output in outputs {
+        if output.velocity_delta == Vec2::ZERO {
+            continue;
+        }
+        let (tag, payload) = split_gravity_id(output.id);
+        match tag {
+            GRAVITY_SHIP_TAG => {
+                let index = usize::try_from(payload).expect("ship gravity id fits usize");
+                assert!(physics.apply_velocity_delta(
+                    MechanicalEntity::Ship(index),
+                    output.velocity_delta,
+                ));
+            }
+            GRAVITY_DEBRIS_TAG => {
+                assert!(physics.apply_velocity_delta(
+                    MechanicalEntity::Debris(payload),
+                    output.velocity_delta,
+                ));
+            }
+            GRAVITY_PARTICLE_TAG => {
+                let index = usize::try_from(payload).expect("particle gravity id fits usize");
+                particles[index].velocity += output.velocity_delta;
+            }
+            GRAVITY_BODY_TAG => {}
+            _ => unreachable!("gravity ids use known Spacewars tags"),
         }
     }
+    gravity_solver.metrics()
 }
 
-fn apply_gravity(ship: &mut ShipState, attractor_position: Vec2, attractor_mass: f32, scale: f32) {
-    apply_gravity_to_velocity(
-        ship.position,
-        &mut ship.velocity,
-        attractor_position,
-        attractor_mass,
-        scale,
-    );
+fn tagged_gravity_id(tag: u64, payload: u64) -> GravityId {
+    debug_assert!(tag < 1_u64 << (64 - GRAVITY_TAG_SHIFT));
+    debug_assert_eq!(payload & !GRAVITY_PAYLOAD_MASK, 0);
+    GravityId::new((tag << GRAVITY_TAG_SHIFT) | payload)
 }
 
-fn apply_gravity_to_velocity(
-    position: Vec2,
-    velocity: &mut Vec2,
-    attractor_position: Vec2,
-    attractor_mass: f32,
-    scale: f32,
-) {
-    let offset = attractor_position - position;
-    let distance = offset.length();
-    let acceleration = gravity_acceleration_attracted_to(attractor_mass, distance, scale);
-    *velocity += offset.normalized() * acceleration;
+fn split_gravity_id(id: GravityId) -> (u64, u64) {
+    (
+        id.value() >> GRAVITY_TAG_SHIFT,
+        id.value() & GRAVITY_PAYLOAD_MASK,
+    )
 }
 
 fn reconcile_physics(state: &mut SpacewarsState) -> physics::PhysicsLifecycle {
@@ -1963,6 +2058,7 @@ struct BodyPhysics {
     order: usize,
     position: Vec2,
     radius: f32,
+    #[cfg(test)]
     mass: f32,
     #[cfg(test)]
     low: Circle,
@@ -2243,43 +2339,10 @@ fn detect_debris_collisions(state: &SpacewarsState) -> Vec<DebrisCollision> {
     collisions
 }
 
-fn apply_debris_gravity(state: &mut SpacewarsState) {
-    let bodies = body_physics(state);
-
-    for debris in &mut state.debris {
-        if debris.dead {
-            continue;
-        }
-
-        for body in &bodies {
-            apply_gravity_to_velocity(
-                debris.position,
-                &mut debris.velocity,
-                body.position,
-                body.mass,
-                ASTEROID_GRAVITY_SCALE,
-            );
-        }
-    }
-}
-
 fn update_particles(state: &mut SpacewarsState, dt: f32) {
     let bodies = body_physics(state);
-    let apply_gravity = state.tick % PARTICLE_GRAVITY_FRAME_MODULUS == 0;
 
     for particle in &mut state.particles {
-        if apply_gravity {
-            for body in &bodies {
-                apply_gravity_to_velocity(
-                    particle.center(),
-                    &mut particle.velocity,
-                    body.position,
-                    body.mass,
-                    PARTICLE_GRAVITY_SCALE,
-                );
-            }
-        }
-
         if let Some(body) = bodies
             .iter()
             .find(|body| particle.bounds().intersects_circle(body.high))
@@ -3242,6 +3305,7 @@ fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
                 order: index,
                 position: planet.position,
                 radius: planet.radius,
+                #[cfg(test)]
                 mass: planet.mass,
                 #[cfg(test)]
                 low: body_circle(planet.position, planet.radius),
@@ -3257,6 +3321,7 @@ fn body_physics(state: &SpacewarsState) -> Vec<BodyPhysics> {
             order: bodies.len(),
             position: sun.position,
             radius: sun.radius,
+            #[cfg(test)]
             mass: sun.mass,
             #[cfg(test)]
             low: body_circle(sun.position, sun.radius),
@@ -5835,14 +5900,47 @@ mod tests {
     }
 
     #[test]
+    fn shared_gravity_keeps_celestial_sources_and_mechanical_targets_distinct() {
+        let mut state = SpacewarsScenario::init_benchmark(123);
+        let celestial_bodies = usize::from(state.sun.is_some()) + state.planets.len();
+        let mechanical_targets = state.ships.len() + state.debris.len() + state.particles.len();
+
+        step(&mut state, &[]);
+
+        let gravity = state.last_step_metrics.gravity;
+        assert_eq!(gravity.direct_source_count, celestial_bodies);
+        assert_eq!(gravity.hierarchical_source_count, 0);
+        assert_eq!(gravity.target_count, mechanical_targets);
+        assert_eq!(
+            gravity.participant_count,
+            celestial_bodies + mechanical_targets
+        );
+        assert_eq!(gravity.approximations, 0);
+    }
+
+    #[test]
     fn gravity_at_zero_distance_leaves_velocity_unchanged() {
-        let mut ship =
-            ShipState::new_with_default_life(0, Vec2::new(10.0, 20.0), Color::WHITE, 1.0 / 60.0);
-        ship.velocity = Vec2::new(1.0, 2.0);
+        let participants = [
+            GravityParticipant::direct_source(
+                GravityId::new(1),
+                Vec2::new(10.0, 20.0),
+                body_mass(10.0),
+            ),
+            GravityParticipant::dynamic(GravityId::new(2), Vec2::new(10.0, 20.0), SHIP_MASS),
+        ];
+        let mut solver = GravitySolver::new();
+        let outputs = solver
+            .solve(
+                &participants,
+                GravityConfig {
+                    backend: GravityBackend::Exact,
+                    softening: GRAVITY_SOFTENING,
+                    interaction_scale: GRAVITY,
+                },
+            )
+            .unwrap();
 
-        apply_gravity(&mut ship, Vec2::new(10.0, 20.0), body_mass(10.0), 1.0);
-
-        assert_eq!(ship.velocity, Vec2::new(1.0, 2.0));
+        assert_eq!(outputs[1].velocity_delta, Vec2::ZERO);
     }
 
     #[test]

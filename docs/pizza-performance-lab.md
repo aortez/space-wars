@@ -1,13 +1,13 @@
 # Pizza performance lab
 
-Pizza has a deterministic performance mode for comparing the existing exact
-simulation with a Rapier-backed collision world. The visual and headless paths
-construct the same fixture and call the same 60 Hz scenario step.
+Pizza has a deterministic performance mode for comparing collision mechanics
+and gravity independently. The visual and headless paths construct the same
+fixture and call the same 60 Hz scenario step.
 
 Normal interactive Pizza uses the same canonical Rapier world as the Rapier
-benchmark. The scenario computes exact mutual gravity and collision damage,
-while Rapier owns ball and wall motion, held-ball kinematics, contacts, and
-contact impulses. Classic remains available only as a benchmark reference.
+benchmark. The shared gravity system computes mutual gravity, while Rapier owns
+ball and wall motion, held-ball kinematics, contacts, and contact impulses.
+Classic remains available only as a collision benchmark reference.
 
 ## Visual verification
 
@@ -29,6 +29,7 @@ cargo run --release -p engine-client -- \
   --benchmark \
   --pizza-benchmark-balls 2000 \
   --pizza-benchmark-backend rapier \
+  --pizza-benchmark-gravity fast \
   --pizza-benchmark-workload churn
 ```
 
@@ -47,16 +48,20 @@ cargo run --release -p engine-client -- \
   --benchmark-report pizza-rapier-dense-300.csv \
   --pizza-benchmark-balls 300 \
   --pizza-benchmark-backend rapier \
+  --pizza-benchmark-gravity fast \
   --pizza-benchmark-workload dense
 ```
 
 `--renderer vector` measures scenario rendering and scene conversion.
 `--renderer raster --raster-scale N` measures the software raster path.
 The output separates the whole scenario step from workload, lifecycle,
-physics, snapshot, and presentation costs. Rapier runs additionally report its
-broad phase, narrow phase, island construction, solver, and CCD timers.
-Population, awake/sleeping body, candidate-pair, active-contact,
-solver-contact, added, and removed counts accompany every one-second sample.
+gravity, physics, snapshot, and presentation costs. Gravity reports validation,
+tree construction, mass aggregation, and traversal time plus source, target,
+node, exact-interaction, approximation, and applied-source counts. Rapier runs
+additionally report its broad phase, narrow phase, island construction, solver,
+and CCD timers. Population, awake/sleeping body, candidate-pair,
+active-contact, solver-contact, added, and removed counts accompany every
+one-second sample.
 
 The runner executes 60 fixed steps per sample as quickly as possible.
 `throughput_fps` is therefore throughput, not a claim that the program rendered
@@ -64,11 +69,11 @@ for one wall-clock second. `avg_total_ms` is the useful per-frame budget number.
 
 ## Workloads
 
-- `sparse` distributes small moving bodies through the whole playfield with no
-  global gravity. It primarily exercises integration and broad-phase updates.
-- `dense` starts overlapping mixed-radius bodies in a central cluster and
-  applies constant downward gravity inside fixed Rapier walls. It keeps
-  collision detection and contact solving visible.
+- `sparse` distributes small moving bodies through the whole playfield. It
+  primarily exercises integration, mutual gravity, and broad-phase updates.
+- `dense` starts overlapping mixed-radius bodies in a central cluster. Mutual
+  gravity keeps the population interacting while collision detection and
+  contact solving remain visible.
 - `churn` uses the dense fixture and, every 120 ticks, removes and replaces 75%
   of the bodies while keeping the configured population constant.
 
@@ -80,13 +85,20 @@ motions diverge.
 
 ## Backend boundaries
 
-`classic` retains Pizza's exact all-pairs gravity and collision loops.
-`rapier` uses the engine's canonical physics world, which owns body motion,
-containment contacts, broad/narrow phase collision detection, and contact
-solving. The benchmark workload deliberately does not calculate mutual body
-gravity; dense and churn use one external gravity vector. A later Barnes-Hut
-experiment can feed custom gravity into the same world without confusing its
-cost with the initial collision/lifecycle baseline.
+Collision and gravity selections are orthogonal:
+
+- `--pizza-benchmark-backend classic` retains Pizza's all-pairs collision loop.
+- `--pizza-benchmark-backend rapier` uses the canonical physics world for body
+  motion, containment contacts, broad/narrow phase collision detection, and
+  contact solving.
+- `--pizza-benchmark-gravity exact` uses the symmetric O(n²) correctness oracle.
+- `--pizza-benchmark-gravity full` uses Barnes-Hut with θ=0.5.
+- `--pizza-benchmark-gravity fast` uses Barnes-Hut with θ=0.7 and is the
+  interactive default.
+
+Both mechanics backends consume the same gravity result. This permits
+Rapier+exact versus Rapier+Barnes-Hut comparisons without also changing the
+collision implementation.
 
 Rapier benchmark bodies use one dynamic body and one circular collider, four
 solver iterations, CCD disabled, and sleeping disabled. These choices keep the
@@ -106,3 +118,28 @@ Run release builds on an otherwise quiet machine. Record:
 
 Treat visual runs as behavior checks. Use headless stage timings to decide
 whether a change improved physics, lifecycle, state projection, or rendering.
+
+## Gravity-only benchmark
+
+The reusable kernel also has a release-mode benchmark that excludes Rapier and
+rendering:
+
+```sh
+cargo run --release -p engine-gravity \
+  --example gravity_benchmark -- \
+  --sizes 300,1000,5000,10000 \
+  --scenarios jittered,clustered \
+  --samples 20 \
+  --theta 0.7
+```
+
+Cases up to `--oracle-limit` (1,000 by default) are checked against exact
+gravity outside the timed samples. `--full` adds 25,000 and 50,000 bodies.
+
+On the development host on 2026-07-27, the θ=0.7 kernel took approximately
+5.6 ms for 10,000 jittered bodies and 10.0 ms for 10,000 clustered bodies. In
+the full dense Pizza scenario, a stabilized 5,000-ball frame was approximately
+3.75 ms gravity, 6.66 ms Rapier, and 5.16 ms vector rendering (about 16 ms
+total). At 10,000 balls, gravity was approximately 9.1 ms while Rapier contacts
+and solving rose to 34.7 ms and rendering to 10.8 ms. These are local reference
+measurements, not portable performance guarantees.

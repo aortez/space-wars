@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/engine-common",
     "crates/engine-core",
+    "crates/engine-gravity",
     "crates/engine-rapier",
     "crates/engine-client",
     "crates/spacewars-cli",
@@ -46,6 +47,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Internal.
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
+engine-gravity = { path = "crates/engine-gravity" }
 engine-rapier = { path = "crates/engine-rapier" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }

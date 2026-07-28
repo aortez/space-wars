@@ -40,6 +40,7 @@ fn create(
             desired_ball_count: setup.desired_balls as usize,
             ball_spawn_rate: setup.ball_spawn_rate,
             bounds,
+            gravity: Default::default(),
             benchmark: None,
         },
         ScenarioStartMode::Benchmark(configuration) => {
@@ -83,8 +84,15 @@ impl ClientScenario for PizzaClientScenario {
     fn benchmark_counts(&self) -> Option<BenchmarkCounts> {
         self.state.benchmark_config()?;
         let counts = self.state.benchmark_counts();
+        let gravity = self.state.last_step_metrics.gravity;
         Some(BenchmarkCounts {
             balls: counts.balls,
+            gravity_sources: gravity.source_count,
+            gravity_targets: gravity.target_count,
+            gravity_nodes: gravity.node_count,
+            gravity_exact_interactions: gravity.exact_interactions,
+            gravity_approximations: gravity.approximations,
+            gravity_applied_sources: gravity.applied_sources,
             active_bodies: counts.active_bodies,
             sleeping_bodies: counts.sleeping_bodies,
             candidate_pairs: counts.candidate_pairs,
@@ -103,6 +111,10 @@ impl ClientScenario for PizzaClientScenario {
             workload_time: metrics.workload_time,
             lifecycle_time: metrics.lifecycle_time,
             gravity_time: metrics.gravity_time,
+            gravity_validation_time: metrics.gravity.validation_time,
+            gravity_build_time: metrics.gravity.build_time,
+            gravity_aggregation_time: metrics.gravity.aggregation_time,
+            gravity_traversal_time: metrics.gravity.traversal_time,
             collision_time: metrics.collision_time,
             physics_time: metrics.physics_time,
             snapshot_time: metrics.snapshot_time,

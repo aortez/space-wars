@@ -29,7 +29,8 @@ use engine_common::{
 #[cfg(test)]
 use engine_core::SpacewarsConfig;
 use scenario_pizza::{
-    MAX_BENCHMARK_BALLS, PizzaBenchmarkConfig, PizzaBenchmarkWorkload, PizzaPhysicsBackend,
+    MAX_BENCHMARK_BALLS, PizzaBenchmarkConfig, PizzaBenchmarkWorkload, PizzaGravityModel,
+    PizzaPhysicsBackend,
 };
 use settings::LoadStatus;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
@@ -93,6 +94,10 @@ struct Args {
     #[arg(long, value_enum, default_value = "rapier")]
     pizza_benchmark_backend: PizzaBenchmarkBackendArg,
 
+    /// Pizza benchmark gravity implementation/accuracy.
+    #[arg(long, value_enum, default_value = "fast")]
+    pizza_benchmark_gravity: PizzaBenchmarkGravityArg,
+
     /// Pizza benchmark workload shape.
     #[arg(long, value_enum, default_value = "dense")]
     pizza_benchmark_workload: PizzaBenchmarkWorkloadArg,
@@ -141,6 +146,24 @@ impl From<PizzaBenchmarkBackendArg> for PizzaPhysicsBackend {
         match value {
             PizzaBenchmarkBackendArg::Classic => Self::Classic,
             PizzaBenchmarkBackendArg::Rapier => Self::Rapier,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum PizzaBenchmarkGravityArg {
+    Exact,
+    Full,
+    #[default]
+    Fast,
+}
+
+impl From<PizzaBenchmarkGravityArg> for PizzaGravityModel {
+    fn from(value: PizzaBenchmarkGravityArg) -> Self {
+        match value {
+            PizzaBenchmarkGravityArg::Exact => Self::Exact,
+            PizzaBenchmarkGravityArg::Full => Self::Full,
+            PizzaBenchmarkGravityArg::Fast => Self::Fast,
         }
     }
 }
@@ -202,6 +225,7 @@ impl Args {
         host::BenchmarkConfiguration {
             pizza: PizzaBenchmarkConfig {
                 backend: self.pizza_benchmark_backend.into(),
+                gravity: self.pizza_benchmark_gravity.into(),
                 workload: self.pizza_benchmark_workload.into(),
                 ball_count: self.pizza_benchmark_balls.min(MAX_BENCHMARK_BALLS),
             },
@@ -1333,6 +1357,7 @@ mod tests {
             benchmark_report: None,
             pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
             pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,
+            pizza_benchmark_gravity: PizzaBenchmarkGravityArg::Fast,
             pizza_benchmark_workload: PizzaBenchmarkWorkloadArg::Dense,
             config_dir: None,
             renderer: None,

@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 engine-common = { workspace = true }
 engine-core = { workspace = true }
+engine-gravity = { workspace = true }
 engine-rapier = { workspace = true }
 
 [dev-dependencies]

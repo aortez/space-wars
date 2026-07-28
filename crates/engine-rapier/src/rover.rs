@@ -95,6 +95,15 @@ impl Default for RoverSpec {
     }
 }
 
+/// Initial placement for a rover assembly independent of terrain or gravity.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoverSpawnPose {
+    /// Midpoint between the two wheel centers.
+    pub wheel_center: Vec2,
+    /// Direction from the wheel line toward the chassis, in radians.
+    pub up_angle: f32,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct RoverControl {
     pub throttle: f32,
@@ -203,18 +212,47 @@ impl RoverAssembly {
         planet_spec: PlanetSpec,
         spec: RoverSpec,
     ) -> Option<Self> {
-        if entity == planet.entity()
-            || physics.contains_entity(entity)
-            || !physics.contains_body(planet.body())
+        if entity == planet.entity() || !physics.contains_body(planet.body()) {
+            return None;
+        }
+
+        let normal = Vec2::new(spec.surface_angle.cos(), spec.surface_angle.sin());
+        let wheel_surface_distance = planet_spec.radius + spec.wheel_radius + 0.03;
+        let wheel_center = planet_spec.center + normal * wheel_surface_distance;
+        Self::insert_at(
+            physics,
+            entity,
+            RoverSpawnPose {
+                wheel_center,
+                up_angle: spec.surface_angle,
+            },
+            spec,
+        )
+    }
+
+    /// Insert the articulated assembly at an arbitrary world pose.
+    ///
+    /// No terrain or gravity source is required. This keeps rover mechanics
+    /// reusable for free-space vehicles and for worlds whose attractors are
+    /// created independently from their collision geometry.
+    pub fn insert_at(
+        physics: &mut PhysicsWorld,
+        entity: PhysicsId,
+        pose: RoverSpawnPose,
+        spec: RoverSpec,
+    ) -> Option<Self> {
+        if physics.contains_entity(entity)
+            || !pose.wheel_center.x.is_finite()
+            || !pose.wheel_center.y.is_finite()
+            || !pose.up_angle.is_finite()
             || !valid_rover_spec(spec)
         {
             return None;
         }
 
-        let normal = Vec2::new(spec.surface_angle.cos(), spec.surface_angle.sin());
-        let tangent_angle = spec.surface_angle - std::f32::consts::FRAC_PI_2;
-        let wheel_surface_distance = planet_spec.radius + spec.wheel_radius + 0.03;
-        let wheel_center = planet_spec.center + normal * wheel_surface_distance;
+        let normal = Vec2::new(pose.up_angle.cos(), pose.up_angle.sin());
+        let tangent_angle = pose.up_angle - std::f32::consts::FRAC_PI_2;
+        let wheel_center = pose.wheel_center;
         let anchor_to_center = spec.suspension_rest_length - spec.suspension_anchor_height;
         let chassis_center = wheel_center + normal * anchor_to_center;
 
@@ -531,5 +569,38 @@ mod tests {
             restored.step(1.0 / 60.0);
         }
         assert_eq!(rover.snapshot(&physics), rover.snapshot(&restored));
+    }
+
+    #[test]
+    fn assembly_can_operate_without_a_planet_or_gravity() {
+        let mut physics = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let rover = RoverAssembly::insert_at(
+            &mut physics,
+            ROVER,
+            RoverSpawnPose {
+                wheel_center: Vec2::new(12.0, -4.0),
+                up_angle: 0.35,
+            },
+            RoverSpec::default(),
+        )
+        .unwrap();
+        assert!(rover.set_control(
+            &mut physics,
+            RoverControl {
+                throttle: 0.8,
+                brake: false,
+            },
+        ));
+        let initial_wheel_angle = rover.snapshot(&physics).unwrap().wheels[0].angle;
+
+        for _ in 0..120 {
+            physics.step(1.0 / 60.0);
+        }
+
+        let snapshot = rover.snapshot(&physics).unwrap();
+        assert!(snapshot.contacts.is_empty());
+        assert!(snapshot.chassis.position.x.is_finite());
+        assert!(snapshot.chassis.position.y.is_finite());
+        assert_ne!(snapshot.wheels[0].angle, initial_wheel_angle);
     }
 }

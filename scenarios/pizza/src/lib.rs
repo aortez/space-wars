@@ -1,8 +1,8 @@
 //! Deterministic Rust port of the allan.pizza ball simulation.
 //!
-//! This first pass intentionally uses exact O(n²) collision and gravity loops.
-//! The reference quadtree and Barnes-Hut optimizations remain a later,
-//! measurable replacement for these correctness-oriented paths.
+//! Rapier owns rigid-body motion and contacts. The shared engine gravity
+//! solver supplies either exact O(n²) gravity or deterministic Barnes-Hut
+//! gravity, making this scenario both an interactive toy and a scale lab.
 
 use std::time::{Duration, Instant};
 
@@ -12,6 +12,9 @@ use engine_common::{
     TextAnchor, TickModel,
 };
 use engine_core::{Color, Vec2};
+use engine_gravity::{
+    GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
+};
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, ContactEvent,
     PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
@@ -71,6 +74,32 @@ impl PizzaPhysicsBackend {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PizzaGravityModel {
+    Exact,
+    Full,
+    #[default]
+    Fast,
+}
+
+impl PizzaGravityModel {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Exact => "exact",
+            Self::Full => "barnes-hut-full",
+            Self::Fast => "barnes-hut-fast",
+        }
+    }
+
+    const fn backend(self) -> GravityBackend {
+        match self {
+            Self::Exact => GravityBackend::Exact,
+            Self::Full => GravityBackend::BarnesHut { theta: 0.5 },
+            Self::Fast => GravityBackend::BarnesHut { theta: 0.7 },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum PizzaBenchmarkWorkload {
     Sparse,
     #[default]
@@ -91,6 +120,7 @@ impl PizzaBenchmarkWorkload {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PizzaBenchmarkConfig {
     pub backend: PizzaPhysicsBackend,
+    pub gravity: PizzaGravityModel,
     pub workload: PizzaBenchmarkWorkload,
     pub ball_count: usize,
 }
@@ -108,6 +138,7 @@ impl Default for PizzaBenchmarkConfig {
     fn default() -> Self {
         Self {
             backend: PizzaPhysicsBackend::Rapier,
+            gravity: PizzaGravityModel::Fast,
             workload: PizzaBenchmarkWorkload::Dense,
             ball_count: DEFAULT_BENCHMARK_BALLS,
         }
@@ -124,6 +155,7 @@ pub struct PizzaStepMetrics {
     pub snapshot_time: Duration,
     pub added: usize,
     pub removed: usize,
+    pub gravity: GravityStepMetrics,
     pub rapier: PhysicsStepMetrics,
 }
 
@@ -183,6 +215,7 @@ pub struct PizzaConfig {
     pub desired_ball_count: usize,
     pub ball_spawn_rate: f32,
     pub bounds: PizzaBounds,
+    pub gravity: PizzaGravityModel,
     pub benchmark: Option<PizzaBenchmarkConfig>,
 }
 
@@ -205,6 +238,9 @@ impl PizzaConfig {
                 0.10
             },
             bounds: PizzaBounds::from_aspect_ratio(self.bounds.width / self.bounds.height),
+            gravity: benchmark
+                .map(|benchmark| benchmark.gravity)
+                .unwrap_or(self.gravity),
             benchmark,
         }
     }
@@ -215,6 +251,7 @@ impl PizzaConfig {
             desired_ball_count: benchmark.ball_count,
             ball_spawn_rate: MAX_SPAWN_RATE,
             bounds,
+            gravity: benchmark.gravity,
             benchmark: Some(benchmark),
         }
     }
@@ -226,6 +263,7 @@ impl Default for PizzaConfig {
             desired_ball_count: 24,
             ball_spawn_rate: 0.10,
             bounds: PizzaBounds::default(),
+            gravity: PizzaGravityModel::Fast,
             benchmark: None,
         }
     }
@@ -274,6 +312,8 @@ pub struct PizzaState {
     next_ball_id: u64,
     rng: StdRng,
     physics: Option<PhysicsWorld>,
+    gravity_solver: GravitySolver,
+    gravity_participants: Vec<GravityParticipant>,
 }
 
 impl PizzaState {
@@ -642,16 +682,8 @@ impl PizzaState {
 }
 
 fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
-    let gravity = match config.benchmark {
-        Some(PizzaBenchmarkConfig {
-            backend: PizzaPhysicsBackend::Rapier,
-            workload: PizzaBenchmarkWorkload::Dense | PizzaBenchmarkWorkload::Churn,
-            ..
-        }) => Vec2::new(0.0, -0.18),
-        _ => Vec2::ZERO,
-    };
     let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
-        gravity,
+        gravity: Vec2::ZERO,
         length_unit: config.bounds.width.min(config.bounds.height).max(0.001),
         solver_iterations: 4,
         internal_stabilization_iterations: 1,
@@ -749,40 +781,72 @@ fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) 
     )
 }
 
-fn apply_exact_gravity_to_physics(state: &mut PizzaState) {
-    let mut velocity_deltas = vec![Vec2::ZERO; state.balls.len()];
-    for left_index in 0..state.balls.len() {
-        for right_index in left_index + 1..state.balls.len() {
-            let left = state.balls[left_index];
-            let right = state.balls[right_index];
-            let delta = right.position - left.position;
-            let distance_squared =
-                (delta.length_squared() + GRAVITY_SOFTENING * GRAVITY_SOFTENING).max(f32::EPSILON);
-            let direction = delta.normalized();
-            if direction == Vec2::ZERO {
-                continue;
-            }
-            let force = GRAVITY * left.mass() * right.mass() / distance_squared;
-            velocity_deltas[left_index] += direction * (force / left.mass());
-            velocity_deltas[right_index] -= direction * (force / right.mass());
-        }
+fn pizza_gravity_config(model: PizzaGravityModel) -> GravityConfig {
+    GravityConfig {
+        backend: model.backend(),
+        softening: GRAVITY_SOFTENING,
+        interaction_scale: GRAVITY,
     }
+}
 
-    let physics = state
-        .physics
-        .as_mut()
-        .expect("interactive Pizza uses canonical physics");
-    physics.clear_forces();
-    for (ball, velocity_delta) in state.balls.iter().zip(velocity_deltas) {
+fn collect_gravity_participants(participants: &mut Vec<GravityParticipant>, balls: &[BallState]) {
+    participants.clear();
+    participants.extend(balls.iter().map(|ball| {
+        let mut participant =
+            GravityParticipant::dynamic(GravityId::new(ball.id), ball.position, ball.mass());
         if !ball.moving {
-            continue;
+            participant.response_scale = 0.0;
         }
-        let body = ball_body_id(ball.id);
-        let mass = physics
-            .body_mass(body)
-            .expect("Pizza metadata and physics mass stay aligned");
-        assert!(physics.apply_impulse(body, velocity_delta * mass, true));
+        participant
+    }));
+}
+
+fn apply_gravity_to_physics(state: &mut PizzaState) -> GravityStepMetrics {
+    let PizzaState {
+        config,
+        balls,
+        physics,
+        gravity_solver,
+        gravity_participants,
+        ..
+    } = state;
+    collect_gravity_participants(gravity_participants, balls);
+    let outputs = gravity_solver
+        .solve(gravity_participants, pizza_gravity_config(config.gravity))
+        .expect("normalized Pizza bodies form valid gravity participants");
+    let physics = physics
+        .as_mut()
+        .expect("Rapier Pizza uses canonical physics");
+    for (ball, output) in balls.iter().zip(outputs) {
+        debug_assert_eq!(output.id, GravityId::new(ball.id));
+        if ball.moving {
+            assert!(physics.apply_velocity_delta(
+                ball_body_id(ball.id),
+                output.velocity_delta,
+                true,
+            ));
+        }
     }
+    gravity_solver.metrics()
+}
+
+fn apply_gravity_to_classic(state: &mut PizzaState) -> GravityStepMetrics {
+    let PizzaState {
+        config,
+        balls,
+        gravity_solver,
+        gravity_participants,
+        ..
+    } = state;
+    collect_gravity_participants(gravity_participants, balls);
+    let outputs = gravity_solver
+        .solve(gravity_participants, pizza_gravity_config(config.gravity))
+        .expect("normalized Pizza balls form valid gravity participants");
+    for (ball, output) in balls.iter_mut().zip(outputs) {
+        debug_assert_eq!(output.id, GravityId::new(ball.id));
+        ball.velocity += output.velocity_delta;
+    }
+    gravity_solver.metrics()
 }
 
 fn apply_contact_damage(state: &mut PizzaState) {
@@ -836,6 +900,8 @@ impl Scenario for PizzaScenario {
             next_ball_id: 1,
             rng: StdRng::seed_from_u64(seed),
             physics: None,
+            gravity_solver: GravitySolver::new(),
+            gravity_participants: Vec::new(),
         };
         state.rebuild_physics();
         state.initialize_benchmark();
@@ -869,7 +935,7 @@ impl Scenario for PizzaScenario {
                     metrics.workload_time = workload_started.elapsed();
 
                     let gravity_started = Instant::now();
-                    apply_exact_gravity(&mut state.balls);
+                    metrics.gravity = apply_gravity_to_classic(state);
                     metrics.gravity_time = gravity_started.elapsed();
 
                     let collision_started = Instant::now();
@@ -881,6 +947,10 @@ impl Scenario for PizzaScenario {
                     metrics.physics_time = metrics.gravity_time + metrics.collision_time;
                 }
                 PizzaPhysicsBackend::Rapier => {
+                    let gravity_started = Instant::now();
+                    metrics.gravity = apply_gravity_to_physics(state);
+                    metrics.gravity_time = gravity_started.elapsed();
+
                     let physics = state
                         .physics
                         .as_mut()
@@ -903,7 +973,7 @@ impl Scenario for PizzaScenario {
         state.advance_spawner();
 
         let gravity_started = Instant::now();
-        apply_exact_gravity_to_physics(state);
+        metrics.gravity = apply_gravity_to_physics(state);
         metrics.gravity_time = gravity_started.elapsed();
 
         let physics = state
@@ -965,8 +1035,9 @@ impl Scenario for PizzaScenario {
             let mut text = RenderText::new(
                 RenderPoint::new(bounds.width * 0.01, bounds.height * 0.99),
                 format!(
-                    "Pizza lab | {} | {} | {} balls | {} active | {} contacts",
+                    "Pizza lab | {} + {} | {} | {} balls | {} active | {} contacts",
                     benchmark.backend.label(),
+                    benchmark.gravity.label(),
                     benchmark.workload.label(),
                     counts.balls,
                     counts.active_bodies,
@@ -1013,26 +1084,6 @@ fn contain_ball(ball: &mut BallState, bounds: PizzaBounds) {
     if ball.position.y - ball.radius <= 0.0 {
         ball.position.y = ball.radius + WALL_FUDGE;
         ball.velocity.y = -ball.velocity.y * WALL_ELASTICITY;
-    }
-}
-
-fn apply_exact_gravity(balls: &mut [BallState]) {
-    for left_index in 0..balls.len() {
-        for right_index in left_index + 1..balls.len() {
-            let (left_slice, right_slice) = balls.split_at_mut(right_index);
-            let left = &mut left_slice[left_index];
-            let right = &mut right_slice[0];
-            let delta = right.position - left.position;
-            let distance_squared =
-                (delta.length_squared() + GRAVITY_SOFTENING * GRAVITY_SOFTENING).max(f32::EPSILON);
-            let direction = delta.normalized();
-            if direction == Vec2::ZERO {
-                continue;
-            }
-            let force = GRAVITY * left.mass() * right.mass() / distance_squared;
-            left.velocity += direction * (force / left.mass());
-            right.velocity -= direction * (force / right.mass());
-        }
     }
 }
 
@@ -1328,6 +1379,7 @@ mod tests {
     fn benchmark_fixture_is_immediate_and_deterministic() {
         let benchmark = PizzaBenchmarkConfig {
             backend: PizzaPhysicsBackend::Classic,
+            gravity: PizzaGravityModel::Fast,
             workload: PizzaBenchmarkWorkload::Dense,
             ball_count: 300,
         };
@@ -1352,9 +1404,46 @@ mod tests {
     }
 
     #[test]
+    fn benchmark_can_compare_exact_and_barnes_hut_gravity() {
+        let base = PizzaBenchmarkConfig {
+            backend: PizzaPhysicsBackend::Classic,
+            gravity: PizzaGravityModel::Exact,
+            workload: PizzaBenchmarkWorkload::Sparse,
+            ball_count: 300,
+        };
+        let mut exact =
+            PizzaScenario::init(PizzaConfig::benchmark(base, PizzaBounds::default()), 0xA11A);
+        let mut approximate = PizzaScenario::init(
+            PizzaConfig::benchmark(
+                PizzaBenchmarkConfig {
+                    gravity: PizzaGravityModel::Fast,
+                    ..base
+                },
+                PizzaBounds::default(),
+            ),
+            0xA11A,
+        );
+
+        let exact_metrics = apply_gravity_to_classic(&mut exact);
+        let approximate_metrics = apply_gravity_to_classic(&mut approximate);
+
+        assert_eq!(exact_metrics.approximations, 0);
+        assert_eq!(exact_metrics.exact_interactions, 300 * 299 / 2);
+        assert!(approximate_metrics.approximations > 0);
+        assert!(approximate_metrics.applied_sources < exact_metrics.applied_sources);
+        assert!(
+            approximate
+                .balls
+                .iter()
+                .all(|ball| ball.velocity.x.is_finite() && ball.velocity.y.is_finite())
+        );
+    }
+
+    #[test]
     fn rapier_benchmark_steps_and_reports_contacts() {
         let benchmark = PizzaBenchmarkConfig {
             backend: PizzaPhysicsBackend::Rapier,
+            gravity: PizzaGravityModel::Fast,
             workload: PizzaBenchmarkWorkload::Dense,
             ball_count: 64,
         };
@@ -1386,6 +1475,7 @@ mod tests {
     fn controlled_churn_replaces_three_quarters_without_changing_population() {
         let benchmark = PizzaBenchmarkConfig {
             backend: PizzaPhysicsBackend::Rapier,
+            gravity: PizzaGravityModel::Fast,
             workload: PizzaBenchmarkWorkload::Churn,
             ball_count: 40,
         };
@@ -1413,6 +1503,7 @@ mod tests {
     fn benchmark_frame_identifies_the_visible_workload() {
         let benchmark = PizzaBenchmarkConfig {
             backend: PizzaPhysicsBackend::Rapier,
+            gravity: PizzaGravityModel::Fast,
             workload: PizzaBenchmarkWorkload::Dense,
             ball_count: 12,
         };
@@ -1426,7 +1517,10 @@ mod tests {
                 .flat_map(|layer| &layer.primitives)
                 .any(|primitive| matches!(
                     primitive,
-                    RenderPrimitive::Text(text) if text.text.contains("rapier | dense | 12 balls")
+                    RenderPrimitive::Text(text)
+                        if text
+                            .text
+                            .contains("rapier + barnes-hut-fast | dense | 12 balls")
                 ))
         );
     }

@@ -60,6 +60,12 @@ pub struct BenchmarkCounts {
     pub shells: usize,
     pub particles: usize,
     pub balls: usize,
+    pub gravity_sources: usize,
+    pub gravity_targets: usize,
+    pub gravity_nodes: usize,
+    pub gravity_exact_interactions: u64,
+    pub gravity_approximations: u64,
+    pub gravity_applied_sources: u64,
     pub active_bodies: usize,
     pub sleeping_bodies: usize,
     pub candidate_pairs: usize,
@@ -74,6 +80,10 @@ pub struct BenchmarkStepMetrics {
     pub workload_time: Duration,
     pub lifecycle_time: Duration,
     pub gravity_time: Duration,
+    pub gravity_validation_time: Duration,
+    pub gravity_build_time: Duration,
+    pub gravity_aggregation_time: Duration,
+    pub gravity_traversal_time: Duration,
     pub collision_time: Duration,
     pub physics_time: Duration,
     pub snapshot_time: Duration,
@@ -92,6 +102,10 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
         self.workload_time += rhs.workload_time;
         self.lifecycle_time += rhs.lifecycle_time;
         self.gravity_time += rhs.gravity_time;
+        self.gravity_validation_time += rhs.gravity_validation_time;
+        self.gravity_build_time += rhs.gravity_build_time;
+        self.gravity_aggregation_time += rhs.gravity_aggregation_time;
+        self.gravity_traversal_time += rhs.gravity_traversal_time;
         self.collision_time += rhs.collision_time;
         self.physics_time += rhs.physics_time;
         self.snapshot_time += rhs.snapshot_time;
