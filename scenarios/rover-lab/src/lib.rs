@@ -9,13 +9,16 @@ use engine_common::{
 };
 use engine_core::Vec2;
 use engine_rapier::{
-    BodyMotion, BumpSpec, PlanetSpec, RoverControl, RoverPhysics, RoverSnapshot, RoverSpec,
+    rover::{
+        BumpSpec, PlanetAssembly, PlanetSpec, RoverAssembly, RoverControl, RoverSnapshot, RoverSpec,
+    },
+    world::{BodyMotion, PhysicsId, PhysicsWorld, PhysicsWorldConfig},
 };
 
 const FIXED_HZ: u32 = 60;
 const DRIVE_ACTION_KIND: u32 = 1;
-const PLANET_ID: u64 = 1;
-const ROVER_ID: u64 = 1;
+const PLANET_ID: PhysicsId = PhysicsId::new(1);
+const ROVER_ID: PhysicsId = PhysicsId::new(2);
 const PLANET_RADIUS: f32 = 20.0;
 const CAMERA_HEIGHT: f32 = 54.0;
 const GRAVITY_ACCELERATION: f32 = 18.0;
@@ -59,13 +62,15 @@ pub struct RoverLabState {
     pub planet: PlanetSpec,
     pub rover_spec: RoverSpec,
     pub control: RoverControl,
-    physics: RoverPhysics,
+    planet_assembly: PlanetAssembly,
+    rover: RoverAssembly,
+    physics: PhysicsWorld,
 }
 
 impl RoverLabState {
     pub fn rover_snapshot(&self) -> RoverSnapshot {
-        self.physics
-            .rover_snapshot(ROVER_ID)
+        self.rover
+            .snapshot(&self.physics)
             .expect("rover lab must retain its rover")
     }
 }
@@ -109,9 +114,19 @@ impl Scenario for RoverLabScenario {
             angle: 0.0,
         };
         let rover_spec = RoverSpec::default();
-        let mut physics = RoverPhysics::new(1.0);
-        assert!(physics.insert_planet(PLANET_ID, planet, &[LAB_BUMP]));
-        assert!(physics.insert_rover(ROVER_ID, PLANET_ID, planet, rover_spec));
+        let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
+            length_unit: 1.0,
+            solver_iterations: 8,
+            internal_stabilization_iterations: 2,
+            max_ccd_substeps: 2,
+            collect_events: true,
+            ..PhysicsWorldConfig::default()
+        });
+        let planet_assembly = PlanetAssembly::insert(&mut physics, PLANET_ID, planet, &[LAB_BUMP])
+            .expect("rover lab planet specification must be valid");
+        let rover =
+            RoverAssembly::insert(&mut physics, ROVER_ID, &planet_assembly, planet, rover_spec)
+                .expect("rover lab rover specification must be valid");
 
         RoverLabState {
             config,
@@ -119,6 +134,8 @@ impl Scenario for RoverLabScenario {
             planet,
             rover_spec,
             control: RoverControl::default(),
+            planet_assembly,
+            rover,
             physics,
         }
     }
@@ -143,22 +160,28 @@ impl Scenario for RoverLabScenario {
         state.planet.angle = (state.planet.angle
             + state.config.planet_angular_velocity * dt_seconds)
             .rem_euclid(std::f32::consts::TAU);
-        state
-            .physics
-            .set_next_planet_pose(PLANET_ID, state.planet.center, state.planet.angle);
-        state.physics.set_rover_control(ROVER_ID, state.control);
+        state.planet_assembly.set_next_pose(
+            &mut state.physics,
+            state.planet.center,
+            state.planet.angle,
+        );
+        state.rover.set_control(&mut state.physics, state.control);
 
         let center = state.planet.center;
         let gravity_acceleration = state.config.gravity_acceleration;
-        state.physics.step(dt_seconds, move |position| {
-            let toward_center = center - position;
-            let distance = toward_center.length();
-            if distance > f32::EPSILON {
-                toward_center * (gravity_acceleration / distance)
-            } else {
-                Vec2::ZERO
-            }
-        });
+        state.physics.clear_forces();
+        state
+            .rover
+            .apply_acceleration_field(&mut state.physics, move |position| {
+                let toward_center = center - position;
+                let distance = toward_center.length();
+                if distance > f32::EPSILON {
+                    toward_center * (gravity_acceleration / distance)
+                } else {
+                    Vec2::ZERO
+                }
+            });
+        state.physics.step(dt_seconds);
         state.tick += 1;
         StepResult::default()
     }

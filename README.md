@@ -12,18 +12,22 @@ Below is a zoomed out view of a CTF game mode.
 The local launcher currently hosts three playable scenarios:
 
 - **Spacewars** — the two-player arcade reboot.
-- **Pizza** — a seeded interactive gravity-and-collision ball simulation. Click
-  empty space to make a ball, or grab and fling an existing one.
+- **Pizza** — a seeded interactive gravity-and-collision ball simulation.
+  Rapier owns rigid-body motion and contacts while the scenario supplies mutual
+  gravity and gameplay damage. Click empty space to make a ball, or grab and
+  fling an existing one.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 
-Textures and sounds for Spacewars have yet to be done. The Pizza implementation
-starts with capped exact collision/gravity loops; quadtree and Barnes-Hut
-optimizations are intentionally deferred.
+Textures and sounds for Spacewars have yet to be done. Pizza retains its
+Classic exact implementation as a benchmark reference; Barnes-Hut gravity is
+intentionally deferred until the canonical Rapier mechanics path is established.
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
 The deterministic Classic/Rapier Pizza benchmark is documented in
 [`docs/pizza-performance-lab.md`](docs/pizza-performance-lab.md).
+The accepted physics ownership and lifecycle design is documented in
+[`docs/design/physics-architecture.md`](docs/design/physics-architecture.md).
 
 ## Run locally
 

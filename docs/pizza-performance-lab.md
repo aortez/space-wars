@@ -4,6 +4,11 @@ Pizza has a deterministic performance mode for comparing the existing exact
 simulation with a Rapier-backed collision world. The visual and headless paths
 construct the same fixture and call the same 60 Hz scenario step.
 
+Normal interactive Pizza uses the same canonical Rapier world as the Rapier
+benchmark. The scenario computes exact mutual gravity and collision damage,
+while Rapier owns ball and wall motion, held-ball kinematics, contacts, and
+contact impulses. Classic remains available only as a benchmark reference.
+
 ## Visual verification
 
 Start the default 300-ball dense Rapier workload:
@@ -76,11 +81,12 @@ motions diverge.
 ## Backend boundaries
 
 `classic` retains Pizza's exact all-pairs gravity and collision loops.
-`rapier` owns body motion, containment contacts, broad/narrow phase collision
-detection, and contact solving. The first Rapier workload deliberately does
-not calculate mutual body gravity; dense and churn use one external gravity
-vector. A later Barnes-Hut experiment can feed custom gravity into Rapier
-without confusing its cost with the initial collision/lifecycle baseline.
+`rapier` uses the engine's canonical physics world, which owns body motion,
+containment contacts, broad/narrow phase collision detection, and contact
+solving. The benchmark workload deliberately does not calculate mutual body
+gravity; dense and churn use one external gravity vector. A later Barnes-Hut
+experiment can feed custom gravity into the same world without confusing its
+cost with the initial collision/lifecycle baseline.
 
 Rapier benchmark bodies use one dynamic body and one circular collider, four
 solver iterations, CCD disabled, and sleeping disabled. These choices keep the

@@ -12,7 +12,10 @@ use engine_common::{
     TextAnchor, TickModel,
 };
 use engine_core::{Color, Vec2};
-use engine_rapier::{BallBodySpec, BallPhysics, BallPhysicsBounds, BallPhysicsMetrics};
+use engine_rapier::world::{
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, ContactEvent,
+    PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
+};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -45,6 +48,11 @@ const BENCHMARK_LABEL_LAYER: i32 = 10;
 const BENCHMARK_CHURN_INTERVAL_TICKS: u64 = 120;
 const BENCHMARK_CHURN_NUMERATOR: usize = 3;
 const BENCHMARK_CHURN_DENOMINATOR: usize = 4;
+const WALL_ENTITY: PhysicsId = PhysicsId::new(0);
+const WALL_BODY: BodyId = BodyId::new(WALL_ENTITY, BodyRole::new(1));
+const WALL_COLLIDER_ROLE: ColliderRole = ColliderRole::new(1);
+const BALL_BODY_ROLE: BodyRole = BodyRole::new(2);
+const BALL_COLLIDER_ROLE: ColliderRole = ColliderRole::new(2);
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum PizzaPhysicsBackend {
@@ -116,7 +124,7 @@ pub struct PizzaStepMetrics {
     pub snapshot_time: Duration,
     pub added: usize,
     pub removed: usize,
-    pub rapier: BallPhysicsMetrics,
+    pub rapier: PhysicsStepMetrics,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -265,7 +273,7 @@ pub struct PizzaState {
     seed: u64,
     next_ball_id: u64,
     rng: StdRng,
-    rapier: Option<BallPhysics>,
+    physics: Option<PhysicsWorld>,
 }
 
 impl PizzaState {
@@ -279,6 +287,7 @@ impl PizzaState {
         for ball in &mut self.balls {
             contain_ball(ball, self.config.bounds);
         }
+        self.rebuild_physics();
     }
 
     pub fn seed(&self) -> u64 {
@@ -308,25 +317,6 @@ impl PizzaState {
         let Some(benchmark) = self.config.benchmark else {
             return;
         };
-        if benchmark.backend == PizzaPhysicsBackend::Rapier {
-            let gravity = match benchmark.workload {
-                PizzaBenchmarkWorkload::Sparse => Vec2::ZERO,
-                PizzaBenchmarkWorkload::Dense | PizzaBenchmarkWorkload::Churn => {
-                    Vec2::new(0.0, -0.18)
-                }
-            };
-            let mut rapier = BallPhysics::new(
-                BallPhysicsBounds {
-                    width: self.config.bounds.width,
-                    height: self.config.bounds.height,
-                },
-                gravity,
-                false,
-                4,
-            );
-            rapier.reserve(benchmark.ball_count);
-            self.rapier = Some(rapier);
-        }
 
         self.balls.reserve(benchmark.ball_count);
         for _ in 0..benchmark.ball_count {
@@ -380,21 +370,7 @@ impl PizzaState {
     }
 
     fn insert_benchmark_ball(&mut self, ball: BallState) {
-        if let Some(rapier) = &mut self.rapier {
-            let inserted = rapier.insert_ball(BallBodySpec {
-                id: ball.id,
-                position: ball.position,
-                velocity: ball.velocity,
-                radius: ball.radius,
-                density: 1.0,
-                restitution: COLLISION_ELASTICITY,
-            });
-            assert!(
-                inserted,
-                "benchmark fixture generated an invalid Rapier ball"
-            );
-        }
-        self.balls.push(ball);
+        self.push_ball(ball);
     }
 
     fn advance_benchmark_churn(&mut self) -> PizzaStepMetrics {
@@ -414,13 +390,7 @@ impl PizzaState {
             (self.balls.len() * BENCHMARK_CHURN_NUMERATOR / BENCHMARK_CHURN_DENOMINATOR).max(1);
         for _ in 0..removed {
             let index = self.rng.random_range(0..self.balls.len());
-            let removed_ball = self.balls.swap_remove(index);
-            if let Some(rapier) = &mut self.rapier {
-                let removed_id = rapier
-                    .swap_remove_ball(index)
-                    .expect("Pizza and Rapier benchmark vectors stay aligned");
-                assert_eq!(removed_id, removed_ball.id);
-            }
+            self.swap_remove_ball(index);
         }
         for _ in 0..removed {
             let ball = self.random_benchmark_ball(benchmark);
@@ -436,15 +406,21 @@ impl PizzaState {
     }
 
     fn sync_from_rapier(&mut self) {
-        let Some(rapier) = &self.rapier else {
+        let Some(physics) = &self.physics else {
             return;
         };
-        assert_eq!(self.balls.len(), rapier.len());
-        for (ball, motion) in self.balls.iter_mut().zip(rapier.motions()) {
-            assert_eq!(ball.id, motion.id);
-            ball.position = motion.position;
-            ball.velocity = motion.velocity;
+        let mut motions = physics
+            .motions()
+            .filter(|record| record.id.role == BALL_BODY_ROLE);
+        for ball in &mut self.balls {
+            let motion = motions
+                .next()
+                .expect("Pizza metadata and physics bodies stay aligned");
+            assert_eq!(ball.id, motion.id.entity.value());
+            ball.position = motion.motion.position;
+            ball.velocity = motion.motion.linear_velocity;
         }
+        assert!(motions.next().is_none());
     }
 
     pub fn benchmark_config(&self) -> Option<PizzaBenchmarkConfig> {
@@ -458,7 +434,7 @@ impl PizzaState {
         let rapier = self.last_step_metrics.rapier;
         PizzaBenchmarkCounts {
             balls: self.balls.len(),
-            active_bodies: if self.rapier.is_some() {
+            active_bodies: if self.physics.is_some() {
                 rapier.active_bodies
             } else {
                 self.balls.len()
@@ -472,6 +448,52 @@ impl PizzaState {
         }
     }
 
+    fn uses_rapier(&self) -> bool {
+        self.config
+            .benchmark
+            .is_none_or(|benchmark| benchmark.backend == PizzaPhysicsBackend::Rapier)
+    }
+
+    fn rebuild_physics(&mut self) {
+        if !self.uses_rapier() {
+            self.physics = None;
+            return;
+        }
+        let mut physics = create_physics_world(&self.config);
+        for ball in &self.balls {
+            assert!(insert_physics_ball(
+                &mut physics,
+                *ball,
+                self.held_ball_id == Some(ball.id),
+            ));
+        }
+        self.physics = Some(physics);
+    }
+
+    fn push_ball(&mut self, ball: BallState) {
+        if let Some(physics) = &mut self.physics {
+            assert!(
+                insert_physics_ball(physics, ball, self.held_ball_id == Some(ball.id)),
+                "Pizza generated an invalid or duplicate physics ball"
+            );
+        }
+        self.balls.push(ball);
+    }
+
+    fn swap_remove_ball(&mut self, index: usize) -> Option<BallState> {
+        if index >= self.balls.len() {
+            return None;
+        }
+        let id = self.balls[index].id;
+        if let Some(physics) = &mut self.physics {
+            assert!(
+                physics.remove_entity(PhysicsId::new(id)),
+                "Pizza metadata and physics lifecycle stay aligned"
+            );
+        }
+        Some(self.balls.swap_remove(index))
+    }
+
     fn advance_spawner(&mut self) {
         if self.balls.len() >= self.config.desired_ball_count
             || self.balls.len() >= MAX_BALLS
@@ -480,7 +502,7 @@ impl PizzaState {
             return;
         }
         let ball = self.random_ball();
-        self.balls.push(ball);
+        self.push_ball(ball);
     }
 
     fn apply_pointer_action(&mut self, action: PointerAction) {
@@ -517,7 +539,7 @@ impl PizzaState {
             let color = random_color(&mut self.rng);
             let ball = self.allocate_ball(self.pointer_position, radius, color);
             let id = ball.id;
-            self.balls.push(ball);
+            self.push_ball(ball);
             id
         };
 
@@ -525,6 +547,11 @@ impl PizzaState {
         if let Some(ball) = self.ball_mut(id) {
             ball.moving = false;
             ball.invincible = true;
+        }
+        if let Some(physics) = &mut self.physics {
+            let body = ball_body_id(id);
+            assert!(physics.set_body_kind(body, BodyKind::KinematicPosition, true));
+            assert!(physics.set_velocity(body, Vec2::ZERO, 0.0, true));
         }
     }
 
@@ -539,6 +566,11 @@ impl PizzaState {
             ball.moving = true;
             ball.invincible = false;
         }
+        if let Some(physics) = &mut self.physics {
+            let body = ball_body_id(id);
+            assert!(physics.set_body_kind(body, BodyKind::Dynamic, true));
+            assert!(physics.set_velocity(body, cursor_velocity, 0.0, true));
+        }
         self.cursor_velocity = Vec2::ZERO;
     }
 
@@ -551,6 +583,11 @@ impl PizzaState {
             ball.velocity = Vec2::ZERO;
             ball.moving = true;
             ball.invincible = false;
+        }
+        if let Some(physics) = &mut self.physics {
+            let body = ball_body_id(id);
+            assert!(physics.set_body_kind(body, BodyKind::Dynamic, true));
+            assert!(physics.set_velocity(body, Vec2::ZERO, 0.0, true));
         }
         self.cursor_velocity = Vec2::ZERO;
     }
@@ -579,6 +616,9 @@ impl PizzaState {
         ball.velocity = self.cursor_velocity;
         ball.position += self.cursor_velocity * (dt * CURSOR_TIME_SCALE);
         contain_ball(ball, self.config.bounds);
+        if let Some(physics) = &mut self.physics {
+            assert!(physics.set_next_kinematic_pose(ball_body_id(id), ball.position, 0.0,));
+        }
     }
 
     fn ball_mut(&mut self, id: u64) -> Option<&mut BallState> {
@@ -596,8 +636,186 @@ impl PizzaState {
             .collect::<Vec<_>>();
         if !candidates.is_empty() {
             let candidate = self.rng.random_range(0..candidates.len());
-            self.balls.swap_remove(candidates[candidate]);
+            self.swap_remove_ball(candidates[candidate]);
         }
+    }
+}
+
+fn create_physics_world(config: &PizzaConfig) -> PhysicsWorld {
+    let gravity = match config.benchmark {
+        Some(PizzaBenchmarkConfig {
+            backend: PizzaPhysicsBackend::Rapier,
+            workload: PizzaBenchmarkWorkload::Dense | PizzaBenchmarkWorkload::Churn,
+            ..
+        }) => Vec2::new(0.0, -0.18),
+        _ => Vec2::ZERO,
+    };
+    let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
+        gravity,
+        length_unit: config.bounds.width.min(config.bounds.height).max(0.001),
+        solver_iterations: 4,
+        internal_stabilization_iterations: 1,
+        max_ccd_substeps: 1,
+        collect_events: config.benchmark.is_none(),
+    });
+    physics.reserve(
+        config.desired_ball_count + 1,
+        config.desired_ball_count + 4,
+        0,
+    );
+
+    let thickness = (config.bounds.width.min(config.bounds.height) * 0.02).max(0.001);
+    let half_width = config.bounds.width * 0.5;
+    let half_height = config.bounds.height * 0.5;
+    let wall_geometry = [
+        (
+            Vec2::new(half_width, -thickness * 0.5),
+            half_width + thickness,
+            thickness * 0.5,
+        ),
+        (
+            Vec2::new(half_width, config.bounds.height + thickness * 0.5),
+            half_width + thickness,
+            thickness * 0.5,
+        ),
+        (
+            Vec2::new(-thickness * 0.5, half_height),
+            thickness * 0.5,
+            half_height + thickness,
+        ),
+        (
+            Vec2::new(config.bounds.width + thickness * 0.5, half_height),
+            thickness * 0.5,
+            half_height + thickness,
+        ),
+    ];
+    let walls = wall_geometry
+        .into_iter()
+        .enumerate()
+        .map(|(index, (position, wall_half_width, wall_half_height))| {
+            let mut collider = ColliderSpec::cuboid(
+                ColliderId::new(
+                    WALL_ENTITY,
+                    WALL_COLLIDER_ROLE,
+                    u16::try_from(index).expect("four walls fit in u16"),
+                ),
+                wall_half_width,
+                wall_half_height,
+            );
+            collider.local_position = position;
+            collider.friction = 0.4;
+            collider.restitution = WALL_ELASTICITY;
+            collider
+        })
+        .collect::<Vec<_>>();
+    assert!(physics.insert_body(
+        WALL_BODY,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            ..BodySpec::default()
+        },
+        &walls,
+    ));
+    physics
+}
+
+fn ball_body_id(id: u64) -> BodyId {
+    BodyId::new(PhysicsId::new(id), BALL_BODY_ROLE)
+}
+
+fn ball_collider_id(id: u64) -> ColliderId {
+    ColliderId::new(PhysicsId::new(id), BALL_COLLIDER_ROLE, 0)
+}
+
+fn insert_physics_ball(physics: &mut PhysicsWorld, ball: BallState, held: bool) -> bool {
+    let mut collider = ColliderSpec::ball(ball_collider_id(ball.id), ball.radius);
+    collider.density = 1.0;
+    collider.friction = 0.3;
+    collider.restitution = COLLISION_ELASTICITY;
+    physics.insert_body(
+        ball_body_id(ball.id),
+        BodySpec {
+            kind: if held {
+                BodyKind::KinematicPosition
+            } else {
+                BodyKind::Dynamic
+            },
+            position: ball.position,
+            linear_velocity: ball.velocity,
+            can_sleep: false,
+            ..BodySpec::default()
+        },
+        &[collider],
+    )
+}
+
+fn apply_exact_gravity_to_physics(state: &mut PizzaState) {
+    let mut velocity_deltas = vec![Vec2::ZERO; state.balls.len()];
+    for left_index in 0..state.balls.len() {
+        for right_index in left_index + 1..state.balls.len() {
+            let left = state.balls[left_index];
+            let right = state.balls[right_index];
+            let delta = right.position - left.position;
+            let distance_squared =
+                (delta.length_squared() + GRAVITY_SOFTENING * GRAVITY_SOFTENING).max(f32::EPSILON);
+            let direction = delta.normalized();
+            if direction == Vec2::ZERO {
+                continue;
+            }
+            let force = GRAVITY * left.mass() * right.mass() / distance_squared;
+            velocity_deltas[left_index] += direction * (force / left.mass());
+            velocity_deltas[right_index] -= direction * (force / right.mass());
+        }
+    }
+
+    let physics = state
+        .physics
+        .as_mut()
+        .expect("interactive Pizza uses canonical physics");
+    physics.clear_forces();
+    for (ball, velocity_delta) in state.balls.iter().zip(velocity_deltas) {
+        if !ball.moving {
+            continue;
+        }
+        let body = ball_body_id(ball.id);
+        let mass = physics
+            .body_mass(body)
+            .expect("Pizza metadata and physics mass stay aligned");
+        assert!(physics.apply_impulse(body, velocity_delta * mass, true));
+    }
+}
+
+fn apply_contact_damage(state: &mut PizzaState) {
+    let contacts = state
+        .physics
+        .as_ref()
+        .expect("interactive Pizza uses canonical physics")
+        .contact_events()
+        .to_vec();
+    for contact in contacts {
+        if contact.collider_a.role != BALL_COLLIDER_ROLE
+            || contact.collider_b.role != BALL_COLLIDER_ROLE
+        {
+            continue;
+        }
+        apply_contact_damage_to_ball(state, contact.collider_a.entity, contact);
+        apply_contact_damage_to_ball(state, contact.collider_b.entity, contact);
+    }
+}
+
+fn apply_contact_damage_to_ball(state: &mut PizzaState, entity: PhysicsId, contact: ContactEvent) {
+    let id = entity.value();
+    let body = ball_body_id(id);
+    let mass = state
+        .physics
+        .as_ref()
+        .and_then(|physics| physics.body_mass(body))
+        .unwrap_or(1.0)
+        .max(f32::EPSILON);
+    if let Some(ball) = state.ball_mut(id)
+        && !ball.invincible
+    {
+        ball.hp -= contact.impulse_magnitude / mass * DAMAGE_SCALAR;
     }
 }
 
@@ -617,8 +835,9 @@ impl Scenario for PizzaScenario {
             seed,
             next_ball_id: 1,
             rng: StdRng::seed_from_u64(seed),
-            rapier: None,
+            physics: None,
         };
+        state.rebuild_physics();
         state.initialize_benchmark();
         state
     }
@@ -662,11 +881,11 @@ impl Scenario for PizzaScenario {
                     metrics.physics_time = metrics.gravity_time + metrics.collision_time;
                 }
                 PizzaPhysicsBackend::Rapier => {
-                    let rapier = state
-                        .rapier
+                    let physics = state
+                        .physics
                         .as_mut()
                         .expect("Rapier benchmark initializes a Rapier world");
-                    metrics.rapier = rapier.step(dt);
+                    metrics.rapier = physics.step(dt);
                     metrics.physics_time = metrics.rapier.wall_time;
 
                     let snapshot_started = Instant::now();
@@ -683,26 +902,22 @@ impl Scenario for PizzaScenario {
         state.advance_held_ball(dt);
         state.advance_spawner();
 
-        let workload_started = Instant::now();
-        let movement_dt = dt * WORLD_TIME_SCALE;
-        for ball in &mut state.balls {
-            if ball.moving {
-                ball.position += ball.velocity * movement_dt;
-            }
-            contain_ball(ball, state.config.bounds);
-        }
-        metrics.workload_time = workload_started.elapsed();
-
         let gravity_started = Instant::now();
-        apply_exact_gravity(&mut state.balls);
+        apply_exact_gravity_to_physics(state);
         metrics.gravity_time = gravity_started.elapsed();
 
-        let collision_started = Instant::now();
-        resolve_collisions(&mut state.balls);
-        for ball in &mut state.balls {
-            contain_ball(ball, state.config.bounds);
-        }
-        metrics.collision_time = collision_started.elapsed();
+        let physics = state
+            .physics
+            .as_mut()
+            .expect("interactive Pizza uses the canonical physics world");
+        metrics.rapier = physics.step(dt * WORLD_TIME_SCALE);
+        metrics.physics_time = metrics.rapier.wall_time;
+        metrics.collision_time = metrics.rapier.narrow_phase_time + metrics.rapier.solver_time;
+
+        let snapshot_started = Instant::now();
+        state.sync_from_rapier();
+        metrics.snapshot_time = snapshot_started.elapsed();
+        apply_contact_damage(state);
 
         let lifecycle_started = Instant::now();
         let balls_before_explosions = state.balls.len();
@@ -711,7 +926,6 @@ impl Scenario for PizzaScenario {
         metrics.lifecycle_time = lifecycle_started.elapsed();
         metrics.added = balls_after_explosions.saturating_sub(balls_before_explosions);
         metrics.removed = balls_before_explosions.saturating_sub(balls_after_explosions);
-        metrics.physics_time = metrics.gravity_time + metrics.collision_time;
         state.last_step_metrics = metrics;
         state.tick += 1;
         StepResult::default()
@@ -897,15 +1111,22 @@ fn collide_balls(left: &mut BallState, right: &mut BallState) {
 }
 
 fn explode_dead_balls(state: &mut PizzaState) {
-    let mut dead = Vec::new();
-    state.balls.retain(|ball| {
-        if !ball.invincible && ball.hp <= 0.0 {
-            dead.push(*ball);
-            false
-        } else {
-            true
-        }
-    });
+    let dead_indices = state
+        .balls
+        .iter()
+        .enumerate()
+        .filter(|(_, ball)| !ball.invincible && ball.hp <= 0.0)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let mut dead = Vec::with_capacity(dead_indices.len());
+    for index in dead_indices.into_iter().rev() {
+        dead.push(
+            state
+                .swap_remove_ball(index)
+                .expect("dead Pizza index remains valid"),
+        );
+    }
+    dead.reverse();
 
     for parent in dead {
         if state.balls.len() >= MAX_BALLS {
@@ -933,7 +1154,7 @@ fn explode_dead_balls(state: &mut PizzaState) {
                 let mut fragment = state.allocate_ball(parent.position + offset, radius, color);
                 fragment.velocity = velocity;
                 contain_ball(&mut fragment, state.config.bounds);
-                state.balls.push(fragment);
+                state.push_ball(fragment);
                 if state.balls.len() >= MAX_BALLS {
                     return;
                 }
@@ -1039,6 +1260,35 @@ mod tests {
     }
 
     #[test]
+    fn interactive_collisions_use_canonical_rapier_motion_and_damage() {
+        let mut state = PizzaScenario::init(
+            PizzaConfig {
+                desired_ball_count: 0,
+                ..PizzaConfig::default()
+            },
+            11,
+        );
+        let mut left = state.allocate_ball(Vec2::new(0.40, 0.30), 0.08, Color::RED);
+        let mut right = state.allocate_ball(Vec2::new(0.50, 0.30), 0.04, Color::BLUE);
+        left.velocity = Vec2::new(0.03, 0.0);
+        right.velocity = Vec2::new(-0.01, 0.0);
+        state.push_ball(left);
+        state.push_ball(right);
+
+        for _ in 0..3 {
+            step(&mut state, &[]);
+        }
+
+        assert!(state.balls[0].hp < state.balls[0].radius);
+        assert!(state.balls[1].hp < state.balls[1].radius);
+        assert!(state.balls[0].position.distance_to(state.balls[1].position) > 0.10);
+        assert_eq!(
+            state.physics.as_ref().unwrap().body_count(),
+            state.balls.len() + 1
+        );
+    }
+
+    #[test]
     fn dead_ball_explodes_into_capped_fragments() {
         let mut state = PizzaScenario::init(
             PizzaConfig {
@@ -1049,11 +1299,15 @@ mod tests {
         );
         let mut ball = state.allocate_ball(Vec2::new(0.5, 0.25), 0.08, Color::GREEN);
         ball.hp = 0.0;
-        state.balls.push(ball);
+        state.push_ball(ball);
         explode_dead_balls(&mut state);
         assert!(!state.balls.is_empty());
         assert!(state.balls.len() <= MAX_BALLS);
         assert!(state.balls.iter().all(|fragment| fragment.radius < 0.08));
+        assert_eq!(
+            state.physics.as_ref().unwrap().body_count(),
+            state.balls.len() + 1
+        );
     }
 
     #[test]
@@ -1064,6 +1318,10 @@ mod tests {
         assert_eq!(frame.camera.center, RenderPoint::new(0.5, 0.25));
         assert_eq!(frame.camera.height, 0.5);
         assert_eq!(frame.camera.visible_width(2.0), 1.0);
+        assert_eq!(
+            state.physics.as_ref().unwrap().body_count(),
+            state.balls.len() + 1
+        );
     }
 
     #[test]

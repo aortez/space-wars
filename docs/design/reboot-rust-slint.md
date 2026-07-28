@@ -52,6 +52,11 @@ Planned scenarios (first few):
 
 The engine is not anticipated to be "generic." It is the *spacewars engine* — a 2D ships-and-planets-and-lasers physics library with room to grow (fluids, more entity kinds). "Generic game engine" is an anti-goal.
 
+Rigid mechanics use the canonical Rapier-backed world described in
+[`physics-architecture.md`](physics-architecture.md). Rapier owns rigid-body
+motion, contact, and joints; engine force systems and scenarios own gravity,
+controls, lifecycle, and gameplay rules.
+
 ### Scenario trait (sketch)
 
 Illustrative, not final:
