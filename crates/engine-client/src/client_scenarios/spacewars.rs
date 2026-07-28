@@ -5,8 +5,8 @@ use engine_core::SpacewarsConfig;
 use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, SpacewarsState};
 
 use super::{
-    CenterPanelState, ClientScenario, PlayerPanelState, RenderBackend, ScenarioCapabilities,
-    ScenarioRegistration, ScenarioStartMode,
+    BenchmarkCounts, CenterPanelState, ClientScenario, PlayerPanelState, RenderBackend,
+    ScenarioCapabilities, ScenarioRegistration, ScenarioStartMode,
 };
 use crate::input::ClientInput;
 use crate::render::{self, FrameLayout, Viewport};
@@ -38,7 +38,7 @@ fn create(
         ScenarioStartMode::Normal => {
             SpacewarsScenario::init(spacewars_config_from_settings(settings), seed)
         }
-        ScenarioStartMode::Benchmark => SpacewarsScenario::init_benchmark(seed),
+        ScenarioStartMode::Benchmark(_) => SpacewarsScenario::init_benchmark(seed),
     };
     Box::new(SpacewarsClientScenario {
         state: Box::new(state),
@@ -109,8 +109,20 @@ impl ClientScenario for SpacewarsClientScenario {
         self.state.zoom_player_out(player);
     }
 
-    fn benchmark_counts(&self) -> Option<SpacewarsBenchmarkCounts> {
-        Some(SpacewarsScenario::benchmark_counts(&self.state))
+    fn benchmark_counts(&self) -> Option<BenchmarkCounts> {
+        let SpacewarsBenchmarkCounts {
+            asteroids,
+            fragments,
+            shells,
+            particles,
+        } = SpacewarsScenario::benchmark_counts(&self.state);
+        Some(BenchmarkCounts {
+            asteroids,
+            fragments,
+            shells,
+            particles,
+            ..BenchmarkCounts::default()
+        })
     }
 
     #[cfg(test)]

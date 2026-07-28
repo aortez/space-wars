@@ -9,17 +9,21 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts two playable scenarios:
+The local launcher currently hosts three playable scenarios:
 
 - **Spacewars** — the two-player arcade reboot.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation. Click
   empty space to make a ball, or grab and fling an existing one.
+- **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
+  independently driven pin-slot suspension wheels on a rotating circular planet.
 
 Textures and sounds for Spacewars have yet to be done. The Pizza implementation
-starts with capped exact collision/gravity loops; quadtree and Barnes–Hut
+starts with capped exact collision/gravity loops; quadtree and Barnes-Hut
 optimizations are intentionally deferred.
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
+The deterministic Classic/Rapier Pizza benchmark is documented in
+[`docs/pizza-performance-lab.md`](docs/pizza-performance-lab.md).
 
 ## Run locally
 
@@ -33,8 +37,12 @@ Or start a scenario directly:
 
 ```sh
 cargo run -p engine-client -- --scenario pizza
+cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spacewars
 ```
+
+Rover Lab uses `W` to drive forward, `S` to brake, `X` to reverse, and `R` to
+reset.
 
 ## Raspberry Pi / kiosk launch
 

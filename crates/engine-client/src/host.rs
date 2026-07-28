@@ -11,17 +11,16 @@ use std::time::{Duration, Instant};
 
 use engine_common::{Action, RenderFrame, Settings, StepResult, TickModel};
 use engine_core::Color as CoreColor;
-use scenario_spacewars::SpacewarsBenchmarkCounts;
 use slint::{
     Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
 };
 
 use crate::MainWindow;
-pub use crate::client_scenarios::RenderBackend;
 use crate::client_scenarios::{
-    self, CenterPanelState, ClientScenario, ScenarioCreateError, ScenarioRegistration,
-    ScenarioStartMode,
+    self, BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario,
+    ScenarioCreateError, ScenarioRegistration, ScenarioStartMode,
 };
+pub use crate::client_scenarios::{BenchmarkConfiguration, RenderBackend};
 use crate::input::{self, ClientInput};
 use crate::raster;
 use crate::render::{self, Viewport};
@@ -33,6 +32,7 @@ const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 #[derive(Debug, Clone)]
 pub struct ScenarioLoopOptions {
     pub start_benchmark: bool,
+    pub benchmark_configuration: BenchmarkConfiguration,
     pub renderer: RenderBackend,
     pub raster_scale: f32,
     pub controls: Option<SharedScenarioControls>,
@@ -43,6 +43,7 @@ impl Default for ScenarioLoopOptions {
     fn default() -> Self {
         Self {
             start_benchmark: false,
+            benchmark_configuration: BenchmarkConfiguration::default(),
             renderer: RenderBackend::default(),
             raster_scale: 1.0,
             controls: None,
@@ -103,11 +104,14 @@ impl ScenarioControls {
 
 #[derive(Debug, Clone)]
 pub struct BenchmarkOptions {
+    pub scenario: String,
     pub seed: u64,
     pub seconds: u64,
     pub report_path: Option<PathBuf>,
     pub renderer: RenderBackend,
     pub raster_scale: f32,
+    pub configuration: BenchmarkConfiguration,
+    pub settings: Settings,
 }
 
 pub enum HostError {
@@ -215,6 +219,7 @@ pub fn start_scenario_loop(
 ) -> Result<Timer, HostError> {
     let ScenarioLoopOptions {
         start_benchmark,
+        benchmark_configuration,
         renderer,
         raster_scale,
         controls,
@@ -223,7 +228,7 @@ pub fn start_scenario_loop(
     let scenario_name = scenario.to_string();
     let initial_viewport = Viewport::from_window(window.window());
     let start_mode = if start_benchmark {
-        ScenarioStartMode::Benchmark
+        ScenarioStartMode::Benchmark(benchmark_configuration)
     } else {
         ScenarioStartMode::Normal
     };
@@ -256,7 +261,7 @@ pub fn start_scenario_loop(
     window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
 
     if benchmark_active {
-        tracing::info!(seed, "started visual Spacewars benchmark.");
+        tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
     }
 
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
@@ -613,7 +618,7 @@ fn start_benchmark_scenario(
         seed,
         settings,
         viewport,
-        ScenarioStartMode::Benchmark,
+        ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
     ) else {
         return;
     };
@@ -622,7 +627,7 @@ fn start_benchmark_scenario(
     *paused = false;
     *benchmark_active = true;
     input.clear();
-    tracing::info!(seed, "started visual Spacewars benchmark.");
+    tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
 }
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
@@ -781,18 +786,16 @@ fn set_vector_presentation(window: &MainWindow, presentation: render::VectorPres
     window.set_vector_minimaps_visible(true);
 }
 
-pub fn run_spacewars_benchmark(
-    options: BenchmarkOptions,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error::Error>> {
     let seconds = options.seconds.max(1);
     let mut scenario = HostedScenario::new(
-        "spacewars",
+        &options.scenario,
         options.seed,
-        &Settings::default(),
+        &options.settings,
         BENCHMARK_VIEWPORT,
-        ScenarioStartMode::Benchmark,
+        ScenarioStartMode::Benchmark(options.configuration),
     )
-    .expect("registered Spacewars benchmark should construct");
+    .expect("validated benchmark scenario should construct");
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model).unwrap_or(Duration::from_secs_f64(1.0 / 60.0));
     let mut input = ClientInput::default();
@@ -819,7 +822,18 @@ pub fn run_spacewars_benchmark(
             let step_started = Instant::now();
             let actions = scenario.actions(&mut input, true, &[]);
             scenario.step(&actions, fixed_dt);
-            sample.step_time += step_started.elapsed();
+            let step_time = step_started.elapsed();
+            sample.step_time += step_time;
+            sample.step_samples.push(step_time);
+            let scenario_metrics = scenario.benchmark_step_metrics();
+            sample.max_lifecycle_time = sample
+                .max_lifecycle_time
+                .max(scenario_metrics.lifecycle_time);
+            sample.scenario_metrics += scenario_metrics;
+            let counts = scenario.benchmark_counts();
+            sample.max_candidate_pairs = sample.max_candidate_pairs.max(counts.candidate_pairs);
+            sample.max_contact_pairs = sample.max_contact_pairs.max(counts.contact_pairs);
+            sample.max_contacts = sample.max_contacts.max(counts.contacts);
 
             let render_started = Instant::now();
             let frames = scenario.render_frames(options.renderer, BENCHMARK_VIEWPORT);
@@ -839,11 +853,14 @@ pub fn run_spacewars_benchmark(
 
             sample.frames += 1;
             sample.updates += 1;
-            sample.max_total_time = sample.max_total_time.max(frame_started.elapsed());
+            let total_time = frame_started.elapsed();
+            sample.max_total_time = sample.max_total_time.max(total_time);
+            sample.total_samples.push(total_time);
         }
 
         sample.wall_time = sample_started.elapsed();
         let row = BenchmarkRow::from_sample(
+            &options.scenario,
             second,
             options.renderer,
             options.raster_scale,
@@ -920,12 +937,20 @@ struct BenchmarkSample {
     render_time: Duration,
     present_time: Duration,
     raster_timings: raster::RasterTimings,
+    scenario_metrics: BenchmarkStepMetrics,
+    step_samples: Vec<Duration>,
+    total_samples: Vec<Duration>,
+    max_lifecycle_time: Duration,
+    max_candidate_pairs: usize,
+    max_contact_pairs: usize,
+    max_contacts: usize,
     max_total_time: Duration,
     wall_time: Duration,
 }
 
 #[derive(Debug)]
 struct BenchmarkRow {
+    scenario: String,
     renderer: &'static str,
     raster_scale: f32,
     second: u64,
@@ -937,7 +962,35 @@ struct BenchmarkRow {
     fragments: usize,
     shells: usize,
     particles: usize,
+    balls: usize,
+    active_bodies: usize,
+    sleeping_bodies: usize,
+    candidate_pairs: usize,
+    max_candidate_pairs: usize,
+    contact_pairs: usize,
+    max_contact_pairs: usize,
+    contacts: usize,
+    max_contacts: usize,
+    added: usize,
+    removed: usize,
     avg_step_ms: f64,
+    p50_step_ms: f64,
+    p95_step_ms: f64,
+    p99_step_ms: f64,
+    max_step_ms: f64,
+    avg_workload_ms: f64,
+    avg_lifecycle_ms: f64,
+    max_lifecycle_ms: f64,
+    avg_gravity_ms: f64,
+    avg_collision_ms: f64,
+    avg_physics_ms: f64,
+    avg_snapshot_ms: f64,
+    avg_rapier_step_ms: f64,
+    avg_rapier_broad_phase_ms: f64,
+    avg_rapier_narrow_phase_ms: f64,
+    avg_rapier_island_ms: f64,
+    avg_rapier_solver_ms: f64,
+    avg_rapier_ccd_ms: f64,
     avg_render_ms: f64,
     avg_present_ms: f64,
     avg_raster_clear_ms: f64,
@@ -957,20 +1010,25 @@ struct BenchmarkRow {
     avg_raster_overview_live_ms: f64,
     avg_raster_image_ms: f64,
     avg_total_ms: f64,
+    p50_total_ms: f64,
+    p95_total_ms: f64,
+    p99_total_ms: f64,
     max_total_ms: f64,
 }
 
 impl BenchmarkRow {
     fn from_sample(
+        scenario: &str,
         second: u64,
         renderer: RenderBackend,
         raster_scale: f32,
         sample: BenchmarkSample,
-        counts: SpacewarsBenchmarkCounts,
+        counts: BenchmarkCounts,
     ) -> Self {
         let frames = sample.frames.max(1);
         let measured_time = sample.step_time + sample.render_time + sample.present_time;
         Self {
+            scenario: scenario.into(),
             renderer: renderer.label(),
             raster_scale,
             second,
@@ -982,7 +1040,47 @@ impl BenchmarkRow {
             fragments: counts.fragments,
             shells: counts.shells,
             particles: counts.particles,
+            balls: counts.balls,
+            active_bodies: counts.active_bodies,
+            sleeping_bodies: counts.sleeping_bodies,
+            candidate_pairs: counts.candidate_pairs,
+            max_candidate_pairs: sample.max_candidate_pairs,
+            contact_pairs: counts.contact_pairs,
+            max_contact_pairs: sample.max_contact_pairs,
+            contacts: counts.contacts,
+            max_contacts: sample.max_contacts,
+            added: sample.scenario_metrics.added,
+            removed: sample.scenario_metrics.removed,
             avg_step_ms: avg_ms(sample.step_time, frames),
+            p50_step_ms: percentile_ms(&sample.step_samples, 0.50),
+            p95_step_ms: percentile_ms(&sample.step_samples, 0.95),
+            p99_step_ms: percentile_ms(&sample.step_samples, 0.99),
+            max_step_ms: sample
+                .step_samples
+                .iter()
+                .copied()
+                .max()
+                .map(duration_ms)
+                .unwrap_or_default(),
+            avg_workload_ms: avg_ms(sample.scenario_metrics.workload_time, frames),
+            avg_lifecycle_ms: avg_ms(sample.scenario_metrics.lifecycle_time, frames),
+            max_lifecycle_ms: duration_ms(sample.max_lifecycle_time),
+            avg_gravity_ms: avg_ms(sample.scenario_metrics.gravity_time, frames),
+            avg_collision_ms: avg_ms(sample.scenario_metrics.collision_time, frames),
+            avg_physics_ms: avg_ms(sample.scenario_metrics.physics_time, frames),
+            avg_snapshot_ms: avg_ms(sample.scenario_metrics.snapshot_time, frames),
+            avg_rapier_step_ms: avg_ms(sample.scenario_metrics.rapier_step_time, frames),
+            avg_rapier_broad_phase_ms: avg_ms(
+                sample.scenario_metrics.rapier_broad_phase_time,
+                frames,
+            ),
+            avg_rapier_narrow_phase_ms: avg_ms(
+                sample.scenario_metrics.rapier_narrow_phase_time,
+                frames,
+            ),
+            avg_rapier_island_ms: avg_ms(sample.scenario_metrics.rapier_island_time, frames),
+            avg_rapier_solver_ms: avg_ms(sample.scenario_metrics.rapier_solver_time, frames),
+            avg_rapier_ccd_ms: avg_ms(sample.scenario_metrics.rapier_ccd_time, frames),
             avg_render_ms: avg_ms(sample.render_time, frames),
             avg_present_ms: avg_ms(sample.present_time, frames),
             avg_raster_clear_ms: avg_ms(sample.raster_timings.clear, frames),
@@ -1008,6 +1106,9 @@ impl BenchmarkRow {
             avg_raster_overview_live_ms: avg_ms(sample.raster_timings.overview_live, frames),
             avg_raster_image_ms: avg_ms(sample.raster_timings.image, frames),
             avg_total_ms: avg_ms(measured_time, frames),
+            p50_total_ms: percentile_ms(&sample.total_samples, 0.50),
+            p95_total_ms: percentile_ms(&sample.total_samples, 0.95),
+            p99_total_ms: percentile_ms(&sample.total_samples, 0.99),
             max_total_ms: duration_ms(sample.max_total_time),
         }
     }
@@ -1016,51 +1117,93 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     writeln!(
         writer,
-        "renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,avg_step_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,max_total_ms"
+        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
 fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result<()> {
-    writeln!(
-        writer,
-        "{},{:.2},{},{},{},{:.2},{},{},{},{},{},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3}",
-        row.renderer,
-        row.raster_scale,
-        row.second,
-        row.frames,
-        row.updates,
-        row.throughput_fps,
-        row.scene_items,
-        row.asteroids,
-        row.fragments,
-        row.shells,
-        row.particles,
-        row.avg_step_ms,
-        row.avg_render_ms,
-        row.avg_present_ms,
-        row.avg_raster_clear_ms,
-        row.avg_raster_player_ms,
-        row.avg_raster_player_starfield_ms,
-        row.avg_raster_player_bodies_ms,
-        row.avg_raster_player_world_ms,
-        row.avg_raster_player_sun_planets_ms,
-        row.avg_raster_player_spaceports_ms,
-        row.avg_raster_player_effects_ms,
-        row.avg_raster_player_ships_ms,
-        row.avg_raster_player_debris_ms,
-        row.avg_raster_player_particles_ms,
-        row.avg_raster_player_other_ms,
-        row.avg_raster_overview_refresh_ms,
-        row.avg_raster_overview_blit_ms,
-        row.avg_raster_overview_live_ms,
-        row.avg_raster_image_ms,
-        row.avg_total_ms,
-        row.max_total_ms,
-    )
+    let fields = [
+        row.scenario.clone(),
+        row.renderer.into(),
+        format!("{:.2}", row.raster_scale),
+        row.second.to_string(),
+        row.frames.to_string(),
+        row.updates.to_string(),
+        format!("{:.2}", row.throughput_fps),
+        row.scene_items.to_string(),
+        row.asteroids.to_string(),
+        row.fragments.to_string(),
+        row.shells.to_string(),
+        row.particles.to_string(),
+        row.balls.to_string(),
+        row.active_bodies.to_string(),
+        row.sleeping_bodies.to_string(),
+        row.candidate_pairs.to_string(),
+        row.max_candidate_pairs.to_string(),
+        row.contact_pairs.to_string(),
+        row.max_contact_pairs.to_string(),
+        row.contacts.to_string(),
+        row.max_contacts.to_string(),
+        row.added.to_string(),
+        row.removed.to_string(),
+        format!("{:.3}", row.avg_step_ms),
+        format!("{:.3}", row.p50_step_ms),
+        format!("{:.3}", row.p95_step_ms),
+        format!("{:.3}", row.p99_step_ms),
+        format!("{:.3}", row.max_step_ms),
+        format!("{:.3}", row.avg_workload_ms),
+        format!("{:.3}", row.avg_lifecycle_ms),
+        format!("{:.3}", row.max_lifecycle_ms),
+        format!("{:.3}", row.avg_gravity_ms),
+        format!("{:.3}", row.avg_collision_ms),
+        format!("{:.3}", row.avg_physics_ms),
+        format!("{:.3}", row.avg_snapshot_ms),
+        format!("{:.3}", row.avg_rapier_step_ms),
+        format!("{:.3}", row.avg_rapier_broad_phase_ms),
+        format!("{:.3}", row.avg_rapier_narrow_phase_ms),
+        format!("{:.3}", row.avg_rapier_island_ms),
+        format!("{:.3}", row.avg_rapier_solver_ms),
+        format!("{:.3}", row.avg_rapier_ccd_ms),
+        format!("{:.3}", row.avg_render_ms),
+        format!("{:.3}", row.avg_present_ms),
+        format!("{:.3}", row.avg_raster_clear_ms),
+        format!("{:.3}", row.avg_raster_player_ms),
+        format!("{:.3}", row.avg_raster_player_starfield_ms),
+        format!("{:.3}", row.avg_raster_player_bodies_ms),
+        format!("{:.3}", row.avg_raster_player_world_ms),
+        format!("{:.3}", row.avg_raster_player_sun_planets_ms),
+        format!("{:.3}", row.avg_raster_player_spaceports_ms),
+        format!("{:.3}", row.avg_raster_player_effects_ms),
+        format!("{:.3}", row.avg_raster_player_ships_ms),
+        format!("{:.3}", row.avg_raster_player_debris_ms),
+        format!("{:.3}", row.avg_raster_player_particles_ms),
+        format!("{:.3}", row.avg_raster_player_other_ms),
+        format!("{:.3}", row.avg_raster_overview_refresh_ms),
+        format!("{:.3}", row.avg_raster_overview_blit_ms),
+        format!("{:.3}", row.avg_raster_overview_live_ms),
+        format!("{:.3}", row.avg_raster_image_ms),
+        format!("{:.3}", row.avg_total_ms),
+        format!("{:.3}", row.p50_total_ms),
+        format!("{:.3}", row.p95_total_ms),
+        format!("{:.3}", row.p99_total_ms),
+        format!("{:.3}", row.max_total_ms),
+    ];
+    writeln!(writer, "{}", fields.join(","))
 }
 
 fn avg_ms(duration: Duration, samples: u32) -> f64 {
     duration_ms(duration) / samples.max(1) as f64
+}
+
+fn percentile_ms(samples: &[Duration], percentile: f64) -> f64 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let mut samples = samples.to_vec();
+    samples.sort_unstable();
+    let percentile = percentile.clamp(0.0, 1.0);
+    let index = ((samples.len() - 1) as f64 * percentile).ceil() as usize;
+    duration_ms(samples[index])
 }
 
 fn duration_ms(duration: Duration) -> f64 {
@@ -1146,8 +1289,12 @@ impl HostedScenario {
         }
     }
 
-    pub(crate) fn benchmark_counts(&self) -> SpacewarsBenchmarkCounts {
+    pub(crate) fn benchmark_counts(&self) -> BenchmarkCounts {
         self.inner.benchmark_counts().unwrap_or_default()
+    }
+
+    pub(crate) fn benchmark_step_metrics(&self) -> BenchmarkStepMetrics {
+        self.inner.benchmark_step_metrics().unwrap_or_default()
     }
 
     #[cfg(test)]
@@ -1586,7 +1733,7 @@ mod tests {
             0,
             &Settings::default(),
             TEST_VIEWPORT,
-            ScenarioStartMode::Benchmark,
+            ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
         )
         .unwrap();
 
@@ -1906,6 +2053,50 @@ mod tests {
         assert_eq!(accumulator, Duration::ZERO);
         assert_eq!(counts.asteroids, 100);
         assert_eq!(counts.particles, 1_200);
+    }
+
+    #[test]
+    fn benchmark_key_starts_visible_rapier_pizza_workload() {
+        let mut scenario = hosted_scenario("pizza", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::Benchmark);
+        step_scenario(
+            &mut scenario,
+            "pizza",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+
+        let counts = scenario.benchmark_counts();
+        assert!(benchmark_active);
+        assert!(!paused);
+        assert_eq!(accumulator, Duration::ZERO);
+        assert_eq!(counts.balls, scenario_pizza::DEFAULT_BENCHMARK_BALLS);
+        assert_eq!(
+            scenario
+                .render_frame()
+                .layers
+                .iter()
+                .map(|layer| layer.primitives.len())
+                .sum::<usize>(),
+            scenario_pizza::DEFAULT_BENCHMARK_BALLS + 1
+        );
     }
 
     #[test]

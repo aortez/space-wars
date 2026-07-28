@@ -1,5 +1,5 @@
 [package]
-name = "scenario-pizza"
+name = "scenario-rover-lab"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -10,4 +10,3 @@ rust-version.workspace = true
 engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-rapier = { workspace = true }
-rand = { workspace = true }
