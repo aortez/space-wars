@@ -128,7 +128,7 @@ impl SpacewarsPhysics {
         };
         physics.world.reserve(
             ships.len() + planets.len() + 2,
-            ships.len() * 6 + planets.len() * 3 + 2,
+            ships.len() + planets.len() * 3 + 2,
             0,
         );
         let _ = physics.insert_world_boundary(universe_radius);
@@ -467,29 +467,7 @@ impl SpacewarsPhysics {
 
     fn insert_ship(&mut self, index: usize, ship: &ShipState, docked: bool) -> bool {
         let entity = ship_entity(index);
-        let triangles = ship_local_triangles(ship);
-        let density = ship.mass()
-            / triangles
-                .iter()
-                .map(|points| triangle_area(*points))
-                .sum::<f32>();
-        let groups = ship_collision_groups(ship, docked);
-        let colliders = triangles
-            .into_iter()
-            .enumerate()
-            .map(|(part, points)| {
-                let mut collider = ColliderSpec::convex_polygon(
-                    collider_id(entity, SHIP_HULL_ROLE, part as u16),
-                    points.to_vec(),
-                );
-                collider.density = density;
-                collider.friction = 0.0;
-                collider.restitution = DEFAULT_ELASTICITY;
-                collider.collision_groups = groups;
-                collider.solver_groups = groups;
-                collider
-            })
-            .collect::<Vec<_>>();
+        let collider = ship_collider(entity, ship, docked);
         let inserted = self.world.insert_body(
             primary_body(entity),
             BodySpec {
@@ -504,7 +482,7 @@ impl SpacewarsPhysics {
                 additional_solver_iterations: 2,
                 ..BodySpec::default()
             },
-            &colliders,
+            &[collider],
         );
         debug_assert!(inserted);
         self.ship_keys[index] = Some(ShipColliderKey {
@@ -665,6 +643,65 @@ fn ship_local_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     ]
 }
 
+fn ship_collider(entity: PhysicsId, ship: &ShipState, docked: bool) -> ColliderSpec {
+    let hull = ship_collision_hull(ship);
+    let density = ship.mass() / polygon_area(&hull).max(f32::EPSILON);
+    let groups = ship_collision_groups(ship, docked);
+    let mut collider = ColliderSpec::convex_polygon(collider_id(entity, SHIP_HULL_ROLE, 0), hull);
+    collider.density = density;
+    collider.friction = 0.0;
+    collider.restitution = DEFAULT_ELASTICITY;
+    collider.collision_groups = groups;
+    collider.solver_groups = groups;
+    collider
+}
+
+/// Build one stable convex collision silhouette from the independently rendered
+/// ship parts. A single collider prevents overlapping decorative triangles from
+/// producing several solver impulses for one impact.
+fn ship_collision_hull(ship: &ShipState) -> Vec<Vec2> {
+    let mut points = ship_local_triangles(ship)
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    points.sort_unstable_by(|a, b| a.x.total_cmp(&b.x).then_with(|| a.y.total_cmp(&b.y)));
+    points.dedup_by(|a, b| a.x == b.x && a.y == b.y);
+    if points.len() <= 2 {
+        return points;
+    }
+
+    let mut lower = Vec::with_capacity(points.len());
+    for &point in &points {
+        while lower.len() >= 2
+            && cross(
+                lower[lower.len() - 1] - lower[lower.len() - 2],
+                point - lower[lower.len() - 1],
+            ) <= 0.0
+        {
+            lower.pop();
+        }
+        lower.push(point);
+    }
+
+    let mut upper = Vec::with_capacity(points.len());
+    for &point in points.iter().rev() {
+        while upper.len() >= 2
+            && cross(
+                upper[upper.len() - 1] - upper[upper.len() - 2],
+                point - upper[upper.len() - 1],
+            ) <= 0.0
+        {
+            upper.pop();
+        }
+        upper.push(point);
+    }
+
+    lower.pop();
+    upper.pop();
+    lower.extend(upper);
+    lower
+}
+
 fn ship_pivot(form: ShipForm) -> Vec2 {
     match form {
         ShipForm::Ship => SHIP_PIVOT,
@@ -687,10 +724,24 @@ fn control_angular_velocity(ship: &ShipState, physical: f32) -> f32 {
 }
 
 fn triangle_area(points: [Vec2; 3]) -> f32 {
-    ((points[1] - points[0]).x * (points[2] - points[0]).y
-        - (points[1] - points[0]).y * (points[2] - points[0]).x)
+    cross(points[1] - points[0], points[2] - points[0]).abs() * 0.5
+}
+
+fn polygon_area(points: &[Vec2]) -> f32 {
+    if points.len() < 3 {
+        return 0.0;
+    }
+    points
+        .iter()
+        .zip(points.iter().cycle().skip(1))
+        .map(|(&a, &b)| cross(a, b))
+        .sum::<f32>()
         .abs()
         * 0.5
+}
+
+fn cross(a: Vec2, b: Vec2) -> f32 {
+    a.x * b.y - a.y * b.x
 }
 
 fn circle(radius: f32, segments: usize) -> Vec<Vec2> {
@@ -888,6 +939,101 @@ mod tests {
         let local_center = super::super::ship_low_bounds(&triangles).center;
 
         assert!(rendered_center.distance_to(local_center + SHIP_PIVOT) < 1.0e-5);
+    }
+
+    #[test]
+    fn ship_collision_hulls_enclose_rendered_parts_and_preserve_mass() {
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::ZERO, engine_core::Color::WHITE, 1.0 / 60.0);
+        let mut closed_ship = ship.clone();
+        closed_ship.wing_theta = super::super::MAX_WING_THETA;
+        let mut pod = ship.clone();
+        pod.form = ShipForm::EscapePod;
+
+        for ship in [&ship, &closed_ship, &pod] {
+            let triangles = ship_local_triangles(ship);
+            let hull = ship_collision_hull(ship);
+            assert!(hull.len() >= 3);
+            assert_eq!(hull, ship_collision_hull(ship));
+
+            for (&start, &end) in hull.iter().zip(hull.iter().cycle().skip(1)) {
+                for point in triangles.iter().flatten() {
+                    assert!(
+                        cross(end - start, *point - start) >= -1.0e-5,
+                        "{point:?} should be inside hull {hull:?}"
+                    );
+                }
+            }
+
+            let collider = ship_collider(ship_entity(0), ship, false);
+            let engine_rapier::world::ColliderShape::ConvexPolygon { vertices } = collider.shape
+            else {
+                panic!("ship should use one convex polygon");
+            };
+            assert_eq!(vertices, hull);
+            assert_eq!(collider.id.part, 0);
+            assert!((collider.density * polygon_area(&vertices) - ship.mass()).abs() < 1.0e-4);
+        }
+
+        ship.wing_theta = super::super::MAX_WING_THETA * 0.5;
+        assert_ne!(
+            ship_collision_hull(&ship),
+            ship_collision_hull(&closed_ship)
+        );
+    }
+
+    #[test]
+    fn fast_glancing_asteroid_hit_uses_one_ship_hull() {
+        let mut ships = [
+            ShipState::new_with_default_life(
+                0,
+                Vec2::new(1_000.0, 1_000.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+            ShipState::new_with_default_life(
+                1,
+                Vec2::new(3_000.0, 3_000.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+        ];
+        ships[0].wing_theta = super::super::MAX_WING_THETA;
+        ships[0].wing_state = super::super::WingState::Closed;
+        ships[0].velocity = Vec2::Y * super::super::WING_CLOSED_SPEED;
+
+        let mut physics = SpacewarsPhysics::new(2_000.0, &ships, None, &[]);
+        assert_eq!(
+            physics.world.collider_count(),
+            3,
+            "the world boundary and two ships should each use one collider"
+        );
+
+        let mut debris = vec![DebrisState::new(
+            DebrisKind::Asteroid,
+            ships[0].position + Vec2::new(5.0, 15.7),
+            Vec2::ZERO,
+            3.0,
+            1.0,
+            engine_core::Color::WHITE,
+        )];
+        let lifecycle = physics.reconcile(1, &mut ships, &mut debris, None, &[], &[false; 2]);
+        assert_eq!(lifecycle.added, 1);
+        assert_eq!(physics.world.collider_count(), 4);
+
+        let _ = physics.step(1.0 / 60.0);
+        let _ = physics.step(1.0 / 60.0);
+
+        physics.synchronize_motion(&mut ships, &mut debris);
+        assert!(
+            debris[0].velocity.length_squared() > 0.0,
+            "the glancing setup should actually hit the asteroid"
+        );
+        assert!(
+            ships[0].rotation_radians.abs() < core::f32::consts::FRAC_PI_2,
+            "the resolving frame rotated the ship by {} radians",
+            ships[0].rotation_radians
+        );
     }
 
     #[test]

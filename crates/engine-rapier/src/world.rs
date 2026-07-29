@@ -584,6 +584,10 @@ impl PhysicsWorld {
         self.bodies.len()
     }
 
+    pub fn collider_count(&self) -> usize {
+        self.colliders.len()
+    }
+
     pub fn contains_entity(&self, id: PhysicsId) -> bool {
         self.entities.contains_key(&id)
     }

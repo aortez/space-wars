@@ -7113,8 +7113,10 @@ mod tests {
     #[test]
     fn step_applies_gravity_before_rapier_resolves_body_collision() {
         let mut state = init_deathmatch();
-        let body_position = state.ships[0].position + Vec2::new(8.0, 0.0);
         let body_radius = 20.0;
+        // Keep the ship crossing the surface: a collider fully contained by a
+        // circle does not have an unambiguous outward contact normal.
+        let body_position = state.ships[0].position + Vec2::new(body_radius + 5.0, 0.0);
         let body_mass = body_mass(body_radius);
         let normal = (state.ships[0].position - body_position).normalized();
         let start_life = state.ships[0].life;
@@ -7137,7 +7139,8 @@ mod tests {
         );
         assert!(
             state.ships[0].velocity.dot(normal) > 0.0,
-            "Rapier should resolve the gravity-driven impact outward"
+            "Rapier should resolve the gravity-driven impact outward: velocity={:?}, normal={normal:?}",
+            state.ships[0].velocity
         );
         assert!(state.ships[0].life < start_life);
     }
