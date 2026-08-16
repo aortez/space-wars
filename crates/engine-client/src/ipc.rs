@@ -1,31 +1,44 @@
+#[cfg(unix)]
 use std::fs;
+#[cfg(unix)]
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::mpsc;
+#[cfg(unix)]
 use std::thread;
+#[cfg(unix)]
 use std::time::Duration;
 
 use engine_common::DEFAULT_CONTROL_SOCKET;
-use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode};
+use slint::Timer;
+#[cfg(unix)]
+use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 
 use crate::MainWindow;
 
+#[cfg(unix)]
 #[derive(Debug)]
 struct ControlRequest {
     command: ControlCommand,
     response: ResponseWriter,
 }
 
+#[cfg(unix)]
 #[derive(Debug)]
 enum ControlCommand {
     Screenshot { output: PathBuf },
 }
 
+#[cfg(unix)]
 #[derive(Debug)]
 struct ResponseWriter {
     stream: std::os::unix::net::UnixStream,
 }
 
+#[cfg(unix)]
 impl ResponseWriter {
     fn ok(mut self, message: impl AsRef<str>) {
         let _ = writeln!(self.stream, "ok {}", message.as_ref());
@@ -42,6 +55,7 @@ pub fn control_socket_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(DEFAULT_CONTROL_SOCKET))
 }
 
+#[cfg(unix)]
 pub fn start_control_server(window: &MainWindow, socket_path: PathBuf) -> Option<Timer> {
     let (tx, rx) = mpsc::channel();
     if let Err(err) = spawn_listener(socket_path.clone(), tx) {
@@ -68,6 +82,13 @@ pub fn start_control_server(window: &MainWindow, socket_path: PathBuf) -> Option
     Some(timer)
 }
 
+#[cfg(not(unix))]
+pub fn start_control_server(_window: &MainWindow, _socket_path: PathBuf) -> Option<Timer> {
+    tracing::info!("control socket is unavailable on this platform.");
+    None
+}
+
+#[cfg(unix)]
 fn spawn_listener(
     socket_path: PathBuf,
     tx: mpsc::Sender<ControlRequest>,
@@ -98,6 +119,7 @@ fn spawn_listener(
     Ok(())
 }
 
+#[cfg(unix)]
 fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<ControlRequest>) {
     let mut body = String::new();
     if let Err(err) = stream.read_to_string(&mut body) {
@@ -122,6 +144,7 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
     }
 }
 
+#[cfg(unix)]
 fn parse_command(body: &str) -> Result<ControlCommand, String> {
     let mut lines = body.lines();
     match lines.next() {
@@ -144,6 +167,7 @@ fn parse_command(body: &str) -> Result<ControlCommand, String> {
     }
 }
 
+#[cfg(unix)]
 fn handle_request(window: &MainWindow, request: ControlRequest) {
     match request.command {
         ControlCommand::Screenshot { output } => match write_window_screenshot(window, &output) {
@@ -155,6 +179,7 @@ fn handle_request(window: &MainWindow, request: ControlRequest) {
     }
 }
 
+#[cfg(unix)]
 fn write_window_screenshot(
     window: &MainWindow,
     output: &Path,
@@ -170,6 +195,7 @@ fn write_window_screenshot(
     Ok(())
 }
 
+#[cfg(unix)]
 fn write_rgba_png(
     output: &Path,
     pixels: &SharedPixelBuffer<Rgba8Pixel>,
@@ -184,7 +210,7 @@ fn write_rgba_png(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

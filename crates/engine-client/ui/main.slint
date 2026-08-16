@@ -691,7 +691,7 @@ export component MainWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: root.launcher-controls-visible ? 500px : 580px;
-                height: root.launcher-controls-visible ? 540px : root.launcher-scenario == "pizza" ? 560px : 710px;
+                height: root.launcher-controls-visible ? 540px : root.launcher-scenario == "spacewars" ? 710px : root.launcher-scenario == "pizza" ? 592px : 430px;
                 background: #080a12f2;
                 border-color: #596273;
                 border-width: 1px;
@@ -800,6 +800,15 @@ export component MainWindow inherits Window {
                         model: ["1.0", "1.5", "2.0", "3.0"];
                         current-value <=> root.launcher-raster-scale-text;
                     }
+                }
+
+                Text {
+                    visible: root.launcher-scenario == "rover-lab";
+                    height: root.launcher-scenario == "rover-lab" ? 44px : 0px;
+                    text: "Rapier 2D feasibility lab: a pin-slot suspension rover on a rotating circular planet with a raised bump.";
+                    color: #c7d0dc;
+                    font-size: 12px;
+                    wrap: word-wrap;
                 }
 
                 Text {
@@ -1025,6 +1034,15 @@ export component MainWindow inherits Window {
                     text: "Spawns up to " + root.launcher-pizza-desired-balls-text + " balls at " + root.launcher-pizza-spawn-rate-text + " chance/tick.";
                     color: #c7d0dc;
                     font-size: 12px;
+                }
+
+                Text {
+                    visible: root.launcher-scenario == "pizza";
+                    height: root.launcher-scenario == "pizza" ? 30px : 0px;
+                    text: "Benchmark starts an immediate, deterministic 300-ball dense Rapier workload. CLI options select other populations, backends, and workloads.";
+                    color: #9fb4cc;
+                    font-size: 11px;
+                    wrap: word-wrap;
                 }
 
                 Text {

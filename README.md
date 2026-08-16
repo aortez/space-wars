@@ -9,17 +9,29 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts two playable scenarios:
+The local launcher currently hosts three playable scenarios:
 
-- **Spacewars** — the two-player arcade reboot.
-- **Pizza** — a seeded interactive gravity-and-collision ball simulation. Click
-  empty space to make a ball, or grab and fling an existing one.
+- **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
+  asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
+  and laser queries share the canonical Rapier mechanics world; gameplay still
+  owns gravity fields, damage, capture, rebuilding, and effects.
+- **Pizza** — a seeded interactive gravity-and-collision ball simulation.
+  Rapier owns rigid-body motion and contacts while the scenario supplies mutual
+  gravity and gameplay damage. Click empty space to make a ball, or grab and
+  fling an existing one.
+- **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
+  independently driven pin-slot suspension wheels on a rotating circular planet.
 
-Textures and sounds for Spacewars have yet to be done. The Pizza implementation
-starts with capped exact collision/gravity loops; quadtree and Barnes–Hut
-optimizations are intentionally deferred.
+Textures and sounds for Spacewars have yet to be done. Pizza retains its
+Classic collision implementation as a benchmark reference. Mutual gravity is
+shared by both mechanics backends and can use the exact oracle or deterministic
+Barnes-Hut `full`/`fast` presets.
 
 See [`docs/design/reboot-rust-slint.md`](docs/design/reboot-rust-slint.md).
+The deterministic Classic/Rapier Pizza benchmark is documented in
+[`docs/pizza-performance-lab.md`](docs/pizza-performance-lab.md).
+The accepted physics ownership and lifecycle design is documented in
+[`docs/design/physics-architecture.md`](docs/design/physics-architecture.md).
 
 ## Run locally
 
@@ -33,8 +45,12 @@ Or start a scenario directly:
 
 ```sh
 cargo run -p engine-client -- --scenario pizza
+cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spacewars
 ```
+
+Rover Lab uses `W` to drive forward, `S` to brake, `X` to reverse, and `R` to
+reset.
 
 ## Raspberry Pi / kiosk launch
 

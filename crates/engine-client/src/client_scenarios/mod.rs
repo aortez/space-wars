@@ -5,13 +5,14 @@ use std::time::Duration;
 
 use engine_common::{Action, RenderFrame, Settings, StepResult, TickModel};
 use engine_core::Color;
-use scenario_spacewars::SpacewarsBenchmarkCounts;
+use scenario_pizza::PizzaBenchmarkConfig;
 
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
 mod null;
 mod pizza;
+mod rover_lab;
 mod spacewars;
 
 #[cfg(test)]
@@ -35,10 +36,88 @@ impl RenderBackend {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BenchmarkConfiguration {
+    pub pizza: PizzaBenchmarkConfig,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScenarioStartMode {
     Normal,
-    Benchmark,
+    Benchmark(BenchmarkConfiguration),
+}
+
+impl ScenarioStartMode {
+    pub const fn is_benchmark(self) -> bool {
+        matches!(self, Self::Benchmark(_))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BenchmarkCounts {
+    pub asteroids: usize,
+    pub fragments: usize,
+    pub shells: usize,
+    pub particles: usize,
+    pub balls: usize,
+    pub gravity_sources: usize,
+    pub gravity_targets: usize,
+    pub gravity_nodes: usize,
+    pub gravity_exact_interactions: u64,
+    pub gravity_approximations: u64,
+    pub gravity_applied_sources: u64,
+    pub active_bodies: usize,
+    pub sleeping_bodies: usize,
+    pub candidate_pairs: usize,
+    pub contact_pairs: usize,
+    pub contacts: usize,
+    pub added: usize,
+    pub removed: usize,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct BenchmarkStepMetrics {
+    pub workload_time: Duration,
+    pub lifecycle_time: Duration,
+    pub gravity_time: Duration,
+    pub gravity_validation_time: Duration,
+    pub gravity_build_time: Duration,
+    pub gravity_aggregation_time: Duration,
+    pub gravity_traversal_time: Duration,
+    pub collision_time: Duration,
+    pub physics_time: Duration,
+    pub snapshot_time: Duration,
+    pub rapier_step_time: Duration,
+    pub rapier_broad_phase_time: Duration,
+    pub rapier_narrow_phase_time: Duration,
+    pub rapier_island_time: Duration,
+    pub rapier_solver_time: Duration,
+    pub rapier_ccd_time: Duration,
+    pub added: usize,
+    pub removed: usize,
+}
+
+impl std::ops::AddAssign for BenchmarkStepMetrics {
+    fn add_assign(&mut self, rhs: Self) {
+        self.workload_time += rhs.workload_time;
+        self.lifecycle_time += rhs.lifecycle_time;
+        self.gravity_time += rhs.gravity_time;
+        self.gravity_validation_time += rhs.gravity_validation_time;
+        self.gravity_build_time += rhs.gravity_build_time;
+        self.gravity_aggregation_time += rhs.gravity_aggregation_time;
+        self.gravity_traversal_time += rhs.gravity_traversal_time;
+        self.collision_time += rhs.collision_time;
+        self.physics_time += rhs.physics_time;
+        self.snapshot_time += rhs.snapshot_time;
+        self.rapier_step_time += rhs.rapier_step_time;
+        self.rapier_broad_phase_time += rhs.rapier_broad_phase_time;
+        self.rapier_narrow_phase_time += rhs.rapier_narrow_phase_time;
+        self.rapier_island_time += rhs.rapier_island_time;
+        self.rapier_solver_time += rhs.rapier_solver_time;
+        self.rapier_ccd_time += rhs.rapier_ccd_time;
+        self.added += rhs.added;
+        self.removed += rhs.removed;
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -87,7 +166,7 @@ impl ScenarioRegistration {
         viewport: Viewport,
         mode: ScenarioStartMode,
     ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-        if mode == ScenarioStartMode::Benchmark && !self.capabilities.benchmark {
+        if mode.is_benchmark() && !self.capabilities.benchmark {
             return Err(ScenarioCreateError::BenchmarkUnsupported { name: self.id });
         }
         Ok((self.create)(seed, settings, viewport, mode))
@@ -120,7 +199,11 @@ pub trait ClientScenario {
     fn zoom_player_in(&mut self, _player: usize) {}
     fn zoom_player_out(&mut self, _player: usize) {}
 
-    fn benchmark_counts(&self) -> Option<SpacewarsBenchmarkCounts> {
+    fn benchmark_counts(&self) -> Option<BenchmarkCounts> {
+        None
+    }
+
+    fn benchmark_step_metrics(&self) -> Option<BenchmarkStepMetrics> {
         None
     }
 
@@ -150,6 +233,7 @@ impl std::error::Error for ScenarioCreateError {}
 static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
     pizza::REGISTRATION,
+    rover_lab::REGISTRATION,
     spacewars::REGISTRATION,
 ];
 
@@ -180,25 +264,25 @@ mod tests {
             launcher_registrations()
                 .map(|registration| registration.id)
                 .collect::<Vec<_>>(),
-            vec!["pizza", "spacewars"]
+            vec!["pizza", "rover-lab", "spacewars"]
         );
     }
 
     #[test]
     fn registry_rejects_unsupported_benchmarks() {
-        let registration = registration("pizza").unwrap();
+        let registration = registration("rover-lab").unwrap();
         let error = match registration.create(
             0,
             &Settings::default(),
             Viewport::new(1280.0, 720.0),
-            ScenarioStartMode::Benchmark,
+            ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
         ) {
-            Ok(_) => panic!("pizza should not support benchmark mode"),
+            Ok(_) => panic!("rover-lab should not support benchmark mode"),
             Err(error) => error,
         };
         assert_eq!(
             error,
-            ScenarioCreateError::BenchmarkUnsupported { name: "pizza" }
+            ScenarioCreateError::BenchmarkUnsupported { name: "rover-lab" }
         );
     }
 }

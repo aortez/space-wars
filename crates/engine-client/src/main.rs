@@ -1,7 +1,7 @@
 //! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
-//! The compile-time registry currently hosts Pizza and Spacewars from the
-//! launcher, with Null retained as a hidden test scenario.
+//! The compile-time registry currently hosts Pizza, Rover Lab, and Spacewars
+//! from the launcher, with Null retained as a hidden test scenario.
 
 mod client_scenarios;
 mod host;
@@ -28,6 +28,10 @@ use engine_common::{
 };
 #[cfg(test)]
 use engine_core::SpacewarsConfig;
+use scenario_pizza::{
+    MAX_BENCHMARK_BALLS, PizzaBenchmarkConfig, PizzaBenchmarkWorkload, PizzaGravityModel,
+    PizzaPhysicsBackend,
+};
 use settings::LoadStatus;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
 use tracing_subscriber::EnvFilter;
@@ -66,11 +70,11 @@ struct Args {
     #[arg(long, default_value_t = 0)]
     debug_triangles: usize,
 
-    /// Start the Spacewars visual benchmark workload in the UI.
+    /// Start the selected scenario's visual benchmark workload in the UI.
     #[arg(long)]
     benchmark: bool,
 
-    /// Run the Spacewars benchmark without a window and print CSV rows.
+    /// Run the selected scenario's benchmark without a window and print CSV rows.
     #[arg(long)]
     benchmark_headless: bool,
 
@@ -81,6 +85,22 @@ struct Args {
     /// Optional CSV file path for --benchmark-headless output.
     #[arg(long)]
     benchmark_report: Option<PathBuf>,
+
+    /// Pizza benchmark population. The visual default is intentionally inspectable.
+    #[arg(long, default_value_t = scenario_pizza::DEFAULT_BENCHMARK_BALLS)]
+    pizza_benchmark_balls: usize,
+
+    /// Pizza benchmark physics implementation.
+    #[arg(long, value_enum, default_value = "rapier")]
+    pizza_benchmark_backend: PizzaBenchmarkBackendArg,
+
+    /// Pizza benchmark gravity implementation/accuracy.
+    #[arg(long, value_enum, default_value = "fast")]
+    pizza_benchmark_gravity: PizzaBenchmarkGravityArg,
+
+    /// Pizza benchmark workload shape.
+    #[arg(long, value_enum, default_value = "dense")]
+    pizza_benchmark_workload: PizzaBenchmarkWorkloadArg,
 
     /// Settings directory override. Useful for Pi/systemd services.
     #[arg(long)]
@@ -112,6 +132,58 @@ enum RendererArg {
     #[default]
     Vector,
     Raster,
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum PizzaBenchmarkBackendArg {
+    Classic,
+    #[default]
+    Rapier,
+}
+
+impl From<PizzaBenchmarkBackendArg> for PizzaPhysicsBackend {
+    fn from(value: PizzaBenchmarkBackendArg) -> Self {
+        match value {
+            PizzaBenchmarkBackendArg::Classic => Self::Classic,
+            PizzaBenchmarkBackendArg::Rapier => Self::Rapier,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum PizzaBenchmarkGravityArg {
+    Exact,
+    Full,
+    #[default]
+    Fast,
+}
+
+impl From<PizzaBenchmarkGravityArg> for PizzaGravityModel {
+    fn from(value: PizzaBenchmarkGravityArg) -> Self {
+        match value {
+            PizzaBenchmarkGravityArg::Exact => Self::Exact,
+            PizzaBenchmarkGravityArg::Full => Self::Full,
+            PizzaBenchmarkGravityArg::Fast => Self::Fast,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum PizzaBenchmarkWorkloadArg {
+    Sparse,
+    #[default]
+    Dense,
+    Churn,
+}
+
+impl From<PizzaBenchmarkWorkloadArg> for PizzaBenchmarkWorkload {
+    fn from(value: PizzaBenchmarkWorkloadArg) -> Self {
+        match value {
+            PizzaBenchmarkWorkloadArg::Sparse => Self::Sparse,
+            PizzaBenchmarkWorkloadArg::Dense => Self::Dense,
+            PizzaBenchmarkWorkloadArg::Churn => Self::Churn,
+        }
+    }
 }
 
 impl From<RendererArg> for host::RenderBackend {
@@ -147,6 +219,17 @@ impl Args {
             || self.renderer.is_some()
             || self.raster_scale.is_some()
             || self.kiosk
+    }
+
+    fn benchmark_configuration(&self) -> host::BenchmarkConfiguration {
+        host::BenchmarkConfiguration {
+            pizza: PizzaBenchmarkConfig {
+                backend: self.pizza_benchmark_backend.into(),
+                gravity: self.pizza_benchmark_gravity.into(),
+                workload: self.pizza_benchmark_workload.into(),
+                ball_count: self.pizza_benchmark_balls.min(MAX_BENCHMARK_BALLS),
+            },
+        }
     }
 }
 
@@ -214,12 +297,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     if args.benchmark_headless {
-        host::run_spacewars_benchmark(host::BenchmarkOptions {
+        host::run_benchmark(host::BenchmarkOptions {
+            scenario: effective_launch.scenario.clone(),
             seed: effective_launch.seed,
             seconds: args.benchmark_seconds,
             report_path: args.benchmark_report.clone(),
             renderer: effective_launch.renderer,
             raster_scale: effective_launch.raster_scale,
+            configuration: args.benchmark_configuration(),
+            settings: loaded.clone(),
         })?;
         return Ok(());
     }
@@ -260,6 +346,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &window,
             &effective_launch,
             args.benchmark,
+            args.benchmark_configuration(),
             Rc::clone(&scenario_controls),
             scenario_settings,
         )?);
@@ -709,6 +796,7 @@ fn handle_launcher_start(
         &window,
         &selections.launch,
         start_benchmark,
+        host::BenchmarkConfiguration::default(),
         Rc::clone(scenario_controls),
         scenario_settings,
     ) {
@@ -1105,6 +1193,7 @@ fn start_scenario_from_launch(
     window: &MainWindow,
     launch: &EffectiveLaunch,
     start_benchmark: bool,
+    benchmark_configuration: host::BenchmarkConfiguration,
     controls: host::SharedScenarioControls,
     settings: Settings,
 ) -> Result<Timer, host::HostError> {
@@ -1116,6 +1205,7 @@ fn start_scenario_from_launch(
         launch.seed,
         host::ScenarioLoopOptions {
             start_benchmark,
+            benchmark_configuration,
             renderer: launch.renderer,
             raster_scale: launch.raster_scale,
             controls: Some(controls),
@@ -1265,6 +1355,10 @@ mod tests {
             benchmark_headless: false,
             benchmark_seconds: 30,
             benchmark_report: None,
+            pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
+            pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,
+            pizza_benchmark_gravity: PizzaBenchmarkGravityArg::Fast,
+            pizza_benchmark_workload: PizzaBenchmarkWorkloadArg::Dense,
             config_dir: None,
             renderer: None,
             raster_scale: None,

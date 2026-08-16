@@ -5,8 +5,8 @@ use engine_core::SpacewarsConfig;
 use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, SpacewarsState};
 
 use super::{
-    CenterPanelState, ClientScenario, PlayerPanelState, RenderBackend, ScenarioCapabilities,
-    ScenarioRegistration, ScenarioStartMode,
+    BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario, PlayerPanelState,
+    RenderBackend, ScenarioCapabilities, ScenarioRegistration, ScenarioStartMode,
 };
 use crate::input::ClientInput;
 use crate::render::{self, FrameLayout, Viewport};
@@ -38,7 +38,7 @@ fn create(
         ScenarioStartMode::Normal => {
             SpacewarsScenario::init(spacewars_config_from_settings(settings), seed)
         }
-        ScenarioStartMode::Benchmark => SpacewarsScenario::init_benchmark(seed),
+        ScenarioStartMode::Benchmark(_) => SpacewarsScenario::init_benchmark(seed),
     };
     Box::new(SpacewarsClientScenario {
         state: Box::new(state),
@@ -109,8 +109,63 @@ impl ClientScenario for SpacewarsClientScenario {
         self.state.zoom_player_out(player);
     }
 
-    fn benchmark_counts(&self) -> Option<SpacewarsBenchmarkCounts> {
-        Some(SpacewarsScenario::benchmark_counts(&self.state))
+    fn benchmark_counts(&self) -> Option<BenchmarkCounts> {
+        let SpacewarsBenchmarkCounts {
+            asteroids,
+            fragments,
+            shells,
+            particles,
+            active_bodies,
+            sleeping_bodies,
+            candidate_pairs,
+            contact_pairs,
+            contacts,
+        } = SpacewarsScenario::benchmark_counts(&self.state);
+        let gravity = self.state.last_step_metrics.gravity;
+        Some(BenchmarkCounts {
+            asteroids,
+            fragments,
+            shells,
+            particles,
+            gravity_sources: gravity.source_count,
+            gravity_targets: gravity.target_count,
+            gravity_nodes: gravity.node_count,
+            gravity_exact_interactions: gravity.exact_interactions,
+            gravity_approximations: gravity.approximations,
+            gravity_applied_sources: gravity.applied_sources,
+            active_bodies,
+            sleeping_bodies,
+            candidate_pairs,
+            contact_pairs,
+            contacts,
+            added: self.state.last_step_metrics.added,
+            removed: self.state.last_step_metrics.removed,
+            ..BenchmarkCounts::default()
+        })
+    }
+
+    fn benchmark_step_metrics(&self) -> Option<BenchmarkStepMetrics> {
+        let metrics = self.state.last_step_metrics;
+        Some(BenchmarkStepMetrics {
+            workload_time: metrics.workload_time,
+            lifecycle_time: metrics.lifecycle_time,
+            gravity_time: metrics.gravity_time,
+            gravity_validation_time: metrics.gravity.validation_time,
+            gravity_build_time: metrics.gravity.build_time,
+            gravity_aggregation_time: metrics.gravity.aggregation_time,
+            gravity_traversal_time: metrics.gravity.traversal_time,
+            collision_time: metrics.collision_time,
+            physics_time: metrics.physics_time,
+            rapier_step_time: metrics.rapier.rapier_step_time,
+            rapier_broad_phase_time: metrics.rapier.broad_phase_time,
+            rapier_narrow_phase_time: metrics.rapier.narrow_phase_time,
+            rapier_island_time: metrics.rapier.island_time,
+            rapier_solver_time: metrics.rapier.solver_time,
+            rapier_ccd_time: metrics.rapier.ccd_time,
+            added: metrics.added,
+            removed: metrics.removed,
+            ..BenchmarkStepMetrics::default()
+        })
     }
 
     #[cfg(test)]

@@ -100,6 +100,10 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
 }
 
 impl ClientInput {
+    pub(crate) fn is_pressed(&self, key: GameKey) -> bool {
+        self.pressed.contains(&key)
+    }
+
     pub(crate) fn take_reset_requested(&mut self) -> bool {
         let requested = self.pressed.remove(&GameKey::Reset);
         self.released.remove(&GameKey::Reset);

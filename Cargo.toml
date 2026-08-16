@@ -3,12 +3,15 @@ resolver = "3"
 members = [
     "crates/engine-common",
     "crates/engine-core",
+    "crates/engine-gravity",
+    "crates/engine-rapier",
     "crates/engine-client",
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/null",
     "scenarios/pizza",
+    "scenarios/rover-lab",
     "scenarios/spacewars",
 ]
 
@@ -16,14 +19,23 @@ members = [
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/aortez/space-wars"
-rust-version = "1.85"
+rust-version = "1.89"
 
 [workspace.dependencies]
 # External.
+bincode = "1"
 clap = { version = "4", features = ["derive"] }
 directories = "6"
 rand = { version = "0.9", features = ["std_rng"] }
 png = "0.17"
+rapier2d = { version = "0.34", default-features = false, features = [
+    "dim2",
+    "enhanced-determinism",
+    "f32",
+    "profiler",
+    "serde-serialize",
+    "std",
+] }
 serde = { version = "1", features = ["derive"] }
 slint = { version = "1", default-features = false }
 slint-build = { version = "1" }
@@ -35,6 +47,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Internal.
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
+engine-gravity = { path = "crates/engine-gravity" }
+engine-rapier = { path = "crates/engine-rapier" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
+scenario-rover-lab = { path = "scenarios/rover-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
