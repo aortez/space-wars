@@ -955,7 +955,7 @@ impl Scenario for PizzaScenario {
                         .physics
                         .as_mut()
                         .expect("Rapier benchmark initializes a Rapier world");
-                    metrics.rapier = physics.step(dt);
+                    metrics.rapier = physics.step(dt * WORLD_TIME_SCALE);
                     metrics.physics_time = metrics.rapier.wall_time;
 
                     let snapshot_started = Instant::now();
@@ -1401,6 +1401,31 @@ mod tests {
         assert_eq!(left.balls, replay.balls);
         assert_eq!(left.balls, rapier.balls);
         assert!(left.balls.iter().all(|ball| ball.hp.is_infinite()));
+    }
+
+    #[test]
+    fn rapier_benchmark_uses_the_same_world_time_scale_as_classic() {
+        let benchmark = PizzaBenchmarkConfig {
+            backend: PizzaPhysicsBackend::Rapier,
+            gravity: PizzaGravityModel::Exact,
+            workload: PizzaBenchmarkWorkload::Sparse,
+            ball_count: 1,
+        };
+        let mut state =
+            PizzaScenario::init(PizzaConfig::benchmark(benchmark, PizzaBounds::default()), 7);
+        let position = Vec2::new(0.5, 0.25);
+        let velocity = Vec2::new(0.1, 0.0);
+        let ball_id = state.balls[0].id;
+        state.balls[0].position = position;
+        state.balls[0].velocity = velocity;
+        let physics = state.physics.as_mut().unwrap();
+        assert!(physics.set_pose(ball_body_id(ball_id), position, 0.0, true));
+        assert!(physics.set_velocity(ball_body_id(ball_id), velocity, 0.0, true));
+
+        step(&mut state, &[]);
+
+        let expected = position + velocity * (FIXED_DT.as_secs_f32() * WORLD_TIME_SCALE);
+        assert!(state.balls[0].position.distance_to(expected) < 1.0e-6);
     }
 
     #[test]

@@ -6,16 +6,18 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
 use engine_core::Vec2;
 use rapier2d::prelude::{
-    BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle, ColliderSet, GenericJoint,
-    Group, ImpulseJoint, ImpulseJointHandle, ImpulseJointSet, IntegrationParameters,
-    InteractionGroups, InteractionTestMode, IslandManager, MultibodyJointSet, NarrowPhase,
-    PhysicsPipeline, PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray,
-    RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
+    ActiveEvents, BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle, ColliderSet,
+    CollisionEvent, ContactPair, EventHandler, GenericJoint, Group, ImpulseJoint,
+    ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups,
+    InteractionTestMode, IslandManager, MultibodyJointSet, NarrowPhase, PhysicsPipeline,
+    PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray, RigidBody,
+    RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
 };
 use serde::{Deserialize, Serialize};
 
@@ -350,7 +352,8 @@ pub struct ContactPoint {
     pub normal: Vec2,
 }
 
-/// One active, solver-backed contact pair normalized to stable collider order.
+/// One solver-backed contact pair observed during the latest step, normalized
+/// to stable collider order.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ContactEvent {
     pub collider_a: ColliderId,
@@ -361,6 +364,56 @@ pub struct ContactEvent {
     pub impulse: Vec2,
     pub impulse_magnitude: f32,
     pub solver_contacts: usize,
+}
+
+#[derive(Default)]
+struct ContactEventCollector {
+    events: Mutex<Vec<ContactEvent>>,
+}
+
+impl ContactEventCollector {
+    fn clear(&self) {
+        self.events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+    }
+
+    fn drain_into(&self, target: &mut Vec<ContactEvent>) {
+        let mut events = self
+            .events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        target.extend(events.drain(..));
+    }
+}
+
+impl EventHandler for ContactEventCollector {
+    fn handle_collision_event(
+        &self,
+        _bodies: &RigidBodySet,
+        _colliders: &ColliderSet,
+        _event: CollisionEvent,
+        _contact_pair: Option<&ContactPair>,
+    ) {
+    }
+
+    fn handle_contact_force_event(
+        &self,
+        _dt: f32,
+        _bodies: &RigidBodySet,
+        colliders: &ColliderSet,
+        contact_pair: &ContactPair,
+        _total_force_magnitude: f32,
+    ) {
+        let Some(event) = contact_event_from_pair(colliders, contact_pair) else {
+            return;
+        };
+        self.events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(event);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -465,6 +518,7 @@ pub struct PhysicsWorld {
     joint_indices: HashMap<JointId, usize>,
     entities: BTreeMap<PhysicsId, EntityRecord>,
     contact_events: Vec<ContactEvent>,
+    contact_event_collector: ContactEventCollector,
     sensor_intersections: Vec<SensorIntersection>,
     collect_events: bool,
 }
@@ -562,6 +616,7 @@ impl PhysicsWorld {
             joint_indices: HashMap::new(),
             entities: BTreeMap::new(),
             contact_events: Vec::new(),
+            contact_event_collector: ContactEventCollector::default(),
             sensor_intersections: Vec::new(),
             collect_events: config.collect_events,
         }
@@ -617,7 +672,7 @@ impl PhysicsWorld {
             {
                 return false;
             }
-            let Some(builder) = build_collider(collider) else {
+            let Some(builder) = build_collider(collider, self.collect_events) else {
                 return false;
             };
             collider_builders.push((collider.id, builder));
@@ -644,7 +699,7 @@ impl PhysicsWorld {
         let Some(parent_handle) = self.body_handle(parent) else {
             return false;
         };
-        let Some(collider) = build_collider(spec) else {
+        let Some(collider) = build_collider(spec, self.collect_events) else {
             return false;
         };
         let handle = self.raw.insert_collider(collider, Some(parent_handle));
@@ -821,13 +876,20 @@ impl PhysicsWorld {
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
             self.contact_events.clear();
+            self.contact_event_collector.clear();
             self.sensor_intersections.clear();
             return PhysicsStepMetrics::default();
         }
         self.raw.integration_parameters.dt = dt_seconds;
 
         let started = Instant::now();
-        self.raw.step();
+        if self.collect_events {
+            self.contact_event_collector.clear();
+            self.raw
+                .step_with_events(&(), &self.contact_event_collector);
+        } else {
+            self.raw.step();
+        }
         let wall_time = started.elapsed();
         let counters = self.raw.physics_pipeline.counters;
 
@@ -1019,6 +1081,7 @@ impl PhysicsWorld {
             joint_indices,
             entities: snapshot.entities,
             contact_events: Vec::new(),
+            contact_event_collector: ContactEventCollector::default(),
             sensor_intersections: Vec::new(),
             collect_events: snapshot.collect_events,
         })
@@ -1133,56 +1196,31 @@ impl PhysicsWorld {
 
     fn rebuild_events(&mut self) {
         self.contact_events.clear();
+        // Solver callbacks preserve CCD impacts that resolve and separate
+        // before Rapier's final contact graph is observable.
+        self.contact_event_collector
+            .drain_into(&mut self.contact_events);
         self.sensor_intersections.clear();
 
+        // Rapier intentionally emits no force callback for a zero-impulse
+        // resting contact, so retain active final contacts as a fallback.
         for pair in self.raw.contact_pairs() {
             if !pair.has_any_active_contact() {
                 continue;
             }
-            let Some(collider_a) = self.raw.colliders.get(pair.collider1) else {
-                continue;
-            };
-            let Some(collider_b) = self.raw.colliders.get(pair.collider2) else {
-                continue;
-            };
-            let Some(mut id_a) = decode_collider(collider_a.user_data) else {
-                continue;
-            };
-            let Some(mut id_b) = decode_collider(collider_b.user_data) else {
-                continue;
-            };
-
-            let (magnitude, strongest_normal) = pair.max_impulse();
-            let mut normal = from_rapier(strongest_normal);
-            let mut impulse = from_rapier(pair.total_impulse());
-            if id_b < id_a {
-                std::mem::swap(&mut id_a, &mut id_b);
-                normal = -normal;
-                impulse = -impulse;
+            if let Some(event) = contact_event_from_pair(&self.raw.colliders, pair) {
+                self.contact_events.push(event);
             }
-            let point = pair
-                .manifolds
-                .iter()
-                .flat_map(|manifold| &manifold.data.solver_contacts)
-                .next()
-                .map(|contact| from_rapier(contact.point));
-            let solver_contacts = pair
-                .manifolds
-                .iter()
-                .map(|manifold| manifold.data.solver_contacts.len())
-                .sum();
-            self.contact_events.push(ContactEvent {
-                collider_a: id_a,
-                collider_b: id_b,
-                point,
-                normal,
-                impulse,
-                impulse_magnitude: magnitude,
-                solver_contacts,
-            });
         }
+        // A CCD pair may be reported in more than one solver substep and in
+        // the final graph. Gameplay receives the strongest occurrence once.
+        self.contact_events.sort_unstable_by(|left, right| {
+            (left.collider_a, left.collider_b)
+                .cmp(&(right.collider_a, right.collider_b))
+                .then_with(|| right.impulse_magnitude.total_cmp(&left.impulse_magnitude))
+        });
         self.contact_events
-            .sort_unstable_by_key(|event| (event.collider_a, event.collider_b));
+            .dedup_by_key(|event| (event.collider_a, event.collider_b));
 
         for (_, collider_a, _, collider_b, intersecting) in self.raw.intersection_pairs() {
             if !intersecting {
@@ -1223,7 +1261,7 @@ fn build_body(id: BodyId, spec: BodySpec) -> RigidBody {
         .build()
 }
 
-fn build_collider(spec: &ColliderSpec) -> Option<Collider> {
+fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider> {
     if !valid_collider_spec(spec) {
         return None;
     }
@@ -1241,18 +1279,58 @@ fn build_collider(spec: &ColliderSpec) -> Option<Collider> {
             ColliderBuilder::polyline(vertices.iter().copied().map(to_rapier).collect(), None)
         }
     };
-    Some(
+    let builder = builder
+        .position(Pose::new(to_rapier(spec.local_position), spec.local_angle))
+        .density(spec.density)
+        .friction(spec.friction)
+        .restitution(spec.restitution.clamp(0.0, 1.0))
+        .sensor(spec.sensor)
+        .collision_groups(spec.collision_groups.to_rapier())
+        .solver_groups(spec.solver_groups.to_rapier())
+        .user_data(encode_collider(spec.id));
+    let builder = if collect_events {
         builder
-            .position(Pose::new(to_rapier(spec.local_position), spec.local_angle))
-            .density(spec.density)
-            .friction(spec.friction)
-            .restitution(spec.restitution.clamp(0.0, 1.0))
-            .sensor(spec.sensor)
-            .collision_groups(spec.collision_groups.to_rapier())
-            .solver_groups(spec.solver_groups.to_rapier())
-            .user_data(encode_collider(spec.id))
-            .build(),
-    )
+            .active_events(ActiveEvents::CONTACT_FORCE_EVENTS)
+            .contact_force_event_threshold(0.0)
+    } else {
+        builder
+    };
+    Some(builder.build())
+}
+
+fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Option<ContactEvent> {
+    let collider_a = colliders.get(pair.collider1)?;
+    let collider_b = colliders.get(pair.collider2)?;
+    let mut id_a = decode_collider(collider_a.user_data)?;
+    let mut id_b = decode_collider(collider_b.user_data)?;
+    let (magnitude, strongest_normal) = pair.max_impulse();
+    let mut normal = from_rapier(strongest_normal);
+    let mut impulse = from_rapier(pair.total_impulse());
+    if id_b < id_a {
+        std::mem::swap(&mut id_a, &mut id_b);
+        normal = -normal;
+        impulse = -impulse;
+    }
+    let point = pair
+        .manifolds
+        .iter()
+        .flat_map(|manifold| &manifold.data.solver_contacts)
+        .next()
+        .map(|contact| from_rapier(contact.point));
+    let solver_contacts = pair
+        .manifolds
+        .iter()
+        .map(|manifold| manifold.data.solver_contacts.len())
+        .sum();
+    Some(ContactEvent {
+        collider_a: id_a,
+        collider_b: id_b,
+        point,
+        normal,
+        impulse,
+        impulse_magnitude: magnitude,
+        solver_contacts,
+    })
 }
 
 fn normalized_world_config(config: PhysicsWorldConfig) -> PhysicsWorldConfig {
@@ -1448,6 +1526,61 @@ mod tests {
         assert!(event.collider_a < event.collider_b);
         assert_eq!(event.collider_a.entity, PhysicsId::new(2));
         assert_eq!(event.collider_b.entity, PhysicsId::new(9));
+    }
+
+    #[test]
+    fn transient_ccd_impacts_are_reported_after_the_pair_separates() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::ZERO,
+            max_ccd_substeps: 4,
+            ..PhysicsWorldConfig::default()
+        });
+        let (_, moving_body, moving_collider_id) = ball_ids(10);
+        let mut moving_collider = ColliderSpec::ball(moving_collider_id, 0.25);
+        moving_collider.friction = 0.0;
+        moving_collider.restitution = 1.0;
+        assert!(world.insert_body(
+            moving_body,
+            BodySpec {
+                position: Vec2::new(-1.0, 0.0),
+                linear_velocity: Vec2::new(100.0, 0.0),
+                can_sleep: false,
+                ccd_enabled: true,
+                ..BodySpec::default()
+            },
+            &[moving_collider],
+        ));
+
+        let (_, fixed_body, fixed_collider_id) = ball_ids(20);
+        let mut fixed_collider = ColliderSpec::ball(fixed_collider_id, 0.25);
+        fixed_collider.friction = 0.0;
+        fixed_collider.restitution = 1.0;
+        assert!(world.insert_body(
+            fixed_body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..BodySpec::default()
+            },
+            &[fixed_collider],
+        ));
+
+        let mut transient_event = None;
+        for _ in 0..4 {
+            let metrics = world.step(1.0 / 60.0);
+            if metrics.contact_pairs == 0 {
+                transient_event = world.contact_events().first().copied();
+                if transient_event.is_some() {
+                    break;
+                }
+            }
+        }
+
+        let event = transient_event.expect("a resolving CCD impact should survive pair separation");
+        assert_eq!(world.contact_events().len(), 1);
+        assert_eq!(event.collider_a, moving_collider_id);
+        assert_eq!(event.collider_b, fixed_collider_id);
+        assert!(event.impulse_magnitude > 0.0);
+        assert!(world.motion(moving_body).unwrap().linear_velocity.x < 0.0);
     }
 
     #[test]

@@ -1024,6 +1024,16 @@ mod tests {
         let _ = physics.step(1.0 / 60.0);
         let _ = physics.step(1.0 / 60.0);
 
+        let contacts = physics.contacts();
+        assert!(
+            contacts.iter().any(|contact| {
+                [contact.a, contact.b].contains(&MechanicalEntity::Ship(0))
+                    && [contact.a, contact.b]
+                        .contains(&MechanicalEntity::Debris(debris[0].physics_id))
+            }),
+            "the resolving CCD substep should remain visible to gameplay"
+        );
+
         physics.synchronize_motion(&mut ships, &mut debris);
         assert!(
             debris[0].velocity.length_squared() > 0.0,
