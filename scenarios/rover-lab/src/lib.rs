@@ -31,6 +31,13 @@ const PLANET_RADIUS: f32 = 20.0;
 const CAMERA_HEIGHT: f32 = 54.0;
 const GRAVITY_ACCELERATION: f32 = 18.0;
 const DEFAULT_PLANET_ANGULAR_VELOCITY: f32 = 0.015;
+const LAB_WHEEL_TARGET_SPEED: f32 = 12.0;
+const LAB_WHEEL_MOTOR_TORQUE: f32 = 100.0;
+const JUMP_MAX_CHARGE_TICKS: u16 = 48;
+const JUMP_MIN_HEIGHT: f32 = 0.6;
+const JUMP_MAX_HEIGHT: f32 = 4.0;
+const MIN_LANDING_AIRTIME_TICKS: u32 = 3;
+const MAX_LANDING_OUTWARD_SPEED: f32 = 0.5;
 const LAB_BUMP: BumpSpec = BumpSpec {
     surface_angle: 1.08,
     half_width: 1.25,
@@ -46,6 +53,8 @@ const WHEEL_COLOR: RenderColor = RenderColor::rgb(0.13, 0.15, 0.19);
 const WHEEL_STROKE: RenderColor = RenderColor::rgb(0.75, 0.82, 0.9);
 const SUSPENSION_COLOR: RenderColor = RenderColor::rgb(0.38, 0.95, 0.84);
 const CONTACT_COLOR: RenderColor = RenderColor::rgb(1.0, 0.2, 0.85);
+const CHARGE_BACKGROUND: RenderColor = RenderColor::rgb(0.08, 0.1, 0.16);
+const CHARGE_FILL: RenderColor = RenderColor::rgb(0.96, 0.74, 0.16);
 
 pub struct RoverLabScenario;
 
@@ -81,6 +90,14 @@ pub struct RoverLabState {
     pub control: RoverControl,
     pub gravity_sources: Vec<RoverGravitySource>,
     pub last_gravity_metrics: GravityStepMetrics,
+    pub jump_held: bool,
+    pub jump_charge_ticks: u16,
+    pub last_jump_speed: f32,
+    pub airborne_ticks: u32,
+    pub last_airtime_ticks: u32,
+    pub last_landing_impulse: f32,
+    jump_was_held: bool,
+    jump_in_flight: bool,
     planet_assembly: PlanetAssembly,
     rover: RoverAssembly,
     physics: PhysicsWorld,
@@ -94,18 +111,24 @@ impl RoverLabState {
             .snapshot(&self.physics)
             .expect("rover lab must retain its rover")
     }
+
+    pub fn jump_charge_fraction(&self) -> f32 {
+        f32::from(self.jump_charge_ticks) / f32::from(JUMP_MAX_CHARGE_TICKS)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RoverLabAction {
     pub throttle: f32,
     pub brake: bool,
+    pub jump_held: bool,
 }
 
 impl RoverLabAction {
-    pub fn drive(throttle: f32, brake: bool) -> Action {
+    pub fn drive(throttle: f32, brake: bool, jump_held: bool) -> Action {
         let mut payload = throttle.to_le_bytes().to_vec();
         payload.push(u8::from(brake));
+        payload.push(u8::from(jump_held));
         Action::scenario(DRIVE_ACTION_KIND, payload)
     }
 
@@ -113,12 +136,13 @@ impl RoverLabAction {
         let Action::Scenario { kind, payload } = action else {
             return None;
         };
-        if *kind != DRIVE_ACTION_KIND || payload.len() != 5 {
+        if *kind != DRIVE_ACTION_KIND || payload.len() != 6 {
             return None;
         }
         Some(Self {
             throttle: f32::from_le_bytes(payload[0..4].try_into().ok()?),
             brake: payload[4] != 0,
+            jump_held: payload[5] != 0,
         })
     }
 }
@@ -134,7 +158,11 @@ impl Scenario for RoverLabScenario {
             radius: PLANET_RADIUS,
             angle: 0.0,
         };
-        let rover_spec = RoverSpec::default();
+        let rover_spec = RoverSpec {
+            wheel_target_speed: LAB_WHEEL_TARGET_SPEED,
+            wheel_motor_torque: LAB_WHEEL_MOTOR_TORQUE,
+            ..RoverSpec::default()
+        };
         let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
             length_unit: 1.0,
             solver_iterations: 8,
@@ -166,6 +194,14 @@ impl Scenario for RoverLabScenario {
             control: RoverControl::default(),
             gravity_sources,
             last_gravity_metrics: GravityStepMetrics::default(),
+            jump_held: false,
+            jump_charge_ticks: 0,
+            last_jump_speed: 0.0,
+            airborne_ticks: 0,
+            last_airtime_ticks: 0,
+            last_landing_impulse: 0.0,
+            jump_was_held: false,
+            jump_in_flight: false,
             planet_assembly,
             rover,
             physics,
@@ -184,12 +220,15 @@ impl Scenario for RoverLabScenario {
                 throttle: action.throttle.clamp(-1.0, 1.0),
                 brake: action.brake,
             };
+            state.jump_held = action.jump_held;
         }
 
         let dt_seconds = dt.as_secs_f32();
         if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
             return StepResult::default();
         }
+
+        update_jump(state);
 
         state.planet.angle = (state.planet.angle
             + state.config.planet_angular_velocity * dt_seconds)
@@ -226,9 +265,14 @@ impl Scenario for RoverLabScenario {
             rover.chassis.linear_velocity.y,
             rover.wheels[0].angle,
             rover.wheels[1].angle,
+            state.jump_charge_fraction(),
+            state.last_jump_speed,
+            state.last_landing_impulse,
         ] {
             payload.extend_from_slice(&value.to_le_bytes());
         }
+        payload.push(u8::try_from(rover.grounded_wheel_count()).unwrap_or(u8::MAX));
+        payload.extend_from_slice(&state.airborne_ticks.to_le_bytes());
         Observation { payload }
     }
 
@@ -239,6 +283,70 @@ impl Scenario for RoverLabScenario {
     fn tick_model() -> TickModel {
         TickModel::FixedTimestep { hz: FIXED_HZ }
     }
+}
+
+fn update_jump(state: &mut RoverLabState) {
+    let snapshot = state.rover_snapshot();
+    let grounded = snapshot.is_grounded();
+
+    if state.jump_in_flight {
+        state.airborne_ticks = state.airborne_ticks.saturating_add(1);
+        let outward_speed = snapshot
+            .support_normal
+            .map(|normal| snapshot.chassis.linear_velocity.dot(normal))
+            .unwrap_or(f32::INFINITY);
+        if grounded
+            && state.airborne_ticks >= MIN_LANDING_AIRTIME_TICKS
+            && outward_speed <= MAX_LANDING_OUTWARD_SPEED
+        {
+            state.last_airtime_ticks = state.airborne_ticks;
+            state.last_landing_impulse = snapshot.max_support_impulse;
+            state.airborne_ticks = 0;
+            state.jump_in_flight = false;
+        }
+    } else if grounded {
+        state.airborne_ticks = 0;
+    } else {
+        state.airborne_ticks = state.airborne_ticks.saturating_add(1);
+    }
+
+    let released = state.jump_was_held && !state.jump_held;
+    if state.jump_held {
+        if grounded && !state.jump_in_flight {
+            state.jump_charge_ticks = state
+                .jump_charge_ticks
+                .saturating_add(1)
+                .min(JUMP_MAX_CHARGE_TICKS);
+        } else {
+            state.jump_charge_ticks = 0;
+        }
+    } else if released {
+        if grounded && !state.jump_in_flight && state.jump_charge_ticks > 0 {
+            let jump_speed = jump_speed(state.jump_charge_ticks, state.config.gravity_acceleration);
+            if state
+                .rover
+                .apply_jump_velocity(&mut state.physics, jump_speed)
+                .is_some()
+            {
+                state.last_jump_speed = jump_speed;
+                state.airborne_ticks = 0;
+                state.jump_in_flight = true;
+            }
+        }
+        state.jump_charge_ticks = 0;
+    } else if !grounded {
+        state.jump_charge_ticks = 0;
+    }
+
+    state.jump_was_held = state.jump_held;
+}
+
+fn jump_speed(charge_ticks: u16, gravity_acceleration: f32) -> f32 {
+    let charge = f32::from(charge_ticks.saturating_sub(1))
+        / f32::from(JUMP_MAX_CHARGE_TICKS.saturating_sub(1));
+    let charge = charge.clamp(0.0, 1.0);
+    let height = JUMP_MIN_HEIGHT + (JUMP_MAX_HEIGHT - JUMP_MIN_HEIGHT) * charge;
+    (2.0 * gravity_acceleration * height).sqrt()
 }
 
 fn apply_rover_gravity(state: &mut RoverLabState, dt_seconds: f32) -> GravityStepMetrics {
@@ -377,7 +485,7 @@ fn render_lab(state: &RoverLabState) -> RenderFrame {
         }),
     );
 
-    for contact in rover.contacts {
+    for contact in &rover.contacts {
         frame.push_primitive(
             5,
             RenderPrimitive::Circle(RenderCircle::filled(
@@ -407,14 +515,92 @@ fn render_lab(state: &RoverLabState) -> RenderFrame {
     };
     let mut text = RenderText::new(
         RenderPoint::new(0.0, 25.3),
-        format!("Rover lab | W forward  S brake  X reverse  R reset | {control_label}"),
+        format!(
+            "Rover lab | D-pad left/right drive  B/down brake  hold/release A jump | {control_label}"
+        ),
     );
     text.color = RenderColor::rgb(0.88, 0.94, 1.0);
     text.size = 16.0;
     text.anchor = TextAnchor::Center;
     frame.push_primitive(10, RenderPrimitive::Text(text));
 
+    let relative_speed = surface_relative_speed(state, rover.chassis);
+    let airtime = if state.jump_in_flight || !rover.is_grounded() {
+        state.airborne_ticks
+    } else {
+        state.last_airtime_ticks
+    } as f32
+        / FIXED_HZ as f32;
+    let mut telemetry = RenderText::new(
+        RenderPoint::new(0.0, -25.2),
+        format!(
+            "speed {relative_speed:+.1} | wheels {}/2 | suspension {:.2}/{:.2} | jump {:>3.0}% | air {airtime:.2}s | landing {:.1}",
+            rover.grounded_wheel_count(),
+            rover.suspension_lengths[0],
+            rover.suspension_lengths[1],
+            state.jump_charge_fraction() * 100.0,
+            state.last_landing_impulse,
+        ),
+    );
+    telemetry.color = RenderColor::rgb(0.78, 0.88, 1.0);
+    telemetry.size = 14.0;
+    telemetry.anchor = TextAnchor::Center;
+    frame.push_primitive(10, RenderPrimitive::Text(telemetry));
+
+    render_jump_charge(&mut frame, state.jump_charge_fraction());
+
     frame
+}
+
+fn surface_relative_speed(state: &RoverLabState, chassis: BodyMotion) -> f32 {
+    let offset = chassis.position - state.planet.center;
+    let normal = offset.normalized();
+    if normal.length_squared() <= f32::EPSILON {
+        return 0.0;
+    }
+    let tangent = Vec2::new(-normal.y, normal.x);
+    let surface_velocity = tangent * (state.config.planet_angular_velocity * offset.length());
+    (chassis.linear_velocity - surface_velocity).dot(tangent)
+}
+
+fn render_jump_charge(frame: &mut RenderFrame, charge: f32) {
+    const LEFT: f32 = -5.0;
+    const RIGHT: f32 = 5.0;
+    const BOTTOM: f32 = -23.9;
+    const TOP: f32 = -23.35;
+
+    let outline = [
+        Vec2::new(LEFT, BOTTOM),
+        Vec2::new(RIGHT, BOTTOM),
+        Vec2::new(RIGHT, TOP),
+        Vec2::new(LEFT, TOP),
+    ];
+    frame.push_primitive(
+        10,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: outline.map(render_point).to_vec(),
+            fill: Some(Fill::new(CHARGE_BACKGROUND)),
+            stroke: Some(Stroke::new(WHEEL_STROKE, 0.08)),
+        }),
+    );
+
+    let fill_right = LEFT + (RIGHT - LEFT) * charge.clamp(0.0, 1.0);
+    if fill_right > LEFT {
+        let fill = [
+            Vec2::new(LEFT, BOTTOM),
+            Vec2::new(fill_right, BOTTOM),
+            Vec2::new(fill_right, TOP),
+            Vec2::new(LEFT, TOP),
+        ];
+        frame.push_primitive(
+            11,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: fill.map(render_point).to_vec(),
+                fill: Some(Fill::new(CHARGE_FILL)),
+                stroke: None,
+            }),
+        );
+    }
 }
 
 fn render_wheel(frame: &mut RenderFrame, wheel: BodyMotion, radius: f32) {
@@ -466,14 +652,70 @@ fn render_point(point: Vec2) -> RenderPoint {
 mod tests {
     use super::*;
 
+    const STEP: Duration = Duration::from_nanos(1_000_000_000 / FIXED_HZ as u64);
+
+    fn step_with(state: &mut RoverLabState, throttle: f32, brake: bool, jump_held: bool) {
+        let action = RoverLabAction::drive(throttle, brake, jump_held);
+        RoverLabScenario::step(state, std::slice::from_ref(&action), STEP);
+    }
+
+    fn settle(state: &mut RoverLabState) {
+        for _ in 0..240 {
+            step_with(state, 0.0, false, false);
+        }
+        assert!(state.rover_snapshot().is_grounded());
+    }
+
+    fn jump_apex(charge_ticks: u16) -> (f32, f32, u32, f32) {
+        let mut state = RoverLabScenario::init(RoverLabConfig::default(), 12);
+        settle(&mut state);
+        let start_radius = state.rover_snapshot().chassis.position.length();
+
+        for _ in 0..charge_ticks {
+            step_with(&mut state, 0.0, false, true);
+        }
+        assert_eq!(
+            state.jump_charge_ticks,
+            charge_ticks.min(JUMP_MAX_CHARGE_TICKS)
+        );
+        step_with(&mut state, 0.0, false, false);
+        let jump_speed = state.last_jump_speed;
+        assert!(jump_speed > 0.0);
+
+        let mut apex = state.rover_snapshot().chassis.position.length();
+        let mut became_airborne = !state.rover_snapshot().is_grounded();
+        for _ in 0..360 {
+            step_with(&mut state, 0.0, false, false);
+            let snapshot = state.rover_snapshot();
+            apex = apex.max(snapshot.chassis.position.length());
+            became_airborne |= !snapshot.is_grounded();
+            if became_airborne && snapshot.is_grounded() && state.last_airtime_ticks > 0 {
+                break;
+            }
+        }
+
+        assert!(became_airborne);
+        assert!(state.rover_snapshot().is_grounded());
+        assert!(state.last_airtime_ticks > 0);
+        assert!(state.last_landing_impulse.is_finite());
+        assert!(state.last_landing_impulse > 0.0);
+        (
+            jump_speed,
+            apex - start_radius,
+            state.last_airtime_ticks,
+            state.last_landing_impulse,
+        )
+    }
+
     #[test]
     fn drive_action_round_trips() {
-        let action = RoverLabAction::drive(-0.75, true);
+        let action = RoverLabAction::drive(-0.75, true, true);
         assert_eq!(
             RoverLabAction::decode(&action),
             Some(RoverLabAction {
                 throttle: -0.75,
                 brake: true,
+                jump_held: true,
             })
         );
     }
@@ -482,7 +724,7 @@ mod tests {
     fn scenario_steps_and_renders_authoritative_rapier_state() {
         let mut state = RoverLabScenario::init(RoverLabConfig::default(), 4);
         let initial = state.rover_snapshot().chassis.position;
-        let action = RoverLabAction::drive(0.7, false);
+        let action = RoverLabAction::drive(0.7, false, false);
         for _ in 0..600 {
             RoverLabScenario::step(
                 &mut state,
@@ -501,6 +743,49 @@ mod tests {
                 .any(|layer| !layer.primitives.is_empty())
         );
         assert!(!RoverLabScenario::observe(&state).payload.is_empty());
+    }
+
+    #[test]
+    fn charge_duration_controls_jump_strength_and_airtime() {
+        let (tap_speed, tap_apex, tap_airtime, _) = jump_apex(1);
+        let (full_speed, full_apex, full_airtime, _) = jump_apex(JUMP_MAX_CHARGE_TICKS);
+
+        assert!((tap_speed - (2.0 * GRAVITY_ACCELERATION * JUMP_MIN_HEIGHT).sqrt()).abs() < 1.0e-4);
+        assert!(
+            (full_speed - (2.0 * GRAVITY_ACCELERATION * JUMP_MAX_HEIGHT).sqrt()).abs() < 1.0e-4
+        );
+        assert!(full_speed > tap_speed);
+        assert!(
+            full_apex > tap_apex + 2.0,
+            "full apex {full_apex} was too close to tap apex {tap_apex}"
+        );
+        assert!(
+            full_airtime > tap_airtime,
+            "full airtime {full_airtime} was not longer than tap airtime {tap_airtime}"
+        );
+    }
+
+    #[test]
+    fn jump_cannot_charge_or_retrigger_while_airborne() {
+        let mut state = RoverLabScenario::init(RoverLabConfig::default(), 18);
+        settle(&mut state);
+        for _ in 0..JUMP_MAX_CHARGE_TICKS {
+            step_with(&mut state, 0.0, false, true);
+        }
+        step_with(&mut state, 0.0, false, false);
+        let takeoff_speed = state.last_jump_speed;
+
+        while state.rover_snapshot().is_grounded() {
+            step_with(&mut state, 0.0, false, false);
+        }
+        for _ in 0..12 {
+            step_with(&mut state, 0.0, false, true);
+            assert_eq!(state.jump_charge_ticks, 0);
+        }
+        step_with(&mut state, 0.0, false, false);
+
+        assert_eq!(state.last_jump_speed, takeoff_speed);
+        assert!(!state.rover_snapshot().is_grounded());
     }
 
     #[test]

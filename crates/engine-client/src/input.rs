@@ -228,18 +228,18 @@ impl ClientInput {
         actions
     }
 
-    pub(crate) fn rover_drive_input(&self) -> (f32, bool) {
+    pub(crate) fn rover_gamepad_input(&self) -> (f32, bool, bool) {
         let gamepads = self.gamepads.borrow();
         let Some(gamepad) = gamepads.seat(0).filter(|gamepad| gamepad.connected) else {
-            return (0.0, false);
+            return (0.0, false, false);
         };
-        let brake = gamepad.south;
+        let brake = gamepad.east || gamepad.dpad_down;
         let throttle = match (gamepad.dpad_left, gamepad.dpad_right) {
             (false, true) if !brake => 1.0,
             (true, false) if !brake => -1.0,
             _ => 0.0,
         };
-        (throttle, brake)
+        (throttle, brake, gamepad.south)
     }
 
     pub(crate) fn reset_spacewars_controls(&mut self) {

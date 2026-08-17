@@ -49,8 +49,9 @@ cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spacewars
 ```
 
-Rover Lab uses `W` to drive forward, `S` to brake, `X` to reverse, and `R` to
-reset.
+Rover Lab uses d-pad left/right to drive, `B` or d-pad down to brake, and a
+hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
+`S` brake, `X` reverse, `Space` jump, and `R` reset.
 
 ## Raspberry Pi / kiosk launch
 
