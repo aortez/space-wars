@@ -69,6 +69,8 @@ pub(crate) struct GamepadSeatInput {
     pub south: bool,
     pub east: bool,
     pub west: bool,
+    pub start: bool,
+    pub select: bool,
 }
 
 #[derive(Debug, Default)]

@@ -49,6 +49,7 @@ struct GamepadPump {
     gamepads: SharedGamepadInput,
     ui_driver: Option<usize>,
     ui_repeat: UiRepeat,
+    mode_handoff: ModeHandoff,
 }
 
 impl GamepadPump {
@@ -60,6 +61,7 @@ impl GamepadPump {
             gamepads,
             ui_driver: None,
             ui_repeat: UiRepeat::default(),
+            mode_handoff: ModeHandoff::default(),
         }
     }
 
@@ -79,17 +81,20 @@ impl GamepadPump {
                 );
             }
         }
+        self.observe_mode(window);
         self.sample_gamepads();
         self.refresh_connection_ui(window);
     }
 
     fn tick(&mut self, window: &MainWindow) {
+        self.observe_mode(window);
         while let Some(event) = self.gilrs.next_event() {
             let id = usize::from(event.id);
             match event.event {
                 EventType::Connected => {
                     let name = self.gilrs.gamepad(event.id).name().to_owned();
                     if let Some(seat) = self.assignments.connect(id) {
+                        self.mode_handoff.block(seat);
                         tracing::info!(
                             gamepad_id = id,
                             player = seat + 1,
@@ -107,6 +112,7 @@ impl GamepadPump {
                 }
                 EventType::Disconnected => {
                     if let Some(seat) = self.assignments.disconnect(id) {
+                        self.mode_handoff.block(seat);
                         self.gamepads.borrow_mut().disconnect_seat(seat);
                         tracing::warn!(gamepad_id = id, player = seat + 1, "gamepad disconnected.");
                         if !window.get_launcher_visible() {
@@ -135,11 +141,13 @@ impl GamepadPump {
                     if is_pad_activity(event_type) {
                         self.ui_driver = Some(seat);
                     }
-                    self.route_button_edge(window, event_type);
+                    self.route_button_edge(window, seat, event_type);
                 }
             }
+            self.observe_mode(window);
         }
 
+        self.observe_mode(window);
         self.sample_gamepads();
         if is_ui_mode(window) {
             self.update_ui_navigation(window);
@@ -148,7 +156,10 @@ impl GamepadPump {
         }
     }
 
-    fn route_button_edge(&mut self, window: &MainWindow, event: EventType) {
+    fn route_button_edge(&mut self, window: &MainWindow, seat: usize, event: EventType) {
+        if !self.mode_handoff.accepts_input(seat) {
+            return;
+        }
         let EventType::ButtonPressed(button, _) = event else {
             return;
         };
@@ -162,14 +173,21 @@ impl GamepadPump {
                 _ => None,
             };
             if let Some(action) = action {
+                self.begin_handoff();
                 window.invoke_ui_action(action.code());
             }
             return;
         }
 
         match button {
-            Button::Start => self.input.borrow_mut().press(GameKey::Pause),
-            Button::Select => self.input.borrow_mut().press(GameKey::Controls),
+            Button::Start => {
+                self.begin_handoff();
+                self.input.borrow_mut().press(GameKey::Pause);
+            }
+            Button::Select => {
+                self.begin_handoff();
+                self.input.borrow_mut().press(GameKey::Controls);
+            }
             _ => {}
         }
     }
@@ -183,10 +201,27 @@ impl GamepadPump {
                 Some((seat, snapshot(&gamepad)))
             })
             .collect::<Vec<_>>();
+        let snapshots = snapshots
+            .into_iter()
+            .map(|(seat, snapshot)| (seat, self.mode_handoff.filter(seat, snapshot)))
+            .collect::<Vec<_>>();
         let mut gamepads = self.gamepads.borrow_mut();
         for (seat, snapshot) in snapshots {
             gamepads.set_seat(seat, snapshot);
         }
+    }
+
+    fn observe_mode(&mut self, window: &MainWindow) {
+        if self.mode_handoff.observe(InputMode::from_window(window)) {
+            self.ui_driver = None;
+            self.ui_repeat.reset();
+        }
+    }
+
+    fn begin_handoff(&mut self) {
+        self.mode_handoff.block_all();
+        self.ui_driver = None;
+        self.ui_repeat.reset();
     }
 
     fn update_ui_navigation(&mut self, window: &MainWindow) {
@@ -248,6 +283,8 @@ fn snapshot(gamepad: &Gamepad<'_>) -> GamepadSeatInput {
         south: gamepad.is_pressed(Button::South),
         east: gamepad.is_pressed(Button::East),
         west: gamepad.is_pressed(Button::West),
+        start: gamepad.is_pressed(Button::Start),
+        select: gamepad.is_pressed(Button::Select),
     }
 }
 
@@ -270,13 +307,102 @@ fn is_pad_activity(event: EventType) -> bool {
 }
 
 fn is_ui_mode(window: &MainWindow) -> bool {
-    window.get_launcher_visible()
-        || window.get_ingame_menu_visible()
-        || window.get_game_over_visible()
+    InputMode::from_window(window) == InputMode::Ui
 }
 
 fn is_game_mode(window: &MainWindow) -> bool {
     !is_ui_mode(window)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InputMode {
+    Ui,
+    Gameplay,
+}
+
+impl InputMode {
+    fn from_window(window: &MainWindow) -> Self {
+        if window.get_launcher_visible()
+            || window.get_ingame_menu_visible()
+            || window.get_game_over_visible()
+        {
+            Self::Ui
+        } else {
+            Self::Gameplay
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct ModeHandoff {
+    mode: Option<InputMode>,
+    awaiting_neutral: [bool; 2],
+}
+
+impl ModeHandoff {
+    fn observe(&mut self, mode: InputMode) -> bool {
+        if self.mode == Some(mode) {
+            return false;
+        }
+        self.mode = Some(mode);
+        self.block_all();
+        true
+    }
+
+    fn block_all(&mut self) {
+        self.awaiting_neutral.fill(true);
+    }
+
+    fn block(&mut self, seat: usize) {
+        if let Some(awaiting_neutral) = self.awaiting_neutral.get_mut(seat) {
+            *awaiting_neutral = true;
+        }
+    }
+
+    fn accepts_input(&self, seat: usize) -> bool {
+        self.awaiting_neutral
+            .get(seat)
+            .is_some_and(|awaiting_neutral| !awaiting_neutral)
+    }
+
+    fn filter(&mut self, seat: usize, snapshot: GamepadSeatInput) -> GamepadSeatInput {
+        if self.accepts_input(seat) {
+            return snapshot;
+        }
+        if is_neutral(&snapshot) {
+            if let Some(awaiting_neutral) = self.awaiting_neutral.get_mut(seat) {
+                *awaiting_neutral = false;
+            }
+            snapshot
+        } else {
+            neutral_snapshot(&snapshot)
+        }
+    }
+}
+
+fn is_neutral(gamepad: &GamepadSeatInput) -> bool {
+    input::shape_stick(gamepad.left_stick_x) == 0.0
+        && input::shape_stick(gamepad.left_stick_y) == 0.0
+        && input::shape_trigger(gamepad.left_trigger) == 0.0
+        && input::shape_trigger(gamepad.right_trigger) == 0.0
+        && !gamepad.dpad_up
+        && !gamepad.dpad_down
+        && !gamepad.dpad_left
+        && !gamepad.dpad_right
+        && !gamepad.right_bumper
+        && !gamepad.south
+        && !gamepad.east
+        && !gamepad.west
+        && !gamepad.start
+        && !gamepad.select
+}
+
+fn neutral_snapshot(gamepad: &GamepadSeatInput) -> GamepadSeatInput {
+    GamepadSeatInput {
+        connected: gamepad.connected,
+        name: gamepad.name.clone(),
+        ..GamepadSeatInput::default()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -469,5 +595,69 @@ mod tests {
             repeat.update(Some(UiDirection::Down), start + UI_REPEAT_DELAY),
             Some(UiAction::Down)
         );
+    }
+
+    #[test]
+    fn held_steering_does_not_move_the_menu_after_a_mode_transition() {
+        let mut handoff = ModeHandoff::default();
+        handoff.observe(InputMode::Gameplay);
+        handoff.filter(0, GamepadSeatInput::default());
+
+        let steering = GamepadSeatInput {
+            connected: true,
+            left_stick_x: 1.0,
+            ..GamepadSeatInput::default()
+        };
+        assert_eq!(handoff.filter(0, steering.clone()).left_stick_x, 1.0);
+
+        assert!(handoff.observe(InputMode::Ui));
+        let filtered = handoff.filter(0, steering);
+        assert_eq!(ui_direction(&filtered), None);
+        assert!(!handoff.accepts_input(0));
+
+        handoff.filter(0, GamepadSeatInput::default());
+        assert!(handoff.accepts_input(0));
+        let next_press = GamepadSeatInput {
+            connected: true,
+            dpad_down: true,
+            ..GamepadSeatInput::default()
+        };
+        assert_eq!(
+            ui_direction(&handoff.filter(0, next_press)),
+            Some(UiDirection::Down)
+        );
+    }
+
+    #[test]
+    fn held_confirm_does_not_become_laser_after_a_mode_transition() {
+        let mut handoff = ModeHandoff::default();
+        handoff.observe(InputMode::Ui);
+        handoff.filter(0, GamepadSeatInput::default());
+
+        let confirm = GamepadSeatInput {
+            connected: true,
+            south: true,
+            ..GamepadSeatInput::default()
+        };
+        assert!(handoff.filter(0, confirm.clone()).south);
+
+        // Resume is queued for the next host tick, so the input handoff must
+        // begin before the visible mode catches up.
+        handoff.block_all();
+        assert!(!handoff.filter(0, confirm.clone()).south);
+        assert!(!handoff.accepts_input(0));
+
+        assert!(handoff.observe(InputMode::Gameplay));
+        assert!(!handoff.filter(0, confirm).south);
+        assert!(!handoff.accepts_input(0));
+
+        handoff.filter(0, GamepadSeatInput::default());
+        assert!(handoff.accepts_input(0));
+        let next_press = GamepadSeatInput {
+            connected: true,
+            south: true,
+            ..GamepadSeatInput::default()
+        };
+        assert!(handoff.filter(0, next_press).south);
     }
 }
