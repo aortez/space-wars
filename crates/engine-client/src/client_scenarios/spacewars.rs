@@ -20,7 +20,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         player_zoom: true,
         game_over: true,
     },
-    controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick turn, RT thrust, LT brake, B reverse, RB wings, A laser, X cannon, d-pad up/down zoom, Start pause, Select controls.",
+    controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick or d-pad left/right turns, RT or d-pad up thrusts, LT or d-pad down brakes, B reverses, RB closes wings, A fires laser, X fires cannon, Start pauses, Select shows controls. Zoom is available in the pause menu.",
     create,
 };
 

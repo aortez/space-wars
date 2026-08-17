@@ -218,16 +218,10 @@ impl ClientInput {
     ) -> Vec<Action> {
         let mut actions = self.spacewars_controls.actions(state, benchmark_active);
         let pressed = self.pressed.borrow();
-        let gamepads = self.gamepads.borrow();
         for controls in [P1_CONTROLS, P2_CONTROLS] {
-            let gamepad = gamepads.seat(controls.player);
-            if pressed.contains(&controls.zoom_in)
-                || gamepad.is_some_and(|gamepad| gamepad.connected && gamepad.dpad_up)
-            {
+            if pressed.contains(&controls.zoom_in) {
                 actions.push(SpacewarsAction::zoom_in(controls.player));
-            } else if pressed.contains(&controls.zoom_out)
-                || gamepad.is_some_and(|gamepad| gamepad.connected && gamepad.dpad_down)
-            {
+            } else if pressed.contains(&controls.zoom_out) {
                 actions.push(SpacewarsAction::zoom_out(controls.player));
             }
         }
@@ -495,14 +489,20 @@ impl ControlSource for GamepadSource {
         } else {
             shape_stick(gamepad.left_stick_x)
         };
+        let forward_thrust = if gamepad.dpad_up {
+            1.0
+        } else {
+            shape_trigger(gamepad.right_trigger)
+        };
+        let brake = if gamepad.dpad_down {
+            1.0
+        } else {
+            shape_trigger(gamepad.left_trigger)
+        };
         ShipIntent {
             turn,
-            thrust: if gamepad.east {
-                -1.0
-            } else {
-                shape_trigger(gamepad.right_trigger)
-            },
-            brake: shape_trigger(gamepad.left_trigger),
+            thrust: if gamepad.east { -1.0 } else { forward_thrust },
+            brake,
             wings_closed: gamepad.right_bumper,
             laser: gamepad.south,
             cannon: gamepad.west,
@@ -937,6 +937,7 @@ mod tests {
                 left_stick_x: 1.0,
                 left_trigger: 0.5,
                 right_trigger: 0.75,
+                dpad_up: true,
                 right_bumper: true,
                 south: true,
                 east: true,
@@ -977,7 +978,7 @@ mod tests {
     }
 
     #[test]
-    fn pad_wins_equal_magnitude_merge_and_dpad_controls_zoom() {
+    fn dpad_controls_digital_flight_without_changing_zoom() {
         let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
         gamepads.borrow_mut().set_seat(
             0,
@@ -996,6 +997,26 @@ mod tests {
             player: 0,
             rate: 1.0,
         }));
-        assert!(has_action(&actions, 0, SpacewarsActionKind::ZoomIn));
+        assert!(actions.contains(&ScenarioAction::SetThrust {
+            player: 0,
+            amount: 1.0,
+        }));
+        assert!(!has_action(&actions, 0, SpacewarsActionKind::ZoomIn));
+
+        input.gamepads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                dpad_down: true,
+                ..GamepadSeatInput::default()
+            },
+        );
+        let actions = decoded(&take_spacewars_actions(&mut input));
+
+        assert!(actions.contains(&ScenarioAction::SetBrake {
+            player: 0,
+            amount: 1.0,
+        }));
+        assert!(!has_action(&actions, 0, SpacewarsActionKind::ZoomOut));
     }
 }

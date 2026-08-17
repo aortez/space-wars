@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
-use gilrs::{Axis, Button, EventType, Gamepad, Gilrs};
+use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs, Mapping};
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
 
 use crate::MainWindow;
@@ -14,6 +14,42 @@ const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const UI_REPEAT_DELAY: Duration = Duration::from_millis(350);
 const UI_REPEAT_INTERVAL: Duration = Duration::from_millis(100);
 const UI_STICK_THRESHOLD: f32 = 0.55;
+const AXIS_DPAD_THRESHOLD: f32 = 0.5;
+
+// Linux SDL GUID for USB 0079:0011, version 0110. Gilrs 0.11 parses
+// this controller's signed half-axis D-pad mappings as one mapping per
+// physical axis, leaving only Right and Up usable. Remap those axes to
+// ordinary stick axes and synthesize all four D-pad directions below.
+const RETRO_CONTROLLER_UUID: [u8; 16] = [
+    0x03, 0x00, 0x00, 0x00, 0x79, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x10, 0x01, 0x00, 0x00,
+];
+
+const REMAPPED_BUTTONS: [Button; 15] = [
+    Button::South,
+    Button::East,
+    Button::North,
+    Button::West,
+    Button::C,
+    Button::Z,
+    Button::LeftTrigger,
+    Button::LeftTrigger2,
+    Button::RightTrigger,
+    Button::RightTrigger2,
+    Button::Select,
+    Button::Start,
+    Button::Mode,
+    Button::LeftThumb,
+    Button::RightThumb,
+];
+
+const REMAPPED_AXES: [Axis; 6] = [
+    Axis::LeftStickX,
+    Axis::LeftStickY,
+    Axis::LeftZ,
+    Axis::RightStickX,
+    Axis::RightStickY,
+    Axis::RightZ,
+];
 
 pub(crate) fn start_gamepad_pump(
     window: &MainWindow,
@@ -66,12 +102,11 @@ impl GamepadPump {
     }
 
     fn initialize(&mut self, window: &MainWindow) {
-        let connected = self
-            .gilrs
-            .gamepads()
-            .map(|(id, gamepad)| (usize::from(id), gamepad.name().to_owned()))
-            .collect::<Vec<_>>();
-        for (id, name) in connected {
+        let connected = self.gilrs.gamepads().map(|(id, _)| id).collect::<Vec<_>>();
+        for id in connected {
+            apply_controller_profile(&mut self.gilrs, id);
+            let name = self.gilrs.gamepad(id).name().to_owned();
+            let id = usize::from(id);
             if let Some(seat) = self.assignments.connect(id) {
                 tracing::info!(
                     gamepad_id = id,
@@ -92,6 +127,7 @@ impl GamepadPump {
             let id = usize::from(event.id);
             match event.event {
                 EventType::Connected => {
+                    apply_controller_profile(&mut self.gilrs, event.id);
                     let name = self.gilrs.gamepad(event.id).name().to_owned();
                     if let Some(seat) = self.assignments.connect(id) {
                         self.mode_handoff.block(seat);
@@ -267,24 +303,116 @@ impl GamepadPump {
     }
 }
 
+fn apply_controller_profile(gilrs: &mut Gilrs, id: GamepadId) {
+    let profile = {
+        let gamepad = gilrs.gamepad(id);
+        if !uses_retro_axis_dpad(gamepad.uuid()) {
+            return;
+        }
+
+        let Some(x_axis) = gamepad
+            .button_code(Button::DPadRight)
+            .or_else(|| gamepad.button_code(Button::DPadLeft))
+        else {
+            tracing::warn!(
+                gamepad_id = usize::from(id),
+                "Retro Controller profile could not find its horizontal D-pad axis."
+            );
+            return;
+        };
+        let Some(y_axis) = gamepad
+            .button_code(Button::DPadUp)
+            .or_else(|| gamepad.button_code(Button::DPadDown))
+        else {
+            tracing::warn!(
+                gamepad_id = usize::from(id),
+                "Retro Controller profile could not find its vertical D-pad axis."
+            );
+            return;
+        };
+
+        let mut mapping = Mapping::new();
+        for button in REMAPPED_BUTTONS {
+            if let Some(code) = gamepad.button_code(button) {
+                mapping.insert_btn(code, button);
+            }
+        }
+        for axis in REMAPPED_AXES {
+            if let Some(code) = gamepad.axis_code(axis) {
+                if code != x_axis && code != y_axis {
+                    mapping.insert_axis(code, axis);
+                }
+            }
+        }
+        mapping.insert_axis(x_axis, Axis::LeftStickX);
+        mapping.insert_axis(y_axis, Axis::LeftStickY);
+        mapping
+    };
+
+    match gilrs.set_mapping(
+        usize::from(id),
+        &profile,
+        "Retro Controller (Space Wars axis D-pad)",
+    ) {
+        Ok(_) => tracing::info!(
+            gamepad_id = usize::from(id),
+            profile = "retro-axis-dpad",
+            "applied controller input profile."
+        ),
+        Err(err) => tracing::warn!(
+            gamepad_id = usize::from(id),
+            error = %err,
+            "failed to apply controller input profile."
+        ),
+    }
+}
+
 fn snapshot(gamepad: &Gamepad<'_>) -> GamepadSeatInput {
+    let left_stick_x = gamepad.value(Axis::LeftStickX);
+    let left_stick_y = gamepad.value(Axis::LeftStickY);
+    let axis_dpad = if uses_retro_axis_dpad(gamepad.uuid()) {
+        dpad_from_axes(left_stick_x, left_stick_y)
+    } else {
+        DpadInput::default()
+    };
     GamepadSeatInput {
         connected: gamepad.is_connected(),
         name: gamepad.name().to_owned(),
-        left_stick_x: gamepad.value(Axis::LeftStickX),
-        left_stick_y: gamepad.value(Axis::LeftStickY),
+        left_stick_x,
+        left_stick_y,
         left_trigger: button_value(gamepad, Button::LeftTrigger2),
         right_trigger: button_value(gamepad, Button::RightTrigger2),
-        dpad_up: gamepad.is_pressed(Button::DPadUp),
-        dpad_down: gamepad.is_pressed(Button::DPadDown),
-        dpad_left: gamepad.is_pressed(Button::DPadLeft),
-        dpad_right: gamepad.is_pressed(Button::DPadRight),
+        dpad_up: gamepad.is_pressed(Button::DPadUp) || axis_dpad.up,
+        dpad_down: gamepad.is_pressed(Button::DPadDown) || axis_dpad.down,
+        dpad_left: gamepad.is_pressed(Button::DPadLeft) || axis_dpad.left,
+        dpad_right: gamepad.is_pressed(Button::DPadRight) || axis_dpad.right,
         right_bumper: gamepad.is_pressed(Button::RightTrigger),
         south: gamepad.is_pressed(Button::South),
         east: gamepad.is_pressed(Button::East),
         west: gamepad.is_pressed(Button::West),
         start: gamepad.is_pressed(Button::Start),
         select: gamepad.is_pressed(Button::Select),
+    }
+}
+
+fn uses_retro_axis_dpad(uuid: [u8; 16]) -> bool {
+    uuid == RETRO_CONTROLLER_UUID
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct DpadInput {
+    up: bool,
+    down: bool,
+    left: bool,
+    right: bool,
+}
+
+fn dpad_from_axes(x: f32, y: f32) -> DpadInput {
+    DpadInput {
+        up: y >= AXIS_DPAD_THRESHOLD,
+        down: y <= -AXIS_DPAD_THRESHOLD,
+        left: x <= -AXIS_DPAD_THRESHOLD,
+        right: x >= AXIS_DPAD_THRESHOLD,
     }
 }
 
@@ -571,6 +699,48 @@ mod tests {
         input.left_stick_x = 0.2;
         input.left_stick_y = 0.2;
         assert_eq!(ui_direction(&input), None);
+    }
+
+    #[test]
+    fn retro_controller_profile_matches_only_the_exact_linux_uuid() {
+        assert!(uses_retro_axis_dpad(RETRO_CONTROLLER_UUID));
+
+        let mut other_version = RETRO_CONTROLLER_UUID;
+        other_version[12] = 0x11;
+        assert!(!uses_retro_axis_dpad(other_version));
+    }
+
+    #[test]
+    fn retro_controller_axes_produce_all_four_dpad_directions() {
+        assert_eq!(
+            dpad_from_axes(1.0, 0.0),
+            DpadInput {
+                right: true,
+                ..DpadInput::default()
+            }
+        );
+        assert_eq!(
+            dpad_from_axes(-1.0, 0.0),
+            DpadInput {
+                left: true,
+                ..DpadInput::default()
+            }
+        );
+        assert_eq!(
+            dpad_from_axes(0.0, 1.0),
+            DpadInput {
+                up: true,
+                ..DpadInput::default()
+            }
+        );
+        assert_eq!(
+            dpad_from_axes(0.0, -1.0),
+            DpadInput {
+                down: true,
+                ..DpadInput::default()
+            }
+        );
+        assert_eq!(dpad_from_axes(0.49, -0.49), DpadInput::default());
     }
 
     #[test]
