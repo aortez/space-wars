@@ -85,20 +85,21 @@ lsblk -f /dev/sdb
 ## OTA Update
 
 After an OTA-capable image has been flashed once, later root filesystem updates
-can be pushed over SSH to the inactive A/B slot:
+can be pushed from the repository root over SSH to the inactive A/B slot:
 
 ```sh
-cd yocto
-npm run update
-npm run update -- --skip-build
+./update.sh
+./update.sh --skip-build
 ```
 
-`npm run update` follows the DirtSim model: it builds unless `--skip-build` is
+`./update.sh` follows the DirtSim model: it builds unless `--skip-build` is
 passed, transfers the latest
 `spacewars-image-raspberrypi5.rootfs.ext4.gz`, verifies the checksum on the Pi,
 injects the configured SSH public key into the inactive slot, switches the boot
-slot, and reboots. The image grants the `spacewars` user passwordless sudo only
-for the A/B update helper and `systemctl reboot`.
+slot, reboots, and verifies that `spacewars-kiosk.service` is active. The image
+grants the `spacewars` user passwordless sudo only for the A/B update helper and
+`systemctl reboot`. The lower-level command remains available as
+`npm run update` from this directory.
 
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
 device identity.

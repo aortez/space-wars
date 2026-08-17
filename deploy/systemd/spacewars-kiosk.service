@@ -11,7 +11,7 @@ StateDirectoryMode=0755
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
 Environment=SLINT_BACKEND=linuxkms-software
 Environment=SLINT_KMS_ROTATION=90
-ExecStart=/usr/bin/engine-client --kiosk --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true

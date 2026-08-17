@@ -14,7 +14,7 @@ Environment=SLINT_BACKEND=linuxkms-software
 Environment=SLINT_DRM_OUTPUT=DPI-1
 Environment=SLINT_KMS_ROTATION=90
 WorkingDirectory=/data/spacewars
-ExecStart=/usr/bin/engine-client --kiosk --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true

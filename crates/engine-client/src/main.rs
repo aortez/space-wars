@@ -213,12 +213,8 @@ impl Args {
         self.benchmark || self.benchmark_headless
     }
 
-    fn has_launch_override(&self) -> bool {
-        self.scenario.is_some()
-            || self.seed.is_some()
-            || self.renderer.is_some()
-            || self.raster_scale.is_some()
-            || self.kiosk
+    fn requests_direct_launch(&self) -> bool {
+        self.scenario.is_some() || self.kiosk
     }
 
     fn benchmark_configuration(&self) -> host::BenchmarkConfiguration {
@@ -457,7 +453,7 @@ fn normalize_raster_scale(value: f32) -> f32 {
 }
 
 fn should_launch_directly(args: &Args) -> bool {
-    args.uses_debug_render() || args.uses_benchmark() || args.has_launch_override()
+    args.uses_debug_render() || args.uses_benchmark() || args.requests_direct_launch()
 }
 
 fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Settings) {
@@ -1578,6 +1574,12 @@ mod tests {
 
         let mut args = base_args();
         args.fullscreen = true;
+        assert!(!should_launch_directly(&args));
+
+        let mut args = base_args();
+        args.seed = Some(42);
+        args.renderer = Some(RendererArg::Raster);
+        args.raster_scale = Some(2.0);
         assert!(!should_launch_directly(&args));
     }
 
