@@ -18,6 +18,7 @@ const ROVER_CHASSIS_COLLIDER_ROLE: ColliderRole = ColliderRole::new(20);
 const ROVER_WHEEL_COLLIDER_ROLE: ColliderRole = ColliderRole::new(21);
 const ROVER_LEFT_SUSPENSION_ROLE: JointRole = JointRole::new(20);
 const ROVER_RIGHT_SUSPENSION_ROLE: JointRole = JointRole::new(21);
+const MIN_SUPPORT_ALIGNMENT: f32 = 0.25;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PlanetSpec {
@@ -115,7 +116,31 @@ pub struct RoverSnapshot {
     pub chassis: BodyMotion,
     pub wheels: [BodyMotion; 2],
     pub suspension_anchors: [Vec2; 2],
+    pub suspension_lengths: [f32; 2],
+    pub grounded_wheels: [bool; 2],
+    pub support_normal: Option<Vec2>,
+    pub max_support_impulse: f32,
     pub contacts: Vec<ContactPoint>,
+}
+
+impl RoverSnapshot {
+    pub fn grounded_wheel_count(&self) -> usize {
+        self.grounded_wheels
+            .into_iter()
+            .filter(|grounded| *grounded)
+            .count()
+    }
+
+    pub fn is_grounded(&self) -> bool {
+        self.grounded_wheels.into_iter().any(|grounded| grounded)
+    }
+}
+
+struct RoverSupportState {
+    grounded_wheels: [bool; 2],
+    normal: Option<Vec2>,
+    max_impulse: f32,
+    wheel_contacts: Vec<ContactPoint>,
 }
 
 /// Stable description of one kinematic circular planet assembly.
@@ -427,6 +452,34 @@ impl RoverAssembly {
         true
     }
 
+    /// Apply one mass-independent takeoff velocity to the complete assembly.
+    ///
+    /// The direction is the average supporting wheel-contact normal aligned
+    /// with the chassis' local up axis. Applying the same velocity change to
+    /// all three bodies preserves their relative motion and leaves Rapier's
+    /// suspension joints authoritative.
+    pub fn apply_jump_velocity(&self, physics: &mut PhysicsWorld, speed: f32) -> Option<Vec2> {
+        if !speed.is_finite()
+            || speed <= 0.0
+            || self
+                .bodies()
+                .into_iter()
+                .any(|body| !physics.contains_body(body))
+        {
+            return None;
+        }
+
+        let chassis = physics.motion(self.chassis)?;
+        let direction = self.support_state(physics, chassis).normal?;
+        let delta_velocity = direction * speed;
+        for body in self.bodies() {
+            if !physics.apply_velocity_delta(body, delta_velocity, true) {
+                return None;
+            }
+        }
+        Some(direction)
+    }
+
     pub fn snapshot(&self, physics: &PhysicsWorld) -> Option<RoverSnapshot> {
         let chassis = physics.motion(self.chassis)?;
         let wheels = [
@@ -436,24 +489,67 @@ impl RoverAssembly {
         let suspension_anchors = self
             .suspension_anchors
             .map(|anchor| chassis.position + anchor.rotate_radians(chassis.angle));
-        let mut contacts = Vec::new();
-        for collider in self
-            .wheel_colliders
-            .into_iter()
-            .chain(std::iter::once(self.chassis_collider))
-        {
-            contacts.extend(physics.contact_points(collider));
-        }
+        let suspension_lengths =
+            [0, 1].map(|index| suspension_anchors[index].distance_to(wheels[index].position));
+        let support = self.support_state(physics, chassis);
+        let mut contacts = support.wheel_contacts;
+        contacts.extend(physics.contact_points(self.chassis_collider));
         Some(RoverSnapshot {
             chassis,
             wheels,
             suspension_anchors,
+            suspension_lengths,
+            grounded_wheels: support.grounded_wheels,
+            support_normal: support.normal,
+            max_support_impulse: support.max_impulse,
             contacts,
         })
     }
 
     pub fn remove(self, physics: &mut PhysicsWorld) -> bool {
         physics.remove_entity(self.entity)
+    }
+
+    fn support_state(&self, physics: &PhysicsWorld, chassis: BodyMotion) -> RoverSupportState {
+        let chassis_up = Vec2::Y.rotate_radians(chassis.angle);
+        let mut grounded_wheels = [false; 2];
+        let mut normal_sum = Vec2::ZERO;
+        let mut wheel_contacts = Vec::new();
+
+        for (index, collider) in self.wheel_colliders.into_iter().enumerate() {
+            for contact in physics.contact_points(collider) {
+                let support_normal = -contact.normal.normalized();
+                if support_normal.dot(chassis_up) >= MIN_SUPPORT_ALIGNMENT {
+                    grounded_wheels[index] = true;
+                    normal_sum += support_normal;
+                }
+                wheel_contacts.push(contact);
+            }
+        }
+
+        let normal = (normal_sum.length_squared() > f32::EPSILON).then(|| normal_sum.normalized());
+        let mut max_impulse = 0.0_f32;
+        for event in physics.contact_events() {
+            for collider in self.wheel_colliders {
+                let support_normal = if event.collider_a == collider {
+                    -event.normal
+                } else if event.collider_b == collider {
+                    event.normal
+                } else {
+                    continue;
+                };
+                if support_normal.normalized().dot(chassis_up) >= MIN_SUPPORT_ALIGNMENT {
+                    max_impulse = max_impulse.max(event.impulse_magnitude);
+                }
+            }
+        }
+
+        RoverSupportState {
+            grounded_wheels,
+            normal,
+            max_impulse,
+            wheel_contacts,
+        }
     }
 }
 
@@ -513,10 +609,17 @@ mod tests {
     }
 
     fn test_world() -> (PhysicsWorld, PlanetSpec, PlanetAssembly, RoverAssembly) {
+        test_world_with_bumps(&[])
+    }
+
+    fn test_world_with_bumps(
+        bumps: &[BumpSpec],
+    ) -> (PhysicsWorld, PlanetSpec, PlanetAssembly, RoverAssembly) {
         let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
             solver_iterations: 8,
             internal_stabilization_iterations: 2,
             max_ccd_substeps: 2,
+            collect_events: true,
             ..PhysicsWorldConfig::default()
         });
         let planet_spec = PlanetSpec {
@@ -524,7 +627,7 @@ mod tests {
             radius: 20.0,
             angle: 0.0,
         };
-        let planet = PlanetAssembly::insert(&mut physics, PLANET, planet_spec, &[]).unwrap();
+        let planet = PlanetAssembly::insert(&mut physics, PLANET, planet_spec, bumps).unwrap();
         let rover = RoverAssembly::insert(
             &mut physics,
             ROVER,
@@ -536,17 +639,173 @@ mod tests {
         (physics, planet_spec, planet, rover)
     }
 
+    fn step_rover(physics: &mut PhysicsWorld, rover: &RoverAssembly, control: RoverControl) {
+        physics.clear_forces();
+        assert!(rover.set_control(physics, control));
+        assert!(rover.apply_acceleration_field(physics, gravity));
+        physics.step(1.0 / 60.0);
+    }
+
+    fn settle_rover(physics: &mut PhysicsWorld, rover: &RoverAssembly) {
+        for _ in 0..240 {
+            step_rover(physics, rover, RoverControl::default());
+        }
+    }
+
+    fn driven_suspension_excursion(
+        mut physics: PhysicsWorld,
+        rover: &RoverAssembly,
+    ) -> (f32, RoverSnapshot) {
+        settle_rover(&mut physics, rover);
+        let mut minimum_length = f32::INFINITY;
+        let mut maximum_length = 0.0_f32;
+        for _ in 0..900 {
+            step_rover(
+                &mut physics,
+                rover,
+                RoverControl {
+                    throttle: 0.7,
+                    brake: false,
+                },
+            );
+            let snapshot = rover.snapshot(&physics).unwrap();
+            for length in snapshot.suspension_lengths {
+                minimum_length = minimum_length.min(length);
+                maximum_length = maximum_length.max(length);
+            }
+        }
+        (
+            maximum_length - minimum_length,
+            rover.snapshot(&physics).unwrap(),
+        )
+    }
+
     #[test]
     fn assembly_uses_the_canonical_world_and_settles() {
         let (mut physics, _, _, rover) = test_world();
-        for _ in 0..240 {
-            physics.clear_forces();
-            assert!(rover.apply_acceleration_field(&mut physics, gravity));
-            physics.step(1.0 / 60.0);
-        }
+        settle_rover(&mut physics, &rover);
         let snapshot = rover.snapshot(&physics).unwrap();
         assert!(!snapshot.contacts.is_empty());
+        assert!(snapshot.is_grounded());
+        assert!(snapshot.support_normal.is_some());
         assert!(snapshot.chassis.position.length() > 20.0);
+    }
+
+    #[test]
+    fn jump_uses_surface_support_and_preserves_articulated_motion() {
+        let (mut physics, planet_spec, _, rover) = test_world();
+        settle_rover(&mut physics, &rover);
+        let before = rover
+            .bodies()
+            .map(|body| physics.motion(body).unwrap().linear_velocity);
+
+        let jump_speed = 8.0;
+        let direction = rover
+            .apply_jump_velocity(&mut physics, jump_speed)
+            .expect("a settled rover must have a supporting contact");
+        let after = rover
+            .bodies()
+            .map(|body| physics.motion(body).unwrap().linear_velocity);
+        let radial_up =
+            (rover.snapshot(&physics).unwrap().chassis.position - planet_spec.center).normalized();
+
+        assert!(direction.dot(radial_up) > 0.95);
+        for index in 0..3 {
+            let applied = after[index] - before[index];
+            assert!((applied - direction * jump_speed).length() < 1.0e-4);
+        }
+    }
+
+    #[test]
+    fn wheel_motors_drive_around_the_curved_surface() {
+        let (mut physics, _, _, rover) = test_world();
+        settle_rover(&mut physics, &rover);
+        let start = rover.snapshot(&physics).unwrap().chassis.position;
+        let start_angle = start.y.atan2(start.x);
+
+        for _ in 0..600 {
+            step_rover(
+                &mut physics,
+                &rover,
+                RoverControl {
+                    throttle: 0.7,
+                    brake: false,
+                },
+            );
+        }
+
+        let end = rover.snapshot(&physics).unwrap().chassis.position;
+        let angular_travel = (end.y.atan2(end.x) - start_angle).abs();
+        assert!(
+            angular_travel > 0.35,
+            "rover only traveled {angular_travel} radians"
+        );
+        assert!(
+            (20.0..25.0).contains(&end.length()),
+            "rover radius was {}",
+            end.length()
+        );
+    }
+
+    #[test]
+    fn suspension_compresses_and_recovers_over_a_surface_bump() {
+        let bump = BumpSpec {
+            surface_angle: 1.08,
+            half_width: 1.25,
+            half_height: 0.32,
+        };
+        let (flat_physics, _, _, flat_rover) = test_world();
+        let (bump_physics, _, _, bump_rover) = test_world_with_bumps(&[bump]);
+        let (flat_excursion, _) = driven_suspension_excursion(flat_physics, &flat_rover);
+        let (bump_excursion, snapshot) = driven_suspension_excursion(bump_physics, &bump_rover);
+
+        assert!(
+            bump_excursion > flat_excursion + 0.04,
+            "bump excursion {bump_excursion} was too close to flat excursion {flat_excursion}"
+        );
+        assert!((20.0..25.0).contains(&snapshot.chassis.position.length()));
+    }
+
+    #[test]
+    fn rover_completes_a_bumped_circumference_without_escaping() {
+        let bump = BumpSpec {
+            surface_angle: 1.08,
+            half_width: 1.25,
+            half_height: 0.32,
+        };
+        let (mut physics, _, _, rover) = test_world_with_bumps(&[bump]);
+        settle_rover(&mut physics, &rover);
+
+        let start = rover.snapshot(&physics).unwrap().chassis.position;
+        let mut previous_angle = start.y.atan2(start.x);
+        let mut accumulated_angle = 0.0_f32;
+        for _ in 0..3600 {
+            step_rover(
+                &mut physics,
+                &rover,
+                RoverControl {
+                    throttle: 0.7,
+                    brake: false,
+                },
+            );
+            let position = rover.snapshot(&physics).unwrap().chassis.position;
+            assert!(
+                (20.0..25.0).contains(&position.length()),
+                "rover radius was {}",
+                position.length()
+            );
+            let angle = position.y.atan2(position.x);
+            let delta = (angle - previous_angle + std::f32::consts::PI)
+                .rem_euclid(std::f32::consts::TAU)
+                - std::f32::consts::PI;
+            accumulated_angle += delta;
+            previous_angle = angle;
+        }
+
+        assert!(
+            accumulated_angle.abs() > std::f32::consts::TAU,
+            "rover only traveled {accumulated_angle} radians"
+        );
     }
 
     #[test]
