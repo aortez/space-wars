@@ -20,7 +20,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         player_zoom: true,
         game_over: true,
     },
-    controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.",
+    controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick turn, RT thrust, LT brake, B reverse, RB wings, A laser, X cannon, d-pad up/down zoom, Start pause, Select controls.",
     create,
 };
 
@@ -58,12 +58,8 @@ impl ClientScenario for SpacewarsClientScenario {
         SpacewarsScenario::step(&mut self.state, actions, dt)
     }
 
-    fn map_keyboard_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
-        if benchmark_active {
-            SpacewarsScenario::benchmark_actions(&self.state)
-        } else {
-            input.actions_for_spacewars()
-        }
+    fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
+        input.actions_for_spacewars(&self.state, benchmark_active)
     }
 
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {

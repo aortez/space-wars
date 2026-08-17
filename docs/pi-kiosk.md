@@ -39,10 +39,11 @@ Yocto's own Rust bootstrap does not accidentally discover Space-Wars'
 
 The image recipe builds `engine-client` with the `engine-client/pi-kiosk`
 feature, which selects Slint `linuxkms` plus the software renderer instead of
-the full desktop backend set. The feature still includes Slint's Winit
-physical-key adapter because the current game input path uses it for original
-key mappings; Pi validation must confirm keyboard behavior on the selected
-display backend.
+the full desktop backend set. Gamepads are read directly from
+`/dev/input/event*` through gilrs/libudev and do not depend on the Slint display
+backend. The feature still includes Slint's Winit physical-key adapter for the
+desktop keyboard fallback; Pi validation must separately confirm whether
+keyboard events are available on the selected display backend.
 
 ## Launch Command
 
@@ -117,10 +118,20 @@ dependent.
 3. Run the headless benchmark command on the Pi with `--benchmark-seconds 10`.
 4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0`.
 5. Confirm fullscreen display startup.
-6. Confirm both players' controls work with the attached keyboard.
-7. Confirm pause, quit-to-launcher, restart, benchmark, and exit shortcuts.
-8. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
-9. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
+6. Confirm `spacewars` belongs to the `input` group and can read the attached
+   controller's `/dev/input/event*` node.
+7. At the launcher, confirm the pad badge appears and Start launches the saved
+   scenario without a mouse.
+8. Confirm analog turn/thrust/brake, weapons, wings, zoom, pause, and controls
+   overlay mappings work for both player seats.
+9. Confirm disconnect auto-pauses with a banner, keyboard remains usable, and
+   reconnect returns the pad to its original seat.
+10. Confirm the D-pad or left stick moves the highlighted launcher, pause, and
+    game-over choices; A selects, B goes back, and Start launches or resumes.
+11. Confirm both players' controls work with the attached keyboard where the
+    selected backend exposes keyboard events.
+12. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
+13. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
 
 ## Service Installation Sketch
 
@@ -178,7 +189,8 @@ the project-root A/B updater over SSH:
 ./update.sh --skip-build
 ```
 
-The OTA path builds unless `--skip-build` is passed, transfers the latest
+Run these from the repository root. The OTA path builds unless `--skip-build`
+is passed, transfers the latest
 `spacewars-image-raspberrypi5.rootfs.ext4.gz` to the Pi, verifies its checksum,
 flashes it to the inactive slot with SSH key injection, switches boot slots,
 reboots, and verifies that `spacewars-kiosk.service` is active. The image

@@ -4,12 +4,14 @@
 //! from the launcher, with Null retained as a hidden test scenario.
 
 mod client_scenarios;
+mod gamepad;
 mod host;
 mod input;
 mod ipc;
 mod raster;
 mod render;
 mod settings;
+mod ui_navigation;
 
 use std::cell::RefCell;
 use std::env;
@@ -33,8 +35,9 @@ use scenario_pizza::{
     PizzaPhysicsBackend,
 };
 use settings::LoadStatus;
-use slint::{ComponentHandle, ModelRc, SharedString, Timer, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, VecModel};
 use tracing_subscriber::EnvFilter;
+use ui_navigation::UiAction;
 
 slint::include_modules!();
 
@@ -313,12 +316,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     select_slint_backend(&args)?;
     let window = MainWindow::new()?;
     let _control_server = ipc::start_control_server(&window, ipc::control_socket_path());
+    let (input, gamepad_input) = input::new_shared_input();
+    input::install_window_input(&window, Rc::clone(&input));
     let render_timer = Rc::new(RefCell::new(None));
     let scenario_controls = host::new_scenario_controls();
     install_launcher_callbacks(
         &window,
         Rc::clone(&render_timer),
         Rc::clone(&scenario_controls),
+        Rc::clone(&input),
         Arc::clone(&settings),
         settings_path.clone(),
     );
@@ -326,9 +332,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &window,
         Rc::clone(&render_timer),
         Rc::clone(&scenario_controls),
+        Rc::clone(&input),
         Arc::clone(&settings),
     );
+    install_ui_navigation(&window);
     apply_video_settings(&window, &args, &settings.read().unwrap());
+    let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
 
     if args.uses_debug_render() {
         *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
@@ -344,6 +353,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             args.benchmark,
             args.benchmark_configuration(),
             Rc::clone(&scenario_controls),
+            Rc::clone(&input),
             scenario_settings,
         )?);
     } else {
@@ -464,6 +474,7 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Setti
     window.set_scenario_pointer_enabled(false);
     window.set_ingame_menu_visible(false);
     window.set_ingame_controls_visible(false);
+    window.set_game_over_visible(false);
     let scenario_names = host::launcher_scenario_names()
         .into_iter()
         .map(SharedString::from)
@@ -494,6 +505,9 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Setti
         pizza.ball_spawn_rate,
     )));
     window.set_launcher_error_text(SharedString::from(""));
+    window.set_launcher_focus_index(0);
+    window.set_launcher_settings_focus_index(0);
+    window.set_launcher_settings_visible(false);
     window.set_launcher_controls_visible(false);
     window.set_launcher_visible(true);
 }
@@ -549,12 +563,14 @@ fn install_launcher_callbacks(
     window: &MainWindow,
     render_timer: Rc<RefCell<Option<Timer>>>,
     scenario_controls: host::SharedScenarioControls,
+    input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
     settings_path: PathBuf,
 ) {
     let weak = window.as_weak();
     let game_timer = Rc::clone(&render_timer);
     let game_controls = Rc::clone(&scenario_controls);
+    let game_input = Rc::clone(&input);
     let game_settings = Arc::clone(&settings);
     let game_settings_path = settings_path.clone();
     window.on_launcher_start_game(move || {
@@ -562,6 +578,7 @@ fn install_launcher_callbacks(
             &weak,
             &game_timer,
             &game_controls,
+            &game_input,
             &game_settings,
             &game_settings_path,
             false,
@@ -571,12 +588,14 @@ fn install_launcher_callbacks(
     let weak = window.as_weak();
     let benchmark_timer = Rc::clone(&render_timer);
     let benchmark_controls = Rc::clone(&scenario_controls);
+    let benchmark_input = Rc::clone(&input);
     let benchmark_settings = Arc::clone(&settings);
     window.on_launcher_start_benchmark(move || {
         handle_launcher_start(
             &weak,
             &benchmark_timer,
             &benchmark_controls,
+            &benchmark_input,
             &benchmark_settings,
             &settings_path,
             true,
@@ -627,6 +646,7 @@ fn install_ingame_menu_callbacks(
     window: &MainWindow,
     render_timer: Rc<RefCell<Option<Timer>>>,
     scenario_controls: host::SharedScenarioControls,
+    input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
 ) {
     let controls = Rc::clone(&scenario_controls);
@@ -666,14 +686,326 @@ fn install_ingame_menu_callbacks(
 
     let weak = window.as_weak();
     window.on_ingame_return_launcher(move || {
-        handle_return_to_launcher(&weak, &render_timer, &scenario_controls, &settings);
+        handle_return_to_launcher(&weak, &render_timer, &scenario_controls, &input, &settings);
     });
+}
+
+fn install_ui_navigation(window: &MainWindow) {
+    let weak = window.as_weak();
+    window.on_ui_action(move |code| {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let Some(action) = UiAction::from_code(code) else {
+            return;
+        };
+        handle_ui_action(&window, action);
+    });
+}
+
+fn handle_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_launcher_visible() {
+        handle_launcher_ui_action(window, action);
+    } else if window.get_game_over_visible() {
+        handle_game_over_ui_action(window, action);
+    } else if window.get_ingame_menu_visible() {
+        handle_ingame_menu_ui_action(window, action);
+    }
+}
+
+fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_launcher_controls_visible() {
+        match action {
+            UiAction::Back | UiAction::Confirm | UiAction::Controls => {
+                window.set_launcher_controls_visible(false);
+            }
+            UiAction::Start => window.invoke_launcher_start_game(),
+            _ => {}
+        }
+        return;
+    }
+
+    if window.get_launcher_settings_visible() {
+        let item_count = launcher_settings_item_count(window);
+        match action {
+            UiAction::Up => {
+                window.set_launcher_settings_focus_index(ui_navigation::moved_selection(
+                    window.get_launcher_settings_focus_index(),
+                    item_count,
+                    -1,
+                ))
+            }
+            UiAction::Down => {
+                window.set_launcher_settings_focus_index(ui_navigation::moved_selection(
+                    window.get_launcher_settings_focus_index(),
+                    item_count,
+                    1,
+                ))
+            }
+            UiAction::Left => adjust_launcher_setting(window, -1),
+            UiAction::Right => adjust_launcher_setting(window, 1),
+            UiAction::Confirm => {
+                if window.get_launcher_settings_focus_index() == item_count - 1 {
+                    window.set_launcher_settings_visible(false);
+                } else {
+                    adjust_launcher_setting(window, 1);
+                }
+            }
+            UiAction::Back => window.set_launcher_settings_visible(false),
+            UiAction::Start => window.invoke_launcher_start_game(),
+            UiAction::Controls => {
+                window.set_launcher_settings_visible(false);
+                window.set_launcher_controls_visible(true);
+            }
+        }
+        return;
+    }
+
+    match action {
+        UiAction::Up | UiAction::Down => window.set_launcher_focus_index(
+            ui_navigation::moved_launcher_selection(window.get_launcher_focus_index(), action),
+        ),
+        UiAction::Left => {
+            if window.get_launcher_focus_index() == 0 {
+                cycle_launcher_scenario(window, -1);
+            } else {
+                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                    window.get_launcher_focus_index(),
+                    action,
+                ));
+            }
+        }
+        UiAction::Right => {
+            if window.get_launcher_focus_index() == 0 {
+                cycle_launcher_scenario(window, 1);
+            } else {
+                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                    window.get_launcher_focus_index(),
+                    action,
+                ));
+            }
+        }
+        UiAction::Confirm => match window.get_launcher_focus_index() {
+            0 => cycle_launcher_scenario(window, 1),
+            1 => window.invoke_launcher_start_game(),
+            2 => window.set_launcher_settings_visible(true),
+            3 => window.set_launcher_controls_visible(true),
+            4 => window.invoke_launcher_quit(),
+            _ => {}
+        },
+        // Back never exits the root kiosk screen. Quit is an explicit menu item.
+        UiAction::Back => {}
+        UiAction::Start => window.invoke_launcher_start_game(),
+        UiAction::Controls => window.set_launcher_controls_visible(true),
+    }
+}
+
+fn handle_game_over_ui_action(window: &MainWindow, action: UiAction) {
+    match action {
+        UiAction::Up | UiAction::Left => window.set_game_over_focus_index(
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, -1),
+        ),
+        UiAction::Down | UiAction::Right => window.set_game_over_focus_index(
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, 1),
+        ),
+        UiAction::Confirm => {
+            if window.get_game_over_focus_index() == 0 {
+                window.invoke_ingame_restart();
+            } else {
+                window.invoke_ingame_return_launcher();
+            }
+        }
+        UiAction::Start => window.invoke_ingame_restart(),
+        UiAction::Back => window.invoke_ingame_return_launcher(),
+        UiAction::Controls => {}
+    }
+}
+
+fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_ingame_controls_visible() {
+        match action {
+            UiAction::Back | UiAction::Confirm | UiAction::Controls => {
+                window.set_ingame_controls_visible(false);
+            }
+            UiAction::Start => window.invoke_ingame_resume(),
+            _ => {}
+        }
+        return;
+    }
+
+    let benchmark_offset = i32::from(window.get_scenario_benchmark_available());
+    match action {
+        UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
+            window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
+                window.get_ingame_menu_focus_index(),
+                benchmark_offset == 1,
+                action,
+            ));
+        }
+        UiAction::Confirm => {
+            let selected = window.get_ingame_menu_focus_index();
+            if selected == 0 {
+                window.invoke_ingame_resume();
+            } else if selected == 1 {
+                window.invoke_ingame_restart();
+            } else if benchmark_offset == 1 && selected == 2 {
+                window.invoke_ingame_start_benchmark();
+            } else if selected == 2 + benchmark_offset {
+                window.set_ingame_controls_visible(true);
+            } else if selected == 3 + benchmark_offset {
+                window.invoke_ingame_return_launcher();
+            }
+        }
+        UiAction::Back | UiAction::Start => window.invoke_ingame_resume(),
+        UiAction::Controls => window.set_ingame_controls_visible(true),
+    }
+}
+
+fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
+    let scenarios = window.get_launcher_scenarios();
+    let count = scenarios.row_count() as i32;
+    if count <= 0 {
+        return;
+    }
+    let current = (0..count as usize)
+        .find(|&index| {
+            scenarios
+                .row_data(index)
+                .is_some_and(|scenario| scenario == window.get_launcher_scenario())
+        })
+        .unwrap_or(0) as i32;
+    let index = ui_navigation::moved_selection(current, count, delta);
+    let Some(scenario) = scenarios.row_data(index as usize) else {
+        return;
+    };
+    window.set_launcher_scenario(scenario.clone());
+    window.invoke_launcher_scenario_selected(scenario);
+    window.set_launcher_settings_focus_index(0);
+}
+
+fn launcher_settings_item_count(window: &MainWindow) -> i32 {
+    match window.get_launcher_scenario().as_str() {
+        "spacewars" => 7,
+        "pizza" => 5,
+        _ => 3,
+    }
+}
+
+fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
+    let focus = window.get_launcher_settings_focus_index();
+    if focus == 0 {
+        let next = cycle_label(
+            window.get_launcher_renderer().as_str(),
+            &["vector", "raster"],
+            delta,
+        );
+        window.set_launcher_renderer(SharedString::from(next));
+        return;
+    }
+    if focus == 1 {
+        let next = cycle_label(
+            window.get_launcher_raster_scale_text().as_str(),
+            &["1.0", "1.5", "2.0", "3.0"],
+            delta,
+        );
+        window.set_launcher_raster_scale_text(SharedString::from(next));
+        return;
+    }
+
+    match window.get_launcher_scenario().as_str() {
+        "spacewars" => adjust_spacewars_launcher_setting(window, focus, delta),
+        "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
+        _ => {}
+    }
+}
+
+fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    match focus {
+        2 => {
+            let next = cycle_label(
+                window.get_launcher_spacewars_preset().as_str(),
+                &[
+                    PRESET_ORIGINAL,
+                    PRESET_SMALL_DUEL,
+                    PRESET_DENSE_ASTEROIDS,
+                    PRESET_LONG_GAME,
+                ],
+                delta,
+            );
+            window.set_launcher_spacewars_preset(SharedString::from(next));
+            window.invoke_launcher_apply_preset();
+        }
+        3 => {
+            let next = cycle_label(
+                window.get_launcher_use_planets().as_str(),
+                &["on", "off"],
+                delta,
+            );
+            window.set_launcher_use_planets(SharedString::from(next));
+            window.set_launcher_spacewars_preset(SharedString::from(PRESET_CUSTOM));
+        }
+        4 => {
+            let next = cycle_label(
+                window.get_launcher_asteroids_enabled().as_str(),
+                &["on", "off"],
+                delta,
+            );
+            window.set_launcher_asteroids_enabled(SharedString::from(next));
+            window.set_launcher_spacewars_preset(SharedString::from(PRESET_CUSTOM));
+        }
+        5 => {
+            let current = window
+                .get_launcher_player_health_text()
+                .parse::<i32>()
+                .unwrap_or(100);
+            let next = (current + delta.signum() * 25).clamp(
+                MIN_SPACEWARS_PLAYER_HEALTH_PERCENT as i32,
+                MAX_SPACEWARS_PLAYER_HEALTH_PERCENT as i32,
+            );
+            window.set_launcher_player_health_text(SharedString::from(next.to_string()));
+            window.set_launcher_spacewars_preset(SharedString::from(PRESET_CUSTOM));
+        }
+        _ => {}
+    }
+}
+
+fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    match focus {
+        2 => {
+            let current = window
+                .get_launcher_pizza_desired_balls_text()
+                .parse::<i32>()
+                .unwrap_or(24);
+            let next = (current + delta.signum() * 25).clamp(1, MAX_PIZZA_DESIRED_BALLS as i32);
+            window.set_launcher_pizza_desired_balls_text(SharedString::from(next.to_string()));
+        }
+        3 => {
+            let current = window
+                .get_launcher_pizza_spawn_rate_text()
+                .parse::<f32>()
+                .unwrap_or(0.1);
+            let next = (current + delta.signum() as f32 * 0.05)
+                .clamp(MIN_PIZZA_BALL_SPAWN_RATE, MAX_PIZZA_BALL_SPAWN_RATE);
+            window
+                .set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(next)));
+        }
+        _ => {}
+    }
+}
+
+fn cycle_label<'a>(current: &str, values: &'a [&'a str], delta: i32) -> &'a str {
+    let current = values
+        .iter()
+        .position(|value| *value == current)
+        .unwrap_or(0) as i32;
+    values[ui_navigation::moved_selection(current, values.len() as i32, delta) as usize]
 }
 
 fn handle_return_to_launcher(
     weak_window: &slint::Weak<MainWindow>,
     render_timer: &Rc<RefCell<Option<Timer>>>,
     scenario_controls: &host::SharedScenarioControls,
+    input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
 ) {
     let Some(window) = weak_window.upgrade() else {
@@ -684,6 +1016,8 @@ fn handle_return_to_launcher(
         timer.stop();
     }
     scenario_controls.borrow_mut().clear();
+    input.borrow_mut().clear();
+    input.borrow_mut().reset_spacewars_controls();
     let settings = settings.read().unwrap();
     let launch = launch_from_settings(&settings);
     show_launcher(&window, &launch, &settings);
@@ -754,6 +1088,7 @@ fn handle_launcher_start(
     weak_window: &slint::Weak<MainWindow>,
     render_timer: &Rc<RefCell<Option<Timer>>>,
     scenario_controls: &host::SharedScenarioControls,
+    input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
     settings_path: &Path,
     start_benchmark: bool,
@@ -794,6 +1129,7 @@ fn handle_launcher_start(
         start_benchmark,
         host::BenchmarkConfiguration::default(),
         Rc::clone(scenario_controls),
+        Rc::clone(input),
         scenario_settings,
     ) {
         Ok(timer) => {
@@ -804,9 +1140,11 @@ fn handle_launcher_start(
             scenario_controls.borrow_mut().clear();
             *timer_slot = Some(timer);
             window.set_launcher_visible(false);
+            window.set_launcher_settings_visible(false);
             window.set_launcher_controls_visible(false);
             window.set_ingame_menu_visible(false);
             window.set_ingame_controls_visible(false);
+            window.set_game_over_visible(false);
         }
         Err(err) => {
             window.set_launcher_error_text(SharedString::from(err.to_string()));
@@ -1191,6 +1529,7 @@ fn start_scenario_from_launch(
     start_benchmark: bool,
     benchmark_configuration: host::BenchmarkConfiguration,
     controls: host::SharedScenarioControls,
+    input: input::SharedInput,
     settings: Settings,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
@@ -1205,6 +1544,7 @@ fn start_scenario_from_launch(
             renderer: launch.renderer,
             raster_scale: launch.raster_scale,
             controls: Some(controls),
+            input: Some(input),
             settings,
         },
     )

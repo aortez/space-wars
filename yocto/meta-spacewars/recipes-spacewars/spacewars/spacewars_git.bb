@@ -19,6 +19,7 @@ DEPENDS += " \
     libinput \
     libxkbcommon \
     seatd \
+    udev \
 "
 
 RDEPENDS:${PN} += " \
@@ -27,6 +28,7 @@ RDEPENDS:${PN} += " \
     libinput \
     libxkbcommon \
     seatd \
+    libudev \
     xkeyboard-config \
 "
 

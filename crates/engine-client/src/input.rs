@@ -5,7 +5,10 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use engine_common::{Action, PointerPhase, RenderPoint};
-use scenario_spacewars::SpacewarsAction;
+use scenario_spacewars::{
+    ControlSource, ShipIntent, ShipIntentEncoder, SpacewarsAction, SpacewarsScenario,
+    SpacewarsState,
+};
 use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
@@ -14,13 +17,86 @@ use slint::winit_030::{EventResult, WinitWindowAccessor};
 use crate::MainWindow;
 
 pub(crate) type SharedInput = Rc<RefCell<ClientInput>>;
+pub(crate) type SharedGamepadInput = Rc<RefCell<GamepadInput>>;
+type SharedKeyboardState = Rc<RefCell<BTreeSet<GameKey>>>;
 
-#[derive(Debug, Default)]
+pub(crate) fn new_shared_input() -> (SharedInput, SharedGamepadInput) {
+    let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+    let input = Rc::new(RefCell::new(ClientInput::new(Rc::clone(&gamepads))));
+    (input, gamepads)
+}
+
 pub(crate) struct ClientInput {
-    pressed: BTreeSet<GameKey>,
-    released: BTreeSet<GameKey>,
+    pressed: SharedKeyboardState,
+    gamepads: SharedGamepadInput,
+    spacewars_controls: SpacewarsControls,
     pointer_events: Vec<ScreenPointerEvent>,
     active_pointer: Option<RenderPoint>,
+}
+
+impl Default for ClientInput {
+    fn default() -> Self {
+        Self::new(Rc::new(RefCell::new(GamepadInput::default())))
+    }
+}
+
+impl ClientInput {
+    pub(crate) fn new(gamepads: SharedGamepadInput) -> Self {
+        let pressed = Rc::new(RefCell::new(BTreeSet::new()));
+        Self {
+            spacewars_controls: SpacewarsControls::new(Rc::clone(&pressed), Rc::clone(&gamepads)),
+            pressed,
+            gamepads,
+            pointer_events: Vec::new(),
+            active_pointer: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct GamepadSeatInput {
+    pub connected: bool,
+    pub name: String,
+    pub left_stick_x: f32,
+    pub left_stick_y: f32,
+    pub left_trigger: f32,
+    pub right_trigger: f32,
+    pub dpad_up: bool,
+    pub dpad_down: bool,
+    pub dpad_left: bool,
+    pub dpad_right: bool,
+    pub right_bumper: bool,
+    pub south: bool,
+    pub east: bool,
+    pub west: bool,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct GamepadInput {
+    seats: [GamepadSeatInput; 2],
+}
+
+impl GamepadInput {
+    pub(crate) fn seat(&self, player: usize) -> Option<&GamepadSeatInput> {
+        self.seats.get(player)
+    }
+
+    pub(crate) fn set_seat(&mut self, player: usize, state: GamepadSeatInput) {
+        if let Some(seat) = self.seats.get_mut(player) {
+            *seat = state;
+        }
+    }
+
+    pub(crate) fn disconnect_seat(&mut self, player: usize) {
+        let Some(seat) = self.seats.get_mut(player) else {
+            return;
+        };
+        let name = std::mem::take(&mut seat.name);
+        *seat = GamepadSeatInput {
+            name,
+            ..GamepadSeatInput::default()
+        };
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,6 +109,7 @@ pub(crate) struct ScreenPointerEvent {
 pub(crate) enum GameKey {
     Reset,
     Pause,
+    ForcePause,
     Benchmark,
     Back,
     Controls,
@@ -101,83 +178,76 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
 
 impl ClientInput {
     pub(crate) fn is_pressed(&self, key: GameKey) -> bool {
-        self.pressed.contains(&key)
+        self.pressed.borrow().contains(&key)
     }
 
     pub(crate) fn take_reset_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::Reset);
-        self.released.remove(&GameKey::Reset);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::Reset)
     }
 
     pub(crate) fn take_pause_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::Pause);
-        self.released.remove(&GameKey::Pause);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::Pause)
+    }
+
+    pub(crate) fn take_force_pause_requested(&mut self) -> bool {
+        self.pressed.borrow_mut().remove(&GameKey::ForcePause)
     }
 
     pub(crate) fn take_benchmark_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::Benchmark);
-        self.released.remove(&GameKey::Benchmark);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::Benchmark)
     }
 
     pub(crate) fn take_back_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::Back);
-        self.released.remove(&GameKey::Back);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::Back)
     }
 
     pub(crate) fn take_controls_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::Controls);
-        self.released.remove(&GameKey::Controls);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::Controls)
     }
 
     pub(crate) fn take_return_launcher_requested(&mut self) -> bool {
-        let requested = self.pressed.remove(&GameKey::ReturnLauncher);
-        self.released.remove(&GameKey::ReturnLauncher);
-        requested
+        self.pressed.borrow_mut().remove(&GameKey::ReturnLauncher)
     }
 
-    pub(crate) fn actions_for_spacewars(&mut self) -> Vec<Action> {
-        let mut actions = Vec::new();
-
-        self.append_player_actions(
-            PlayerControlMap {
-                player: 0,
-                wing: GameKey::P1Wing,
-                thrust: GameKey::P1Thrust,
-                brake: GameKey::P1Brake,
-                reverse: GameKey::P1Reverse,
-                turn_left: GameKey::P1TurnLeft,
-                turn_right: GameKey::P1TurnRight,
-                laser: GameKey::P1Laser,
-                cannon: GameKey::P1Cannon,
-                zoom_in: GameKey::P1ZoomIn,
-                zoom_out: GameKey::P1ZoomOut,
-            },
-            &mut actions,
-        );
-        self.append_player_actions(
-            PlayerControlMap {
-                player: 1,
-                wing: GameKey::P2Wing,
-                thrust: GameKey::P2Thrust,
-                brake: GameKey::P2Brake,
-                reverse: GameKey::P2Reverse,
-                turn_left: GameKey::P2TurnLeft,
-                turn_right: GameKey::P2TurnRight,
-                laser: GameKey::P2Laser,
-                cannon: GameKey::P2Cannon,
-                zoom_in: GameKey::P2ZoomIn,
-                zoom_out: GameKey::P2ZoomOut,
-            },
-            &mut actions,
-        );
-
-        self.released.clear();
+    pub(crate) fn actions_for_spacewars(
+        &mut self,
+        state: &SpacewarsState,
+        benchmark_active: bool,
+    ) -> Vec<Action> {
+        let mut actions = self.spacewars_controls.actions(state, benchmark_active);
+        let pressed = self.pressed.borrow();
+        let gamepads = self.gamepads.borrow();
+        for controls in [P1_CONTROLS, P2_CONTROLS] {
+            let gamepad = gamepads.seat(controls.player);
+            if pressed.contains(&controls.zoom_in)
+                || gamepad.is_some_and(|gamepad| gamepad.connected && gamepad.dpad_up)
+            {
+                actions.push(SpacewarsAction::zoom_in(controls.player));
+            } else if pressed.contains(&controls.zoom_out)
+                || gamepad.is_some_and(|gamepad| gamepad.connected && gamepad.dpad_down)
+            {
+                actions.push(SpacewarsAction::zoom_out(controls.player));
+            }
+        }
         actions
+    }
+
+    pub(crate) fn rover_drive_input(&self) -> (f32, bool) {
+        let gamepads = self.gamepads.borrow();
+        let Some(gamepad) = gamepads.seat(0).filter(|gamepad| gamepad.connected) else {
+            return (0.0, false);
+        };
+        let brake = gamepad.south;
+        let throttle = match (gamepad.dpad_left, gamepad.dpad_right) {
+            (false, true) if !brake => 1.0,
+            (true, false) if !brake => -1.0,
+            _ => 0.0,
+        };
+        (throttle, brake)
+    }
+
+    pub(crate) fn reset_spacewars_controls(&mut self) {
+        self.spacewars_controls.reset();
     }
 
     pub(crate) fn clear(&mut self) {
@@ -187,8 +257,7 @@ impl ClientInput {
     }
 
     fn clear_keyboard(&mut self) {
-        self.pressed.clear();
-        self.released.clear();
+        self.pressed.borrow_mut().clear();
     }
 
     pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
@@ -240,70 +309,11 @@ impl ClientInput {
     }
 
     pub(crate) fn press(&mut self, key: GameKey) {
-        self.pressed.insert(key);
-        self.released.remove(&key);
+        self.pressed.borrow_mut().insert(key);
     }
 
     pub(crate) fn release(&mut self, key: GameKey) {
-        if self.pressed.remove(&key) {
-            self.released.insert(key);
-        }
-    }
-
-    fn append_player_actions(&self, controls: PlayerControlMap, actions: &mut Vec<Action>) {
-        let wing_control_active = if self.pressed.contains(&controls.wing) {
-            actions.push(SpacewarsAction::close_wings(controls.player));
-            true
-        } else if self.released.contains(&controls.wing) {
-            actions.push(SpacewarsAction::open_wings(controls.player));
-            true
-        } else {
-            false
-        };
-
-        if self.pressed.contains(&controls.brake) {
-            actions.push(SpacewarsAction::brake(controls.player));
-        } else if self.released.contains(&controls.brake) {
-            actions.push(SpacewarsAction::brake_halt(controls.player));
-        } else if !wing_control_active {
-            if self.pressed.contains(&controls.thrust) {
-                actions.push(SpacewarsAction::thrust(controls.player));
-            } else if self.pressed.contains(&controls.reverse) {
-                actions.push(SpacewarsAction::reverse(controls.player));
-            } else if self.released.contains(&controls.thrust)
-                || self.released.contains(&controls.reverse)
-            {
-                actions.push(SpacewarsAction::thrust_halt(controls.player));
-            }
-        }
-
-        if self.pressed.contains(&controls.turn_left) {
-            actions.push(SpacewarsAction::turn_left(controls.player));
-        } else if self.pressed.contains(&controls.turn_right) {
-            actions.push(SpacewarsAction::turn_right(controls.player));
-        } else if self.released.contains(&controls.turn_left)
-            || self.released.contains(&controls.turn_right)
-        {
-            actions.push(SpacewarsAction::turn_halt(controls.player));
-        }
-
-        if self.pressed.contains(&controls.laser) {
-            actions.push(SpacewarsAction::fire_laser(controls.player));
-        } else if self.released.contains(&controls.laser) {
-            actions.push(SpacewarsAction::fire_laser_halt(controls.player));
-        }
-
-        if self.pressed.contains(&controls.cannon) {
-            actions.push(SpacewarsAction::fire_cannon(controls.player));
-        } else {
-            actions.push(SpacewarsAction::fire_cannon_halt(controls.player));
-        }
-
-        if self.pressed.contains(&controls.zoom_in) {
-            actions.push(SpacewarsAction::zoom_in(controls.player));
-        } else if self.pressed.contains(&controls.zoom_out) {
-            actions.push(SpacewarsAction::zoom_out(controls.player));
-        }
+        self.pressed.borrow_mut().remove(&key);
     }
 }
 
@@ -320,6 +330,219 @@ struct PlayerControlMap {
     cannon: GameKey,
     zoom_in: GameKey,
     zoom_out: GameKey,
+}
+
+const P1_CONTROLS: PlayerControlMap = PlayerControlMap {
+    player: 0,
+    wing: GameKey::P1Wing,
+    thrust: GameKey::P1Thrust,
+    brake: GameKey::P1Brake,
+    reverse: GameKey::P1Reverse,
+    turn_left: GameKey::P1TurnLeft,
+    turn_right: GameKey::P1TurnRight,
+    laser: GameKey::P1Laser,
+    cannon: GameKey::P1Cannon,
+    zoom_in: GameKey::P1ZoomIn,
+    zoom_out: GameKey::P1ZoomOut,
+};
+
+const P2_CONTROLS: PlayerControlMap = PlayerControlMap {
+    player: 1,
+    wing: GameKey::P2Wing,
+    thrust: GameKey::P2Thrust,
+    brake: GameKey::P2Brake,
+    reverse: GameKey::P2Reverse,
+    turn_left: GameKey::P2TurnLeft,
+    turn_right: GameKey::P2TurnRight,
+    laser: GameKey::P2Laser,
+    cannon: GameKey::P2Cannon,
+    zoom_in: GameKey::P2ZoomIn,
+    zoom_out: GameKey::P2ZoomOut,
+};
+
+struct SpacewarsControls {
+    seats: [ControlSeat; 2],
+    benchmark_sources: [BenchmarkSource; 2],
+    encoder: ShipIntentEncoder,
+}
+
+impl SpacewarsControls {
+    fn new(pressed: SharedKeyboardState, gamepads: SharedGamepadInput) -> Self {
+        let mut p1 =
+            ControlSeat::with_source(KeyboardSource::new(Rc::clone(&pressed), P1_CONTROLS));
+        p1.add_source(GamepadSource::new(Rc::clone(&gamepads), 0));
+        let mut p2 = ControlSeat::with_source(KeyboardSource::new(pressed, P2_CONTROLS));
+        p2.add_source(GamepadSource::new(gamepads, 1));
+        Self {
+            seats: [p1, p2],
+            benchmark_sources: [BenchmarkSource, BenchmarkSource],
+            encoder: ShipIntentEncoder::default(),
+        }
+    }
+
+    fn actions(&mut self, state: &SpacewarsState, benchmark_active: bool) -> Vec<Action> {
+        let mut actions = Vec::new();
+        for player in 0..self.seats.len() {
+            let intent = if benchmark_active {
+                self.benchmark_sources[player].intent(state, player)
+            } else {
+                self.seats[player].intent(state, player)
+            };
+            actions.extend(self.encoder.encode(player, intent));
+        }
+        actions
+    }
+
+    fn reset(&mut self) {
+        self.encoder.reset();
+    }
+}
+
+struct ControlSeat {
+    sources: Vec<Box<dyn ControlSource>>,
+}
+
+impl ControlSeat {
+    fn with_source(source: impl ControlSource + 'static) -> Self {
+        Self {
+            sources: vec![Box::new(source)],
+        }
+    }
+
+    fn add_source(&mut self, source: impl ControlSource + 'static) {
+        self.sources.push(Box::new(source));
+    }
+
+    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
+        self.sources
+            .iter_mut()
+            .fold(ShipIntent::default(), |intent, source| {
+                intent.merged_with(source.intent(state, player))
+            })
+    }
+}
+
+struct KeyboardSource {
+    pressed: SharedKeyboardState,
+    controls: PlayerControlMap,
+}
+
+impl KeyboardSource {
+    fn new(pressed: SharedKeyboardState, controls: PlayerControlMap) -> Self {
+        Self { pressed, controls }
+    }
+}
+
+impl ControlSource for KeyboardSource {
+    fn intent(&mut self, _state: &SpacewarsState, _player: usize) -> ShipIntent {
+        let pressed = self.pressed.borrow();
+        let thrust = if pressed.contains(&self.controls.thrust) {
+            1.0
+        } else if pressed.contains(&self.controls.reverse) {
+            -1.0
+        } else {
+            0.0
+        };
+        let turn = if pressed.contains(&self.controls.turn_left) {
+            -1.0
+        } else if pressed.contains(&self.controls.turn_right) {
+            1.0
+        } else {
+            0.0
+        };
+        ShipIntent {
+            turn,
+            thrust,
+            brake: if pressed.contains(&self.controls.brake) {
+                1.0
+            } else {
+                0.0
+            },
+            wings_closed: pressed.contains(&self.controls.wing),
+            laser: pressed.contains(&self.controls.laser),
+            cannon: pressed.contains(&self.controls.cannon),
+        }
+    }
+}
+
+struct GamepadSource {
+    gamepads: SharedGamepadInput,
+    seat: usize,
+}
+
+impl GamepadSource {
+    fn new(gamepads: SharedGamepadInput, seat: usize) -> Self {
+        Self { gamepads, seat }
+    }
+}
+
+impl ControlSource for GamepadSource {
+    fn intent(&mut self, _state: &SpacewarsState, _player: usize) -> ShipIntent {
+        let gamepads = self.gamepads.borrow();
+        let Some(gamepad) = gamepads.seat(self.seat) else {
+            return ShipIntent::default();
+        };
+        if !gamepad.connected {
+            return ShipIntent::default();
+        }
+
+        let turn = if gamepad.dpad_left {
+            -1.0
+        } else if gamepad.dpad_right {
+            1.0
+        } else {
+            shape_stick(gamepad.left_stick_x)
+        };
+        ShipIntent {
+            turn,
+            thrust: if gamepad.east {
+                -1.0
+            } else {
+                shape_trigger(gamepad.right_trigger)
+            },
+            brake: shape_trigger(gamepad.left_trigger),
+            wings_closed: gamepad.right_bumper,
+            laser: gamepad.south,
+            cannon: gamepad.west,
+        }
+    }
+}
+
+const STICK_DEADZONE: f32 = 0.15;
+const TRIGGER_DEADZONE: f32 = 0.05;
+
+pub(crate) fn shape_stick(value: f32) -> f32 {
+    shape_axis(value, STICK_DEADZONE, true)
+}
+
+pub(crate) fn shape_trigger(value: f32) -> f32 {
+    shape_axis(value.clamp(0.0, 1.0), TRIGGER_DEADZONE, false)
+}
+
+fn shape_axis(value: f32, deadzone: f32, signed: bool) -> f32 {
+    if !value.is_finite() {
+        return 0.0;
+    }
+    let value = if signed {
+        value.clamp(-1.0, 1.0)
+    } else {
+        value.clamp(0.0, 1.0)
+    };
+    let magnitude = value.abs();
+    if magnitude <= deadzone {
+        return 0.0;
+    }
+
+    let normalized = (magnitude - deadzone) / (1.0 - deadzone);
+    normalized * normalized * value.signum()
+}
+
+struct BenchmarkSource;
+
+impl ControlSource for BenchmarkSource {
+    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
+        SpacewarsScenario::benchmark_intent(state, player)
+    }
 }
 
 fn mapped_key_event(event: &WindowEvent) -> Option<(GameKey, ElementState)> {
@@ -371,6 +594,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine_common::Scenario;
+    use engine_core::SpacewarsConfig;
     use scenario_spacewars::{SpacewarsAction as ScenarioAction, SpacewarsActionKind};
 
     fn decoded(actions: &[Action]) -> Vec<ScenarioAction> {
@@ -380,7 +605,12 @@ mod tests {
     fn has_action(actions: &[ScenarioAction], player: usize, kind: SpacewarsActionKind) -> bool {
         actions
             .iter()
-            .any(|action| action.player == player && action.kind == kind)
+            .any(|action| action.player() == player && action.kind() == kind)
+    }
+
+    fn take_spacewars_actions(input: &mut ClientInput) -> Vec<Action> {
+        let state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 0);
+        input.actions_for_spacewars(&state, false)
     }
 
     #[test]
@@ -421,45 +651,61 @@ mod tests {
 
         input.clear_keyboard();
 
-        assert!(!input.pressed.contains(&GameKey::P1Thrust));
+        assert!(!input.pressed.borrow().contains(&GameKey::P1Thrust));
         assert!(input.has_pointer_cancellation());
     }
 
     #[test]
-    fn original_p1_wing_priority_suppresses_thrust_until_release_is_consumed() {
+    fn keyboard_source_emits_changed_full_scale_setpoints() {
         let mut input = ClientInput::default();
         input.press(GameKey::P1Wing);
         input.press(GameKey::P1Thrust);
 
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(has_action(&actions, 0, SpacewarsActionKind::CloseWings));
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::Thrust));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert!(actions.contains(&ScenarioAction::SetWings {
+            player: 0,
+            closed: true,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetThrust {
+            player: 0,
+            amount: 1.0,
+        }));
 
         input.release(GameKey::P1Wing);
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(has_action(&actions, 0, SpacewarsActionKind::OpenWings));
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::Thrust));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert_eq!(
+            actions,
+            vec![ScenarioAction::SetWings {
+                player: 0,
+                closed: false,
+            }]
+        );
 
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(has_action(&actions, 0, SpacewarsActionKind::Thrust));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert!(actions.is_empty());
     }
 
     #[test]
-    fn release_emits_one_tick_halt_for_continuous_controls() {
+    fn release_emits_one_changed_zero_setpoint() {
         let mut input = ClientInput::default();
         input.press(GameKey::P1TurnLeft);
         input.press(GameKey::P1Laser);
-        input.actions_for_spacewars();
+        take_spacewars_actions(&mut input);
 
         input.release(GameKey::P1TurnLeft);
         input.release(GameKey::P1Laser);
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(has_action(&actions, 0, SpacewarsActionKind::TurnHalt));
-        assert!(has_action(&actions, 0, SpacewarsActionKind::FireLaserHalt));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert!(actions.contains(&ScenarioAction::SetTurn {
+            player: 0,
+            rate: 0.0,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetLaser {
+            player: 0,
+            on: false,
+        }));
 
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::TurnHalt));
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::FireLaserHalt));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert!(actions.is_empty());
     }
 
     #[test]
@@ -483,33 +729,47 @@ mod tests {
     }
 
     #[test]
-    fn brake_has_propulsion_priority_and_remains_available_with_wings() {
+    fn keyboard_source_reports_brake_and_propulsion_independently() {
         let mut input = ClientInput::default();
         input.press(GameKey::P1Wing);
         input.press(GameKey::P1Thrust);
         input.press(GameKey::P1Reverse);
         input.press(GameKey::P1Brake);
 
-        let actions = decoded(&input.actions_for_spacewars());
+        let actions = decoded(&take_spacewars_actions(&mut input));
 
-        assert!(has_action(&actions, 0, SpacewarsActionKind::CloseWings));
-        assert!(has_action(&actions, 0, SpacewarsActionKind::Brake));
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::Thrust));
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::Reverse));
+        assert!(actions.contains(&ScenarioAction::SetWings {
+            player: 0,
+            closed: true,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetBrake {
+            player: 0,
+            amount: 1.0,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetThrust {
+            player: 0,
+            amount: 1.0,
+        }));
     }
 
     #[test]
-    fn brake_release_emits_one_tick_brake_halt() {
+    fn brake_release_emits_one_zero_setpoint() {
         let mut input = ClientInput::default();
         input.press(GameKey::P1Brake);
-        input.actions_for_spacewars();
+        take_spacewars_actions(&mut input);
 
         input.release(GameKey::P1Brake);
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(has_action(&actions, 0, SpacewarsActionKind::BrakeHalt));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert_eq!(
+            actions,
+            vec![ScenarioAction::SetBrake {
+                player: 0,
+                amount: 0.0,
+            }]
+        );
 
-        let actions = decoded(&input.actions_for_spacewars());
-        assert!(!has_action(&actions, 0, SpacewarsActionKind::BrakeHalt));
+        let actions = decoded(&take_spacewars_actions(&mut input));
+        assert!(actions.is_empty());
     }
 
     #[test]
@@ -578,7 +838,7 @@ mod tests {
         let mut input = ClientInput::default();
         input.press(GameKey::P1ZoomIn);
         input.press(GameKey::P2ZoomOut);
-        let actions = decoded(&input.actions_for_spacewars());
+        let actions = decoded(&take_spacewars_actions(&mut input));
 
         assert!(has_action(&actions, 0, SpacewarsActionKind::ZoomIn));
         assert!(has_action(&actions, 1, SpacewarsActionKind::ZoomOut));
@@ -652,5 +912,88 @@ mod tests {
             game_key_from_key_code(KeyCode::KeyQ),
             Some(GameKey::ReturnLauncher)
         );
+    }
+
+    #[test]
+    fn gamepad_curves_apply_deadzones_and_reach_full_scale() {
+        assert_eq!(shape_stick(0.14), 0.0);
+        assert_eq!(shape_stick(-0.15), 0.0);
+        assert!((shape_stick(0.575) - 0.25).abs() < 0.001);
+        assert_eq!(shape_stick(-1.0), -1.0);
+        assert_eq!(shape_trigger(0.04), 0.0);
+        assert_eq!(shape_trigger(1.0), 1.0);
+        assert_eq!(shape_stick(f32::NAN), 0.0);
+    }
+
+    #[test]
+    fn gamepad_source_maps_ship_controls_and_reverse_wins() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        gamepads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                left_stick_x: 1.0,
+                left_trigger: 0.5,
+                right_trigger: 0.75,
+                right_bumper: true,
+                south: true,
+                east: true,
+                west: true,
+                ..GamepadSeatInput::default()
+            },
+        );
+        let mut input = ClientInput::new(gamepads);
+        let actions = decoded(&take_spacewars_actions(&mut input));
+
+        assert!(actions.contains(&ScenarioAction::SetTurn {
+            player: 0,
+            rate: 1.0,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetThrust {
+            player: 0,
+            amount: -1.0,
+        }));
+        assert!(actions.iter().any(|action| matches!(
+            action,
+            ScenarioAction::SetBrake {
+                player: 0,
+                amount,
+            } if *amount > 0.0 && *amount < 0.5
+        )));
+        assert!(actions.contains(&ScenarioAction::SetWings {
+            player: 0,
+            closed: true,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetLaser {
+            player: 0,
+            on: true,
+        }));
+        assert!(actions.contains(&ScenarioAction::SetCannon {
+            player: 0,
+            on: true,
+        }));
+    }
+
+    #[test]
+    fn pad_wins_equal_magnitude_merge_and_dpad_controls_zoom() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        gamepads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                dpad_right: true,
+                dpad_up: true,
+                ..GamepadSeatInput::default()
+            },
+        );
+        let mut input = ClientInput::new(gamepads);
+        input.press(GameKey::P1TurnLeft);
+        let actions = decoded(&take_spacewars_actions(&mut input));
+
+        assert!(actions.contains(&ScenarioAction::SetTurn {
+            player: 0,
+            rate: 1.0,
+        }));
+        assert!(has_action(&actions, 0, SpacewarsActionKind::ZoomIn));
     }
 }
