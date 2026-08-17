@@ -21,7 +21,9 @@ use crate::client_scenarios::{
     ScenarioCreateError, ScenarioRegistration, ScenarioStartMode,
 };
 pub use crate::client_scenarios::{BenchmarkConfiguration, RenderBackend};
-use crate::input::{self, ClientInput};
+#[cfg(test)]
+use crate::input;
+use crate::input::{ClientInput, SharedInput};
 use crate::raster;
 use crate::render::{self, Viewport};
 
@@ -29,13 +31,14 @@ const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ScenarioLoopOptions {
     pub start_benchmark: bool,
     pub benchmark_configuration: BenchmarkConfiguration,
     pub renderer: RenderBackend,
     pub raster_scale: f32,
     pub controls: Option<SharedScenarioControls>,
+    pub input: Option<SharedInput>,
     pub settings: Settings,
 }
 
@@ -47,6 +50,7 @@ impl Default for ScenarioLoopOptions {
             renderer: RenderBackend::default(),
             raster_scale: 1.0,
             controls: None,
+            input: None,
             settings: Settings::default(),
         }
     }
@@ -223,6 +227,7 @@ pub fn start_scenario_loop(
         renderer,
         raster_scale,
         controls,
+        input,
         settings,
     } = options;
     let scenario_name = scenario.to_string();
@@ -242,8 +247,12 @@ pub fn start_scenario_loop(
     scenario.set_viewport(initial_viewport);
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model);
-    let input = std::rc::Rc::new(std::cell::RefCell::new(ClientInput::default()));
-    input::install_window_input(window, std::rc::Rc::clone(&input));
+    let input = input.unwrap_or_else(|| Rc::new(RefCell::new(ClientInput::default())));
+    {
+        let mut input = input.borrow_mut();
+        input.clear();
+        input.reset_spacewars_controls();
+    }
     let controls = controls.unwrap_or_else(new_scenario_controls);
 
     let timer = Timer::default();
@@ -319,7 +328,9 @@ pub fn start_scenario_loop(
             &window,
             scenario.center_panel_state(paused, benchmark_active, &performance_text),
         );
-        set_ingame_menu(&window, paused);
+        let game_over = scenario.is_game_over();
+        window.set_game_over_visible(game_over);
+        set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
         let frames = scenario.render_frames(renderer, viewport);
         input_projections = render::frame_projections(&frames, viewport, scenario.frame_layout());
@@ -503,10 +514,14 @@ fn step_scenario(
         return HostStepResult::default();
     }
 
-    if input.take_controls_requested() && *paused && !scenario.is_game_over() {
+    if input.take_controls_requested() && !scenario.is_game_over() {
         *accumulator = Duration::ZERO;
         deliver_pointer_cancellation(scenario, input, input_projections);
         input.clear();
+        if !*paused {
+            *paused = true;
+            return HostStepResult::set_ingame_controls_visible(true);
+        }
         return HostStepResult::set_ingame_controls_visible(!ingame_controls_visible);
     }
 
@@ -515,6 +530,18 @@ fn step_scenario(
         *accumulator = Duration::ZERO;
         input.clear();
         return HostStepResult::return_to_launcher();
+    }
+
+    if input.take_force_pause_requested() && !scenario.is_game_over() {
+        *paused = true;
+        *accumulator = Duration::ZERO;
+        deliver_pointer_cancellation(scenario, input, input_projections);
+        input.clear();
+        tracing::info!(
+            benchmark = *benchmark_active,
+            "paused after controller disconnect."
+        );
+        return HostStepResult::default();
     }
 
     if input.take_pause_requested() && !scenario.is_game_over() {
@@ -594,6 +621,7 @@ fn restart_scenario(
             *paused = false;
             *benchmark_active = false;
             input.clear();
+            input.reset_spacewars_controls();
             tracing::info!(scenario = scenario_name, seed, "started new game.");
         }
         Err(err) => {
@@ -627,6 +655,7 @@ fn start_benchmark_scenario(
     *paused = false;
     *benchmark_active = true;
     input.clear();
+    input.reset_spacewars_controls();
     tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
 }
 
@@ -1303,7 +1332,7 @@ impl HostedScenario {
         benchmark_active: bool,
         input_projections: &[render::FrameProjection],
     ) -> Vec<Action> {
-        let mut actions = self.inner.map_keyboard_input(input, benchmark_active);
+        let mut actions = self.inner.map_input(input, benchmark_active);
         actions.extend(self.pointer_actions(input, input_projections));
         actions
     }
@@ -1903,6 +1932,38 @@ mod tests {
     }
 
     #[test]
+    fn controller_disconnect_pause_is_idempotent() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::ForcePause);
+        step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+
+        assert!(paused);
+        assert_eq!(accumulator, Duration::ZERO);
+    }
+
+    #[test]
     fn escape_toggles_pause_and_backs_out_of_controls() {
         let mut scenario = hosted_scenario("spacewars", 42).unwrap();
         let mut input = ClientInput::default();
@@ -2024,6 +2085,39 @@ mod tests {
             &[],
         );
         assert_eq!(result.ingame_controls_visible, Some(false));
+    }
+
+    #[test]
+    fn controls_key_opens_the_controls_screen_and_pauses_gameplay() {
+        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::from_secs(1);
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+
+        input.press(input::GameKey::Controls);
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+
+        assert!(paused);
+        assert_eq!(result.ingame_controls_visible, Some(true));
+        assert_eq!(accumulator, Duration::ZERO);
     }
 
     #[test]

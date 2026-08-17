@@ -54,18 +54,32 @@ reset.
 
 ## Raspberry Pi / kiosk launch
 
-The first-pass Pi launch mode is:
+The Pi image launches the scenario selector fullscreen:
 
 ```sh
-engine-client --kiosk --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 ```
 
-`--kiosk` launches directly, requests fullscreen, and lets the image-selected
-Slint backend run instead of forcing the desktop `winit` backend. The same
-settings directory can also be selected with `SPACEWARS_CONFIG_DIR`.
+`--fullscreen` leaves the launcher visible so a scenario can be selected while
+requesting fullscreen presentation. The image selects Slint's LinuxKMS backend
+with `SLINT_BACKEND`; `--kiosk` remains available when booting directly into the
+saved scenario is preferred. The same settings directory can also be selected
+with `SPACEWARS_CONFIG_DIR`.
 
 See [`docs/pi-kiosk.md`](docs/pi-kiosk.md) for the current Pi runbook and
 example systemd service. The Yocto image scaffold is under [`yocto/`](yocto/).
+
+Once an OTA-capable image has been flashed, build and deploy an update from the
+repository root:
+
+```sh
+./update.sh
+```
+
+This updates `spacewars@spacewars.local` by default, reboots into the newly
+written A/B slot, and verifies that `spacewars-kiosk.service` is active. Use
+`./update.sh --skip-build` to deploy the existing image or `./update.sh --help`
+for target, user, image, SSH key, dry-run, and confirmation options.
 
 ## History
 

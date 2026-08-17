@@ -26,6 +26,7 @@ rust-version = "1.89"
 bincode = "1"
 clap = { version = "4", features = ["derive"] }
 directories = "6"
+gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
 rand = { version = "0.9", features = ["std_rng"] }
 png = "0.17"
 rapier2d = { version = "0.34", default-features = false, features = [

@@ -177,7 +177,7 @@ pub trait ClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration;
     fn tick_model(&self) -> TickModel;
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult;
-    fn map_keyboard_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action>;
+    fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action>;
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame>;
     fn frame_layout(&self) -> FrameLayout;
 

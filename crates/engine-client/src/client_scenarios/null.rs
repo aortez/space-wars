@@ -50,7 +50,7 @@ impl ClientScenario for NullClientScenario {
         NullScenario::step(&mut self.state, actions, dt)
     }
 
-    fn map_keyboard_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+    fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
         Vec::new()
     }
 

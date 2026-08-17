@@ -19,6 +19,7 @@ scenario-rover-lab = { workspace = true }
 scenario-spacewars = { workspace = true }
 clap = { workspace = true }
 directories = { workspace = true }
+gilrs = { workspace = true }
 png = { workspace = true }
 slint = { workspace = true }
 tempfile = { workspace = true }
@@ -43,7 +44,7 @@ pi-kiosk = [
     "slint/backend-linuxkms",
     "slint/compat-1-2",
     "slint/software-renderer-systemfonts",
-    # Game input currently uses Slint's Winit physical-key event adapter.
-    # Keep this until Pi validation confirms a backend-neutral replacement.
+    # Retain desktop keyboard compatibility; native pad input uses evdev through
+    # gilrs and does not depend on the display backend.
     "slint/unstable-winit-030",
 ]

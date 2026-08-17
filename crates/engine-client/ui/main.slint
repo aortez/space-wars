@@ -1,7 +1,5 @@
 // Root window for the engine-client.
 
-import { Button, ComboBox, LineEdit } from "std-widgets.slint";
-
 export enum PrimitiveKind {
     path,
     text,
@@ -113,6 +111,96 @@ component PlayerStatusPanel inherits Rectangle {
     }
 }
 
+component MenuButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected: false;
+    callback activated();
+
+    background: root.selected ? #174f70 : #151a27;
+    border-color: root.selected ? #80d8ff : #596273;
+    border-width: root.selected ? 3px : 1px;
+    border-radius: 6px;
+
+    Text {
+        x: 12px;
+        width: parent.width - 24px;
+        height: parent.height;
+        text: root.text;
+        color: root.selected ? #ffffff : #d9e1ec;
+        font-size: 16px;
+        font-weight: root.selected ? 700 : 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => {
+            root.activated();
+        }
+    }
+}
+
+component ChoiceRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> selected: false;
+    callback previous();
+    callback next();
+
+    background: root.selected ? #122f44 : #10141f;
+    border-color: root.selected ? #80d8ff : #424a5a;
+    border-width: root.selected ? 3px : 1px;
+    border-radius: 6px;
+
+    Text {
+        x: 14px;
+        width: parent.width * 0.38;
+        height: parent.height;
+        text: root.label;
+        color: #c7d0dc;
+        font-size: 14px;
+        vertical-alignment: center;
+    }
+
+    MenuButton {
+        x: parent.width * 0.40;
+        y: 6px;
+        width: 48px;
+        height: parent.height - 12px;
+        text: "‹";
+        activated => {
+            root.previous();
+        }
+    }
+
+    Text {
+        x: parent.width * 0.40 + 56px;
+        width: parent.width * 0.60 - 112px;
+        height: parent.height;
+        text: root.value;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    MenuButton {
+        x: parent.width - 54px;
+        y: 6px;
+        width: 48px;
+        height: parent.height - 12px;
+        text: "›";
+        activated => {
+            root.next();
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     in property <bool> app-full-screen: false;
     in property <[ScenePrimitive]> primitives;
@@ -131,8 +219,14 @@ export component MainWindow inherits Window {
     in property <bool> scenario-pointer-enabled: false;
     in-out property <bool> launcher-visible: false;
     in-out property <bool> launcher-controls-visible: false;
+    in-out property <bool> launcher-settings-visible: false;
+    in-out property <int> launcher-focus-index: 0;
+    in-out property <int> launcher-settings-focus-index: 0;
     in-out property <bool> ingame-menu-visible: false;
     in-out property <bool> ingame-controls-visible: false;
+    in-out property <int> ingame-menu-focus-index: 0;
+    in-out property <bool> game-over-visible: false;
+    in-out property <int> game-over-focus-index: 0;
     in property <[string]> launcher-scenarios;
     in-out property <string> launcher-scenario: "spacewars";
     in-out property <string> launcher-seed-text: "0";
@@ -152,6 +246,10 @@ export component MainWindow inherits Window {
     in property <bool> scenario-benchmark-available: false;
     in property <bool> scenario-player-zoom-available: false;
     in property <string> scenario-controls-help: "";
+    in property <string> p1-input-binding: "P1 ⌨";
+    in property <string> p2-input-binding: "P2 ⌨";
+    in-out property <bool> controller-disconnected-visible: false;
+    in-out property <string> controller-disconnected-text: "";
     in property <bool> spacewars-ui-visible: false;
     in property <string> p1-name: "";
     in property <string> p1-status: "";
@@ -188,6 +286,7 @@ export component MainWindow inherits Window {
     callback ingame-p2-zoom-in();
     callback ingame-p2-zoom-out();
     callback scenario-pointer(float, float, int);
+    callback ui-action(int);
 
     forward-focus: launcher-shortcuts;
 
@@ -200,6 +299,24 @@ export component MainWindow inherits Window {
     changed launcher-controls-visible => {
         if (root.launcher-visible) {
             launcher-shortcuts.focus();
+        }
+    }
+
+    changed launcher-settings-visible => {
+        if (root.launcher-visible) {
+            launcher-shortcuts.focus();
+        }
+    }
+
+    changed ingame-menu-visible => {
+        if (root.ingame-menu-visible) {
+            root.ingame-menu-focus-index = 0;
+        }
+    }
+
+    changed game-over-visible => {
+        if (root.game-over-visible) {
+            root.game-over-focus-index = 0;
         }
     }
 
@@ -242,7 +359,10 @@ export component MainWindow inherits Window {
     }
 
     scenario-pointer-area := TouchArea {
-        enabled: root.scenario-pointer-enabled && !root.launcher-visible && !root.ingame-menu-visible;
+        enabled: root.scenario-pointer-enabled
+            && !root.launcher-visible
+            && !root.ingame-menu-visible
+            && !root.game-over-visible;
         width: parent.width;
         height: parent.height;
         mouse-cursor: crosshair;
@@ -412,48 +532,124 @@ export component MainWindow inherits Window {
         visible: root.ingame-menu-visible;
         width: parent.width;
         height: parent.height;
-        background: #050514bb;
+        background: #050514cc;
 
         Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 560px;
-            height: root.ingame-controls-visible ? 470px : 310px;
-            background: #080a12f2;
+            width: root.width < 632px ? root.width - 32px : 600px;
+            height: root.ingame-controls-visible ? (root.height < 456px ? root.height - 24px : 432px) : 326px;
+            background: #080a12f7;
             border-color: #596273;
             border-width: 1px;
+            border-radius: 8px;
 
             Text {
                 x: 24px;
-                y: 22px;
+                y: 18px;
                 text: root.ingame-controls-visible ? "Controls" : "Paused";
-                color: #e6edf7;
-                font-size: 24px;
+                color: #ffffff;
+                font-size: 26px;
+                font-weight: 700;
             }
 
             Text {
                 visible: !root.ingame-controls-visible;
                 x: 24px;
-                y: 66px;
+                y: 54px;
                 width: parent.width - 48px;
-                text: "P or Esc resumes from the keyboard. Q returns to the launcher.";
-                color: #c7d0dc;
-                font-size: 13px;
+                text: "D-pad chooses  ·  A selects  ·  B or Start resumes";
+                color: #80d8ff;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible;
+                x: 24px;
+                y: 84px;
+                width: (parent.width - 58px) / 2;
+                height: 54px;
+                text: "Resume";
+                selected: root.ingame-menu-focus-index == 0;
+                activated => {
+                    root.ingame-menu-focus-index = 0;
+                    root.ingame-resume();
+                }
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible;
+                x: parent.width / 2 + 5px;
+                y: 84px;
+                width: (parent.width - 58px) / 2;
+                height: 54px;
+                text: "Restart Round";
+                selected: root.ingame-menu-focus-index == 1;
+                activated => {
+                    root.ingame-menu-focus-index = 1;
+                    root.ingame-restart();
+                }
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible && root.scenario-benchmark-available;
+                x: 24px;
+                y: 148px;
+                width: (parent.width - 58px) / 2;
+                height: 54px;
+                text: "Benchmark";
+                selected: root.ingame-menu-focus-index == 2;
+                activated => {
+                    root.ingame-menu-focus-index = 2;
+                    root.ingame-start-benchmark();
+                }
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible;
+                x: root.scenario-benchmark-available ? parent.width / 2 + 5px : 24px;
+                y: 148px;
+                width: (parent.width - 58px) / 2;
+                height: 54px;
+                text: "Controls";
+                selected: root.ingame-menu-focus-index == (root.scenario-benchmark-available ? 3 : 2);
+                activated => {
+                    root.ingame-menu-focus-index = root.scenario-benchmark-available ? 3 : 2;
+                    root.ingame-controls-visible = true;
+                }
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible;
+                x: root.scenario-benchmark-available ? 24px : parent.width / 2 + 5px;
+                y: root.scenario-benchmark-available ? 212px : 148px;
+                width: root.scenario-benchmark-available ? parent.width - 48px : (parent.width - 58px) / 2;
+                height: 54px;
+                text: "Return to Launcher";
+                selected: root.ingame-menu-focus-index == (root.scenario-benchmark-available ? 4 : 3);
+                activated => {
+                    root.ingame-menu-focus-index = root.scenario-benchmark-available ? 4 : 3;
+                    root.ingame-return-launcher();
+                }
             }
 
             Rectangle {
                 visible: root.ingame-controls-visible;
                 x: 24px;
-                y: 74px;
+                y: 62px;
                 width: parent.width - 48px;
-                height: 250px;
-                background: #00000000;
+                height: parent.height - 132px;
+                background: #10141f;
+                border-color: #424a5a;
+                border-width: 1px;
+                border-radius: 6px;
 
                 Text {
-                    x: 0px;
-                    y: 0px;
-                    width: parent.width;
-                    height: 132px;
+                    x: 16px;
+                    y: 12px;
+                    width: parent.width - 32px;
+                    height: 145px;
                     text: root.scenario-controls-help;
                     color: #e6edf7;
                     font-size: 13px;
@@ -461,169 +657,126 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
-                    visible: false;
-                    x: 0px;
-                    y: 54px;
-                    width: parent.width;
-                    text: "Player 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
-                    color: #e6edf7;
+                    x: 16px;
+                    y: 160px;
+                    width: parent.width - 32px;
+                    height: 80px;
+                    text: "Controller menus: D-pad or left stick navigates, A selects, B goes back, Start resumes. Disconnecting a controller pauses the round.";
+                    color: #80d8ff;
                     font-size: 13px;
                     wrap: word-wrap;
                 }
 
                 Text {
-                    visible: root.scenario-player-zoom-available;
-                    x: 0px;
-                    y: 126px;
-                    width: parent.width;
-                    text: "Zoom: P1 U/I, P2 Insert/Home.";
+                    x: 16px;
+                    y: 238px;
+                    width: parent.width - 32px;
+                    height: 52px;
+                    text: "Keyboard: P/Esc pause, R restart, " + (root.scenario-benchmark-available ? "B benchmark, " : "") + "Q launcher, C/F1 controls.";
                     color: #c7d0dc;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 0px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P1 In";
-                    clicked => {
-                        root.ingame-p1-zoom-in();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 114px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P1 Out";
-                    clicked => {
-                        root.ingame-p1-zoom-out();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 228px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P2 In";
-                    clicked => {
-                        root.ingame-p2-zoom-in();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 342px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P2 Out";
-                    clicked => {
-                        root.ingame-p2-zoom-out();
-                    }
-                }
-
-                Text {
-                    x: 0px;
-                    y: 214px;
-                    width: parent.width;
-                    text: "Global: P/Esc pause/resume, R restart, " + (root.scenario-benchmark-available ? "B benchmark, " : "") + "Q launcher, C or F1 controls/back. Losing window focus clears held input.";
-                    color: #c7d0dc;
-                    font-size: 13px;
+                    font-size: 12px;
                     wrap: word-wrap;
                 }
             }
 
-            Button {
-                visible: !root.ingame-controls-visible;
-                x: 24px;
-                y: 106px;
-                width: 160px;
-                height: 36px;
-                text: "Resume (P/Esc)";
-                primary: true;
-                clicked => {
-                    root.ingame-resume();
-                }
-            }
-
-            Button {
-                visible: !root.ingame-controls-visible;
-                x: 194px;
-                y: 106px;
-                width: 150px;
-                height: 36px;
-                text: "Restart (R)";
-                clicked => {
-                    root.ingame-restart();
-                }
-            }
-
-            Button {
-                visible: !root.ingame-controls-visible && root.scenario-benchmark-available;
-                x: 354px;
-                y: 106px;
-                width: 160px;
-                height: 36px;
-                text: "Benchmark (B)";
-                clicked => {
-                    root.ingame-start-benchmark();
-                }
-            }
-
-            Button {
-                visible: !root.ingame-controls-visible;
-                x: 24px;
-                y: 158px;
-                width: 246px;
-                height: 36px;
-                text: "Return to Launcher (Q)";
-                clicked => {
-                    root.ingame-return-launcher();
-                }
-            }
-
-            Button {
-                visible: !root.ingame-controls-visible;
-                x: 290px;
-                y: 158px;
-                width: 246px;
-                height: 36px;
-                text: "Controls (F1)";
-                clicked => {
-                    root.ingame-controls-visible = true;
-                }
-            }
-
-            Button {
+            MenuButton {
                 visible: root.ingame-controls-visible;
                 x: 24px;
-                y: 390px;
-                width: 140px;
-                height: 36px;
-                text: "Back (Esc)";
-                clicked => {
+                y: parent.height - 58px;
+                width: 150px;
+                height: 42px;
+                text: "Back";
+                selected: true;
+                activated => {
                     root.ingame-controls-visible = false;
                 }
             }
 
-            Button {
+            MenuButton {
                 visible: root.ingame-controls-visible;
-                x: parent.width - 164px;
-                y: 390px;
-                width: 140px;
-                height: 36px;
-                text: "Resume (P)";
-                primary: true;
-                clicked => {
+                x: parent.width - 174px;
+                y: parent.height - 58px;
+                width: 150px;
+                height: 42px;
+                text: "Resume";
+                activated => {
                     root.ingame-resume();
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.game-over-visible && !root.launcher-visible;
+        width: parent.width;
+        height: parent.height;
+        background: #050514c8;
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: root.width < 592px ? root.width - 32px : 560px;
+            height: 254px;
+            background: #080a12f8;
+            border-color: #f6f2a6;
+            border-width: 2px;
+            border-radius: 10px;
+
+            Text {
+                y: 24px;
+                width: parent.width;
+                text: "Round Complete";
+                color: #ffffff;
+                font-size: 30px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 72px;
+                width: parent.width - 48px;
+                height: 38px;
+                text: root.spacewars-message-text;
+                color: #f6f2a6;
+                font-size: 17px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 24px;
+                y: 112px;
+                width: parent.width - 48px;
+                text: "A selects  ·  Start plays again  ·  B returns to launcher";
+                color: #80d8ff;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+
+            MenuButton {
+                x: 24px;
+                y: 150px;
+                width: (parent.width - 58px) / 2;
+                height: 64px;
+                text: "Play Again";
+                selected: root.game-over-focus-index == 0;
+                activated => {
+                    root.game-over-focus-index = 0;
+                    root.ingame-restart();
+                }
+            }
+
+            MenuButton {
+                x: parent.width / 2 + 5px;
+                y: 150px;
+                width: (parent.width - 58px) / 2;
+                height: 64px;
+                text: "Launcher";
+                selected: root.game-over-focus-index == 1;
+                activated => {
+                    root.game-over-focus-index = 1;
+                    root.ingame-return-launcher();
                 }
             }
         }
@@ -643,44 +796,41 @@ export component MainWindow inherits Window {
             }
 
             if (event.text == Key.Escape) {
-                if (root.launcher-controls-visible) {
-                    root.launcher-controls-visible = false;
-                } else {
-                    root.launcher-quit();
-                }
+                root.ui-action(5);
                 return accept;
             }
-
-            if (event.text == Key.F1) {
-                root.launcher-controls-visible = !root.launcher-controls-visible;
+            if (event.text == Key.UpArrow) {
+                root.ui-action(0);
                 return accept;
             }
-
-            if (root.launcher-controls-visible) {
-                if (event.text == "c" || event.text == "C") {
-                    root.launcher-controls-visible = false;
-                    return accept;
-                }
-                return reject;
+            if (event.text == Key.DownArrow) {
+                root.ui-action(1);
+                return accept;
             }
-
-            if (seed-edit.has-focus || universe-radius-edit.has-focus || asteroid-rate-edit.has-focus || player-health-edit.has-focus || pizza-balls-edit.has-focus || pizza-spawn-rate-edit.has-focus) {
-                return reject;
+            if (event.text == Key.LeftArrow) {
+                root.ui-action(2);
+                return accept;
             }
-
+            if (event.text == Key.RightArrow) {
+                root.ui-action(3);
+                return accept;
+            }
             if (event.text == Key.Return) {
-                root.launcher-start-game();
+                root.ui-action(4);
                 return accept;
-            } else if (event.text == "b" || event.text == "B") {
+            }
+            if (event.text == Key.F1 || event.text == "c" || event.text == "C") {
+                root.ui-action(7);
+                return accept;
+            }
+            if (event.text == "b" || event.text == "B") {
                 root.launcher-start-benchmark();
-                return accept;
-            } else if (event.text == "c" || event.text == "C") {
-                root.launcher-controls-visible = true;
                 return accept;
             }
 
             return reject;
         }
+
 
         Rectangle {
             width: parent.width;
@@ -690,556 +840,458 @@ export component MainWindow inherits Window {
             Rectangle {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
-                width: root.launcher-controls-visible ? 500px : 580px;
-                height: root.launcher-controls-visible ? 540px : root.launcher-scenario == "spacewars" ? 710px : root.launcher-scenario == "pizza" ? 592px : 430px;
-                background: #080a12f2;
+                width: root.width < 792px ? root.width - 32px : 760px;
+                height: root.height < 464px ? root.height - 24px : 440px;
+                background: #080a12f8;
                 border-color: #596273;
                 border-width: 1px;
+                border-radius: 10px;
 
-            Text {
-                x: 24px;
-                y: 22px;
-                text: "Space-Wars";
-                color: #e6edf7;
-                font-size: 28px;
-            }
-
-            Text {
-                x: 24px;
-                y: 62px;
-                text: root.launcher-controls-visible ? "Controls" : "Launch";
-                color: #c7d0dc;
-                font-size: 14px;
-            }
-
-            VerticalLayout {
-                visible: !root.launcher-controls-visible;
-                x: 24px;
-                y: 96px;
-                width: parent.width - 48px;
-                height: parent.height - 118px;
-                spacing: 6px;
-
-                HorizontalLayout {
-                    height: 34px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Scenario";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: root.launcher-scenarios;
-                        current-value <=> root.launcher-scenario;
-                        selected(value) => {
-                            root.launcher-scenario-selected(value);
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    height: 34px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Seed";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    seed-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-seed-text;
-                        placeholder-text: "0";
-                        accepted => {
-                            root.launcher-start-game();
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    height: 34px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Renderer";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: ["vector", "raster"];
-                        current-value <=> root.launcher-renderer;
-                    }
-                }
-
-                HorizontalLayout {
-                    height: 34px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Raster Scale";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: ["1.0", "1.5", "2.0", "3.0"];
-                        current-value <=> root.launcher-raster-scale-text;
-                    }
+                Text {
+                    x: 24px;
+                    y: 16px;
+                    text: "Space-Wars";
+                    color: #ffffff;
+                    font-size: 28px;
+                    font-weight: 700;
                 }
 
                 Text {
-                    visible: root.launcher-scenario == "rover-lab";
-                    height: root.launcher-scenario == "rover-lab" ? 44px : 0px;
-                    text: "Rapier 2D feasibility lab: a pin-slot suspension rover on a rotating circular planet with a raised bump.";
-                    color: #c7d0dc;
-                    font-size: 12px;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 22px : 0px;
-                    text: "Game Setup";
-                    color: #e6edf7;
+                    x: 24px;
+                    y: 50px;
+                    width: parent.width - 48px;
+                    text: root.launcher-error-text != "" ? root.launcher-error-text : root.launcher-controls-visible ? "Controls" : root.launcher-settings-visible ? "Settings · left/right adjusts the highlighted value" : "Choose a scenario";
+                    color: root.launcher-error-text != "" ? #ff7184 : #9fb4cc;
                     font-size: 13px;
-                    vertical-alignment: bottom;
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Preset";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: ["Custom", "Original", "Small Duel", "Dense Asteroids", "Long Game"];
-                        current-value <=> root.launcher-spacewars-preset;
-                    }
-
-                    Button {
-                        width: 150px;
-                        text: "Apply";
-                        clicked => {
-                            root.launcher-apply-preset();
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "World Radius";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    universe-radius-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-universe-radius-text;
-                        placeholder-text: "1200";
-                        accepted => {
-                            root.launcher-start-game();
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Planets";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: ["on", "off"];
-                        current-value <=> root.launcher-use-planets;
-                    }
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Asteroids";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    ComboBox {
-                        horizontal-stretch: 1;
-                        model: ["on", "off"];
-                        current-value <=> root.launcher-asteroids-enabled;
-                    }
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Asteroid Rate";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    asteroid-rate-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-asteroid-probability-text;
-                        placeholder-text: "20.0";
-                        accepted => {
-                            root.launcher-start-game();
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Player Health";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    player-health-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-player-health-text;
-                        placeholder-text: "100";
-                        accepted => {
-                            root.launcher-start-game();
-                        }
-                    }
                 }
 
                 Text {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 16px : 0px;
-                    text: "Setup: " + root.launcher-spacewars-preset + " | radius " + root.launcher-universe-radius-text + " | health " + root.launcher-player-health-text + "%";
-                    color: #c7d0dc;
-                    font-size: 12px;
+                    x: parent.width - 300px;
+                    y: 22px;
+                    width: 276px;
+                    text: root.p1-input-binding + "   " + root.p2-input-binding;
+                    color: #80d8ff;
+                    font-size: 14px;
+                    horizontal-alignment: right;
                 }
 
-                Text {
-                    visible: root.launcher-scenario == "spacewars";
-                    height: root.launcher-scenario == "spacewars" ? 16px : 0px;
-                    text: "Planets " + root.launcher-use-planets + " | asteroids " + root.launcher-asteroids-enabled + " @ " + root.launcher-asteroid-probability-text + "/s";
-                    color: #c7d0dc;
-                    font-size: 12px;
-                }
+                Rectangle {
+                    visible: !root.launcher-controls-visible && !root.launcher-settings-visible;
+                    x: 24px;
+                    y: 72px;
+                    width: parent.width - 48px;
+                    height: parent.height - 92px;
+                    background: #00000000;
 
-                Text {
-                    visible: root.launcher-scenario == "pizza";
-                    height: root.launcher-scenario == "pizza" ? 22px : 0px;
-                    text: "Pizza Setup";
-                    color: #e6edf7;
-                    font-size: 13px;
-                    vertical-alignment: bottom;
-                }
-
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "pizza";
-                    height: root.launcher-scenario == "pizza" ? 34px : 0px;
-                    spacing: 10px;
-
-                    Text {
-                        text: "Desired Balls";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
-
-                    pizza-balls-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-pizza-desired-balls-text;
-                        placeholder-text: "24";
-                        accepted => {
-                            root.launcher-start-game();
+                    ChoiceRow {
+                        x: 0px;
+                        y: 0px;
+                        width: parent.width;
+                        height: 58px;
+                        label: "Scenario";
+                        value: root.launcher-scenario;
+                        selected: root.launcher-focus-index == 0;
+                        previous => {
+                            root.launcher-focus-index = 0;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-focus-index = 0;
+                            root.ui-action(3);
                         }
                     }
-                }
 
-                HorizontalLayout {
-                    visible: root.launcher-scenario == "pizza";
-                    height: root.launcher-scenario == "pizza" ? 34px : 0px;
-                    spacing: 10px;
+                    Rectangle {
+                        x: 0px;
+                        y: 68px;
+                        width: parent.width;
+                        height: 74px;
+                        background: #10141f;
+                        border-color: #424a5a;
+                        border-width: 1px;
+                        border-radius: 6px;
 
-                    Text {
-                        text: "Spawn Rate";
-                        color: #c7d0dc;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                        width: 150px;
-                    }
+                        Text {
+                            x: 14px;
+                            y: 9px;
+                            width: parent.width - 28px;
+                            height: 24px;
+                            text: root.launcher-scenario == "spacewars" ? "Two-player orbital combat and planet capture" : root.launcher-scenario == "pizza" ? "Interactive many-body collision sandbox" : "Rapier rover and wheel mechanics lab";
+                            color: #e6edf7;
+                            font-size: 15px;
+                        }
 
-                    pizza-spawn-rate-edit := LineEdit {
-                        horizontal-stretch: 1;
-                        text <=> root.launcher-pizza-spawn-rate-text;
-                        placeholder-text: "0.10";
-                        accepted => {
-                            root.launcher-start-game();
+                        Text {
+                            x: 14px;
+                            y: 38px;
+                            width: parent.width - 28px;
+                            height: 22px;
+                            text: root.launcher-scenario == "spacewars" ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : "A semi-interactive mechanics scenario";
+                            color: #9fb4cc;
+                            font-size: 13px;
                         }
                     }
-                }
 
-                Text {
-                    visible: root.launcher-scenario == "pizza";
-                    height: root.launcher-scenario == "pizza" ? 16px : 0px;
-                    text: "Spawns up to " + root.launcher-pizza-desired-balls-text + " balls at " + root.launcher-pizza-spawn-rate-text + " chance/tick.";
-                    color: #c7d0dc;
-                    font-size: 12px;
-                }
-
-                Text {
-                    visible: root.launcher-scenario == "pizza";
-                    height: root.launcher-scenario == "pizza" ? 30px : 0px;
-                    text: "Benchmark starts an immediate, deterministic 300-ball dense Rapier workload. CLI options select other populations, backends, and workloads.";
-                    color: #9fb4cc;
-                    font-size: 11px;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    text: root.launcher-error-text;
-                    color: #ff6f6f;
-                    font-size: 13px;
-                    height: 18px;
-                }
-
-                HorizontalLayout {
-                    height: 36px;
-                    spacing: 10px;
-
-                    Button {
-                        width: 170px;
-                        text: "Start Game (Enter)";
-                        primary: true;
-                        clicked => {
+                    MenuButton {
+                        x: 0px;
+                        y: 154px;
+                        width: (parent.width - 12px) / 2;
+                        height: 64px;
+                        text: "Start Game";
+                        selected: root.launcher-focus-index == 1;
+                        activated => {
+                            root.launcher-focus-index = 1;
                             root.launcher-start-game();
                         }
                     }
 
-                    Button {
-                        visible: root.scenario-benchmark-available;
-                        width: 150px;
-                        text: "Benchmark (B)";
-                        clicked => {
-                            root.launcher-start-benchmark();
+                    MenuButton {
+                        x: parent.width / 2 + 6px;
+                        y: 154px;
+                        width: (parent.width - 12px) / 2;
+                        height: 64px;
+                        text: "Settings";
+                        selected: root.launcher-focus-index == 2;
+                        activated => {
+                            root.launcher-focus-index = 2;
+                            root.launcher-settings-visible = true;
                         }
                     }
 
-                    Button {
-                        width: 150px;
-                        text: "Controls (F1)";
-                        clicked => {
+                    MenuButton {
+                        x: 0px;
+                        y: 228px;
+                        width: (parent.width - 12px) / 2;
+                        height: 56px;
+                        text: "Controls";
+                        selected: root.launcher-focus-index == 3;
+                        activated => {
+                            root.launcher-focus-index = 3;
                             root.launcher-controls-visible = true;
                         }
                     }
 
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        background: #00000000;
+                    MenuButton {
+                        x: parent.width / 2 + 6px;
+                        y: 228px;
+                        width: (parent.width - 12px) / 2;
+                        height: 56px;
+                        text: "Quit";
+                        selected: root.launcher-focus-index == 4;
+                        activated => {
+                            root.launcher-focus-index = 4;
+                            root.launcher-quit();
+                        }
+                    }
+
+                    Text {
+                        x: 0px;
+                        y: 296px;
+                        width: parent.width;
+                        text: "D-pad / left stick chooses  ·  A selects  ·  Start launches";
+                        color: #80d8ff;
+                        font-size: 14px;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        x: 0px;
+                        y: 322px;
+                        width: parent.width;
+                        text: root.scenario-benchmark-available ? "Keyboard: arrows + Enter  ·  B starts benchmark  ·  F1 opens controls" : "Keyboard: arrows + Enter  ·  F1 opens controls";
+                        color: #7d8494;
+                        font-size: 11px;
+                        horizontal-alignment: center;
                     }
                 }
 
-                HorizontalLayout {
-                    height: 36px;
+                Rectangle {
+                    visible: root.launcher-settings-visible;
+                    x: 24px;
+                    y: 72px;
+                    width: parent.width - 48px;
+                    height: parent.height - 88px;
+                    background: #00000000;
 
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        background: #00000000;
+                    ChoiceRow {
+                        x: 0px;
+                        y: 0px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Renderer";
+                        value: root.launcher-renderer;
+                        selected: root.launcher-settings-focus-index == 0;
+                        previous => {
+                            root.launcher-settings-focus-index = 0;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 0;
+                            root.ui-action(3);
+                        }
                     }
 
-                    Button {
-                        width: 140px;
-                        text: "Quit (Esc)";
-                        clicked => {
-                            root.launcher-quit();
+                    ChoiceRow {
+                        x: 0px;
+                        y: 52px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Raster Scale";
+                        value: root.launcher-raster-scale-text + "×";
+                        selected: root.launcher-settings-focus-index == 1;
+                        previous => {
+                            root.launcher-settings-focus-index = 1;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 1;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "spacewars";
+                        x: 0px;
+                        y: 104px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Preset";
+                        value: root.launcher-spacewars-preset;
+                        selected: root.launcher-settings-focus-index == 2;
+                        previous => {
+                            root.launcher-settings-focus-index = 2;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 2;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "spacewars";
+                        x: 0px;
+                        y: 156px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Planets";
+                        value: root.launcher-use-planets;
+                        selected: root.launcher-settings-focus-index == 3;
+                        previous => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "spacewars";
+                        x: 0px;
+                        y: 208px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Asteroids";
+                        value: root.launcher-asteroids-enabled;
+                        selected: root.launcher-settings-focus-index == 4;
+                        previous => {
+                            root.launcher-settings-focus-index = 4;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 4;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "spacewars";
+                        x: 0px;
+                        y: 260px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Player Health";
+                        value: root.launcher-player-health-text + "%";
+                        selected: root.launcher-settings-focus-index == 5;
+                        previous => {
+                            root.launcher-settings-focus-index = 5;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 5;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "pizza";
+                        x: 0px;
+                        y: 104px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Desired Balls";
+                        value: root.launcher-pizza-desired-balls-text;
+                        selected: root.launcher-settings-focus-index == 2;
+                        previous => {
+                            root.launcher-settings-focus-index = 2;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 2;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "pizza";
+                        x: 0px;
+                        y: 156px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Spawn Rate";
+                        value: root.launcher-pizza-spawn-rate-text;
+                        selected: root.launcher-settings-focus-index == 3;
+                        previous => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    Text {
+                        visible: root.launcher-scenario == "rover-lab";
+                        x: 0px;
+                        y: 114px;
+                        width: parent.width;
+                        height: 74px;
+                        text: "Rover Lab currently uses its built-in deterministic setup.";
+                        color: #c7d0dc;
+                        font-size: 14px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    MenuButton {
+                        x: 0px;
+                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : 166px;
+                        width: 150px;
+                        height: 44px;
+                        text: "Back";
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 6 : root.launcher-scenario == "pizza" ? 4 : 2);
+                        activated => {
+                            root.launcher-settings-visible = false;
+                        }
+                    }
+
+                    MenuButton {
+                        x: parent.width - 180px;
+                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : 166px;
+                        width: 180px;
+                        height: 44px;
+                        text: "Start Game";
+                        activated => {
+                            root.launcher-start-game();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: root.launcher-controls-visible;
+                    x: 24px;
+                    y: 72px;
+                    width: parent.width - 48px;
+                    height: parent.height - 88px;
+                    background: #10141f;
+                    border-color: #424a5a;
+                    border-width: 1px;
+                    border-radius: 6px;
+
+                    Text {
+                        x: 18px;
+                        y: 14px;
+                        width: parent.width - 36px;
+                        height: 150px;
+                        text: root.scenario-controls-help;
+                        color: #e6edf7;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        x: 18px;
+                        y: 168px;
+                        width: parent.width - 36px;
+                        height: 76px;
+                        text: "Menus: D-pad or left stick navigates, A selects, B goes back, Start launches or resumes. Pads are assigned P1 then P2 in connection order; keyboard remains available.";
+                        color: #80d8ff;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    Text {
+                        x: 18px;
+                        y: 248px;
+                        width: parent.width - 36px;
+                        height: 42px;
+                        text: "A disconnected active controller pauses the game. Reconnecting restores its reserved seat.";
+                        color: #9fb4cc;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+
+                    MenuButton {
+                        x: 18px;
+                        y: parent.height - 58px;
+                        width: 150px;
+                        height: 44px;
+                        text: "Back";
+                        selected: true;
+                        activated => {
+                            root.launcher-controls-visible = false;
+                        }
+                    }
+
+                    MenuButton {
+                        x: parent.width - 198px;
+                        y: parent.height - 58px;
+                        width: 180px;
+                        height: 44px;
+                        text: "Start Game";
+                        activated => {
+                            root.launcher-start-game();
                         }
                     }
                 }
             }
-
-            Rectangle {
-                visible: root.launcher-controls-visible;
-                x: 24px;
-                y: 100px;
-                width: parent.width - 48px;
-                height: 330px;
-                background: #00000000;
-
-                Text {
-                    x: 0px;
-                    y: 0px;
-                    width: parent.width;
-                    height: 132px;
-                    text: root.scenario-controls-help;
-                    color: #e6edf7;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    visible: false;
-                    x: 0px;
-                    y: 54px;
-                    width: parent.width;
-                    text: "Player 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon";
-                    color: #e6edf7;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    visible: root.scenario-player-zoom-available;
-                    x: 0px;
-                    y: 126px;
-                    width: parent.width;
-                    text: "Zoom: P1 " + root.launcher-p1-zoom-text + ", P2 " + root.launcher-p2-zoom-text + ". Keys: U/I and Insert/Home.";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 0px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P1 In";
-                    clicked => {
-                        root.launcher-p1-zoom-in();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 114px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P1 Out";
-                    clicked => {
-                        root.launcher-p1-zoom-out();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 228px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P2 In";
-                    clicked => {
-                        root.launcher-p2-zoom-in();
-                    }
-                }
-
-                Button {
-                    visible: root.scenario-player-zoom-available;
-                    x: 342px;
-                    y: 154px;
-                    width: 104px;
-                    height: 32px;
-                    text: "P2 Out";
-                    clicked => {
-                        root.launcher-p2-zoom-out();
-                    }
-                }
-
-                Text {
-                    x: 0px;
-                    y: 214px;
-                    width: parent.width;
-                    text: "Launcher: Enter start, B benchmark, C or F1 controls/back, Esc back/quit.";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-
-                Text {
-                    x: 0px;
-                    y: 270px;
-                    width: parent.width;
-                    text: "In game: P pause, R restart, B benchmark. Wings close while held and open on release.";
-                    color: #c7d0dc;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-            }
-
-            Button {
-                visible: root.launcher-controls-visible;
-                x: 24px;
-                y: 456px;
-                width: 140px;
-                height: 36px;
-                text: "Back (Esc)";
-                clicked => {
-                    root.launcher-controls-visible = false;
-                }
-            }
-
-            Button {
-                visible: root.launcher-controls-visible;
-                x: parent.width - 164px;
-                y: 456px;
-                width: 140px;
-                height: 36px;
-                text: "Quit (Esc)";
-                clicked => {
-                    root.launcher-quit();
-                }
-            }
-            }
         }
     }
+
+    Rectangle {
+        visible: root.controller-disconnected-visible && !root.launcher-visible;
+        x: (parent.width - self.width) / 2;
+        y: 20px;
+        width: root.width < 552px ? root.width - 32px : 520px;
+        height: 44px;
+        background: #42191ff2;
+        border-color: #ff7184;
+        border-width: 1px;
+        border-radius: 4px;
+
+        Text {
+            x: 12px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text: root.controller-disconnected-text;
+            color: #ffe7ea;
+            font-size: 14px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
 }

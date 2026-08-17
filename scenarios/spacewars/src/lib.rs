@@ -158,6 +158,8 @@ const GRAVITY_SHIP_TAG: u64 = 2;
 const GRAVITY_DEBRIS_TAG: u64 = 3;
 const GRAVITY_PARTICLE_TAG: u64 = 4;
 
+pub const SPACEWARS_PLAYER_COUNT: usize = 2;
+
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
 const SHIP_MASS: f32 = 31.25;
@@ -493,8 +495,10 @@ pub struct ShipState {
     pub wing_theta: f32,
     pub wing_state: WingState,
     pub wing_behavior: WingBehavior,
-    pub thrust_behavior: ThrustBehavior,
-    pub turn_behavior: TurnBehavior,
+    pub wings_closed: bool,
+    pub thrust: f32,
+    pub brake: f32,
+    pub turn: f32,
     pub laser_firing: bool,
     pub cannon_firing: bool,
     pub laser_beam: Option<LaserBeamState>,
@@ -534,21 +538,6 @@ pub enum WingBehavior {
     Open,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ThrustBehavior {
-    None,
-    Full,
-    Brake,
-    Reverse,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TurnBehavior {
-    None,
-    Left,
-    Right,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ExhaustTrailState {
     pub start: Vec2,
@@ -569,140 +558,282 @@ pub struct ParticleState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum SpacewarsActionKind {
-    CloseWings = 1,
-    OpenWings = 2,
-    Thrust = 3,
-    ThrustHalt = 4,
-    Reverse = 5,
-    Brake = 6,
-    BrakeHalt = 7,
-    TurnLeft = 8,
-    TurnRight = 9,
-    TurnHalt = 10,
-    FireLaser = 11,
-    FireLaserHalt = 12,
-    FireCannon = 13,
-    FireCannonHalt = 14,
-    ZoomIn = 15,
-    ZoomOut = 16,
+    SetWings = 1,
+    SetThrust = 2,
+    SetBrake = 3,
+    SetTurn = 4,
+    SetLaser = 5,
+    SetCannon = 6,
+    ZoomIn = 7,
+    ZoomOut = 8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SpacewarsAction {
-    pub player: usize,
-    pub kind: SpacewarsActionKind,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SpacewarsAction {
+    SetWings { player: usize, closed: bool },
+    SetThrust { player: usize, amount: f32 },
+    SetBrake { player: usize, amount: f32 },
+    SetTurn { player: usize, rate: f32 },
+    SetLaser { player: usize, on: bool },
+    SetCannon { player: usize, on: bool },
+    ZoomIn { player: usize },
+    ZoomOut { player: usize },
+}
+
+/// What one control source wants a ship to do this tick.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct ShipIntent {
+    pub turn: f32,
+    pub thrust: f32,
+    pub brake: f32,
+    pub wings_closed: bool,
+    pub laser: bool,
+    pub cannon: bool,
+}
+
+impl ShipIntent {
+    pub fn normalized(self) -> Self {
+        Self {
+            turn: quantize_control(self.turn, -1.0, 1.0),
+            thrust: quantize_control(self.thrust, -1.0, 1.0),
+            brake: quantize_control(self.brake, 0.0, 1.0),
+            ..self
+        }
+    }
+
+    pub fn merged_with(self, other: Self) -> Self {
+        let self_intent = self.normalized();
+        let other = other.normalized();
+        Self {
+            turn: larger_magnitude(self_intent.turn, other.turn),
+            thrust: larger_magnitude(self_intent.thrust, other.thrust),
+            brake: self_intent.brake.max(other.brake),
+            wings_closed: self_intent.wings_closed || other.wings_closed,
+            laser: self_intent.laser || other.laser,
+            cannon: self_intent.cannon || other.cannon,
+        }
+    }
+}
+
+/// Host-side sources implement this without leaking device events into the sim.
+pub trait ControlSource {
+    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent;
+}
+
+#[derive(Debug, Clone)]
+pub struct ShipIntentEncoder {
+    last_sent: [ShipIntent; SPACEWARS_PLAYER_COUNT],
+}
+
+impl Default for ShipIntentEncoder {
+    fn default() -> Self {
+        Self {
+            last_sent: [ShipIntent::default(); SPACEWARS_PLAYER_COUNT],
+        }
+    }
+}
+
+impl ShipIntentEncoder {
+    pub fn encode(&mut self, player: usize, intent: ShipIntent) -> Vec<Action> {
+        let Some(previous) = self.last_sent.get_mut(player) else {
+            return Vec::new();
+        };
+        let intent = intent.normalized();
+        let mut actions = Vec::new();
+
+        if intent.turn != previous.turn {
+            actions.push(SpacewarsAction::set_turn(player, intent.turn));
+        }
+        if intent.thrust != previous.thrust {
+            actions.push(SpacewarsAction::set_thrust(player, intent.thrust));
+        }
+        if intent.brake != previous.brake {
+            actions.push(SpacewarsAction::set_brake(player, intent.brake));
+        }
+        if intent.wings_closed != previous.wings_closed {
+            actions.push(SpacewarsAction::set_wings(player, intent.wings_closed));
+        }
+        if intent.laser != previous.laser {
+            actions.push(SpacewarsAction::set_laser(player, intent.laser));
+        }
+        if intent.cannon != previous.cannon {
+            actions.push(SpacewarsAction::set_cannon(player, intent.cannon));
+        }
+
+        *previous = intent;
+        actions
+    }
+
+    pub fn reset(&mut self) {
+        self.last_sent = [ShipIntent::default(); SPACEWARS_PLAYER_COUNT];
+    }
+}
+
+fn quantize_control(value: f32, min: f32, max: f32) -> f32 {
+    let value = if value.is_nan() {
+        0.0
+    } else {
+        value.clamp(min, max)
+    };
+    let quantized = (value * 100.0).round() / 100.0;
+    if quantized == -0.0 { 0.0 } else { quantized }
+}
+
+fn larger_magnitude(current: f32, candidate: f32) -> f32 {
+    if candidate.abs() >= current.abs() {
+        candidate
+    } else {
+        current
+    }
 }
 
 impl SpacewarsAction {
-    pub fn new(player: usize, kind: SpacewarsActionKind) -> Self {
-        Self { player, kind }
-    }
-
     pub fn encode(self) -> Action {
-        Action::scenario(self.kind as u32, vec![self.player as u8])
+        let player = u8::try_from(self.player()).unwrap_or(u8::MAX);
+        let mut payload = vec![player];
+        match self {
+            Self::SetWings { closed, .. } => payload.push(u8::from(closed)),
+            Self::SetThrust { amount, .. } | Self::SetBrake { amount, .. } => {
+                payload.extend_from_slice(&amount.to_le_bytes());
+            }
+            Self::SetTurn { rate, .. } => payload.extend_from_slice(&rate.to_le_bytes()),
+            Self::SetLaser { on, .. } | Self::SetCannon { on, .. } => {
+                payload.push(u8::from(on));
+            }
+            Self::ZoomIn { .. } | Self::ZoomOut { .. } => {}
+        }
+        Action::scenario(self.kind() as u32, payload)
     }
 
     pub fn decode(action: &Action) -> Option<Self> {
         let Action::Scenario { kind, payload } = action else {
             return None;
         };
-        let [player] = payload.as_slice() else {
-            return None;
-        };
-        let player = *player as usize;
-        if player >= 2 {
+        let (&player, value) = payload.split_first()?;
+        let player = player as usize;
+        if player >= SPACEWARS_PLAYER_COUNT {
             return None;
         }
-        Some(Self {
-            player,
-            kind: SpacewarsActionKind::from_u32(*kind)?,
-        })
+
+        match SpacewarsActionKind::from_u32(*kind)? {
+            SpacewarsActionKind::SetWings => Some(Self::SetWings {
+                player,
+                closed: decode_bool(value)?,
+            }),
+            SpacewarsActionKind::SetThrust => Some(Self::SetThrust {
+                player,
+                amount: decode_f32(value, -1.0, 1.0)?,
+            }),
+            SpacewarsActionKind::SetBrake => Some(Self::SetBrake {
+                player,
+                amount: decode_f32(value, 0.0, 1.0)?,
+            }),
+            SpacewarsActionKind::SetTurn => Some(Self::SetTurn {
+                player,
+                rate: decode_f32(value, -1.0, 1.0)?,
+            }),
+            SpacewarsActionKind::SetLaser => Some(Self::SetLaser {
+                player,
+                on: decode_bool(value)?,
+            }),
+            SpacewarsActionKind::SetCannon => Some(Self::SetCannon {
+                player,
+                on: decode_bool(value)?,
+            }),
+            SpacewarsActionKind::ZoomIn if value.is_empty() => Some(Self::ZoomIn { player }),
+            SpacewarsActionKind::ZoomOut if value.is_empty() => Some(Self::ZoomOut { player }),
+            SpacewarsActionKind::ZoomIn | SpacewarsActionKind::ZoomOut => None,
+        }
     }
 
-    pub fn close_wings(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::CloseWings).encode()
+    pub const fn player(self) -> usize {
+        match self {
+            Self::SetWings { player, .. }
+            | Self::SetThrust { player, .. }
+            | Self::SetBrake { player, .. }
+            | Self::SetTurn { player, .. }
+            | Self::SetLaser { player, .. }
+            | Self::SetCannon { player, .. }
+            | Self::ZoomIn { player }
+            | Self::ZoomOut { player } => player,
+        }
     }
 
-    pub fn open_wings(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::OpenWings).encode()
+    pub const fn kind(self) -> SpacewarsActionKind {
+        match self {
+            Self::SetWings { .. } => SpacewarsActionKind::SetWings,
+            Self::SetThrust { .. } => SpacewarsActionKind::SetThrust,
+            Self::SetBrake { .. } => SpacewarsActionKind::SetBrake,
+            Self::SetTurn { .. } => SpacewarsActionKind::SetTurn,
+            Self::SetLaser { .. } => SpacewarsActionKind::SetLaser,
+            Self::SetCannon { .. } => SpacewarsActionKind::SetCannon,
+            Self::ZoomIn { .. } => SpacewarsActionKind::ZoomIn,
+            Self::ZoomOut { .. } => SpacewarsActionKind::ZoomOut,
+        }
     }
 
-    pub fn thrust(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::Thrust).encode()
+    pub fn set_wings(player: usize, closed: bool) -> Action {
+        Self::SetWings { player, closed }.encode()
     }
 
-    pub fn thrust_halt(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::ThrustHalt).encode()
+    pub fn set_thrust(player: usize, amount: f32) -> Action {
+        Self::SetThrust { player, amount }.encode()
     }
 
-    pub fn reverse(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::Reverse).encode()
+    pub fn set_brake(player: usize, amount: f32) -> Action {
+        Self::SetBrake { player, amount }.encode()
     }
 
-    pub fn brake(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::Brake).encode()
+    pub fn set_turn(player: usize, rate: f32) -> Action {
+        Self::SetTurn { player, rate }.encode()
     }
 
-    pub fn brake_halt(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::BrakeHalt).encode()
+    pub fn set_laser(player: usize, on: bool) -> Action {
+        Self::SetLaser { player, on }.encode()
     }
 
-    pub fn turn_left(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::TurnLeft).encode()
-    }
-
-    pub fn turn_right(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::TurnRight).encode()
-    }
-
-    pub fn turn_halt(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::TurnHalt).encode()
-    }
-
-    pub fn fire_laser(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::FireLaser).encode()
-    }
-
-    pub fn fire_laser_halt(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::FireLaserHalt).encode()
-    }
-
-    pub fn fire_cannon(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::FireCannon).encode()
-    }
-
-    pub fn fire_cannon_halt(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::FireCannonHalt).encode()
+    pub fn set_cannon(player: usize, on: bool) -> Action {
+        Self::SetCannon { player, on }.encode()
     }
 
     pub fn zoom_in(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::ZoomIn).encode()
+        Self::ZoomIn { player }.encode()
     }
 
     pub fn zoom_out(player: usize) -> Action {
-        Self::new(player, SpacewarsActionKind::ZoomOut).encode()
+        Self::ZoomOut { player }.encode()
     }
+}
+
+fn decode_bool(bytes: &[u8]) -> Option<bool> {
+    match bytes {
+        [0] => Some(false),
+        [1] => Some(true),
+        _ => None,
+    }
+}
+
+fn decode_f32(bytes: &[u8], min: f32, max: f32) -> Option<f32> {
+    let bytes: [u8; 4] = bytes.try_into().ok()?;
+    let value = f32::from_le_bytes(bytes);
+    Some(if value.is_nan() {
+        0.0
+    } else {
+        value.clamp(min, max)
+    })
 }
 
 impl SpacewarsActionKind {
     fn from_u32(value: u32) -> Option<Self> {
         match value {
-            1 => Some(Self::CloseWings),
-            2 => Some(Self::OpenWings),
-            3 => Some(Self::Thrust),
-            4 => Some(Self::ThrustHalt),
-            5 => Some(Self::Reverse),
-            6 => Some(Self::Brake),
-            7 => Some(Self::BrakeHalt),
-            8 => Some(Self::TurnLeft),
-            9 => Some(Self::TurnRight),
-            10 => Some(Self::TurnHalt),
-            11 => Some(Self::FireLaser),
-            12 => Some(Self::FireLaserHalt),
-            13 => Some(Self::FireCannon),
-            14 => Some(Self::FireCannonHalt),
-            15 => Some(Self::ZoomIn),
-            16 => Some(Self::ZoomOut),
+            1 => Some(Self::SetWings),
+            2 => Some(Self::SetThrust),
+            3 => Some(Self::SetBrake),
+            4 => Some(Self::SetTurn),
+            5 => Some(Self::SetLaser),
+            6 => Some(Self::SetCannon),
+            7 => Some(Self::ZoomIn),
+            8 => Some(Self::ZoomOut),
             _ => None,
         }
     }
@@ -863,47 +994,40 @@ impl Scenario for SpacewarsScenario {
 
 impl SpacewarsState {
     fn apply_action(&mut self, action: SpacewarsAction) {
-        match action.kind {
-            SpacewarsActionKind::ZoomIn => {
-                self.zoom_player_in(action.player);
+        match action {
+            SpacewarsAction::ZoomIn { player } => {
+                self.zoom_player_in(player);
                 return;
             }
-            SpacewarsActionKind::ZoomOut => {
-                self.zoom_player_out(action.player);
+            SpacewarsAction::ZoomOut { player } => {
+                self.zoom_player_out(player);
                 return;
             }
             _ => {}
         }
 
+        let player = action.player();
         if self
             .players
-            .get(action.player)
+            .get(player)
             .map(|player| player.eliminated)
             .unwrap_or(true)
         {
             return;
         }
 
-        let Some(ship) = self.ships.get_mut(action.player) else {
+        let Some(ship) = self.ships.get_mut(player) else {
             return;
         };
 
-        match action.kind {
-            SpacewarsActionKind::CloseWings => ship.close_wings(),
-            SpacewarsActionKind::OpenWings => ship.open_wings(),
-            SpacewarsActionKind::Thrust => ship.thrust(),
-            SpacewarsActionKind::ThrustHalt => ship.thrust_halt(),
-            SpacewarsActionKind::Reverse => ship.reverse(),
-            SpacewarsActionKind::Brake => ship.brake(),
-            SpacewarsActionKind::BrakeHalt => ship.brake_halt(),
-            SpacewarsActionKind::TurnLeft => ship.turn_left(),
-            SpacewarsActionKind::TurnRight => ship.turn_right(),
-            SpacewarsActionKind::TurnHalt => ship.turn_halt(),
-            SpacewarsActionKind::FireLaser => ship.fire_laser(),
-            SpacewarsActionKind::FireLaserHalt => ship.fire_laser_halt(),
-            SpacewarsActionKind::FireCannon => ship.fire_cannon(),
-            SpacewarsActionKind::FireCannonHalt => ship.fire_cannon_halt(),
-            SpacewarsActionKind::ZoomIn | SpacewarsActionKind::ZoomOut => unreachable!(),
+        match action {
+            SpacewarsAction::SetWings { closed, .. } => ship.set_wings(closed),
+            SpacewarsAction::SetThrust { amount, .. } => ship.set_thrust(amount),
+            SpacewarsAction::SetBrake { amount, .. } => ship.set_brake(amount),
+            SpacewarsAction::SetTurn { rate, .. } => ship.set_turn(rate),
+            SpacewarsAction::SetLaser { on, .. } => ship.set_laser(on),
+            SpacewarsAction::SetCannon { on, .. } => ship.set_cannon(on),
+            SpacewarsAction::ZoomIn { .. } | SpacewarsAction::ZoomOut { .. } => unreachable!(),
         }
     }
 
@@ -936,24 +1060,29 @@ impl SpacewarsScenario {
     }
 
     pub fn benchmark_actions(state: &SpacewarsState) -> Vec<Action> {
-        let mut actions = vec![
-            SpacewarsAction::thrust(0),
-            SpacewarsAction::fire_laser(0),
-            SpacewarsAction::fire_cannon(0),
-            SpacewarsAction::thrust(1),
-            SpacewarsAction::fire_laser(1),
-            SpacewarsAction::fire_cannon(1),
-        ];
-
-        if (state.tick / 90) % 2 == 0 {
-            actions.push(SpacewarsAction::turn_right(0));
-            actions.push(SpacewarsAction::turn_left(1));
-        } else {
-            actions.push(SpacewarsAction::turn_left(0));
-            actions.push(SpacewarsAction::turn_right(1));
+        let mut encoder = ShipIntentEncoder::default();
+        let mut actions = Vec::new();
+        for player in 0..SPACEWARS_PLAYER_COUNT {
+            actions.extend(encoder.encode(player, Self::benchmark_intent(state, player)));
         }
-
         actions
+    }
+
+    pub fn benchmark_intent(state: &SpacewarsState, player: usize) -> ShipIntent {
+        let turn = if (state.tick / 90) % 2 == 0 {
+            if player == 0 { 1.0 } else { -1.0 }
+        } else if player == 0 {
+            -1.0
+        } else {
+            1.0
+        };
+        ShipIntent {
+            turn,
+            thrust: 1.0,
+            laser: true,
+            cannon: true,
+            ..ShipIntent::default()
+        }
     }
 
     pub fn benchmark_counts(state: &SpacewarsState) -> SpacewarsBenchmarkCounts {
@@ -3786,8 +3915,10 @@ impl ShipState {
             wing_theta: 0.0,
             wing_state: WingState::Opened,
             wing_behavior: WingBehavior::None,
-            thrust_behavior: ThrustBehavior::None,
-            turn_behavior: TurnBehavior::None,
+            wings_closed: false,
+            thrust: 0.0,
+            brake: 0.0,
+            turn: 0.0,
             laser_firing: false,
             cannon_firing: false,
             laser_beam: None,
@@ -3853,12 +3984,20 @@ impl ShipState {
         self.life = self.life_max * progress.clamp(0.0, 1.0);
     }
 
+    fn set_wings(&mut self, closed: bool) {
+        self.wings_closed = closed;
+        if closed {
+            self.close_wings();
+        } else {
+            self.open_wings();
+        }
+    }
+
     fn close_wings(&mut self) {
         if self.form == ShipForm::EscapePod {
             self.wing_state = WingState::Closed;
             self.wing_behavior = WingBehavior::None;
             self.wing_theta = MAX_WING_THETA;
-            self.thrust_behavior = ThrustBehavior::None;
             return;
         }
         self.wing_behavior = WingBehavior::Close;
@@ -3869,67 +4008,31 @@ impl ShipState {
             self.wing_state = WingState::Opened;
             self.wing_behavior = WingBehavior::None;
             self.wing_theta = 0.0;
-            self.thrust_behavior = ThrustBehavior::None;
             self.cap_speed(POD_CRUISE_SPEED);
             return;
         }
         self.wing_behavior = WingBehavior::Open;
-        self.thrust_behavior = ThrustBehavior::None;
         self.cap_speed(MAX_SPEED);
     }
 
-    fn thrust(&mut self) {
-        self.thrust_behavior = ThrustBehavior::Full;
+    fn set_thrust(&mut self, amount: f32) {
+        self.thrust = amount.clamp(-1.0, 1.0);
     }
 
-    fn thrust_halt(&mut self) {
-        self.thrust_behavior = ThrustBehavior::None;
+    fn set_brake(&mut self, amount: f32) {
+        self.brake = amount.clamp(0.0, 1.0);
     }
 
-    fn reverse(&mut self) {
-        self.thrust_behavior = ThrustBehavior::Reverse;
+    fn set_turn(&mut self, rate: f32) {
+        self.turn = rate.clamp(-1.0, 1.0);
     }
 
-    fn brake(&mut self) {
-        self.thrust_behavior = ThrustBehavior::Brake;
+    fn set_laser(&mut self, on: bool) {
+        self.laser_firing = on;
     }
 
-    fn brake_halt(&mut self) {
-        self.thrust_behavior = ThrustBehavior::None;
-    }
-
-    fn turn_left(&mut self) {
-        self.turn_behavior = TurnBehavior::Left;
-    }
-
-    fn turn_right(&mut self) {
-        self.turn_behavior = TurnBehavior::Right;
-    }
-
-    fn turn_halt(&mut self) {
-        self.turn_behavior = TurnBehavior::None;
-    }
-
-    fn fire_laser(&mut self) {
-        if self.form == ShipForm::EscapePod {
-            return;
-        }
-        self.laser_firing = true;
-    }
-
-    fn fire_laser_halt(&mut self) {
-        self.laser_firing = false;
-    }
-
-    fn fire_cannon(&mut self) {
-        if self.form == ShipForm::EscapePod {
-            return;
-        }
-        self.cannon_firing = true;
-    }
-
-    fn fire_cannon_halt(&mut self) {
-        self.cannon_firing = false;
+    fn set_cannon(&mut self, on: bool) {
+        self.cannon_firing = on;
     }
 
     fn update_cannon(&mut self, dt: f32, tick: u64) -> Option<DebrisState> {
@@ -3970,7 +4073,6 @@ impl ShipState {
     fn update_laser(&mut self) {
         if self.form == ShipForm::EscapePod {
             self.laser_beam = None;
-            self.laser_firing = false;
             self.queued_laser_fire = false;
             return;
         }
@@ -4074,7 +4176,6 @@ impl ShipState {
     }
 
     fn update_wings(&mut self, dt: f32) {
-        let braking = self.thrust_behavior == ThrustBehavior::Brake;
         match self.wing_behavior {
             WingBehavior::None => {}
             WingBehavior::Close => {
@@ -4085,9 +4186,6 @@ impl ShipState {
                     self.wing_theta = MAX_WING_THETA;
                 }
                 self.update_wing_position();
-                if !braking {
-                    self.thrust_behavior = ThrustBehavior::Full;
-                }
             }
             WingBehavior::Open => {
                 self.wing_theta -= dt * WING_DELTA_SPEED;
@@ -4099,22 +4197,12 @@ impl ShipState {
                 }
                 self.update_wing_position();
                 self.cap_speed(MAX_SPEED);
-                if self.wing_behavior == WingBehavior::None && !braking {
-                    self.thrust_behavior = ThrustBehavior::None;
-                }
             }
-        }
-
-        if self.wing_state == WingState::Closed
-            && self.wing_behavior != WingBehavior::Open
-            && !braking
-        {
-            self.thrust_behavior = ThrustBehavior::Full;
         }
     }
 
     fn update_wing_position(&mut self) {
-        if self.thrust_behavior != ThrustBehavior::Brake {
+        if self.brake <= 0.0 {
             let max_velocity =
                 (self.wing_theta + 0.46) / MAX_WING_THETA * WING_CLOSED_SPEED + MAX_SPEED;
             let speed = self.velocity.length();
@@ -4125,61 +4213,80 @@ impl ShipState {
     }
 
     fn update_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
-        match self.thrust_behavior {
-            ThrustBehavior::None => {}
-            ThrustBehavior::Full => {
-                self.velocity += self.direction * self.thrust_power;
-                if self.wing_state == WingState::Closed && self.wing_behavior != WingBehavior::Open
-                {
-                    self.velocity +=
-                        self.direction * (self.wing_theta / MAX_WING_THETA * WING_CLOSED_SPEED);
-                    self.cap_speed(WING_CLOSED_SPEED);
-                } else {
-                    self.cap_speed(MAX_SPEED);
-                }
-                self.fire_exhaust(self.direction, rng, tick);
+        if self.brake > 0.0 {
+            if self.velocity.length() > MAX_SPEED * 0.25 {
+                self.velocity -= self.velocity.normalized() * (self.thrust_power * self.brake);
+            } else {
+                self.velocity *= 1.0 - 0.1 * self.brake;
             }
-            ThrustBehavior::Brake => {
-                if self.velocity.length() > MAX_SPEED * 0.25 {
-                    self.velocity -= self.velocity.normalized() * self.thrust_power;
-                } else {
-                    self.velocity *= 0.9;
-                }
 
-                if self.omega.abs() > 0.01 {
-                    self.omega -= self.omega.signum() * self.turn_power;
-                } else {
+            if self.omega.abs() > 0.01 {
+                let turn_delta = self.turn_power * self.brake;
+                if self.omega.abs() <= turn_delta {
                     self.omega = 0.0;
+                } else {
+                    self.omega -= self.omega.signum() * turn_delta;
                 }
+            } else {
+                self.omega = 0.0;
             }
-            ThrustBehavior::Reverse => {
-                self.velocity -= self.direction * self.thrust_power;
-                self.cap_speed(MAX_SPEED);
-                self.fire_exhaust(self.direction * -10.0, rng, tick);
-            }
+            return;
+        }
+
+        let wings_supply_thrust = self.wing_behavior == WingBehavior::Close
+            || (self.wing_state == WingState::Closed && self.wing_behavior != WingBehavior::Open);
+        let amount = if wings_supply_thrust {
+            self.thrust.max(1.0)
+        } else {
+            self.thrust
+        };
+        if amount == 0.0 {
+            return;
+        }
+
+        self.velocity += self.direction * (self.thrust_power * amount);
+        if amount > 0.0
+            && self.wing_state == WingState::Closed
+            && self.wing_behavior != WingBehavior::Open
+        {
+            self.velocity +=
+                self.direction * (self.wing_theta / MAX_WING_THETA * WING_CLOSED_SPEED * amount);
+            self.cap_speed(WING_CLOSED_SPEED);
+        } else {
+            self.cap_speed(MAX_SPEED);
+        }
+
+        if amount > 0.0 {
+            self.fire_exhaust(self.direction * amount, rng, tick);
+        } else {
+            self.fire_exhaust(self.direction * amount * 10.0, rng, tick);
         }
     }
 
     fn update_pod_thrust(&mut self, rng: &mut SpacewarsRng, tick: u64) {
-        match self.thrust_behavior {
-            ThrustBehavior::None | ThrustBehavior::Full => {
-                let max_speed = if self.wing_state == WingState::Closed {
-                    POD_MAX_SPEED
-                } else {
-                    POD_CRUISE_SPEED
-                };
-                self.velocity += self.direction * self.thrust_power;
-                self.cap_speed(max_speed);
-                self.fire_exhaust(self.direction, rng, tick);
-            }
-            ThrustBehavior::Brake | ThrustBehavior::Reverse => {
-                if self.omega.abs() > 0.01 {
-                    self.omega -= self.omega.signum() * self.turn_power;
-                } else {
+        if self.brake > 0.0 || self.thrust < 0.0 {
+            let amount = self.brake.max(-self.thrust);
+            if self.omega.abs() > 0.01 {
+                let turn_delta = self.turn_power * amount;
+                if self.omega.abs() <= turn_delta {
                     self.omega = 0.0;
+                } else {
+                    self.omega -= self.omega.signum() * turn_delta;
                 }
+            } else {
+                self.omega = 0.0;
             }
+            return;
         }
+
+        let max_speed = if self.wing_state == WingState::Closed {
+            POD_MAX_SPEED
+        } else {
+            POD_CRUISE_SPEED
+        };
+        self.velocity += self.direction * self.thrust_power;
+        self.cap_speed(max_speed);
+        self.fire_exhaust(self.direction, rng, tick);
     }
 
     fn update_exhaust_trails(&mut self, dt: f32) {
@@ -4241,19 +4348,12 @@ impl ShipState {
     }
 
     fn update_turn(&mut self) {
-        match self.turn_behavior {
-            TurnBehavior::None => {
-                self.omega = 0.0;
-            }
-            TurnBehavior::Left => {
-                self.omega = (self.omega - self.turn_power).max(-self.current_max_omega);
-                self.turn_behavior = TurnBehavior::None;
-            }
-            TurnBehavior::Right => {
-                self.omega = (self.omega + self.turn_power).min(self.current_max_omega);
-                self.turn_behavior = TurnBehavior::None;
-            }
+        if self.turn == 0.0 {
+            self.omega = 0.0;
+            return;
         }
+        self.omega = (self.omega + self.turn_power * self.turn)
+            .clamp(-self.current_max_omega, self.current_max_omega);
     }
 
     fn cap_speed(&mut self, max_speed: f32) {
@@ -4277,17 +4377,21 @@ impl ShipState {
         self.life = 0.0;
         self.velocity += self.death_impulse;
         self.death_impulse = Vec2::ZERO;
-        self.laser_firing = false;
-        self.cannon_firing = false;
         self.laser_beam = None;
         self.queued_laser_fire = false;
         self.queued_cannon_fire = false;
         self.cannon_cooldown_remaining = 0.0;
-        self.wing_theta = 0.0;
-        self.wing_state = WingState::Opened;
+        self.wing_theta = if self.wings_closed {
+            MAX_WING_THETA
+        } else {
+            0.0
+        };
+        self.wing_state = if self.wings_closed {
+            WingState::Closed
+        } else {
+            WingState::Opened
+        };
         self.wing_behavior = WingBehavior::None;
-        self.thrust_behavior = ThrustBehavior::None;
-        self.turn_behavior = TurnBehavior::None;
         self.turn_power = POD_TURN_FORCE / POD_MASS * self.delta_time;
         self.thrust_power = POD_THRUST_FORCE / POD_MASS * self.delta_time;
         self.current_max_omega = BASE_MAX_OMEGA;
@@ -4302,17 +4406,17 @@ impl ShipState {
         self.dead = false;
         self.fragmented = false;
         self.life = self.life_max;
-        self.laser_firing = false;
-        self.cannon_firing = false;
         self.laser_beam = None;
         self.queued_laser_fire = false;
         self.queued_cannon_fire = false;
         self.cannon_cooldown_remaining = 0.0;
         self.wing_theta = 0.0;
         self.wing_state = WingState::Opened;
-        self.wing_behavior = WingBehavior::None;
-        self.thrust_behavior = ThrustBehavior::None;
-        self.turn_behavior = TurnBehavior::None;
+        self.wing_behavior = if self.wings_closed {
+            WingBehavior::Close
+        } else {
+            WingBehavior::None
+        };
         self.turn_power = SHIP_TURN_FORCE / SHIP_MASS * self.delta_time;
         self.thrust_power = SHIP_THRUST_FORCE / SHIP_MASS * self.delta_time;
         self.current_max_omega = BASE_MAX_OMEGA;
@@ -6259,7 +6363,7 @@ mod tests {
         let start_position = state.ships[0].position;
 
         for _ in 0..4 {
-            step(&mut state, &[SpacewarsAction::thrust(0)]);
+            step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         }
 
         assert!((state.ships[0].position - start_position).dot(normal) > 0.0);
@@ -6664,11 +6768,11 @@ mod tests {
         state.ships[1].position = Vec2::new(900.0, 900.0);
         land_ship_on_planet(&mut state, 0, 0);
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
 
         assert!(state.ships[0].spaceport_ejection.is_some());
         assert_eq!(state.ships[0].laser_beam, None);
-        step(&mut state, &[SpacewarsAction::fire_laser_halt(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, false)]);
         step_until_spaceport_ejection_finishes(&mut state, 0);
 
         let beam = state.ships[0]
@@ -6699,7 +6803,7 @@ mod tests {
         state.ships[1].position = Vec2::new(900.0, 900.0);
         land_ship_on_planet(&mut state, 0, 0);
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert!(state.ships[0].spaceport_ejection.is_some());
         assert!(
@@ -6708,7 +6812,7 @@ mod tests {
                 .iter()
                 .all(|debris| debris.kind != DebrisKind::Shell)
         );
-        step(&mut state, &[SpacewarsAction::fire_cannon_halt(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, false)]);
         step_until_spaceport_ejection_finishes(&mut state, 0);
 
         let shell = state
@@ -7103,7 +7207,7 @@ mod tests {
         let position = state.ships[0].position;
         let velocity = state.ships[0].velocity;
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
 
         assert_eq!(state.tick, tick);
         assert_eq!(state.ships[0].position, position);
@@ -7173,16 +7277,93 @@ mod tests {
         let mut state = init_deathmatch();
         let speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         assert_vec_close(
             state.ships[0].velocity,
             direction_from_rotation(0.0) * speed_delta,
         );
         assert!((state.ships[0].position.y - (450.0 + speed_delta / 60.0)).abs() < 0.001);
 
-        step(&mut state, &[SpacewarsAction::reverse(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, -1.0)]);
         assert_vec_close(state.ships[0].velocity, Vec2::ZERO);
         assert!((state.ships[0].position.y - (450.0 + speed_delta / 60.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn analog_thrust_scales_acceleration_and_exhaust_length() {
+        let mut full = init_deathmatch_no_asteroids();
+        let mut half = full.clone();
+        full.sun = None;
+        half.sun = None;
+
+        step(&mut full, &[SpacewarsAction::set_thrust(0, 1.0)]);
+        step(&mut half, &[SpacewarsAction::set_thrust(0, 0.5)]);
+
+        assert_close(
+            half.ships[0].velocity.length(),
+            full.ships[0].velocity.length() * 0.5,
+        );
+        let full_exhaust = full.ships[0].exhaust_trails[0]
+            .start
+            .distance_to(full.ships[0].exhaust_trails[0].end);
+        let half_exhaust = half.ships[0].exhaust_trails[0]
+            .start
+            .distance_to(half.ships[0].exhaust_trails[0].end);
+        assert_close(half_exhaust, full_exhaust * 0.5);
+    }
+
+    #[test]
+    fn analog_turn_and_brake_scale_existing_power() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets.clear();
+        let turn_power = SHIP_TURN_FORCE / SHIP_MASS / 60.0;
+
+        step(&mut state, &[SpacewarsAction::set_turn(0, 0.5)]);
+        assert_close(state.ships[0].omega, turn_power * 0.5);
+
+        state.ships[0].velocity = Vec2::new(100.0, 0.0);
+        step(
+            &mut state,
+            &[
+                SpacewarsAction::set_turn(0, 0.0),
+                SpacewarsAction::set_brake(0, 0.5),
+            ],
+        );
+        let full_speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
+        assert_close(state.ships[0].velocity.x, 100.0 - full_speed_delta * 0.5);
+    }
+
+    #[test]
+    fn held_setpoints_survive_escape_pod_and_ship_rebuild_transitions() {
+        let mut ship = ShipState::new_with_default_life(0, Vec2::ZERO, Color::WHITE, 1.0 / 60.0);
+        ship.set_wings(true);
+        ship.set_thrust(0.5);
+        ship.set_brake(0.25);
+        ship.set_turn(-0.75);
+        ship.set_laser(true);
+        ship.set_cannon(true);
+
+        ship.change_to_escape_pod();
+        ship.update_laser();
+        assert_eq!(ship.form, ShipForm::EscapePod);
+        assert!(ship.wings_closed);
+        assert_eq!(ship.wing_state, WingState::Closed);
+        assert_eq!(ship.thrust, 0.5);
+        assert_eq!(ship.brake, 0.25);
+        assert_eq!(ship.turn, -0.75);
+        assert!(ship.laser_firing);
+        assert!(ship.cannon_firing);
+        assert!(ship.laser_beam.is_none());
+
+        ship.restore_from_escape_pod();
+        assert_eq!(ship.form, ShipForm::Ship);
+        assert_eq!(ship.wing_behavior, WingBehavior::Close);
+        assert_eq!(ship.thrust, 0.5);
+        assert_eq!(ship.brake, 0.25);
+        assert_eq!(ship.turn, -0.75);
+        assert!(ship.laser_firing);
+        assert!(ship.cannon_firing);
     }
 
     #[test]
@@ -7194,11 +7375,11 @@ mod tests {
         state.ships[0].direction = Vec2::Y;
         let speed_delta = SHIP_THRUST_FORCE / SHIP_MASS / 60.0;
 
-        step(&mut state, &[SpacewarsAction::brake(0)]);
+        step(&mut state, &[SpacewarsAction::set_brake(0, 1.0)]);
 
         assert_vec_close(state.ships[0].velocity, Vec2::new(100.0 - speed_delta, 0.0));
         for _ in 0..180 {
-            step(&mut state, &[SpacewarsAction::brake(0)]);
+            step(&mut state, &[SpacewarsAction::set_brake(0, 1.0)]);
         }
         assert!(state.ships[0].velocity.x >= 0.0);
         assert_close(state.ships[0].velocity.y, 0.0);
@@ -7218,14 +7399,17 @@ mod tests {
 
         step(
             &mut state,
-            &[SpacewarsAction::close_wings(0), SpacewarsAction::brake(0)],
+            &[
+                SpacewarsAction::set_wings(0, true),
+                SpacewarsAction::set_brake(0, 1.0),
+            ],
         );
 
         assert_close(
             state.ships[0].velocity.length(),
             WING_CLOSED_SPEED - speed_delta,
         );
-        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::Brake);
+        assert_eq!(state.ships[0].brake, 1.0);
     }
 
     #[test]
@@ -7234,8 +7418,8 @@ mod tests {
         let mut replay = init_deathmatch_no_asteroids();
         let start_thruster = ship_thruster_center(&first.ships[0]);
 
-        step(&mut first, &[SpacewarsAction::thrust(0)]);
-        step(&mut replay, &[SpacewarsAction::thrust(0)]);
+        step(&mut first, &[SpacewarsAction::set_thrust(0, 1.0)]);
+        step(&mut replay, &[SpacewarsAction::set_thrust(0, 1.0)]);
 
         assert_eq!(
             first.ships[0].exhaust_trails,
@@ -7253,10 +7437,10 @@ mod tests {
     fn turn_emits_exhaust_after_rotation_begins() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::turn_right(0)]);
+        step(&mut state, &[SpacewarsAction::set_turn(0, 1.0)]);
         assert!(state.ships[0].exhaust_trails.is_empty());
 
-        step(&mut state, &[SpacewarsAction::turn_right(0)]);
+        step(&mut state, &[SpacewarsAction::set_turn(0, 1.0)]);
 
         assert_eq!(state.ships[0].exhaust_trails.len(), 2);
     }
@@ -7265,11 +7449,11 @@ mod tests {
     fn exhaust_trails_fade_and_are_removed() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         assert_eq!(state.ships[0].exhaust_trails.len(), 2);
 
         for _ in 0..12 {
-            step(&mut state, &[SpacewarsAction::thrust_halt(0)]);
+            step(&mut state, &[SpacewarsAction::set_thrust(0, 0.0)]);
         }
 
         assert!(state.ships[0].exhaust_trails.is_empty());
@@ -7280,32 +7464,35 @@ mod tests {
         let mut state = init_deathmatch();
         let turn_power = SHIP_TURN_FORCE / SHIP_MASS / 60.0;
 
-        step(&mut state, &[SpacewarsAction::turn_right(0)]);
+        step(&mut state, &[SpacewarsAction::set_turn(0, 1.0)]);
         assert_close(state.ships[0].omega, turn_power);
         assert_close(state.ships[0].rotation_radians, -0.0096);
 
         step(&mut state, &[]);
+        assert_close(state.ships[0].omega, turn_power * 2.0);
+        assert_close(state.ships[0].rotation_radians, -0.0288);
+
+        step(&mut state, &[SpacewarsAction::set_turn(0, 0.0)]);
         assert_close(state.ships[0].omega, 0.0);
-        assert_close(state.ships[0].rotation_radians, -0.0096);
     }
 
     #[test]
     fn wings_close_then_open_with_original_hold_release_semantics() {
         let mut state = init_deathmatch();
 
-        step(&mut state, &[SpacewarsAction::close_wings(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, true)]);
         assert_close(state.ships[0].wing_theta, WING_DELTA_SPEED / 60.0);
         assert_eq!(state.ships[0].wing_behavior, WingBehavior::Close);
-        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::Full);
+        assert_eq!(state.ships[0].thrust, 0.0);
 
         for _ in 0..9 {
-            step(&mut state, &[SpacewarsAction::close_wings(0)]);
+            step(&mut state, &[SpacewarsAction::set_wings(0, true)]);
         }
         assert_close(state.ships[0].wing_theta, MAX_WING_THETA);
         assert_eq!(state.ships[0].wing_state, WingState::Closed);
         assert_close(state.ships[0].current_max_omega, WING_CLOSED_MAX_OMEGA);
 
-        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, false)]);
         assert_eq!(state.ships[0].wing_behavior, WingBehavior::Open);
         assert!(state.ships[0].wing_theta < MAX_WING_THETA);
     }
@@ -7315,13 +7502,13 @@ mod tests {
         let mut state = init_deathmatch();
         state.ships[0].velocity = Vec2::new(0.0, MAX_SPEED * 2.0);
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         assert_close(state.ships[0].velocity.length(), MAX_SPEED);
 
         state.ships[0].wing_state = WingState::Closed;
         state.ships[0].wing_theta = MAX_WING_THETA;
         state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED * 2.0);
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         assert_close(state.ships[0].velocity.length(), WING_CLOSED_SPEED);
     }
 
@@ -7332,10 +7519,10 @@ mod tests {
         state.ships[0].wing_theta = MAX_WING_THETA;
         state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED);
 
-        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, false)]);
 
         assert_eq!(state.ships[0].wing_behavior, WingBehavior::Open);
-        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::None);
+        assert_eq!(state.ships[0].thrust, 0.0);
         assert_close(state.ships[0].velocity.length(), MAX_SPEED);
 
         while state.ships[0].wing_behavior == WingBehavior::Open {
@@ -7355,11 +7542,11 @@ mod tests {
         state.ships[0].wing_theta = MAX_WING_THETA;
         state.ships[0].velocity = Vec2::new(0.0, WING_CLOSED_SPEED);
 
-        step(&mut state, &[SpacewarsAction::open_wings(0)]);
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, false)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
 
         assert_eq!(state.ships[0].wing_behavior, WingBehavior::Open);
-        assert_eq!(state.ships[0].thrust_behavior, ThrustBehavior::Full);
+        assert_eq!(state.ships[0].thrust, 1.0);
         assert_close(state.ships[0].velocity.length(), MAX_SPEED);
     }
 
@@ -7389,12 +7576,171 @@ mod tests {
     }
 
     #[test]
+    fn action_payloads_round_trip_and_clamp_untrusted_scalars() {
+        let encoded = SpacewarsAction::SetThrust {
+            player: 1,
+            amount: 0.42,
+        }
+        .encode();
+        assert_eq!(
+            SpacewarsAction::decode(&encoded),
+            Some(SpacewarsAction::SetThrust {
+                player: 1,
+                amount: 0.42,
+            })
+        );
+
+        let mut high = vec![0];
+        high.extend_from_slice(&f32::INFINITY.to_le_bytes());
+        assert_eq!(
+            SpacewarsAction::decode(&Action::scenario(SpacewarsActionKind::SetTurn as u32, high,)),
+            Some(SpacewarsAction::SetTurn {
+                player: 0,
+                rate: 1.0,
+            })
+        );
+
+        let mut nan = vec![0];
+        nan.extend_from_slice(&f32::NAN.to_le_bytes());
+        assert_eq!(
+            SpacewarsAction::decode(&Action::scenario(SpacewarsActionKind::SetBrake as u32, nan,)),
+            Some(SpacewarsAction::SetBrake {
+                player: 0,
+                amount: 0.0,
+            })
+        );
+    }
+
+    #[test]
+    fn action_decoder_rejects_malformed_players_booleans_and_lengths() {
+        assert!(SpacewarsAction::decode(&SpacewarsAction::set_thrust(usize::MAX, 1.0)).is_none());
+        assert!(
+            SpacewarsAction::decode(&Action::scenario(
+                SpacewarsActionKind::SetWings as u32,
+                vec![2, 1],
+            ))
+            .is_none()
+        );
+        assert!(
+            SpacewarsAction::decode(&Action::scenario(
+                SpacewarsActionKind::SetLaser as u32,
+                vec![0, 2],
+            ))
+            .is_none()
+        );
+        assert!(
+            SpacewarsAction::decode(&Action::scenario(
+                SpacewarsActionKind::SetTurn as u32,
+                vec![0, 1, 2],
+            ))
+            .is_none()
+        );
+        assert!(
+            SpacewarsAction::decode(&Action::scenario(
+                SpacewarsActionKind::ZoomIn as u32,
+                vec![0, 1],
+            ))
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn intent_encoder_emits_only_changed_normalized_setpoints() {
+        let mut encoder = ShipIntentEncoder::default();
+        assert!(encoder.encode(0, ShipIntent::default()).is_empty());
+
+        let actions = encoder.encode(
+            0,
+            ShipIntent {
+                turn: 0.456,
+                laser: true,
+                ..ShipIntent::default()
+            },
+        );
+        assert_eq!(
+            actions
+                .iter()
+                .filter_map(SpacewarsAction::decode)
+                .collect::<Vec<_>>(),
+            vec![
+                SpacewarsAction::SetTurn {
+                    player: 0,
+                    rate: 0.46,
+                },
+                SpacewarsAction::SetLaser {
+                    player: 0,
+                    on: true,
+                },
+            ]
+        );
+        assert!(
+            encoder
+                .encode(
+                    0,
+                    ShipIntent {
+                        turn: 0.459,
+                        laser: true,
+                        ..ShipIntent::default()
+                    }
+                )
+                .is_empty()
+        );
+
+        let released = encoder.encode(0, ShipIntent::default());
+        assert_eq!(
+            released
+                .iter()
+                .filter_map(SpacewarsAction::decode)
+                .collect::<Vec<_>>(),
+            vec![
+                SpacewarsAction::SetTurn {
+                    player: 0,
+                    rate: 0.0,
+                },
+                SpacewarsAction::SetLaser {
+                    player: 0,
+                    on: false,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn intents_merge_component_wise_by_magnitude_and_boolean_union() {
+        let keyboard = ShipIntent {
+            turn: -1.0,
+            thrust: 1.0,
+            wings_closed: true,
+            ..ShipIntent::default()
+        };
+        let gamepad = ShipIntent {
+            turn: 0.4,
+            thrust: -0.6,
+            brake: 0.75,
+            laser: true,
+            ..ShipIntent::default()
+        };
+
+        assert_eq!(
+            keyboard.merged_with(gamepad),
+            ShipIntent {
+                turn: -1.0,
+                thrust: 1.0,
+                brake: 0.75,
+                wings_closed: true,
+                laser: true,
+                cannon: false,
+            }
+        );
+    }
+
+    #[test]
     fn fire_cannon_spawns_original_shell_and_recoil() {
         let mut state = init_deathmatch_no_asteroids();
         let start_ship = state.ships[0].clone();
         let mount_center = ship_mount_center(&start_ship);
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert_eq!(state.debris.len(), 1);
         let shell = state.debris[0];
@@ -7425,9 +7771,9 @@ mod tests {
     fn held_cannon_respects_original_cooldown() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
         for _ in 0..29 {
-            step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+            step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
         }
 
         assert_eq!(
@@ -7439,7 +7785,7 @@ mod tests {
             1
         );
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert_eq!(
             state
@@ -7461,7 +7807,7 @@ mod tests {
         state.ships[1].position = shell_spawn_position - target_low_offset;
         let start_life = state.ships[1].life;
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert_eq!(
             state.ship_debris_collisions,
@@ -7491,7 +7837,7 @@ mod tests {
         ));
         let start_life = state.debris[0].life;
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert_eq!(
             state.debris_collisions,
@@ -7511,7 +7857,7 @@ mod tests {
     fn cannon_shell_hits_body_and_leaves_breakup_fragment() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
         let shell_position = state.debris[0].position;
         state.sun = Some(SunState {
             position: shell_position,
@@ -7537,7 +7883,7 @@ mod tests {
     fn fire_laser_starts_beam_and_hold_extends_it() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         let first = state.ships[0].laser_beam.expect("laser should start");
         assert_close(first.length(), LASER_GROWTH_PER_TICK);
         assert_close(
@@ -7545,7 +7891,7 @@ mod tests {
             LASER_BASE_DAMAGE / LASER_GROWTH_PER_TICK,
         );
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         let second = state.ships[0].laser_beam.expect("laser should continue");
         assert_close(second.length(), LASER_GROWTH_PER_TICK * 2.0);
         assert_close(
@@ -7558,10 +7904,10 @@ mod tests {
     fn fire_laser_halt_clears_beam() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         assert!(state.ships[0].laser_beam.is_some());
 
-        step(&mut state, &[SpacewarsAction::fire_laser_halt(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, false)]);
 
         assert!(state.ships[0].laser_beam.is_none());
         assert!(state.laser_hits.is_empty());
@@ -7584,7 +7930,7 @@ mod tests {
             ship_low_bounds(&ship_triangles(&state.ships[1])).center - state.ships[1].position;
         state.ships[1].position = head + state.ships[0].direction * 90.0 - target_low_offset;
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
 
         let beam = state.ships[0]
             .laser_beam
@@ -7620,9 +7966,9 @@ mod tests {
         reconcile_physics(&mut state);
         state.physics.step(1.0 / 60.0);
 
-        state.apply_action(SpacewarsAction {
+        state.apply_action(SpacewarsAction::SetLaser {
             player: 0,
-            kind: SpacewarsActionKind::FireLaser,
+            on: true,
         });
         update_ship_lasers(&mut state);
         state.laser_hits = resolve_laser_hits(&mut state);
@@ -7651,8 +7997,8 @@ mod tests {
         step(
             &mut state,
             &[
-                SpacewarsAction::fire_laser(0),
-                SpacewarsAction::fire_cannon(0),
+                SpacewarsAction::set_laser(0, true),
+                SpacewarsAction::set_cannon(0, true),
             ],
         );
 
@@ -7671,7 +8017,7 @@ mod tests {
     fn render_frame_includes_active_laser_lines() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::fire_laser(0)]);
+        step(&mut state, &[SpacewarsAction::set_laser(0, true)]);
         let frame = SpacewarsScenario::render_frame(&state);
         let lines = frame
             .layers
@@ -7687,7 +8033,7 @@ mod tests {
     fn render_frame_includes_exhaust_lines_behind_ships() {
         let mut state = init_deathmatch_no_asteroids();
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
         let frame = SpacewarsScenario::render_frame(&state);
         let exhaust_layer = frame
             .layers
@@ -7724,7 +8070,7 @@ mod tests {
                 ASTEROID_DAMAGE_SCALAR,
                 Color::DIM_GREY,
             ));
-            step(state, &[SpacewarsAction::fire_laser(0)]);
+            step(state, &[SpacewarsAction::set_laser(0, true)]);
         }
 
         assert_eq!(first.particles, replay.particles);
@@ -7812,7 +8158,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         let start_life = state.ships[0].life;
 
-        step(&mut state, &[SpacewarsAction::fire_cannon(0)]);
+        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
 
         assert_eq!(state.ships[0].life, start_life);
         assert!(
@@ -8074,8 +8420,8 @@ mod tests {
         step(
             &mut state,
             &[
-                SpacewarsAction::fire_laser(0),
-                SpacewarsAction::fire_cannon(0),
+                SpacewarsAction::set_laser(0, true),
+                SpacewarsAction::set_cannon(0, true),
             ],
         );
 
@@ -8091,7 +8437,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.ships[0].change_to_escape_pod();
 
-        step(&mut state, &[SpacewarsAction::thrust(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, 1.0)]);
 
         assert_eq!(state.ships[0].form, ShipForm::EscapePod);
         assert!(state.ships[0].velocity.length() > 0.0);
@@ -8118,14 +8464,14 @@ mod tests {
         state.ships[0].change_to_escape_pod();
         state.ships[0].velocity = state.ships[0].direction * POD_CRUISE_SPEED;
 
-        step(&mut state, &[SpacewarsAction::reverse(0)]);
+        step(&mut state, &[SpacewarsAction::set_thrust(0, -1.0)]);
 
         assert_eq!(state.ships[0].form, ShipForm::EscapePod);
         assert!(state.ships[0].velocity.length() < POD_CRUISE_SPEED);
         assert!(state.ships[0].velocity.dot(state.ships[0].direction) > 0.0);
 
         for _ in 0..30 {
-            step(&mut state, &[SpacewarsAction::reverse(0)]);
+            step(&mut state, &[SpacewarsAction::set_thrust(0, -1.0)]);
         }
 
         assert!(state.ships[0].velocity.length() < 0.25);
@@ -8137,13 +8483,13 @@ mod tests {
         state.players[0].planet_count = 1;
         state.ships[0].change_to_escape_pod();
 
-        step(&mut state, &[SpacewarsAction::close_wings(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, true)]);
 
         assert_eq!(state.ships[0].form, ShipForm::EscapePod);
         assert_eq!(state.ships[0].wing_state, WingState::Closed);
         assert_close(state.ships[0].velocity.length(), POD_MAX_SPEED);
 
-        step(&mut state, &[SpacewarsAction::open_wings(0)]);
+        step(&mut state, &[SpacewarsAction::set_wings(0, false)]);
 
         assert_eq!(state.ships[0].wing_state, WingState::Opened);
         assert_close(state.ships[0].velocity.length(), POD_CRUISE_SPEED);
@@ -8556,14 +8902,8 @@ mod tests {
         let initial = state.player_view_heights;
         let step = player_zoom_step(&state.config);
 
-        state.apply_action(SpacewarsAction {
-            player: 0,
-            kind: SpacewarsActionKind::ZoomIn,
-        });
-        state.apply_action(SpacewarsAction {
-            player: 1,
-            kind: SpacewarsActionKind::ZoomOut,
-        });
+        state.apply_action(SpacewarsAction::ZoomIn { player: 0 });
+        state.apply_action(SpacewarsAction::ZoomOut { player: 1 });
 
         assert_eq!(state.player_view_heights[0], initial[0] - step);
         assert_eq!(state.player_view_heights[1], initial[1] + step);
@@ -8737,17 +9077,20 @@ mod tests {
         let mut replay = init_deathmatch_no_asteroids();
 
         for tick in 0..120 {
-            let mut actions = vec![SpacewarsAction::thrust(0), SpacewarsAction::thrust(1)];
+            let mut actions = vec![
+                SpacewarsAction::set_thrust(0, 1.0),
+                SpacewarsAction::set_thrust(1, 1.0),
+            ];
             if tick % 4 < 2 {
-                actions.push(SpacewarsAction::turn_right(0));
-                actions.push(SpacewarsAction::turn_left(1));
+                actions.push(SpacewarsAction::set_turn(0, 1.0));
+                actions.push(SpacewarsAction::set_turn(1, -1.0));
             } else {
-                actions.push(SpacewarsAction::turn_left(0));
-                actions.push(SpacewarsAction::turn_right(1));
+                actions.push(SpacewarsAction::set_turn(0, -1.0));
+                actions.push(SpacewarsAction::set_turn(1, 1.0));
             }
             if tick % 30 == 0 {
-                actions.push(SpacewarsAction::fire_cannon(0));
-                actions.push(SpacewarsAction::fire_cannon(1));
+                actions.push(SpacewarsAction::set_cannon(0, true));
+                actions.push(SpacewarsAction::set_cannon(1, true));
             }
 
             step(&mut first, &actions);
