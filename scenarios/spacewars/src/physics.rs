@@ -3,24 +3,29 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use engine_core::Vec2;
-use engine_rapier::world::{
-    BodyId as PhysicsBodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
-    CollisionGroups, PhysicsId, PhysicsStepMetrics, PhysicsWorld, PhysicsWorldConfig,
-    RayCastOptions,
+use engine_rapier::{
+    rover::{RoverAssembly, RoverSnapshot, RoverSpawnPose, RoverSpec},
+    world::{
+        BodyId as PhysicsBodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId,
+        ColliderRole, ColliderSpec, CollisionGroups, PhysicsId, PhysicsStepMetrics, PhysicsWorld,
+        PhysicsWorldConfig, RayCastOptions,
+    },
 };
 
 use super::{
     BODY_BOUNDS_RADIUS_SCALE, BodyId, CANNON_SHELL_RADIUS, DEFAULT_ELASTICITY, DebrisKind,
     DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
-    SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING, SHIP_THRUSTER,
-    SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_ARC_LENGTH, SPACEPORT_DEPTH_FACTOR,
-    SPACEPORT_OUTER_POINTS, ShipForm, ShipState, SunState, rotate_points, spaceport_local_points,
+    RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING,
+    SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_ARC_LENGTH, SPACEPORT_DEPTH_FACTOR,
+    SPACEPORT_OUTER_POINTS, ShipForm, ShipState, SunState, planet_surface_velocity, rotate_points,
+    spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
 const SUN_ENTITY_VALUE: u64 = 2;
 const PLANET_ENTITY_BASE: u64 = 100;
 const SHIP_ENTITY_BASE: u64 = 10_000;
+const ROVER_ENTITY_BASE: u64 = 50_000;
 const DEBRIS_ENTITY_BASE: u64 = 100_000;
 
 const WORLD_ROLE: ColliderRole = ColliderRole::new(1);
@@ -29,6 +34,7 @@ const SPACEPORT_SENSOR_ROLE: ColliderRole = ColliderRole::new(3);
 const SPACEPORT_GATE_ROLE: ColliderRole = ColliderRole::new(4);
 const SHIP_HULL_ROLE: ColliderRole = ColliderRole::new(5);
 const DEBRIS_ROLE: ColliderRole = ColliderRole::new(6);
+const ROVER_SURFACE_ROLE: ColliderRole = ColliderRole::new(7);
 
 const GROUP_SHIP_0: u32 = 1 << 0;
 const GROUP_SHIP_1: u32 = 1 << 1;
@@ -39,12 +45,30 @@ const GROUP_BODY: u32 = 1 << 5;
 const GROUP_WORLD: u32 = 1 << 6;
 const GROUP_SPACEPORT_GATE: u32 = 1 << 7;
 const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
+const GROUP_ROVER: u32 = 1 << 9;
+const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
 const GROUP_ALL_SOLIDS: u32 =
-    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_SPACEPORT_GATE;
+    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_SPACEPORT_GATE | GROUP_ROVER;
 
 const PLANET_SURFACE_SEGMENTS: usize = 24;
 const WORLD_SURFACE_SEGMENTS: usize = 192;
+
+pub(super) fn spacewars_rover_spec() -> RoverSpec {
+    RoverSpec {
+        suspension_stiffness: 10_000.0,
+        suspension_damping: 350.0,
+        suspension_max_force: 10_000.0,
+        wheel_target_speed: 12.0,
+        wheel_motor_torque: 100.0,
+        wheel_brake_torque: 120.0,
+        collision_groups: CollisionGroups::new(
+            GROUP_ROVER,
+            GROUP_BODY | GROUP_WORLD | GROUP_ROVER_SURFACE,
+        ),
+        ..RoverSpec::default()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum MechanicalEntity {
@@ -95,13 +119,33 @@ struct DebrisColliderKey {
 }
 
 #[derive(Debug, Clone)]
+struct RoverPhysicsEntry {
+    planet: usize,
+    owner_id: usize,
+    last_planet: PlanetState,
+    assembly: RoverAssembly,
+}
+
+#[derive(Debug, Clone)]
 pub(super) struct SpacewarsPhysics {
     world: PhysicsWorld,
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
     planet_keys: Vec<Option<PlanetColliderKey>>,
+    rovers: BTreeMap<u64, RoverPhysicsEntry>,
     debris_keys: BTreeMap<u64, DebrisColliderKey>,
     next_debris_entity: u64,
+}
+
+pub(super) struct PhysicsReconcileInput<'a> {
+    pub tick: u64,
+    pub dt_seconds: f32,
+    pub ships: &'a mut [ShipState; 2],
+    pub debris: &'a mut [DebrisState],
+    pub sun: Option<SunState>,
+    pub planets: &'a [PlanetState],
+    pub rovers: &'a [RoverState],
+    pub docked_ships: &'a [bool; 2],
 }
 
 impl SpacewarsPhysics {
@@ -123,6 +167,7 @@ impl SpacewarsPhysics {
             sun_radius: None,
             ship_keys: [None, None],
             planet_keys: vec![None; planets.len()],
+            rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
             next_debris_entity: DEBRIS_ENTITY_BASE,
         };
@@ -144,15 +189,17 @@ impl SpacewarsPhysics {
         physics
     }
 
-    pub fn reconcile(
-        &mut self,
-        tick: u64,
-        ships: &mut [ShipState; 2],
-        debris: &mut [DebrisState],
-        sun: Option<SunState>,
-        planets: &[PlanetState],
-        docked_ships: &[bool; 2],
-    ) -> PhysicsLifecycle {
+    pub fn reconcile(&mut self, input: PhysicsReconcileInput<'_>) -> PhysicsLifecycle {
+        let PhysicsReconcileInput {
+            tick,
+            dt_seconds,
+            ships,
+            debris,
+            sun,
+            planets,
+            rovers,
+            docked_ships,
+        } = input;
         let mut lifecycle = PhysicsLifecycle::default();
         match sun {
             Some(sun) if self.sun_radius != Some(sun.radius.to_bits()) => {
@@ -209,6 +256,7 @@ impl SpacewarsPhysics {
             }
         }
 
+        self.reconcile_rovers(rovers, planets, dt_seconds, &mut lifecycle);
         self.reconcile_debris(tick, debris, &mut lifecycle);
         lifecycle
     }
@@ -225,6 +273,36 @@ impl SpacewarsPhysics {
         };
         self.world
             .apply_velocity_delta(primary_body(entity), delta_velocity, true)
+    }
+
+    pub fn rover_snapshot(&self, rover: &RoverState) -> Option<RoverSnapshot> {
+        let entry = self.rover_entry(rover)?;
+        entry.assembly.snapshot(&self.world)
+    }
+
+    pub fn rover_body_motions(&self, rover: &RoverState) -> Option<[BodyMotion; 3]> {
+        let bodies = self.rover_entry(rover)?.assembly.bodies();
+        Some([
+            self.world.motion(bodies[0])?,
+            self.world.motion(bodies[1])?,
+            self.world.motion(bodies[2])?,
+        ])
+    }
+
+    pub fn apply_rover_velocity_delta(
+        &mut self,
+        id: u64,
+        body_index: usize,
+        delta_velocity: Vec2,
+    ) -> bool {
+        let Some(body) = self
+            .rovers
+            .get(&id)
+            .and_then(|entry| entry.assembly.bodies().get(body_index).copied())
+        else {
+            return false;
+        };
+        self.world.apply_velocity_delta(body, delta_velocity, true)
     }
 
     #[cfg(test)]
@@ -266,6 +344,108 @@ impl SpacewarsPhysics {
             item.rotation_radians = motion.angle;
             item.omega = motion.angular_velocity;
         }
+    }
+
+    fn rover_entry(&self, rover: &RoverState) -> Option<&RoverPhysicsEntry> {
+        let entry = self.rovers.get(&rover.id)?;
+        (entry.planet == rover.planet && entry.owner_id == rover.owner_id).then_some(entry)
+    }
+
+    fn reconcile_rovers(
+        &mut self,
+        rovers: &[RoverState],
+        planets: &[PlanetState],
+        dt_seconds: f32,
+        lifecycle: &mut PhysicsLifecycle,
+    ) {
+        let mut active = BTreeSet::new();
+        for rover in rovers {
+            if !active.insert(rover.id) {
+                continue;
+            }
+            let key_matches = self
+                .rovers
+                .get(&rover.id)
+                .map(|entry| entry.planet == rover.planet && entry.owner_id == rover.owner_id)
+                .unwrap_or(false);
+            if !key_matches {
+                if let Some(entry) = self.rovers.remove(&rover.id) {
+                    lifecycle.removed += usize::from(entry.assembly.remove(&mut self.world));
+                }
+                let Some(planet) = planets.get(rover.planet) else {
+                    continue;
+                };
+                if let Some(entry) = self.insert_rover(rover, planet) {
+                    self.rovers.insert(rover.id, entry);
+                    lifecycle.added += 1;
+                }
+            }
+
+            if let Some(entry) = self.rovers.get_mut(&rover.id) {
+                if key_matches && let Some(planet) = planets.get(entry.planet) {
+                    transport_rover_with_planet(&mut self.world, entry, planet, dt_seconds);
+                }
+                let _ = entry
+                    .assembly
+                    .set_control(&mut self.world, rover.intent.control());
+            }
+        }
+
+        let stale = self
+            .rovers
+            .keys()
+            .copied()
+            .filter(|id| !active.contains(id))
+            .collect::<Vec<_>>();
+        for id in stale {
+            if let Some(entry) = self.rovers.remove(&id) {
+                lifecycle.removed += usize::from(entry.assembly.remove(&mut self.world));
+            }
+        }
+    }
+
+    fn insert_rover(
+        &mut self,
+        rover: &RoverState,
+        planet: &PlanetState,
+    ) -> Option<RoverPhysicsEntry> {
+        let spec = spacewars_rover_spec();
+        let up_angle = planet.wrapper_angle + core::f32::consts::PI;
+        let up = Vec2::from_radians(up_angle);
+        let wheel_center = planet.position
+            + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + spec.wheel_radius + 0.03);
+        let assembly = RoverAssembly::insert_at(
+            &mut self.world,
+            rover_entity(rover.id),
+            RoverSpawnPose {
+                wheel_center,
+                up_angle,
+            },
+            spec,
+        )?;
+
+        for body in assembly.bodies() {
+            let Some(motion) = self.world.motion(body) else {
+                assembly.remove(&mut self.world);
+                return None;
+            };
+            if !self.world.set_velocity(
+                body,
+                planet_surface_velocity(planet, motion.position),
+                planet.wrapper_omega,
+                true,
+            ) {
+                assembly.remove(&mut self.world);
+                return None;
+            }
+        }
+        let _ = assembly.set_control(&mut self.world, rover.intent.control());
+        Some(RoverPhysicsEntry {
+            planet: rover.planet,
+            owner_id: rover.owner_id,
+            last_planet: *planet,
+            assembly,
+        })
     }
 
     pub fn contacts(&self) -> Vec<MechanicalContact> {
@@ -321,7 +501,8 @@ impl SpacewarsPhysics {
                 max_distance,
                 solid: false,
                 include_sensors: false,
-                collision_groups: CollisionGroups::ALL,
+                // Combat damage is deliberately outside this first rover slice.
+                collision_groups: CollisionGroups::new(u32::MAX, !GROUP_ROVER),
                 exclude_entity: Some(ship_entity(shooter)),
             },
         )?;
@@ -381,7 +562,7 @@ impl SpacewarsPhysics {
         collider.restitution = DEFAULT_ELASTICITY;
         collider.friction = 0.0;
         collider.collision_groups =
-            CollisionGroups::new(GROUP_WORLD, GROUP_ALL_SHIPS | GROUP_DEBRIS);
+            CollisionGroups::new(GROUP_WORLD, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER);
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -424,6 +605,19 @@ impl SpacewarsPhysics {
         let entity = planet_entity(index);
         let body_groups = CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
         let mut colliders = planet_solid_colliders(entity, planet.radius, body_groups);
+        // Ships retain the legacy segmented, frictionless, elastic surface and
+        // spaceport cavity. Rovers get a smooth traction surface on the same
+        // kinematic body so their suspension is not launched by segment seams.
+        let mut rover_surface = ColliderSpec::ball(
+            collider_id(entity, ROVER_SURFACE_ROLE, 0),
+            planet.radius * BODY_BOUNDS_RADIUS_SCALE,
+        );
+        rover_surface.density = 0.0;
+        rover_surface.friction = 1.25;
+        rover_surface.restitution = 0.0;
+        rover_surface.collision_groups = CollisionGroups::new(GROUP_ROVER_SURFACE, GROUP_ROVER);
+        rover_surface.solver_groups = rover_surface.collision_groups;
+        colliders.push(rover_surface);
 
         let mut sensor = ColliderSpec::convex_polygon(
             collider_id(entity, SPACEPORT_SENSOR_ROLE, 0),
@@ -443,6 +637,7 @@ impl SpacewarsPhysics {
         gate.collision_groups =
             CollisionGroups::new(GROUP_SPACEPORT_GATE, blocked_pod_groups(planet.owner_id));
         gate.solver_groups = gate.collision_groups;
+
         colliders.push(sensor);
         colliders.push(gate);
 
@@ -573,6 +768,40 @@ fn synchronize_debris_to_physics(world: &mut PhysicsWorld, debris: &DebrisState)
     if motion.linear_velocity != debris.velocity || motion.angular_velocity != debris.omega {
         let _ = world.set_velocity(body, debris.velocity, debris.omega, true);
     }
+}
+
+/// Carry free dynamic rover motion between successive poses of its scripted
+/// kinematic planet. Rapier still resolves suspension, traction, contacts, and
+/// gravity; this supplies the non-physical frame acceleration implied by the
+/// legacy orbital path so the rover is not left behind by its moving terrain.
+fn transport_rover_with_planet(
+    world: &mut PhysicsWorld,
+    entry: &mut RoverPhysicsEntry,
+    planet: &PlanetState,
+    dt_seconds: f32,
+) {
+    if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+        entry.last_planet = *planet;
+        return;
+    }
+
+    let previous = entry.last_planet;
+    let angle_delta = planet.wrapper_angle - previous.wrapper_angle;
+    for body in entry.assembly.bodies() {
+        let Some(motion) = world.motion(body) else {
+            continue;
+        };
+        let next_position =
+            planet.position + (motion.position - previous.position).rotate_radians(angle_delta);
+        let frame_velocity = planet_surface_velocity(planet, next_position);
+        let relative_velocity =
+            motion.linear_velocity - planet_surface_velocity(&previous, motion.position);
+        let linear_velocity = frame_velocity + relative_velocity.rotate_radians(angle_delta);
+        let relative_angular_velocity = motion.angular_velocity - previous.wrapper_omega;
+        let angular_velocity = angle_delta / dt_seconds + relative_angular_velocity;
+        let _ = world.set_velocity(body, linear_velocity, angular_velocity, true);
+    }
+    entry.last_planet = *planet;
 }
 
 fn ship_collision_groups(ship: &ShipState, docked: bool) -> CollisionGroups {
@@ -872,6 +1101,11 @@ fn ship_entity(index: usize) -> PhysicsId {
     PhysicsId::new(SHIP_ENTITY_BASE + index as u64)
 }
 
+fn rover_entity(id: u64) -> PhysicsId {
+    debug_assert!(id < DEBRIS_ENTITY_BASE - ROVER_ENTITY_BASE);
+    PhysicsId::new(ROVER_ENTITY_BASE + id)
+}
+
 fn planet_index(entity: PhysicsId) -> Option<usize> {
     let value = entity.value();
     (PLANET_ENTITY_BASE..SHIP_ENTITY_BASE)
@@ -1017,7 +1251,16 @@ mod tests {
             1.0,
             engine_core::Color::WHITE,
         )];
-        let lifecycle = physics.reconcile(1, &mut ships, &mut debris, None, &[], &[false; 2]);
+        let lifecycle = physics.reconcile(PhysicsReconcileInput {
+            tick: 1,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun: None,
+            planets: &[],
+            rovers: &[],
+            docked_ships: &[false; 2],
+        });
         assert_eq!(lifecycle.added, 1);
         assert_eq!(physics.world.collider_count(), 4);
 

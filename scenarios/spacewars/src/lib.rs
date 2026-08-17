@@ -27,7 +27,10 @@ use engine_core::{
 use engine_gravity::{
     GravityBackend, GravityConfig, GravityId, GravityParticipant, GravitySolver, GravityStepMetrics,
 };
-use engine_rapier::world::PhysicsStepMetrics;
+use engine_rapier::{
+    rover::{RoverControl, RoverSnapshot},
+    world::PhysicsStepMetrics,
+};
 use physics::{MechanicalContact, MechanicalEntity};
 
 #[cfg(test)]
@@ -42,6 +45,7 @@ const PLANET_LAYER: i32 = -10;
 const SPACEPORT_LAYER: i32 = -5;
 const SPACEPORT_FEEDBACK_LAYER: i32 = -4;
 const PLANET_OWNERSHIP_LAYER: i32 = -3;
+const ROVER_LAYER: i32 = -2;
 const EXHAUST_LAYER: i32 = -1;
 const SHIP_LAYER: i32 = 0;
 const DEBRIS_LAYER: i32 = 1;
@@ -75,6 +79,10 @@ const FLAG_WIDTH_FACTOR: f32 = 0.45;
 const FLAG_STEM_FACTOR: f32 = 0.7;
 const FLAG_RADIUS_DIVISOR: f32 = 15.0;
 const OVERVIEW_OWNERSHIP_STROKE_WIDTH: f32 = 2.25;
+const ROVER_MIN_PLANET_RADIUS: f32 = 45.0;
+const ROVER_PATROL_SPEED: f32 = 6.0;
+const ROVER_PATROL_SPEED_ERROR_SCALE: f32 = 3.0;
+const ROVER_OVERVIEW_RADIUS: f32 = 4.0;
 const PLANET_CAPTURE_SECS: f32 = 4.0;
 const PLANET_CAPTURE_DECAY_RATE: f32 = 0.5;
 const POD_REBUILD_SECS: f32 = 8.0;
@@ -157,6 +165,9 @@ const GRAVITY_BODY_TAG: u64 = 1;
 const GRAVITY_SHIP_TAG: u64 = 2;
 const GRAVITY_DEBRIS_TAG: u64 = 3;
 const GRAVITY_PARTICLE_TAG: u64 = 4;
+const GRAVITY_ROVER_TAG: u64 = 5;
+const GRAVITY_ROVER_FRAME_TAG: u64 = 6;
+const ROVER_BODY_COUNT: u64 = 3;
 
 pub const SPACEWARS_PLAYER_COUNT: usize = 2;
 
@@ -251,6 +262,7 @@ pub struct SpacewarsState {
     pub debris: Vec<DebrisState>,
     pub sun: Option<SunState>,
     pub planets: Vec<PlanetState>,
+    pub rovers: Vec<RoverState>,
     pub starfield: Option<StarFieldState>,
     pub particles: Vec<ParticleState>,
     pub laser_hits: Vec<LaserHit>,
@@ -328,6 +340,41 @@ pub struct PlanetState {
     pub orbit_omega: f32,
     pub wrapper_angle: f32,
     pub wrapper_omega: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoverState {
+    pub id: u64,
+    pub planet: usize,
+    pub owner_id: usize,
+    pub deployed_tick: u64,
+    pub intent: RoverIntent,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct RoverIntent {
+    pub throttle: f32,
+    pub brake: bool,
+}
+
+impl RoverIntent {
+    fn control(self) -> RoverControl {
+        RoverControl {
+            throttle: self.throttle,
+            brake: self.brake,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RoverObservation {
+    pub id: u64,
+    pub planet: usize,
+    pub owner_id: usize,
+    pub chassis_position: Vec2,
+    pub surface_relative_speed: f32,
+    pub grounded_wheels: u8,
+    pub suspension_lengths: [f32; 2],
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -884,6 +931,7 @@ impl Scenario for SpacewarsScenario {
             debris: Vec::new(),
             sun,
             planets,
+            rovers: Vec::new(),
             starfield,
             particles: Vec::new(),
             laser_hits: Vec::new(),
@@ -919,6 +967,8 @@ impl Scenario for SpacewarsScenario {
             }
         }
         update_spaceports(state, dt);
+        reconcile_rover_deployments(state);
+        update_rover_patrol(state);
 
         let universe_radius = state.config.universe_radius as f32;
         for ship in &mut state.ships {
@@ -931,7 +981,7 @@ impl Scenario for SpacewarsScenario {
         handle_ship_deaths(state);
 
         let lifecycle_started = Instant::now();
-        let lifecycle = reconcile_physics(state);
+        let lifecycle = reconcile_physics(state, dt);
         let lifecycle_time = lifecycle_started.elapsed();
 
         let gravity_started = Instant::now();
@@ -1106,6 +1156,25 @@ impl SpacewarsScenario {
                 counts
             },
         )
+    }
+
+    pub fn observe_rover(state: &SpacewarsState, rover_id: u64) -> Option<RoverObservation> {
+        let rover = state.rovers.iter().find(|rover| rover.id == rover_id)?;
+        let planet = state.planets.get(rover.planet)?;
+        let snapshot = state.physics.rover_snapshot(rover)?;
+        let radial = (snapshot.chassis.position - planet.position).normalized();
+        let tangent = radial.rotate_radians(core::f32::consts::FRAC_PI_2);
+        let surface_velocity = planet_surface_velocity(planet, snapshot.chassis.position);
+        Some(RoverObservation {
+            id: rover.id,
+            planet: rover.planet,
+            owner_id: rover.owner_id,
+            chassis_position: snapshot.chassis.position,
+            surface_relative_speed: (snapshot.chassis.linear_velocity - surface_velocity)
+                .dot(tangent),
+            grounded_wheels: u8::try_from(snapshot.grounded_wheel_count()).unwrap_or(u8::MAX),
+            suspension_lengths: snapshot.suspension_lengths,
+        })
     }
 
     pub fn render_player_frames(state: &SpacewarsState) -> Vec<RenderFrame> {
@@ -1768,6 +1837,7 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
         debris,
         sun,
         planets,
+        rovers,
         particles,
         physics,
         gravity_solver,
@@ -1797,6 +1867,30 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
             1.0,
         )
     }));
+    for rover in rovers {
+        let Some(motions) = physics.rover_body_motions(rover) else {
+            continue;
+        };
+        for (body_index, motion) in motions.into_iter().enumerate() {
+            gravity_participants.push(GravityParticipant::target(
+                tagged_gravity_id(
+                    GRAVITY_ROVER_TAG,
+                    rover_gravity_payload(rover.id, body_index),
+                ),
+                motion.position,
+                1.0,
+            ));
+        }
+        // The host planet follows a scripted kinematic orbit and therefore
+        // does not receive gravity. Measure its common external acceleration
+        // at the center (the coincident host source is ignored) so rover bodies
+        // retain local/tidal gravity without being pulled out of that frame.
+        gravity_participants.push(GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_ROVER_FRAME_TAG, rover.id),
+            planets[rover.planet].position,
+            1.0,
+        ));
+    }
 
     let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
     gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
@@ -1831,11 +1925,18 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
             },
         )
         .expect("Spacewars mechanics produce valid gravity participants");
+    let rover_frame_deltas = outputs
+        .iter()
+        .filter_map(|output| {
+            let (tag, rover_id) = split_gravity_id(output.id);
+            (tag == GRAVITY_ROVER_FRAME_TAG).then_some((rover_id, output.velocity_delta))
+        })
+        .collect::<BTreeMap<_, _>>();
     for output in outputs {
-        if output.velocity_delta == Vec2::ZERO {
+        let (tag, payload) = split_gravity_id(output.id);
+        if output.velocity_delta == Vec2::ZERO && tag != GRAVITY_ROVER_TAG {
             continue;
         }
-        let (tag, payload) = split_gravity_id(output.id);
         match tag {
             GRAVITY_SHIP_TAG => {
                 let index = usize::try_from(payload).expect("ship gravity id fits usize");
@@ -1854,11 +1955,34 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
                 let index = usize::try_from(payload).expect("particle gravity id fits usize");
                 particles[index].velocity += output.velocity_delta;
             }
-            GRAVITY_BODY_TAG => {}
+            GRAVITY_ROVER_TAG => {
+                let (rover_id, body_index) = split_rover_gravity_payload(payload);
+                let frame_delta = rover_frame_deltas
+                    .get(&rover_id)
+                    .copied()
+                    .unwrap_or(Vec2::ZERO);
+                assert!(physics.apply_rover_velocity_delta(
+                    rover_id,
+                    body_index,
+                    output.velocity_delta - frame_delta,
+                ));
+            }
+            GRAVITY_BODY_TAG | GRAVITY_ROVER_FRAME_TAG => {}
             _ => unreachable!("gravity ids use known Spacewars tags"),
         }
     }
     gravity_solver.metrics()
+}
+
+fn rover_gravity_payload(rover_id: u64, body_index: usize) -> u64 {
+    rover_id * ROVER_BODY_COUNT + body_index as u64
+}
+
+fn split_rover_gravity_payload(payload: u64) -> (u64, usize) {
+    (
+        payload / ROVER_BODY_COUNT,
+        (payload % ROVER_BODY_COUNT) as usize,
+    )
 }
 
 fn tagged_gravity_id(tag: u64, payload: u64) -> GravityId {
@@ -1874,7 +1998,7 @@ fn split_gravity_id(id: GravityId) -> (u64, u64) {
     )
 }
 
-fn reconcile_physics(state: &mut SpacewarsState) -> physics::PhysicsLifecycle {
+fn reconcile_physics(state: &mut SpacewarsState, dt_seconds: f32) -> physics::PhysicsLifecycle {
     let mut docked_ships = [false; 2];
     for contact in &state.spaceport_contacts {
         if let Some(docked) = docked_ships.get_mut(contact.ship) {
@@ -1882,14 +2006,16 @@ fn reconcile_physics(state: &mut SpacewarsState) -> physics::PhysicsLifecycle {
         }
     }
 
-    state.physics.reconcile(
-        state.tick,
-        &mut state.ships,
-        &mut state.debris,
-        state.sun,
-        &state.planets,
-        &docked_ships,
-    )
+    state.physics.reconcile(physics::PhysicsReconcileInput {
+        tick: state.tick,
+        dt_seconds,
+        ships: &mut state.ships,
+        debris: &mut state.debris,
+        sun: state.sun,
+        planets: &state.planets,
+        rovers: &state.rovers,
+        docked_ships: &docked_ships,
+    })
 }
 
 fn resolve_physics_spaceport_contacts(
@@ -3412,6 +3538,80 @@ fn refresh_player_planet_counts(state: &mut SpacewarsState) {
     }
 }
 
+fn reconcile_rover_deployments(state: &mut SpacewarsState) {
+    state.rovers.retain(|rover| {
+        state
+            .planets
+            .get(rover.planet)
+            .map(|planet| {
+                planet.radius >= ROVER_MIN_PLANET_RADIUS && planet.owner_id == Some(rover.owner_id)
+            })
+            .unwrap_or(false)
+    });
+
+    let mut deployed_planets = state
+        .rovers
+        .iter()
+        .map(|rover| rover.planet)
+        .collect::<BTreeSet<_>>();
+    for (planet_index, planet) in state.planets.iter().enumerate() {
+        let Some(owner_id) = planet.owner_id.filter(|owner| *owner < state.players.len()) else {
+            continue;
+        };
+        if planet.radius < ROVER_MIN_PLANET_RADIUS || !deployed_planets.insert(planet_index) {
+            continue;
+        }
+        state.rovers.push(RoverState {
+            id: planet_index as u64,
+            planet: planet_index,
+            owner_id,
+            deployed_tick: state.tick,
+            intent: RoverIntent::default(),
+        });
+    }
+    state.rovers.sort_unstable_by_key(|rover| rover.id);
+}
+
+fn update_rover_patrol(state: &mut SpacewarsState) {
+    let intents = state
+        .rovers
+        .iter()
+        .map(|rover| {
+            SpacewarsScenario::observe_rover(state, rover.id)
+                .map(rover_patrol_intent)
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>();
+    for (rover, intent) in state.rovers.iter_mut().zip(intents) {
+        rover.intent = intent;
+    }
+}
+
+fn rover_patrol_intent(observation: RoverObservation) -> RoverIntent {
+    if observation.grounded_wheels == 0 {
+        return RoverIntent::default();
+    }
+
+    let direction = if observation.owner_id.is_multiple_of(2) {
+        1.0
+    } else {
+        -1.0
+    };
+    let directed_speed = observation.surface_relative_speed * direction;
+    if directed_speed > ROVER_PATROL_SPEED + 1.0 {
+        return RoverIntent {
+            throttle: 0.0,
+            brake: true,
+        };
+    }
+    RoverIntent {
+        throttle: direction
+            * ((ROVER_PATROL_SPEED - directed_speed) / ROVER_PATROL_SPEED_ERROR_SCALE)
+                .clamp(0.0, 1.0),
+        brake: false,
+    }
+}
+
 fn collision_normal(ship_position: Vec2, body_position: Vec2) -> Vec2 {
     let offset = ship_position - body_position;
     if offset.length() == 0.0 {
@@ -3648,6 +3848,16 @@ impl PlanetState {
         self.wrapper_angle += self.wrapper_omega * dt;
         self.position = sun_position + Vec2::from_radians(self.orbit_angle) * self.orbit_radius;
     }
+}
+
+fn planet_surface_velocity(planet: &PlanetState, world_position: Vec2) -> Vec2 {
+    let orbit_offset = Vec2::from_radians(planet.orbit_angle) * planet.orbit_radius;
+    let orbit_velocity =
+        orbit_offset.rotate_radians(core::f32::consts::FRAC_PI_2) * planet.orbit_omega;
+    let surface_offset = world_position - planet.position;
+    let spin_velocity =
+        surface_offset.rotate_radians(core::f32::consts::FRAC_PI_2) * planet.wrapper_omega;
+    orbit_velocity + spin_velocity
 }
 
 impl DebrisState {
@@ -4581,6 +4791,23 @@ fn render_state_with_camera(
         render_planet_flags(&mut frame, state, planet);
     }
 
+    for rover in &state.rovers {
+        let Some(snapshot) = state.physics.rover_snapshot(rover) else {
+            continue;
+        };
+        let color = state
+            .players
+            .get(rover.owner_id)
+            .map(|player| render_color(player.color))
+            .unwrap_or(RenderColor::WHITE);
+        match options.rover_style {
+            RoverRenderStyle::Full => render_rover(&mut frame, snapshot, color),
+            RoverRenderStyle::SimpleMark => {
+                render_rover_mark(&mut frame, snapshot.chassis.position, color)
+            }
+        }
+    }
+
     if options.show_exhaust {
         for ship in &state.ships {
             render_exhaust(&mut frame, ship);
@@ -4627,6 +4854,7 @@ struct RenderOptions {
     show_particles: bool,
     show_planet_ownership_halo: bool,
     debris_style: DebrisRenderStyle,
+    rover_style: RoverRenderStyle,
     player_view: Option<(usize, f32)>,
 }
 
@@ -4639,6 +4867,7 @@ impl RenderOptions {
             show_particles: true,
             show_planet_ownership_halo: false,
             debris_style: DebrisRenderStyle::Full,
+            rover_style: RoverRenderStyle::Full,
             player_view: None,
         }
     }
@@ -4651,6 +4880,7 @@ impl RenderOptions {
             show_particles: false,
             show_planet_ownership_halo: true,
             debris_style: DebrisRenderStyle::SimpleMarks,
+            rover_style: RoverRenderStyle::SimpleMark,
             player_view: Some((player, player_view_aspect_ratio)),
         }
     }
@@ -4663,6 +4893,7 @@ impl RenderOptions {
             show_particles: true,
             show_planet_ownership_halo: false,
             debris_style: DebrisRenderStyle::Full,
+            rover_style: RoverRenderStyle::Full,
             player_view: None,
         }
     }
@@ -4675,6 +4906,7 @@ impl RenderOptions {
             show_particles: false,
             show_planet_ownership_halo: true,
             debris_style: DebrisRenderStyle::SimpleMarks,
+            rover_style: RoverRenderStyle::SimpleMark,
             player_view: Some((player, player_view_aspect_ratio)),
         }
     }
@@ -4684,6 +4916,12 @@ impl RenderOptions {
 enum DebrisRenderStyle {
     Full,
     SimpleMarks,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum RoverRenderStyle {
+    Full,
+    SimpleMark,
 }
 
 fn render_player_view_rectangle(
@@ -5166,6 +5404,69 @@ fn blend_color(from: RenderColor, to: RenderColor, t: f32) -> RenderColor {
     )
 }
 
+fn render_rover(frame: &mut RenderFrame, rover: RoverSnapshot, owner_color: RenderColor) {
+    let spec = physics::spacewars_rover_spec();
+    let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.95);
+    let suspension_color = with_alpha(owner_color, 0.9);
+    for index in 0..2 {
+        let wheel = rover.wheels[index];
+        frame.push_primitive(
+            ROVER_LAYER,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(rover.suspension_anchors[index]),
+                render_point(wheel.position),
+                Stroke::new(suspension_color, 0.3),
+            )),
+        );
+        frame.push_primitive(
+            ROVER_LAYER,
+            RenderPrimitive::Circle(RenderCircle {
+                center: render_point(wheel.position),
+                radius: spec.wheel_radius,
+                fill: Some(Fill::new(dim(owner_color, 0.22))),
+                stroke: Some(Stroke::new(owner_color, 0.24)),
+            }),
+        );
+        let spoke = Vec2::from_radians(wheel.angle) * (spec.wheel_radius * 0.75);
+        frame.push_primitive(
+            ROVER_LAYER,
+            RenderPrimitive::Line(engine_common::RenderLine::new(
+                render_point(wheel.position - spoke),
+                render_point(wheel.position + spoke),
+                Stroke::new(owner_color, 0.18),
+            )),
+        );
+    }
+
+    let chassis_points = [
+        Vec2::new(-spec.chassis_half_width, -spec.chassis_half_height),
+        Vec2::new(spec.chassis_half_width, -spec.chassis_half_height),
+        Vec2::new(spec.chassis_half_width, spec.chassis_half_height),
+        Vec2::new(-spec.chassis_half_width, spec.chassis_half_height),
+    ]
+    .map(|point| rover.chassis.position + point.rotate_radians(rover.chassis.angle));
+    frame.push_primitive(
+        ROVER_LAYER,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: chassis_points.map(render_point).to_vec(),
+            fill: Some(Fill::new(owner_color)),
+            stroke: Some(Stroke::new(outline, 0.35)),
+        }),
+    );
+}
+
+fn render_rover_mark(frame: &mut RenderFrame, position: Vec2, owner_color: RenderColor) {
+    frame.push_primitive(
+        ROVER_LAYER,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(position),
+            radius: ROVER_OVERVIEW_RADIUS,
+            fill: Some(Fill::new(owner_color)),
+            stroke: Some(Stroke::new(RenderColor::WHITE, 0.75)),
+        }),
+    );
+}
+
 fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
     if ship.form == ShipForm::EscapePod {
         render_escape_pod(frame, ship);
@@ -5411,6 +5712,26 @@ mod tests {
 
     fn init_default(seed: u64) -> SpacewarsState {
         SpacewarsScenario::init(SpacewarsConfig::default(), seed)
+    }
+
+    fn init_rover_world(seed: u64) -> SpacewarsState {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            use_starfield: false,
+            ..SpacewarsConfig::default()
+        };
+        SpacewarsScenario::init(config, seed)
+    }
+
+    fn largest_rover_planet(state: &SpacewarsState) -> usize {
+        state
+            .planets
+            .iter()
+            .enumerate()
+            .filter(|(_, planet)| planet.radius >= ROVER_MIN_PLANET_RADIUS)
+            .max_by(|(_, left), (_, right)| left.radius.total_cmp(&right.radius))
+            .map(|(index, _)| index)
+            .expect("default world should contain a rover-sized planet")
     }
 
     fn step(state: &mut SpacewarsState, actions: &[Action]) -> StepResult {
@@ -7963,7 +8284,7 @@ mod tests {
         let head_offset = desired_head - ship_mount_center(&state.ships[0]);
         state.ships[0].position += head_offset;
         let direction = state.ships[0].direction;
-        reconcile_physics(&mut state);
+        reconcile_physics(&mut state, 1.0 / 60.0);
         state.physics.step(1.0 / 60.0);
 
         state.apply_action(SpacewarsAction::SetLaser {
@@ -9168,5 +9489,218 @@ mod tests {
 
         assert_eq!(state.last_step_metrics.added, 1);
         assert_eq!(state.last_step_metrics.removed, 1);
+    }
+
+    #[test]
+    fn owned_planet_deploys_rover_into_canonical_physics_and_gravity() {
+        let mut state = init_rover_world(123);
+        let planet = largest_rover_planet(&state);
+        let baseline_bodies = state.physics.body_count();
+
+        step(&mut state, &[]);
+        let baseline_gravity_targets = state.last_step_metrics.gravity.target_count;
+        assert!(state.rovers.is_empty());
+
+        state.planets[planet].owner_id = Some(0);
+        step(&mut state, &[]);
+
+        assert_eq!(state.rovers.len(), 1);
+        assert_eq!(
+            state.rovers[0],
+            RoverState {
+                id: planet as u64,
+                planet,
+                owner_id: 0,
+                deployed_tick: 1,
+                intent: RoverIntent::default(),
+            }
+        );
+        assert!(SpacewarsScenario::observe_rover(&state, planet as u64).is_some());
+        assert_eq!(state.physics.body_count(), baseline_bodies + 3);
+        assert_eq!(
+            state.last_step_metrics.gravity.target_count,
+            baseline_gravity_targets + 4
+        );
+    }
+
+    #[test]
+    fn planets_below_rover_size_threshold_do_not_deploy_one() {
+        let mut state = init_rover_world(123);
+        let planet = largest_rover_planet(&state);
+        state.planets[planet].radius = ROVER_MIN_PLANET_RADIUS - 0.01;
+        state.planets[planet].mass = body_mass(state.planets[planet].radius);
+        state.planets[planet].owner_id = Some(0);
+
+        step(&mut state, &[]);
+
+        assert!(state.rovers.is_empty());
+    }
+
+    #[test]
+    fn rover_is_replaced_on_capture_and_removed_when_planet_becomes_unowned() {
+        let mut state = init_rover_world(123);
+        let planet = largest_rover_planet(&state);
+        let baseline_bodies = state.physics.body_count();
+        state.planets[planet].owner_id = Some(0);
+        step(&mut state, &[]);
+        assert_eq!(state.physics.body_count(), baseline_bodies + 3);
+
+        state.planets[planet].owner_id = Some(1);
+        step(&mut state, &[]);
+
+        assert_eq!(state.rovers.len(), 1);
+        assert_eq!(state.rovers[0].id, planet as u64);
+        assert_eq!(state.rovers[0].owner_id, 1);
+        assert_eq!(state.rovers[0].deployed_tick, 1);
+        assert_eq!(state.physics.body_count(), baseline_bodies + 3);
+        assert!(SpacewarsScenario::observe_rover(&state, planet as u64).is_some());
+
+        state.planets[planet].owner_id = None;
+        step(&mut state, &[]);
+
+        assert!(state.rovers.is_empty());
+        assert!(SpacewarsScenario::observe_rover(&state, planet as u64).is_none());
+        assert_eq!(state.physics.body_count(), baseline_bodies);
+    }
+
+    #[test]
+    fn rover_patrol_stays_attached_to_moving_spinning_planet() {
+        let mut state = init_rover_world(123);
+        let planet_index = largest_rover_planet(&state);
+        state.planets[planet_index].owner_id = Some(0);
+        step(&mut state, &[]);
+
+        let start_planet = state.planets[planet_index];
+        let start = SpacewarsScenario::observe_rover(&state, planet_index as u64)
+            .expect("deployed rover should be observable");
+        let start_offset = start.chassis_position - start_planet.position;
+        let mut previous_surface_angle =
+            start_offset.y.atan2(start_offset.x) - start_planet.wrapper_angle;
+        let mut accumulated_surface_travel = 0.0_f32;
+        let mut grounded_ticks = 0;
+        let mut controlled_ticks = 0;
+        let mut minimum_radial_distance = f32::INFINITY;
+        let mut maximum_radial_distance = 0.0_f32;
+
+        for _ in 0..600 {
+            step(&mut state, &[]);
+            let planet = state.planets[planet_index];
+            let observation = SpacewarsScenario::observe_rover(&state, planet_index as u64)
+                .expect("active rover should remain observable");
+            let radial_distance = observation.chassis_position.distance_to(planet.position);
+            minimum_radial_distance = minimum_radial_distance.min(radial_distance);
+            maximum_radial_distance = maximum_radial_distance.max(radial_distance);
+            grounded_ticks += usize::from(observation.grounded_wheels > 0);
+            controlled_ticks += usize::from(
+                state.rovers[0].intent.throttle.abs() > 0.01 || state.rovers[0].intent.brake,
+            );
+            let offset = observation.chassis_position - planet.position;
+            let surface_angle = offset.y.atan2(offset.x) - planet.wrapper_angle;
+            let angle_delta = (surface_angle - previous_surface_angle + core::f32::consts::PI)
+                .rem_euclid(core::f32::consts::TAU)
+                - core::f32::consts::PI;
+            accumulated_surface_travel += angle_delta.abs();
+            previous_surface_angle = surface_angle;
+        }
+
+        let end_planet = state.planets[planet_index];
+        let surface_radius = end_planet.radius * BODY_BOUNDS_RADIUS_SCALE;
+
+        assert!(
+            minimum_radial_distance > surface_radius - 3.0,
+            "rover sank below planet surface: minimum {minimum_radial_distance}, surface {surface_radius}"
+        );
+        assert!(
+            maximum_radial_distance < surface_radius + 15.0,
+            "rover drifted away from planet: maximum {maximum_radial_distance}, surface {surface_radius}"
+        );
+        assert!(grounded_ticks > 500, "rover should remain grounded");
+        assert!(
+            controlled_ticks > 500,
+            "patrol should keep driving or braking the rover"
+        );
+        assert!(
+            accumulated_surface_travel > 0.05,
+            "patrol should travel around the planet surface"
+        );
+    }
+
+    #[test]
+    fn rover_deployment_and_patrol_replay_bit_for_bit() {
+        let mut first = init_rover_world(123);
+        let mut replay = init_rover_world(123);
+        let planet = largest_rover_planet(&first);
+        first.planets[planet].owner_id = Some(0);
+        replay.planets[planet].owner_id = Some(0);
+
+        for _ in 0..180 {
+            step(&mut first, &[]);
+            step(&mut replay, &[]);
+
+            assert_eq!(first.rovers, replay.rovers);
+            assert_eq!(
+                SpacewarsScenario::observe_rover(&first, planet as u64),
+                SpacewarsScenario::observe_rover(&replay, planet as u64)
+            );
+            assert_eq!(
+                first.physics.snapshot_bytes(),
+                replay.physics.snapshot_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn rover_has_detailed_player_rendering_and_simplified_overview_mark() {
+        let mut state = init_rover_world(123);
+        let planet = largest_rover_planet(&state);
+        state.planets[planet].owner_id = Some(0);
+        step(&mut state, &[]);
+        let owner_color = render_color(state.players[0].color);
+
+        let player_frame = SpacewarsScenario::render_frame(&state);
+        let rover_layer = player_frame
+            .layers
+            .iter()
+            .find(|layer| layer.z == ROVER_LAYER)
+            .expect("player view should render the rover");
+        assert_eq!(rover_layer.primitives.len(), 7);
+        assert_eq!(
+            rover_layer
+                .primitives
+                .iter()
+                .filter(|primitive| matches!(primitive, RenderPrimitive::Circle(_)))
+                .count(),
+            2
+        );
+        assert_eq!(
+            rover_layer
+                .primitives
+                .iter()
+                .filter(|primitive| matches!(primitive, RenderPrimitive::Line(_)))
+                .count(),
+            4
+        );
+        assert_eq!(
+            rover_layer
+                .primitives
+                .iter()
+                .filter(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+                .count(),
+            1
+        );
+
+        let overview = render_overview_state(&state, 0, 0.75);
+        let overview_layer = overview
+            .layers
+            .iter()
+            .find(|layer| layer.z == ROVER_LAYER)
+            .expect("overview should retain a rover mark");
+        assert_eq!(overview_layer.primitives.len(), 1);
+        let RenderPrimitive::Circle(mark) = &overview_layer.primitives[0] else {
+            panic!("overview rover should be a simple circular mark");
+        };
+        assert_eq!(mark.radius, ROVER_OVERVIEW_RADIUS);
+        assert_eq!(mark.fill, Some(Fill::new(owner_color)));
+        assert_eq!(mark.stroke, Some(Stroke::new(RenderColor::WHITE, 0.75)));
     }
 }
