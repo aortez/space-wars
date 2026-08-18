@@ -4,6 +4,7 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-client",
     "crates/spacewars-cli",
@@ -49,6 +50,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }

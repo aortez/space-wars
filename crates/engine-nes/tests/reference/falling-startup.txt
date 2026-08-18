@@ -1,0 +1,36 @@
+schema=engine-nes-falling-startup-v1
+dirtsim_commit=0db5f847e7c059b807eb982702ba26fe9f004bf9
+falling_sha256=e22b947542c2d7e595bf84725b333be7af8189c5965b9c53e356a249c7d79943
+
+# DirtSim/SmolNES instruction-entry trace. P omits the hardware-unused high bit.
+000 pc=c006 op=78 a=00 x=00 y=00 p=04 s=fd scanline=0 dot=0
+001 pc=c007 op=d8 a=00 x=00 y=00 p=04 s=fd scanline=0 dot=6
+002 pc=c008 op=a2 a=00 x=00 y=00 p=04 s=fd scanline=0 dot=12
+003 pc=c00a op=8e a=00 x=40 y=00 p=04 s=fd scanline=0 dot=18
+004 pc=c00d op=a2 a=00 x=40 y=00 p=04 s=fd scanline=0 dot=30
+005 pc=c00f op=9a a=00 x=ff y=00 p=84 s=fd scanline=0 dot=36
+006 pc=c010 op=e8 a=00 x=ff y=00 p=84 s=ff scanline=0 dot=42
+007 pc=c011 op=8e a=00 x=00 y=00 p=06 s=ff scanline=0 dot=48
+008 pc=c014 op=8e a=00 x=00 y=00 p=06 s=ff scanline=0 dot=60
+009 pc=c017 op=8e a=00 x=00 y=00 p=06 s=ff scanline=0 dot=72
+010 pc=c01a op=20 a=00 x=00 y=00 p=06 s=ff scanline=0 dot=84
+011 pc=c000 op=2c a=00 x=00 y=00 p=06 s=fd scanline=0 dot=102
+012 pc=c003 op=10 a=00 x=00 y=00 p=06 s=fd scanline=0 dot=114
+
+# engine-nes instruction-entry trace after its seven-cycle reset. P includes bit 5.
+000 pc=c006 op=78 a=00 x=00 y=00 p=24 s=fd cpu_cycle=7 instruction_cycles=2
+001 pc=c007 op=d8 a=00 x=00 y=00 p=24 s=fd cpu_cycle=9 instruction_cycles=2
+002 pc=c008 op=a2 a=00 x=00 y=00 p=24 s=fd cpu_cycle=11 instruction_cycles=2
+003 pc=c00a op=8e a=00 x=40 y=00 p=24 s=fd cpu_cycle=13 instruction_cycles=4
+004 pc=c00d op=a2 a=00 x=40 y=00 p=24 s=fd cpu_cycle=17 instruction_cycles=2
+005 pc=c00f op=9a a=00 x=ff y=00 p=a4 s=fd cpu_cycle=19 instruction_cycles=2
+006 pc=c010 op=e8 a=00 x=ff y=00 p=a4 s=ff cpu_cycle=21 instruction_cycles=2
+007 pc=c011 op=8e a=00 x=00 y=00 p=26 s=ff cpu_cycle=23 instruction_cycles=4
+008 pc=c014 op=8e a=00 x=00 y=00 p=26 s=ff cpu_cycle=27 instruction_cycles=4
+009 pc=c017 op=8e a=00 x=00 y=00 p=26 s=ff cpu_cycle=31 instruction_cycles=4
+010 pc=c01a op=20 a=00 x=00 y=00 p=26 s=ff cpu_cycle=35 instruction_cycles=6
+011 pc=c000 op=2c a=00 x=00 y=00 p=26 s=fd cpu_cycle=41 instruction_cycles=4
+012 pc=c003 op=10 a=00 x=00 y=00 p=26 s=fd cpu_cycle=45 instruction_cycles=3
+
+result=instruction_pc_opcode_registers_match_after_masking_status_bit_5
+boundary=next_instruction_repeats_c000_because_ppu_status_vblank_is_not_implemented

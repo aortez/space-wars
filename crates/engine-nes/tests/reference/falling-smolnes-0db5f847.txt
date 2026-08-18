@@ -1,0 +1,27 @@
+schema=engine-nes-dirtsim-reference-v1
+captured=2026-08-17
+host=oldman-fish
+kernel=Linux 7.0.0-29-generic x86_64
+cpu=AMD Ryzen 7 9800X3D 8-Core Processor
+compiler=gcc 15.2.0
+dirtsim_commit=0db5f847e7c059b807eb982702ba26fe9f004bf9
+falling_commit=52dcb8a951200562e696dfc2aba5d4d14edd0078
+falling_sha256=e22b947542c2d7e595bf84725b333be7af8189c5965b9c53e356a249c7d79943
+
+snapshot label=idle_1 frame=1 rgb565_fnv=045b5aaabee52325 palette_fnv=969672350183a325 cpu_ram_fnv=500439ad0370f0e9 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=97c865ed10bb2f60 savestate_fnv=ff5ad2f80de15df8 controller=00 controller_seq=0 controller_frame=0
+snapshot label=idle_2 frame=2 rgb565_fnv=045b5aaabee52325 palette_fnv=969672350183a325 cpu_ram_fnv=12c55fb6df640fdb prg_ram_fnv=b9d103fd6854a325 ppu_fnv=9b5a238bc365648b savestate_fnv=a31120ebbb8ce462 controller=00 controller_seq=0 controller_frame=0
+snapshot label=idle_10 frame=10 rgb565_fnv=646bfccbf4453707 palette_fnv=20e2803bc22ca325 cpu_ram_fnv=674f00a202a8611c prg_ram_fnv=b9d103fd6854a325 ppu_fnv=acfd6b8739f8a229 savestate_fnv=d0259ec13925fc17 controller=00 controller_seq=0 controller_frame=0
+snapshot label=idle_100 frame=100 rgb565_fnv=d8360161663bc504 palette_fnv=648ff85ce90f7cd5 cpu_ram_fnv=b1370214b1b527f1 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=cb2e86d60388494b savestate_fnv=f989377fd9b778e5 controller=00 controller_seq=0 controller_frame=0
+snapshot label=script_idle_100 frame=100 rgb565_fnv=d8360161663bc504 palette_fnv=648ff85ce90f7cd5 cpu_ram_fnv=b1370214b1b527f1 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=cb2e86d60388494b savestate_fnv=f989377fd9b778e5 controller=00 controller_seq=0 controller_frame=0
+snapshot label=script_start_down_101 frame=101 rgb565_fnv=d8360161663bc504 palette_fnv=648ff85ce90f7cd5 cpu_ram_fnv=b636391cd2124c67 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=c6a32e07bd0f608b savestate_fnv=f9da68c2f6e9c204 controller=08 controller_seq=1 controller_frame=101
+snapshot label=script_start_up_130 frame=130 rgb565_fnv=0c274a1b9a64cb71 palette_fnv=e1c780ba7a0d7cab cpu_ram_fnv=03b0cda729c1e286 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=a091db2ccb932857 savestate_fnv=4fe3eb86960fb2b3 controller=00 controller_seq=2 controller_frame=102
+snapshot label=script_right_150 frame=150 rgb565_fnv=acad6c5dcefbac4e palette_fnv=d47e4b5c60309604 cpu_ram_fnv=9d516fad82d90dc9 prg_ram_fnv=b9d103fd6854a325 ppu_fnv=a98d2b1b5ba0c4fb savestate_fnv=8877d1c420fe4520 controller=80 controller_seq=3 controller_frame=131
+snapshot label=script_release_170 frame=170 rgb565_fnv=21a653b6527de4dc palette_fnv=6b1183fadfe31ce0 cpu_ram_fnv=ad03cc59ece34bfe prg_ram_fnv=b9d103fd6854a325 ppu_fnv=433cfea05c78835b savestate_fnv=c19e8756be57e7f0 controller=00 controller_seq=4 controller_frame=151
+
+# Two back-to-back release-mode trials; 100 warmup + 1000 measured frames each.
+trial=1 benchmark label=full frames=1000 elapsed_ms=369.866 fps=2703.683 apu=1 pixels=1 rgb565=1
+trial=1 benchmark label=palette_no_apu frames=1000 elapsed_ms=365.561 fps=2735.532 apu=0 pixels=1 rgb565=0
+trial=1 benchmark label=headless_no_apu frames=1000 elapsed_ms=365.910 fps=2732.916 apu=0 pixels=0 rgb565=0
+trial=2 benchmark label=full frames=1000 elapsed_ms=363.602 fps=2750.258 apu=1 pixels=1 rgb565=1
+trial=2 benchmark label=palette_no_apu frames=1000 elapsed_ms=364.353 fps=2744.596 apu=0 pixels=1 rgb565=0
+trial=2 benchmark label=headless_no_apu frames=1000 elapsed_ms=364.415 fps=2744.127 apu=0 pixels=0 rgb565=0

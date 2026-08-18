@@ -1,6 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: planned. Tracking issue:
+Status: M22a/M22b implemented; M22c (PPU and first Falling frames) is next.
+Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
 ## Decision
@@ -155,6 +156,7 @@ pub struct MachineConfig {
     pub ram_init: RamInit,
     pub video: VideoOutput,
     pub audio: AudioOutput,
+    pub oam_dma_alignment: OamDmaAlignment,
 }
 
 pub struct FrameResult<'a> {
@@ -285,6 +287,10 @@ enabled without allocating or formatting strings in the hot path.
 
 OAM DMA is scheduler state, not a helper that copies 256 bytes instantaneously.
 Its 513/514 CPU-cycle behavior and interaction with CPU phase are tested.
+Real hardware can power on in either CPU/APU alignment, so the deterministic
+machine configuration explicitly selects which scheduler-slot parity takes
+the shorter path. DMC DMA will later share this cadence rather than inventing
+a second parity model.
 
 ### Master scheduler
 
