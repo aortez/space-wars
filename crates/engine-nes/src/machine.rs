@@ -1,6 +1,6 @@
 use crate::{
     BusAccess, BusAccessKind, Cartridge, CartridgeError, CartridgeImage, Cpu, CpuBus,
-    InstructionTrace, MachineConfig, MachineError, NesBus, OamDmaAlignment,
+    InstructionTrace, MachineConfig, MachineError, NesBus, OamDmaAlignment, Ppu,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,8 +57,8 @@ impl OamDma {
     }
 }
 
-/// CPU-stage NES composition. PPU/APU scheduling will extend this owner rather
-/// than introduce a parallel execution path.
+/// Deterministic NES composition. Each CPU-rate scheduler slot also advances
+/// the PPU by three clocks; DMA uses the same path while the CPU is suspended.
 #[derive(Clone, Debug)]
 pub struct NesMachine {
     cpu: Cpu,
@@ -73,7 +73,7 @@ impl NesMachine {
         let cartridge = Cartridge::new(image);
         Self {
             cpu: Cpu::new(),
-            bus: NesBus::new(cartridge, config.ram_init),
+            bus: NesBus::new(cartridge, config.ram_init, config.video),
             config,
             cpu_slots: 0,
             oam_dma: None,
@@ -102,6 +102,14 @@ impl NesMachine {
 
     pub fn bus_mut(&mut self) -> &mut NesBus {
         &mut self.bus
+    }
+
+    pub fn ppu(&self) -> &Ppu {
+        self.bus.ppu()
+    }
+
+    pub fn ppu_mut(&mut self) -> &mut Ppu {
+        self.bus.ppu_mut()
     }
 
     pub fn cpu_slots(&self) -> u64 {
@@ -140,6 +148,11 @@ impl NesMachine {
                 instruction_completed: cpu_cycle.instruction_completed,
             }
         };
+        let dma_completed = cycle.source == MachineCycleSource::OamDma && self.oam_dma.is_none();
+        self.clock_ppu_for_cpu_slot();
+        if dma_completed {
+            self.cpu.poll_nmi_after_stall();
+        }
         self.cpu_slots = self.cpu_slots.wrapping_add(1);
         Ok(cycle)
     }
@@ -161,6 +174,7 @@ impl NesMachine {
 
         loop {
             let cycle = self.cpu.clock(&mut self.bus)?;
+            self.clock_ppu_for_cpu_slot();
             self.cpu_slots = self.cpu_slots.wrapping_add(1);
             trace = trace.or(cycle.instruction_started);
             if cycle.instruction_completed {
@@ -249,6 +263,20 @@ impl NesMachine {
             instruction_completed: false,
         }
     }
+
+    fn clock_ppu_for_cpu_slot(&mut self) {
+        self.forward_ppu_nmi();
+        for _ in 0..3 {
+            self.bus.clock_ppu();
+            self.forward_ppu_nmi();
+        }
+    }
+
+    fn forward_ppu_nmi(&mut self) {
+        if self.bus.take_ppu_nmi() {
+            self.cpu.signal_nmi_edge();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -299,7 +327,7 @@ mod tests {
         assert_eq!(cycles[2].access.kind, BusAccessKind::DmaWrite);
         assert_eq!(cycles.last().unwrap().access.kind, BusAccessKind::DmaWrite);
         assert_eq!(
-            short.bus().oam_placeholder().as_slice(),
+            short.ppu().oam().as_slice(),
             &(0..=u8::MAX).collect::<Vec<_>>()
         );
 
@@ -327,13 +355,31 @@ mod tests {
         assert!(machine.oam_dma_active());
         let cycles = drain_dma(&mut machine);
         assert!(matches!(cycles.len(), 513 | 514));
-        assert!(
-            machine
-                .bus()
-                .oam_placeholder()
-                .iter()
-                .all(|value| *value == 0x22)
-        );
+        assert!(machine.ppu().oam().iter().all(|value| *value == 0x22));
+    }
+
+    #[test]
+    fn nmi_edge_during_oam_dma_is_serviced_before_the_next_opcode() {
+        let mut rom = NromBuilder::new_32k();
+        rom.write(0x8000, &[0xea, 0x4c, 0x00, 0x80]); // NOP; JMP $8000
+        rom.write(0x9000, &[0x40]); // RTI
+        rom.set_vectors(0x9000, 0x8000, 0x8000);
+        let mut machine = NesMachine::from_ines(&rom.build(), MachineConfig::default()).unwrap();
+        machine.step_instruction().unwrap(); // reset
+        request_page_two(&mut machine);
+        assert_eq!(machine.clock().unwrap().source, MachineCycleSource::OamDma);
+        machine.cpu.signal_nmi_edge();
+        drain_dma(&mut machine);
+
+        let first_after_dma = machine.clock().unwrap();
+        assert_eq!(first_after_dma.source, MachineCycleSource::Cpu);
+        assert_eq!(first_after_dma.access.kind, BusAccessKind::DummyRead);
+        assert_eq!(first_after_dma.access.address, 0x8000);
+        assert!(first_after_dma.instruction_started.is_none());
+        while !machine.cpu.at_instruction_boundary() {
+            machine.clock().unwrap();
+        }
+        assert_eq!(machine.cpu.registers().program_counter, 0x9000);
     }
 
     #[test]

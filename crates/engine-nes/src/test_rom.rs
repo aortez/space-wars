@@ -61,6 +61,17 @@ impl NromBuilder {
         self.prg[offset..end].copy_from_slice(bytes);
     }
 
+    pub fn write_chr(&mut self, ppu_address: u16, bytes: &[u8]) {
+        let chr = self
+            .chr
+            .as_mut()
+            .expect("CHR writes require a ROM-backed test cartridge");
+        let offset = usize::from(ppu_address);
+        let end = offset.checked_add(bytes.len()).expect("CHR write overflow");
+        assert!(end <= chr.len(), "CHR write exceeds pattern-table storage");
+        chr[offset..end].copy_from_slice(bytes);
+    }
+
     pub fn set_vectors(&mut self, nmi: u16, reset: u16, irq: u16) {
         self.write(0xfffa, &nmi.to_le_bytes());
         self.write(0xfffc, &reset.to_le_bytes());
@@ -103,5 +114,14 @@ mod tests {
         let image = builder.build();
         let prg = &image[HEADER_LEN..HEADER_LEN + PRG_BANK_LEN];
         assert_eq!(&prg[0x3ffa..0x4000], &[0x23, 0x81, 0x56, 0x84, 0x89, 0x87]);
+    }
+
+    #[test]
+    fn writes_chr_fixture_bytes() {
+        let mut builder = NromBuilder::new_16k();
+        builder.write_chr(0x123, &[0xa5, 0x5a]);
+        let image = builder.build();
+        let chr_start = HEADER_LEN + PRG_BANK_LEN;
+        assert_eq!(&image[chr_start + 0x123..chr_start + 0x125], &[0xa5, 0x5a]);
     }
 }

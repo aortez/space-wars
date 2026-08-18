@@ -29,6 +29,87 @@ static double monotonicMs(void)
     return (double)now.tv_sec * 1000.0 + (double)now.tv_nsec / 1000000.0;
 }
 
+static bool writeSnapshotArtifacts(
+    const char* label,
+    const uint8_t* rgb565,
+    const uint8_t* palette,
+    const uint8_t* cpuRam,
+    const uint8_t* prgRam)
+{
+    const char* directory = getenv("ENGINE_NES_REFERENCE_DUMP_DIR");
+    if (directory == NULL || directory[0] == '\0') {
+        return true;
+    }
+
+    char path[1024];
+    int length = snprintf(path, sizeof(path), "%s/%s.palette", directory, label);
+    if (length < 0 || (size_t)length >= sizeof(path)) {
+        return false;
+    }
+    FILE* output = fopen(path, "wb");
+    if (output == NULL) {
+        return false;
+    }
+    bool ok = fwrite(palette, 1, SMOLNES_RUNTIME_PALETTE_FRAME_BYTES, output)
+        == SMOLNES_RUNTIME_PALETTE_FRAME_BYTES;
+    ok = fclose(output) == 0 && ok;
+
+    length = snprintf(path, sizeof(path), "%s/%s.cpu-ram", directory, label);
+    if (length < 0 || (size_t)length >= sizeof(path)) {
+        return false;
+    }
+    output = fopen(path, "wb");
+    if (output == NULL) {
+        return false;
+    }
+    ok = fwrite(cpuRam, 1, SMOLNES_RUNTIME_CPU_RAM_BYTES, output)
+            == SMOLNES_RUNTIME_CPU_RAM_BYTES
+        && ok;
+    ok = fclose(output) == 0 && ok;
+
+    length = snprintf(path, sizeof(path), "%s/%s.prg-ram", directory, label);
+    if (length < 0 || (size_t)length >= sizeof(path)) {
+        return false;
+    }
+    output = fopen(path, "wb");
+    if (output == NULL) {
+        return false;
+    }
+    ok = fwrite(prgRam, 1, SMOLNES_RUNTIME_PRG_RAM_BYTES, output)
+            == SMOLNES_RUNTIME_PRG_RAM_BYTES
+        && ok;
+    ok = fclose(output) == 0 && ok;
+
+    length = snprintf(path, sizeof(path), "%s/%s.ppm", directory, label);
+    if (length < 0 || (size_t)length >= sizeof(path)) {
+        return false;
+    }
+    output = fopen(path, "wb");
+    if (output == NULL) {
+        return false;
+    }
+    ok = fprintf(
+             output,
+             "P6\n%u %u\n255\n",
+             SMOLNES_RUNTIME_FRAME_WIDTH,
+             SMOLNES_RUNTIME_FRAME_HEIGHT)
+        > 0
+        && ok;
+    for (size_t pixel = 0;
+         pixel < SMOLNES_RUNTIME_FRAME_WIDTH * SMOLNES_RUNTIME_FRAME_HEIGHT && ok;
+         ++pixel) {
+        const uint16_t color = (uint16_t)rgb565[pixel * 2]
+            | (uint16_t)rgb565[pixel * 2 + 1] << 8;
+        const uint8_t expanded[3] = {
+            (uint8_t)((((color >> 11) & 31u) * 255u + 15u) / 31u),
+            (uint8_t)((((color >> 5) & 63u) * 255u + 31u) / 63u),
+            (uint8_t)(((color & 31u) * 255u + 15u) / 31u),
+        };
+        ok = fwrite(expanded, 1, sizeof(expanded), output) == sizeof(expanded);
+    }
+    return fclose(output) == 0 && ok;
+}
+
 static bool printSnapshot(SmolnesRuntimeHandle* runtime, const char* label)
 {
     uint8_t frame[SMOLNES_RUNTIME_FRAME_BYTES];
@@ -56,7 +137,8 @@ static bool printSnapshot(SmolnesRuntimeHandle* runtime, const char* label)
         || !smolnesRuntimeCopyPpuSnapshot(runtime, &ppu)
         || !smolnesRuntimeCopyControllerSnapshot(runtime, &controller)
         || !smolnesRuntimeCopySavestate(
-            runtime, savestate, savestateSize, &savestateFrameId)) {
+            runtime, savestate, savestateSize, &savestateFrameId)
+        || !writeSnapshotArtifacts(label, frame, palette, cpuRam, prgRam)) {
         free(savestate);
         return false;
     }

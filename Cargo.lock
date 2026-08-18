@@ -1405,6 +1405,7 @@ dependencies = [
 name = "engine-nes"
 version = "0.1.0"
 dependencies = [
+ "png 0.17.16",
  "stats_alloc",
 ]
 

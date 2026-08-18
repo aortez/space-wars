@@ -160,6 +160,7 @@ pub struct Cpu {
     state: CpuState,
     cycles: u64,
     nmi_pending: bool,
+    nmi_edge_pending: bool,
     irq_line: bool,
     irq_pending: bool,
 }
@@ -186,6 +187,7 @@ impl Cpu {
             },
             cycles: 0,
             nmi_pending: false,
+            nmi_edge_pending: false,
             irq_line: false,
             irq_pending: false,
         }
@@ -203,6 +205,7 @@ impl Cpu {
             state: CpuState::Fetch,
             cycles: 0,
             nmi_pending: false,
+            nmi_edge_pending: false,
             irq_line: false,
             irq_pending: false,
         }
@@ -229,6 +232,21 @@ impl Cpu {
         self.nmi_pending = true;
     }
 
+    /// Latches a hardware NMI edge for recognition at the CPU's next
+    /// interrupt-poll point. Unlike [`request_nmi`](Self::request_nmi), an
+    /// edge arriving after an instruction's poll does not preempt the next
+    /// opcode; that instruction runs before the NMI sequence begins.
+    pub(crate) fn signal_nmi_edge(&mut self) {
+        self.nmi_edge_pending = true;
+    }
+
+    /// Promotes an edge observed while an external scheduler held the CPU at
+    /// an instruction boundary, such as an OAM DMA stall.
+    pub(crate) fn poll_nmi_after_stall(&mut self) {
+        debug_assert!(self.at_instruction_boundary());
+        self.poll_nmi_edge();
+    }
+
     pub fn set_irq_line(&mut self, asserted: bool) {
         self.irq_line = asserted;
         if asserted
@@ -241,6 +259,7 @@ impl Cpu {
 
     pub fn restart_reset_sequence(&mut self) {
         self.nmi_pending = false;
+        self.nmi_edge_pending = false;
         self.irq_pending = false;
         self.state = CpuState::Reset {
             step: 0,
@@ -386,6 +405,7 @@ impl Cpu {
                 let (hi, access) = Self::read(bus, 0xfffd, BusAccessKind::Read);
                 self.registers.program_counter = u16::from_le_bytes([vector_lo, hi]);
                 self.registers.status.set(Status::INTERRUPT_DISABLE, true);
+                self.poll_nmi_edge();
                 self.state = CpuState::Fetch;
                 (access, true)
             }
@@ -486,8 +506,11 @@ impl Cpu {
         // its final-cycle poll. Branches poll before the offset fetch and, for
         // a page crossing, again before the high-byte fixup.
         let regular_poll = completed && !operation.is_branch() && operation != Operation::Brk;
-        if (branch_poll || regular_poll) && self.irq_line && !interrupt_disable_before_cycle {
-            self.irq_pending = true;
+        if branch_poll || regular_poll {
+            self.poll_nmi_edge();
+            if self.irq_line && !interrupt_disable_before_cycle {
+                self.irq_pending = true;
+            }
         }
 
         self.state = if completed {
@@ -496,6 +519,13 @@ impl Cpu {
             CpuState::Execute(execution)
         };
         (access, completed)
+    }
+
+    fn poll_nmi_edge(&mut self) {
+        if self.nmi_edge_pending {
+            self.nmi_edge_pending = false;
+            self.nmi_pending = true;
+        }
     }
 
     fn clock_read_instruction<B: CpuBus>(

@@ -1,4 +1,4 @@
-use crate::{Cartridge, ControllerButtons, ControllerPort, RamInit};
+use crate::{Cartridge, ControllerButtons, ControllerPort, Ppu, PpuCycle, RamInit, VideoOutput};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BusAccessKind {
@@ -24,17 +24,15 @@ pub trait CpuBus {
     fn write(&mut self, address: u16, value: u8);
 }
 
-/// CPU-visible NES address space for the mapper-0 CPU slice.
+/// CPU-visible NES address space for a mapper-0 machine.
 ///
-/// PPU and APU registers are intentionally placeholders in this slice: they
-/// retain bus-visible values and expose integration seams but do not yet clock
-/// those devices. Controller strobing and NROM mapping are functional.
+/// The bus owns the PPU because CPU register accesses and PPU cartridge reads
+/// must observe one mutable machine state. The machine scheduler remains
+/// responsible for advancing it three dots per CPU-rate slot.
 #[derive(Clone, Debug)]
 pub struct NesBus {
     ram: Box<[u8; 0x800]>,
-    ppu_registers: [u8; 8],
-    oam: Box<[u8; 0x100]>,
-    oam_address: u8,
+    ppu: Ppu,
     apu_io_registers: [u8; 0x18],
     controllers: [ControllerPort; 2],
     cartridge: Cartridge,
@@ -43,16 +41,14 @@ pub struct NesBus {
 }
 
 impl NesBus {
-    pub fn new(cartridge: Cartridge, ram_init: RamInit) -> Self {
+    pub fn new(cartridge: Cartridge, ram_init: RamInit, video_output: VideoOutput) -> Self {
         let ram_value = match ram_init {
             RamInit::Zero => 0,
             RamInit::Pattern(value) => value,
         };
         Self {
             ram: Box::new([ram_value; 0x800]),
-            ppu_registers: [0; 8],
-            oam: Box::new([0; 0x100]),
-            oam_address: 0,
+            ppu: Ppu::new(video_output),
             apu_io_registers: [0; 0x18],
             controllers: [ControllerPort::default(); 2],
             cartridge,
@@ -91,19 +87,33 @@ impl NesBus {
         self.controllers.get(port)
     }
 
-    pub fn set_ppu_register_placeholder(&mut self, register: usize, value: u8) {
-        if let Some(slot) = self.ppu_registers.get_mut(register) {
-            *slot = value;
-        }
+    pub fn ppu(&self) -> &Ppu {
+        &self.ppu
     }
 
-    pub fn oam_placeholder(&self) -> &[u8; 0x100] {
-        &self.oam
+    pub fn ppu_mut(&mut self) -> &mut Ppu {
+        &mut self.ppu
     }
 
     pub(crate) fn write_oam_dma(&mut self, value: u8) {
-        self.write_oam_data(value);
+        self.ppu.write_oam_dma(value);
         self.open_bus = value;
+    }
+
+    pub(crate) fn clock_ppu(&mut self) -> PpuCycle {
+        self.ppu.clock(&self.cartridge)
+    }
+
+    pub(crate) fn take_ppu_nmi(&mut self) -> bool {
+        self.ppu.take_nmi_pending()
+    }
+
+    pub fn ppu_memory_peek(&self, address: u16) -> u8 {
+        self.ppu.memory_peek(&self.cartridge, address)
+    }
+
+    pub fn ppu_memory_write(&mut self, address: u16, value: u8) {
+        self.ppu.memory_write(&mut self.cartridge, address, value);
     }
 
     pub fn take_oam_dma_request(&mut self) -> Option<u8> {
@@ -118,14 +128,9 @@ impl NesBus {
     pub fn peek(&self, address: u16) -> u8 {
         match address {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)],
-            0x2000..=0x3fff => {
-                let register = usize::from(address & 7);
-                if register == 4 {
-                    self.oam[usize::from(self.oam_address)]
-                } else {
-                    self.ppu_registers[register]
-                }
-            }
+            0x2000..=0x3fff => self
+                .ppu
+                .peek_cpu_register(usize::from(address & 7), &self.cartridge),
             0x4000..=0x4015 => self.apu_io_registers[usize::from(address - 0x4000)],
             0x4016 => (self.open_bus & 0xe0) | self.controllers[0].peek_serial(),
             0x4017 => (self.open_bus & 0xe0) | self.controllers[1].peek_serial(),
@@ -139,14 +144,9 @@ impl CpuBus for NesBus {
     fn read(&mut self, address: u16) -> u8 {
         let value = match address {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)],
-            0x2000..=0x3fff => {
-                let register = usize::from(address & 7);
-                if register == 4 {
-                    self.oam[usize::from(self.oam_address)]
-                } else {
-                    self.ppu_registers[register]
-                }
-            }
+            0x2000..=0x3fff => self
+                .ppu
+                .cpu_read_register(usize::from(address & 7), &self.cartridge),
             0x4000..=0x4015 => self.apu_io_registers[usize::from(address - 0x4000)],
             0x4016 => (self.open_bus & 0xe0) | self.controllers[0].read_serial(),
             0x4017 => (self.open_bus & 0xe0) | self.controllers[1].read_serial(),
@@ -161,14 +161,10 @@ impl CpuBus for NesBus {
         self.open_bus = value;
         match address {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)] = value,
-            0x2000..=0x3fff => match usize::from(address & 7) {
-                3 => {
-                    self.ppu_registers[3] = value;
-                    self.oam_address = value;
-                }
-                4 => self.write_oam_data(value),
-                register => self.ppu_registers[register] = value,
-            },
+            0x2000..=0x3fff => {
+                self.ppu
+                    .cpu_write_register(usize::from(address & 7), value, &mut self.cartridge)
+            }
             0x4000..=0x4013 | 0x4015 | 0x4017 => {
                 self.apu_io_registers[usize::from(address - 0x4000)] = value;
             }
@@ -189,14 +185,6 @@ impl CpuBus for NesBus {
     }
 }
 
-impl NesBus {
-    fn write_oam_data(&mut self, value: u8) {
-        self.oam[usize::from(self.oam_address)] = value;
-        self.ppu_registers[4] = value;
-        self.oam_address = self.oam_address.wrapping_add(1);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,18 +192,20 @@ mod tests {
 
     fn bus() -> NesBus {
         let image = CartridgeImage::parse(&NromBuilder::new_16k().build()).unwrap();
-        NesBus::new(Cartridge::new(image), RamInit::Zero)
+        NesBus::new(Cartridge::new(image), RamInit::Zero, VideoOutput::Enabled)
     }
 
     #[test]
-    fn mirrors_internal_ram_and_ppu_register_placeholders() {
+    fn mirrors_internal_ram_and_ppu_registers() {
         let mut bus = bus();
         bus.write(0x0003, 0x45);
         assert_eq!(bus.read(0x0803), 0x45);
         assert_eq!(bus.read(0x1803), 0x45);
 
-        bus.write(0x2002, 0x80);
-        assert_eq!(bus.read(0x3ffa), 0x80);
+        bus.write(0x2003, 0xfe);
+        bus.write(0x2004, 0x80);
+        bus.write(0x2003, 0xfe);
+        assert_eq!(bus.read(0x3ffc), 0x80);
     }
 
     #[test]
@@ -240,13 +230,13 @@ mod tests {
     }
 
     #[test]
-    fn oam_register_placeholder_preserves_addressed_write_behavior() {
+    fn oam_register_preserves_addressed_write_behavior() {
         let mut bus = bus();
         bus.write(0x2003, 0xfe);
         bus.write(0x2004, 0x12);
         bus.write(0x2004, 0x34);
-        assert_eq!(bus.oam_placeholder()[0xfe], 0x12);
-        assert_eq!(bus.oam_placeholder()[0xff], 0x34);
+        assert_eq!(bus.ppu().oam()[0xfe], 0x12);
+        assert_eq!(bus.ppu().oam()[0xff], 0x34);
         assert_eq!(bus.read(0x2004), 0);
     }
 }

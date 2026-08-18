@@ -1,6 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: M22a/M22b implemented; M22c (PPU and first Falling frames) is next.
+Status: M22a-M22c implemented; M22d (deterministic frame/state contract) is
+next.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -930,6 +931,16 @@ Exit criteria:
   stable; expected differences from DirtSim are documented.
 - A human can inspect a generated frame without `engine-client`.
 - PPU stepping is deterministic and allocation-free.
+
+Implemented evidence (2026-08-17): Falling boots to recognizable title and
+gameplay frames; four sampled 256 x 224 palette crops plus physical CPU/PRG RAM
+match the pinned DirtSim runtime byte-for-byte. Generated tests cover PPU
+memory/registers, rendering, sprites, scrolling, NMI, odd-frame timing, and OAM
+DMA. Optional external runs pass 10/10 vblank/NMI and 11/11 sprite-zero-hit
+ROMs. The scalar renderer runs Falling at about 1,378 frames/s on the reference
+desktop and allocates nothing during steady-state scheduling. Exact commands,
+hashes, and the deliberately deferred advanced sprite-overflow quirks are in
+`crates/engine-nes/REFERENCE.md`.
 
 ### M22d: Deterministic frame/state contract
 

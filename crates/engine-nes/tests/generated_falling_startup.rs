@@ -56,7 +56,7 @@ fn generated_rom_preserves_the_pinned_falling_cpu_startup_boundary() {
         assert_eq!(step.cycles, cycles);
     }
 
-    // The CPU is now back at the vblank wait helper. M22c's PPU will make the
-    // status read progress; this slice intentionally leaves it low.
+    // The CPU is now back at the vblank wait helper. The integrated PPU will
+    // eventually raise status bit 7 and let subsequent execution progress.
     assert_eq!(machine.cpu().registers().program_counter, 0xc000);
 }

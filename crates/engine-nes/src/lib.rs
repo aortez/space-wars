@@ -13,6 +13,7 @@ mod controller;
 mod cpu;
 mod error;
 mod machine;
+mod ppu;
 pub mod test_rom;
 
 pub use bus::{BusAccess, BusAccessKind, CpuBus, NesBus};
@@ -22,3 +23,7 @@ pub use controller::{ControllerButtons, ControllerPort};
 pub use cpu::{Cpu, CpuCycle, CpuRegisters, InstructionTrace, Status};
 pub use error::{CartridgeError, CpuError, MachineError};
 pub use machine::{InstructionStep, MachineCycle, MachineCycleSource, NesMachine};
+pub use ppu::{
+    FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NES_PALETTE_RGB565, Ppu, PpuCycle, PpuRegisters,
+    PpuTiming, rgb565_to_rgb888, write_rgb888,
+};

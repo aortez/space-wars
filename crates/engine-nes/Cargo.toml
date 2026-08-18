@@ -10,6 +10,7 @@ description = "Deterministic, platform-independent NES emulation core"
 [dependencies]
 
 [dev-dependencies]
+png.workspace = true
 stats_alloc = "0.1.10"
 
 [[example]]
@@ -23,3 +24,15 @@ path = "examples/cpu_trace.rs"
 [[example]]
 name = "cpu_nestest"
 path = "examples/cpu_nestest.rs"
+
+[[example]]
+name = "frame_dump"
+path = "examples/frame_dump.rs"
+
+[[example]]
+name = "ppu_benchmark"
+path = "examples/ppu_benchmark.rs"
+
+[[example]]
+name = "ppu_conformance"
+path = "examples/ppu_conformance.rs"
