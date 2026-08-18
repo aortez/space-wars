@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::world::{
     BodyId, BodyKind, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
-    ContactPoint, JointId, JointRole, PhysicsId, PhysicsWorld,
+    CollisionGroups, ContactPoint, JointId, JointRole, PhysicsId, PhysicsWorld,
 };
 
 const PLANET_BODY_ROLE: BodyRole = BodyRole::new(10);
@@ -73,6 +73,7 @@ pub struct RoverSpec {
     pub wheel_target_speed: f32,
     pub wheel_motor_torque: f32,
     pub wheel_brake_torque: f32,
+    pub collision_groups: CollisionGroups,
 }
 
 impl Default for RoverSpec {
@@ -92,6 +93,7 @@ impl Default for RoverSpec {
             wheel_target_speed: 7.0,
             wheel_motor_torque: 80.0,
             wheel_brake_torque: 100.0,
+            collision_groups: CollisionGroups::ALL,
         }
     }
 }
@@ -291,6 +293,8 @@ impl RoverAssembly {
         chassis_shape.density = 1.0;
         chassis_shape.friction = 0.7;
         chassis_shape.restitution = 0.0;
+        chassis_shape.collision_groups = spec.collision_groups;
+        chassis_shape.solver_groups = spec.collision_groups;
         if !physics.insert_body(
             chassis,
             BodySpec {
@@ -331,6 +335,8 @@ impl RoverAssembly {
             wheel_shape.density = 0.8;
             wheel_shape.friction = 1.6;
             wheel_shape.restitution = 0.0;
+            wheel_shape.collision_groups = spec.collision_groups;
+            wheel_shape.solver_groups = spec.collision_groups;
             if !physics.insert_body(
                 wheels[index],
                 BodySpec {
