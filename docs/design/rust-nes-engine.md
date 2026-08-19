@@ -1,7 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: M22a-M22f implemented; M22g (realtime pacing, low-latency handoffs,
-and audio-device output) is next.
+Status: M22a-M22g implemented; M22h cross-target/performance validation is
+next.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -1051,14 +1051,12 @@ intermediate canvas.
 
 Scenario factories are now genuinely fallible. Launcher startup errors remain
 visible, and restart construction completes before replacement so a failed
-restart retains the usable prior instance. `EmulatorClock` uses a nominal NTSC
-elapsed-time accumulator with bounded catch-up instead of treating each 16 ms
-Slint callback as one hardware frame; the UI thread never sleeps for an
-emulator deadline. M22g deliberately moves that pacing into the exact-rational
-worker and adds bounded input/video/audio handoffs. Client tests cover native
-conversion, controller ownership, clock accumulation, pause/restart/launcher/
-relaunch, and failed replacement while the existing vector/raster suite remains
-unchanged.
+restart retains the usable prior instance. M22f's temporary nominal NTSC
+elapsed-time accumulator kept the UI thread from sleeping for emulator
+deadlines; M22g has now replaced it with the dedicated exact-rational worker.
+Client tests cover native conversion, controller ownership, pause/restart/
+launcher/relaunch, and failed replacement while the existing vector/raster
+suite remains unchanged.
 
 ### M22g: Realtime pacing, low-latency handoffs, and audio device
 
@@ -1082,6 +1080,32 @@ Exit criteria:
 - Audio has bounded observable depth and clean lifecycle behavior.
 - Input-to-frame software telemetry is complete and internally consistent.
 - Falling feels responsive and stable during desktop manual play.
+
+Implemented evidence (2026-08-18): `engine-client` now transfers ownership of
+the synchronous `FallingState` to a dedicated worker. It derives accumulated
+deadlines from each completed frame's exact PPU-clock count, catches up at most
+four frames before rebasing, samples only the newest sequence-stamped input,
+and neutralizes input at every lifecycle boundary. The old Slint-timer NES
+cadence has been removed.
+
+Video uses three fixed native-index slots, publishes only the newest complete
+generation, and permits at most one queued Slint callback. The UI callback
+copies without waiting, converts through the existing three RGB buffers, and
+records produced, coalesced, consumed, and submitted frame IDs. An intentional
+consumer stall test confirms bounded newest-frame behavior.
+
+CPAL 0.18.2 supplies the cross-platform 48 kHz output device. The emulator and
+device callback communicate through a safe fixed 4,096-sample atomic ring; the
+callback takes no locks and allocates nothing. Priming remains shallow and
+observable, full rings drop/count excess samples, underruns re-enter priming,
+and the existing master-volume/mute settings are applied without changing APU
+state. Pause, focus loss, restart, launcher return, and explicit shutdown all
+silence and flush audio. A missing device logs a recoverable warning and keeps
+Falling playable silently. Unit tests cover pacing fractions, bounded overload,
+latest input, wake coalescing, audio depth/overflow/underrun/mute/volume, and
+repeated lifecycle transitions. Desktop manual validation confirmed native
+presentation, a 48 kHz stereo callback, bounded queue depth, and live telemetry;
+release-mode and Pi measurements remain M22h work.
 
 ### M22h: Cross-target integration and performance validation
 

@@ -9,6 +9,8 @@ mod host;
 mod input;
 mod ipc;
 mod native_video;
+mod nes_audio;
+mod nes_realtime;
 mod raster;
 mod render;
 mod settings;
@@ -475,6 +477,9 @@ fn should_launch_directly(args: &Args) -> bool {
 }
 
 fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Settings) {
+    // Release any scenario-specific native-video presenter retained by the
+    // generated callback before exposing the launcher again.
+    window.on_native_video_ready(|| {});
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
     window.set_vector_minimaps_visible(false);
     window.set_raster_visible(false);

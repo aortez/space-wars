@@ -153,9 +153,7 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
     let keyboard_input = Rc::clone(&input);
     window.window().on_winit_window_event(move |_, event| {
         if matches!(event, WindowEvent::Focused(false)) {
-            let mut input = keyboard_input.borrow_mut();
-            input.cancel_pointer();
-            input.clear_keyboard();
+            keyboard_input.borrow_mut().handle_focus_loss();
             return EventResult::Propagate;
         }
 
@@ -324,6 +322,12 @@ impl ClientInput {
 
     fn clear_keyboard(&mut self) {
         self.pressed.borrow_mut().clear();
+    }
+
+    fn handle_focus_loss(&mut self) {
+        self.cancel_pointer();
+        self.clear_keyboard();
+        self.press(GameKey::ForcePause);
     }
 
     pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
@@ -732,6 +736,24 @@ mod tests {
 
         assert!(!input.pressed.borrow().contains(&GameKey::P1Thrust));
         assert!(input.has_pointer_cancellation());
+    }
+
+    #[test]
+    fn focus_loss_releases_controls_and_requests_a_host_pause() {
+        let mut input = ClientInput::default();
+        input.press(GameKey::NesA);
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(10.0, 20.0),
+            phase: PointerPhase::Press,
+        });
+        input.take_pointer_events();
+
+        input.handle_focus_loss();
+
+        assert_eq!(input.nes_controller_buttons(0), ControllerButtons::NONE);
+        assert!(input.has_pointer_cancellation());
+        assert!(input.take_force_pause_requested());
+        assert!(!input.take_force_pause_requested());
     }
 
     #[test]

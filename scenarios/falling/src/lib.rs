@@ -1,4 +1,4 @@
-//! A deterministic, silent host adapter for the bundled Falling NES game.
+//! A deterministic scenario adapter for the bundled Falling NES game.
 
 use std::fmt;
 use std::time::Duration;
@@ -9,8 +9,8 @@ use engine_common::{
 };
 use engine_nes::{
     AudioOutput, CartridgeError, CartridgeIdentity, CartridgeImage, ControllerButtons,
-    FRAME_HEIGHT, FRAME_WIDTH, FrameInput, MachineConfig, MachineError, NES_PALETTE_RGB565,
-    NesMachine, VideoOutput,
+    FRAME_HEIGHT, FRAME_WIDTH, FrameInput, FrameResult, MachineConfig, MachineError,
+    NES_PALETTE_RGB565, NesMachine, VideoOutput,
 };
 
 pub const FALLING_ROM: &[u8] = include_bytes!("../assets/falling.nes");
@@ -170,6 +170,26 @@ impl FallingState {
         }
     }
 
+    /// Advances one authoritative frame with a caller-owned input sequence.
+    /// Realtime and synchronous hosts therefore share the exact same machine
+    /// boundary; only the caller's pacing policy differs.
+    pub fn advance_frame(&mut self, input: FrameInput) -> Result<FrameResult<'_>, String> {
+        if let Some(error) = &self.runtime_error {
+            return Err(error.clone());
+        }
+
+        self.controller = input.controllers[0];
+        self.next_input_sequence = input.sequence_id.wrapping_add(1);
+        match self.machine.run_frame_with_input(input) {
+            Ok(result) => Ok(result),
+            Err(error) => {
+                let detail = error.to_string();
+                self.runtime_error = Some(detail.clone());
+                Err(detail)
+            }
+        }
+    }
+
     fn apply_actions(&mut self, actions: &[Action]) {
         for action in actions {
             if let Some(buttons) = FallingAction::decode(action) {
@@ -188,12 +208,9 @@ impl FallingState {
             controllers: [self.controller, ControllerButtons::NONE],
         };
         self.next_input_sequence = self.next_input_sequence.wrapping_add(1);
-        match self.machine.run_frame_with_input(input) {
+        match self.advance_frame(input) {
             Ok(_) => StepResult::default(),
-            Err(error) => {
-                self.runtime_error = Some(error.to_string());
-                StepResult { terminated: true }
-            }
+            Err(_) => StepResult { terminated: true },
         }
     }
 }
@@ -360,6 +377,23 @@ mod tests {
         assert_eq!(state.controller(), buttons);
         assert_eq!(state.machine().last_applied_input().controllers[0], buttons);
         assert_eq!(state.machine().last_applied_input().sequence_id, 1);
+    }
+
+    #[test]
+    fn realtime_callers_preserve_their_input_sequence_at_the_same_boundary() {
+        let mut state = FallingState::try_new(FallingConfig::default()).unwrap();
+        let input = FrameInput::new(
+            41,
+            [
+                ControllerButtons::LEFT | ControllerButtons::B,
+                ControllerButtons::NONE,
+            ],
+        );
+
+        let result = state.advance_frame(input).unwrap();
+        assert_eq!(result.input.sequence_id, 41);
+        assert_eq!(result.input.controllers, input.controllers);
+        assert_eq!(result.input.frame_id, result.frame_id);
     }
 
     #[test]

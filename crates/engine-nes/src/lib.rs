@@ -31,7 +31,10 @@ pub use cartridge::{
     CHR_MEMORY_BYTES, Cartridge, CartridgeIdentity, CartridgeImage, CartridgeMetadata, Mirroring,
     PRG_RAM_BYTES,
 };
-pub use config::{AudioOutput, MachineConfig, OamDmaAlignment, RamInit, Region, VideoOutput};
+pub use config::{
+    AudioOutput, MachineConfig, NTSC_MASTER_CLOCK_NUMERATOR_HZ, NTSC_PPU_CLOCK_DENOMINATOR,
+    OamDmaAlignment, RamInit, Region, VideoOutput,
+};
 pub use controller::{ControllerButtons, ControllerPort, ControllerSnapshot};
 pub use cpu::{Cpu, CpuCycle, CpuPhase, CpuRegisters, CpuSnapshot, InstructionTrace, Status};
 pub use error::{CartridgeError, CpuError, MachineError, StateError};

@@ -13,6 +13,7 @@ EXTRA_CARGO_FLAGS = "--locked --workspace --no-default-features --features engin
 EXTRA_RUSTFLAGS += "--remap-path-prefix=${WORKDIR}=${TARGET_DBGSRC_DIR}"
 
 DEPENDS += " \
+    alsa-lib \
     fontconfig \
     freetype \
     libdrm \
@@ -23,6 +24,7 @@ DEPENDS += " \
 "
 
 RDEPENDS:${PN} += " \
+    alsa-lib \
     fontconfig \
     libdrm \
     libinput \

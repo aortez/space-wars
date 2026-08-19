@@ -22,8 +22,8 @@ The local launcher currently hosts four playable scenarios:
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
-  Rust-native mapper-0 emulator. It currently presents silent, pixel-perfect
-  native video while realtime audio is the next NES milestone.
+  Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
+  realtime pacing, and bounded 48 kHz device audio.
 
 Textures and sounds for Spacewars have yet to be done. Pizza retains its
 Classic collision implementation as a benchmark reference. Mutual gravity is
@@ -40,8 +40,9 @@ A Rust-native NES engine is also under development. Its mapper-0 cartridge,
 cycle-oriented RP2A03 CPU, scalar 2C02 PPU, complete five-channel APU,
 deterministic 48 kHz sample/frame/state API, checkpoints, portable savestates,
 reference captures, and generated test tools live in `crates/engine-nes`.
-Falling now exercises that core through the ordinary launcher, input, pause,
-restart, and relaunch lifecycle. See
+Falling now exercises that core through a dedicated realtime worker, bounded
+input/video/audio handoffs, and the ordinary launcher, pause, restart, and
+relaunch lifecycle. See
 [`docs/design/rust-nes-engine.md`](docs/design/rust-nes-engine.md) and
 [`crates/engine-nes/REFERENCE.md`](crates/engine-nes/REFERENCE.md).
 

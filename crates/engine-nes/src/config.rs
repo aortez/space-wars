@@ -1,3 +1,8 @@
+/// NTSC color-clock numerator used by the RP2A03/2C02 timing ratios.
+pub const NTSC_MASTER_CLOCK_NUMERATOR_HZ: u64 = 236_250_000;
+/// The 2C02 PPU clock is the NTSC color source divided by 44.
+pub const NTSC_PPU_CLOCK_DENOMINATOR: u64 = 44;
+
 /// Emulated television timing standard.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Region {

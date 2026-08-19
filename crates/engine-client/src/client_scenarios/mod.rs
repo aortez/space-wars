@@ -1,13 +1,14 @@
 //! Object-safe scenario adapters and the client's compile-time registry.
 
 use std::fmt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use engine_common::{Action, NativeVideoFrame, RenderFrame, Settings, StepResult, TickModel};
 use engine_core::Color;
 use scenario_pizza::PizzaBenchmarkConfig;
 
 use crate::input::ClientInput;
+use crate::nes_realtime::{RealtimeTelemetry, RealtimeVideoConsumer};
 use crate::render::{FrameLayout, Viewport};
 
 mod falling;
@@ -16,8 +17,6 @@ mod pizza;
 mod rover_lab;
 mod spacewars;
 
-#[cfg(test)]
-pub(crate) use falling::FallingClientScenario;
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
 #[cfg(test)]
@@ -197,6 +196,26 @@ pub trait ClientScenario {
         None
     }
 
+    /// Returns the bounded presentation endpoint when this client adapter is
+    /// paced by a dedicated realtime worker instead of the Slint timer.
+    fn realtime_video_consumer(&self) -> Option<RealtimeVideoConsumer> {
+        None
+    }
+
+    /// Publishes one complete latest-state action snapshot. Realtime adapters
+    /// sample it at their next authoritative frame boundary.
+    fn publish_realtime_actions(&self, _actions: &[Action], _observed_at: Instant) {}
+
+    fn set_realtime_paused(&self, _paused: bool) {}
+
+    fn shutdown_realtime(&mut self) {}
+
+    fn record_realtime_displayed_loop_iteration(&self) {}
+
+    fn realtime_telemetry(&self) -> Option<RealtimeTelemetry> {
+        None
+    }
+
     fn set_viewport(&mut self, _viewport: Viewport) {}
 
     fn center_panel_state(
@@ -212,7 +231,7 @@ pub trait ClientScenario {
         false
     }
 
-    fn runtime_error(&self) -> Option<&str> {
+    fn runtime_error(&self) -> Option<String> {
         None
     }
 
@@ -258,8 +277,8 @@ pub enum ScenarioCreateError {
         name: &'static str,
         detail: String,
     },
-    // Silent Falling does not construct this yet; M22g's device-backed audio
-    // startup will use the already-stable launcher error surface.
+    // Reserved for a scenario that requires audio to start. Falling degrades
+    // to silent emulation when no default device is available.
     #[allow(dead_code)]
     AudioInitialization {
         name: &'static str,
