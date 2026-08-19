@@ -61,10 +61,17 @@ saved/default scenario should launch directly.
 The current Yocto service sets:
 
 ```sh
+ALSA_CARD=Audio
 SLINT_BACKEND=linuxkms-software
 SLINT_DRM_OUTPUT=DPI-1
 SLINT_KMS_ROTATION=90
 ```
+
+`ALSA_CARD=Audio` selects the kiosk's USB audio adapter by its stable ALSA card
+ID. Without it, ALSA selects the first HDMI interface even when no HDMI audio
+sink is connected; CPAL then cannot open the default stream and Falling
+continues silently. Confirm the expected card ID with `aplay -l` before using
+this unit on different hardware.
 
 The Yocto image is configured for the same Raspberry Pi 5 HyperPixel 4 KMS path
 used by DirtSim:
