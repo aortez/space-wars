@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use engine_common::{Action, PointerPhase, RenderPoint};
+use engine_nes::ControllerButtons;
 use scenario_spacewars::{
     ControlSource, ShipIntent, ShipIntentEncoder, SpacewarsAction, SpacewarsScenario,
     SpacewarsState,
@@ -116,6 +117,13 @@ pub(crate) enum GameKey {
     Back,
     Controls,
     ReturnLauncher,
+    NesUp,
+    NesDown,
+    NesLeft,
+    NesRight,
+    NesA,
+    NesSelect,
+    NesStart,
     P1Wing,
     P1Thrust,
     P1Brake,
@@ -145,9 +153,7 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
     let keyboard_input = Rc::clone(&input);
     window.window().on_winit_window_event(move |_, event| {
         if matches!(event, WindowEvent::Focused(false)) {
-            let mut input = keyboard_input.borrow_mut();
-            input.cancel_pointer();
-            input.clear_keyboard();
+            keyboard_input.borrow_mut().handle_focus_loss();
             return EventResult::Propagate;
         }
 
@@ -242,6 +248,68 @@ impl ClientInput {
         (throttle, brake, gamepad.south)
     }
 
+    pub(crate) fn nes_controller_buttons(&self, player: usize) -> ControllerButtons {
+        let mut buttons = ControllerButtons::NONE;
+        let pressed = self.pressed.borrow();
+        if player == 0 {
+            if pressed.contains(&GameKey::NesUp) {
+                buttons |= ControllerButtons::UP;
+            }
+            if pressed.contains(&GameKey::NesDown) {
+                buttons |= ControllerButtons::DOWN;
+            }
+            if pressed.contains(&GameKey::NesLeft) {
+                buttons |= ControllerButtons::LEFT;
+            }
+            if pressed.contains(&GameKey::NesRight) {
+                buttons |= ControllerButtons::RIGHT;
+            }
+            if pressed.contains(&GameKey::NesA) || pressed.contains(&GameKey::P1Laser) {
+                buttons |= ControllerButtons::A;
+            }
+            if pressed.contains(&GameKey::P1Reverse) {
+                buttons |= ControllerButtons::B;
+            }
+            if pressed.contains(&GameKey::NesSelect) {
+                buttons |= ControllerButtons::SELECT;
+            }
+            if pressed.contains(&GameKey::NesStart) {
+                buttons |= ControllerButtons::START;
+            }
+        }
+        drop(pressed);
+
+        let gamepads = self.gamepads.borrow();
+        let Some(gamepad) = gamepads.seat(player).filter(|gamepad| gamepad.connected) else {
+            return buttons;
+        };
+        if gamepad.dpad_up {
+            buttons |= ControllerButtons::UP;
+        }
+        if gamepad.dpad_down {
+            buttons |= ControllerButtons::DOWN;
+        }
+        if gamepad.dpad_left {
+            buttons |= ControllerButtons::LEFT;
+        }
+        if gamepad.dpad_right {
+            buttons |= ControllerButtons::RIGHT;
+        }
+        if gamepad.south {
+            buttons |= ControllerButtons::A;
+        }
+        if gamepad.east {
+            buttons |= ControllerButtons::B;
+        }
+        if gamepad.select {
+            buttons |= ControllerButtons::SELECT;
+        }
+        if gamepad.start {
+            buttons |= ControllerButtons::START;
+        }
+        buttons
+    }
+
     pub(crate) fn reset_spacewars_controls(&mut self) {
         self.spacewars_controls.reset();
     }
@@ -254,6 +322,12 @@ impl ClientInput {
 
     fn clear_keyboard(&mut self) {
         self.pressed.borrow_mut().clear();
+    }
+
+    fn handle_focus_loss(&mut self) {
+        self.cancel_pointer();
+        self.clear_keyboard();
+        self.press(GameKey::ForcePause);
     }
 
     pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
@@ -569,6 +643,13 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::Escape => Some(GameKey::Back),
         KeyCode::KeyC | KeyCode::F1 => Some(GameKey::Controls),
         KeyCode::KeyQ => Some(GameKey::ReturnLauncher),
+        KeyCode::ArrowUp => Some(GameKey::NesUp),
+        KeyCode::ArrowDown => Some(GameKey::NesDown),
+        KeyCode::ArrowLeft => Some(GameKey::NesLeft),
+        KeyCode::ArrowRight => Some(GameKey::NesRight),
+        KeyCode::KeyZ => Some(GameKey::NesA),
+        KeyCode::Tab => Some(GameKey::NesSelect),
+        KeyCode::Enter => Some(GameKey::NesStart),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
         KeyCode::KeyS => Some(GameKey::P1Brake),
@@ -658,6 +739,24 @@ mod tests {
     }
 
     #[test]
+    fn focus_loss_releases_controls_and_requests_a_host_pause() {
+        let mut input = ClientInput::default();
+        input.press(GameKey::NesA);
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(10.0, 20.0),
+            phase: PointerPhase::Press,
+        });
+        input.take_pointer_events();
+
+        input.handle_focus_loss();
+
+        assert_eq!(input.nes_controller_buttons(0), ControllerButtons::NONE);
+        assert!(input.has_pointer_cancellation());
+        assert!(input.take_force_pause_requested());
+        assert!(!input.take_force_pause_requested());
+    }
+
+    #[test]
     fn keyboard_source_emits_changed_full_scale_setpoints() {
         let mut input = ClientInput::default();
         input.press(GameKey::P1Wing);
@@ -728,6 +827,34 @@ mod tests {
             game_key_from_key_code(KeyCode::Numpad2),
             Some(GameKey::P2Reverse)
         );
+    }
+
+    #[test]
+    fn nes_input_combines_keyboard_and_the_assigned_gamepad() {
+        let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
+        gamepads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                dpad_right: true,
+                south: true,
+                start: true,
+                ..GamepadSeatInput::default()
+            },
+        );
+        let mut input = ClientInput::new(gamepads);
+        input.press(GameKey::NesLeft);
+        input.press(GameKey::P1Reverse);
+
+        assert_eq!(
+            input.nes_controller_buttons(0),
+            ControllerButtons::LEFT
+                | ControllerButtons::RIGHT
+                | ControllerButtons::A
+                | ControllerButtons::B
+                | ControllerButtons::START
+        );
+        assert_eq!(input.nes_controller_buttons(1), ControllerButtons::NONE);
     }
 
     #[test]

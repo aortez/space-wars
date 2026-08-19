@@ -61,10 +61,17 @@ saved/default scenario should launch directly.
 The current Yocto service sets:
 
 ```sh
+ALSA_CARD=Audio
 SLINT_BACKEND=linuxkms-software
 SLINT_DRM_OUTPUT=DPI-1
 SLINT_KMS_ROTATION=90
 ```
+
+`ALSA_CARD=Audio` selects the kiosk's USB audio adapter by its stable ALSA card
+ID. Without it, ALSA selects the first HDMI interface even when no HDMI audio
+sink is connected; CPAL then cannot open the default stream and Falling
+continues silently. Confirm the expected card ID with `aplay -l` before using
+this unit on different hardware.
 
 The Yocto image is configured for the same Raspberry Pi 5 HyperPixel 4 KMS path
 used by DirtSim:
@@ -111,11 +118,26 @@ backend. Normal UI startup should be tested separately because Slint backend
 selection, fullscreen behavior, and physical keyboard input are display-stack
 dependent.
 
+The Yocto image also installs the target-independent NES benchmark. It uses the
+bundled Falling ROM and does not need a window, input device, or audio device:
+
+```sh
+falling-benchmark 2000 120
+```
+
+It emits one full-video/audio row and one no-output row. Record both JSON lines;
+their state hashes must match, and the full row's `core_realtime_multiple` must
+be at least `4.0` for the initial NES milestone. `wall_realtime_multiple`
+includes output checksum validation, while tail cost is reported separately as
+`frame_ns_p95`, `frame_ns_p99`, and `frame_ns_max`.
+
 ## Manual Pi Validation
 
 1. Confirm the binary starts with `--help`.
 2. Confirm `/var/lib/spacewars` exists and is writable by the service user.
-3. Run the headless benchmark command on the Pi with `--benchmark-seconds 10`.
+3. Run the headless Spacewars benchmark command on the Pi with
+   `--benchmark-seconds 10`, then run `falling-benchmark 2000 120` and save both
+   NES JSON rows.
 4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0`.
 5. Confirm fullscreen display startup.
 6. Confirm `spacewars` belongs to the `input` group and can read the attached

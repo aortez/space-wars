@@ -4,11 +4,13 @@ members = [
     "crates/engine-common",
     "crates/engine-core",
     "crates/engine-gravity",
+    "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-client",
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
+    "scenarios/falling",
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
@@ -25,6 +27,7 @@ rust-version = "1.89"
 # External.
 bincode = "1"
 clap = { version = "4", features = ["derive"] }
+cpal = "0.18.2"
 directories = "6"
 gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
 rand = { version = "0.9", features = ["std_rng"] }
@@ -49,8 +52,16 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 engine-common = { path = "crates/engine-common" }
 engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
+engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
+scenario-falling = { path = "scenarios/falling" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
+
+[profile.release]
+# Cross-crate inlining materially improves the tightly interleaved NES
+# CPU/PPU/APU scheduler on the Raspberry Pi 5.
+lto = "fat"
+codegen-units = 1

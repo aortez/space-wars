@@ -78,7 +78,11 @@ pub trait Scenario {
 
 - **Tick model is per-scenario.** Spacewars wants fixed-timestep + deterministic. NES runs on the emulator's own clock (~60Hz NTSC). Clock scenario is fine with 1Hz. The client's game loop reads `tick_model()` when hosting a scenario and adjusts.
 - **Agent interface is part of the trait**, not optional plumbing. `Observation` and `Action` are defined in `engine-common`. Per-scenario schemas vary (Mario's observation ≠ Spacewars'); the transport shape is shared.
-- **Render is via `RenderFrame`**, not direct drawing. Scenarios emit primitives (sprites, shapes, text, ordered layers); the client's renderer translates them to Slint draw calls. Keeps scenarios platform-agnostic.
+- **Presentation is typed**, not direct drawing. Vector scenarios emit
+  `RenderFrame` primitives (sprites, shapes, text, ordered layers); native-video
+  scenarios emit a platform-neutral pixel frame. The client translates either
+  form into Slint presentation state, keeping scenarios platform-agnostic. See
+  [`rust-nes-engine.md`](rust-nes-engine.md) for the native-video contract.
 
 ## Architecture
 
@@ -86,7 +90,7 @@ Cargo workspace:
 
 ```
 engine-core        # LIBRARY. 2D entities (Ship, Planet, Laser, Cannon, Particle, Debris, EscapePod, BGStarField), physics, fluids (later). Deterministic, narrow API. No UI / network / FS deps.
-engine-nes         # LIBRARY. NES emulator core: 6502 CPU, PPU, APU, cart mappers. Lifted from dirtsim when we get there.
+engine-nes         # LIBRARY. Rust-native NES core: RP2A03 CPU, PPU, APU, and cartridge mappers. DirtSim is a reference oracle.
 engine-common      # LIBRARY. Shared types: Settings, Action, Observation, Scenario trait, RenderFrame, SimError.
 engine-client      # BINARY. Slint UI + custom drawing + input + audio + settings IO + scenario host.
 engine-agent       # BINARY. Training entry point. Embeds scenarios directly for training speed.
@@ -109,7 +113,9 @@ Apply to `engine-core` and the scenario-wrapping traits:
 - Seeded RNG (`rand` with explicit `SeedableRng`); no `thread_rng()` inside the step.
 - No UI, filesystem, or network side-effects inside the step.
 - Cross-platform float determinism is nice-to-have; acceptable fallback is "canonical results come from a reference platform, others are good enough for play."
-- Serializable state via `serde` + `postcard` (binary, compact, embedded-friendly).
+- Serializable state or explicit versioned state DTOs via `serde` plus an
+  appropriate compact binary format. Durable formats do not implicitly expose
+  every private implementation field.
 
 ### Client requirements
 
@@ -245,7 +251,7 @@ Slint's own backends cover all three desktop/embedded targets — no hand-rolled
 | Networking | `tokio` + `tokio-tungstenite` (WebSocket), `quinn` (QUIC, Phase 2) |
 | Args | `clap` |
 | Logging | `tracing` + `tracing-subscriber` |
-| Audio | `rodio` |
+| Audio | Rust audio backend selected by measured desktop/Pi latency and packaging; direct `cpal` is the initial NES candidate |
 | RNG | `rand` (explicit seeded generators) |
 | Config paths | `directories` (XDG / AppData / Pi) |
 
@@ -258,7 +264,9 @@ All pure Rust or with clean cross-compile stories.
 - Unified client-server interface as the story for local, remote, and agent clients.
 - Yocto layer structure. Recipes change from CMake-externalsrc to Cargo-externalsrc, but the layout of `meta-spacewars`, the image recipe, and the systemd service files translate directly.
 - `os-manager` as a privileged helper on Pi.
-- **NES emulator code** — lifted (with license checks) when `engine-nes` lands.
+- **NES emulator behavior and performance lessons** — use DirtSim's pinned
+  runtime as a differential oracle while implementing `engine-nes` natively in
+  Rust. See [`rust-nes-engine.md`](rust-nes-engine.md).
 
 ## What changes from dirtsim's stack
 
@@ -270,7 +278,8 @@ All pure Rust or with clean cross-compile stories.
 - `zpp_bits` → `serde` + `postcard`.
 - spdlog → `tracing`.
 - `args` → `clap`.
-- SDL2_mixer → `rodio`.
+- SDL2_mixer → a Rust audio backend selected by measured desktop/Pi latency and
+  packaging; direct `cpal` is the initial NES candidate.
 - Hand-rolled Wayland/X11/DRM/FBDEV display backends → Slint covers all of them.
 
 ## Proposed directory layout
@@ -301,7 +310,8 @@ Space-Wars/
 ├── yocto/meta-spacewars/         # Yocto layer: cargo recipes, image recipe, systemd services.
 ├── docs/
 │   └── design/
-│       └── reboot-rust-slint.md  # this doc.
+│       ├── reboot-rust-slint.md  # this doc.
+│       └── rust-nes-engine.md    # Rust NES core and integration plan.
 ├── reference/
 │   ├── Final.jar                 # 2008 binary.
 │   ├── README.md
@@ -316,13 +326,18 @@ Space-Wars/
 ## Open questions
 
 1. **Slint rendering path on Pi**: software renderer on DRM/FBDEV (simpler, fewer deps) vs GL via `slint-backend-winit` (more capable, more runtime deps). Leaning software renderer for the embedded target.
-2. **Audio**: `rodio` on all targets, or `kira` (richer mixing), or something else? Leaning `rodio` as the default; revisit if mixing features matter.
+2. **Audio**: direct `cpal`, a higher-level mixer, or another Rust backend?
+   Decide from measured desktop/Pi latency, bounded-buffer control, and Yocto
+   packaging. Direct `cpal` is the initial NES candidate.
 3. **Split-screen implementation**: one client process with N viewports (shared render loop, simpler) vs N client processes (more dirtsim-like). Leaning one-client-N-viewports for split-screen; keep N remote clients as the network-play path.
 4. **Float determinism across platforms**: accept divergence for now, with one side pinned as authoritative for replays and network sync?
 5. **NN framework for the agent**: candle vs burn vs tch. Can defer — the `engine-agent` crate just needs to read observations and emit actions at first.
 6. **sim-server remote transport** (when Phase 2 begins): QUIC via `quinn` (lower latency, built-in multiplexing, better loss handling) vs WebSocket via `tokio-tungstenite` (simpler, matches dirtsim's shape). Leaning QUIC for network multiplayer, WebSocket for browser-based diagnostic tooling. UDS is the obvious choice for same-machine multi-process.
 7. **Zephyr / MCU target**: out of scope for this phase. sparkle-duck-shared is Yocto Linux for Pi; Zephyr would be a separate project.
-8. **`engine-nes` lift timing**: pull the NES emulator from dirtsim after the arcade scenario is playable, or in parallel once the Scenario trait is proven?
+8. ✅ **`engine-nes` direction**: implement the emulator natively in Rust now
+   that the Scenario trait and registry are proven; use DirtSim as a pinned
+   behavioral and performance oracle rather than shipping its C runtime. See
+   [`rust-nes-engine.md`](rust-nes-engine.md).
 9. **Scenario discovery**: compile-time (cargo features per scenario) vs runtime (dynamic library loading)? Leaning compile-time — dynamic loading is painful on Windows and unnecessary for our scope.
 10. **Asset ownership**: shared `assets/` vs per-scenario asset dirs. Leaning shared for sprites/sounds that cross scenarios (a ship sprite used by arcade + clock), per-scenario for the rest; ROMs live under `assets/nes-roms/` regardless.
 

@@ -215,16 +215,18 @@ impl GamepadPump {
             return;
         }
 
-        match button {
-            Button::Start => {
+        match gameplay_button_route(button, window.get_scenario_captures_gamepad_start()) {
+            Some(GameplayButtonRoute::HostPause) => {
                 self.begin_handoff();
                 self.input.borrow_mut().press(GameKey::Pause);
             }
-            Button::Select => {
+            Some(GameplayButtonRoute::HostControls) => {
                 self.begin_handoff();
                 self.input.borrow_mut().press(GameKey::Controls);
             }
-            _ => {}
+            // Native-console scenarios sample Start as part of their complete
+            // controller snapshot. Other gameplay buttons are continuous too.
+            Some(GameplayButtonRoute::Scenario) | None => {}
         }
     }
 
@@ -300,6 +302,25 @@ impl GamepadPump {
             window.set_controller_disconnected_visible(false);
             window.set_controller_disconnected_text(SharedString::from(""));
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GameplayButtonRoute {
+    HostPause,
+    HostControls,
+    Scenario,
+}
+
+fn gameplay_button_route(
+    button: Button,
+    scenario_captures_start: bool,
+) -> Option<GameplayButtonRoute> {
+    match button {
+        Button::Start if scenario_captures_start => Some(GameplayButtonRoute::Scenario),
+        Button::Start => Some(GameplayButtonRoute::HostPause),
+        Button::Select => Some(GameplayButtonRoute::HostControls),
+        _ => None,
     }
 }
 
@@ -655,6 +676,22 @@ impl SeatAssignments {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scenario_can_capture_start_without_losing_the_host_controls_button() {
+        assert_eq!(
+            gameplay_button_route(Button::Start, true),
+            Some(GameplayButtonRoute::Scenario)
+        );
+        assert_eq!(
+            gameplay_button_route(Button::Start, false),
+            Some(GameplayButtonRoute::HostPause)
+        );
+        assert_eq!(
+            gameplay_button_route(Button::Select, true),
+            Some(GameplayButtonRoute::HostControls)
+        );
+    }
 
     #[test]
     fn gamepads_take_the_first_two_seats_in_connection_order() {

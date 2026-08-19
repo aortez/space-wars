@@ -13,6 +13,7 @@ EXTRA_CARGO_FLAGS = "--locked --workspace --no-default-features --features engin
 EXTRA_RUSTFLAGS += "--remap-path-prefix=${WORKDIR}=${TARGET_DBGSRC_DIR}"
 
 DEPENDS += " \
+    alsa-lib \
     fontconfig \
     freetype \
     libdrm \
@@ -23,6 +24,7 @@ DEPENDS += " \
 "
 
 RDEPENDS:${PN} += " \
+    alsa-lib \
     fontconfig \
     libdrm \
     libinput \
@@ -67,6 +69,7 @@ do_install() {
     install -m 0755 ${CARGO_BINDIR}/spacewars-cli ${D}${bindir}/spacewars-cli
     install -m 0755 ${CARGO_BINDIR}/engine-agent ${D}${bindir}/engine-agent
     install -m 0755 ${CARGO_BINDIR}/engine-os-manager ${D}${bindir}/engine-os-manager
+    install -m 0755 ${CARGO_BINDIR}/falling-benchmark ${D}${bindir}/falling-benchmark
     install -m 0755 ${WORKDIR}/spacewars-data-init.sh ${D}${bindir}/spacewars-data-init
 
     install -d ${D}${systemd_system_unitdir}
@@ -92,6 +95,7 @@ FILES:${PN} = " \
     ${bindir}/spacewars-cli \
     ${bindir}/engine-agent \
     ${bindir}/engine-os-manager \
+    ${bindir}/falling-benchmark \
     ${bindir}/spacewars-data-init \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \

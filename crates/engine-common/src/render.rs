@@ -6,6 +6,91 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Pixel storage carried directly from a scenario to a native-video host.
+///
+/// The first format keeps the emulator's compact palette-index framebuffer
+/// intact until the platform adapter expands it into its own reusable image
+/// slots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativePixelFormat {
+    Indexed8Rgb565,
+}
+
+/// Visible source rectangle within a native framebuffer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeVideoCrop {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl NativeVideoCrop {
+    pub const fn full(width: u32, height: u32) -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }
+    }
+}
+
+/// Optional emulation metadata carried beside a native frame for diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeVideoTiming {
+    pub emulated_ticks: u64,
+    pub input_sequence_id: u64,
+}
+
+/// Immutable, platform-neutral native framebuffer view.
+///
+/// Pixel ownership remains with the scenario. A client may copy/convert this
+/// view into bounded platform-owned presentation slots, but it must not retain
+/// the borrow after the scenario advances.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeVideoFrame<'a> {
+    pub width: u32,
+    pub height: u32,
+    pub visible_crop: NativeVideoCrop,
+    pub pixel_format: NativePixelFormat,
+    pub frame_id: u64,
+    pub pixels: &'a [u8],
+    pub palette_rgb565: &'a [u16],
+    pub timing: Option<NativeVideoTiming>,
+}
+
+impl NativeVideoFrame<'_> {
+    /// Checks the bounded shape that a native presentation adapter relies on.
+    /// Palette index ranges remain the producing scenario's invariant so this
+    /// structural check stays constant-time on the frame hot path.
+    pub fn has_valid_layout(&self) -> bool {
+        let Some(pixel_count) = self.width.checked_mul(self.height) else {
+            return false;
+        };
+        let Ok(pixel_count) = usize::try_from(pixel_count) else {
+            return false;
+        };
+        let Some(crop_right) = self.visible_crop.x.checked_add(self.visible_crop.width) else {
+            return false;
+        };
+        let Some(crop_bottom) = self.visible_crop.y.checked_add(self.visible_crop.height) else {
+            return false;
+        };
+
+        self.width != 0
+            && self.height != 0
+            && self.visible_crop.width != 0
+            && self.visible_crop.height != 0
+            && self.pixels.len() == pixel_count
+            && crop_right <= self.width
+            && crop_bottom <= self.height
+            && match self.pixel_format {
+                NativePixelFormat::Indexed8Rgb565 => !self.palette_rgb565.is_empty(),
+            }
+    }
+}
+
 /// Draw list emitted by a scenario's `render_frame`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RenderFrame {
@@ -343,6 +428,50 @@ pub enum TextAnchor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_video_layout_checks_pixels_palette_and_crop() {
+        let pixels = [0_u8; 12];
+        let palette = [0_u16; 4];
+        let frame = NativeVideoFrame {
+            width: 4,
+            height: 3,
+            visible_crop: NativeVideoCrop {
+                x: 0,
+                y: 1,
+                width: 4,
+                height: 2,
+            },
+            pixel_format: NativePixelFormat::Indexed8Rgb565,
+            frame_id: 7,
+            pixels: &pixels,
+            palette_rgb565: &palette,
+            timing: Some(NativeVideoTiming {
+                emulated_ticks: 99,
+                input_sequence_id: 4,
+            }),
+        };
+
+        assert!(frame.has_valid_layout());
+        assert!(
+            !NativeVideoFrame {
+                visible_crop: NativeVideoCrop {
+                    y: 2,
+                    height: 2,
+                    ..frame.visible_crop
+                },
+                ..frame
+            }
+            .has_valid_layout()
+        );
+        assert!(
+            !NativeVideoFrame {
+                pixels: &pixels[..11],
+                ..frame
+            }
+            .has_valid_layout()
+        );
+    }
 
     const EPS: f32 = 1.0e-5;
 

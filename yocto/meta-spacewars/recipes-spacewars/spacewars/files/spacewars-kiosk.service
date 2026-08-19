@@ -10,6 +10,7 @@ User=spacewars
 Group=spacewars
 SupplementaryGroups=input video audio
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
+Environment=ALSA_CARD=Audio
 Environment=SLINT_BACKEND=linuxkms-software
 Environment=SLINT_DRM_OUTPUT=DPI-1
 Environment=SLINT_KMS_ROTATION=90

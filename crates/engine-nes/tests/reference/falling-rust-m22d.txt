@@ -1,0 +1,39 @@
+schema=engine-nes-rust-state-m22d-v1
+captured=2026-08-17
+host=oldman-fish
+kernel=Linux 7.0.0-29-generic x86_64
+cpu=AMD Ryzen 7 9800X3D 8-Core Processor
+rustc=1.94.1 (e408947bf 2026-03-25)
+engine_nes_slice=m22d
+falling_commit=52dcb8a951200562e696dfc2aba5d4d14edd0078
+falling_sha256=e22b947542c2d7e595bf84725b333be7af8189c5965b9c53e356a249c7d79943
+falling_fnv1a64=16a4d7eebe1afc30
+state_hash_version=1
+savestate_format_version=1
+savestate_payload_max_bytes=131072
+
+# Generated-ROM regression after eight frames of the fixed two-controller
+# script in tests/state_contract.rs.
+generated_state_hash_v1=161edaff377fb6b3
+
+# Release build, Falling after 100 neutral warmup frames, 2,000 operations per
+# row. Timing is diagnostic; state hash and savestate size are deterministic.
+falling_frame=100
+falling_state_hash_v1=5ba6822133b4aeb5
+falling_savestate_bytes=76497
+benchmark operation=state-hash-v1 iterations=2000 elapsed_ns=22917952 ns_per_operation=11458.976
+benchmark operation=checkpoint-create-v1 iterations=2000 elapsed_ns=24410253 ns_per_operation=12205.127
+benchmark operation=checkpoint-restore-v1 iterations=2000 elapsed_ns=1968550 ns_per_operation=984.275
+
+# Automated contract evidence; see tests/state_contract.rs and
+# tests/no_allocation.rs for the exact generated ROMs and assertions.
+determinism_frames=90
+parallel_shared_rom_machines=4
+checkpoint_partial_instruction=pass
+checkpoint_active_oam_dma=pass
+savestate_partial_instruction=pass
+savestate_active_oam_dma=pass
+headless_visible_authoritative_hash=pass
+wrong_rom_and_malformed_transactionality=pass
+steady_state_run_frame_allocations=0
+checkpoint_restore_allocations=0

@@ -43,7 +43,8 @@ pub enum TickModel {
     FixedTimestep { hz: u32 },
     /// Step called with whatever dt the host has accumulated.
     Variable,
-    /// The scenario runs its own clock (e.g., NES emulator at 60Hz NTSC).
+    /// One step advances one native clock quantum (for example, one NTSC NES
+    /// frame); realtime hosts pace those quanta independently of UI callbacks.
     EmulatorClock,
 }
 

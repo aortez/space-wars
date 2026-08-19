@@ -4,7 +4,8 @@ use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickMod
 use scenario_null::{NullConfig, NullScenario, NullState};
 
 use super::{
-    ClientScenario, RenderBackend, ScenarioCapabilities, ScenarioRegistration, ScenarioStartMode,
+    ClientScenario, RenderBackend, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
+    ScenarioStartMode,
 };
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
@@ -17,6 +18,8 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         pointer_input: false,
         player_zoom: false,
         game_over: false,
+        native_video: false,
+        captures_gamepad_start: false,
     },
     controls_help: "No controls.",
     create,
@@ -31,10 +34,10 @@ fn create(
     _settings: &Settings,
     _viewport: Viewport,
     _mode: ScenarioStartMode,
-) -> Box<dyn ClientScenario> {
-    Box::new(NullClientScenario {
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(NullClientScenario {
         state: NullScenario::init(NullConfig, seed),
-    })
+    }))
 }
 
 impl ClientScenario for NullClientScenario {

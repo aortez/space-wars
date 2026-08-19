@@ -1,15 +1,17 @@
 //! Object-safe scenario adapters and the client's compile-time registry.
 
 use std::fmt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use engine_common::{Action, RenderFrame, Settings, StepResult, TickModel};
+use engine_common::{Action, NativeVideoFrame, RenderFrame, Settings, StepResult, TickModel};
 use engine_core::Color;
 use scenario_pizza::PizzaBenchmarkConfig;
 
 use crate::input::ClientInput;
+use crate::nes_realtime::{RealtimeTelemetry, RealtimeVideoConsumer};
 use crate::render::{FrameLayout, Viewport};
 
+mod falling;
 mod null;
 mod pizza;
 mod rover_lab;
@@ -126,6 +128,8 @@ pub struct ScenarioCapabilities {
     pub pointer_input: bool,
     pub player_zoom: bool,
     pub game_over: bool,
+    pub native_video: bool,
+    pub captures_gamepad_start: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -155,8 +159,15 @@ pub struct ScenarioRegistration {
     pub launcher_visible: bool,
     pub capabilities: ScenarioCapabilities,
     pub controls_help: &'static str,
-    create: fn(u64, &Settings, Viewport, ScenarioStartMode) -> Box<dyn ClientScenario>,
+    create: ScenarioFactory,
 }
+
+type ScenarioFactory = fn(
+    u64,
+    &Settings,
+    Viewport,
+    ScenarioStartMode,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError>;
 
 impl ScenarioRegistration {
     pub fn create(
@@ -169,7 +180,7 @@ impl ScenarioRegistration {
         if mode.is_benchmark() && !self.capabilities.benchmark {
             return Err(ScenarioCreateError::BenchmarkUnsupported { name: self.id });
         }
-        Ok((self.create)(seed, settings, viewport, mode))
+        (self.create)(seed, settings, viewport, mode)
     }
 }
 
@@ -180,6 +191,30 @@ pub trait ClientScenario {
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action>;
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame>;
     fn frame_layout(&self) -> FrameLayout;
+
+    fn native_video_frame(&self) -> Option<NativeVideoFrame<'_>> {
+        None
+    }
+
+    /// Returns the bounded presentation endpoint when this client adapter is
+    /// paced by a dedicated realtime worker instead of the Slint timer.
+    fn realtime_video_consumer(&self) -> Option<RealtimeVideoConsumer> {
+        None
+    }
+
+    /// Publishes one complete latest-state action snapshot. Realtime adapters
+    /// sample it at their next authoritative frame boundary.
+    fn publish_realtime_actions(&self, _actions: &[Action], _observed_at: Instant) {}
+
+    fn set_realtime_paused(&self, _paused: bool) {}
+
+    fn shutdown_realtime(&mut self) {}
+
+    fn record_realtime_displayed_loop_iteration(&self) {}
+
+    fn realtime_telemetry(&self) -> Option<RealtimeTelemetry> {
+        None
+    }
 
     fn set_viewport(&mut self, _viewport: Viewport) {}
 
@@ -194,6 +229,10 @@ pub trait ClientScenario {
 
     fn is_game_over(&self) -> bool {
         false
+    }
+
+    fn runtime_error(&self) -> Option<String> {
+        None
     }
 
     fn zoom_player_in(&mut self, _player: usize) {}
@@ -213,9 +252,38 @@ pub trait ClientScenario {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScenarioCreateError {
-    BenchmarkUnsupported { name: &'static str },
+    BenchmarkUnsupported {
+        name: &'static str,
+    },
+    // Reserved for scenarios whose assets cannot be embedded, such as a
+    // future user-supplied cartridge loader.
+    #[allow(dead_code)]
+    MissingAsset {
+        name: &'static str,
+        asset: String,
+    },
+    InvalidAsset {
+        name: &'static str,
+        asset: String,
+        detail: String,
+    },
+    UnsupportedCartridge {
+        name: &'static str,
+        detail: String,
+    },
+    RuntimeInitialization {
+        name: &'static str,
+        detail: String,
+    },
+    // Reserved for a scenario that requires audio to start. Falling degrades
+    // to silent emulation when no default device is available.
+    #[allow(dead_code)]
+    AudioInitialization {
+        name: &'static str,
+        detail: String,
+    },
 }
 
 impl fmt::Display for ScenarioCreateError {
@@ -223,6 +291,26 @@ impl fmt::Display for ScenarioCreateError {
         match self {
             Self::BenchmarkUnsupported { name } => {
                 write!(f, "scenario {name:?} does not support benchmark mode")
+            }
+            Self::MissingAsset { name, asset } => {
+                write!(f, "scenario {name:?} is missing required asset {asset:?}")
+            }
+            Self::InvalidAsset {
+                name,
+                asset,
+                detail,
+            } => write!(
+                f,
+                "scenario {name:?} has an invalid asset {asset:?}: {detail}"
+            ),
+            Self::UnsupportedCartridge { name, detail } => {
+                write!(f, "scenario {name:?} cannot load its cartridge: {detail}")
+            }
+            Self::RuntimeInitialization { name, detail } => {
+                write!(f, "scenario {name:?} failed to initialize: {detail}")
+            }
+            Self::AudioInitialization { name, detail } => {
+                write!(f, "scenario {name:?} could not initialize audio: {detail}")
             }
         }
     }
@@ -232,6 +320,7 @@ impl std::error::Error for ScenarioCreateError {}
 
 static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
+    falling::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
     spacewars::REGISTRATION,
@@ -257,6 +346,33 @@ pub fn launcher_registrations() -> impl Iterator<Item = &'static ScenarioRegistr
 mod tests {
     use super::*;
 
+    fn missing_asset_factory(
+        _seed: u64,
+        _settings: &Settings,
+        _viewport: Viewport,
+        _mode: ScenarioStartMode,
+    ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+        Err(ScenarioCreateError::MissingAsset {
+            name: "missing-test",
+            asset: "test.nes".into(),
+        })
+    }
+
+    static MISSING_ASSET_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+        id: "missing-test",
+        launcher_visible: false,
+        capabilities: ScenarioCapabilities {
+            benchmark: false,
+            pointer_input: false,
+            player_zoom: false,
+            game_over: false,
+            native_video: true,
+            captures_gamepad_start: true,
+        },
+        controls_help: "",
+        create: missing_asset_factory,
+    };
+
     #[test]
     fn registry_keeps_null_hostable_but_hidden() {
         assert!(registration("null").is_some());
@@ -264,7 +380,7 @@ mod tests {
             launcher_registrations()
                 .map(|registration| registration.id)
                 .collect::<Vec<_>>(),
-            vec!["pizza", "rover-lab", "spacewars"]
+            vec!["falling", "pizza", "rover-lab", "spacewars"]
         );
     }
 
@@ -284,5 +400,26 @@ mod tests {
             error,
             ScenarioCreateError::BenchmarkUnsupported { name: "rover-lab" }
         );
+    }
+
+    #[test]
+    fn scenario_factories_propagate_recoverable_asset_errors() {
+        let error = match MISSING_ASSET_REGISTRATION.create(
+            0,
+            &Settings::default(),
+            Viewport::new(1280.0, 720.0),
+            ScenarioStartMode::Normal,
+        ) {
+            Ok(_) => panic!("missing scenario asset should fail"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            ScenarioCreateError::MissingAsset {
+                name: "missing-test",
+                asset: "test.nes".into(),
+            }
+        );
+        assert!(error.to_string().contains("test.nes"));
     }
 }
