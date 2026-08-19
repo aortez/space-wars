@@ -1,7 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: M22a-M22e implemented; M22f (host contracts, native video, and the
-silent Falling scenario) is next.
+Status: M22a-M22f implemented; M22g (realtime pacing, low-latency handoffs,
+and audio-device output) is next.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -107,7 +107,7 @@ crates/engine-nes
   Pure emulated hardware, cartridge formats, snapshots, and unpaced output.
   No engine-client, Slint, filesystem, OS audio, or scenario dependency.
 
-scenarios/nes-falling
+scenarios/falling
   Falling ROM metadata and bytes, scenario configuration, actions,
   observations, and the synchronous machine instance.
 
@@ -126,7 +126,7 @@ The intended dependency direction is:
 engine-nes
     ^
     |
-scenario-nes-falling --> engine-common
+scenario-falling --> engine-common
     ^
     |
 engine-client
@@ -603,7 +603,7 @@ Provide an engine example/tool that runs a licensed ROM for N frames and writes
 a PNG from a selected frame. This lets PPU work be inspected before the Slint
 integration exists.
 
-Once `nes-falling` is hosted, retain a short manual checklist for:
+Once `falling` is hosted, retain a short manual checklist for:
 
 - title/gameplay colors;
 - background/sprite priority;
@@ -1040,6 +1040,26 @@ Exit criteria:
 - Failed ROM/scenario creation leaves the launcher usable.
 - Existing scenario tests and renderer paths remain green.
 
+Implemented evidence (2026-08-18): `scenario-falling` embeds the exact pinned
+MIT-licensed ROM and validates its byte length and FNV identity before exposing
+a complete frame. Its version-1 action carries one complete controller mask,
+and its version-1 observation includes authoritative state hash, frame/input,
+and minimal game-state fields. The client presents the borrowed 256×240 indexed
+frame through three reusable Slint RGB buffers, applies the 256×224 visible
+crop, and uses centered nearest-neighbor scaling without a window-sized
+intermediate canvas.
+
+Scenario factories are now genuinely fallible. Launcher startup errors remain
+visible, and restart construction completes before replacement so a failed
+restart retains the usable prior instance. `EmulatorClock` uses a nominal NTSC
+elapsed-time accumulator with bounded catch-up instead of treating each 16 ms
+Slint callback as one hardware frame; the UI thread never sleeps for an
+emulator deadline. M22g deliberately moves that pacing into the exact-rational
+worker and adds bounded input/video/audio handoffs. Client tests cover native
+conversion, controller ownership, clock accumulation, pause/restart/launcher/
+relaunch, and failed replacement while the existing vector/raster suite remains
+unchanged.
+
 ### M22g: Realtime pacing, low-latency handoffs, and audio device
 
 Purpose: produce the intended human-play experience without weakening the
@@ -1096,7 +1116,7 @@ Prefer these review units:
 1. **Reference + cartridge + CPU** — M22a and M22b. No UI changes.
 2. **PPU + deterministic machine** — M22c and M22d, including frame dumps.
 3. **APU** — M22e, isolated from OS audio.
-4. **Native presentation + `nes-falling`** — M22f.
+4. **Native presentation + `falling`** — M22f.
 5. **Realtime/audio/latency + Pi validation** — M22g and M22h.
 
 If the CPU or PPU review becomes too large, split by generated test coverage

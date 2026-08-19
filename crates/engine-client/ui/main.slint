@@ -216,7 +216,15 @@ export component MainWindow inherits Window {
     in property <length> p2-minimap-size: 0px;
     in property <bool> raster-visible: false;
     in property <image> raster-frame;
+    in property <bool> native-video-visible: false;
+    in property <image> native-video-frame;
+    in property <int> native-video-crop-x: 0;
+    in property <int> native-video-crop-y: 0;
+    in property <int> native-video-crop-width: 0;
+    in property <int> native-video-crop-height: 0;
     in property <bool> scenario-pointer-enabled: false;
+    in property <bool> scenario-captures-gamepad-start: false;
+    in property <string> scenario-error-text: "";
     in-out property <bool> launcher-visible: false;
     in-out property <bool> launcher-controls-visible: false;
     in-out property <bool> launcher-settings-visible: false;
@@ -331,6 +339,21 @@ export component MainWindow inherits Window {
         width: parent.width;
         height: parent.height;
         source: root.raster-frame;
+    }
+
+    Image {
+        visible: root.native-video-visible;
+        width: parent.width;
+        height: parent.height;
+        source: root.native-video-frame;
+        source-clip-x: root.native-video-crop-x;
+        source-clip-y: root.native-video-crop-y;
+        source-clip-width: root.native-video-crop-width;
+        source-clip-height: root.native-video-crop-height;
+        image-fit: contain;
+        image-rendering: pixelated;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 
     for primitive in root.primitives: ScenePrimitiveItem {
@@ -916,7 +939,7 @@ export component MainWindow inherits Window {
                             y: 9px;
                             width: parent.width - 28px;
                             height: 24px;
-                            text: root.launcher-scenario == "spacewars" ? "Two-player orbital combat and planet capture" : root.launcher-scenario == "pizza" ? "Interactive many-body collision sandbox" : "Rapier rover and wheel mechanics lab";
+                            text: root.launcher-scenario == "spacewars" ? "Two-player orbital combat and planet capture" : root.launcher-scenario == "pizza" ? "Interactive many-body collision sandbox" : root.launcher-scenario == "falling" ? "Rust-native NES homebrew game" : "Rapier rover and wheel mechanics lab";
                             color: #e6edf7;
                             font-size: 15px;
                         }
@@ -926,7 +949,7 @@ export component MainWindow inherits Window {
                             y: 38px;
                             width: parent.width - 28px;
                             height: 22px;
-                            text: root.launcher-scenario == "spacewars" ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : "A semi-interactive mechanics scenario";
+                            text: root.launcher-scenario == "spacewars" ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : root.launcher-scenario == "falling" ? "256×224 native video  ·  silent in this milestone" : "A semi-interactive mechanics scenario";
                             color: #9fb4cc;
                             font-size: 13px;
                         }
@@ -1014,6 +1037,7 @@ export component MainWindow inherits Window {
                     background: #00000000;
 
                     ChoiceRow {
+                        visible: root.launcher-scenario != "falling";
                         x: 0px;
                         y: 0px;
                         width: parent.width;
@@ -1032,6 +1056,7 @@ export component MainWindow inherits Window {
                     }
 
                     ChoiceRow {
+                        visible: root.launcher-scenario != "falling";
                         x: 0px;
                         y: 52px;
                         width: parent.width;
@@ -1164,12 +1189,12 @@ export component MainWindow inherits Window {
                     }
 
                     Text {
-                        visible: root.launcher-scenario == "rover-lab";
+                        visible: root.launcher-scenario == "rover-lab" || root.launcher-scenario == "falling";
                         x: 0px;
-                        y: 114px;
+                        y: root.launcher-scenario == "falling" ? 12px : 114px;
                         width: parent.width;
                         height: 74px;
-                        text: "Rover Lab currently uses its built-in deterministic setup.";
+                        text: root.launcher-scenario == "falling" ? "Falling uses a fixed, pixel-perfect native NES presentation. Renderer and raster-scale settings do not apply." : "Rover Lab currently uses its built-in deterministic setup.";
                         color: #c7d0dc;
                         font-size: 14px;
                         horizontal-alignment: center;
@@ -1178,11 +1203,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : 166px;
+                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 6 : root.launcher-scenario == "pizza" ? 4 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 6 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -1190,7 +1215,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : 166px;
+                        y: root.launcher-scenario == "spacewars" ? 314px : root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";
@@ -1291,6 +1316,30 @@ export component MainWindow inherits Window {
             font-size: 14px;
             horizontal-alignment: center;
             vertical-alignment: center;
+        }
+    }
+
+    Rectangle {
+        visible: root.scenario-error-text != "" && !root.launcher-visible;
+        x: root.width * 0.15;
+        y: root.controller-disconnected-visible ? 72px : 16px;
+        width: root.width * 0.70;
+        height: 48px;
+        background: #24080df0;
+        border-color: #ff7184;
+        border-width: 2px;
+        border-radius: 6px;
+
+        Text {
+            x: 12px;
+            width: parent.width - 24px;
+            height: parent.height;
+            text: root.scenario-error-text;
+            color: #ffe5e9;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
         }
     }
 

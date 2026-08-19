@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use engine_common::{Action, RenderFrame, Settings, StepResult, TickModel};
+use engine_common::{Action, NativeVideoFrame, RenderFrame, Settings, StepResult, TickModel};
 use engine_core::Color as CoreColor;
 use slint::{
     Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
@@ -24,10 +24,16 @@ pub use crate::client_scenarios::{BenchmarkConfiguration, RenderBackend};
 #[cfg(test)]
 use crate::input;
 use crate::input::{ClientInput, SharedInput};
+use crate::native_video::{self, NativeVideoRenderer};
 use crate::raster;
 use crate::render::{self, Viewport};
 
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
+// Nominal NTSC NES frame period. M22g replaces this synchronous accumulator
+// with an exact rational, client-owned realtime worker; importantly, even this
+// bridge advances from elapsed time rather than treating one Slint callback as
+// one hardware frame.
+const EMULATOR_FRAME_INTERVAL: Duration = Duration::from_nanos(16_639_267);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 
@@ -119,8 +125,20 @@ pub struct BenchmarkOptions {
 }
 
 pub enum HostError {
-    UnknownScenario { name: String },
-    BenchmarkUnsupported { name: String },
+    UnknownScenario {
+        name: String,
+    },
+    BenchmarkUnsupported {
+        name: String,
+    },
+    ScenarioCreation {
+        name: String,
+        source: ScenarioCreateError,
+    },
+    Presentation {
+        name: String,
+        detail: String,
+    },
 }
 
 impl fmt::Debug for HostError {
@@ -142,11 +160,24 @@ impl fmt::Display for HostError {
             HostError::BenchmarkUnsupported { name } => {
                 write!(f, "scenario {name:?} does not support benchmark mode")
             }
+            HostError::ScenarioCreation { name, source } => {
+                write!(f, "could not start scenario {name:?}: {source}")
+            }
+            HostError::Presentation { name, detail } => {
+                write!(f, "could not present scenario {name:?}: {detail}")
+            }
         }
     }
 }
 
-impl std::error::Error for HostError {}
+impl std::error::Error for HostError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ScenarioCreation { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
 
 pub fn validate_scenario(name: &str) -> Result<(), HostError> {
     if is_known_scenario(name) {
@@ -263,11 +294,34 @@ pub fn start_scenario_loop(
     let mut benchmark_active = start_benchmark;
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let mut raster_renderer = raster::RasterRenderer::new();
+    let mut native_video_renderer = NativeVideoRenderer::new();
+    let mut presented_native_frame_id = None;
     let initial_frames = scenario.render_frames(renderer, initial_viewport);
     let mut input_projections =
         render::frame_projections(&initial_frames, initial_viewport, scenario.frame_layout());
     let mut projection_viewport = initial_viewport;
     window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
+    window.set_scenario_error_text(SharedString::from(""));
+
+    if let Some(frame) = scenario.native_video_frame() {
+        let frame_id =
+            present_native_video(window, frame, &mut native_video_renderer).map_err(|error| {
+                HostError::Presentation {
+                    name: scenario_name.clone(),
+                    detail: error.to_string(),
+                }
+            })?;
+        presented_native_frame_id = Some(frame_id);
+    } else {
+        present_frames(
+            window,
+            initial_frames,
+            scenario.frame_layout(),
+            renderer,
+            raster_scale,
+            &mut raster_renderer,
+        );
+    }
 
     if benchmark_active {
         tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
@@ -318,8 +372,19 @@ pub fn start_scenario_loop(
         if let Some(visible) = step_result.ingame_controls_visible {
             window.set_ingame_controls_visible(visible);
         }
+        if let Some(error_text) = step_result.scenario_error_text {
+            window.set_scenario_error_text(SharedString::from(error_text));
+        }
         if window.get_launcher_visible() {
             return;
+        }
+
+        if let Some(error) = scenario.runtime_error() {
+            paused = true;
+            accumulator = Duration::ZERO;
+            window.set_scenario_error_text(SharedString::from(format!(
+                "Scenario stopped: {error}. Restart or return to the launcher."
+            )));
         }
 
         performance.record_frame(now, step_result.updates);
@@ -332,27 +397,46 @@ pub fn start_scenario_loop(
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
-        let frames = scenario.render_frames(renderer, viewport);
-        input_projections = render::frame_projections(&frames, viewport, scenario.frame_layout());
-        projection_viewport = viewport;
-        present_frames(
-            &window,
-            frames,
-            scenario.frame_layout(),
-            renderer,
-            raster_scale,
-            &mut raster_renderer,
-        );
+        if let Some(frame) = scenario.native_video_frame() {
+            input_projections.clear();
+            projection_viewport = viewport;
+            if presented_native_frame_id != Some(frame.frame_id) {
+                match present_native_video(&window, frame, &mut native_video_renderer) {
+                    Ok(frame_id) => presented_native_frame_id = Some(frame_id),
+                    Err(error) => {
+                        paused = true;
+                        accumulator = Duration::ZERO;
+                        window.set_scenario_error_text(SharedString::from(format!(
+                            "Video presentation stopped: {error}. Restart or return to the launcher."
+                        )));
+                    }
+                }
+            }
+        } else {
+            let frames = scenario.render_frames(renderer, viewport);
+            input_projections =
+                render::frame_projections(&frames, viewport, scenario.frame_layout());
+            projection_viewport = viewport;
+            present_frames(
+                &window,
+                frames,
+                scenario.frame_layout(),
+                renderer,
+                raster_scale,
+                &mut raster_renderer,
+            );
+        }
     });
 
     Ok(timer)
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct HostStepResult {
     updates: usize,
     return_to_launcher: bool,
     ingame_controls_visible: Option<bool>,
+    scenario_error_text: Option<String>,
 }
 
 impl HostStepResult {
@@ -361,6 +445,7 @@ impl HostStepResult {
             updates,
             return_to_launcher: false,
             ingame_controls_visible: None,
+            scenario_error_text: None,
         }
     }
 
@@ -369,6 +454,7 @@ impl HostStepResult {
             updates: 0,
             return_to_launcher: true,
             ingame_controls_visible: None,
+            scenario_error_text: None,
         }
     }
 
@@ -377,6 +463,21 @@ impl HostStepResult {
             updates: 0,
             return_to_launcher: false,
             ingame_controls_visible: Some(visible),
+            scenario_error_text: None,
+        }
+    }
+
+    fn scenario_error(error: impl Into<String>) -> Self {
+        Self {
+            scenario_error_text: Some(error.into()),
+            ..Self::default()
+        }
+    }
+
+    fn scenario_restarted() -> Self {
+        Self {
+            scenario_error_text: Some(String::new()),
+            ..Self::default()
         }
     }
 }
@@ -413,7 +514,7 @@ fn step_scenario(
                 return HostStepResult::default();
             }
             ScenarioControlRequest::Restart => {
-                restart_scenario(
+                return match restart_scenario(
                     scenario,
                     scenario_name,
                     seed,
@@ -423,12 +524,20 @@ fn step_scenario(
                     benchmark_active,
                     settings,
                     viewport,
-                );
-                return HostStepResult::default();
+                ) {
+                    Ok(()) => HostStepResult::scenario_restarted(),
+                    Err(error) => {
+                        *paused = true;
+                        *accumulator = Duration::ZERO;
+                        HostStepResult::scenario_error(format!(
+                            "Restart failed: {error}. The previous game is still available."
+                        ))
+                    }
+                };
             }
             ScenarioControlRequest::Benchmark => {
                 if scenario.registration().capabilities.benchmark {
-                    start_benchmark_scenario(
+                    return match start_benchmark_scenario(
                         scenario,
                         scenario_name,
                         seed,
@@ -438,7 +547,16 @@ fn step_scenario(
                         benchmark_active,
                         settings,
                         viewport,
-                    );
+                    ) {
+                        Ok(()) => HostStepResult::scenario_restarted(),
+                        Err(error) => {
+                            *paused = true;
+                            *accumulator = Duration::ZERO;
+                            HostStepResult::scenario_error(format!(
+                                "Benchmark start failed: {error}. The previous game is still available."
+                            ))
+                        }
+                    };
                 }
                 return HostStepResult::default();
             }
@@ -455,7 +573,7 @@ fn step_scenario(
 
     if input.take_benchmark_requested() {
         if scenario.registration().capabilities.benchmark {
-            start_benchmark_scenario(
+            return match start_benchmark_scenario(
                 scenario,
                 scenario_name,
                 seed,
@@ -465,13 +583,22 @@ fn step_scenario(
                 benchmark_active,
                 settings,
                 viewport,
-            );
+            ) {
+                Ok(()) => HostStepResult::scenario_restarted(),
+                Err(error) => {
+                    *paused = true;
+                    *accumulator = Duration::ZERO;
+                    HostStepResult::scenario_error(format!(
+                        "Benchmark start failed: {error}. The previous game is still available."
+                    ))
+                }
+            };
         }
         return HostStepResult::default();
     }
 
     if input.take_reset_requested() {
-        restart_scenario(
+        return match restart_scenario(
             scenario,
             scenario_name,
             seed,
@@ -481,8 +608,16 @@ fn step_scenario(
             benchmark_active,
             settings,
             viewport,
-        );
-        return HostStepResult::default();
+        ) {
+            Ok(()) => HostStepResult::scenario_restarted(),
+            Err(error) => {
+                *paused = true;
+                *accumulator = Duration::ZERO;
+                HostStepResult::scenario_error(format!(
+                    "Restart failed: {error}. The previous game is still available."
+                ))
+            }
+        };
     }
 
     if input.take_back_requested() {
@@ -562,7 +697,7 @@ fn step_scenario(
     }
 
     match (tick_model, fixed_dt) {
-        (TickModel::FixedTimestep { .. }, Some(dt)) => {
+        (TickModel::FixedTimestep { .. } | TickModel::EmulatorClock, Some(dt)) => {
             *accumulator += elapsed;
             let mut steps = 0;
             while *accumulator >= dt && steps < MAX_FIXED_STEPS_PER_TICK {
@@ -576,12 +711,14 @@ fn step_scenario(
             }
             HostStepResult::updates(steps)
         }
-        (TickModel::Variable | TickModel::EmulatorClock, _) => {
+        (TickModel::Variable, _) => {
             let actions = scenario.actions(input, *benchmark_active, input_projections);
             scenario.step(&actions, elapsed);
             HostStepResult::updates(1)
         }
-        (TickModel::FixedTimestep { .. }, None) => HostStepResult::default(),
+        (TickModel::FixedTimestep { .. } | TickModel::EmulatorClock, None) => {
+            HostStepResult::default()
+        }
     }
 }
 
@@ -607,27 +744,34 @@ fn restart_scenario(
     benchmark_active: &mut bool,
     settings: &Settings,
     viewport: Viewport,
-) {
-    match HostedScenario::new(
-        scenario_name,
-        seed,
-        settings,
-        viewport,
-        ScenarioStartMode::Normal,
-    ) {
-        Ok(reset) => {
-            *scenario = reset;
-            *accumulator = Duration::ZERO;
-            *paused = false;
-            *benchmark_active = false;
-            input.clear();
-            input.reset_spacewars_controls();
-            tracing::info!(scenario = scenario_name, seed, "started new game.");
-        }
-        Err(err) => {
-            tracing::error!(error = %err, scenario = scenario_name, "failed to start new game.");
-        }
-    }
+) -> Result<(), HostError> {
+    replace_scenario(scenario, || {
+        HostedScenario::new(
+            scenario_name,
+            seed,
+            settings,
+            viewport,
+            ScenarioStartMode::Normal,
+        )
+    })?;
+    *accumulator = Duration::ZERO;
+    *paused = false;
+    *benchmark_active = false;
+    input.clear();
+    input.reset_spacewars_controls();
+    tracing::info!(scenario = scenario_name, seed, "started new game.");
+    Ok(())
+}
+
+fn replace_scenario(
+    current: &mut HostedScenario,
+    create: impl FnOnce() -> Result<HostedScenario, HostError>,
+) -> Result<(), HostError> {
+    // Construction completes before assignment so failure leaves the current
+    // live scenario available for resume, another restart, or launcher return.
+    let replacement = create()?;
+    *current = replacement;
+    Ok(())
 }
 
 fn start_benchmark_scenario(
@@ -640,23 +784,23 @@ fn start_benchmark_scenario(
     benchmark_active: &mut bool,
     settings: &Settings,
     viewport: Viewport,
-) {
-    let Ok(benchmark) = HostedScenario::new(
-        scenario_name,
-        seed,
-        settings,
-        viewport,
-        ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
-    ) else {
-        return;
-    };
-    *scenario = benchmark;
+) -> Result<(), HostError> {
+    replace_scenario(scenario, || {
+        HostedScenario::new(
+            scenario_name,
+            seed,
+            settings,
+            viewport,
+            ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
+        )
+    })?;
     *accumulator = Duration::ZERO;
     *paused = false;
     *benchmark_active = true;
     input.clear();
     input.reset_spacewars_controls();
     tracing::info!(scenario = scenario_name, seed, "started visual benchmark.");
+    Ok(())
 }
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
@@ -720,7 +864,7 @@ fn performance_target_label(tick_model: TickModel) -> String {
     match tick_model {
         TickModel::FixedTimestep { hz } => format!("{hz} Hz"),
         TickModel::Variable => "variable".into(),
-        TickModel::EmulatorClock => "emulator".into(),
+        TickModel::EmulatorClock => "emulator 60.10 Hz".into(),
     }
 }
 
@@ -733,7 +877,8 @@ fn measured_label(value: Option<f32>) -> String {
 fn fixed_step_duration(tick_model: TickModel) -> Option<Duration> {
     match tick_model {
         TickModel::FixedTimestep { hz } => Some(Duration::from_secs_f64(1.0 / hz.max(1) as f64)),
-        TickModel::Variable | TickModel::EmulatorClock => None,
+        TickModel::Variable => None,
+        TickModel::EmulatorClock => Some(EMULATOR_FRAME_INTERVAL),
     }
 }
 
@@ -762,6 +907,7 @@ fn present_frames(
     raster_renderer: &mut raster::RasterRenderer,
 ) -> usize {
     let viewport = Viewport::from_window(window.window());
+    window.set_native_video_visible(false);
     let scene_item_count = match renderer {
         RenderBackend::Vector => {
             let presentation =
@@ -788,6 +934,34 @@ fn present_frames(
     };
     window.window().request_redraw();
     scene_item_count
+}
+
+fn present_native_video(
+    window: &MainWindow,
+    frame: NativeVideoFrame<'_>,
+    renderer: &mut NativeVideoRenderer,
+) -> Result<u64, native_video::NativeVideoError> {
+    let presentation = renderer.present(frame)?;
+    let crop = presentation.source_crop;
+    window.set_primitives(ModelRc::new(VecModel::from(Vec::new())));
+    window.set_vector_minimaps_visible(false);
+    window.set_raster_visible(false);
+    window.set_native_video_frame(presentation.image);
+    window.set_native_video_crop_x(native_video::slint_dimension(crop.x)?);
+    window.set_native_video_crop_y(native_video::slint_dimension(crop.y)?);
+    window.set_native_video_crop_width(native_video::slint_dimension(crop.width)?);
+    window.set_native_video_crop_height(native_video::slint_dimension(crop.height)?);
+    window.set_native_video_visible(true);
+    window.window().request_redraw();
+    if let Some(timing) = presentation.timing {
+        tracing::trace!(
+            frame_id = presentation.frame_id,
+            emulated_ticks = timing.emulated_ticks,
+            input_sequence_id = timing.input_sequence_id,
+            "submitted native video frame."
+        );
+    }
+    Ok(presentation.frame_id)
 }
 
 fn set_vector_presentation(window: &MainWindow, presentation: render::VectorPresentation) {
@@ -1298,6 +1472,10 @@ impl HostedScenario {
                 ScenarioCreateError::BenchmarkUnsupported { .. } => {
                     HostError::BenchmarkUnsupported { name: name.into() }
                 }
+                source => HostError::ScenarioCreation {
+                    name: name.into(),
+                    source,
+                },
             })?;
         Ok(Self { inner })
     }
@@ -1381,6 +1559,14 @@ impl HostedScenario {
         self.inner.render_frames(renderer, viewport)
     }
 
+    pub(crate) fn native_video_frame(&self) -> Option<NativeVideoFrame<'_>> {
+        self.inner.native_video_frame()
+    }
+
+    fn runtime_error(&self) -> Option<&str> {
+        self.inner.runtime_error()
+    }
+
     pub(crate) fn frame_layout(&self) -> render::FrameLayout {
         self.inner.frame_layout()
     }
@@ -1451,7 +1637,9 @@ mod tests {
     use engine_core::SpacewarsConfig;
     use scenario_spacewars::{ShipForm, SpacewarsState};
 
-    use crate::client_scenarios::{PizzaClientScenario, SpacewarsClientScenario};
+    use crate::client_scenarios::{
+        FallingClientScenario, PizzaClientScenario, SpacewarsClientScenario,
+    };
     use crate::input::ScreenPointerEvent;
 
     const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
@@ -1534,6 +1722,26 @@ mod tests {
     }
 
     #[test]
+    fn failed_replacement_retains_the_current_usable_scenario() {
+        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
+        spacewars_state_mut(&mut scenario).tick = 73;
+
+        let error = replace_scenario(&mut scenario, || {
+            Err(HostError::ScenarioCreation {
+                name: "spacewars".into(),
+                source: ScenarioCreateError::MissingAsset {
+                    name: "spacewars",
+                    asset: "missing-test-asset".into(),
+                },
+            })
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("missing-test-asset"));
+        assert_eq!(spacewars_state(&scenario).tick, 73);
+    }
+
+    #[test]
     fn performance_stats_reports_target_and_measured_rates() {
         let start = Instant::now();
         let mut stats = PerformanceStats::new(TickModel::FixedTimestep { hz: 60 }, start);
@@ -1554,6 +1762,228 @@ mod tests {
         assert!(scenario.render_frame().layers.is_empty());
         assert_eq!(scenario.center_panel_state(false, false, ""), None);
         assert_eq!(scenario.registration().id, "null");
+    }
+
+    #[test]
+    fn falling_hosts_a_complete_native_frame_without_vector_fallback() {
+        let scenario = hosted_scenario("falling", 0).unwrap();
+        let frame = scenario.native_video_frame().unwrap();
+
+        assert!(scenario.registration().capabilities.native_video);
+        assert!(scenario.registration().capabilities.captures_gamepad_start);
+        assert!(matches!(scenario.tick_model(), TickModel::EmulatorClock));
+        assert_eq!((frame.width, frame.height), (256, 240));
+        assert_eq!(
+            (frame.visible_crop.width, frame.visible_crop.height),
+            (256, 224)
+        );
+        assert!(frame.has_valid_layout());
+        assert!(
+            scenario
+                .render_frames(RenderBackend::Vector, TEST_VIEWPORT)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn emulator_clock_accumulates_elapsed_time_instead_of_following_ui_ticks() {
+        let mut scenario = hosted_scenario("falling", 0).unwrap();
+        let initial_frame_id = scenario.native_video_frame().unwrap().frame_id;
+        let mut input = ClientInput::default();
+        input.press(input::GameKey::NesStart);
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+        let frame_dt = fixed_step_duration(TickModel::EmulatorClock).unwrap();
+
+        let result = step_scenario(
+            &mut scenario,
+            "falling",
+            0,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            frame_dt - Duration::from_nanos(1),
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert_eq!(result.updates, 0);
+        assert_eq!(
+            scenario.native_video_frame().unwrap().frame_id,
+            initial_frame_id
+        );
+
+        let result = step_scenario(
+            &mut scenario,
+            "falling",
+            0,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            Duration::from_nanos(1),
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert_eq!(result.updates, 1);
+        assert_eq!(
+            scenario.native_video_frame().unwrap().frame_id,
+            initial_frame_id + 1
+        );
+        let falling = scenario
+            .as_any()
+            .downcast_ref::<FallingClientScenario>()
+            .expect("scenario should host Falling");
+        assert!(
+            falling
+                .state
+                .controller()
+                .contains(engine_nes::ControllerButtons::START)
+        );
+    }
+
+    #[test]
+    fn falling_pause_restart_launcher_return_and_relaunch_are_deterministic() {
+        let mut scenario = hosted_scenario("falling", 7).unwrap();
+        let initial_hash = scenario
+            .as_any()
+            .downcast_ref::<FallingClientScenario>()
+            .unwrap()
+            .state
+            .machine()
+            .state_hash();
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+        let frame_dt = fixed_step_duration(TickModel::EmulatorClock).unwrap();
+
+        step_scenario(
+            &mut scenario,
+            "falling",
+            7,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            frame_dt * 2,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        input.press(input::GameKey::Pause);
+        step_scenario(
+            &mut scenario,
+            "falling",
+            7,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            frame_dt,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert!(paused);
+
+        controls.request_restart();
+        let restart = step_scenario(
+            &mut scenario,
+            "falling",
+            7,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert_eq!(restart.scenario_error_text.as_deref(), Some(""));
+        assert!(!paused);
+        let restarted_hash = scenario
+            .as_any()
+            .downcast_ref::<FallingClientScenario>()
+            .unwrap()
+            .state
+            .machine()
+            .state_hash();
+        assert_eq!(restarted_hash, initial_hash);
+
+        input.press(input::GameKey::Pause);
+        step_scenario(
+            &mut scenario,
+            "falling",
+            7,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        input.press(input::GameKey::ReturnLauncher);
+        let result = step_scenario(
+            &mut scenario,
+            "falling",
+            7,
+            TickModel::EmulatorClock,
+            Some(frame_dt),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert!(result.return_to_launcher);
+
+        let relaunched = hosted_scenario("falling", 7).unwrap();
+        let relaunched_hash = relaunched
+            .as_any()
+            .downcast_ref::<FallingClientScenario>()
+            .unwrap()
+            .state
+            .machine()
+            .state_hash();
+        assert_eq!(relaunched_hash, initial_hash);
     }
 
     #[test]

@@ -8,6 +8,7 @@ mod gamepad;
 mod host;
 mod input;
 mod ipc;
+mod native_video;
 mod raster;
 mod render;
 mod settings;
@@ -347,15 +348,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
     } else if launch_directly {
         let scenario_settings = settings.read().unwrap().clone();
-        *render_timer.borrow_mut() = Some(start_scenario_from_launch(
+        match start_scenario_from_launch(
             &window,
             &effective_launch,
             args.benchmark,
             args.benchmark_configuration(),
             Rc::clone(&scenario_controls),
             Rc::clone(&input),
-            scenario_settings,
-        )?);
+            scenario_settings.clone(),
+        ) {
+            Ok(timer) => *render_timer.borrow_mut() = Some(timer),
+            Err(error) => {
+                tracing::error!(%error, "direct scenario launch failed; showing launcher.");
+                show_launcher(&window, &effective_launch, &scenario_settings);
+                window.set_launcher_error_text(SharedString::from(error.to_string()));
+            }
+        }
     } else {
         show_launcher(&window, &effective_launch, &settings.read().unwrap());
     }
@@ -470,11 +478,13 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Setti
     window.set_primitives(ModelRc::new(VecModel::from(Vec::<ScenePrimitive>::new())));
     window.set_vector_minimaps_visible(false);
     window.set_raster_visible(false);
+    window.set_native_video_visible(false);
     window.set_spacewars_ui_visible(false);
     window.set_scenario_pointer_enabled(false);
     window.set_ingame_menu_visible(false);
     window.set_ingame_controls_visible(false);
     window.set_game_over_visible(false);
+    window.set_scenario_error_text(SharedString::from(""));
     let scenario_names = host::launcher_scenario_names()
         .into_iter()
         .map(SharedString::from)
@@ -516,11 +526,13 @@ fn apply_scenario_metadata(window: &MainWindow, scenario: &str) {
     let Some(registration) = host::scenario_registration(scenario) else {
         window.set_scenario_benchmark_available(false);
         window.set_scenario_player_zoom_available(false);
+        window.set_scenario_captures_gamepad_start(false);
         window.set_scenario_controls_help(SharedString::from(""));
         return;
     };
     window.set_scenario_benchmark_available(registration.capabilities.benchmark);
     window.set_scenario_player_zoom_available(registration.capabilities.player_zoom);
+    window.set_scenario_captures_gamepad_start(registration.capabilities.captures_gamepad_start);
     window.set_scenario_controls_help(SharedString::from(registration.controls_help));
 }
 
@@ -887,11 +899,15 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 7,
         "pizza" => 5,
+        "falling" => 1,
         _ => 3,
     }
 }
 
 fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
+    if window.get_launcher_scenario() == "falling" {
+        return;
+    }
     let focus = window.get_launcher_settings_focus_index();
     if focus == 0 {
         let next = cycle_label(

@@ -13,6 +13,8 @@ path = "src/main.rs"
 [dependencies]
 engine-common = { workspace = true }
 engine-core = { workspace = true }
+engine-nes = { workspace = true }
+scenario-falling = { workspace = true }
 scenario-null = { workspace = true }
 scenario-pizza = { workspace = true }
 scenario-rover-lab = { workspace = true }

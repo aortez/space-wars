@@ -10,6 +10,7 @@ members = [
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
+    "scenarios/falling",
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
@@ -52,6 +53,7 @@ engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
+scenario-falling = { path = "scenarios/falling" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
