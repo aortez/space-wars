@@ -59,3 +59,9 @@ scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
+
+[profile.release]
+# Cross-crate inlining materially improves the tightly interleaved NES
+# CPU/PPU/APU scheduler on the Raspberry Pi 5.
+lto = "fat"
+codegen-units = 1

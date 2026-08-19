@@ -111,11 +111,26 @@ backend. Normal UI startup should be tested separately because Slint backend
 selection, fullscreen behavior, and physical keyboard input are display-stack
 dependent.
 
+The Yocto image also installs the target-independent NES benchmark. It uses the
+bundled Falling ROM and does not need a window, input device, or audio device:
+
+```sh
+falling-benchmark 2000 120
+```
+
+It emits one full-video/audio row and one no-output row. Record both JSON lines;
+their state hashes must match, and the full row's `core_realtime_multiple` must
+be at least `4.0` for the initial NES milestone. `wall_realtime_multiple`
+includes output checksum validation, while tail cost is reported separately as
+`frame_ns_p95`, `frame_ns_p99`, and `frame_ns_max`.
+
 ## Manual Pi Validation
 
 1. Confirm the binary starts with `--help`.
 2. Confirm `/var/lib/spacewars` exists and is writable by the service user.
-3. Run the headless benchmark command on the Pi with `--benchmark-seconds 10`.
+3. Run the headless Spacewars benchmark command on the Pi with
+   `--benchmark-seconds 10`, then run `falling-benchmark 2000 120` and save both
+   NES JSON rows.
 4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0`.
 5. Confirm fullscreen display startup.
 6. Confirm `spacewars` belongs to the `input` group and can read the attached

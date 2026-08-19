@@ -1215,6 +1215,26 @@ mod tests {
         assert_eq!(paused.audio_queue_depth_samples, 0);
     }
 
+    #[test]
+    fn repeated_start_stop_soak_joins_workers_and_flushes_audio() {
+        for _ in 0..12 {
+            let audio = RealtimeAudioEndpoint::new(1);
+            let mut runtime =
+                NesRealtimeRuntime::spawn_with_audio_endpoint(FakeCore::new(), audio).unwrap();
+            runtime.set_paused(false);
+            wait_for(Duration::from_secs(1), || {
+                runtime.telemetry().emulated_frames >= 1
+            });
+
+            runtime.stop_and_join();
+            let stopped = runtime.telemetry();
+            assert!(!stopped.audio_active);
+            assert_eq!(stopped.audio_queue_depth_samples, 0);
+            std::thread::sleep(Duration::from_millis(20));
+            assert_eq!(runtime.telemetry().emulated_frames, stopped.emulated_frames);
+        }
+    }
+
     fn wait_for(timeout: Duration, condition: impl Fn() -> bool) {
         let deadline = Instant::now() + timeout;
         while !condition() {

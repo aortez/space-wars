@@ -1,7 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: M22a-M22g implemented; M22h cross-target/performance validation is
-next.
+Status: M22a-M22g implemented. M22h implementation and automated cross-target
+validation are complete; the final physical Pi controller/audio soak remains.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -1132,6 +1132,25 @@ Exit criteria:
 - Realtime play has no accumulating video queue, stale input, leaked worker,
   or leaked audio device.
 - Adding a new scenario does not copy emulator code.
+
+Implemented evidence (2026-08-18): CI now owns formatter, core/golden/state,
+clippy, bundled-ROM benchmark, Linux workspace, native Windows, and AArch64
+checks. `falling-benchmark` emits versioned NDJSON for the embedded ROM and
+asserts that full-output and headless execution reach identical scheduler work
+and authoritative state. A Rust 1.89 Yocto build deployed successfully to the
+Pi 5 kiosk; three installed full video/audio runs measured 4.104-4.117x
+realtime with 4.070-4.138 ms p99 core frame time and hashes identical to the
+desktop. Fat LTO plus one code-generation unit supplied the measured headroom;
+an explicit Cortex-A76 target was slower and was not retained.
+
+The pinned DirtSim comparison was rerun on the same desktop and remains a
+faster optimization oracle, while its different scheduler/APU/presentation
+work prevents treating throughput as an equivalence test. A mapper/scenario
+extension guide documents the static mapper seam, state-format obligations,
+licensed asset workflow, shared realtime adapter, and required validation.
+Repeated bounded worker/audio lifecycle behavior is covered in tests. Exact
+commands, target identity, hashes, performance ranges, and the remaining
+physical Pi controller/audio soak are recorded in `docs/nes-validation.md`.
 
 ## Suggested pull-request boundaries
 

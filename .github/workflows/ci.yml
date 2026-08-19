@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nes-core:
+    name: NES core, golden tests, and benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --all -- --check
+      - run: cargo test --locked -p engine-nes -p scenario-falling --all-targets
+      - run: cargo clippy --locked -p engine-nes -p scenario-falling --all-targets --no-deps -- -D warnings
+      - name: Exercise bundled-ROM release benchmark
+        run: cargo run --locked --release -p scenario-falling --bin falling-benchmark -- 120 10
+
+  linux-workspace:
+    name: Linux workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Install native client dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libudev-dev
+      - run: cargo test --locked --workspace --all-targets
+
+  windows-client:
+    name: Windows client
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - run: cargo test --locked -p engine-nes -p scenario-falling --all-targets
+      - run: cargo check --locked -p engine-client --all-targets
+
+  aarch64-core:
+    name: AArch64 core and scenario
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: Install AArch64 linker
+        run: sudo apt-get update && sudo apt-get install --yes gcc-aarch64-linux-gnu
+      - run: cargo check --locked -p engine-nes -p scenario-falling --target aarch64-unknown-linux-gnu
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc

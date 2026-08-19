@@ -44,7 +44,11 @@ Falling now exercises that core through a dedicated realtime worker, bounded
 input/video/audio handoffs, and the ordinary launcher, pause, restart, and
 relaunch lifecycle. See
 [`docs/design/rust-nes-engine.md`](docs/design/rust-nes-engine.md) and
-[`crates/engine-nes/REFERENCE.md`](crates/engine-nes/REFERENCE.md).
+[`crates/engine-nes/REFERENCE.md`](crates/engine-nes/REFERENCE.md). The mapper
+and additional-scenario workflow is in
+[`docs/nes-extension-guide.md`](docs/nes-extension-guide.md), and desktop/Pi
+milestone results are recorded in
+[`docs/nes-validation.md`](docs/nes-validation.md).
 
 ## Run locally
 

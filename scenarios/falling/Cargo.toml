@@ -7,6 +7,10 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Rust-native NES Falling scenario"
 
+[[bin]]
+name = "falling-benchmark"
+path = "src/bin/falling_benchmark.rs"
+
 [dependencies]
 engine-common = { workspace = true }
 engine-nes = { workspace = true }

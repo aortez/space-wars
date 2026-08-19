@@ -21,5 +21,18 @@ cargo run -p engine-client -- --scenario falling
 The game uses d-pad directions and Start; standard A/B input is passed through
 as well. On gamepad, Select is reserved for the host controls menu. On keyboard,
 use arrows, `Z`/`Space` for A, `X` for B, `Tab` for NES Select, `Enter` for
-Start, and `Esc` for the host pause menu. This milestone intentionally disables
-device audio while preserving deterministic APU execution.
+Start, and `Esc` for the host pause menu. The client sends the deterministic
+48 kHz APU output through a shallow bounded device buffer; if no output device
+is available, gameplay continues silently.
+
+Run the same bundled-ROM full-output and headless benchmark used for desktop
+and Raspberry Pi validation with:
+
+```sh
+cargo run --release -p scenario-falling --bin falling-benchmark -- 2000 120
+```
+
+The two newline-delimited JSON rows include core execution average and
+p50/p95/p99/max frame times plus wall time including output checksum
+validation. They must finish with the same authoritative state hash regardless
+of whether video and audio output are enabled.

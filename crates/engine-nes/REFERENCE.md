@@ -244,7 +244,16 @@ cargo run --release -p engine-nes --example apu_benchmark -- \
   1000 /tmp/falling-52dcb8a9.nes
 cargo run --release -p engine-nes --example state_benchmark -- \
   2000 /tmp/falling-52dcb8a9.nes
+cargo run --release -p scenario-falling --bin falling-benchmark -- 2000 120
 ```
+
+The last command needs no external ROM path: it benchmarks the licensed ROM
+embedded by `scenario-falling`. It prints full-video/audio and no-output rows
+with core execution average and p50/p95/p99/max frame times, wall time including
+checksum validation, exact emulated-time headroom for both, and matching
+authoritative state hashes. The same installed binary is used on the Pi so
+desktop and kiosk measurements cannot silently select different assets or
+workloads.
 
 `tests/no_allocation.rs` wraps the system allocator only in its test process
 and independently asserts that 10,000 steady-state CPU instructions and
