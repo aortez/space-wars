@@ -190,6 +190,17 @@ pub struct Cpu {
     irq_pending: bool,
 }
 
+#[derive(Default)]
+struct AccessProbe;
+
+impl CpuBus for AccessProbe {
+    fn read(&mut self, _address: u16) -> u8 {
+        0
+    }
+
+    fn write(&mut self, _address: u16, _value: u8) {}
+}
+
 impl Default for Cpu {
     fn default() -> Self {
         Self::new()
@@ -278,6 +289,19 @@ impl Cpu {
         matches!(self.state, CpuState::Fetch)
     }
 
+    /// Returns whether RDY would be unable to halt the CPU on its next bus
+    /// cycle. The RP2A03 retries a pending DMA halt after CPU writes, including
+    /// both writes of read-modify-write instructions.
+    pub(crate) fn next_cycle_is_write(&self) -> Result<bool, CpuError> {
+        let mut probe_cpu = self.clone();
+        let mut probe_bus = AccessProbe;
+        let cycle = probe_cpu.clock(&mut probe_bus)?;
+        Ok(matches!(
+            cycle.access.kind,
+            BusAccessKind::Write | BusAccessKind::DummyWrite
+        ))
+    }
+
     pub fn request_nmi(&mut self) {
         self.nmi_pending = true;
     }
@@ -290,21 +314,18 @@ impl Cpu {
         self.nmi_edge_pending = true;
     }
 
-    /// Promotes an edge observed while an external scheduler held the CPU at
-    /// an instruction boundary, such as an OAM DMA stall.
-    pub(crate) fn poll_nmi_after_stall(&mut self) {
+    /// Polls interrupt lines after an external scheduler held the CPU at an
+    /// instruction boundary, such as an OAM or DMC DMA stall.
+    pub(crate) fn poll_interrupts_after_stall(&mut self) {
         debug_assert!(self.at_instruction_boundary());
         self.poll_nmi_edge();
+        if self.irq_line && !self.registers.status.contains(Status::INTERRUPT_DISABLE) {
+            self.irq_pending = true;
+        }
     }
 
     pub fn set_irq_line(&mut self, asserted: bool) {
         self.irq_line = asserted;
-        if asserted
-            && self.at_instruction_boundary()
-            && !self.registers.status.contains(Status::INTERRUPT_DISABLE)
-        {
-            self.irq_pending = true;
-        }
     }
 
     pub fn restart_reset_sequence(&mut self) {

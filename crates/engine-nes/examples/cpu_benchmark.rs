@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         black_box(instruction_machine.step_instruction()?);
     }
     print_result(
-        "instruction-step-v1",
+        "instruction-step-v2",
         instructions,
         instruction_machine.cpu().cycles() - start_cycles,
         started.elapsed(),
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         black_box(cycle);
     }
     print_result(
-        "cycle-scheduler-v1",
+        "cycle-scheduler-v2",
         instructions,
         scheduler_machine.cpu().cycles() - start_cycles,
         started.elapsed(),
@@ -88,10 +88,10 @@ fn print_result(api: &str, instructions: u64, cpu_cycles: u64, elapsed: Duration
 
     println!(
         concat!(
-            "{{\"schema\":\"engine-nes-cpu-benchmark-v1\",",
+            "{{\"schema\":\"engine-nes-cpu-benchmark-v2\",",
             "\"crate_version\":\"{}\",\"profile\":\"{}\",",
             "\"os\":\"{}\",\"arch\":\"{}\",\"api\":\"{}\",",
-            "\"workload\":\"generated-nrom-mixed-loop-v1\",",
+            "\"workload\":\"generated-nrom-mixed-loop-v2\",",
             "\"configuration\":{{\"region\":\"ntsc\",\"ram_init\":\"zero\",",
             "\"video_output\":\"enabled\",\"audio_output\":\"enabled\",",
             "\"oam_dma_alignment\":\"short_on_even_slot\"}},",

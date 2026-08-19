@@ -1,7 +1,7 @@
 # Rust NES engine implementation plan
 
-Status: M22a-M22d implemented; M22e (APU and deterministic sample output) is
-next.
+Status: M22a-M22e implemented; M22f (host contracts, native video, and the
+silent Falling scenario) is next.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -1002,6 +1002,20 @@ Exit criteria:
 - DMC/IRQ/DMA interactions have focused coverage.
 - Full machine work meets the initial headroom target or has an evidence-backed
   optimization plan.
+
+Implemented evidence (2026-08-18): pulse 1/2, triangle, noise, DMC, length,
+envelope, sweep, linear counter, frame IRQ, DMC IRQ/DMA, fixed-point nonlinear
+mixing, integer high-pass filtering, and exact rational 48 kHz sample cadence
+all advance in the shared machine scheduler. Samples use a reusable fixed
+buffer; disabling audio suppresses mixing/output while preserving identical
+authoritative state. Checkpoints, durable savestates, snapshots, and version-2
+state hashes include complete APU and in-flight DMC state. Generated tests pin
+sample hashes and reproduce output across checkpoint/savestate branches.
+Optional external runs pass the modern 8/8 APU suite, the older 11/11 detailed
+APU suite, and both cycle-exact DMC/OAM DMA interaction ROMs. Falling with full
+CPU/PPU/APU work measures about 911 unpaced frames/s on the reference desktop,
+well above the initial 4x-realtime target. Exact inputs, hashes, timing tables,
+commands, and benchmark rows are in `crates/engine-nes/REFERENCE.md`.
 
 ### M22f: Host contracts, native video, and silent Falling scenario
 

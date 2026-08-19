@@ -174,6 +174,30 @@ fn indexed_store_always_performs_a_dummy_read() {
 }
 
 #[test]
+fn dma_halt_probe_identifies_cpu_write_and_rmw_write_cycles() {
+    let (mut store, mut store_bus) = setup(0x8d, &[0x00, 0x20]); // STA $2000
+    assert!(!store.next_cycle_is_write().unwrap()); // opcode
+    store.clock(&mut store_bus).unwrap();
+    assert!(!store.next_cycle_is_write().unwrap()); // low address
+    store.clock(&mut store_bus).unwrap();
+    assert!(!store.next_cycle_is_write().unwrap()); // high address
+    store.clock(&mut store_bus).unwrap();
+    assert!(store.next_cycle_is_write().unwrap()); // store
+    store.clock(&mut store_bus).unwrap();
+    assert!(!store.next_cycle_is_write().unwrap()); // next opcode
+
+    let (mut rmw, mut rmw_bus) = setup(0x06, &[0x42]); // ASL $42
+    rmw_bus.memory[0x42] = 0x81;
+    for _ in 0..3 {
+        assert!(!rmw.next_cycle_is_write().unwrap());
+        rmw.clock(&mut rmw_bus).unwrap();
+    }
+    assert!(rmw.next_cycle_is_write().unwrap()); // old-value dummy write
+    rmw.clock(&mut rmw_bus).unwrap();
+    assert!(rmw.next_cycle_is_write().unwrap()); // modified-value write
+}
+
+#[test]
 fn read_modify_write_exposes_old_and_new_writes() {
     let (mut cpu, mut bus) = setup(0x06, &[0x42]); // ASL $42
     bus.memory[0x42] = 0x81;

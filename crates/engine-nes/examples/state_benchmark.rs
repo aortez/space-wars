@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let rom = fs::read(path)?;
         (
             NesMachine::from_ines(&rom, MachineConfig::default())?,
-            "external-nrom-state-v1",
+            "external-nrom-state-v2",
             fnv1a64(&rom),
         )
     } else {
@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut machine = NesMachine::from_ines(&rom, MachineConfig::default())?;
         machine.bus_mut().write(0x2000, 0x80);
         machine.bus_mut().write(0x2001, 0x1e);
-        (machine, "generated-nrom-state-v1", fnv1a64(&rom))
+        (machine, "generated-nrom-state-v2", fnv1a64(&rom))
     };
 
     for _ in 0..100 {
@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         black_box(machine.state_hash());
     }
     print_result(
-        "state-hash-v1",
+        "state-hash-v2",
         workload,
         rom_hash,
         iterations,
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         black_box(checkpoint.state_hash());
     }
     print_result(
-        "checkpoint-create-v1",
+        "checkpoint-create-v2",
         workload,
         rom_hash,
         iterations,
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let elapsed_ns = started.elapsed().as_nanos();
     assert_eq!(machine.state_hash(), expected_hash);
     print_result(
-        "checkpoint-restore-v1",
+        "checkpoint-restore-v2",
         workload,
         rom_hash,
         iterations,
@@ -110,7 +110,7 @@ fn print_result(
     };
     println!(
         concat!(
-            "{{\"schema\":\"engine-nes-state-benchmark-v1\",",
+            "{{\"schema\":\"engine-nes-state-benchmark-v2\",",
             "\"crate_version\":\"{}\",\"profile\":\"{}\",",
             "\"os\":\"{}\",\"arch\":\"{}\",\"operation\":\"{}\",",
             "\"workload\":\"{}\",\"rom_fnv1a64\":\"{:016x}\",",

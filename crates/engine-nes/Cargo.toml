@@ -18,6 +18,10 @@ name = "cpu_benchmark"
 path = "examples/cpu_benchmark.rs"
 
 [[example]]
+name = "apu_benchmark"
+path = "examples/apu_benchmark.rs"
+
+[[example]]
 name = "cpu_trace"
 path = "examples/cpu_trace.rs"
 

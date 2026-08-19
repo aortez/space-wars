@@ -32,7 +32,7 @@ The pinned Falling header describes mapper 0 with two 16 KiB PRG banks and one
 
 ## Hardware references
 
-These references were consulted on 2026-08-17:
+These references were consulted on 2026-08-17 and 2026-08-18:
 
 - [NESdev CPU](https://www.nesdev.org/wiki/CPU)
 - [NESdev 6502 cycle times](https://www.nesdev.org/wiki/6502_cycle_times)
@@ -47,6 +47,14 @@ These references were consulted on 2026-08-17:
 - [NESdev PPU frame timing](https://www.nesdev.org/wiki/PPU_frame_timing)
 - [NESdev PPU rendering](https://www.nesdev.org/wiki/PPU_rendering)
 - [NESdev PPU sprite evaluation](https://www.nesdev.org/wiki/PPU_sprite_evaluation)
+- [NESdev APU](https://www.nesdev.org/wiki/APU)
+- [NESdev pulse channel](https://www.nesdev.org/wiki/APU_Pulse)
+- [NESdev triangle channel](https://www.nesdev.org/wiki/APU_Triangle)
+- [NESdev noise channel](https://www.nesdev.org/wiki/APU_Noise)
+- [NESdev sweep unit](https://www.nesdev.org/wiki/APU_Sweep)
+- [NESdev frame counter](https://www.nesdev.org/wiki/APU_Frame_Counter)
+- [NESdev DMC](https://www.nesdev.org/wiki/APU_DMC)
+- [NESdev mixer](https://www.nesdev.org/wiki/APU_Mixer)
 - [Visual6502 6502 instruction timing](http://www.visual6502.org/wiki/index.php?title=6502_all_256_Opcodes)
 
 Tests near subtle behavior state the relevant invariant directly. Reference
@@ -159,8 +167,10 @@ always completes the final CPU-rate slot's three PPU clocks, so a result can be
 up to two PPU clocks past the exact frame edge; `FrameTiming` reports the slots
 and physical clocks consumed. `run_frame_with_input` retains a caller-supplied
 sequence ID, while `run_frame` assigns the next wrapping ID automatically.
-Video is a borrow of the reusable 256 x 240 palette buffer. The audio slice is
-empty until M22e adds the APU without changing this frame API.
+Video is a borrow of the reusable 256 x 240 palette buffer. Audio is a borrow
+of a reusable bounded mono `i16` buffer containing the exact 48 kHz samples
+produced during the call. Audio-disabled machines return an empty slice while
+the complete APU, IRQ, DMA, and sample-phase state still advances.
 
 The state surfaces have deliberately different stability contracts:
 
@@ -172,23 +182,49 @@ The state surfaces have deliberately different stability contracts:
   remain shared through `Arc`; restoration copies mutable fixed-size buffers in
   place and preserves the target machine's video/audio output policy.
 - `save_state` emits an explicit little-endian durable envelope beginning with
-  `SWNESST\0`. Version 1 carries flags, canonical ROM byte length and FNV-1a 64
+  `SWNESST\0`. Version 2 carries flags, canonical ROM byte length and FNV-1a 64
   identity, payload length, payload checksum, and an explicit hardware-state
   payload. Payloads are capped at 128 KiB. Loading is transactional and rejects
   unsupported versions/flags, truncation, size/length/checksum errors, the wrong
   ROM, invalid field values, and trailing payload bytes.
-- `state_hash` version 1 streams FNV-1a 64 without allocation over a domain tag,
+- `state_hash` version 2 streams FNV-1a 64 without allocation over a domain tag,
   ROM identity, configuration that affects emulation, and complete mutable
   hardware state. It excludes the derived framebuffer and host video/audio
   output selection, allowing visible and headless machines to compare equal.
 
 `tests/state_contract.rs` covers fixed input scripts, a checked-in generated-ROM
-golden hash, partial-instruction and active-DMA checkpoint/savestate branches,
+golden hash, partial-instruction and active OAM/DMC DMA checkpoint/savestate branches,
 CHR/PRG/CPU memory, output-policy preservation, transactional malformed-state
 handling, and four parallel machines sharing one cartridge image. The allocator
 test also covers `run_frame` and repeated checkpoint restoration. Reference-host
 Falling evidence is recorded in
 [`tests/reference/falling-rust-m22d.txt`](tests/reference/falling-rust-m22d.txt).
+
+## APU and deterministic sample output
+
+The APU implements both pulse channels, triangle, noise, DMC, envelopes,
+length/linear counters, sweep, the four/five-step frame sequencer, frame and
+DMC IRQs, and DMC memory reads. Fixed integer lookup tables reproduce the
+documented nonlinear pulse and TND mixer formulas without platform-dependent
+floating point. A fixed-point one-pole high-pass removes DC after exact
+rational NTSC-to-48-kHz accumulation.
+
+DMC and OAM are independent DMA units in the scheduler. Halt and dummy phases
+can overlap ordinary OAM accesses; a DMC get wins a read collision and forces
+OAM to realign. CPU writes defer the halt instead of being swallowed. The two
+external `sprdma_and_dmc_dma` ROMs pass their exact timing tables, covering
+ordinary 3/4-cycle DMC stalls, `$4014`, OAM overlap, post-OAM CPU writes, and
+both ends of OAM transfer. Later-chip implicit-stop anomalies and the 2A03's
+internal-register address-line conflicts remain compatibility follow-ups; they
+are not needed by Falling or claimed by this milestone.
+
+The generated audio ROM is the CI-owned deterministic oracle. Two independent
+machines reproduce identical samples, checkpoint and durable-state branches
+reproduce the next sample buffer exactly, and audio-disabled execution reaches
+the same authoritative hash. Its eighth-frame sample FNV-1a 64 is
+`cced032a9bd17f6b`. Complete M22e hashes, conformance checksums, exact DMA
+tables, and benchmark rows are recorded in
+[`tests/reference/falling-rust-m22e.txt`](tests/reference/falling-rust-m22e.txt).
 
 ## Benchmarks
 
@@ -203,41 +239,45 @@ cargo run --release -p engine-nes --example cpu_benchmark -- 10000000
 cargo run --release -p engine-nes --example ppu_benchmark -- 1000
 cargo run --release -p engine-nes --example ppu_benchmark -- \
   1000 /tmp/falling-52dcb8a9.nes
+cargo run --release -p engine-nes --example apu_benchmark -- 1000
+cargo run --release -p engine-nes --example apu_benchmark -- \
+  1000 /tmp/falling-52dcb8a9.nes
 cargo run --release -p engine-nes --example state_benchmark -- \
   2000 /tmp/falling-52dcb8a9.nes
 ```
 
 `tests/no_allocation.rs` wraps the system allocator only in its test process
 and independently asserts that 10,000 steady-state CPU instructions and
-10,000 rendering scheduler slots, three complete `run_frame` calls, and 100
-checkpoint restores allocate, reallocate, and deallocate nothing.
+10,000 complete CPU/PPU/APU scheduler slots, three complete `run_frame` calls
+with audio samples, and 100 checkpoint restores allocate, reallocate, and
+deallocate nothing.
 
 The CPU example emits two versioned newline-delimited JSON objects containing
 crate/profile, OS/architecture, API/workload version, configuration,
 instruction and cycle counts, elapsed time, throughput, and a deterministic
-RAM signature. `instruction-step-v1` measures the synchronous instruction API;
-`cycle-scheduler-v1` measures the lower-level path that exposes every CPU/DMA
-scheduler slot. The PPU example emits one equivalent row with ROM checksum,
-frame/slot counts, throughput, and the final palette hash.
+RAM signature. `instruction-step-v2` and `cycle-scheduler-v2` now share the
+same complete machine clock path, so neither can accidentally omit APU or DMA
+work. Both measure about 30.6 MHz of emulated CPU-rate slots on the reference
+host for the generated mixed loop.
 
-Before PPU work, the instruction path ran at roughly 90 MHz of emulated CPU
-bus clocks and the fully observable scheduler at roughly 56 MHz. With three
-scalar PPU dots now executed for every CPU-rate slot, the same paths measure
-about 49 MHz and 40 MHz respectively. Keeping both rows makes abstraction cost
-visible instead of folding it into a single favorable number.
+The APU benchmark disables video and runs each ROM with audio output enabled
+and disabled. The generated tone measures about 1,079 frames/s with mixing and
+1,313 without it; Falling measures about 924 and 1,024 frames/s respectively.
+Each pair reaches the same authoritative state hash. The enabled rows also
+record sample count, hash, nonzero count, absolute sum, and peak, so a fast but
+silent or divergent mixer cannot look successful.
 
-The scalar frame benchmark measures 1,423-1,439 generated frames/s and about
-1,378 Falling frames/s after 100 warmup frames: roughly 23 times NTSC realtime.
-The pinned DirtSim `palette_no_apu` workload measures about 2,736-2,745
-frames/s on this host. DirtSim's deferred visible-span renderer is therefore
-about twice as fast as the intentionally direct Rust dot path. That is a clear
-future profiling/optimization target; M22c preserves the scalar path and exact
-frame evidence first.
+The scalar full-machine benchmark, including CPU, PPU, APU, framebuffer, and
+48 kHz sample production, measures about 911 Falling frames/s after 100 warmup
+frames: roughly 15 times NTSC realtime and comfortably above the initial 4x
+target. The older pinned DirtSim `palette_no_apu` workload measures about
+2,736-2,745 frames/s; that remains a useful optimization oracle but no longer
+represents equivalent work.
 
-The M22d Falling state benchmark measures version-1 state hashing at about
-11.5 us, checkpoint creation (including that hash) at about 12.2 us, and
-allocation-free checkpoint restoration at about 0.98 us. The current
-ROM-backed-CHR Falling savestate is 76,497 bytes; CHR-RAM cartridges add their
+The M22e Falling state benchmark measures version-2 state hashing at about
+11.60 us, checkpoint creation (including that hash) at about 12.47 us, and
+allocation-free checkpoint restoration at about 0.987 us. The current
+ROM-backed-CHR Falling savestate is 78,239 bytes; CHR-RAM cartridges add their
 bounded 8 KiB mutable pattern memory. These are single-host measurements, while
 the format version, state hashes, and sizes are deterministic evidence.
 
@@ -267,6 +307,29 @@ The 2026-08-17 run matched all 5,003 official-opcode trace entries, including
 PC, A/X/Y, status, stack pointer, and cumulative cycles through cycle 14,579.
 The runner stops when the canonical log enters its starred unofficial-opcode
 section, which is deliberately outside this slice.
+
+## Optional APU and DMA conformance runs
+
+The external APU and DMA ROMs were run locally from
+[`christopherpow/nes-test-roms@97720008e51db15dd281a2a1e64d4c65cf1bca4c`](https://github.com/christopherpow/nes-test-roms/commit/97720008e51db15dd281a2a1e64d4c65cf1bca4c).
+They are not redistributed or required by CI. The same protocol runner used
+for PPU tests supports both modern `$6000` completion and an older
+caller-selected result byte:
+
+```sh
+cargo run --release -p engine-nes --example ppu_conformance -- \
+  /path/to/apu_test/rom_singles/8-dmc_rates.nes 500
+cargo run --release -p engine-nes --example ppu_conformance -- \
+  /path/to/blargg_apu_2005.07.30/11.len_reload_timing.nes 300 f0
+cargo run --release -p engine-nes --example ppu_conformance -- \
+  /path/to/sprdma_and_dmc_dma/sprdma_and_dmc_dma.nes 300
+```
+
+The 2026-08-18 run passes all 8 current `apu_test` single ROMs, all 11
+`blargg_apu_2005.07.30` detailed ROMs, and both normal and 512-cycle-offset
+`sprdma_and_dmc_dma` ROMs. Set `ENGINE_NES_TRACE_APU=1` or
+`ENGINE_NES_TRACE_DMA=1` for event-level diagnosis. Checksums and the exact DMA
+timing output are pinned in `tests/reference/falling-rust-m22e.txt`.
 
 ## Optional PPU conformance runs
 

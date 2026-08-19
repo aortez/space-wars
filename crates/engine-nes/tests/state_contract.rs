@@ -1,9 +1,9 @@
 use std::thread;
 
 use engine_nes::{
-    AudioOutput, CHR_MEMORY_BYTES, CPU_RAM_BYTES, ControllerButtons, CpuBus, CpuPhase, FRAME_WIDTH,
-    FrameInput, MAX_SAVESTATE_PAYLOAD_BYTES, MachineConfig, NesMachine, PRG_RAM_BYTES, StateError,
-    VideoOutput, test_rom::NromBuilder,
+    AudioOutput, CHR_MEMORY_BYTES, CPU_RAM_BYTES, ControllerButtons, CpuBus, CpuPhase, DmcDmaPhase,
+    FRAME_WIDTH, FrameInput, MAX_SAVESTATE_PAYLOAD_BYTES, MachineConfig, NesMachine, PRG_RAM_BYTES,
+    StateError, VideoOutput, test_rom::NromBuilder,
 };
 
 const SAVESTATE_HEADER_BYTES: usize = 36;
@@ -183,6 +183,45 @@ fn checkpoint_and_savestate_resume_active_oam_dma_exactly() {
 }
 
 #[test]
+fn checkpoint_and_savestate_resume_active_dmc_dma_exactly() {
+    let mut rom = NromBuilder::new_32k();
+    rom.write(0x8000, &[0xea, 0x4c, 0x00, 0x80]);
+    rom.write(0xc000, &[0xa5]);
+    rom.set_vectors(0x8000, 0x8000, 0x8000);
+    let bytes = rom.build();
+    let mut source = NesMachine::from_ines(&bytes, MachineConfig::default()).unwrap();
+    source.step_instruction().unwrap();
+    source.bus_mut().write(0x4010, 0x8f);
+    source.bus_mut().write(0x4012, 0x00);
+    source.bus_mut().write(0x4013, 0x00);
+    source.bus_mut().write(0x4015, 0x10);
+    while !source.dmc_dma_active() {
+        source.clock().unwrap();
+    }
+    source.clock().unwrap();
+    assert_eq!(source.snapshot().dmc_dma.unwrap().phase, DmcDmaPhase::Dummy);
+
+    let checkpoint = source.checkpoint();
+    let state = source.save_state();
+    let mut loaded = NesMachine::from_ines(&bytes, MachineConfig::default()).unwrap();
+    loaded.load_state(&state).unwrap();
+    assert_eq!(loaded.snapshot(), source.snapshot());
+
+    for _ in 0..1_000 {
+        source.clock().unwrap();
+        loaded.clock().unwrap();
+    }
+    let expected = source.snapshot();
+    assert_eq!(loaded.snapshot(), expected);
+
+    source.restore(&checkpoint).unwrap();
+    for _ in 0..1_000 {
+        source.clock().unwrap();
+    }
+    assert_eq!(source.snapshot(), expected);
+}
+
+#[test]
 fn savestate_round_trip_preserves_memory_partial_execution_and_output_policy() {
     let mut rom = NromBuilder::new_32k().without_chr();
     rom.write(0x8000, &[0xee, 0x00, 0x60, 0x4c, 0x00, 0x80]); // INC $6000; loop
@@ -220,6 +259,7 @@ fn savestate_round_trip_preserves_memory_partial_execution_and_output_policy() {
     assert_eq!(target.config().video, VideoOutput::Disabled);
     assert_eq!(target.config().audio, AudioOutput::Disabled);
     assert!(target.ppu().framebuffer().is_none());
+    assert!(target.apu().frame_samples().is_empty());
     let memory = target.snapshot().bus.memory;
     assert_eq!(memory.cpu_ram[7], 0xa5);
     assert_eq!(memory.prg_ram[7], 0x5a);
@@ -422,8 +462,8 @@ fn fixed_state_hash_is_a_versioned_regression_artifact() {
             .run_frame_with_input(input_for_frame(frame))
             .unwrap();
     }
-    assert_eq!(machine.state_hash().version, 1);
+    assert_eq!(machine.state_hash().version, 2);
     // Intentionally pinned: changing this requires a documented state-hash
     // version bump or an explained correction to authoritative emulation.
-    assert_eq!(machine.state_hash().value, 0x161e_daff_377f_b6b3);
+    assert_eq!(machine.state_hash().value, 0xbe45_28d4_0459_2bae);
 }

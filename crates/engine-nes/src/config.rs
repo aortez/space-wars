@@ -22,7 +22,7 @@ pub enum VideoOutput {
     Disabled,
 }
 
-/// Whether a host wants reusable samples when the APU is implemented.
+/// Whether a host wants reusable mixed samples from the APU.
 /// Disabling output never disables emulated APU work.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum AudioOutput {

@@ -1,0 +1,79 @@
+schema=engine-nes-rust-apu-m22e-v1
+captured=2026-08-18
+host=oldman-fish
+kernel=Linux 7.0.0-29-generic x86_64
+cpu=AMD Ryzen 7 9800X3D 8-Core Processor
+rustc=1.89.0 (29483883e 2025-08-04)
+engine_nes_slice=m22e
+nes_test_roms_commit=97720008e51db15dd281a2a1e64d4c65cf1bca4c
+falling_commit=52dcb8a951200562e696dfc2aba5d4d14edd0078
+falling_sha256=e22b947542c2d7e595bf84725b333be7af8189c5965b9c53e356a249c7d79943
+falling_fnv1a64=16a4d7eebe1afc30
+state_hash_version=2
+savestate_format_version=2
+savestate_payload_max_bytes=131072
+
+# Generated-ROM deterministic evidence.
+generated_state_hash_after_8_frames_v2=be4528d404592bae
+generated_audio_frame_8_sample_fnv1a64=cced032a9bd17f6b
+generated_audio_checkpoint_reproduction=pass
+generated_audio_savestate_reproduction=pass
+audio_enabled_disabled_authoritative_hash=pass
+
+# Optional external ROMs are not redistributed. Every checksum below belongs
+# to the exact nes_test_roms_commit named above.
+suite=apu_test_rom_singles result=8/8_pass
+rom_sha256 1-len_ctr.nes=aacf86c1d773badd11392e54506a43a06a3dd0b67a4c255909d1daf770a4a1e2
+rom_sha256 2-len_table.nes=c002ff1483b4dfb36a6eb004d49739cd58a2dff16e0bac167d5a7c12235caeeb
+rom_sha256 3-irq_flag.nes=dd888551665937391a2d691b1f96d1858316dbfce4951306146e9e396367f079
+rom_sha256 4-jitter.nes=bff573d72d0f134fe307f0bb8b968b8d2ffdb85e8aadad9c152839068d6db32a
+rom_sha256 5-len_timing.nes=4d88f8cc0b21303dc151af4d0f4169d79284634a73082d7ea1ae5cfafedd1e46
+rom_sha256 6-irq_flag_timing.nes=fc1daff82dd1a49c7c1242392ffbf1c6f44fb70156868582117f2a844cc4dffd
+rom_sha256 7-dmc_basics.nes=547324867ee0ba2aa11401001d8d1288530aa4e0ecaaac1667ce79980a388ec1
+rom_sha256 8-dmc_rates.nes=5d9a79a505b37fa277cacc95a362f7e2a56e59ace7a698213d78432cc06a8867
+
+suite=blargg_apu_2005.07.30 result=11/11_pass legacy_result_address=f0 terminal_frame=300
+rom_sha256 01.len_ctr.nes=e1e3a29ab5369ab84a6f5f2f426c64bde86b9a1d26a906739d43fbf624bb8829
+rom_sha256 02.len_table.nes=63cc6a57fae3da5e30df9520d02b723c5b93789e8a6eef6793f876345b245b51
+rom_sha256 03.irq_flag.nes=6f71c7e3de4b6c00da92c20a86c1c2095196a55dc201ee3286004ecf33a08c2f
+rom_sha256 04.clock_jitter.nes=46fa69b26fe8c24dc1d0b5908f90ab0141972eeb607bd563d28f53d6f4543fe6
+rom_sha256 05.len_timing_mode0.nes=606802d6849ccfcf74e907a8512c03a50d443752d1f616e62a242a1fa7eca0ff
+rom_sha256 06.len_timing_mode1.nes=0f34e26d56ad235d8d6d63565ed4728fbd0b9b8590a4fd4048eaf64283b429d4
+rom_sha256 07.irq_flag_timing.nes=851c9698941d51da34b4bfbc9644aa08ee41b39c6c814cc9b8412c204ea68085
+rom_sha256 08.irq_timing.nes=0a20a2b9ca9a8e78d65b500b161294c889399f0ff048edd104b07b15255946ca
+rom_sha256 09.reset_timing.nes=bb04f8328a51abb2d17e6e5362b8375f3cbfbf0641733d068b22f23e7dc588e6
+rom_sha256 10.len_halt_timing.nes=cbdaa9a5cf9c19ba2360d3349a47922eec25a3e610374d963c422f2b67c57ac9
+rom_sha256 11.len_reload_timing.nes=40e633285a4a8710780bfd80d346dee62406f4be161eb75615f469cd9e84e132
+
+suite=sprdma_and_dmc_dma result=2/2_pass
+rom_sha256 sprdma_and_dmc_dma.nes=db3199bc1b0bdc07a316b3ab999d8fd8bb361456d2154e364c132cb06a26a10f
+rom_sha256 sprdma_and_dmc_dma_512.nes=3789f5134b0561b4344e3f4ce08b4d2a416f67435e083917a80d87fdb9d3583c
+normal_timing=00:527,01:528,02:527,03:528,04:527,05:526,06:525,07:526,08:525,09:526,0A:525,0B:526,0C:525,0D:526,0E:525,0F:526
+offset_512_timing=00:525,01:526,02:525,03:526,04:524,05:525,06:526,07:527,08:527,09:528,0A:526,0B:527,0C:527,0D:528,0E:527,0F:528
+
+# Release build, 100 warmup + 1,000 measured frames per APU/frame row.
+benchmark workload=generated-nrom-apu-v1 audio=enabled frames=1000 cpu_slots=29780666 samples=798690 elapsed_ns=926560647 fps=1079.260 sample_fnv1a64=b21054b686b49a34 nonzero_samples=798617 sample_abs_sum=2658263804 sample_peak=11355 state_fnv1a64=92faaf8f3849e488
+benchmark workload=generated-nrom-apu-v1 audio=disabled frames=1000 cpu_slots=29780666 samples=0 elapsed_ns=761833624 fps=1312.623 state_fnv1a64=92faaf8f3849e488
+benchmark workload=falling-apu-v1 audio=enabled video=disabled frames=1000 cpu_slots=29780500 samples=798685 elapsed_ns=1082421991 fps=923.854 sample_fnv1a64=3ba93ab773b544a5 nonzero_samples=798097 sample_abs_sum=1401020755 sample_peak=10915 state_fnv1a64=91298c4b05a944b8
+benchmark workload=falling-apu-v1 audio=disabled video=disabled frames=1000 cpu_slots=29780500 samples=0 elapsed_ns=976201702 fps=1024.378 state_fnv1a64=91298c4b05a944b8
+benchmark workload=falling-full-machine-frame-v2 frames=1000 cpu_slots=29780500 elapsed_ns=1097644151 fps=911.042 palette_fnv1a64=4b44a595f473f325
+
+# Ten million generated-loop instructions through each complete machine API.
+benchmark api=instruction-step-v2 instructions=10000000 cpu_cycles=26666667 elapsed_ns=872687045 emulated_cpu_mhz=30.557 ram_fnv1a64=7bbd1655ce724225
+benchmark api=cycle-scheduler-v2 instructions=10000000 cpu_cycles=26666667 elapsed_ns=868739143 emulated_cpu_mhz=30.696 ram_fnv1a64=7bbd1655ce724225
+
+# Falling after 100 neutral frames, 2,000 state operations per row.
+falling_frame=100
+falling_state_hash_v2=796f4665e49fbc29
+falling_savestate_bytes=78239
+benchmark operation=state-hash-v2 iterations=2000 elapsed_ns=23209031 ns_per_operation=11604.515
+benchmark operation=checkpoint-create-v2 iterations=2000 elapsed_ns=24945984 ns_per_operation=12472.992
+benchmark operation=checkpoint-restore-v2 iterations=2000 elapsed_ns=1973240 ns_per_operation=986.620
+
+# Automated contract evidence.
+generated_apu_unit_and_frame_tests=pass
+checkpoint_active_dmc_dma=pass
+savestate_active_dmc_dma=pass
+steady_state_cpu_ppu_apu_allocations=0
+run_frame_audio_allocations=0
+checkpoint_restore_allocations=0

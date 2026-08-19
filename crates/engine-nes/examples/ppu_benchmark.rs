@@ -1,4 +1,4 @@
-//! Release-mode full-frame benchmark for the scalar CPU/PPU scheduler.
+//! Release-mode full-frame benchmark for the scalar CPU/PPU/APU scheduler.
 
 use std::{env, error::Error, fs, time::Instant};
 
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let rom = fs::read(path)?;
         (
             NesMachine::from_ines(&rom, config)?,
-            "external-nrom-full-frame-v1",
+            "external-nrom-full-machine-frame-v2",
             fnv1a(&rom),
         )
     } else {
@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut machine = NesMachine::from_ines(&rom, config)?;
         machine.bus_mut().write(0x2000, 0x80);
         machine.bus_mut().write(0x2001, 0x1e);
-        (machine, "generated-nrom-full-frame-v1", fnv1a(&rom))
+        (machine, "generated-nrom-full-machine-frame-v2", fnv1a(&rom))
     };
 
     run_frames(&mut machine, 100)?;
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let seconds = elapsed.as_secs_f64();
     let hash = fnv1a(machine.ppu().framebuffer().expect("video is enabled"));
     println!(
-        "{{\"schema\":\"engine-nes-ppu-benchmark-v1\",\"crate_version\":\"{}\",\"profile\":\"{}\",\"os\":\"{}\",\"arch\":\"{}\",\"workload\":\"{}\",\"rom_fnv1a64\":\"{:016x}\",\"frames\":{},\"cpu_slots\":{},\"elapsed_ns\":{},\"frames_per_second\":{:.3},\"cpu_slots_per_second\":{:.3},\"palette_fnv1a64\":\"{:016x}\"}}",
+        "{{\"schema\":\"engine-nes-frame-benchmark-v2\",\"crate_version\":\"{}\",\"profile\":\"{}\",\"os\":\"{}\",\"arch\":\"{}\",\"workload\":\"{}\",\"rom_fnv1a64\":\"{:016x}\",\"frames\":{},\"cpu_slots\":{},\"elapsed_ns\":{},\"frames_per_second\":{:.3},\"cpu_slots_per_second\":{:.3},\"palette_fnv1a64\":\"{:016x}\"}}",
         env!("CARGO_PKG_VERSION"),
         if cfg!(debug_assertions) {
             "debug"

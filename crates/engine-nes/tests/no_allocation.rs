@@ -7,7 +7,7 @@ use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
 
 #[test]
-fn cpu_and_ppu_steady_state_do_not_allocate() {
+fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     let mut rom = NromBuilder::new_32k();
     // LDX #0; loop: INX; TXA; STA $0200,X; EOR #$5a; ROR A; JMP loop
     rom.write(

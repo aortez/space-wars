@@ -2,7 +2,7 @@
 
 use std::{env, error::Error, fs, path::PathBuf};
 
-use engine_nes::{BusAccessKind, MachineConfig, NesMachine};
+use engine_nes::{BusAccessKind, MachineConfig, MachineCycleSource, NesMachine};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = env::args_os().skip(1);
@@ -29,9 +29,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut machine = NesMachine::from_ines(&rom, MachineConfig::default())?;
     let mut saw_running = false;
     let trace_status = env::var_os("ENGINE_NES_TRACE_PPU_STATUS").is_some();
+    let trace_apu = env::var_os("ENGINE_NES_TRACE_APU").is_some();
+    let trace_dma = env::var_os("ENGINE_NES_TRACE_DMA").is_some();
+    let mut dma_run = None::<(u64, u64, u64, u64)>;
     while machine.ppu().frame_id() < max_frames {
         let timing = machine.ppu().timing();
+        let apu_before = machine.apu().snapshot();
+        let cpu_before = machine.cpu().snapshot();
         let cycle = machine.clock()?;
+        if trace_dma {
+            match cycle.source {
+                MachineCycleSource::Cpu => {
+                    if let Some((start, slots, oam_only, overlapping)) = dma_run.take() {
+                        eprintln!(
+                            "dma-run slots={start}..{} count={slots} oam-only={oam_only} overlapping={overlapping} pc={:04x}",
+                            cycle.slot - 1,
+                            machine.cpu().registers().program_counter,
+                        );
+                    }
+                }
+                source => {
+                    let run = dma_run.get_or_insert((cycle.slot, 0, 0, 0));
+                    run.1 += 1;
+                    run.2 += u64::from(source == MachineCycleSource::OamDma);
+                    run.3 += u64::from(source == MachineCycleSource::OamAndDmcDma);
+                }
+            }
+        }
+        let apu_after = machine.apu().snapshot();
+        let cpu_after = machine.cpu().snapshot();
         if trace_status
             && cycle.access.address & 0xe007 == 0x2002
             && matches!(
@@ -47,6 +73,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                 timing.dot,
                 cycle.access.value,
                 machine.cpu().registers().program_counter,
+            );
+        }
+        if trace_apu
+            && (apu_before.frame_counter.irq_pending != apu_after.frame_counter.irq_pending
+                || cycle.access.address == 0x4017
+                || cycle.access.address == 0x4015
+                || cpu_before.phase != cpu_after.phase
+                    && matches!(cpu_after.phase, engine_nes::CpuPhase::Interrupt { .. }))
+        {
+            eprintln!(
+                "apu-event slot={} pc={:04x} access={:?}@{:04x}={:02x} frame-seq={}->{} frame-irq={}->{} cpu={:?}->{:?}",
+                cycle.slot,
+                cpu_before.registers.program_counter,
+                cycle.access.kind,
+                cycle.access.address,
+                cycle.access.value,
+                apu_before.frame_counter.sequence_cycle,
+                apu_after.frame_counter.sequence_cycle,
+                apu_before.frame_counter.irq_pending,
+                apu_after.frame_counter.irq_pending,
+                cpu_before.phase,
+                cpu_after.phase,
             );
         }
         if trace_status

@@ -1,10 +1,10 @@
 use std::fmt;
 
 use crate::{
-    BusAccess, BusAccessKind, BusSnapshot, Cartridge, CartridgeError, CartridgeIdentity,
-    CartridgeImage, ControllerButtons, Cpu, CpuBus, CpuSnapshot, FRAME_PIXELS, InstructionTrace,
-    MachineConfig, MachineError, NesBus, OamDmaAlignment, Ppu, PpuSnapshot, RamInit, Region,
-    StateError,
+    Apu, BusAccess, BusAccessKind, BusSnapshot, Cartridge, CartridgeError, CartridgeIdentity,
+    CartridgeImage, ControllerButtons, Cpu, CpuBus, CpuSnapshot, DmcDmaKind, DmcDmaRequest,
+    FRAME_PIXELS, InstructionTrace, MachineConfig, MachineError, NesBus, OamDmaAlignment, Ppu,
+    PpuSnapshot, RamInit, Region, StateError,
     state_codec::{StateHasher, StateReader, StateSink, fnv1a64},
 };
 
@@ -46,19 +46,19 @@ pub struct FrameResult<'a> {
     pub timing: FrameTiming,
     pub input: AppliedInput,
     pub video: Option<&'a [u8; FRAME_PIXELS]>,
-    /// Reserved now so the APU slice can add borrowed samples without changing
-    /// the synchronous frame API.
+    /// Reusable 48 kHz mono samples generated since this frame call began.
+    /// Audio-disabled machines return an empty slice while hardware still runs.
     pub audio_samples: &'a [i16],
 }
 
-pub const STATE_HASH_VERSION: u16 = 1;
-pub const SAVESTATE_FORMAT_VERSION: u16 = 1;
+pub const STATE_HASH_VERSION: u16 = 2;
+pub const SAVESTATE_FORMAT_VERSION: u16 = 2;
 pub const MAX_SAVESTATE_PAYLOAD_BYTES: usize = 128 * 1024;
 
 const SAVESTATE_MAGIC: [u8; 8] = *b"SWNESST\0";
 const SAVESTATE_FLAGS: u16 = 0;
 const SAVESTATE_HEADER_BYTES: usize = 8 + 2 + 2 + 4 + 8 + 4 + 8;
-const STATE_HASH_DOMAIN: &[u8] = b"space-wars-engine-nes-authoritative-state-v1\0";
+const STATE_HASH_DOMAIN: &[u8] = b"space-wars-engine-nes-authoritative-state-v2\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StateHash {
@@ -89,6 +89,21 @@ pub struct OamDmaSnapshot {
     pub needs_alignment: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DmcDmaPhase {
+    Halt,
+    Dummy,
+    Align,
+    Read,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DmcDmaSnapshot {
+    pub request: DmcDmaRequest,
+    pub phase: DmcDmaPhase,
+    pub needs_alignment: bool,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MachineSnapshot {
     pub cartridge: CartridgeIdentity,
@@ -97,7 +112,9 @@ pub struct MachineSnapshot {
     pub bus: BusSnapshot,
     pub ppu: PpuSnapshot,
     pub cpu_slots: u64,
+    pub apu_irq_line_sample: bool,
     pub oam_dma: Option<OamDmaSnapshot>,
+    pub dmc_dma: Option<DmcDmaSnapshot>,
     pub last_applied_input: AppliedInput,
     pub state_hash: StateHash,
 }
@@ -136,6 +153,10 @@ pub struct InstructionStep {
 pub enum MachineCycleSource {
     Cpu,
     OamDma,
+    DmcDma,
+    /// OAM and DMC DMA both advanced during this scheduler slot. Their
+    /// no-operation phases overlap; when both need a read, DMC owns the bus.
+    OamAndDmcDma,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -164,6 +185,35 @@ struct OamDma {
     value: u8,
     phase: DmaPhase,
     needs_alignment: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct DmcDma {
+    request: DmcDmaRequest,
+    phase: DmcDmaPhase,
+    needs_alignment: bool,
+}
+
+impl DmcDma {
+    fn new(request: DmcDmaRequest, start_slot: u64, alignment: OamDmaAlignment) -> Self {
+        // OAM needs alignment when its halt lands on a get slot; after DMC's
+        // mandatory dummy cycle, DMC has the opposite requirement and needs
+        // alignment when its successful halt lands on a put slot.
+        let needs_alignment = !alignment.needs_alignment(start_slot);
+        Self {
+            request,
+            phase: DmcDmaPhase::Halt,
+            needs_alignment,
+        }
+    }
+
+    fn snapshot(self) -> DmcDmaSnapshot {
+        DmcDmaSnapshot {
+            request: self.request,
+            phase: self.phase,
+            needs_alignment: self.needs_alignment,
+        }
+    }
 }
 
 impl OamDma {
@@ -201,7 +251,9 @@ pub struct NesMachine {
     bus: NesBus,
     config: MachineConfig,
     cpu_slots: u64,
+    apu_irq_line_sample: bool,
     oam_dma: Option<OamDma>,
+    dmc_dma: Option<DmcDma>,
     last_applied_input: AppliedInput,
 }
 
@@ -210,10 +262,18 @@ impl NesMachine {
         let cartridge = Cartridge::new(image);
         Self {
             cpu: Cpu::new(),
-            bus: NesBus::new(cartridge, config.ram_init, config.video),
+            bus: NesBus::new(
+                cartridge,
+                config.ram_init,
+                config.video,
+                config.audio,
+                config.oam_dma_alignment,
+            ),
             config,
             cpu_slots: 0,
+            apu_irq_line_sample: false,
             oam_dma: None,
+            dmc_dma: None,
             last_applied_input: AppliedInput::default(),
         }
     }
@@ -250,12 +310,24 @@ impl NesMachine {
         self.bus.ppu_mut()
     }
 
+    pub fn apu(&self) -> &Apu {
+        self.bus.apu()
+    }
+
+    pub fn apu_mut(&mut self) -> &mut Apu {
+        self.bus.apu_mut()
+    }
+
     pub fn cpu_slots(&self) -> u64 {
         self.cpu_slots
     }
 
     pub fn oam_dma_active(&self) -> bool {
         self.oam_dma.is_some() || self.bus.oam_dma_requested()
+    }
+
+    pub fn dmc_dma_active(&self) -> bool {
+        self.dmc_dma.is_some() || self.bus.dmc_dma_requested()
     }
 
     pub fn last_applied_input(&self) -> AppliedInput {
@@ -289,7 +361,9 @@ impl NesMachine {
             bus: self.bus.snapshot(),
             ppu: self.ppu().snapshot(),
             cpu_slots: self.cpu_slots,
+            apu_irq_line_sample: self.apu_irq_line_sample,
             oam_dma: self.oam_dma.map(OamDma::snapshot),
+            dmc_dma: self.dmc_dma.map(DmcDma::snapshot),
             last_applied_input: self.last_applied_input,
             state_hash: self.state_hash(),
         }
@@ -319,7 +393,9 @@ impl NesMachine {
         self.bus.copy_emulated_state_from(&checkpoint.machine.bus);
         self.config = checkpoint.machine.config;
         self.cpu_slots = checkpoint.machine.cpu_slots;
+        self.apu_irq_line_sample = checkpoint.machine.apu_irq_line_sample;
         self.oam_dma = checkpoint.machine.oam_dma;
+        self.dmc_dma = checkpoint.machine.dmc_dma;
         self.last_applied_input = checkpoint.machine.last_applied_input;
         self.config.video = video;
         self.config.audio = audio;
@@ -431,6 +507,7 @@ impl NesMachine {
         &mut self,
         input: FrameInput,
     ) -> Result<FrameResult<'_>, MachineError> {
+        self.bus.apu_mut().begin_frame_output();
         let start_slots = self.cpu_slots;
         let start_ppu_clocks = self.ppu().timing().clocks;
         let target_frame = self.ppu().frame_id().wrapping_add(1);
@@ -457,13 +534,16 @@ impl NesMachine {
             },
             input: self.last_applied_input,
             video: self.ppu().framebuffer(),
-            audio_samples: &[],
+            audio_samples: self.apu().frame_samples(),
         })
     }
 
     /// Advances one CPU-rate scheduler slot. OAM DMA owns 513 slots when it
-    /// begins on an even slot and 514 when an alignment slot is required; the
-    /// CPU remains completely suspended during those accesses.
+    /// begins on an even slot and 514 when an alignment slot is required. DMC
+    /// DMA may suspend the CPU for three or four slots. When it coincides with
+    /// OAM DMA, the two units overlap except where the DMC read steals an OAM
+    /// read and forces OAM to realign. The PPU and APU continue advancing
+    /// exactly once per shared scheduler slot.
     pub fn clock(&mut self) -> Result<MachineCycle, MachineError> {
         if self.oam_dma.is_none()
             && self.cpu.at_instruction_boundary()
@@ -475,9 +555,31 @@ impl NesMachine {
                 self.config.oam_dma_alignment,
             ));
         }
+        let dmc_can_halt = self.oam_dma.is_some() || !self.cpu.next_cycle_is_write()?;
+        if self.dmc_dma.is_none()
+            && dmc_can_halt
+            && let Some(request) = self.bus.take_dmc_dma_request()
+        {
+            self.dmc_dma = Some(DmcDma::new(
+                request,
+                self.cpu_slots,
+                self.config.oam_dma_alignment,
+            ));
+        }
 
         let slot = self.cpu_slots;
-        let cycle = if let Some(dma) = self.oam_dma {
+        // The frame/DMC interrupt output is sampled across the internal
+        // CPU/APU boundary. Retaining this one-slot pipeline also keeps a flag
+        // transition late in an opcode-fetch cycle from being observed by the
+        // instruction's already-completed interrupt poll.
+        self.cpu.set_irq_line(self.apu_irq_line_sample);
+        self.apu_irq_line_sample = self.bus.apu().irq_pending();
+        let dma_was_active = self.oam_dma.is_some() || self.dmc_dma.is_some();
+        let cycle = if let (Some(dmc_dma), Some(oam_dma)) = (self.dmc_dma, self.oam_dma) {
+            self.clock_overlapping_dma(slot, dmc_dma, oam_dma)
+        } else if let Some(dma) = self.dmc_dma {
+            self.clock_dmc_dma(slot, dma)
+        } else if let Some(dma) = self.oam_dma {
             self.clock_oam_dma(slot, dma)
         } else {
             let cpu_cycle = self.cpu.clock(&mut self.bus)?;
@@ -489,10 +591,11 @@ impl NesMachine {
                 instruction_completed: cpu_cycle.instruction_completed,
             }
         };
-        let dma_completed = cycle.source == MachineCycleSource::OamDma && self.oam_dma.is_none();
         self.clock_ppu_for_cpu_slot();
-        if dma_completed {
-            self.cpu.poll_nmi_after_stall();
+        self.bus.clock_apu();
+        let dma_completed = dma_was_active && self.oam_dma.is_none() && self.dmc_dma.is_none();
+        if dma_completed && self.cpu.at_instruction_boundary() {
+            self.cpu.poll_interrupts_after_stall();
         }
         self.cpu_slots = self.cpu_slots.wrapping_add(1);
         Ok(cycle)
@@ -505,33 +608,134 @@ impl NesMachine {
         let start = self.cpu.cycles();
         let mut trace = None;
 
-        // DMA requested by the preceding instruction must finish before the
-        // next opcode fetch. Keep this outside the instruction hot loop so
-        // ordinary synchronous CPU stepping does not pay scheduler dispatch
-        // and trace-repacking overhead for every micro-operation.
-        while self.oam_dma_active() {
-            self.clock()?;
-        }
-
         loop {
-            let cycle = self.cpu.clock(&mut self.bus)?;
-            self.clock_ppu_for_cpu_slot();
-            self.cpu_slots = self.cpu_slots.wrapping_add(1);
+            let cycle = self.clock()?;
             trace = trace.or(cycle.instruction_started);
             if cycle.instruction_completed {
-                if let Some(page) = self.bus.take_oam_dma_request() {
-                    self.oam_dma = Some(OamDma::new(
-                        page,
-                        self.cpu_slots,
-                        self.config.oam_dma_alignment,
-                    ));
-                }
                 return Ok(InstructionStep {
                     trace,
                     cycles: self.cpu.cycles().wrapping_sub(start) as u8,
                 });
             }
         }
+    }
+
+    fn clock_dmc_dma(&mut self, slot: u64, mut dma: DmcDma) -> MachineCycle {
+        let (access, completed) = match dma.phase {
+            DmcDmaPhase::Halt => {
+                let address = self.cpu.registers().program_counter;
+                let value = self.bus.read(address);
+                dma.phase = DmcDmaPhase::Dummy;
+                (
+                    BusAccess {
+                        kind: BusAccessKind::DummyRead,
+                        address,
+                        value,
+                    },
+                    false,
+                )
+            }
+            DmcDmaPhase::Dummy => {
+                let address = self.cpu.registers().program_counter;
+                let value = self.bus.read(address);
+                dma.phase = if dma.needs_alignment {
+                    DmcDmaPhase::Align
+                } else {
+                    DmcDmaPhase::Read
+                };
+                (
+                    BusAccess {
+                        kind: BusAccessKind::DummyRead,
+                        address,
+                        value,
+                    },
+                    false,
+                )
+            }
+            DmcDmaPhase::Align => {
+                let address = self.cpu.registers().program_counter;
+                let value = self.bus.read(address);
+                dma.phase = DmcDmaPhase::Read;
+                (
+                    BusAccess {
+                        kind: BusAccessKind::DummyRead,
+                        address,
+                        value,
+                    },
+                    false,
+                )
+            }
+            DmcDmaPhase::Read => {
+                let address = dma.request.address;
+                let value = self.bus.read(address);
+                self.bus.complete_dmc_dma(value);
+                (
+                    BusAccess {
+                        kind: BusAccessKind::DmaRead,
+                        address,
+                        value,
+                    },
+                    true,
+                )
+            }
+        };
+        self.dmc_dma = (!completed).then_some(dma);
+        MachineCycle {
+            slot,
+            source: MachineCycleSource::DmcDma,
+            access,
+            instruction_started: None,
+            instruction_completed: false,
+        }
+    }
+
+    fn clock_overlapping_dma(
+        &mut self,
+        slot: u64,
+        mut dmc_dma: DmcDma,
+        mut oam_dma: OamDma,
+    ) -> MachineCycle {
+        if dmc_dma.phase == DmcDmaPhase::Read {
+            let address = dmc_dma.request.address;
+            let value = self.bus.read(address);
+            self.bus.complete_dmc_dma(value);
+            self.dmc_dma = None;
+
+            // DMC gets have priority over OAM gets. The stolen OAM read leaves
+            // the OAM unit on the wrong half of the get/put cadence, so its
+            // following slot is an explicit alignment cycle.
+            if oam_dma.phase == DmaPhase::Read {
+                oam_dma.phase = DmaPhase::Align;
+                oam_dma.needs_alignment = true;
+            }
+            self.oam_dma = Some(oam_dma);
+
+            return MachineCycle {
+                slot,
+                source: MachineCycleSource::OamAndDmcDma,
+                access: BusAccess {
+                    kind: BusAccessKind::DmaRead,
+                    address,
+                    value,
+                },
+                instruction_started: None,
+                instruction_completed: false,
+            };
+        }
+
+        dmc_dma.phase = match dmc_dma.phase {
+            DmcDmaPhase::Halt => DmcDmaPhase::Dummy,
+            DmcDmaPhase::Dummy if dmc_dma.needs_alignment => DmcDmaPhase::Align,
+            DmcDmaPhase::Dummy | DmcDmaPhase::Align => DmcDmaPhase::Read,
+            DmcDmaPhase::Read => unreachable!("DMC read returned above"),
+        };
+        self.dmc_dma = Some(dmc_dma);
+
+        // OAM accesses and no-op phases continue while the DMC unit performs
+        // its halt, dummy, and alignment phases.
+        let mut cycle = self.clock_oam_dma(slot, oam_dma);
+        cycle.source = MachineCycleSource::OamAndDmcDma;
+        cycle
     }
 
     fn clock_oam_dma(&mut self, slot: u64, mut dma: OamDma) -> MachineCycle {
@@ -623,6 +827,7 @@ impl NesMachine {
         self.cpu.write_state(sink);
         self.bus.write_state(sink, include_framebuffer);
         sink.write_u64(self.cpu_slots);
+        sink.write_bool(self.apu_irq_line_sample);
         match self.oam_dma {
             None => sink.write_u8(0),
             Some(dma) => {
@@ -635,6 +840,24 @@ impl NesMachine {
                     DmaPhase::Align => 1,
                     DmaPhase::Read => 2,
                     DmaPhase::Write => 3,
+                });
+                sink.write_bool(dma.needs_alignment);
+            }
+        }
+        match self.dmc_dma {
+            None => sink.write_u8(0),
+            Some(dma) => {
+                sink.write_u8(1);
+                sink.write_u16(dma.request.address);
+                sink.write_u8(match dma.request.kind {
+                    DmcDmaKind::Load => 0,
+                    DmcDmaKind::Reload => 1,
+                });
+                sink.write_u8(match dma.phase {
+                    DmcDmaPhase::Halt => 0,
+                    DmcDmaPhase::Dummy => 1,
+                    DmcDmaPhase::Align => 2,
+                    DmcDmaPhase::Read => 3,
                 });
                 sink.write_bool(dma.needs_alignment);
             }
@@ -672,6 +895,7 @@ impl NesMachine {
         self.cpu.read_state(reader)?;
         self.bus.read_state(reader, include_framebuffer)?;
         self.cpu_slots = reader.read_u64()?;
+        self.apu_irq_line_sample = reader.read_bool()?;
         self.oam_dma = match reader.read_u8()? {
             0 => None,
             1 => {
@@ -701,6 +925,38 @@ impl NesMachine {
             }
             _ => return Err(StateError::InvalidPayload("invalid OAM DMA presence tag")),
         };
+        self.dmc_dma = match reader.read_u8()? {
+            0 => None,
+            1 => {
+                let request = DmcDmaRequest {
+                    address: reader.read_u16()?,
+                    kind: match reader.read_u8()? {
+                        0 => DmcDmaKind::Load,
+                        1 => DmcDmaKind::Reload,
+                        _ => return Err(StateError::InvalidPayload("invalid DMC DMA kind")),
+                    },
+                };
+                let phase = match reader.read_u8()? {
+                    0 => DmcDmaPhase::Halt,
+                    1 => DmcDmaPhase::Dummy,
+                    2 => DmcDmaPhase::Align,
+                    3 => DmcDmaPhase::Read,
+                    _ => return Err(StateError::InvalidPayload("invalid DMC DMA phase")),
+                };
+                let needs_alignment = reader.read_bool()?;
+                if phase == DmcDmaPhase::Align && !needs_alignment {
+                    return Err(StateError::InvalidPayload(
+                        "DMC DMA align phase lacks an alignment cycle",
+                    ));
+                }
+                Some(DmcDma {
+                    request,
+                    phase,
+                    needs_alignment,
+                })
+            }
+            _ => return Err(StateError::InvalidPayload("invalid DMC DMA presence tag")),
+        };
         self.last_applied_input = AppliedInput {
             sequence_id: reader.read_u64()?,
             frame_id: reader.read_u64()?,
@@ -720,9 +976,30 @@ impl NesMachine {
                 "OAM DMA is both active and pending",
             ));
         }
+        if self.dmc_dma.is_some() && self.bus.dmc_dma_requested() {
+            return Err(StateError::InvalidPayload(
+                "DMC DMA is both active and pending",
+            ));
+        }
+        if let Some(dma) = self.dmc_dma {
+            let dmc = self.apu().snapshot().dmc;
+            if dmc.sample_buffer.is_some()
+                || dmc.bytes_remaining == 0
+                || dma.request.address != dmc.current_address
+            {
+                return Err(StateError::InvalidPayload(
+                    "active DMC DMA disagrees with the APU reader",
+                ));
+            }
+        }
         if self.ppu().timing().clocks != self.cpu_slots.wrapping_mul(3) {
             return Err(StateError::InvalidPayload(
                 "CPU and PPU scheduler clocks disagree",
+            ));
+        }
+        if self.apu().snapshot().cycles != self.cpu_slots {
+            return Err(StateError::InvalidPayload(
+                "CPU and APU scheduler clocks disagree",
             ));
         }
         Ok(())
@@ -775,6 +1052,29 @@ mod tests {
         cycles
     }
 
+    fn request_one_dmc_byte(machine: &mut NesMachine) {
+        machine.bus_mut().write(0x4010, 0x8f); // IRQ, fastest NTSC rate.
+        machine.bus_mut().write(0x4012, 0x00); // $c000.
+        machine.bus_mut().write(0x4013, 0x00); // One byte.
+        machine.bus_mut().write(0x4015, 0x10);
+    }
+
+    fn wait_for_dmc_request(machine: &mut NesMachine) {
+        while !machine.dmc_dma_active() {
+            machine.clock().unwrap();
+        }
+    }
+
+    fn drain_dmc_dma(machine: &mut NesMachine) -> Vec<MachineCycle> {
+        let mut cycles = Vec::new();
+        while machine.dmc_dma_active() {
+            let cycle = machine.clock().unwrap();
+            assert_eq!(cycle.source, MachineCycleSource::DmcDma);
+            cycles.push(cycle);
+        }
+        cycles
+    }
+
     #[test]
     fn oam_dma_suspends_cpu_for_513_or_514_scheduler_slots() {
         let mut short = machine_with_program(&[0x24, 0x00, 0xea]); // BIT $00; NOP
@@ -808,10 +1108,128 @@ mod tests {
     }
 
     #[test]
-    fn read_modify_write_uses_the_last_page_written_before_dma_halts_cpu() {
+    fn dmc_load_dma_targets_three_slot_path_and_fetches_cartridge_data() {
+        fn run(alignment: OamDmaAlignment) -> (Vec<MachineCycle>, NesMachine, u64) {
+            let mut rom = NromBuilder::new_32k();
+            rom.write(0x8000, &[0xea, 0x4c, 0x00, 0x80]);
+            rom.write(0xc000, &[0xa5]);
+            rom.set_vectors(0x8000, 0x8000, 0x8000);
+            let mut machine = NesMachine::from_ines(
+                &rom.build(),
+                MachineConfig {
+                    oam_dma_alignment: alignment,
+                    ..MachineConfig::default()
+                },
+            )
+            .unwrap();
+            machine.step_instruction().unwrap(); // reset: scheduler slot 7.
+            request_one_dmc_byte(&mut machine);
+            wait_for_dmc_request(&mut machine); // request becomes visible at slot 11.
+            let cpu_cycles = machine.cpu().cycles();
+            let cycles = drain_dmc_dma(&mut machine);
+            (cycles, machine, cpu_cycles)
+        }
+
+        let (short, short_machine, short_cpu_cycles) = run(OamDmaAlignment::ShortOnOddSlot);
+        assert_eq!(short.len(), 3);
+        assert_eq!(short_machine.cpu().cycles(), short_cpu_cycles);
+        assert_eq!(
+            short
+                .iter()
+                .map(|cycle| cycle.access.kind)
+                .collect::<Vec<_>>(),
+            [
+                BusAccessKind::DummyRead,
+                BusAccessKind::DummyRead,
+                BusAccessKind::DmaRead,
+            ]
+        );
+        assert_eq!(short.last().unwrap().access.address, 0xc000);
+        assert_eq!(short.last().unwrap().access.value, 0xa5);
+        assert_eq!(short_machine.apu().snapshot().dmc.sample_buffer, Some(0xa5));
+        assert!(short_machine.apu().snapshot().dmc.irq_pending);
+
+        let (other_cadence, other_machine, other_cpu_cycles) =
+            run(OamDmaAlignment::ShortOnEvenSlot);
+        assert_eq!(other_cadence.len(), 3);
+        assert_eq!(other_machine.cpu().cycles(), other_cpu_cycles);
+        assert_eq!(other_cadence[2].access.kind, BusAccessKind::DmaRead);
+    }
+
+    #[test]
+    fn dmc_dma_preempts_and_then_resumes_oam_dma() {
+        let mut rom = NromBuilder::new_32k();
+        rom.write(0x8000, &[0xea, 0x4c, 0x00, 0x80]);
+        rom.write(0xc000, &[0x3c]);
+        rom.set_vectors(0x8000, 0x8000, 0x8000);
+        let mut machine = NesMachine::from_ines(&rom.build(), MachineConfig::default()).unwrap();
+        machine.step_instruction().unwrap();
+        request_page_two(&mut machine);
+        request_one_dmc_byte(&mut machine);
+
+        let mut total_slots = 0;
+        let mut overlapping_slots = 0;
+        let mut oam_before_overlap = None;
+        let mut oam_after_overlap = None;
+        while machine.oam_dma_active() || machine.dmc_dma_active() {
+            let before = machine.snapshot().oam_dma;
+            let cycle = machine.clock().unwrap();
+            total_slots += 1;
+            match cycle.source {
+                MachineCycleSource::OamAndDmcDma => {
+                    overlapping_slots += 1;
+                    if oam_before_overlap.is_none() {
+                        oam_before_overlap = before;
+                    }
+                    oam_after_overlap = machine.snapshot().oam_dma;
+                }
+                MachineCycleSource::OamDma | MachineCycleSource::DmcDma => {}
+                MachineCycleSource::Cpu => panic!("CPU ran while DMA remained active"),
+            }
+        }
+
+        assert_eq!(total_slots, 516);
+        assert_eq!(overlapping_slots, 3);
+        assert_ne!(oam_before_overlap, oam_after_overlap);
+        assert_eq!(machine.apu().snapshot().dmc.sample_buffer, Some(0x3c));
+        assert_eq!(
+            machine.ppu().oam().as_slice(),
+            &(0..=u8::MAX).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn dmc_irq_reaches_the_cpu_and_status_write_clears_it() {
+        let mut rom = NromBuilder::new_32k();
+        rom.write(0x8000, &[0x58, 0xea, 0x4c, 0x01, 0x80]); // CLI; NOP; loop.
+        rom.write(0x9000, &[0xe6, 0x00, 0xa9, 0x00, 0x8d, 0x15, 0x40, 0x40]); // INC $00; disable DMC; RTI.
+        rom.write(0xc000, &[0x5a]);
+        rom.set_vectors(0x8000, 0x8000, 0x9000);
+        let mut machine = NesMachine::from_ines(&rom.build(), MachineConfig::default()).unwrap();
+        machine.step_instruction().unwrap(); // reset
+        machine.step_instruction().unwrap(); // CLI
+        request_one_dmc_byte(&mut machine);
+
+        for _ in 0..100 {
+            if machine.bus().ram()[0] == 1 {
+                break;
+            }
+            machine.clock().unwrap();
+        }
+        assert_eq!(machine.bus().ram()[0], 1);
+        for _ in 0..50 {
+            if !machine.apu().snapshot().dmc.irq_pending {
+                break;
+            }
+            machine.clock().unwrap();
+        }
+        assert!(!machine.apu().snapshot().dmc.irq_pending);
+        assert_eq!(machine.bus().peek(0x4015) & 0x80, 0);
+    }
+
+    #[test]
+    fn read_modify_write_uses_open_bus_and_the_last_page_written_before_dma() {
         let mut machine = machine_with_program(&[0xee, 0x14, 0x40, 0xea]); // INC $4014; NOP
-        machine.bus_mut().ram_mut()[0x000..0x100].fill(0x11);
-        machine.bus_mut().ram_mut()[0x100..0x200].fill(0x22);
         machine.step_instruction().unwrap(); // reset
 
         let increment = machine.step_instruction().unwrap();
@@ -819,7 +1237,16 @@ mod tests {
         assert!(machine.oam_dma_active());
         let cycles = drain_dma(&mut machine);
         assert!(matches!(cycles.len(), 513 | 514));
-        assert!(machine.ppu().oam().iter().all(|value| *value == 0x22));
+        assert_eq!(machine.bus().snapshot().apu_io_registers[0x14], 0x41);
+        assert_eq!(
+            cycles
+                .iter()
+                .find(|cycle| cycle.access.kind == BusAccessKind::DmaRead)
+                .unwrap()
+                .access
+                .address,
+            0x4100
+        );
     }
 
     #[test]
@@ -863,7 +1290,10 @@ mod tests {
         assert_eq!(result.input.controllers, input.controllers);
         assert_eq!(result.timing.ppu_clocks, result.timing.cpu_slots * 3);
         assert!(result.video.is_some());
-        assert!(result.audio_samples.is_empty());
+        // Power-on begins at scanline zero, so the first result reaches the
+        // initial vblank sooner than a complete steady-state PPU frame.
+        assert!((730..=800).contains(&result.audio_samples.len()));
+        assert!(result.audio_samples.iter().all(|sample| *sample == 0));
 
         assert_eq!(
             machine.bus.controller(0).unwrap().buttons(),
