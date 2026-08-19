@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::cartridge::CartridgeIdentity;
+
 /// A cartridge could not be represented by the currently supported iNES
 /// subset.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -116,3 +118,86 @@ impl From<CpuError> for MachineError {
         Self::Cpu(value)
     }
 }
+
+/// A checkpoint or durable savestate is invalid for the target machine.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StateError {
+    InvalidMagic([u8; 8]),
+    UnsupportedVersion {
+        found: u16,
+    },
+    UnsupportedFlags {
+        found: u16,
+    },
+    Truncated {
+        needed: usize,
+        actual: usize,
+    },
+    TooLarge {
+        declared: usize,
+        maximum: usize,
+    },
+    LengthMismatch {
+        declared: usize,
+        actual: usize,
+    },
+    ChecksumMismatch {
+        expected: u64,
+        actual: u64,
+    },
+    CartridgeMismatch {
+        expected: CartridgeIdentity,
+        actual: CartridgeIdentity,
+    },
+    InvalidPayload(&'static str),
+    TrailingPayload {
+        remaining: usize,
+    },
+}
+
+impl fmt::Display for StateError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidMagic(actual) => write!(
+                formatter,
+                "invalid NES savestate magic {:02x?}; expected SWNESST\\0",
+                actual
+            ),
+            Self::UnsupportedVersion { found } => {
+                write!(formatter, "unsupported NES savestate version {found}")
+            }
+            Self::UnsupportedFlags { found } => {
+                write!(formatter, "unsupported NES savestate flags ${found:04x}")
+            }
+            Self::Truncated { needed, actual } => write!(
+                formatter,
+                "truncated NES savestate: needed {needed} bytes, found {actual}"
+            ),
+            Self::TooLarge { declared, maximum } => write!(
+                formatter,
+                "NES savestate declares {declared} payload bytes; maximum is {maximum}"
+            ),
+            Self::LengthMismatch { declared, actual } => write!(
+                formatter,
+                "NES savestate declares {declared} payload bytes, found {actual}"
+            ),
+            Self::ChecksumMismatch { expected, actual } => write!(
+                formatter,
+                "NES savestate checksum mismatch: expected {expected:016x}, found {actual:016x}"
+            ),
+            Self::CartridgeMismatch { expected, actual } => write!(
+                formatter,
+                "NES savestate cartridge mismatch: expected {expected:?}, found {actual:?}"
+            ),
+            Self::InvalidPayload(reason) => {
+                write!(formatter, "invalid NES savestate payload: {reason}")
+            }
+            Self::TrailingPayload { remaining } => write!(
+                formatter,
+                "NES savestate payload has {remaining} unexpected trailing bytes"
+            ),
+        }
+    }
+}
+
+impl Error for StateError {}

@@ -36,3 +36,7 @@ path = "examples/ppu_benchmark.rs"
 [[example]]
 name = "ppu_conformance"
 path = "examples/ppu_conformance.rs"
+
+[[example]]
+name = "state_benchmark"
+path = "examples/state_benchmark.rs"

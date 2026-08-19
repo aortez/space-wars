@@ -1,4 +1,7 @@
-use crate::{Cartridge, VideoOutput};
+use crate::{
+    Cartridge, StateError, VideoOutput,
+    state_codec::{StateReader, StateSink},
+};
 
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
@@ -70,6 +73,18 @@ pub struct PpuCycle {
     pub dot: u16,
     pub frame_completed: bool,
     pub nmi_requested: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PpuSnapshot {
+    pub timing: PpuTiming,
+    pub registers: PpuRegisters,
+    pub oam: Box<[u8; 0x100]>,
+    pub nametables: Box<[u8; 0x1000]>,
+    pub palette_ram: [u8; 0x20],
+    pub scanline_sprite_pixels: Box<[u8; FRAME_WIDTH]>,
+    pub nmi_output: bool,
+    pub nmi_pending: bool,
 }
 
 /// Cycle-oriented NTSC Ricoh 2C02 PPU for mapper-0 machines.
@@ -203,6 +218,58 @@ impl Ppu {
 
     pub fn palette_ram(&self) -> &[u8; 0x20] {
         &self.palette_ram
+    }
+
+    pub fn snapshot(&self) -> PpuSnapshot {
+        PpuSnapshot {
+            timing: self.timing(),
+            registers: self.registers(),
+            oam: self.oam.clone(),
+            nametables: self.nametables.clone(),
+            palette_ram: self.palette_ram,
+            scanline_sprite_pixels: self.scanline_sprite_pixels.clone(),
+            nmi_output: self.nmi_output,
+            nmi_pending: self.nmi_pending,
+        }
+    }
+
+    pub(crate) fn copy_emulated_state_from(&mut self, source: &Self) {
+        let video_output = self.video_output;
+        self.control = source.control;
+        self.mask = source.mask;
+        self.status = source.status;
+        self.oam_address = source.oam_address;
+        self.oam.copy_from_slice(&source.oam[..]);
+        self.nametables.copy_from_slice(&source.nametables[..]);
+        self.palette_ram = source.palette_ram;
+        self.data_buffer = source.data_buffer;
+        self.io_bus = source.io_bus;
+        self.vram_address = source.vram_address;
+        self.temporary_address = source.temporary_address;
+        self.fine_x = source.fine_x;
+        self.second_write = source.second_write;
+        self.next_nametable = source.next_nametable;
+        self.next_attribute = source.next_attribute;
+        self.next_pattern_low = source.next_pattern_low;
+        self.next_pattern_high = source.next_pattern_high;
+        self.pattern_shift_low = source.pattern_shift_low;
+        self.pattern_shift_high = source.pattern_shift_high;
+        self.attribute_shift_low = source.attribute_shift_low;
+        self.attribute_shift_high = source.attribute_shift_high;
+        self.scanline_sprite_pixels
+            .copy_from_slice(&source.scanline_sprite_pixels[..]);
+        self.framebuffer.copy_from_slice(&source.framebuffer[..]);
+        self.frame_id = source.frame_id;
+        self.scanline = source.scanline;
+        self.dot = source.dot;
+        self.odd_frame = source.odd_frame;
+        self.clocks = source.clocks;
+        self.rendering_enabled_previous_dot = source.rendering_enabled_previous_dot;
+        self.nmi_output = source.nmi_output;
+        self.nmi_delay = source.nmi_delay;
+        self.nmi_pending = source.nmi_pending;
+        self.suppress_vblank = source.suppress_vblank;
+        self.video_output = video_output;
     }
 
     pub fn take_nmi_pending(&mut self) -> bool {
@@ -447,6 +514,135 @@ impl Ppu {
             frame_completed,
             nmi_requested: !nmi_was_pending && self.nmi_pending,
         }
+    }
+
+    pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S, include_framebuffer: bool) {
+        sink.write_u8(self.control);
+        sink.write_u8(self.mask);
+        sink.write_u8(self.status);
+        sink.write_u8(self.oam_address);
+        sink.write(&self.oam[..]);
+        sink.write(&self.nametables[..]);
+        sink.write(&self.palette_ram);
+        sink.write_u8(self.data_buffer);
+        sink.write_u8(self.io_bus);
+        sink.write_u16(self.vram_address);
+        sink.write_u16(self.temporary_address);
+        sink.write_u8(self.fine_x);
+        sink.write_bool(self.second_write);
+        sink.write_u8(self.next_nametable);
+        sink.write_u8(self.next_attribute);
+        sink.write_u8(self.next_pattern_low);
+        sink.write_u8(self.next_pattern_high);
+        sink.write_u16(self.pattern_shift_low);
+        sink.write_u16(self.pattern_shift_high);
+        sink.write_u16(self.attribute_shift_low);
+        sink.write_u16(self.attribute_shift_high);
+        sink.write(&self.scanline_sprite_pixels[..]);
+        if include_framebuffer {
+            sink.write(&self.framebuffer[..]);
+        }
+        sink.write_u64(self.frame_id);
+        sink.write_u16(self.scanline);
+        sink.write_u16(self.dot);
+        sink.write_bool(self.odd_frame);
+        sink.write_u64(self.clocks);
+        sink.write_bool(self.rendering_enabled_previous_dot);
+        sink.write_bool(self.nmi_output);
+        sink.write_optional_u8(self.nmi_delay);
+        sink.write_bool(self.nmi_pending);
+        sink.write_bool(self.suppress_vblank);
+    }
+
+    pub(crate) fn read_state(
+        &mut self,
+        reader: &mut StateReader<'_>,
+        include_framebuffer: bool,
+    ) -> Result<(), StateError> {
+        self.control = reader.read_u8()?;
+        self.mask = reader.read_u8()?;
+        self.status = reader.read_u8()?;
+        self.oam_address = reader.read_u8()?;
+        self.oam.copy_from_slice(reader.read_bytes(0x100)?);
+        self.nametables.copy_from_slice(reader.read_bytes(0x1000)?);
+        self.palette_ram.copy_from_slice(reader.read_bytes(0x20)?);
+        self.data_buffer = reader.read_u8()?;
+        self.io_bus = reader.read_u8()?;
+        self.vram_address = reader.read_u16()?;
+        self.temporary_address = reader.read_u16()?;
+        self.fine_x = reader.read_u8()?;
+        self.second_write = reader.read_bool()?;
+        self.next_nametable = reader.read_u8()?;
+        self.next_attribute = reader.read_u8()?;
+        self.next_pattern_low = reader.read_u8()?;
+        self.next_pattern_high = reader.read_u8()?;
+        self.pattern_shift_low = reader.read_u16()?;
+        self.pattern_shift_high = reader.read_u16()?;
+        self.attribute_shift_low = reader.read_u16()?;
+        self.attribute_shift_high = reader.read_u16()?;
+        self.scanline_sprite_pixels
+            .copy_from_slice(reader.read_bytes(FRAME_WIDTH)?);
+        if include_framebuffer {
+            self.framebuffer
+                .copy_from_slice(reader.read_bytes(FRAME_PIXELS)?);
+        }
+        self.frame_id = reader.read_u64()?;
+        self.scanline = reader.read_u16()?;
+        self.dot = reader.read_u16()?;
+        self.odd_frame = reader.read_bool()?;
+        self.clocks = reader.read_u64()?;
+        self.rendering_enabled_previous_dot = reader.read_bool()?;
+        self.nmi_output = reader.read_bool()?;
+        self.nmi_delay = reader.read_optional_u8()?;
+        self.nmi_pending = reader.read_bool()?;
+        self.suppress_vblank = reader.read_bool()?;
+
+        if self.status & !0xe0 != 0 {
+            return Err(StateError::InvalidPayload("PPU status has unknown bits"));
+        }
+        if self.vram_address > 0x7fff || self.temporary_address > 0x7fff {
+            return Err(StateError::InvalidPayload(
+                "PPU scrolling address exceeds 15 bits",
+            ));
+        }
+        if self.fine_x > 7 || self.next_attribute > 3 {
+            return Err(StateError::InvalidPayload(
+                "PPU fine scroll or attribute latch is out of range",
+            ));
+        }
+        if self.palette_ram.iter().any(|value| *value > 0x3f) {
+            return Err(StateError::InvalidPayload(
+                "PPU palette contains an out-of-range color",
+            ));
+        }
+        if self
+            .scanline_sprite_pixels
+            .iter()
+            .any(|value| value & 0xc0 != 0)
+        {
+            return Err(StateError::InvalidPayload(
+                "PPU scanline sprite data has unknown bits",
+            ));
+        }
+        if include_framebuffer && self.framebuffer.iter().any(|value| *value > 0x3f) {
+            return Err(StateError::InvalidPayload(
+                "PPU framebuffer contains an out-of-range color",
+            ));
+        }
+        if self.scanline >= SCANLINES_PER_FRAME || self.dot >= DOTS_PER_SCANLINE {
+            return Err(StateError::InvalidPayload("PPU timing is out of range"));
+        }
+        if self.nmi_delay.is_some_and(|delay| delay > 2) {
+            return Err(StateError::InvalidPayload("PPU NMI delay is out of range"));
+        }
+        let expected_nmi_output =
+            self.status & STATUS_VBLANK != 0 && self.control & CTRL_NMI_ENABLE != 0;
+        if self.nmi_output != expected_nmi_output {
+            return Err(StateError::InvalidPayload(
+                "PPU NMI output disagrees with its control and status lines",
+            ));
+        }
+        Ok(())
     }
 
     fn rendering_enabled(&self) -> bool {

@@ -151,6 +151,45 @@ The complete commands, hashes, external conformance checksums, and benchmark
 rows are captured in
 [`tests/reference/falling-rust-m22c.txt`](tests/reference/falling-rust-m22c.txt).
 
+## Deterministic frame and state contract
+
+`run_frame` latches both controller masks once, associates them with the next
+PPU frame ID, and keeps them stable until that frame completes. The scheduler
+always completes the final CPU-rate slot's three PPU clocks, so a result can be
+up to two PPU clocks past the exact frame edge; `FrameTiming` reports the slots
+and physical clocks consumed. `run_frame_with_input` retains a caller-supplied
+sequence ID, while `run_frame` assigns the next wrapping ID automatically.
+Video is a borrow of the reusable 256 x 240 palette buffer. The audio slice is
+empty until M22e adds the APU without changing this frame API.
+
+The state surfaces have deliberately different stability contracts:
+
+- `MachineSnapshot` is an owned, bounded diagnostic view. It exposes CPU/PPU
+  registers and phases, RAM, optional CHR RAM, controller shift state, DMA,
+  scheduler counters, and the authoritative hash; it is not a persistence
+  format.
+- `MachineCheckpoint` is opaque same-build rollback state. Immutable ROM bytes
+  remain shared through `Arc`; restoration copies mutable fixed-size buffers in
+  place and preserves the target machine's video/audio output policy.
+- `save_state` emits an explicit little-endian durable envelope beginning with
+  `SWNESST\0`. Version 1 carries flags, canonical ROM byte length and FNV-1a 64
+  identity, payload length, payload checksum, and an explicit hardware-state
+  payload. Payloads are capped at 128 KiB. Loading is transactional and rejects
+  unsupported versions/flags, truncation, size/length/checksum errors, the wrong
+  ROM, invalid field values, and trailing payload bytes.
+- `state_hash` version 1 streams FNV-1a 64 without allocation over a domain tag,
+  ROM identity, configuration that affects emulation, and complete mutable
+  hardware state. It excludes the derived framebuffer and host video/audio
+  output selection, allowing visible and headless machines to compare equal.
+
+`tests/state_contract.rs` covers fixed input scripts, a checked-in generated-ROM
+golden hash, partial-instruction and active-DMA checkpoint/savestate branches,
+CHR/PRG/CPU memory, output-policy preservation, transactional malformed-state
+handling, and four parallel machines sharing one cartridge image. The allocator
+test also covers `run_frame` and repeated checkpoint restoration. Reference-host
+Falling evidence is recorded in
+[`tests/reference/falling-rust-m22d.txt`](tests/reference/falling-rust-m22d.txt).
+
 ## Benchmarks
 
 The DirtSim and Rust artifacts record measurements on the same AMD Ryzen 7
@@ -164,11 +203,14 @@ cargo run --release -p engine-nes --example cpu_benchmark -- 10000000
 cargo run --release -p engine-nes --example ppu_benchmark -- 1000
 cargo run --release -p engine-nes --example ppu_benchmark -- \
   1000 /tmp/falling-52dcb8a9.nes
+cargo run --release -p engine-nes --example state_benchmark -- \
+  2000 /tmp/falling-52dcb8a9.nes
 ```
 
 `tests/no_allocation.rs` wraps the system allocator only in its test process
 and independently asserts that 10,000 steady-state CPU instructions and
-10,000 rendering scheduler slots allocate, reallocate, and deallocate nothing.
+10,000 rendering scheduler slots, three complete `run_frame` calls, and 100
+checkpoint restores allocate, reallocate, and deallocate nothing.
 
 The CPU example emits two versioned newline-delimited JSON objects containing
 crate/profile, OS/architecture, API/workload version, configuration,
@@ -191,6 +233,13 @@ frames/s on this host. DirtSim's deferred visible-span renderer is therefore
 about twice as fast as the intentionally direct Rust dot path. That is a clear
 future profiling/optimization target; M22c preserves the scalar path and exact
 frame evidence first.
+
+The M22d Falling state benchmark measures version-1 state hashing at about
+11.5 us, checkpoint creation (including that hash) at about 12.2 us, and
+allocation-free checkpoint restoration at about 0.98 us. The current
+ROM-backed-CHR Falling savestate is 76,497 bytes; CHR-RAM cartridges add their
+bounded 8 KiB mutable pattern memory. These are single-host measurements, while
+the format version, state hashes, and sizes are deterministic evidence.
 
 Performance numbers are evidence tied to a host and workload, not acceptance
 goldens. The instruction/cycle counts and RAM hash are deterministic; elapsed

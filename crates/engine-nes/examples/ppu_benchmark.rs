@@ -2,7 +2,9 @@
 
 use std::{env, error::Error, fs, time::Instant};
 
-use engine_nes::{CpuBus, MachineConfig, NesMachine, VideoOutput, test_rom::NromBuilder};
+use engine_nes::{
+    ControllerButtons, CpuBus, MachineConfig, NesMachine, VideoOutput, test_rom::NromBuilder,
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut arguments = env::args().skip(1);
@@ -72,9 +74,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_frames(machine: &mut NesMachine, count: u64) -> Result<(), engine_nes::MachineError> {
-    let target = machine.ppu().frame_id().wrapping_add(count);
-    while machine.ppu().frame_id() != target {
-        machine.clock()?;
+    for _ in 0..count {
+        machine.run_frame([ControllerButtons::NONE; 2])?;
     }
     Ok(())
 }

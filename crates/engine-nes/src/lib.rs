@@ -14,16 +14,28 @@ mod cpu;
 mod error;
 mod machine;
 mod ppu;
+mod state_codec;
 pub mod test_rom;
 
-pub use bus::{BusAccess, BusAccessKind, CpuBus, NesBus};
-pub use cartridge::{Cartridge, CartridgeImage, CartridgeMetadata, Mirroring};
+pub use bus::{
+    APU_IO_REGISTER_BYTES, BusAccess, BusAccessKind, BusSnapshot, CPU_RAM_BYTES, CpuBus,
+    MemorySnapshot, NesBus,
+};
+pub use cartridge::{
+    CHR_MEMORY_BYTES, Cartridge, CartridgeIdentity, CartridgeImage, CartridgeMetadata, Mirroring,
+    PRG_RAM_BYTES,
+};
 pub use config::{AudioOutput, MachineConfig, OamDmaAlignment, RamInit, Region, VideoOutput};
-pub use controller::{ControllerButtons, ControllerPort};
-pub use cpu::{Cpu, CpuCycle, CpuRegisters, InstructionTrace, Status};
-pub use error::{CartridgeError, CpuError, MachineError};
-pub use machine::{InstructionStep, MachineCycle, MachineCycleSource, NesMachine};
+pub use controller::{ControllerButtons, ControllerPort, ControllerSnapshot};
+pub use cpu::{Cpu, CpuCycle, CpuPhase, CpuRegisters, CpuSnapshot, InstructionTrace, Status};
+pub use error::{CartridgeError, CpuError, MachineError, StateError};
+pub use machine::{
+    AppliedInput, FrameInput, FrameResult, FrameTiming, InstructionStep,
+    MAX_SAVESTATE_PAYLOAD_BYTES, MachineCheckpoint, MachineCycle, MachineCycleSource,
+    MachineSnapshot, NesMachine, OamDmaPhase, OamDmaSnapshot, SAVESTATE_FORMAT_VERSION,
+    STATE_HASH_VERSION, StateHash,
+};
 pub use ppu::{
     FRAME_HEIGHT, FRAME_PIXELS, FRAME_WIDTH, NES_PALETTE_RGB565, Ppu, PpuCycle, PpuRegisters,
-    PpuTiming, rgb565_to_rgb888, write_rgb888,
+    PpuSnapshot, PpuTiming, rgb565_to_rgb888, write_rgb888,
 };

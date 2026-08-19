@@ -1,6 +1,6 @@
 use std::alloc::System;
 
-use engine_nes::{MachineConfig, NesMachine, test_rom::NromBuilder};
+use engine_nes::{ControllerButtons, MachineConfig, NesMachine, test_rom::NromBuilder};
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 
 #[global_allocator]
@@ -50,6 +50,31 @@ fn cpu_and_ppu_steady_state_do_not_allocate() {
     let region = Region::new(GLOBAL);
     for _ in 0..10_000 {
         rendering.clock().unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let region = Region::new(GLOBAL);
+    for _ in 0..3 {
+        rendering.run_frame([ControllerButtons::NONE; 2]).unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let checkpoint = rendering.checkpoint();
+    let region = Region::new(GLOBAL);
+    for _ in 0..100 {
+        rendering.restore(&checkpoint).unwrap();
     }
     let stats = region.change();
     assert_eq!(stats.allocations, 0);

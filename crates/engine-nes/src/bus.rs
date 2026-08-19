@@ -1,4 +1,28 @@
-use crate::{Cartridge, ControllerButtons, ControllerPort, Ppu, PpuCycle, RamInit, VideoOutput};
+use crate::{
+    CHR_MEMORY_BYTES, Cartridge, ControllerButtons, ControllerPort, ControllerSnapshot, Ppu,
+    PpuCycle, RamInit, StateError, VideoOutput,
+    cartridge::PRG_RAM_BYTES,
+    state_codec::{StateReader, StateSink},
+};
+
+pub const CPU_RAM_BYTES: usize = 0x800;
+pub const APU_IO_REGISTER_BYTES: usize = 0x18;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemorySnapshot {
+    pub cpu_ram: Box<[u8; CPU_RAM_BYTES]>,
+    pub prg_ram: Box<[u8; PRG_RAM_BYTES]>,
+    pub chr_ram: Option<Box<[u8; CHR_MEMORY_BYTES]>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BusSnapshot {
+    pub memory: MemorySnapshot,
+    pub apu_io_registers: [u8; APU_IO_REGISTER_BYTES],
+    pub controllers: [ControllerSnapshot; 2],
+    pub open_bus: u8,
+    pub oam_dma_request: Option<u8>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BusAccessKind {
@@ -31,9 +55,9 @@ pub trait CpuBus {
 /// responsible for advancing it three dots per CPU-rate slot.
 #[derive(Clone, Debug)]
 pub struct NesBus {
-    ram: Box<[u8; 0x800]>,
+    ram: Box<[u8; CPU_RAM_BYTES]>,
     ppu: Ppu,
-    apu_io_registers: [u8; 0x18],
+    apu_io_registers: [u8; APU_IO_REGISTER_BYTES],
     controllers: [ControllerPort; 2],
     cartridge: Cartridge,
     open_bus: u8,
@@ -65,12 +89,33 @@ impl NesBus {
         &mut self.cartridge
     }
 
-    pub fn ram(&self) -> &[u8; 0x800] {
+    pub fn ram(&self) -> &[u8; CPU_RAM_BYTES] {
         &self.ram
     }
 
-    pub fn ram_mut(&mut self) -> &mut [u8; 0x800] {
+    pub fn ram_mut(&mut self) -> &mut [u8; CPU_RAM_BYTES] {
         &mut self.ram
+    }
+
+    pub fn memory_snapshot(&self) -> MemorySnapshot {
+        MemorySnapshot {
+            cpu_ram: self.ram.clone(),
+            prg_ram: Box::new(*self.cartridge.prg_ram()),
+            chr_ram: self.cartridge.chr_ram().map(|data| Box::new(*data)),
+        }
+    }
+
+    pub fn snapshot(&self) -> BusSnapshot {
+        BusSnapshot {
+            memory: self.memory_snapshot(),
+            apu_io_registers: self.apu_io_registers,
+            controllers: [
+                self.controllers[0].snapshot(),
+                self.controllers[1].snapshot(),
+            ],
+            open_bus: self.open_bus,
+            oam_dma_request: self.oam_dma_request,
+        }
     }
 
     pub fn open_bus(&self) -> u8 {
@@ -122,6 +167,47 @@ impl NesBus {
 
     pub(crate) fn oam_dma_requested(&self) -> bool {
         self.oam_dma_request.is_some()
+    }
+
+    pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S, include_framebuffer: bool) {
+        sink.write(&self.ram[..]);
+        self.ppu.write_state(sink, include_framebuffer);
+        sink.write(&self.apu_io_registers);
+        for controller in &self.controllers {
+            controller.write_state(sink);
+        }
+        self.cartridge.write_state(sink);
+        sink.write_u8(self.open_bus);
+        sink.write_optional_u8(self.oam_dma_request);
+    }
+
+    pub(crate) fn read_state(
+        &mut self,
+        reader: &mut StateReader<'_>,
+        include_framebuffer: bool,
+    ) -> Result<(), StateError> {
+        self.ram.copy_from_slice(reader.read_bytes(CPU_RAM_BYTES)?);
+        self.ppu.read_state(reader, include_framebuffer)?;
+        self.apu_io_registers
+            .copy_from_slice(reader.read_bytes(APU_IO_REGISTER_BYTES)?);
+        for controller in &mut self.controllers {
+            controller.read_state(reader)?;
+        }
+        self.cartridge.read_state(reader)?;
+        self.open_bus = reader.read_u8()?;
+        self.oam_dma_request = reader.read_optional_u8()?;
+        Ok(())
+    }
+
+    pub(crate) fn copy_emulated_state_from(&mut self, source: &Self) {
+        debug_assert_eq!(self.cartridge.image(), source.cartridge.image());
+        self.ram.copy_from_slice(&source.ram[..]);
+        self.ppu.copy_emulated_state_from(&source.ppu);
+        self.apu_io_registers = source.apu_io_registers;
+        self.controllers = source.controllers;
+        self.cartridge.copy_mutable_state_from(&source.cartridge);
+        self.open_bus = source.open_bus;
+        self.oam_dma_request = source.oam_dma_request;
     }
 
     /// Side-effect-free debug view of the CPU address space.
@@ -219,6 +305,26 @@ mod tests {
         assert_eq!(bus.read(0x4016), 1);
         bus.write(0x0000, 0xa0);
         assert_eq!(bus.read(0x4016), 0xa0);
+    }
+
+    #[test]
+    fn shared_strobe_latches_and_shifts_both_controller_ports_independently() {
+        let mut bus = bus();
+        bus.set_controller_buttons(
+            0,
+            ControllerButtons::A | ControllerButtons::START | ControllerButtons::LEFT,
+        );
+        bus.set_controller_buttons(
+            1,
+            ControllerButtons::B | ControllerButtons::SELECT | ControllerButtons::RIGHT,
+        );
+        bus.write(0x4016, 1);
+        bus.write(0x4016, 0);
+
+        let first = std::array::from_fn::<_, 10, _>(|_| bus.read(0x4016) & 1);
+        let second = std::array::from_fn::<_, 10, _>(|_| bus.read(0x4017) & 1);
+        assert_eq!(first, [1, 0, 0, 1, 0, 0, 1, 0, 1, 1]);
+        assert_eq!(second, [0, 1, 1, 0, 0, 0, 0, 1, 1, 1]);
     }
 
     #[test]

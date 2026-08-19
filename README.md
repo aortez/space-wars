@@ -34,10 +34,10 @@ The accepted physics ownership and lifecycle design is documented in
 [`docs/design/physics-architecture.md`](docs/design/physics-architecture.md).
 
 A Rust-native NES engine is also under development. Its mapper-0 cartridge,
-cycle-oriented RP2A03 CPU, scalar 2C02 PPU, deterministic frame dumps,
-reference captures, and generated test tools live in `crates/engine-nes`; it
-is not launcher-visible until the state/APU, native-video, and Falling scenario
-slices land. See
+cycle-oriented RP2A03 CPU, scalar 2C02 PPU, deterministic frame/state API,
+checkpoints, portable savestates, reference captures, and generated test tools
+live in `crates/engine-nes`; it is not launcher-visible until the APU,
+native-video, and Falling scenario slices land. See
 [`docs/design/rust-nes-engine.md`](docs/design/rust-nes-engine.md) and
 [`crates/engine-nes/REFERENCE.md`](crates/engine-nes/REFERENCE.md).
 

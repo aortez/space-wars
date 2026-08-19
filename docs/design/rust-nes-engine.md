@@ -1,6 +1,6 @@
 # Rust NES engine implementation plan
 
-Status: M22a-M22c implemented; M22d (deterministic frame/state contract) is
+Status: M22a-M22d implemented; M22e (APU and deterministic sample output) is
 next.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
@@ -169,19 +169,25 @@ pub struct FrameResult<'a> {
 }
 
 impl NesMachine {
-    pub fn power_on(
-        cartridge: CartridgeImage,
-        config: MachineConfig,
-    ) -> Result<Self, LoadError>;
+    pub fn power_on(cartridge: CartridgeImage, config: MachineConfig) -> Self;
 
     pub fn run_frame(
         &mut self,
         controllers: [ControllerButtons; 2],
     ) -> Result<FrameResult<'_>, RuntimeError>;
 
+    pub fn run_frame_with_input(
+        &mut self,
+        input: FrameInput,
+    ) -> Result<FrameResult<'_>, RuntimeError>;
+
     pub fn step_instruction(&mut self) -> Result<InstructionResult, RuntimeError>;
+    pub fn snapshot(&self) -> MachineSnapshot;
+    pub fn state_hash(&self) -> StateHash;
     pub fn checkpoint(&self) -> MachineCheckpoint;
     pub fn restore(&mut self, checkpoint: &MachineCheckpoint) -> Result<(), StateError>;
+    pub fn save_state(&self) -> Vec<u8>;
+    pub fn load_state(&mut self, state: &[u8]) -> Result<(), StateError>;
 }
 ```
 
@@ -962,6 +968,20 @@ Exit criteria:
 - Checkpoint and savestate restore reproduce subsequent state/output.
 - Several parallel machines sharing one ROM image remain independent.
 - Headless and visible modes agree on authoritative state.
+
+Implemented evidence (2026-08-17): `run_frame` applies a stable two-port input
+snapshot and advances one PPU frame ID, with explicit caller or automatic input
+sequence IDs. Owned diagnostic snapshots expose CPU, PPU, CPU RAM, PRG RAM,
+optional CHR RAM, controller, DMA, and scheduler state. Versioned state hashes
+exclude presentation buffers and output policy but include ROM identity and all
+authoritative emulated state. Opaque same-build checkpoints share immutable ROM
+bytes and restore fixed buffers in place without allocation. Durable
+little-endian savestates use a bounded, checksummed envelope and reject
+truncation, corruption, incompatible ROMs, and invalid payloads transactionally.
+Generated tests reproduce state and output after partial-instruction and active
+OAM-DMA restores, compare visible/headless machines for 90 frames, and run four
+independent machines in parallel. Exact format notes, commands, golden hashes,
+and reference-host timings are in `crates/engine-nes/REFERENCE.md`.
 
 ### M22e: APU and deterministic sample output
 

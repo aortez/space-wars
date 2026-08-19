@@ -1,6 +1,9 @@
 mod decode;
 
-use crate::{BusAccess, BusAccessKind, CpuBus, CpuError};
+use crate::{
+    BusAccess, BusAccessKind, CpuBus, CpuError, StateError,
+    state_codec::{StateReader, StateSink},
+};
 use decode::{AddressingMode, Instruction, Operation, decode};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -99,6 +102,26 @@ pub struct CpuCycle {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CpuPhase {
+    Reset { step: u8 },
+    Fetch,
+    Execute { opcode: u8, step: u8 },
+    Interrupt { nmi: bool, step: u8 },
+    Faulted { pc: u16, opcode: u8 },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CpuSnapshot {
+    pub registers: CpuRegisters,
+    pub phase: CpuPhase,
+    pub cycles: u64,
+    pub nmi_pending: bool,
+    pub nmi_edge_pending: bool,
+    pub irq_line: bool,
+    pub irq_pending: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum InterruptKind {
     Nmi,
     Irq,
@@ -107,6 +130,7 @@ enum InterruptKind {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Execution {
     instruction: Instruction,
+    opcode: u8,
     step: u8,
     lo: u8,
     hi: u8,
@@ -116,9 +140,10 @@ struct Execution {
 }
 
 impl Execution {
-    fn new(instruction: Instruction) -> Self {
+    fn new(instruction: Instruction, opcode: u8) -> Self {
         Self {
             instruction,
+            opcode,
             step: 0,
             lo: 0,
             hi: 0,
@@ -224,6 +249,31 @@ impl Cpu {
         self.cycles
     }
 
+    pub fn snapshot(&self) -> CpuSnapshot {
+        let phase = match self.state {
+            CpuState::Reset { step, .. } => CpuPhase::Reset { step },
+            CpuState::Fetch => CpuPhase::Fetch,
+            CpuState::Execute(execution) => CpuPhase::Execute {
+                opcode: execution.opcode,
+                step: execution.step,
+            },
+            CpuState::Interrupt { kind, step, .. } => CpuPhase::Interrupt {
+                nmi: kind == InterruptKind::Nmi,
+                step,
+            },
+            CpuState::Faulted { pc, opcode } => CpuPhase::Faulted { pc, opcode },
+        };
+        CpuSnapshot {
+            registers: self.registers,
+            phase,
+            cycles: self.cycles,
+            nmi_pending: self.nmi_pending,
+            nmi_edge_pending: self.nmi_edge_pending,
+            irq_line: self.irq_line,
+            irq_pending: self.irq_pending,
+        }
+    }
+
     pub fn at_instruction_boundary(&self) -> bool {
         matches!(self.state, CpuState::Fetch)
     }
@@ -265,6 +315,152 @@ impl Cpu {
             step: 0,
             vector_lo: 0,
         };
+    }
+
+    pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S) {
+        sink.write_u8(self.registers.accumulator);
+        sink.write_u8(self.registers.x);
+        sink.write_u8(self.registers.y);
+        sink.write_u8(self.registers.status.bits());
+        sink.write_u8(self.registers.stack_pointer);
+        sink.write_u16(self.registers.program_counter);
+        sink.write_u64(self.cycles);
+        sink.write_bool(self.nmi_pending);
+        sink.write_bool(self.nmi_edge_pending);
+        sink.write_bool(self.irq_line);
+        sink.write_bool(self.irq_pending);
+        match self.state {
+            CpuState::Reset { step, vector_lo } => {
+                sink.write_u8(0);
+                sink.write_u8(step);
+                sink.write_u8(vector_lo);
+            }
+            CpuState::Fetch => sink.write_u8(1),
+            CpuState::Execute(execution) => {
+                sink.write_u8(2);
+                sink.write_u8(execution.opcode);
+                sink.write_u8(execution.step);
+                sink.write_u8(execution.lo);
+                sink.write_u8(execution.hi);
+                sink.write_u16(execution.address);
+                sink.write_u8(execution.value);
+                sink.write_bool(execution.page_crossed);
+            }
+            CpuState::Interrupt {
+                kind,
+                step,
+                vector_lo,
+            } => {
+                sink.write_u8(3);
+                sink.write_u8(match kind {
+                    InterruptKind::Nmi => 0,
+                    InterruptKind::Irq => 1,
+                });
+                sink.write_u8(step);
+                sink.write_u8(vector_lo);
+            }
+            CpuState::Faulted { pc, opcode } => {
+                sink.write_u8(4);
+                sink.write_u16(pc);
+                sink.write_u8(opcode);
+            }
+        }
+    }
+
+    pub(crate) fn read_state(&mut self, reader: &mut StateReader<'_>) -> Result<(), StateError> {
+        let accumulator = reader.read_u8()?;
+        let x = reader.read_u8()?;
+        let y = reader.read_u8()?;
+        let status = Status::from_bits(reader.read_u8()?);
+        if !status.contains(Status::UNUSED) || status.contains(Status::BREAK) {
+            return Err(StateError::InvalidPayload(
+                "CPU status does not have the normalized unused/break bits",
+            ));
+        }
+        let registers = CpuRegisters {
+            accumulator,
+            x,
+            y,
+            status,
+            stack_pointer: reader.read_u8()?,
+            program_counter: reader.read_u16()?,
+        };
+        let cycles = reader.read_u64()?;
+        let nmi_pending = reader.read_bool()?;
+        let nmi_edge_pending = reader.read_bool()?;
+        let irq_line = reader.read_bool()?;
+        let irq_pending = reader.read_bool()?;
+        let state = match reader.read_u8()? {
+            0 => {
+                let step = reader.read_u8()?;
+                if step > 6 {
+                    return Err(StateError::InvalidPayload("invalid CPU reset step"));
+                }
+                CpuState::Reset {
+                    step,
+                    vector_lo: reader.read_u8()?,
+                }
+            }
+            1 => CpuState::Fetch,
+            2 => {
+                let opcode = reader.read_u8()?;
+                let Some(instruction) = decode(opcode) else {
+                    return Err(StateError::InvalidPayload(
+                        "CPU execution state has an unsupported opcode",
+                    ));
+                };
+                let step = reader.read_u8()?;
+                if !valid_execution_step(instruction, step) {
+                    return Err(StateError::InvalidPayload("invalid CPU execution step"));
+                }
+                CpuState::Execute(Execution {
+                    instruction,
+                    opcode,
+                    step,
+                    lo: reader.read_u8()?,
+                    hi: reader.read_u8()?,
+                    address: reader.read_u16()?,
+                    value: reader.read_u8()?,
+                    page_crossed: reader.read_bool()?,
+                })
+            }
+            3 => {
+                let kind = match reader.read_u8()? {
+                    0 => InterruptKind::Nmi,
+                    1 => InterruptKind::Irq,
+                    _ => return Err(StateError::InvalidPayload("invalid CPU interrupt kind")),
+                };
+                let step = reader.read_u8()?;
+                if !(1..=6).contains(&step) {
+                    return Err(StateError::InvalidPayload("invalid CPU interrupt step"));
+                }
+                CpuState::Interrupt {
+                    kind,
+                    step,
+                    vector_lo: reader.read_u8()?,
+                }
+            }
+            4 => {
+                let pc = reader.read_u16()?;
+                let opcode = reader.read_u8()?;
+                if decode(opcode).is_some() {
+                    return Err(StateError::InvalidPayload(
+                        "faulted CPU state contains an official opcode",
+                    ));
+                }
+                CpuState::Faulted { pc, opcode }
+            }
+            _ => return Err(StateError::InvalidPayload("invalid CPU phase")),
+        };
+
+        self.registers = registers;
+        self.state = state;
+        self.cycles = cycles;
+        self.nmi_pending = nmi_pending;
+        self.nmi_edge_pending = nmi_edge_pending;
+        self.irq_line = irq_line;
+        self.irq_pending = irq_pending;
+        Ok(())
     }
 
     pub fn clock<B: CpuBus>(&mut self, bus: &mut B) -> Result<CpuCycle, CpuError> {
@@ -352,7 +548,7 @@ impl Cpu {
             self.state = CpuState::Faulted { pc, opcode };
             return Err(CpuError::UnsupportedOpcode { pc, opcode });
         };
-        self.state = CpuState::Execute(Execution::new(instruction));
+        self.state = CpuState::Execute(Execution::new(instruction, opcode));
         let trace = InstructionTrace {
             cycle,
             pc,
@@ -1604,6 +1800,56 @@ impl Cpu {
     const fn wrong_page_address(original_high: u8, target: u16) -> u16 {
         u16::from_be_bytes([original_high, target as u8])
     }
+}
+
+fn valid_execution_step(instruction: Instruction, step: u8) -> bool {
+    use AddressingMode as M;
+    use Operation as O;
+
+    let maximum = if instruction.operation.is_read() {
+        match instruction.mode {
+            M::Immediate => 0,
+            M::ZeroPage => 1,
+            M::ZeroPageX | M::ZeroPageY => 2,
+            M::Absolute => 2,
+            M::AbsoluteX | M::AbsoluteY => 3,
+            M::IndirectX | M::IndirectY => 4,
+            _ => return false,
+        }
+    } else if instruction.operation.is_write() {
+        match instruction.mode {
+            M::ZeroPage => 1,
+            M::ZeroPageX | M::ZeroPageY => 2,
+            M::Absolute => 2,
+            M::AbsoluteX | M::AbsoluteY => 3,
+            M::IndirectX | M::IndirectY => 4,
+            _ => return false,
+        }
+    } else if instruction.operation.is_rmw() {
+        match instruction.mode {
+            M::Accumulator => 0,
+            M::ZeroPage => 3,
+            M::ZeroPageX => 4,
+            M::Absolute => 4,
+            M::AbsoluteX => 5,
+            _ => return false,
+        }
+    } else if instruction.operation.is_branch() {
+        2
+    } else {
+        match (instruction.operation, instruction.mode) {
+            (O::Brk, M::Implied) => 5,
+            (O::Jmp, M::Absolute) => 1,
+            (O::Jmp, M::Indirect) => 3,
+            (O::Jsr, M::Absolute) => 4,
+            (O::Pha | O::Php, M::Implied) => 1,
+            (O::Pla | O::Plp, M::Implied) => 2,
+            (O::Rti | O::Rts, M::Implied) => 4,
+            (_, M::Implied) => 0,
+            _ => return false,
+        }
+    };
+    step <= maximum
 }
 
 #[cfg(test)]

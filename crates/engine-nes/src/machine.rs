@@ -1,7 +1,128 @@
+use std::fmt;
+
 use crate::{
-    BusAccess, BusAccessKind, Cartridge, CartridgeError, CartridgeImage, Cpu, CpuBus,
-    InstructionTrace, MachineConfig, MachineError, NesBus, OamDmaAlignment, Ppu,
+    BusAccess, BusAccessKind, BusSnapshot, Cartridge, CartridgeError, CartridgeIdentity,
+    CartridgeImage, ControllerButtons, Cpu, CpuBus, CpuSnapshot, FRAME_PIXELS, InstructionTrace,
+    MachineConfig, MachineError, NesBus, OamDmaAlignment, Ppu, PpuSnapshot, RamInit, Region,
+    StateError,
+    state_codec::{StateHasher, StateReader, StateSink, fnv1a64},
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameInput {
+    pub sequence_id: u64,
+    pub controllers: [ControllerButtons; 2],
+}
+
+impl FrameInput {
+    pub const fn new(sequence_id: u64, controllers: [ControllerButtons; 2]) -> Self {
+        Self {
+            sequence_id,
+            controllers,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AppliedInput {
+    pub sequence_id: u64,
+    pub frame_id: u64,
+    pub controllers: [ControllerButtons; 2],
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameTiming {
+    /// CPU-rate scheduler slots consumed by this call, including OAM DMA.
+    pub cpu_slots: u64,
+    /// Physical PPU clocks consumed by this call.
+    pub ppu_clocks: u64,
+    /// Whether the PPU identifies the completed frame as odd.
+    pub odd_frame: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FrameResult<'a> {
+    pub frame_id: u64,
+    pub timing: FrameTiming,
+    pub input: AppliedInput,
+    pub video: Option<&'a [u8; FRAME_PIXELS]>,
+    /// Reserved now so the APU slice can add borrowed samples without changing
+    /// the synchronous frame API.
+    pub audio_samples: &'a [i16],
+}
+
+pub const STATE_HASH_VERSION: u16 = 1;
+pub const SAVESTATE_FORMAT_VERSION: u16 = 1;
+pub const MAX_SAVESTATE_PAYLOAD_BYTES: usize = 128 * 1024;
+
+const SAVESTATE_MAGIC: [u8; 8] = *b"SWNESST\0";
+const SAVESTATE_FLAGS: u16 = 0;
+const SAVESTATE_HEADER_BYTES: usize = 8 + 2 + 2 + 4 + 8 + 4 + 8;
+const STATE_HASH_DOMAIN: &[u8] = b"space-wars-engine-nes-authoritative-state-v1\0";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StateHash {
+    pub version: u16,
+    pub value: u64,
+}
+
+impl fmt::Display for StateHash {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "v{}:{:016x}", self.version, self.value)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OamDmaPhase {
+    Halt,
+    Align,
+    Read,
+    Write,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OamDmaSnapshot {
+    pub page: u8,
+    pub index: u8,
+    pub value: u8,
+    pub phase: OamDmaPhase,
+    pub needs_alignment: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MachineSnapshot {
+    pub cartridge: CartridgeIdentity,
+    pub config: MachineConfig,
+    pub cpu: CpuSnapshot,
+    pub bus: BusSnapshot,
+    pub ppu: PpuSnapshot,
+    pub cpu_slots: u64,
+    pub oam_dma: Option<OamDmaSnapshot>,
+    pub last_applied_input: AppliedInput,
+    pub state_hash: StateHash,
+}
+
+/// Same-build owned rollback state. Immutable cartridge bytes remain shared
+/// through `Arc`; mutable machine buffers are independent clones.
+#[derive(Clone, Debug)]
+pub struct MachineCheckpoint {
+    machine: NesMachine,
+    state_hash: StateHash,
+}
+
+impl MachineCheckpoint {
+    pub fn cartridge_identity(&self) -> CartridgeIdentity {
+        self.machine.bus.cartridge().image().identity()
+    }
+
+    pub fn frame_id(&self) -> u64 {
+        self.machine.ppu().frame_id()
+    }
+
+    pub fn state_hash(&self) -> StateHash {
+        self.state_hash
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct InstructionStep {
@@ -55,6 +176,21 @@ impl OamDma {
             needs_alignment: alignment.needs_alignment(start_slot),
         }
     }
+
+    fn snapshot(self) -> OamDmaSnapshot {
+        OamDmaSnapshot {
+            page: self.page,
+            index: self.index,
+            value: self.value,
+            phase: match self.phase {
+                DmaPhase::Halt => OamDmaPhase::Halt,
+                DmaPhase::Align => OamDmaPhase::Align,
+                DmaPhase::Read => OamDmaPhase::Read,
+                DmaPhase::Write => OamDmaPhase::Write,
+            },
+            needs_alignment: self.needs_alignment,
+        }
+    }
 }
 
 /// Deterministic NES composition. Each CPU-rate scheduler slot also advances
@@ -66,6 +202,7 @@ pub struct NesMachine {
     config: MachineConfig,
     cpu_slots: u64,
     oam_dma: Option<OamDma>,
+    last_applied_input: AppliedInput,
 }
 
 impl NesMachine {
@@ -77,6 +214,7 @@ impl NesMachine {
             config,
             cpu_slots: 0,
             oam_dma: None,
+            last_applied_input: AppliedInput::default(),
         }
     }
 
@@ -118,6 +256,209 @@ impl NesMachine {
 
     pub fn oam_dma_active(&self) -> bool {
         self.oam_dma.is_some() || self.bus.oam_dma_requested()
+    }
+
+    pub fn last_applied_input(&self) -> AppliedInput {
+        self.last_applied_input
+    }
+
+    pub fn cartridge_identity(&self) -> CartridgeIdentity {
+        self.bus.cartridge().image().identity()
+    }
+
+    /// Hashes authoritative emulated state without allocating. Derived video
+    /// pixels and host output policy are deliberately excluded.
+    pub fn state_hash(&self) -> StateHash {
+        let mut hasher = StateHasher::new();
+        hasher.write(STATE_HASH_DOMAIN);
+        let identity = self.cartridge_identity();
+        hasher.write_u32(identity.byte_len);
+        hasher.write_u64(identity.fnv1a64);
+        self.write_state(&mut hasher, false);
+        StateHash {
+            version: STATE_HASH_VERSION,
+            value: hasher.finish(),
+        }
+    }
+
+    pub fn snapshot(&self) -> MachineSnapshot {
+        MachineSnapshot {
+            cartridge: self.cartridge_identity(),
+            config: self.config,
+            cpu: self.cpu.snapshot(),
+            bus: self.bus.snapshot(),
+            ppu: self.ppu().snapshot(),
+            cpu_slots: self.cpu_slots,
+            oam_dma: self.oam_dma.map(OamDma::snapshot),
+            last_applied_input: self.last_applied_input,
+            state_hash: self.state_hash(),
+        }
+    }
+
+    pub fn checkpoint(&self) -> MachineCheckpoint {
+        MachineCheckpoint {
+            machine: self.clone(),
+            state_hash: self.state_hash(),
+        }
+    }
+
+    /// Restores same-build rollback state while retaining the target machine's
+    /// video/audio output policy. A cartridge mismatch leaves `self` untouched.
+    pub fn restore(&mut self, checkpoint: &MachineCheckpoint) -> Result<(), StateError> {
+        let expected = self.cartridge_identity();
+        let actual = checkpoint.cartridge_identity();
+        if self.bus.cartridge().image() != checkpoint.machine.bus.cartridge().image() {
+            return Err(StateError::CartridgeMismatch { expected, actual });
+        }
+
+        let video = self.config.video;
+        let audio = self.config.audio;
+        // Copy fixed-size hardware buffers in place so frequent rollback
+        // restores remain allocation-free after construction.
+        self.cpu = checkpoint.machine.cpu.clone();
+        self.bus.copy_emulated_state_from(&checkpoint.machine.bus);
+        self.config = checkpoint.machine.config;
+        self.cpu_slots = checkpoint.machine.cpu_slots;
+        self.oam_dma = checkpoint.machine.oam_dma;
+        self.last_applied_input = checkpoint.machine.last_applied_input;
+        self.config.video = video;
+        self.config.audio = audio;
+        Ok(())
+    }
+
+    /// Creates a portable, versioned, checksummed savestate. Immutable ROM
+    /// bytes are represented by their cartridge identity rather than copied.
+    pub fn save_state(&self) -> Vec<u8> {
+        let mut payload = Vec::with_capacity(80 * 1024);
+        self.write_state(&mut payload, true);
+        assert!(
+            payload.len() <= MAX_SAVESTATE_PAYLOAD_BYTES,
+            "internal savestate payload exceeds its declared bound"
+        );
+        let payload_len = u32::try_from(payload.len()).expect("savestate payload bound fits u32");
+        let identity = self.cartridge_identity();
+        let checksum = fnv1a64(&payload);
+
+        let mut state = Vec::with_capacity(SAVESTATE_HEADER_BYTES + payload.len());
+        state.write(&SAVESTATE_MAGIC);
+        state.write_u16(SAVESTATE_FORMAT_VERSION);
+        state.write_u16(SAVESTATE_FLAGS);
+        state.write_u32(identity.byte_len);
+        state.write_u64(identity.fnv1a64);
+        state.write_u32(payload_len);
+        state.write_u64(checksum);
+        state.write(&payload);
+        state
+    }
+
+    /// Loads a durable state transactionally. Any validation or decoding
+    /// error leaves the target machine unchanged, including output buffers.
+    pub fn load_state(&mut self, state: &[u8]) -> Result<(), StateError> {
+        let mut envelope = StateReader::new(state);
+        let magic = envelope.read_array()?;
+        if magic != SAVESTATE_MAGIC {
+            return Err(StateError::InvalidMagic(magic));
+        }
+        let version = envelope.read_u16()?;
+        if version != SAVESTATE_FORMAT_VERSION {
+            return Err(StateError::UnsupportedVersion { found: version });
+        }
+        let flags = envelope.read_u16()?;
+        if flags != SAVESTATE_FLAGS {
+            return Err(StateError::UnsupportedFlags { found: flags });
+        }
+        let actual_identity = CartridgeIdentity {
+            byte_len: envelope.read_u32()?,
+            fnv1a64: envelope.read_u64()?,
+        };
+        let declared_length = envelope.read_u32()? as usize;
+        let expected_checksum = envelope.read_u64()?;
+        if declared_length > MAX_SAVESTATE_PAYLOAD_BYTES {
+            return Err(StateError::TooLarge {
+                declared: declared_length,
+                maximum: MAX_SAVESTATE_PAYLOAD_BYTES,
+            });
+        }
+        let actual_length = envelope.remaining();
+        if actual_length != declared_length {
+            return Err(StateError::LengthMismatch {
+                declared: declared_length,
+                actual: actual_length,
+            });
+        }
+        let payload = envelope.read_bytes(declared_length)?;
+        envelope.finish()?;
+        let actual_checksum = fnv1a64(payload);
+        if actual_checksum != expected_checksum {
+            return Err(StateError::ChecksumMismatch {
+                expected: expected_checksum,
+                actual: actual_checksum,
+            });
+        }
+        let expected_identity = self.cartridge_identity();
+        if actual_identity != expected_identity {
+            return Err(StateError::CartridgeMismatch {
+                expected: expected_identity,
+                actual: actual_identity,
+            });
+        }
+
+        let mut candidate = self.clone();
+        let mut payload_reader = StateReader::new(payload);
+        candidate.read_state(&mut payload_reader, true)?;
+        payload_reader.finish()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Applies controller state and advances until exactly one new video frame
+    /// has completed. The automatically assigned sequence starts at one and
+    /// follows the most recently supplied explicit or automatic sequence.
+    pub fn run_frame(
+        &mut self,
+        controllers: [ControllerButtons; 2],
+    ) -> Result<FrameResult<'_>, MachineError> {
+        let sequence_id = self.last_applied_input.sequence_id.wrapping_add(1);
+        self.run_frame_with_input(FrameInput::new(sequence_id, controllers))
+    }
+
+    /// Applies one caller-identified input snapshot and advances one completed
+    /// PPU frame ID. Input remains stable for the entire call unless diagnostic
+    /// code mutates the bus directly. The final CPU-rate slot finishes all
+    /// three of its PPU dots, so the returned timing can extend at most two
+    /// dots beyond the vblank edge that completed the frame.
+    pub fn run_frame_with_input(
+        &mut self,
+        input: FrameInput,
+    ) -> Result<FrameResult<'_>, MachineError> {
+        let start_slots = self.cpu_slots;
+        let start_ppu_clocks = self.ppu().timing().clocks;
+        let target_frame = self.ppu().frame_id().wrapping_add(1);
+        for (port, buttons) in input.controllers.into_iter().enumerate() {
+            self.bus.set_controller_buttons(port, buttons);
+        }
+        self.last_applied_input = AppliedInput {
+            sequence_id: input.sequence_id,
+            frame_id: target_frame,
+            controllers: input.controllers,
+        };
+
+        while self.ppu().frame_id() != target_frame {
+            self.clock()?;
+        }
+
+        let end_ppu = self.ppu().timing();
+        Ok(FrameResult {
+            frame_id: target_frame,
+            timing: FrameTiming {
+                cpu_slots: self.cpu_slots.wrapping_sub(start_slots),
+                ppu_clocks: end_ppu.clocks.wrapping_sub(start_ppu_clocks),
+                odd_frame: end_ppu.odd_frame,
+            },
+            input: self.last_applied_input,
+            video: self.ppu().framebuffer(),
+            audio_samples: &[],
+        })
     }
 
     /// Advances one CPU-rate scheduler slot. OAM DMA owns 513 slots when it
@@ -264,6 +605,129 @@ impl NesMachine {
         }
     }
 
+    fn write_state<S: StateSink>(&self, sink: &mut S, include_framebuffer: bool) {
+        sink.write_u8(match self.config.region {
+            Region::Ntsc => 0,
+        });
+        match self.config.ram_init {
+            RamInit::Zero => sink.write_u8(0),
+            RamInit::Pattern(value) => {
+                sink.write_u8(1);
+                sink.write_u8(value);
+            }
+        }
+        sink.write_u8(match self.config.oam_dma_alignment {
+            OamDmaAlignment::ShortOnEvenSlot => 0,
+            OamDmaAlignment::ShortOnOddSlot => 1,
+        });
+        self.cpu.write_state(sink);
+        self.bus.write_state(sink, include_framebuffer);
+        sink.write_u64(self.cpu_slots);
+        match self.oam_dma {
+            None => sink.write_u8(0),
+            Some(dma) => {
+                sink.write_u8(1);
+                sink.write_u8(dma.page);
+                sink.write_u8(dma.index);
+                sink.write_u8(dma.value);
+                sink.write_u8(match dma.phase {
+                    DmaPhase::Halt => 0,
+                    DmaPhase::Align => 1,
+                    DmaPhase::Read => 2,
+                    DmaPhase::Write => 3,
+                });
+                sink.write_bool(dma.needs_alignment);
+            }
+        }
+        sink.write_u64(self.last_applied_input.sequence_id);
+        sink.write_u64(self.last_applied_input.frame_id);
+        for buttons in self.last_applied_input.controllers {
+            sink.write_u8(buttons.bits());
+        }
+    }
+
+    fn read_state(
+        &mut self,
+        reader: &mut StateReader<'_>,
+        include_framebuffer: bool,
+    ) -> Result<(), StateError> {
+        self.config.region = match reader.read_u8()? {
+            0 => Region::Ntsc,
+            _ => return Err(StateError::InvalidPayload("invalid machine region")),
+        };
+        self.config.ram_init = match reader.read_u8()? {
+            0 => RamInit::Zero,
+            1 => RamInit::Pattern(reader.read_u8()?),
+            _ => {
+                return Err(StateError::InvalidPayload(
+                    "invalid RAM initialization mode",
+                ));
+            }
+        };
+        self.config.oam_dma_alignment = match reader.read_u8()? {
+            0 => OamDmaAlignment::ShortOnEvenSlot,
+            1 => OamDmaAlignment::ShortOnOddSlot,
+            _ => return Err(StateError::InvalidPayload("invalid OAM DMA alignment")),
+        };
+        self.cpu.read_state(reader)?;
+        self.bus.read_state(reader, include_framebuffer)?;
+        self.cpu_slots = reader.read_u64()?;
+        self.oam_dma = match reader.read_u8()? {
+            0 => None,
+            1 => {
+                let page = reader.read_u8()?;
+                let index = reader.read_u8()?;
+                let value = reader.read_u8()?;
+                let phase = match reader.read_u8()? {
+                    0 => DmaPhase::Halt,
+                    1 => DmaPhase::Align,
+                    2 => DmaPhase::Read,
+                    3 => DmaPhase::Write,
+                    _ => return Err(StateError::InvalidPayload("invalid OAM DMA phase")),
+                };
+                let needs_alignment = reader.read_bool()?;
+                if phase == DmaPhase::Align && !needs_alignment {
+                    return Err(StateError::InvalidPayload(
+                        "OAM DMA align phase lacks an alignment cycle",
+                    ));
+                }
+                Some(OamDma {
+                    page,
+                    index,
+                    value,
+                    phase,
+                    needs_alignment,
+                })
+            }
+            _ => return Err(StateError::InvalidPayload("invalid OAM DMA presence tag")),
+        };
+        self.last_applied_input = AppliedInput {
+            sequence_id: reader.read_u64()?,
+            frame_id: reader.read_u64()?,
+            controllers: [
+                ControllerButtons::from_bits(reader.read_u8()?),
+                ControllerButtons::from_bits(reader.read_u8()?),
+            ],
+        };
+
+        if self.oam_dma.is_some() && !self.cpu.at_instruction_boundary() {
+            return Err(StateError::InvalidPayload(
+                "active OAM DMA does not hold the CPU at an instruction boundary",
+            ));
+        }
+        if self.oam_dma.is_some() && self.bus.oam_dma_requested() {
+            return Err(StateError::InvalidPayload(
+                "OAM DMA is both active and pending",
+            ));
+        }
+        if self.ppu().timing().clocks != self.cpu_slots.wrapping_mul(3) {
+            return Err(StateError::InvalidPayload(
+                "CPU and PPU scheduler clocks disagree",
+            ));
+        }
+        Ok(())
+    }
+
     fn clock_ppu_for_cpu_slot(&mut self) {
         self.forward_ppu_nmi();
         for _ in 0..3 {
@@ -380,6 +844,57 @@ mod tests {
             machine.clock().unwrap();
         }
         assert_eq!(machine.cpu.registers().program_counter, 0x9000);
+    }
+
+    #[test]
+    fn frame_api_applies_both_ports_and_completes_one_frame_id() {
+        let mut machine = machine_with_program(&[0x4c, 0x00, 0x80]); // JMP $8000
+        let input = FrameInput::new(
+            42,
+            [
+                ControllerButtons::A | ControllerButtons::LEFT,
+                ControllerButtons::B | ControllerButtons::RIGHT,
+            ],
+        );
+        let result = machine.run_frame_with_input(input).unwrap();
+        assert_eq!(result.frame_id, 1);
+        assert_eq!(result.input.sequence_id, 42);
+        assert_eq!(result.input.frame_id, 1);
+        assert_eq!(result.input.controllers, input.controllers);
+        assert_eq!(result.timing.ppu_clocks, result.timing.cpu_slots * 3);
+        assert!(result.video.is_some());
+        assert!(result.audio_samples.is_empty());
+
+        assert_eq!(
+            machine.bus.controller(0).unwrap().buttons(),
+            input.controllers[0]
+        );
+        assert_eq!(
+            machine.bus.controller(1).unwrap().buttons(),
+            input.controllers[1]
+        );
+        let result = machine
+            .run_frame([ControllerButtons::NONE, ControllerButtons::START])
+            .unwrap();
+        assert_eq!(result.frame_id, 2);
+        assert_eq!(result.input.sequence_id, 43);
+        assert_eq!(result.input.frame_id, 2);
+    }
+
+    #[test]
+    fn disabled_video_preserves_frame_timing_without_returning_pixels() {
+        let mut rom = NromBuilder::new_32k();
+        rom.write(0x8000, &[0x4c, 0x00, 0x80]); // JMP $8000
+        rom.set_vectors(0x8000, 0x8000, 0x8000);
+        let config = MachineConfig {
+            video: crate::VideoOutput::Disabled,
+            ..MachineConfig::default()
+        };
+        let mut machine = NesMachine::from_ines(&rom.build(), config).unwrap();
+        let result = machine.run_frame([ControllerButtons::NONE; 2]).unwrap();
+        assert_eq!(result.frame_id, 1);
+        assert!(result.video.is_none());
+        assert_eq!(result.timing.ppu_clocks, result.timing.cpu_slots * 3);
     }
 
     #[test]

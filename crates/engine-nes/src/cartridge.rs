@@ -1,12 +1,22 @@
 use std::sync::Arc;
 
-use crate::CartridgeError;
+use crate::state_codec::fnv1a64;
+use crate::{CartridgeError, StateError, state_codec::StateReader, state_codec::StateSink};
 
 const INES_HEADER_LEN: usize = 16;
 const TRAINER_LEN: usize = 512;
 const PRG_ROM_BANK_LEN: usize = 16 * 1024;
-const CHR_ROM_BANK_LEN: usize = 8 * 1024;
-const PRG_RAM_LEN: usize = 8 * 1024;
+pub const CHR_MEMORY_BYTES: usize = 8 * 1024;
+pub const PRG_RAM_BYTES: usize = 8 * 1024;
+
+const CHR_ROM_BANK_LEN: usize = CHR_MEMORY_BYTES;
+const PRG_RAM_LEN: usize = PRG_RAM_BYTES;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CartridgeIdentity {
+    pub byte_len: u32,
+    pub fnv1a64: u64,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mirroring {
@@ -47,6 +57,7 @@ pub struct CartridgeMetadata {
 /// machines can execute the same image without copying it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CartridgeImage {
+    identity: CartridgeIdentity,
     metadata: CartridgeMetadata,
     prg_rom: Arc<[u8]>,
     chr_rom: Arc<[u8]>,
@@ -120,6 +131,10 @@ impl CartridgeImage {
         let trainer = has_trainer.then(|| Arc::from(&bytes[trainer_start..prg_start]));
 
         Ok(Self {
+            identity: CartridgeIdentity {
+                byte_len: expected_at_least as u32,
+                fnv1a64: fnv1a64(&bytes[..expected_at_least]),
+            },
             metadata: CartridgeMetadata {
                 mapper,
                 mirroring,
@@ -137,6 +152,10 @@ impl CartridgeImage {
 
     pub fn metadata(&self) -> CartridgeMetadata {
         self.metadata
+    }
+
+    pub fn identity(&self) -> CartridgeIdentity {
+        self.identity
     }
 
     pub fn prg_rom(&self) -> &[u8] {
@@ -236,6 +255,52 @@ impl Cartridge {
     pub fn prg_ram(&self) -> &[u8; PRG_RAM_LEN] {
         &self.prg_ram
     }
+
+    pub fn chr_ram(&self) -> Option<&[u8; CHR_ROM_BANK_LEN]> {
+        match &self.chr {
+            ChrMemory::Rom(_) => None,
+            ChrMemory::Ram(data) => Some(data),
+        }
+    }
+
+    pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S) {
+        sink.write(&self.prg_ram[..]);
+        match &self.chr {
+            ChrMemory::Rom(_) => sink.write_u8(0),
+            ChrMemory::Ram(data) => {
+                sink.write_u8(1);
+                sink.write(&data[..]);
+            }
+        }
+    }
+
+    pub(crate) fn read_state(&mut self, reader: &mut StateReader<'_>) -> Result<(), StateError> {
+        self.prg_ram
+            .copy_from_slice(reader.read_bytes(PRG_RAM_LEN)?);
+        match (reader.read_u8()?, &mut self.chr) {
+            (0, ChrMemory::Rom(_)) => Ok(()),
+            (1, ChrMemory::Ram(data)) => {
+                data.copy_from_slice(reader.read_bytes(CHR_ROM_BANK_LEN)?);
+                Ok(())
+            }
+            (0, ChrMemory::Ram(_)) | (1, ChrMemory::Rom(_)) => Err(StateError::InvalidPayload(
+                "CHR memory kind does not match the cartridge",
+            )),
+            _ => Err(StateError::InvalidPayload("invalid CHR memory kind")),
+        }
+    }
+
+    pub(crate) fn copy_mutable_state_from(&mut self, source: &Self) {
+        debug_assert_eq!(self.image, source.image);
+        self.prg_ram.copy_from_slice(&source.prg_ram[..]);
+        match (&mut self.chr, &source.chr) {
+            (ChrMemory::Ram(target), ChrMemory::Ram(source)) => {
+                target.copy_from_slice(&source[..]);
+            }
+            (ChrMemory::Rom(_), ChrMemory::Rom(_)) => {}
+            _ => unreachable!("matching cartridge images have matching CHR memory kinds"),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -254,6 +319,27 @@ mod tests {
         let cartridge = Cartridge::new(image);
         assert_eq!(cartridge.cpu_read(0x8000), Some(0x12));
         assert_eq!(cartridge.cpu_read(0xc000), Some(0x12));
+    }
+
+    #[test]
+    fn cartridge_identity_covers_the_canonical_image_but_not_trailing_bytes() {
+        let bytes = NromBuilder::new_16k().build();
+        let identity = CartridgeImage::parse(&bytes).unwrap().identity();
+        assert_eq!(identity.byte_len as usize, bytes.len());
+
+        let mut with_trailing = bytes.clone();
+        with_trailing.extend_from_slice(&[0xa5; 7]);
+        assert_eq!(
+            CartridgeImage::parse(&with_trailing).unwrap().identity(),
+            identity
+        );
+
+        let mut changed = bytes;
+        *changed.last_mut().unwrap() ^= 1;
+        assert_ne!(
+            CartridgeImage::parse(&changed).unwrap().identity(),
+            identity
+        );
     }
 
     #[test]

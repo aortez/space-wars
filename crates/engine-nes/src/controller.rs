@@ -1,3 +1,8 @@
+use crate::{
+    StateError,
+    state_codec::{StateReader, StateSink},
+};
+
 /// Buttons in the order shifted by an NES controller: A, B, Select, Start,
 /// Up, Down, Left, Right.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -53,6 +58,13 @@ pub struct ControllerPort {
     strobe: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ControllerSnapshot {
+    pub buttons: ControllerButtons,
+    pub shift_register: u8,
+    pub strobe: bool,
+}
+
 impl ControllerPort {
     pub fn buttons(&self) -> ControllerButtons {
         self.buttons
@@ -67,6 +79,14 @@ impl ControllerPort {
 
     pub fn strobe(&self) -> bool {
         self.strobe
+    }
+
+    pub fn snapshot(&self) -> ControllerSnapshot {
+        ControllerSnapshot {
+            buttons: self.buttons,
+            shift_register: self.shift_register,
+            strobe: self.strobe,
+        }
     }
 
     /// Applies the shared `$4016` strobe signal.
@@ -101,6 +121,19 @@ impl ControllerPort {
 
     fn latch(&mut self) {
         self.shift_register = self.buttons.bits();
+    }
+
+    pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S) {
+        sink.write_u8(self.buttons.bits());
+        sink.write_u8(self.shift_register);
+        sink.write_bool(self.strobe);
+    }
+
+    pub(crate) fn read_state(&mut self, reader: &mut StateReader<'_>) -> Result<(), StateError> {
+        self.buttons = ControllerButtons::from_bits(reader.read_u8()?);
+        self.shift_register = reader.read_u8()?;
+        self.strobe = reader.read_bool()?;
+        Ok(())
     }
 }
 
