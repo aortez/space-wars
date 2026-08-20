@@ -44,3 +44,7 @@ path = "examples/ppu_conformance.rs"
 [[example]]
 name = "state_benchmark"
 path = "examples/state_benchmark.rs"
+
+[[example]]
+name = "mapper_benchmark"
+path = "examples/mapper_benchmark.rs"

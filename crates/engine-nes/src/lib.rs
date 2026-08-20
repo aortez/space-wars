@@ -28,8 +28,8 @@ pub use bus::{
     MemorySnapshot, NesBus,
 };
 pub use cartridge::{
-    CHR_MEMORY_BYTES, Cartridge, CartridgeIdentity, CartridgeImage, CartridgeMetadata, Mirroring,
-    PRG_RAM_BYTES,
+    CHR_MEMORY_BYTES, Cartridge, CartridgeIdentity, CartridgeImage, CartridgeMetadata,
+    MapperSnapshot, Mirroring, PRG_RAM_BYTES,
 };
 pub use config::{
     AudioOutput, MachineConfig, NTSC_MASTER_CLOCK_NUMERATOR_HZ, NTSC_PPU_CLOCK_DENOMINATOR,

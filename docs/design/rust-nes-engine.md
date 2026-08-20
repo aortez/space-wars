@@ -2,6 +2,8 @@
 
 Status: M22a-M22g implemented. M22h implementation and automated cross-target
 validation are complete; the final physical Pi controller/audio soak remains.
+The post-milestone NROM/UxROM/CNROM user ROM library is implemented on top of
+the same core and realtime contracts.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
 
@@ -50,7 +52,8 @@ model to add that compatibility later.
 
 ## Non-goals
 
-- A generic ROM browser or support promise for arbitrary user ROMs.
+- Broad arbitrary-ROM compatibility or an implied compatibility promise beyond
+  the formats and hardware features explicitly implemented by the core.
 - Bundling commercial ROMs or ambiguously licensed test ROMs.
 - PAL, Dendy, Famicom expansion audio, Zapper, Four Score, or other peripherals.
 - Analog NTSC signal simulation, CRT filters, shaders, or presentation effects.
@@ -111,9 +114,14 @@ scenarios/falling
   Falling ROM metadata and bytes, scenario configuration, actions,
   observations, and the synchronous machine instance.
 
+scenarios/nes
+  Cartridge-agnostic synchronous scenario state. Receives an already parsed,
+  owned cartridge image and has no filesystem or platform dependency.
+
 crates/engine-client
-  Scenario adapter, realtime worker, physical input mapping, native-video
-  presentation, audio device, launcher errors, and lifecycle.
+  Bounded ROM discovery, shared scenario adapter, realtime worker, physical
+  input mapping, native-video presentation, audio device, launcher errors, and
+  lifecycle.
 
 crates/engine-agent
   Future direct synchronous use of engine-nes/scenario state. No realtime
@@ -126,16 +134,32 @@ The intended dependency direction is:
 engine-nes
     ^
     |
-scenario-falling --> engine-common
-    ^
-    |
-engine-client
+scenario-falling   scenario-nes --> engine-common
+           ^          ^
+           |          |
+           +--- engine-client
 ```
 
 `engine-nes` should not depend on `engine-common`; the emulator remains useful
 without the Space Wars scenario model. Shared presentation and scenario types
 belong in `engine-common`, while Slint-specific buffers stay in
 `engine-client`.
+
+### Post-milestone user cartridge library
+
+The initial milestone intentionally did not require a ROM browser. Its
+boundaries made a later library small rather than invasive: `engine-client`
+performs bounded filesystem discovery and iNES inspection, then passes an owned
+`CartridgeImage` into platform-independent `scenario-nes`. Falling and user
+cartridges share one client adapter and one `NesRealtimeRuntime`, so pacing,
+audio, native video, input neutralization, pause, restart, and teardown cannot
+drift between the bundled and user-supplied paths.
+
+The launcher persists a selected SHA-256 content identity, reports unsupported
+images without trying to run them, and rescans when the launcher is entered.
+This remains a deliberately narrow NROM/UxROM/CNROM feature, not a compatibility
+claim for arbitrary ROMs. The operational workflow and exact compatibility boundary
+are in [`../nes-rom-library.md`](../nes-rom-library.md).
 
 ## Proposed core API
 
@@ -238,7 +262,9 @@ savestates, and static dispatch:
 ```rust
 enum MapperState {
     Nrom(Nrom),
-    // Uxrom, Cnrom, Mmc1, Mmc3, ... later.
+    Uxrom(Uxrom),
+    Cnrom(Cnrom),
+    // Mmc1, Mmc3, ... later.
 }
 ```
 

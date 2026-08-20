@@ -9,7 +9,7 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts four playable scenarios:
+The local launcher currently hosts five playable scenarios:
 
 - **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
   asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
@@ -24,6 +24,10 @@ The local launcher currently hosts four playable scenarios:
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
+- **NES Library** — user-supplied NROM (mapper 0), UxROM (mapper 2), and CNROM
+  (mapper 3) `.nes` cartridges running through the same emulator, realtime
+  worker, native-video, audio, input, and host lifecycle as Falling.
+  Unsupported cartridges remain visible with a compatibility reason.
 
 Textures and sounds for Spacewars have yet to be done. Pizza retains its
 Classic collision implementation as a benchmark reference. Mutual gravity is
@@ -36,7 +40,7 @@ The deterministic Classic/Rapier Pizza benchmark is documented in
 The accepted physics ownership and lifecycle design is documented in
 [`docs/design/physics-architecture.md`](docs/design/physics-architecture.md).
 
-A Rust-native NES engine is also under development. Its mapper-0 cartridge,
+A Rust-native NES engine is also under development. Its NROM/UxROM/CNROM cartridge,
 cycle-oriented RP2A03 CPU, scalar 2C02 PPU, complete five-channel APU,
 deterministic 48 kHz sample/frame/state API, checkpoints, portable savestates,
 reference captures, and generated test tools live in `crates/engine-nes`.
@@ -49,6 +53,8 @@ and additional-scenario workflow is in
 [`docs/nes-extension-guide.md`](docs/nes-extension-guide.md), and desktop/Pi
 milestone results are recorded in
 [`docs/nes-validation.md`](docs/nes-validation.md).
+The user-cartridge workflow and current compatibility boundary are documented
+in [`docs/nes-rom-library.md`](docs/nes-rom-library.md).
 
 ## Run locally
 
@@ -67,14 +73,40 @@ cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```
 
+To run your own cartridge directly:
+
+```sh
+cargo run -p engine-client -- --rom /path/to/game.nes
+```
+
+For launcher selection, copy `.nes` files into the `roms` directory beside
+`settings.toml` (normally `~/.config/spacewars/roms` on Linux), then reopen the
+launcher. `--config-dir /path/to/config` makes the library location explicit.
+Only use ROM images that you have the right to use; Space-Wars does not bundle
+or download commercial games.
+
+For the kiosk, keep user-owned cartridges in the gitignored local
+`data/roms/` directory and sync them to its persistent data partition:
+
+```sh
+mkdir -p data/roms
+./sync-data.sh --dry-run
+./sync-data.sh
+```
+
+The default target is `spacewars@spacewars.local`. Run
+`./sync-data.sh --help` for host, user, data-directory, and explicit mirror
+options.
+
 Rover Lab uses d-pad left/right to drive, `B` or d-pad down to brake, and a
 hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
 `S` brake, `X` reverse, `Space` jump, and `R` reset.
 
-Falling uses the d-pad, `A`, `B`, and `Start` as an NES controller. `Select`
-opens the host controls menu so a gamepad-only player can restart or return to
-the launcher. Keyboard equivalents are the arrow keys, `Z`/`Space`, `X`, and
-`Enter`; `Esc` opens the host pause menu.
+Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
+cartridge. Press `Start` + `Select` together for the host controls menu so a
+gamepad-only player can restart or return to the launcher. Keyboard equivalents
+for player 1 are the arrow keys, `Z`/`Space`, `X`, `Tab`, and `Enter`; `Esc`
+opens the host pause menu.
 
 ## Raspberry Pi / kiosk launch
 

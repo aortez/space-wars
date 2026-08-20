@@ -11,6 +11,7 @@ members = [
     "crates/engine-agent",
     "crates/engine-os-manager",
     "scenarios/falling",
+    "scenarios/nes",
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
@@ -41,6 +42,7 @@ rapier2d = { version = "0.34", default-features = false, features = [
     "std",
 ] }
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 slint = { version = "1", default-features = false }
 slint-build = { version = "1" }
 tempfile = "3"
@@ -55,6 +57,7 @@ engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 scenario-falling = { path = "scenarios/falling" }
+scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }

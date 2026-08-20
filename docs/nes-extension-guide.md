@@ -1,8 +1,10 @@
 # Extending the Rust NES engine
 
-This guide describes the intended path for adding a cartridge mapper and a
-second bundled NES scenario without copying the emulator or introducing a
-platform dependency into `engine-nes`.
+This guide describes the intended path for adding a cartridge mapper or a
+bundled NES scenario without copying the emulator or introducing a platform
+dependency into `engine-nes`. User-provided cartridges already use the generic
+`scenario-nes` and client adapter described in
+[`nes-rom-library.md`](nes-rom-library.md).
 
 ## Before implementation
 
@@ -19,10 +21,10 @@ bug. Hardware documentation and focused conformance tests remain authoritative.
 
 ## Adding a mapper
 
-Mapper 0 is currently represented directly by `Cartridge` in
-`crates/engine-nes/src/cartridge.rs`. The first additional mapper should turn
-that concrete mutable implementation into an exhaustive internal enum such as
-`MapperState`, while retaining the existing public `Cartridge` facade.
+`Cartridge` retains the public mapper-independent facade while an exhaustive
+internal `MapperState` enum provides static NROM, UxROM, and CNROM dispatch in
+`crates/engine-nes/src/cartridge.rs`. Add new hardware as another explicit enum
+variant; do not fork the cartridge facade or machine bus.
 
 1. Parse and bounds-check the mapper's legal PRG/CHR layouts in
    `CartridgeImage::parse`. Keep immutable ROM bytes in shared `Arc` storage and
@@ -50,9 +52,10 @@ synchronous frame call continues to use the same CPU/PPU/APU/DMA scheduler.
 
 ## Adding a bundled NES scenario
 
-Use `scenarios/falling` and
-`crates/engine-client/src/client_scenarios/falling.rs` as the vertical example,
-but share the core and realtime facilities rather than cloning their internals.
+Use `scenarios/falling` as the bundled-asset example and `scenarios/nes` as the
+generic synchronous adapter. Shared client lifecycle code lives in
+`crates/engine-client/src/client_scenarios/nes.rs`; a new game must not clone
+that worker, video, audio, or input glue.
 
 1. Add `scenarios/<name>` to the workspace. Embed the pinned ROM with
    `include_bytes!`, place its license next to it, and expose source commit,
@@ -65,14 +68,14 @@ but share the core and realtime facilities rather than cloning their internals.
 3. Validate the embedded identity before startup and map cartridge/runtime
    failures into recoverable errors. Add deterministic boot, fixed-input,
    observation, framebuffer, audio, checkpoint, and output-disabled tests.
-4. Add one client adapter module and `ScenarioRegistration` entry in
-   `crates/engine-client/src/client_scenarios/mod.rs`. Declare native-video and
-   Start-button capture capabilities accurately, provide complete controls
-   help, and map keyboard/gamepad state to a full controller snapshot.
+4. Add a `ScenarioRegistration` entry in
+   `crates/engine-client/src/client_scenarios/mod.rs`. Use the shared NES client
+   adapter unless the scenario has a demonstrated game-specific host contract.
+   Declare native-video and Start/Select capture capabilities accurately and
+   provide complete controls help.
 5. Reuse `NesRealtimeRuntime`, `RealtimeNesCore`, native-video presentation,
-   and the CPAL output path. If a second adapter would duplicate Falling's
-   lifecycle glue, extract a generic NES client adapter at that point; do not
-   copy the worker, video slots, audio ring, or pacing logic.
+   and the CPAL output path through the generic client adapter. Do not copy the
+   worker, video slots, audio ring, controller handoff, or pacing logic.
 6. Add a launcher-registry assertion, repeated pause/restart/launcher/relaunch
    lifecycle coverage, manual visual/audio checks, and full/headless release
    benchmark rows. Confirm that absence of an audio device remains recoverable.

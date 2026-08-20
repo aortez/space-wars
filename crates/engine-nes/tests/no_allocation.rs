@@ -1,6 +1,9 @@
 use std::alloc::System;
 
-use engine_nes::{ControllerButtons, MachineConfig, NesMachine, test_rom::NromBuilder};
+use engine_nes::{
+    ControllerButtons, MachineConfig, NesMachine,
+    test_rom::{CnromBuilder, NromBuilder, UxromBuilder},
+};
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 
 #[global_allocator]
@@ -75,6 +78,60 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     let region = Region::new(GLOBAL);
     for _ in 0..100 {
         rendering.restore(&checkpoint).unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let mut uxrom = UxromBuilder::new(8);
+    uxrom.write_fixed(
+        0xc000,
+        &[
+            0xa9, 0x00, // LDA #$00
+            0x49, 0x01, // loop: EOR #$01
+            0x8d, 0x00, 0x80, // STA $8000
+            0x4c, 0x02, 0xc0, // JMP loop
+        ],
+    );
+    uxrom.set_vectors(0xc000, 0xc000, 0xc000);
+    let mut switching = NesMachine::from_ines(&uxrom.build(), MachineConfig::default()).unwrap();
+    switching.step_instruction().unwrap(); // Reset.
+    switching.step_instruction().unwrap(); // LDA #$00.
+
+    let region = Region::new(GLOBAL);
+    for _ in 0..10_000 {
+        switching.step_instruction().unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let mut cnrom = CnromBuilder::new_32k(4);
+    cnrom.write_prg(
+        0x8000,
+        &[
+            0xa9, 0x00, // LDA #$00
+            0x49, 0x01, // loop: EOR #$01
+            0x8d, 0x00, 0x80, // STA $8000
+            0x4c, 0x02, 0x80, // JMP loop
+        ],
+    );
+    cnrom.set_vectors(0x8000, 0x8000, 0x8000);
+    let mut switching = NesMachine::from_ines(&cnrom.build(), MachineConfig::default()).unwrap();
+    switching.step_instruction().unwrap(); // Reset.
+    switching.step_instruction().unwrap(); // LDA #$00.
+
+    let region = Region::new(GLOBAL);
+    for _ in 0..10_000 {
+        switching.step_instruction().unwrap();
     }
     let stats = region.change();
     assert_eq!(stats.allocations, 0);

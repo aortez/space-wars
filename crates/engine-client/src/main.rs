@@ -11,6 +11,7 @@ mod ipc;
 mod native_video;
 mod nes_audio;
 mod nes_realtime;
+mod nes_roms;
 mod raster;
 mod render;
 mod settings;
@@ -53,12 +54,18 @@ const PRESET_SMALL_DUEL: &str = "Small Duel";
 const PRESET_DENSE_ASTEROIDS: &str = "Dense Asteroids";
 const PRESET_LONG_GAME: &str = "Long Game";
 
+type SharedNesRomCatalog = Rc<RefCell<nes_roms::NesRomCatalog>>;
+
 #[derive(Parser, Debug)]
 #[command(name = "engine-client", about = "Spacewars scenario host")]
 struct Args {
     /// Scenario to load.
     #[arg(long)]
     scenario: Option<String>,
+
+    /// Launch a user-supplied iNES cartridge directly.
+    #[arg(long, value_name = "PATH", conflicts_with = "scenario")]
+    rom: Option<PathBuf>,
 
     /// Scenario seed.
     #[arg(long)]
@@ -220,7 +227,7 @@ impl Args {
     }
 
     fn requests_direct_launch(&self) -> bool {
-        self.scenario.is_some() || self.kiosk
+        self.scenario.is_some() || self.rom.is_some() || self.kiosk
     }
 
     fn benchmark_configuration(&self) -> host::BenchmarkConfiguration {
@@ -258,6 +265,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     needs_writeback |= normalize_spacewars_settings(&mut loaded);
     needs_writeback |= normalize_pizza_settings(&mut loaded);
     let effective_launch = effective_launch_options(&args, &loaded);
+    let config_directory = settings_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let rom_catalog = Rc::new(RefCell::new(nes_roms::NesRomCatalog::new(config_directory)));
+    {
+        let mut catalog = rom_catalog.borrow_mut();
+        if let Err(error) = catalog.refresh() {
+            tracing::warn!(
+                directory = %catalog.directory().display(),
+                %error,
+                "could not scan the NES ROM library."
+            );
+        }
+    }
 
     if !args.uses_debug_render() {
         host::validate_scenario(effective_launch.scenario.as_str())?;
@@ -330,6 +352,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&input),
         Arc::clone(&settings),
         settings_path.clone(),
+        Rc::clone(&rom_catalog),
     );
     install_ingame_menu_callbacks(
         &window,
@@ -337,6 +360,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Rc::clone(&input),
         Arc::clone(&settings),
+        Rc::clone(&rom_catalog),
     );
     install_ui_navigation(&window);
     apply_video_settings(&window, &args, &settings.read().unwrap());
@@ -350,24 +374,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
     } else if launch_directly {
         let scenario_settings = settings.read().unwrap().clone();
-        match start_scenario_from_launch(
-            &window,
+        let launch_result = resolve_launch_asset(
             &effective_launch,
-            args.benchmark,
-            args.benchmark_configuration(),
-            Rc::clone(&scenario_controls),
-            Rc::clone(&input),
-            scenario_settings.clone(),
-        ) {
+            args.rom.as_deref(),
+            &scenario_settings,
+            &rom_catalog.borrow(),
+        )
+        .and_then(|asset| {
+            start_scenario_from_launch(
+                &window,
+                &effective_launch,
+                args.benchmark,
+                args.benchmark_configuration(),
+                Rc::clone(&scenario_controls),
+                Rc::clone(&input),
+                scenario_settings.clone(),
+                asset,
+            )
+            .map_err(|error| error.to_string())
+        });
+        match launch_result {
             Ok(timer) => *render_timer.borrow_mut() = Some(timer),
             Err(error) => {
                 tracing::error!(%error, "direct scenario launch failed; showing launcher.");
-                show_launcher(&window, &effective_launch, &scenario_settings);
-                window.set_launcher_error_text(SharedString::from(error.to_string()));
+                show_launcher(&window, &effective_launch, &scenario_settings, &rom_catalog);
+                window.set_launcher_error_text(SharedString::from(error));
             }
         }
     } else {
-        show_launcher(&window, &effective_launch, &settings.read().unwrap());
+        show_launcher(
+            &window,
+            &effective_launch,
+            &settings.read().unwrap(),
+            &rom_catalog,
+        );
     }
 
     window.run()?;
@@ -375,7 +415,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn effective_launch_options(args: &Args, settings: &Settings) -> EffectiveLaunch {
-    let scenario = if args.uses_benchmark() && args.scenario.is_none() {
+    let scenario = if args.rom.is_some() {
+        "nes".into()
+    } else if args.uses_benchmark() && args.scenario.is_none() {
         "spacewars".into()
     } else {
         args.scenario
@@ -476,7 +518,12 @@ fn should_launch_directly(args: &Args) -> bool {
     args.uses_debug_render() || args.uses_benchmark() || args.requests_direct_launch()
 }
 
-fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Settings) {
+fn show_launcher(
+    window: &MainWindow,
+    launch: &EffectiveLaunch,
+    settings: &Settings,
+    rom_catalog: &SharedNesRomCatalog,
+) {
     // Release any scenario-specific native-video presenter retained by the
     // generated callback before exposing the launcher again.
     window.on_native_video_ready(|| {});
@@ -519,6 +566,7 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Setti
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
         pizza.ball_spawn_rate,
     )));
+    refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
     window.set_launcher_settings_focus_index(0);
@@ -527,17 +575,110 @@ fn show_launcher(window: &MainWindow, launch: &EffectiveLaunch, settings: &Setti
     window.set_launcher_visible(true);
 }
 
+fn refresh_nes_rom_library(
+    window: &MainWindow,
+    settings: &Settings,
+    rom_catalog: &SharedNesRomCatalog,
+) {
+    let mut catalog = rom_catalog.borrow_mut();
+    window.set_launcher_nes_rom_directory(SharedString::from(
+        catalog.directory().to_string_lossy().into_owned(),
+    ));
+    if let Err(error) = catalog.refresh() {
+        set_launcher_nes_rom_entry(window, None);
+        window.set_launcher_nes_rom_status(SharedString::from(format!(
+            "Could not scan the ROM library: {error}"
+        )));
+        return;
+    }
+
+    let selected_id = settings
+        .nes
+        .selected_rom_id
+        .as_deref()
+        .filter(|id| catalog.entry(id).is_some())
+        .or_else(|| catalog.first_supported_id())
+        .or_else(|| catalog.entries().first().map(|entry| entry.id.as_str()));
+    let entry = selected_id.and_then(|id| catalog.entry(id));
+    set_launcher_nes_rom_entry(window, entry);
+}
+
+fn set_launcher_nes_rom_entry(window: &MainWindow, entry: Option<&nes_roms::NesRomCatalogEntry>) {
+    let Some(entry) = entry else {
+        window.set_launcher_nes_rom_id(SharedString::from(""));
+        window.set_launcher_nes_rom_name(SharedString::from("No cartridges found"));
+        window.set_launcher_nes_rom_status(SharedString::from(
+            "Copy a .nes file into the ROM library, then return to the launcher.",
+        ));
+        window.set_launcher_nes_rom_supported(false);
+        return;
+    };
+
+    window.set_launcher_nes_rom_id(SharedString::from(entry.id.clone()));
+    window.set_launcher_nes_rom_name(SharedString::from(entry.display_name.clone()));
+    window.set_launcher_nes_rom_status(SharedString::from(entry.compatibility.summary()));
+    window.set_launcher_nes_rom_supported(entry.is_supported());
+}
+
+fn cycle_launcher_nes_rom(window: &MainWindow, catalog: &nes_roms::NesRomCatalog, delta: i32) {
+    let entries = catalog.entries();
+    if entries.is_empty() {
+        set_launcher_nes_rom_entry(window, None);
+        return;
+    }
+    let selected_id = window.get_launcher_nes_rom_id();
+    let current = entries
+        .iter()
+        .position(|entry| entry.id == selected_id.as_str())
+        .unwrap_or(0) as i32;
+    let index = ui_navigation::moved_selection(current, entries.len() as i32, delta);
+    set_launcher_nes_rom_entry(window, entries.get(index as usize));
+    window.set_launcher_error_text(SharedString::from(""));
+}
+
+fn resolve_launch_asset(
+    launch: &EffectiveLaunch,
+    explicit_rom: Option<&Path>,
+    settings: &Settings,
+    catalog: &nes_roms::NesRomCatalog,
+) -> Result<client_scenarios::ScenarioAsset, String> {
+    if launch.scenario != "nes" {
+        return Ok(client_scenarios::ScenarioAsset::None);
+    }
+
+    let asset = if let Some(path) = explicit_rom {
+        nes_roms::load_path(path)
+    } else {
+        let id = settings
+            .nes
+            .selected_rom_id
+            .as_deref()
+            .or_else(|| catalog.first_supported_id())
+            .ok_or_else(|| {
+                format!(
+                    "No NES cartridge is selected. Copy a .nes file into {}.",
+                    catalog.directory().display()
+                )
+            })?;
+        catalog.load(id)
+    }
+    .map_err(|error| error.to_string())?;
+    Ok(client_scenarios::ScenarioAsset::NesRom(asset))
+}
+
 fn apply_scenario_metadata(window: &MainWindow, scenario: &str) {
     let Some(registration) = host::scenario_registration(scenario) else {
         window.set_scenario_benchmark_available(false);
         window.set_scenario_player_zoom_available(false);
         window.set_scenario_captures_gamepad_start(false);
+        window.set_scenario_captures_gamepad_select(false);
         window.set_scenario_controls_help(SharedString::from(""));
         return;
     };
     window.set_scenario_benchmark_available(registration.capabilities.benchmark);
     window.set_scenario_player_zoom_available(registration.capabilities.player_zoom);
     window.set_scenario_captures_gamepad_start(registration.capabilities.captures_gamepad_start);
+    window.set_scenario_captures_gamepad_select(registration.capabilities.captures_gamepad_select);
     window.set_scenario_controls_help(SharedString::from(registration.controls_help));
 }
 
@@ -583,6 +724,7 @@ fn install_launcher_callbacks(
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
     settings_path: PathBuf,
+    rom_catalog: SharedNesRomCatalog,
 ) {
     let weak = window.as_weak();
     let game_timer = Rc::clone(&render_timer);
@@ -590,6 +732,7 @@ fn install_launcher_callbacks(
     let game_input = Rc::clone(&input);
     let game_settings = Arc::clone(&settings);
     let game_settings_path = settings_path.clone();
+    let game_rom_catalog = Rc::clone(&rom_catalog);
     window.on_launcher_start_game(move || {
         handle_launcher_start(
             &weak,
@@ -598,6 +741,7 @@ fn install_launcher_callbacks(
             &game_input,
             &game_settings,
             &game_settings_path,
+            &game_rom_catalog,
             false,
         );
     });
@@ -607,6 +751,7 @@ fn install_launcher_callbacks(
     let benchmark_controls = Rc::clone(&scenario_controls);
     let benchmark_input = Rc::clone(&input);
     let benchmark_settings = Arc::clone(&settings);
+    let benchmark_rom_catalog = Rc::clone(&rom_catalog);
     window.on_launcher_start_benchmark(move || {
         handle_launcher_start(
             &weak,
@@ -615,6 +760,7 @@ fn install_launcher_callbacks(
             &benchmark_input,
             &benchmark_settings,
             &settings_path,
+            &benchmark_rom_catalog,
             true,
         );
     });
@@ -625,6 +771,14 @@ fn install_launcher_callbacks(
             return;
         };
         apply_scenario_metadata(&window, scenario.as_str());
+    });
+
+    let weak = window.as_weak();
+    window.on_launcher_nes_rom_cycle(move |delta| {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        cycle_launcher_nes_rom(&window, &rom_catalog.borrow(), delta);
     });
 
     let weak = window.as_weak();
@@ -665,6 +819,7 @@ fn install_ingame_menu_callbacks(
     scenario_controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
+    rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
     window.on_ingame_resume(move || {
@@ -703,7 +858,14 @@ fn install_ingame_menu_callbacks(
 
     let weak = window.as_weak();
     window.on_ingame_return_launcher(move || {
-        handle_return_to_launcher(&weak, &render_timer, &scenario_controls, &input, &settings);
+        handle_return_to_launcher(
+            &weak,
+            &render_timer,
+            &scenario_controls,
+            &input,
+            &settings,
+            &rom_catalog,
+        );
     });
 }
 
@@ -905,6 +1067,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "spacewars" => 7,
         "pizza" => 5,
         "falling" => 1,
+        "nes" => 2,
         _ => 3,
     }
 }
@@ -914,6 +1077,12 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         return;
     }
     let focus = window.get_launcher_settings_focus_index();
+    if window.get_launcher_scenario() == "nes" {
+        if focus == 0 {
+            window.invoke_launcher_nes_rom_cycle(delta);
+        }
+        return;
+    }
     if focus == 0 {
         let next = cycle_label(
             window.get_launcher_renderer().as_str(),
@@ -1028,6 +1197,7 @@ fn handle_return_to_launcher(
     scenario_controls: &host::SharedScenarioControls,
     input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
+    rom_catalog: &SharedNesRomCatalog,
 ) {
     let Some(window) = weak_window.upgrade() else {
         return;
@@ -1041,7 +1211,7 @@ fn handle_return_to_launcher(
     input.borrow_mut().reset_spacewars_controls();
     let settings = settings.read().unwrap();
     let launch = launch_from_settings(&settings);
-    show_launcher(&window, &launch, &settings);
+    show_launcher(&window, &launch, &settings, rom_catalog);
 }
 
 fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
@@ -1112,6 +1282,7 @@ fn handle_launcher_start(
     input: &input::SharedInput,
     settings: &Arc<RwLock<Settings>>,
     settings_path: &Path,
+    rom_catalog: &SharedNesRomCatalog,
     start_benchmark: bool,
 ) {
     let Some(window) = weak_window.upgrade() else {
@@ -1143,6 +1314,18 @@ fn handle_launcher_start(
         return;
     }
     let scenario_settings = settings.read().unwrap().clone();
+    let asset = match resolve_launch_asset(
+        &selections.launch,
+        None,
+        &scenario_settings,
+        &rom_catalog.borrow(),
+    ) {
+        Ok(asset) => asset,
+        Err(message) => {
+            window.set_launcher_error_text(SharedString::from(message));
+            return;
+        }
+    };
 
     match start_scenario_from_launch(
         &window,
@@ -1152,6 +1335,7 @@ fn handle_launcher_start(
         Rc::clone(scenario_controls),
         Rc::clone(input),
         scenario_settings,
+        asset,
     ) {
         Ok(timer) => {
             let mut timer_slot = render_timer.borrow_mut();
@@ -1176,6 +1360,7 @@ fn handle_launcher_start(
 #[derive(Debug, Clone, PartialEq)]
 struct LauncherSelections {
     launch: EffectiveLaunch,
+    nes_rom_id: Option<String>,
     spacewars: SpacewarsSettings,
     pizza: PizzaSettings,
 }
@@ -1191,6 +1376,7 @@ fn persist_launcher_settings(
     let raster_scale = normalize_raster_scale(launch.raster_scale);
     let spacewars = selections.spacewars.normalized();
     let pizza = selections.pizza.normalized();
+    let nes_rom_id = selections.nes_rom_id.clone();
     let mut changed = false;
 
     if settings.launch.scenario != launch.scenario {
@@ -1211,6 +1397,10 @@ fn persist_launcher_settings(
     }
     if settings.last_scenario.as_deref() != Some(launch.scenario.as_str()) {
         settings.last_scenario = Some(launch.scenario.clone());
+        changed = true;
+    }
+    if settings.nes.selected_rom_id != nes_rom_id {
+        settings.nes.selected_rom_id = nes_rom_id;
         changed = true;
     }
     if settings.spacewars != spacewars {
@@ -1367,8 +1557,15 @@ fn launcher_selections_from_window(
             current_settings.pizza.clone(),
         ),
     };
+    let nes_rom_id = if launch.scenario == "nes" {
+        let id = window.get_launcher_nes_rom_id();
+        (!id.trim().is_empty()).then(|| id.to_string())
+    } else {
+        current_settings.nes.selected_rom_id.clone()
+    };
     Ok(LauncherSelections {
         launch,
+        nes_rom_id,
         spacewars,
         pizza,
     })
@@ -1552,6 +1749,7 @@ fn start_scenario_from_launch(
     controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Settings,
+    asset: client_scenarios::ScenarioAsset,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
     apply_scenario_metadata(window, launch.scenario.as_str());
@@ -1567,6 +1765,7 @@ fn start_scenario_from_launch(
             controls: Some(controls),
             input: Some(input),
             settings,
+            asset,
         },
     )
 }
@@ -1704,6 +1903,7 @@ mod tests {
     fn base_args() -> Args {
         Args {
             scenario: None,
+            rom: None,
             seed: None,
             dev: false,
             debug_render: false,
@@ -1760,6 +1960,61 @@ mod tests {
         assert_eq!(launch.seed, 99);
         assert_eq!(launch.renderer, host::RenderBackend::Raster);
         assert_eq!(launch.raster_scale, 2.5);
+    }
+
+    #[test]
+    fn rom_path_selects_the_generic_nes_scenario() {
+        let mut args = base_args();
+        args.rom = Some(PathBuf::from("game.nes"));
+
+        let launch = effective_launch_options(&args, &Settings::default());
+
+        assert_eq!(launch.scenario, "nes");
+        assert!(should_launch_directly(&args));
+    }
+
+    #[test]
+    fn rom_path_and_named_scenario_are_mutually_exclusive() {
+        assert!(
+            Args::try_parse_from([
+                "engine-client",
+                "--rom",
+                "game.nes",
+                "--scenario",
+                "falling",
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn generic_nes_launch_resolves_the_persisted_library_cartridge() {
+        let config = tempfile::tempdir().unwrap();
+        let mut catalog = nes_roms::NesRomCatalog::new(config.path());
+        catalog.refresh().unwrap();
+        std::fs::write(
+            catalog.directory().join("falling-copy.nes"),
+            scenario_falling::FALLING_ROM,
+        )
+        .unwrap();
+        catalog.refresh().unwrap();
+        let id = catalog.first_supported_id().unwrap().to_string();
+        let mut settings = Settings::default();
+        settings.nes.selected_rom_id = Some(id.clone());
+        let launch = EffectiveLaunch {
+            scenario: "nes".into(),
+            seed: 0,
+            renderer: host::RenderBackend::Vector,
+            raster_scale: 1.0,
+        };
+
+        let asset = resolve_launch_asset(&launch, None, &settings, &catalog).unwrap();
+
+        let client_scenarios::ScenarioAsset::NesRom(asset) = asset else {
+            panic!("NES launch did not resolve a cartridge asset");
+        };
+        assert_eq!(asset.digest.to_string(), id);
+        assert_eq!(asset.display_name, "falling-copy");
     }
 
     #[test]
@@ -1922,6 +2177,10 @@ mod tests {
         assert!(should_launch_directly(&args));
 
         let mut args = base_args();
+        args.rom = Some(PathBuf::from("game.nes"));
+        assert!(should_launch_directly(&args));
+
+        let mut args = base_args();
         args.benchmark = true;
         assert!(should_launch_directly(&args));
 
@@ -2000,6 +2259,7 @@ mod tests {
                 renderer: host::RenderBackend::Raster,
                 raster_scale: 2.0,
             },
+            nes_rom_id: Some("abc123".into()),
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,
                 use_planets: false,
@@ -2026,6 +2286,7 @@ mod tests {
         assert_eq!(stored.spacewars, selections.spacewars);
         assert_eq!(stored.pizza, selections.pizza);
         assert_eq!(stored.last_scenario.as_deref(), Some("spacewars"));
+        assert_eq!(stored.nes.selected_rom_id.as_deref(), Some("abc123"));
         drop(stored);
 
         let reloaded = settings::load_settings(&path).unwrap();
@@ -2035,6 +2296,10 @@ mod tests {
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
         assert_eq!(reloaded.settings.spacewars, selections.spacewars);
         assert_eq!(reloaded.settings.pizza, selections.pizza);
+        assert_eq!(
+            reloaded.settings.nes.selected_rom_id.as_deref(),
+            Some("abc123")
+        );
         assert_eq!(
             reloaded.settings.last_scenario.as_deref(),
             Some("spacewars")

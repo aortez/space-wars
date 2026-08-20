@@ -1,25 +1,19 @@
-use std::time::{Duration, Instant};
-
-use engine_common::{
-    Action, NativePixelFormat, NativeVideoFrame, NativeVideoTiming, RenderFrame, Scenario,
-    Settings, StepResult, TickModel,
-};
-use engine_nes::{AudioOutput, CartridgeError, ControllerButtons, FrameInput, NES_PALETTE_RGB565};
+use engine_common::{NativePixelFormat, NativeVideoFrame, NativeVideoTiming, Settings};
+use engine_nes::{AudioOutput, CartridgeError, FrameInput, NES_PALETTE_RGB565};
 use scenario_falling::{
-    FALLING_VISIBLE_CROP, FallingAction, FallingConfig, FallingError, FallingScenario, FallingState,
+    FALLING_VISIBLE_CROP, FallingConfig, FallingError, FallingScenario, FallingState,
 };
+#[cfg(test)]
+use scenario_nes::NesAction;
 
 use super::{
-    ClientScenario, RenderBackend, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
+    ClientScenario, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
     ScenarioStartMode,
 };
-use crate::input::ClientInput;
-use crate::nes_audio::CpalAudioOutput;
-use crate::nes_realtime::{
-    NesRealtimeRuntime, RealtimeNesCore, RealtimeNesFrame, RealtimeStartError, RealtimeTelemetry,
-    RealtimeVideoConsumer,
-};
-use crate::render::{FrameLayout, Viewport};
+use crate::nes_realtime::{RealtimeNesCore, RealtimeNesFrame};
+use crate::render::Viewport;
+
+use super::nes::{create_audio_output, spawn_native_nes_client};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "falling",
@@ -31,14 +25,11 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         game_over: false,
         native_video: true,
         captures_gamepad_start: true,
+        captures_gamepad_select: true,
     },
-    controls_help: "Falling: d-pad left/right moves during play; up/down chooses a title mode; Start begins or pauses the game. A/B are passed through for standard NES compatibility. Gamepad Select opens the host pause/controls menu. Keyboard: arrows, Z/Space = A, X = B, Tab = NES Select, Enter = Start, Esc = host pause.",
+    controls_help: "Falling: d-pad left/right moves during play; up/down chooses a title mode; Start begins or pauses the game. A/B and Select are standard NES inputs. Press Start+Select together for the host controls menu. Keyboard: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
     create,
 };
-
-pub(crate) struct FallingClientScenario {
-    pub(crate) runtime: NesRealtimeRuntime,
-}
 
 struct FallingRealtimeCore {
     state: FallingState,
@@ -49,6 +40,7 @@ fn create(
     settings: &Settings,
     _viewport: Viewport,
     _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let audio_device = create_audio_output();
     let state = FallingScenario::try_init(
@@ -63,42 +55,7 @@ fn create(
     )
     .map_err(map_error)?;
     let core = FallingRealtimeCore { state };
-    let runtime = match audio_device {
-        Some(audio) => NesRealtimeRuntime::spawn_with_audio(core, audio),
-        None => NesRealtimeRuntime::spawn(core),
-    }
-    .map_err(map_realtime_start_error)?;
-    runtime.set_audio_volume(settings.audio.master_volume);
-    runtime.set_audio_muted(settings.audio.muted);
-    Ok(Box::new(FallingClientScenario { runtime }))
-}
-
-#[cfg(test)]
-fn create_audio_output() -> Option<CpalAudioOutput> {
-    // Unit tests validate the lock-free audio path with a synthetic callback;
-    // they must not claim or depend on the developer's default device.
-    None
-}
-
-#[cfg(not(test))]
-fn create_audio_output() -> Option<CpalAudioOutput> {
-    match CpalAudioOutput::try_default() {
-        Ok(audio) => {
-            tracing::info!(output = %audio.describe(), "initialized NES audio output.");
-            Some(audio)
-        }
-        Err(error) => {
-            tracing::warn!(%error, "NES audio is unavailable; continuing with silent emulation.");
-            None
-        }
-    }
-}
-
-fn map_realtime_start_error(error: RealtimeStartError) -> ScenarioCreateError {
-    ScenarioCreateError::RuntimeInitialization {
-        name: REGISTRATION.id,
-        detail: error.to_string(),
-    }
+    spawn_native_nes_client(&REGISTRATION, core, audio_device, settings)
 }
 
 fn map_error(error: FallingError) -> ScenarioCreateError {
@@ -134,83 +91,10 @@ fn is_unsupported_cartridge(error: &CartridgeError) -> bool {
         CartridgeError::UnsupportedNes2
             | CartridgeError::UnsupportedConsoleType(_)
             | CartridgeError::UnsupportedMapper(_)
-            | CartridgeError::UnsupportedPrgRomBanks(_)
-            | CartridgeError::UnsupportedChrRomBanks(_)
+            | CartridgeError::UnsupportedFourScreenMirroring(_)
+            | CartridgeError::UnsupportedPrgRomBanks { .. }
+            | CartridgeError::UnsupportedChrRomBanks { .. }
     )
-}
-
-impl ClientScenario for FallingClientScenario {
-    fn registration(&self) -> &'static ScenarioRegistration {
-        &REGISTRATION
-    }
-
-    fn tick_model(&self) -> TickModel {
-        FallingScenario::tick_model()
-    }
-
-    fn step(&mut self, _actions: &[Action], _dt: Duration) -> StepResult {
-        // Realtime play advances on the worker. Deterministic callers use the
-        // platform-independent FallingScenario directly.
-        StepResult::default()
-    }
-
-    fn map_input(&self, input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
-        vec![FallingAction::set_controller(
-            input.nes_controller_buttons(0),
-        )]
-    }
-
-    fn render_frames(&self, _renderer: RenderBackend, _viewport: Viewport) -> Vec<RenderFrame> {
-        Vec::new()
-    }
-
-    fn frame_layout(&self) -> FrameLayout {
-        FrameLayout::EqualHorizontal
-    }
-
-    fn realtime_video_consumer(&self) -> Option<RealtimeVideoConsumer> {
-        Some(self.runtime.video_consumer())
-    }
-
-    fn publish_realtime_actions(&self, actions: &[Action], observed_at: Instant) {
-        let controller = actions
-            .iter()
-            .filter_map(FallingAction::decode)
-            .next_back()
-            .unwrap_or(ControllerButtons::NONE);
-        self.runtime
-            .publish_input([controller, ControllerButtons::NONE], observed_at);
-    }
-
-    fn set_realtime_paused(&self, paused: bool) {
-        self.runtime.set_paused(paused);
-    }
-
-    fn shutdown_realtime(&mut self) {
-        self.runtime.stop_and_join();
-    }
-
-    fn record_realtime_displayed_loop_iteration(&self) {
-        self.runtime.record_displayed_loop_iteration();
-    }
-
-    fn realtime_telemetry(&self) -> Option<RealtimeTelemetry> {
-        Some(self.runtime.telemetry())
-    }
-
-    fn runtime_error(&self) -> Option<String> {
-        self.runtime.runtime_error()
-    }
-
-    #[cfg(test)]
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    #[cfg(test)]
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
 }
 
 impl RealtimeNesCore for FallingRealtimeCore {
@@ -260,7 +144,7 @@ mod tests {
     use engine_nes::ControllerButtons;
 
     use super::*;
-    use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
+    use crate::input::{ClientInput, GameKey, GamepadInput, GamepadSeatInput};
 
     #[test]
     fn client_maps_nes_keyboard_and_gamepad_to_one_complete_action() {
@@ -281,13 +165,17 @@ mod tests {
             &Settings::default(),
             Viewport::new(1280.0, 720.0),
             ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
         )
         .unwrap();
 
         let actions = scenario.map_input(&mut input, false);
         assert_eq!(
-            FallingAction::decode(&actions[0]),
-            Some(ControllerButtons::RIGHT | ControllerButtons::A | ControllerButtons::START)
+            NesAction::decode(&actions[0]),
+            Some([
+                ControllerButtons::RIGHT | ControllerButtons::A | ControllerButtons::START,
+                ControllerButtons::NONE,
+            ])
         );
     }
 }

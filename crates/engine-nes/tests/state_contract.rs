@@ -462,8 +462,8 @@ fn fixed_state_hash_is_a_versioned_regression_artifact() {
             .run_frame_with_input(input_for_frame(frame))
             .unwrap();
     }
-    assert_eq!(machine.state_hash().version, 2);
+    assert_eq!(machine.state_hash().version, 3);
     // Intentionally pinned: changing this requires a documented state-hash
     // version bump or an explained correction to authoritative emulation.
-    assert_eq!(machine.state_hash().value, 0xbe45_28d4_0459_2bae);
+    assert_eq!(machine.state_hash().value, 0x01a3_389a_7aa7_947f);
 }

@@ -1,7 +1,7 @@
 use crate::{
     Apu, ApuSnapshot, AudioOutput, CHR_MEMORY_BYTES, Cartridge, ControllerButtons, ControllerPort,
-    ControllerSnapshot, DmcDmaRequest, OamDmaAlignment, Ppu, PpuCycle, RamInit, StateError,
-    VideoOutput,
+    ControllerSnapshot, DmcDmaRequest, MapperSnapshot, OamDmaAlignment, Ppu, PpuCycle, RamInit,
+    StateError, VideoOutput,
     cartridge::PRG_RAM_BYTES,
     state_codec::{StateReader, StateSink},
 };
@@ -19,6 +19,7 @@ pub struct MemorySnapshot {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BusSnapshot {
     pub memory: MemorySnapshot,
+    pub mapper: MapperSnapshot,
     pub apu_io_registers: [u8; APU_IO_REGISTER_BYTES],
     pub apu: ApuSnapshot,
     pub controllers: [ControllerSnapshot; 2],
@@ -50,7 +51,7 @@ pub trait CpuBus {
     fn write(&mut self, address: u16, value: u8);
 }
 
-/// CPU-visible NES address space for a mapper-0 machine.
+/// CPU-visible NES address space for one machine.
 ///
 /// The bus owns the PPU because CPU register accesses and PPU cartridge reads
 /// must observe one mutable machine state. The machine scheduler remains
@@ -120,6 +121,7 @@ impl NesBus {
     pub fn snapshot(&self) -> BusSnapshot {
         BusSnapshot {
             memory: self.memory_snapshot(),
+            mapper: self.cartridge.mapper_snapshot(),
             apu_io_registers: self.apu_io_registers,
             apu: self.apu.snapshot(),
             controllers: [

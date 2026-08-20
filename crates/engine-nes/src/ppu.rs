@@ -87,7 +87,7 @@ pub struct PpuSnapshot {
     pub nmi_pending: bool,
 }
 
-/// Cycle-oriented NTSC Ricoh 2C02 PPU for mapper-0 machines.
+/// Cycle-oriented NTSC Ricoh 2C02 PPU.
 ///
 /// The implementation keeps the rendering fetch pipeline, scrolling
 /// registers, and frame timing authoritative even when video output is
@@ -695,8 +695,7 @@ impl Ppu {
         match address {
             0x0000..=0x1fff => cartridge.ppu_read(address).unwrap_or(0),
             0x2000..=0x3eff => {
-                let mirroring = cartridge.image().metadata().mirroring;
-                self.nametables[mirroring.map_nametable_address(address)]
+                self.nametables[cartridge.mirroring().map_nametable_address(address)]
             }
             0x3f00..=0x3fff => self.palette_ram[palette_index(address)] & 0x3f,
             _ => unreachable!("PPU address is masked to 14 bits"),
@@ -710,8 +709,7 @@ impl Ppu {
                 cartridge.ppu_write(address, value);
             }
             0x2000..=0x3eff => {
-                let mirroring = cartridge.image().metadata().mirroring;
-                self.nametables[mirroring.map_nametable_address(address)] = value;
+                self.nametables[cartridge.mirroring().map_nametable_address(address)] = value;
             }
             0x3f00..=0x3fff => self.palette_ram[palette_index(address)] = value & 0x3f,
             _ => unreachable!("PPU address is masked to 14 bits"),

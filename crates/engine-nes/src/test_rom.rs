@@ -1,6 +1,6 @@
-//! Deterministic, repository-owned mapper-0 ROM construction for tests,
-//! examples, and benchmarks. It intentionally supports only the subset needed
-//! to exercise the engine.
+//! Deterministic, repository-owned ROM construction for tests, examples, and
+//! benchmarks. The builders intentionally support only the subsets needed to
+//! exercise each mapper.
 
 const HEADER_LEN: usize = 16;
 const TRAINER_LEN: usize = 512;
@@ -103,6 +103,166 @@ impl NromBuilder {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct UxromBuilder {
+    prg: Vec<u8>,
+    flags6: u8,
+}
+
+impl UxromBuilder {
+    pub fn new(prg_banks: usize) -> Self {
+        assert!(
+            (2..=128).contains(&prg_banks) && prg_banks.is_power_of_two(),
+            "UxROM test images require 2-128 power-of-two PRG banks"
+        );
+        Self {
+            prg: vec![0xea; prg_banks * PRG_BANK_LEN],
+            flags6: 0,
+        }
+    }
+
+    pub fn prg_bank_count(&self) -> usize {
+        self.prg.len() / PRG_BANK_LEN
+    }
+
+    pub fn set_vertical_mirroring(&mut self, vertical: bool) {
+        self.flags6 = (self.flags6 & !1) | u8::from(vertical);
+    }
+
+    pub fn write_bank(&mut self, bank: usize, offset: usize, bytes: &[u8]) {
+        assert!(
+            bank < self.prg_bank_count(),
+            "UxROM PRG bank is out of range"
+        );
+        let start = bank
+            .checked_mul(PRG_BANK_LEN)
+            .and_then(|start| start.checked_add(offset))
+            .expect("ROM write overflow");
+        let end = start.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(offset < PRG_BANK_LEN, "ROM write starts outside a PRG bank");
+        assert!(
+            end <= (bank + 1) * PRG_BANK_LEN,
+            "ROM write crosses a PRG bank boundary"
+        );
+        self.prg[start..end].copy_from_slice(bytes);
+    }
+
+    pub fn write_fixed(&mut self, cpu_address: u16, bytes: &[u8]) {
+        assert!(
+            cpu_address >= 0xc000,
+            "fixed UxROM writes start at CPU $C000"
+        );
+        self.write_bank(
+            self.prg_bank_count() - 1,
+            usize::from(cpu_address - 0xc000),
+            bytes,
+        );
+    }
+
+    pub fn set_vectors(&mut self, nmi: u16, reset: u16, irq: u16) {
+        self.write_fixed(0xfffa, &nmi.to_le_bytes());
+        self.write_fixed(0xfffc, &reset.to_le_bytes());
+        self.write_fixed(0xfffe, &irq.to_le_bytes());
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        let mut image = Vec::with_capacity(HEADER_LEN + self.prg.len());
+        image.extend_from_slice(b"NES\x1a");
+        image.push(self.prg_bank_count() as u8);
+        image.push(0);
+        image.push(self.flags6 | 0x20);
+        image.push(0);
+        image.extend_from_slice(&[0; 8]);
+        image.extend_from_slice(&self.prg);
+        image
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CnromBuilder {
+    prg: Vec<u8>,
+    chr: Vec<u8>,
+    flags6: u8,
+}
+
+impl CnromBuilder {
+    pub fn new_16k(chr_banks: usize) -> Self {
+        Self::new(1, chr_banks)
+    }
+
+    pub fn new_32k(chr_banks: usize) -> Self {
+        Self::new(2, chr_banks)
+    }
+
+    fn new(prg_banks: usize, chr_banks: usize) -> Self {
+        assert!(
+            matches!(chr_banks, 2 | 4),
+            "CNROM test images require two or four CHR banks"
+        );
+        Self {
+            prg: vec![0xea; prg_banks * PRG_BANK_LEN],
+            chr: vec![0; chr_banks * CHR_BANK_LEN],
+            flags6: 0,
+        }
+    }
+
+    pub fn chr_bank_count(&self) -> usize {
+        self.chr.len() / CHR_BANK_LEN
+    }
+
+    pub fn set_vertical_mirroring(&mut self, vertical: bool) {
+        self.flags6 = (self.flags6 & !1) | u8::from(vertical);
+    }
+
+    pub fn write_prg(&mut self, cpu_address: u16, bytes: &[u8]) {
+        assert!(cpu_address >= 0x8000, "PRG writes start at CPU $8000");
+        let mut offset = usize::from(cpu_address - 0x8000);
+        if self.prg.len() == PRG_BANK_LEN {
+            offset %= PRG_BANK_LEN;
+        }
+        let end = offset.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(end <= self.prg.len(), "ROM write exceeds PRG storage");
+        self.prg[offset..end].copy_from_slice(bytes);
+    }
+
+    pub fn write_chr_bank(&mut self, bank: usize, offset: usize, bytes: &[u8]) {
+        assert!(
+            bank < self.chr_bank_count(),
+            "CNROM CHR bank is out of range"
+        );
+        let start = bank
+            .checked_mul(CHR_BANK_LEN)
+            .and_then(|start| start.checked_add(offset))
+            .expect("ROM write overflow");
+        let end = start.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(offset < CHR_BANK_LEN, "ROM write starts outside a CHR bank");
+        assert!(
+            end <= (bank + 1) * CHR_BANK_LEN,
+            "ROM write crosses a CHR bank boundary"
+        );
+        self.chr[start..end].copy_from_slice(bytes);
+    }
+
+    pub fn set_vectors(&mut self, nmi: u16, reset: u16, irq: u16) {
+        self.write_prg(0xfffa, &nmi.to_le_bytes());
+        self.write_prg(0xfffc, &reset.to_le_bytes());
+        self.write_prg(0xfffe, &irq.to_le_bytes());
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        let mut image = Vec::with_capacity(HEADER_LEN + self.prg.len() + self.chr.len());
+        image.extend_from_slice(b"NES\x1a");
+        image.push((self.prg.len() / PRG_BANK_LEN) as u8);
+        image.push(self.chr_bank_count() as u8);
+        image.push(self.flags6 | 0x30);
+        image.push(0);
+        image.extend_from_slice(&[0; 8]);
+        image.extend_from_slice(&self.prg);
+        image.extend_from_slice(&self.chr);
+        image
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +283,35 @@ mod tests {
         let image = builder.build();
         let chr_start = HEADER_LEN + PRG_BANK_LEN;
         assert_eq!(&image[chr_start + 0x123..chr_start + 0x125], &[0xa5, 0x5a]);
+    }
+
+    #[test]
+    fn builds_mapper_two_with_chr_ram_and_fixed_vectors() {
+        let mut builder = UxromBuilder::new(8);
+        builder.set_vertical_mirroring(true);
+        builder.set_vectors(0xc123, 0xc456, 0xc789);
+        let image = builder.build();
+        assert_eq!(image[4], 8);
+        assert_eq!(image[5], 0);
+        assert_eq!(image[6], 0x21);
+        let vectors = HEADER_LEN + 8 * PRG_BANK_LEN - 6;
+        assert_eq!(&image[vectors..], &[0x23, 0xc1, 0x56, 0xc4, 0x89, 0xc7]);
+    }
+
+    #[test]
+    fn builds_mapper_three_with_switchable_chr_rom() {
+        let mut builder = CnromBuilder::new_32k(4);
+        builder.set_vertical_mirroring(true);
+        builder.write_chr_bank(2, 0x123, &[0xa5, 0x5a]);
+        builder.set_vectors(0x8123, 0x8456, 0x8789);
+        let image = builder.build();
+        assert_eq!(image[4], 2);
+        assert_eq!(image[5], 4);
+        assert_eq!(image[6], 0x31);
+        let chr_start = HEADER_LEN + 2 * PRG_BANK_LEN;
+        assert_eq!(
+            &image[chr_start + 2 * CHR_BANK_LEN + 0x123..][..2],
+            &[0xa5, 0x5a]
+        );
     }
 }

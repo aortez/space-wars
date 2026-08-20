@@ -91,14 +91,56 @@ impl CartridgeImage {
         }
 
         let mapper = u16::from(flags6 >> 4) | u16::from(flags7 & 0xf0);
-        if mapper != 0 {
-            return Err(CartridgeError::UnsupportedMapper(mapper));
-        }
-        if !matches!(prg_banks, 1 | 2) {
-            return Err(CartridgeError::UnsupportedPrgRomBanks(prg_banks));
-        }
-        if chr_banks > 1 {
-            return Err(CartridgeError::UnsupportedChrRomBanks(chr_banks));
+        match mapper {
+            0 => {
+                if !matches!(prg_banks, 1 | 2) {
+                    return Err(CartridgeError::UnsupportedPrgRomBanks {
+                        mapper,
+                        banks: prg_banks,
+                    });
+                }
+                if chr_banks > 1 {
+                    return Err(CartridgeError::UnsupportedChrRomBanks {
+                        mapper,
+                        banks: chr_banks,
+                    });
+                }
+            }
+            2 => {
+                if flags6 & 0x08 != 0 {
+                    return Err(CartridgeError::UnsupportedFourScreenMirroring(mapper));
+                }
+                if !(2..=128).contains(&prg_banks) || !prg_banks.is_power_of_two() {
+                    return Err(CartridgeError::UnsupportedPrgRomBanks {
+                        mapper,
+                        banks: prg_banks,
+                    });
+                }
+                if chr_banks != 0 {
+                    return Err(CartridgeError::UnsupportedChrRomBanks {
+                        mapper,
+                        banks: chr_banks,
+                    });
+                }
+            }
+            3 => {
+                if flags6 & 0x08 != 0 {
+                    return Err(CartridgeError::UnsupportedFourScreenMirroring(mapper));
+                }
+                if !matches!(prg_banks, 1 | 2) {
+                    return Err(CartridgeError::UnsupportedPrgRomBanks {
+                        mapper,
+                        banks: prg_banks,
+                    });
+                }
+                if !matches!(chr_banks, 2 | 4) {
+                    return Err(CartridgeError::UnsupportedChrRomBanks {
+                        mapper,
+                        banks: chr_banks,
+                    });
+                }
+            }
+            _ => return Err(CartridgeError::UnsupportedMapper(mapper)),
         }
 
         let has_trainer = flags6 & 0x04 != 0;
@@ -177,12 +219,50 @@ enum ChrMemory {
     Ram(Box<[u8; CHR_ROM_BANK_LEN]>),
 }
 
-/// Mutable NROM state belonging to one machine.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MapperSnapshot {
+    Nrom,
+    Uxrom { selected_prg_bank: u8 },
+    Cnrom { selected_chr_bank: u8 },
+}
+
+#[derive(Clone, Debug)]
+enum MapperState {
+    Nrom,
+    Uxrom { selected_prg_bank: u8 },
+    Cnrom { selected_chr_bank: u8 },
+}
+
+impl MapperState {
+    fn new(mapper: u16) -> Self {
+        match mapper {
+            0 => Self::Nrom,
+            2 => Self::Uxrom {
+                selected_prg_bank: 0,
+            },
+            3 => Self::Cnrom {
+                selected_chr_bank: 0,
+            },
+            _ => unreachable!("cartridge images reject unsupported mappers"),
+        }
+    }
+
+    const fn snapshot(&self) -> MapperSnapshot {
+        match *self {
+            Self::Nrom => MapperSnapshot::Nrom,
+            Self::Uxrom { selected_prg_bank } => MapperSnapshot::Uxrom { selected_prg_bank },
+            Self::Cnrom { selected_chr_bank } => MapperSnapshot::Cnrom { selected_chr_bank },
+        }
+    }
+}
+
+/// Mutable cartridge and mapper state belonging to one machine.
 #[derive(Clone, Debug)]
 pub struct Cartridge {
     image: CartridgeImage,
     prg_ram: Box<[u8; PRG_RAM_LEN]>,
     chr: ChrMemory,
+    mapper: MapperState,
 }
 
 impl Cartridge {
@@ -197,10 +277,12 @@ impl Cartridge {
         } else {
             ChrMemory::Rom(Arc::clone(&image.chr_rom))
         };
+        let mapper = MapperState::new(image.metadata.mapper);
         Self {
             image,
             prg_ram,
             chr,
+            mapper,
         }
     }
 
@@ -211,13 +293,24 @@ impl Cartridge {
     pub fn cpu_read(&self, address: u16) -> Option<u8> {
         match address {
             0x6000..=0x7fff => Some(self.prg_ram[usize::from(address - 0x6000)]),
-            0x8000..=0xffff => {
-                let mut offset = usize::from(address - 0x8000);
-                if self.image.prg_rom.len() == PRG_ROM_BANK_LEN {
-                    offset %= PRG_ROM_BANK_LEN;
+            0x8000..=0xffff => Some(match &self.mapper {
+                MapperState::Nrom | MapperState::Cnrom { .. } => {
+                    let mut offset = usize::from(address - 0x8000);
+                    if self.image.prg_rom.len() == PRG_ROM_BANK_LEN {
+                        offset %= PRG_ROM_BANK_LEN;
+                    }
+                    self.image.prg_rom[offset]
                 }
-                Some(self.image.prg_rom[offset])
-            }
+                MapperState::Uxrom { selected_prg_bank } => {
+                    let bank = if address < 0xc000 {
+                        usize::from(*selected_prg_bank)
+                    } else {
+                        self.prg_bank_count() - 1
+                    };
+                    let offset = bank * PRG_ROM_BANK_LEN + usize::from(address & 0x3fff);
+                    self.image.prg_rom[offset]
+                }
+            }),
             _ => None,
         }
     }
@@ -228,13 +321,29 @@ impl Cartridge {
                 self.prg_ram[usize::from(address - 0x6000)] = value;
                 true
             }
-            0x8000..=0xffff => true,
+            0x8000..=0xffff => {
+                let prg_bank_count = self.prg_bank_count() as u8;
+                let chr_bank_count = self.chr_bank_count() as u8;
+                match &mut self.mapper {
+                    MapperState::Nrom => {}
+                    MapperState::Uxrom { selected_prg_bank } => {
+                        *selected_prg_bank = value % prg_bank_count;
+                    }
+                    MapperState::Cnrom { selected_chr_bank } => {
+                        *selected_chr_bank = value % chr_bank_count;
+                    }
+                }
+                true
+            }
             _ => false,
         }
     }
 
     pub fn ppu_read(&self, address: u16) -> Option<u8> {
-        let offset = usize::from(address & 0x1fff);
+        let mut offset = usize::from(address & 0x1fff);
+        if let MapperState::Cnrom { selected_chr_bank } = self.mapper {
+            offset += usize::from(selected_chr_bank) * CHR_ROM_BANK_LEN;
+        }
         match &self.chr {
             ChrMemory::Rom(data) => data.get(offset).copied(),
             ChrMemory::Ram(data) => data.get(offset).copied(),
@@ -263,7 +372,28 @@ impl Cartridge {
         }
     }
 
+    pub const fn mapper_snapshot(&self) -> MapperSnapshot {
+        self.mapper.snapshot()
+    }
+
+    pub fn mirroring(&self) -> Mirroring {
+        match self.mapper {
+            MapperState::Nrom | MapperState::Uxrom { .. } | MapperState::Cnrom { .. } => {
+                self.image.metadata.mirroring
+            }
+        }
+    }
+
+    fn prg_bank_count(&self) -> usize {
+        self.image.prg_rom.len() / PRG_ROM_BANK_LEN
+    }
+
+    fn chr_bank_count(&self) -> usize {
+        self.image.chr_rom.len() / CHR_ROM_BANK_LEN
+    }
+
     pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S) {
+        sink.write_u16(self.image.metadata.mapper);
         sink.write(&self.prg_ram[..]);
         match &self.chr {
             ChrMemory::Rom(_) => sink.write_u8(0),
@@ -272,22 +402,58 @@ impl Cartridge {
                 sink.write(&data[..]);
             }
         }
+        if let MapperState::Uxrom { selected_prg_bank } = &self.mapper {
+            sink.write_u8(*selected_prg_bank);
+        }
+        if let MapperState::Cnrom { selected_chr_bank } = &self.mapper {
+            sink.write_u8(*selected_chr_bank);
+        }
     }
 
     pub(crate) fn read_state(&mut self, reader: &mut StateReader<'_>) -> Result<(), StateError> {
+        if reader.read_u16()? != self.image.metadata.mapper {
+            return Err(StateError::InvalidPayload(
+                "mapper state does not match the cartridge",
+            ));
+        }
         self.prg_ram
             .copy_from_slice(reader.read_bytes(PRG_RAM_LEN)?);
         match (reader.read_u8()?, &mut self.chr) {
-            (0, ChrMemory::Rom(_)) => Ok(()),
+            (0, ChrMemory::Rom(_)) => {}
             (1, ChrMemory::Ram(data)) => {
                 data.copy_from_slice(reader.read_bytes(CHR_ROM_BANK_LEN)?);
-                Ok(())
             }
-            (0, ChrMemory::Ram(_)) | (1, ChrMemory::Rom(_)) => Err(StateError::InvalidPayload(
-                "CHR memory kind does not match the cartridge",
-            )),
-            _ => Err(StateError::InvalidPayload("invalid CHR memory kind")),
+            (0, ChrMemory::Ram(_)) | (1, ChrMemory::Rom(_)) => {
+                return Err(StateError::InvalidPayload(
+                    "CHR memory kind does not match the cartridge",
+                ));
+            }
+            _ => return Err(StateError::InvalidPayload("invalid CHR memory kind")),
         }
+        let prg_bank_count = self.prg_bank_count();
+        let chr_bank_count = self.chr_bank_count();
+        match &mut self.mapper {
+            MapperState::Nrom => {}
+            MapperState::Uxrom { selected_prg_bank } => {
+                let bank = reader.read_u8()?;
+                if usize::from(bank) >= prg_bank_count {
+                    return Err(StateError::InvalidPayload(
+                        "UxROM PRG bank is outside the cartridge",
+                    ));
+                }
+                *selected_prg_bank = bank;
+            }
+            MapperState::Cnrom { selected_chr_bank } => {
+                let bank = reader.read_u8()?;
+                if usize::from(bank) >= chr_bank_count {
+                    return Err(StateError::InvalidPayload(
+                        "CNROM CHR bank is outside the cartridge",
+                    ));
+                }
+                *selected_chr_bank = bank;
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn copy_mutable_state_from(&mut self, source: &Self) {
@@ -300,13 +466,14 @@ impl Cartridge {
             (ChrMemory::Rom(_), ChrMemory::Rom(_)) => {}
             _ => unreachable!("matching cartridge images have matching CHR memory kinds"),
         }
+        self.mapper = source.mapper.clone();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_rom::NromBuilder;
+    use crate::test_rom::{CnromBuilder, NromBuilder, UxromBuilder};
 
     #[test]
     fn parses_nrom_and_mirrors_one_prg_bank() {
@@ -319,6 +486,80 @@ mod tests {
         let cartridge = Cartridge::new(image);
         assert_eq!(cartridge.cpu_read(0x8000), Some(0x12));
         assert_eq!(cartridge.cpu_read(0xc000), Some(0x12));
+    }
+
+    #[test]
+    fn parses_uxrom_and_rejects_incompatible_layouts() {
+        let bytes = UxromBuilder::new(8).build();
+        let image = CartridgeImage::parse(&bytes).unwrap();
+        assert_eq!(image.metadata().mapper, 2);
+        assert_eq!(image.metadata().prg_rom_len, 8 * PRG_ROM_BANK_LEN);
+        assert_eq!(image.metadata().chr_rom_len, 0);
+        assert!(image.metadata().chr_is_ram);
+
+        let mut invalid_prg = bytes.clone();
+        invalid_prg[4] = 3;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_prg),
+            Err(CartridgeError::UnsupportedPrgRomBanks {
+                mapper: 2,
+                banks: 3,
+            })
+        );
+
+        let mut invalid_chr = bytes;
+        invalid_chr[5] = 1;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_chr),
+            Err(CartridgeError::UnsupportedChrRomBanks {
+                mapper: 2,
+                banks: 1,
+            })
+        );
+
+        let mut invalid_mirroring = UxromBuilder::new(8).build();
+        invalid_mirroring[6] |= 0x08;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_mirroring),
+            Err(CartridgeError::UnsupportedFourScreenMirroring(2))
+        );
+    }
+
+    #[test]
+    fn parses_cnrom_and_rejects_incompatible_layouts() {
+        let bytes = CnromBuilder::new_32k(4).build();
+        let image = CartridgeImage::parse(&bytes).unwrap();
+        assert_eq!(image.metadata().mapper, 3);
+        assert_eq!(image.metadata().prg_rom_len, 2 * PRG_ROM_BANK_LEN);
+        assert_eq!(image.metadata().chr_rom_len, 4 * CHR_ROM_BANK_LEN);
+        assert!(!image.metadata().chr_is_ram);
+
+        let mut invalid_prg = bytes.clone();
+        invalid_prg[4] = 3;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_prg),
+            Err(CartridgeError::UnsupportedPrgRomBanks {
+                mapper: 3,
+                banks: 3,
+            })
+        );
+
+        let mut invalid_chr = bytes.clone();
+        invalid_chr[5] = 1;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_chr),
+            Err(CartridgeError::UnsupportedChrRomBanks {
+                mapper: 3,
+                banks: 1,
+            })
+        );
+
+        let mut invalid_mirroring = bytes;
+        invalid_mirroring[6] |= 0x08;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_mirroring),
+            Err(CartridgeError::UnsupportedFourScreenMirroring(3))
+        );
     }
 
     #[test]
@@ -380,14 +621,20 @@ mod tests {
         bytes[4] = 0;
         assert_eq!(
             CartridgeImage::parse(&bytes),
-            Err(CartridgeError::UnsupportedPrgRomBanks(0))
+            Err(CartridgeError::UnsupportedPrgRomBanks {
+                mapper: 0,
+                banks: 0,
+            })
         );
 
         let mut bytes = valid;
         bytes[5] = 2;
         assert_eq!(
             CartridgeImage::parse(&bytes),
-            Err(CartridgeError::UnsupportedChrRomBanks(2))
+            Err(CartridgeError::UnsupportedChrRomBanks {
+                mapper: 0,
+                banks: 2,
+            })
         );
     }
 

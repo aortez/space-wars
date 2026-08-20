@@ -72,6 +72,11 @@ To configure Wi-Fi on first boot, create `wifi-creds.local` before flashing:
 NetworkManager connection under `/data/NetworkManager/system-connections/`, the
 same persistent location used by DirtSim.
 
+Space-Wars settings and user NES cartridges also live on the persistent data
+partition. The image exposes `/data/spacewars/config` as
+`/var/lib/spacewars`; place cartridges in `/var/lib/spacewars/roms` and return
+to the launcher to rescan them.
+
 Manual fallback without the script:
 
 ```sh
