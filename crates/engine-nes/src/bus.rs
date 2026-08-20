@@ -82,9 +82,10 @@ impl NesBus {
         };
         let mut apu = Apu::new(audio_output);
         apu.set_dma_alignment(dma_alignment);
+        let observe_mapper_ppu_addresses = cartridge.observes_ppu_addresses();
         Self {
             ram: Box::new([ram_value; 0x800]),
-            ppu: Ppu::new(video_output),
+            ppu: Ppu::new_with_mapper_observer(video_output, observe_mapper_ppu_addresses),
             apu,
             apu_io_registers: [0; 0x18],
             controllers: [ControllerPort::default(); 2],
@@ -169,7 +170,7 @@ impl NesBus {
     }
 
     pub(crate) fn clock_ppu(&mut self) -> PpuCycle {
-        self.ppu.clock(&self.cartridge)
+        self.ppu.clock(&mut self.cartridge)
     }
 
     pub(crate) fn clock_apu(&mut self) {
@@ -281,7 +282,7 @@ impl CpuBus for NesBus {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)],
             0x2000..=0x3fff => self
                 .ppu
-                .cpu_read_register(usize::from(address & 7), &self.cartridge),
+                .cpu_read_register(usize::from(address & 7), &mut self.cartridge),
             0x4000..=0x4014 => self.open_bus,
             0x4015 => unreachable!("$4015 returns before the general bus read"),
             0x4016 => (self.open_bus & 0xe0) | self.controllers[0].read_serial(),

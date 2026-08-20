@@ -231,6 +231,133 @@ impl Mmc1Builder {
 }
 
 #[derive(Clone, Debug)]
+pub struct Mmc3Builder {
+    prg: Vec<u8>,
+    chr: Option<Vec<u8>>,
+    flags6: u8,
+}
+
+impl Mmc3Builder {
+    pub fn with_chr_ram(prg_banks: usize) -> Self {
+        Self::new(prg_banks, None)
+    }
+
+    pub fn with_chr_rom(prg_banks: usize, chr_banks: usize) -> Self {
+        assert!(
+            (1..=32).contains(&chr_banks) && chr_banks.is_power_of_two(),
+            "MMC3 test images require 1-32 power-of-two CHR ROM banks"
+        );
+        Self::new(prg_banks, Some(chr_banks))
+    }
+
+    fn new(prg_banks: usize, chr_banks: Option<usize>) -> Self {
+        assert!(
+            (1..=32).contains(&prg_banks) && prg_banks.is_power_of_two(),
+            "MMC3 test images require 1-32 power-of-two PRG banks"
+        );
+        Self {
+            prg: vec![0xea; prg_banks * PRG_BANK_LEN],
+            chr: chr_banks.map(|banks| vec![0; banks * CHR_BANK_LEN]),
+            flags6: 0,
+        }
+    }
+
+    pub fn prg_half_bank_count(&self) -> usize {
+        self.prg.len() / (PRG_BANK_LEN / 2)
+    }
+
+    pub fn chr_quarter_bank_count(&self) -> usize {
+        self.chr.as_ref().map_or(8, |chr| chr.len() / 1024)
+    }
+
+    pub fn set_vertical_mirroring(&mut self, vertical: bool) {
+        self.flags6 = (self.flags6 & !1) | u8::from(vertical);
+    }
+
+    pub fn set_battery_backed(&mut self, battery_backed: bool) {
+        self.flags6 = (self.flags6 & !2) | (u8::from(battery_backed) << 1);
+    }
+
+    pub fn set_four_screen(&mut self, four_screen: bool) {
+        self.flags6 = (self.flags6 & !0x08) | (u8::from(four_screen) << 3);
+    }
+
+    pub fn write_prg_half_bank(&mut self, bank: usize, offset: usize, bytes: &[u8]) {
+        let bank_len = PRG_BANK_LEN / 2;
+        assert!(
+            bank < self.prg_half_bank_count(),
+            "MMC3 PRG bank is out of range"
+        );
+        let start = bank
+            .checked_mul(bank_len)
+            .and_then(|start| start.checked_add(offset))
+            .expect("ROM write overflow");
+        let end = start.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(offset < bank_len, "ROM write starts outside a PRG bank");
+        assert!(
+            end <= (bank + 1) * bank_len,
+            "ROM write crosses a PRG bank boundary"
+        );
+        self.prg[start..end].copy_from_slice(bytes);
+    }
+
+    pub fn write_fixed_last(&mut self, cpu_address: u16, bytes: &[u8]) {
+        assert!(
+            cpu_address >= 0xe000,
+            "fixed MMC3 writes start at CPU $E000"
+        );
+        self.write_prg_half_bank(
+            self.prg_half_bank_count() - 1,
+            usize::from(cpu_address - 0xe000),
+            bytes,
+        );
+    }
+
+    pub fn write_chr_quarter_bank(&mut self, bank: usize, offset: usize, bytes: &[u8]) {
+        let chr = self
+            .chr
+            .as_mut()
+            .expect("CHR writes require a ROM-backed MMC3 test cartridge");
+        let bank_len = 1024;
+        let bank_count = chr.len() / bank_len;
+        assert!(bank < bank_count, "MMC3 CHR bank is out of range");
+        let start = bank
+            .checked_mul(bank_len)
+            .and_then(|start| start.checked_add(offset))
+            .expect("ROM write overflow");
+        let end = start.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(offset < bank_len, "ROM write starts outside a CHR bank");
+        assert!(
+            end <= (bank + 1) * bank_len,
+            "ROM write crosses a CHR bank boundary"
+        );
+        chr[start..end].copy_from_slice(bytes);
+    }
+
+    pub fn set_vectors(&mut self, nmi: u16, reset: u16, irq: u16) {
+        self.write_fixed_last(0xfffa, &nmi.to_le_bytes());
+        self.write_fixed_last(0xfffc, &reset.to_le_bytes());
+        self.write_fixed_last(0xfffe, &irq.to_le_bytes());
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        let chr_len = self.chr.as_ref().map_or(0, Vec::len);
+        let mut image = Vec::with_capacity(HEADER_LEN + self.prg.len() + chr_len);
+        image.extend_from_slice(b"NES\x1a");
+        image.push((self.prg.len() / PRG_BANK_LEN) as u8);
+        image.push((chr_len / CHR_BANK_LEN) as u8);
+        image.push(self.flags6 | 0x40);
+        image.push(0);
+        image.extend_from_slice(&[0; 8]);
+        image.extend_from_slice(&self.prg);
+        if let Some(chr) = &self.chr {
+            image.extend_from_slice(chr);
+        }
+        image
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct UxromBuilder {
     prg: Vec<u8>,
     flags6: u8,
@@ -461,6 +588,29 @@ mod tests {
         assert_eq!(
             &image[chr_start + 2 * CHR_BANK_LEN + 0x123..][..2],
             &[0xa5, 0x5a]
+        );
+    }
+
+    #[test]
+    fn builds_mapper_four_with_irq_banks_and_fixed_vectors() {
+        let mut builder = Mmc3Builder::with_chr_rom(16, 16);
+        builder.set_vertical_mirroring(true);
+        builder.set_battery_backed(true);
+        builder.write_prg_half_bank(7, 0x123, &[0xa5, 0x5a]);
+        builder.write_chr_quarter_bank(11, 0x321, &[0x42]);
+        builder.set_vectors(0xe123, 0xe456, 0xe789);
+        let image = builder.build();
+        assert_eq!(image[4], 16);
+        assert_eq!(image[5], 16);
+        assert_eq!(image[6], 0x43);
+        let prg_half_len = PRG_BANK_LEN / 2;
+        assert_eq!(image[HEADER_LEN + 7 * prg_half_len + 0x123], 0xa5);
+        let chr_start = HEADER_LEN + 16 * PRG_BANK_LEN;
+        assert_eq!(image[chr_start + 11 * 1024 + 0x321], 0x42);
+        let vectors = HEADER_LEN + 16 * PRG_BANK_LEN - 6;
+        assert_eq!(
+            &image[vectors..chr_start],
+            &[0x23, 0xe1, 0x56, 0xe4, 0x89, 0xe7]
         );
     }
 }

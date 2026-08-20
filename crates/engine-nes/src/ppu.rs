@@ -122,6 +122,9 @@ pub struct Ppu {
     scanline_sprite_pixels: Box<[u8; FRAME_WIDTH]>,
     framebuffer: Box<[u8; FRAME_PIXELS]>,
     video_output: VideoOutput,
+    // The cartridge's mapper type is immutable. Cache whether its circuitry
+    // observes PPU A12 so simpler mappers do not pay for signal bookkeeping.
+    observe_mapper_ppu_addresses: bool,
 
     frame_id: u64,
     scanline: u16,
@@ -137,6 +140,13 @@ pub struct Ppu {
 
 impl Ppu {
     pub fn new(video_output: VideoOutput) -> Self {
+        Self::new_with_mapper_observer(video_output, false)
+    }
+
+    pub(crate) fn new_with_mapper_observer(
+        video_output: VideoOutput,
+        observe_mapper_ppu_addresses: bool,
+    ) -> Self {
         Self {
             control: 0,
             mask: 0,
@@ -162,6 +172,7 @@ impl Ppu {
             scanline_sprite_pixels: Box::new([0; FRAME_WIDTH]),
             framebuffer: Box::new([0; FRAME_PIXELS]),
             video_output,
+            observe_mapper_ppu_addresses,
             frame_id: 0,
             scanline: 0,
             dot: 0,
@@ -234,6 +245,10 @@ impl Ppu {
     }
 
     pub(crate) fn copy_emulated_state_from(&mut self, source: &Self) {
+        debug_assert_eq!(
+            self.observe_mapper_ppu_addresses,
+            source.observe_mapper_ppu_addresses
+        );
         let video_output = self.video_output;
         self.control = source.control;
         self.mask = source.mask;
@@ -278,7 +293,7 @@ impl Ppu {
         pending
     }
 
-    pub(crate) fn cpu_read_register(&mut self, register: usize, cartridge: &Cartridge) -> u8 {
+    pub(crate) fn cpu_read_register(&mut self, register: usize, cartridge: &mut Cartridge) -> u8 {
         let value = match register & 7 {
             2 => {
                 let value = (self.status & 0xe0) | (self.io_bus & 0x1f);
@@ -311,7 +326,7 @@ impl Ppu {
                     self.data_buffer = memory;
                     buffered
                 };
-                self.increment_vram_address();
+                self.increment_vram_address(cartridge);
                 value
             }
             _ => self.io_bus,
@@ -332,7 +347,7 @@ impl Ppu {
                 }
             }
             7 if self.vram_address & 0x3fff >= 0x3f00 => {
-                self.read_memory(cartridge, self.vram_address)
+                self.peek_memory(cartridge, self.vram_address)
             }
             7 => self.data_buffer,
             _ => self.io_bus,
@@ -376,10 +391,11 @@ impl Ppu {
                 self.temporary_address = (self.temporary_address & 0x7f00) | u16::from(value);
                 self.vram_address = self.temporary_address;
                 self.second_write = false;
+                cartridge.observe_ppu_address(self.vram_address, self.clocks);
             }
             7 => {
                 self.write_memory(cartridge, self.vram_address, value);
-                self.increment_vram_address();
+                self.increment_vram_address(cartridge);
             }
             _ => {}
         }
@@ -391,14 +407,14 @@ impl Ppu {
     }
 
     pub(crate) fn memory_peek(&self, cartridge: &Cartridge, address: u16) -> u8 {
-        self.read_memory(cartridge, address)
+        self.peek_memory(cartridge, address)
     }
 
     pub(crate) fn memory_write(&mut self, cartridge: &mut Cartridge, address: u16, value: u8) {
         self.write_memory(cartridge, address, value);
     }
 
-    pub(crate) fn clock(&mut self, cartridge: &Cartridge) -> PpuCycle {
+    pub(crate) fn clock(&mut self, cartridge: &mut Cartridge) -> PpuCycle {
         let scanline = self.scanline;
         let dot = self.dot;
         let mut frame_completed = false;
@@ -442,15 +458,17 @@ impl Ppu {
                 match (dot - 1) & 7 {
                     0 => {
                         self.load_background_registers();
-                        self.next_nametable =
-                            self.read_memory(cartridge, 0x2000 | (self.vram_address & 0x0fff));
+                        self.next_nametable = self.read_rendering_memory(
+                            cartridge,
+                            0x2000 | (self.vram_address & 0x0fff),
+                        );
                     }
                     2 => {
                         let address = 0x23c0
                             | (self.vram_address & 0x0c00)
                             | ((self.vram_address >> 4) & 0x38)
                             | ((self.vram_address >> 2) & 0x07);
-                        let attribute = self.read_memory(cartridge, address);
+                        let attribute = self.read_rendering_memory(cartridge, address);
                         let shift = ((self.vram_address >> 4) & 4) | (self.vram_address & 2);
                         self.next_attribute = (attribute >> shift) & 3;
                     }
@@ -463,7 +481,7 @@ impl Ppu {
                         let address = base
                             | (u16::from(self.next_nametable) << 4)
                             | ((self.vram_address >> 12) & 7);
-                        self.next_pattern_low = self.read_memory(cartridge, address);
+                        self.next_pattern_low = self.read_rendering_memory(cartridge, address);
                     }
                     6 => {
                         let base = if self.control & CTRL_BACKGROUND_PATTERN != 0 {
@@ -475,11 +493,13 @@ impl Ppu {
                             | (u16::from(self.next_nametable) << 4)
                             | ((self.vram_address >> 12) & 7)
                             | 8;
-                        self.next_pattern_high = self.read_memory(cartridge, address);
+                        self.next_pattern_high = self.read_rendering_memory(cartridge, address);
                     }
                     7 => self.increment_coarse_x(),
                     _ => {}
                 }
+            } else if self.observe_mapper_ppu_addresses && (258..=320).contains(&dot) {
+                self.clock_mapper_sprite_fetch(cartridge, scanline, dot);
             }
 
             if dot == 256 {
@@ -492,7 +512,7 @@ impl Ppu {
 
             if dot == 338 || dot == 340 {
                 self.next_nametable =
-                    self.read_memory(cartridge, 0x2000 | (self.vram_address & 0x0fff));
+                    self.read_rendering_memory(cartridge, 0x2000 | (self.vram_address & 0x0fff));
             }
         }
 
@@ -676,13 +696,14 @@ impl Ppu {
         }
     }
 
-    fn increment_vram_address(&mut self) {
+    fn increment_vram_address(&mut self, cartridge: &mut Cartridge) {
         let increment = if self.control & CTRL_VRAM_INCREMENT != 0 {
             32
         } else {
             1
         };
         self.vram_address = self.vram_address.wrapping_add(increment) & 0x7fff;
+        cartridge.observe_ppu_address(self.vram_address, self.clocks);
     }
 
     fn write_oam(&mut self, value: u8) {
@@ -690,7 +711,21 @@ impl Ppu {
         self.oam_address = self.oam_address.wrapping_add(1);
     }
 
-    fn read_memory(&self, cartridge: &Cartridge, address: u16) -> u8 {
+    fn read_memory(&self, cartridge: &mut Cartridge, address: u16) -> u8 {
+        let address = address & 0x3fff;
+        cartridge.observe_ppu_address(address, self.clocks);
+        self.peek_memory(cartridge, address)
+    }
+
+    fn read_rendering_memory(&self, cartridge: &mut Cartridge, address: u16) -> u8 {
+        let address = address & 0x3fff;
+        if self.observe_mapper_ppu_addresses {
+            cartridge.observe_ppu_address(address, self.clocks);
+        }
+        self.peek_memory(cartridge, address)
+    }
+
+    fn peek_memory(&self, cartridge: &Cartridge, address: u16) -> u8 {
         let address = address & 0x3fff;
         match address {
             0x0000..=0x1fff => cartridge.ppu_read(address).unwrap_or(0),
@@ -704,6 +739,7 @@ impl Ppu {
 
     fn write_memory(&mut self, cartridge: &mut Cartridge, address: u16, value: u8) {
         let address = address & 0x3fff;
+        cartridge.observe_ppu_address(address, self.clocks);
         match address {
             0x0000..=0x1fff => {
                 cartridge.ppu_write(address, value);
@@ -778,6 +814,54 @@ impl Ppu {
         self.vram_address = (self.vram_address & !0x7be0) | (self.temporary_address & 0x7be0);
     }
 
+    fn clock_mapper_sprite_fetch(&self, cartridge: &mut Cartridge, scanline: u16, dot: u16) {
+        debug_assert!((258..=320).contains(&dot));
+        let phase = (dot - 257) & 7;
+        let address = match phase {
+            0 | 2 => 0x2000 | (self.vram_address & 0x0fff),
+            4 | 6 => {
+                let slot = usize::from((dot - 257) / 8);
+                self.sprite_pattern_table_for_fetch(scanline, slot)
+            }
+            _ => return,
+        };
+        cartridge.observe_ppu_address(address, self.clocks);
+    }
+
+    fn sprite_pattern_table_for_fetch(&self, scanline: u16, slot: usize) -> u16 {
+        if self.control & CTRL_TALL_SPRITES == 0 {
+            return if self.control & CTRL_SPRITE_PATTERN != 0 {
+                0x1000
+            } else {
+                0
+            };
+        }
+
+        let target_scanline = if scanline == PRE_RENDER_SCANLINE {
+            0
+        } else {
+            scanline + 1
+        };
+        let mut selected = 0;
+        for sprite in self.oam.chunks_exact(4) {
+            let top = u16::from(sprite[0]) + 1;
+            if target_scanline < top || target_scanline >= top + 16 {
+                continue;
+            }
+            if selected == slot {
+                return u16::from(sprite[1] & 1) << 12;
+            }
+            selected += 1;
+            if selected == 8 {
+                break;
+            }
+        }
+
+        // Empty secondary-OAM entries perform discarded fetches from tile
+        // $FF. In 8x16 mode its low bit selects the upper pattern table.
+        0x1000
+    }
+
     fn evaluate_scanline_sprites(&mut self, cartridge: &Cartridge, scanline: u16) {
         self.scanline_sprite_pixels.fill(0);
         if !self.rendering_enabled() {
@@ -824,8 +908,8 @@ impl Ppu {
                 };
                 table | (u16::from(tile) << 4) | pattern_row
             };
-            let pattern_low = self.read_memory(cartridge, pattern_address);
-            let pattern_high = self.read_memory(cartridge, pattern_address | 8);
+            let pattern_low = self.peek_memory(cartridge, pattern_address);
+            let pattern_high = self.peek_memory(cartridge, pattern_address | 8);
 
             for sprite_x in 0..8 {
                 let screen_x = start_x + sprite_x;
@@ -1015,8 +1099,8 @@ mod tests {
         ppu.memory_write(&mut cartridge, 0x0010, 0xa5);
         ppu.memory_write(&mut cartridge, 0x0011, 0x5a);
         write_address(&mut ppu, &mut cartridge, 0x0010);
-        assert_eq!(ppu.cpu_read_register(7, &cartridge), 0);
-        assert_eq!(ppu.cpu_read_register(7, &cartridge), 0xa5);
+        assert_eq!(ppu.cpu_read_register(7, &mut cartridge), 0);
+        assert_eq!(ppu.cpu_read_register(7, &mut cartridge), 0xa5);
         assert_eq!(ppu.registers().vram_address, 0x0012);
 
         ppu.cpu_write_register(0, CTRL_VRAM_INCREMENT, &mut cartridge);
@@ -1028,7 +1112,7 @@ mod tests {
         ppu.memory_write(&mut cartridge, 0x3f00, 0x2a);
         write_address(&mut ppu, &mut cartridge, 0x3f00);
         ppu.cpu_write_register(1, 0xc0, &mut cartridge);
-        assert_eq!(ppu.cpu_read_register(7, &cartridge), 0xea);
+        assert_eq!(ppu.cpu_read_register(7, &mut cartridge), 0xea);
     }
 
     #[test]
@@ -1043,7 +1127,7 @@ mod tests {
         assert_eq!(ppu.registers().temporary_address & 0x73ff, 0x6285);
 
         ppu.cpu_write_register(6, 0x3f, &mut cartridge);
-        ppu.cpu_read_register(2, &cartridge);
+        ppu.cpu_read_register(2, &mut cartridge);
         assert!(!ppu.registers().second_write);
         ppu.cpu_write_register(6, 0x21, &mut cartridge);
         ppu.cpu_write_register(6, 0x43, &mut cartridge);
@@ -1057,20 +1141,20 @@ mod tests {
         ppu.cpu_write_register(0, CTRL_NMI_ENABLE, &mut cartridge);
 
         for _ in 0..(VBLANK_SCANLINE as usize * DOTS_PER_SCANLINE as usize + 1) {
-            assert!(!ppu.clock(&cartridge).frame_completed);
+            assert!(!ppu.clock(&mut cartridge).frame_completed);
         }
-        let cycle = ppu.clock(&cartridge);
+        let cycle = ppu.clock(&mut cartridge);
         assert_eq!((cycle.scanline, cycle.dot), (VBLANK_SCANLINE, 1));
         assert!(cycle.frame_completed);
         assert_eq!(cycle.frame_id, 1);
         assert!(!cycle.nmi_requested);
         assert_eq!(ppu.frame_id(), 1);
-        assert!(!ppu.clock(&cartridge).nmi_requested);
-        assert!(ppu.clock(&cartridge).nmi_requested);
+        assert!(!ppu.clock(&mut cartridge).nmi_requested);
+        assert!(ppu.clock(&mut cartridge).nmi_requested);
         assert!(ppu.take_nmi_pending());
         assert!(!ppu.take_nmi_pending());
 
-        let status = ppu.cpu_read_register(2, &cartridge);
+        let status = ppu.cpu_read_register(2, &mut cartridge);
         assert_ne!(status & STATUS_VBLANK, 0);
         assert_eq!(ppu.registers().status & STATUS_VBLANK, 0);
     }
@@ -1080,25 +1164,25 @@ mod tests {
         let mut cartridge = cartridge(false, false);
         let mut ppu = Ppu::default();
         for _ in 0..=(VBLANK_SCANLINE as usize * DOTS_PER_SCANLINE as usize + 1) {
-            ppu.clock(&cartridge);
+            ppu.clock(&mut cartridge);
         }
         assert!(!ppu.take_nmi_pending());
         ppu.cpu_write_register(0, CTRL_NMI_ENABLE, &mut cartridge);
         for _ in 0..3 {
-            ppu.clock(&cartridge);
+            ppu.clock(&mut cartridge);
         }
         assert!(ppu.take_nmi_pending());
         ppu.cpu_write_register(0, 0, &mut cartridge);
         ppu.cpu_write_register(0, CTRL_NMI_ENABLE, &mut cartridge);
         for _ in 0..3 {
-            ppu.clock(&cartridge);
+            ppu.clock(&mut cartridge);
         }
         assert!(ppu.take_nmi_pending());
     }
 
     #[test]
     fn odd_rendering_frame_skips_one_coordinate() {
-        let cartridge = cartridge(false, false);
+        let mut cartridge = cartridge(false, false);
         let mut ppu = Ppu {
             mask: MASK_BACKGROUND,
             ..Ppu::default()
@@ -1106,12 +1190,12 @@ mod tests {
 
         let first_start = ppu.clocks;
         while ppu.scanline != 0 || ppu.dot != 0 || ppu.clocks == first_start {
-            ppu.clock(&cartridge);
+            ppu.clock(&mut cartridge);
         }
         let first = ppu.clocks - first_start;
         let second_start = ppu.clocks;
         while ppu.scanline != 0 || ppu.dot != 0 || ppu.clocks == second_start {
-            ppu.clock(&cartridge);
+            ppu.clock(&mut cartridge);
         }
         let second = ppu.clocks - second_start;
         assert_eq!(first, 89_342);

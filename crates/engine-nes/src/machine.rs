@@ -572,7 +572,8 @@ impl NesMachine {
         // CPU/APU boundary. Retaining this one-slot pipeline also keeps a flag
         // transition late in an opcode-fetch cycle from being observed by the
         // instruction's already-completed interrupt poll.
-        self.cpu.set_irq_line(self.apu_irq_line_sample);
+        self.cpu
+            .set_irq_line(self.apu_irq_line_sample || self.bus.cartridge().irq_pending());
         self.apu_irq_line_sample = self.bus.apu().irq_pending();
         let dma_was_active = self.oam_dma.is_some() || self.dmc_dma.is_some();
         let cycle = if let (Some(dmc_dma), Some(oam_dma)) = (self.dmc_dma, self.oam_dma) {

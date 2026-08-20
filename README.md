@@ -25,9 +25,10 @@ The local launcher currently hosts five playable scenarios:
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
 - **NES Library** — user-supplied NROM (mapper 0), MMC1 (mapper 1), UxROM
-  (mapper 2), and CNROM (mapper 3) `.nes` cartridges running through the same
-  emulator, realtime worker, native-video, audio, input, and host lifecycle as Falling.
-  Unsupported cartridges remain visible with a compatibility reason.
+  (mapper 2), CNROM (mapper 3), and MMC3 (mapper 4) `.nes` cartridges running
+  through the same emulator, realtime worker, native-video, audio, input, and
+  host lifecycle as Falling. Unsupported cartridges remain visible with a
+  compatibility reason.
 
 Textures and sounds for Spacewars have yet to be done. Pizza retains its
 Classic collision implementation as a benchmark reference. Mutual gravity is
@@ -41,7 +42,7 @@ The accepted physics ownership and lifecycle design is documented in
 [`docs/design/physics-architecture.md`](docs/design/physics-architecture.md).
 
 A Rust-native NES engine is also under development. Its
-NROM/MMC1/UxROM/CNROM cartridge, cycle-oriented RP2A03 CPU, scalar 2C02 PPU,
+NROM/MMC1/UxROM/CNROM/MMC3 cartridge, cycle-oriented RP2A03 CPU, scalar 2C02 PPU,
 complete five-channel APU,
 deterministic 48 kHz sample/frame/state API, checkpoints, portable savestates,
 reference captures, and generated test tools live in `crates/engine-nes`.

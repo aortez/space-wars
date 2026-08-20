@@ -2,7 +2,7 @@
 
 Status: M22a-M22g implemented. M22h implementation and automated cross-target
 validation are complete; the final physical Pi controller/audio soak remains.
-The post-milestone NROM/MMC1/UxROM/CNROM user ROM library is implemented on
+The post-milestone NROM/MMC1/UxROM/CNROM/MMC3 user ROM library is implemented on
 top of the same core and realtime contracts.
 Tracking issue:
 [GitHub issue #7](https://github.com/aortez/space-wars/issues/7).
@@ -157,7 +157,7 @@ drift between the bundled and user-supplied paths.
 
 The launcher persists a selected SHA-256 content identity, reports unsupported
 images without trying to run them, and rescans when the launcher is entered.
-This remains a deliberately bounded NROM/MMC1/UxROM/CNROM feature, not a
+This remains a deliberately bounded NROM/MMC1/UxROM/CNROM/MMC3 feature, not a
 compatibility claim for arbitrary ROMs. The operational workflow and exact
 compatibility boundary are in
 [`../nes-rom-library.md`](../nes-rom-library.md).
@@ -262,11 +262,11 @@ savestates, and static dispatch:
 
 ```rust
 enum MapperState {
-    Nrom(Nrom),
+    Nrom,
     Mmc1(Mmc1),
     Uxrom(Uxrom),
     Cnrom(Cnrom),
-    // Mmc3, ... later.
+    Mmc3(Mmc3),
 }
 ```
 

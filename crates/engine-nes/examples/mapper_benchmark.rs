@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use engine_nes::{
     AudioOutput, CpuBus, MachineConfig, NesMachine, VideoOutput,
-    test_rom::{CnromBuilder, Mmc1Builder, UxromBuilder},
+    test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, UxromBuilder},
 };
 
 const DEFAULT_BANK_WRITES: u64 = 2_000_000;
@@ -35,6 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &cnrom_benchmark_rom(),
         bank_writes,
         6,
+    )?;
+    run_workload(
+        "generated-mmc3-bank-switch-v1",
+        &mmc3_benchmark_rom(),
+        bank_writes,
+        8,
     )?;
     Ok(())
 }
@@ -166,5 +172,28 @@ fn mmc1_benchmark_rom() -> Vec<u8> {
         ],
     );
     rom.set_vectors(0xc000, 0xc000, 0xc000);
+    rom.build()
+}
+
+fn mmc3_benchmark_rom() -> Vec<u8> {
+    let mut rom = Mmc3Builder::with_chr_ram(8);
+    for bank in 0..rom.prg_half_bank_count() - 1 {
+        rom.write_prg_half_bank(bank, 0, &[bank as u8]);
+    }
+    rom.write_fixed_last(
+        0xe000,
+        &[
+            0xa2, 0x00, // LDX #$00
+            0xa9, 0x06, // loop: LDA #$06: select PRG register R6.
+            0x8d, 0x00, 0x80, // STA $8000
+            0x8a, // TXA
+            0x8d, 0x01, 0x80, // STA $8001: commit R6.
+            0xad, 0x00, 0x80, // LDA $8000: mapped read.
+            0x95, 0x00, // STA $00,X
+            0xe8, // INX
+            0x4c, 0x02, 0xe0, // JMP loop
+        ],
+    );
+    rom.set_vectors(0xe000, 0xe000, 0xe000);
     rom.build()
 }

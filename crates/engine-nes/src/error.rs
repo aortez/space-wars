@@ -47,7 +47,7 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedMapper(mapper) => {
                 write!(
                     formatter,
-                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), and CNROM (3)"
+                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), CNROM (3), and MMC3 (4)"
                 )
             }
             Self::UnsupportedFourScreenMirroring(1) => formatter
@@ -75,6 +75,10 @@ impl fmt::Display for CartridgeError {
                 formatter,
                 "CNROM (mapper 3) requires one or two 16 KiB PRG ROM banks, found {banks}"
             ),
+            Self::UnsupportedPrgRomBanks { mapper: 4, banks } => write!(
+                formatter,
+                "MMC3 (mapper 4) requires 1-32 power-of-two 16 KiB PRG ROM banks, found {banks}"
+            ),
             Self::UnsupportedPrgRomBanks { mapper, banks } => write!(
                 formatter,
                 "mapper {mapper} does not support {banks} 16 KiB PRG ROM banks"
@@ -94,6 +98,10 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedChrRomBanks { mapper: 3, banks } => write!(
                 formatter,
                 "CNROM (mapper 3) requires two or four 8 KiB CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 4, banks } => write!(
+                formatter,
+                "MMC3 (mapper 4) supports 8 KiB CHR RAM or 1-32 power-of-two 8 KiB CHR ROM banks, found {banks}"
             ),
             Self::UnsupportedChrRomBanks { mapper, banks } => write!(
                 formatter,

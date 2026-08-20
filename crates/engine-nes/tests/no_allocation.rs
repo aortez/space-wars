@@ -2,7 +2,7 @@ use std::alloc::System;
 
 use engine_nes::{
     ControllerButtons, MachineConfig, NesMachine,
-    test_rom::{CnromBuilder, Mmc1Builder, NromBuilder, UxromBuilder},
+    test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder},
 };
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 
@@ -155,6 +155,38 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     let mut switching = NesMachine::from_ines(&cnrom.build(), MachineConfig::default()).unwrap();
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDA #$00.
+
+    let region = Region::new(GLOBAL);
+    for _ in 0..10_000 {
+        switching.step_instruction().unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let mut mmc3 = Mmc3Builder::with_chr_ram(8);
+    mmc3.write_fixed_last(
+        0xe000,
+        &[
+            0xa2, 0x00, // LDX #$00
+            0xa9, 0x06, // loop: LDA #$06: select PRG register R6.
+            0x8d, 0x00, 0x80, // STA $8000
+            0x8a, // TXA: choose a bank.
+            0x8d, 0x01, 0x80, // STA $8001: commit R6.
+            0xad, 0x00, 0x80, // LDA $8000: mapped read.
+            0x95, 0x00, // STA $00,X
+            0xe8, // INX
+            0x4c, 0x02, 0xe0, // JMP loop.
+        ],
+    );
+    mmc3.set_vectors(0xe000, 0xe000, 0xe000);
+    let mut switching = NesMachine::from_ines(&mmc3.build(), MachineConfig::default()).unwrap();
+    switching.step_instruction().unwrap(); // Reset.
+    switching.step_instruction().unwrap(); // LDX #$00.
 
     let region = Region::new(GLOBAL);
     for _ in 0..10_000 {
