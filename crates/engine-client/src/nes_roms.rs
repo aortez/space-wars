@@ -369,7 +369,7 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use engine_nes::test_rom::{CnromBuilder, NromBuilder, UxromBuilder};
+    use engine_nes::test_rom::{CnromBuilder, Mmc1Builder, NromBuilder, UxromBuilder};
 
     fn write_rom(path: &Path) {
         fs::write(path, NromBuilder::new_16k().build()).unwrap();
@@ -431,6 +431,28 @@ mod tests {
     }
 
     #[test]
+    fn catalog_accepts_mapper_one_cartridges() {
+        let config = tempfile::tempdir().unwrap();
+        let directory = config.path().join(ROM_DIRECTORY_NAME);
+        fs::create_dir(&directory).unwrap();
+        fs::write(
+            directory.join("mmc1.nes"),
+            Mmc1Builder::with_chr_rom(8, 4).build(),
+        )
+        .unwrap();
+
+        let mut catalog = NesRomCatalog::new(config.path());
+        catalog.refresh().unwrap();
+
+        let entry = &catalog.entries()[0];
+        assert!(entry.is_supported());
+        assert!(matches!(
+            entry.compatibility,
+            NesRomCompatibility::Supported(CartridgeMetadata { mapper: 1, .. })
+        ));
+    }
+
+    #[test]
     fn catalog_accepts_mapper_three_cartridges() {
         let config = tempfile::tempdir().unwrap();
         let directory = config.path().join(ROM_DIRECTORY_NAME);
@@ -458,8 +480,8 @@ mod tests {
         let directory = config.path().join(ROM_DIRECTORY_NAME);
         fs::create_dir(&directory).unwrap();
         let mut bytes = NromBuilder::new_16k().build();
-        bytes[6] = (bytes[6] & 0x0f) | 0x10;
-        fs::write(directory.join("mapper-one.nes"), bytes).unwrap();
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        fs::write(directory.join("mapper-four.nes"), bytes).unwrap();
 
         let mut catalog = NesRomCatalog::new(config.path());
         catalog.refresh().unwrap();
@@ -468,9 +490,9 @@ mod tests {
         assert!(!entry.is_supported());
         assert!(matches!(
             entry.compatibility,
-            NesRomCompatibility::Rejected(CartridgeError::UnsupportedMapper(1))
+            NesRomCompatibility::Rejected(CartridgeError::UnsupportedMapper(4))
         ));
-        assert!(entry.compatibility.summary().contains("mapper 1"));
+        assert!(entry.compatibility.summary().contains("mapper 4"));
     }
 
     #[test]

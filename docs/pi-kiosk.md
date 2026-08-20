@@ -164,7 +164,7 @@ includes output checksum validation, while tail cost is reported separately as
    controller's `/dev/input/event*` node.
 7. At the launcher, confirm the pad badge appears and Start launches the saved
    scenario without a mouse.
-8. Add a known supported NROM, UxROM, or CNROM test cartridge to
+8. Add a known supported NROM, MMC1, UxROM, or CNROM test cartridge to
    `/var/lib/spacewars/roms`, confirm it appears in NES Library with cartridge
    metadata, and launch it with the pad.
 9. Confirm NES d-pad, A, B, Select, and Start input, host Start+Select, audio,

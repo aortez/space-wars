@@ -47,9 +47,11 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedMapper(mapper) => {
                 write!(
                     formatter,
-                    "unsupported mapper {mapper}; supported mappers are NROM (0), UxROM (2), and CNROM (3)"
+                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), and CNROM (3)"
                 )
             }
+            Self::UnsupportedFourScreenMirroring(1) => formatter
+                .write_str("MMC1 (mapper 1) uses mapper-controlled mirroring, not four-screen mirroring"),
             Self::UnsupportedFourScreenMirroring(2) => formatter
                 .write_str("UxROM (mapper 2) supports horizontal or vertical mirroring, not four-screen mirroring"),
             Self::UnsupportedFourScreenMirroring(3) => formatter
@@ -60,6 +62,10 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedPrgRomBanks { mapper: 0, banks } => write!(
                 formatter,
                 "NROM (mapper 0) requires one or two 16 KiB PRG ROM banks, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 1, banks } => write!(
+                formatter,
+                "MMC1 (mapper 1) requires 2-16 power-of-two 16 KiB PRG ROM banks in the supported 256 KiB SxROM subset, found {banks}"
             ),
             Self::UnsupportedPrgRomBanks { mapper: 2, banks } => write!(
                 formatter,
@@ -76,6 +82,10 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedChrRomBanks { mapper: 0, banks } => write!(
                 formatter,
                 "NROM (mapper 0) supports zero or one 8 KiB CHR ROM bank, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 1, banks } => write!(
+                formatter,
+                "MMC1 (mapper 1) supports 8 KiB CHR RAM or 1-16 power-of-two 8 KiB CHR ROM banks, found {banks}"
             ),
             Self::UnsupportedChrRomBanks { mapper: 2, banks } => write!(
                 formatter,

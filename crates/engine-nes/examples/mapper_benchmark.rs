@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use engine_nes::{
     AudioOutput, CpuBus, MachineConfig, NesMachine, VideoOutput,
-    test_rom::{CnromBuilder, UxromBuilder},
+    test_rom::{CnromBuilder, Mmc1Builder, UxromBuilder},
 };
 
 const DEFAULT_BANK_WRITES: u64 = 2_000_000;
@@ -22,11 +22,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "generated-uxrom-bank-switch-v1",
         &uxrom_benchmark_rom(),
         bank_writes,
+        6,
+    )?;
+    run_workload(
+        "generated-mmc1-serial-bank-switch-v1",
+        &mmc1_benchmark_rom(),
+        bank_writes,
+        14,
     )?;
     run_workload(
         "generated-cnrom-bank-switch-v1",
         &cnrom_benchmark_rom(),
         bank_writes,
+        6,
     )?;
     Ok(())
 }
@@ -35,6 +43,7 @@ fn run_workload(
     workload: &str,
     rom: &[u8],
     bank_writes: u64,
+    instructions_per_bank_write: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut machine = NesMachine::from_ines(
         rom,
@@ -51,12 +60,9 @@ fn run_workload(
     let start_cycles = machine.cpu().cycles();
     let started = Instant::now();
     for _ in 0..bank_writes {
-        black_box(machine.step_instruction()?); // TXA.
-        black_box(machine.step_instruction()?); // STA $8000: select bank.
-        black_box(machine.step_instruction()?); // LDA $8000: mapped read.
-        black_box(machine.step_instruction()?); // STA $0000,X.
-        black_box(machine.step_instruction()?); // INX.
-        black_box(machine.step_instruction()?); // JMP loop.
+        for _ in 0..instructions_per_bank_write {
+            black_box(machine.step_instruction()?);
+        }
     }
     let elapsed = started.elapsed();
     let cycles = machine.cpu().cycles() - start_cycles;
@@ -131,5 +137,34 @@ fn cnrom_benchmark_rom() -> Vec<u8> {
         ],
     );
     rom.set_vectors(0x8000, 0x8000, 0x8000);
+    rom.build()
+}
+
+fn mmc1_benchmark_rom() -> Vec<u8> {
+    let mut rom = Mmc1Builder::with_chr_ram(8);
+    for bank in 0..7 {
+        rom.write_prg_bank(bank, 0, &[bank as u8]);
+    }
+    rom.write_fixed_last(
+        0xc000,
+        &[
+            0xa2, 0x00, // LDX #$00
+            0x8a, // loop: TXA
+            0x8d, 0x00, 0xe0, // STA $E000: bit 0
+            0x4a, // LSR A
+            0x8d, 0x00, 0xe0, // STA $E000: bit 1
+            0x4a, // LSR A
+            0x8d, 0x00, 0xe0, // STA $E000: bit 2
+            0x4a, // LSR A
+            0x8d, 0x00, 0xe0, // STA $E000: bit 3
+            0x4a, // LSR A
+            0x8d, 0x00, 0xe0, // STA $E000: bit 4 and commit
+            0xad, 0x00, 0x80, // LDA $8000: mapped read
+            0x95, 0x00, // STA $00,X
+            0xe8, // INX
+            0x4c, 0x02, 0xc0, // JMP loop
+        ],
+    );
+    rom.set_vectors(0xc000, 0xc000, 0xc000);
     rom.build()
 }

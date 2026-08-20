@@ -6,6 +6,7 @@ use crate::{CartridgeError, StateError, state_codec::StateReader, state_codec::S
 const INES_HEADER_LEN: usize = 16;
 const TRAINER_LEN: usize = 512;
 const PRG_ROM_BANK_LEN: usize = 16 * 1024;
+const CHR_ROM_HALF_BANK_LEN: usize = 4 * 1024;
 pub const CHR_MEMORY_BYTES: usize = 8 * 1024;
 pub const PRG_RAM_BYTES: usize = 8 * 1024;
 
@@ -20,6 +21,8 @@ pub struct CartridgeIdentity {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mirroring {
+    OneScreenLower,
+    OneScreenUpper,
     Horizontal,
     Vertical,
     FourScreen,
@@ -27,13 +30,15 @@ pub enum Mirroring {
 
 impl Mirroring {
     /// Maps `$2000-$2fff` (and the `$3000-$3eff` mirror) into physical
-    /// nametable storage. Horizontal/vertical layouts use 2 KiB; four-screen
-    /// layouts use 4 KiB supplied by the cartridge.
+    /// nametable storage. One-screen and horizontal/vertical layouts use 2
+    /// KiB; four-screen layouts use 4 KiB supplied by the cartridge.
     pub const fn map_nametable_address(self, address: u16) -> usize {
         let offset = (address.wrapping_sub(0x2000) as usize) & 0x0fff;
         let table = offset / 0x0400;
         let within_table = offset & 0x03ff;
         let physical_table = match self {
+            Self::OneScreenLower => 0,
+            Self::OneScreenUpper => 1,
             Self::Horizontal => table / 2,
             Self::Vertical => table & 1,
             Self::FourScreen => table,
@@ -100,6 +105,25 @@ impl CartridgeImage {
                     });
                 }
                 if chr_banks > 1 {
+                    return Err(CartridgeError::UnsupportedChrRomBanks {
+                        mapper,
+                        banks: chr_banks,
+                    });
+                }
+            }
+            1 => {
+                if flags6 & 0x08 != 0 {
+                    return Err(CartridgeError::UnsupportedFourScreenMirroring(mapper));
+                }
+                if !(2..=16).contains(&prg_banks) || !prg_banks.is_power_of_two() {
+                    return Err(CartridgeError::UnsupportedPrgRomBanks {
+                        mapper,
+                        banks: prg_banks,
+                    });
+                }
+                if chr_banks != 0
+                    && (!(1..=16).contains(&chr_banks) || !chr_banks.is_power_of_two())
+                {
                     return Err(CartridgeError::UnsupportedChrRomBanks {
                         mapper,
                         banks: chr_banks,
@@ -222,13 +246,76 @@ enum ChrMemory {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MapperSnapshot {
     Nrom,
-    Uxrom { selected_prg_bank: u8 },
-    Cnrom { selected_chr_bank: u8 },
+    Mmc1 {
+        shift_register: u8,
+        control: u8,
+        chr_bank0: u8,
+        chr_bank1: u8,
+        prg_bank: u8,
+        previous_cpu_access_was_write: bool,
+    },
+    Uxrom {
+        selected_prg_bank: u8,
+    },
+    Cnrom {
+        selected_chr_bank: u8,
+    },
+}
+
+#[derive(Clone, Debug)]
+struct Mmc1State {
+    shift_register: u8,
+    control: u8,
+    chr_bank0: u8,
+    chr_bank1: u8,
+    prg_bank: u8,
+    previous_cpu_access_was_write: bool,
+}
+
+impl Mmc1State {
+    const fn new() -> Self {
+        Self {
+            shift_register: 0x10,
+            control: 0x0c,
+            chr_bank0: 0,
+            chr_bank1: 0,
+            prg_bank: 0,
+            previous_cpu_access_was_write: false,
+        }
+    }
+
+    fn write(&mut self, address: u16, value: u8, consecutive_cpu_write: bool) {
+        if value & 0x80 != 0 {
+            self.shift_register = 0x10;
+            self.control |= 0x0c;
+            return;
+        }
+        if consecutive_cpu_write {
+            return;
+        }
+
+        let complete = self.shift_register & 1 != 0;
+        self.shift_register = (self.shift_register >> 1) | ((value & 1) << 4);
+        if !complete {
+            return;
+        }
+
+        let data = self.shift_register & 0x1f;
+        self.shift_register = 0x10;
+        match address {
+            0x8000..=0x9fff => self.control = data,
+            0xa000..=0xbfff => self.chr_bank0 = data,
+            0xc000..=0xdfff => self.chr_bank1 = data,
+            0xe000..=0xffff => self.prg_bank = data,
+            _ => unreachable!("MMC1 writes are in the cartridge ROM window"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 enum MapperState {
     Nrom,
+    Mmc1(Mmc1State),
     Uxrom { selected_prg_bank: u8 },
     Cnrom { selected_chr_bank: u8 },
 }
@@ -237,6 +324,7 @@ impl MapperState {
     fn new(mapper: u16) -> Self {
         match mapper {
             0 => Self::Nrom,
+            1 => Self::Mmc1(Mmc1State::new()),
             2 => Self::Uxrom {
                 selected_prg_bank: 0,
             },
@@ -250,6 +338,14 @@ impl MapperState {
     const fn snapshot(&self) -> MapperSnapshot {
         match *self {
             Self::Nrom => MapperSnapshot::Nrom,
+            Self::Mmc1(ref state) => MapperSnapshot::Mmc1 {
+                shift_register: state.shift_register,
+                control: state.control,
+                chr_bank0: state.chr_bank0,
+                chr_bank1: state.chr_bank1,
+                prg_bank: state.prg_bank,
+                previous_cpu_access_was_write: state.previous_cpu_access_was_write,
+            },
             Self::Uxrom { selected_prg_bank } => MapperSnapshot::Uxrom { selected_prg_bank },
             Self::Cnrom { selected_chr_bank } => MapperSnapshot::Cnrom { selected_chr_bank },
         }
@@ -292,7 +388,10 @@ impl Cartridge {
 
     pub fn cpu_read(&self, address: u16) -> Option<u8> {
         match address {
-            0x6000..=0x7fff => Some(self.prg_ram[usize::from(address - 0x6000)]),
+            0x6000..=0x7fff if self.prg_ram_enabled() => {
+                Some(self.prg_ram[usize::from(address - 0x6000)])
+            }
+            0x6000..=0x7fff => None,
             0x8000..=0xffff => Some(match &self.mapper {
                 MapperState::Nrom | MapperState::Cnrom { .. } => {
                     let mut offset = usize::from(address - 0x8000);
@@ -310,22 +409,52 @@ impl Cartridge {
                     let offset = bank * PRG_ROM_BANK_LEN + usize::from(address & 0x3fff);
                     self.image.prg_rom[offset]
                 }
+                MapperState::Mmc1(state) => {
+                    let bank_count = self.prg_bank_count();
+                    let selected = usize::from(state.prg_bank & 0x0f) % bank_count;
+                    let bank = match (state.control >> 2) & 3 {
+                        0 | 1 => {
+                            let first = selected & !1;
+                            (first + usize::from(address >= 0xc000)) % bank_count
+                        }
+                        2 if address < 0xc000 => 0,
+                        2 => selected,
+                        3 if address < 0xc000 => selected,
+                        3 => bank_count - 1,
+                        _ => unreachable!("MMC1 PRG mode is two bits"),
+                    };
+                    let offset = bank * PRG_ROM_BANK_LEN + usize::from(address & 0x3fff);
+                    self.image.prg_rom[offset]
+                }
             }),
             _ => None,
         }
     }
 
     pub fn cpu_write(&mut self, address: u16, value: u8) -> bool {
+        self.cpu_write_with_timing(address, value, false)
+    }
+
+    fn cpu_write_with_timing(
+        &mut self,
+        address: u16,
+        value: u8,
+        consecutive_cpu_write: bool,
+    ) -> bool {
         match address {
-            0x6000..=0x7fff => {
+            0x6000..=0x7fff if self.prg_ram_enabled() => {
                 self.prg_ram[usize::from(address - 0x6000)] = value;
                 true
             }
+            0x6000..=0x7fff => false,
             0x8000..=0xffff => {
                 let prg_bank_count = self.prg_bank_count() as u8;
                 let chr_bank_count = self.chr_bank_count() as u8;
                 match &mut self.mapper {
                     MapperState::Nrom => {}
+                    MapperState::Mmc1(state) => {
+                        state.write(address, value, consecutive_cpu_write);
+                    }
                     MapperState::Uxrom { selected_prg_bank } => {
                         *selected_prg_bank = value % prg_bank_count;
                     }
@@ -340,10 +469,7 @@ impl Cartridge {
     }
 
     pub fn ppu_read(&self, address: u16) -> Option<u8> {
-        let mut offset = usize::from(address & 0x1fff);
-        if let MapperState::Cnrom { selected_chr_bank } = self.mapper {
-            offset += usize::from(selected_chr_bank) * CHR_ROM_BANK_LEN;
-        }
+        let offset = self.chr_offset(address);
         match &self.chr {
             ChrMemory::Rom(data) => data.get(offset).copied(),
             ChrMemory::Ram(data) => data.get(offset).copied(),
@@ -351,7 +477,7 @@ impl Cartridge {
     }
 
     pub fn ppu_write(&mut self, address: u16, value: u8) -> bool {
-        let offset = usize::from(address & 0x1fff);
+        let offset = self.chr_offset(address);
         match &mut self.chr {
             ChrMemory::Rom(_) => false,
             ChrMemory::Ram(data) => {
@@ -378,10 +504,42 @@ impl Cartridge {
 
     pub fn mirroring(&self) -> Mirroring {
         match self.mapper {
+            MapperState::Mmc1(ref state) => match state.control & 3 {
+                0 => Mirroring::OneScreenLower,
+                1 => Mirroring::OneScreenUpper,
+                2 => Mirroring::Vertical,
+                3 => Mirroring::Horizontal,
+                _ => unreachable!("MMC1 mirroring mode is two bits"),
+            },
             MapperState::Nrom | MapperState::Uxrom { .. } | MapperState::Cnrom { .. } => {
                 self.image.metadata.mirroring
             }
         }
+    }
+
+    pub(crate) fn note_cpu_read_cycle(&mut self) {
+        if let MapperState::Mmc1(state) = &mut self.mapper {
+            state.previous_cpu_access_was_write = false;
+        }
+    }
+
+    pub(crate) fn note_cpu_write_cycle(&mut self) -> bool {
+        if let MapperState::Mmc1(state) = &mut self.mapper {
+            let previous = state.previous_cpu_access_was_write;
+            state.previous_cpu_access_was_write = true;
+            previous
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn cpu_write_cycle(
+        &mut self,
+        address: u16,
+        value: u8,
+        consecutive_cpu_write: bool,
+    ) -> bool {
+        self.cpu_write_with_timing(address, value, consecutive_cpu_write)
     }
 
     fn prg_bank_count(&self) -> usize {
@@ -390,6 +548,42 @@ impl Cartridge {
 
     fn chr_bank_count(&self) -> usize {
         self.image.chr_rom.len() / CHR_ROM_BANK_LEN
+    }
+
+    fn chr_half_bank_count(&self) -> usize {
+        match &self.chr {
+            ChrMemory::Rom(data) => data.len() / CHR_ROM_HALF_BANK_LEN,
+            ChrMemory::Ram(data) => data.len() / CHR_ROM_HALF_BANK_LEN,
+        }
+    }
+
+    fn chr_offset(&self, address: u16) -> usize {
+        let address = usize::from(address & 0x1fff);
+        match &self.mapper {
+            MapperState::Cnrom { selected_chr_bank } => {
+                usize::from(*selected_chr_bank) * CHR_ROM_BANK_LEN + address
+            }
+            MapperState::Mmc1(state) => {
+                let half_bank_count = self.chr_half_bank_count();
+                if state.control & 0x10 == 0 {
+                    let bank = usize::from(state.chr_bank0 & 0x1e) % half_bank_count;
+                    bank * CHR_ROM_HALF_BANK_LEN + address
+                } else {
+                    let register = if address < CHR_ROM_HALF_BANK_LEN {
+                        state.chr_bank0
+                    } else {
+                        state.chr_bank1
+                    };
+                    let bank = usize::from(register) % half_bank_count;
+                    bank * CHR_ROM_HALF_BANK_LEN + (address & (CHR_ROM_HALF_BANK_LEN - 1))
+                }
+            }
+            MapperState::Nrom | MapperState::Uxrom { .. } => address,
+        }
+    }
+
+    fn prg_ram_enabled(&self) -> bool {
+        !matches!(&self.mapper, MapperState::Mmc1(state) if state.prg_bank & 0x10 != 0)
     }
 
     pub(crate) fn write_state<S: StateSink>(&self, sink: &mut S) {
@@ -402,11 +596,18 @@ impl Cartridge {
                 sink.write(&data[..]);
             }
         }
-        if let MapperState::Uxrom { selected_prg_bank } = &self.mapper {
-            sink.write_u8(*selected_prg_bank);
-        }
-        if let MapperState::Cnrom { selected_chr_bank } = &self.mapper {
-            sink.write_u8(*selected_chr_bank);
+        match &self.mapper {
+            MapperState::Nrom => {}
+            MapperState::Mmc1(state) => {
+                sink.write_u8(state.shift_register);
+                sink.write_u8(state.control);
+                sink.write_u8(state.chr_bank0);
+                sink.write_u8(state.chr_bank1);
+                sink.write_u8(state.prg_bank);
+                sink.write_bool(state.previous_cpu_access_was_write);
+            }
+            MapperState::Uxrom { selected_prg_bank } => sink.write_u8(*selected_prg_bank),
+            MapperState::Cnrom { selected_chr_bank } => sink.write_u8(*selected_chr_bank),
         }
     }
 
@@ -434,6 +635,30 @@ impl Cartridge {
         let chr_bank_count = self.chr_bank_count();
         match &mut self.mapper {
             MapperState::Nrom => {}
+            MapperState::Mmc1(state) => {
+                let shift_register = reader.read_u8()?;
+                let control = reader.read_u8()?;
+                let chr_bank0 = reader.read_u8()?;
+                let chr_bank1 = reader.read_u8()?;
+                let prg_bank = reader.read_u8()?;
+                if shift_register == 0 || shift_register > 0x1f {
+                    return Err(StateError::InvalidPayload(
+                        "invalid MMC1 serial shift register",
+                    ));
+                }
+                if [control, chr_bank0, chr_bank1, prg_bank]
+                    .into_iter()
+                    .any(|value| value > 0x1f)
+                {
+                    return Err(StateError::InvalidPayload("invalid MMC1 mapper register"));
+                }
+                state.shift_register = shift_register;
+                state.control = control;
+                state.chr_bank0 = chr_bank0;
+                state.chr_bank1 = chr_bank1;
+                state.prg_bank = prg_bank;
+                state.previous_cpu_access_was_write = reader.read_bool()?;
+            }
             MapperState::Uxrom { selected_prg_bank } => {
                 let bank = reader.read_u8()?;
                 if usize::from(bank) >= prg_bank_count {
@@ -473,7 +698,7 @@ impl Cartridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_rom::{CnromBuilder, NromBuilder, UxromBuilder};
+    use crate::test_rom::{CnromBuilder, Mmc1Builder, NromBuilder, UxromBuilder};
 
     #[test]
     fn parses_nrom_and_mirrors_one_prg_bank() {
@@ -522,6 +747,46 @@ mod tests {
         assert_eq!(
             CartridgeImage::parse(&invalid_mirroring),
             Err(CartridgeError::UnsupportedFourScreenMirroring(2))
+        );
+    }
+
+    #[test]
+    fn parses_mmc1_and_rejects_out_of_scope_layouts() {
+        let bytes = Mmc1Builder::with_chr_rom(16, 16).build();
+        let image = CartridgeImage::parse(&bytes).unwrap();
+        assert_eq!(image.metadata().mapper, 1);
+        assert_eq!(image.metadata().prg_rom_len, 16 * PRG_ROM_BANK_LEN);
+        assert_eq!(image.metadata().chr_rom_len, 16 * CHR_ROM_BANK_LEN);
+        assert!(!image.metadata().chr_is_ram);
+
+        let chr_ram = CartridgeImage::parse(&Mmc1Builder::with_chr_ram(2).build()).unwrap();
+        assert!(chr_ram.metadata().chr_is_ram);
+
+        let mut invalid_prg = bytes.clone();
+        invalid_prg[4] = 32;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_prg),
+            Err(CartridgeError::UnsupportedPrgRomBanks {
+                mapper: 1,
+                banks: 32,
+            })
+        );
+
+        let mut invalid_chr = bytes.clone();
+        invalid_chr[5] = 3;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_chr),
+            Err(CartridgeError::UnsupportedChrRomBanks {
+                mapper: 1,
+                banks: 3,
+            })
+        );
+
+        let mut invalid_mirroring = bytes;
+        invalid_mirroring[6] |= 0x08;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_mirroring),
+            Err(CartridgeError::UnsupportedFourScreenMirroring(1))
         );
     }
 
@@ -611,10 +876,10 @@ mod tests {
         );
 
         let mut bytes = valid.clone();
-        bytes[6] = 0x10;
+        bytes[6] = 0x40;
         assert_eq!(
             CartridgeImage::parse(&bytes),
-            Err(CartridgeError::UnsupportedMapper(1))
+            Err(CartridgeError::UnsupportedMapper(4))
         );
 
         let mut bytes = valid.clone();
@@ -666,6 +931,14 @@ mod tests {
     #[test]
     fn maps_each_nametable_mirroring_layout() {
         let starts = [0x2000, 0x2400, 0x2800, 0x2c00];
+        assert_eq!(
+            starts.map(|address| Mirroring::OneScreenLower.map_nametable_address(address)),
+            [0x000, 0x000, 0x000, 0x000]
+        );
+        assert_eq!(
+            starts.map(|address| Mirroring::OneScreenUpper.map_nametable_address(address)),
+            [0x400, 0x400, 0x400, 0x400]
+        );
         assert_eq!(
             starts.map(|address| Mirroring::Horizontal.map_nametable_address(address)),
             [0x000, 0x000, 0x400, 0x400]

@@ -63,6 +63,12 @@ The library currently accepts:
 - iNES 1.0 cartridges for the standard NES console;
 - mapper 0 / NROM with one or two 16 KiB PRG ROM banks and zero or one 8 KiB
   CHR ROM bank, with zero selecting CHR RAM;
+- mapper 1 / MMC1 for the conventional iNES SxROM subset with 2-16
+  power-of-two 16 KiB PRG ROM banks (up to 256 KiB), 8 KiB CHR RAM or 1-16
+  power-of-two 8 KiB CHR ROM banks (up to 128 KiB), serial register writes,
+  16/32 KiB PRG modes, 4/8 KiB CHR modes, mapper-controlled one-screen,
+  horizontal, or vertical mirroring, MMC1B PRG-RAM disable, and the hardware's
+  consecutive-cycle write filter;
 - mapper 2 / UxROM with 2-128 power-of-two 16 KiB PRG ROM banks, a switchable
   `$8000-$BFFF` bank, the final bank fixed at `$C000-$FFFF`, 8 KiB CHR RAM, and
   fixed horizontal or vertical mirroring;
@@ -73,8 +79,10 @@ The library currently accepts:
 - the 151 official RP2A03/6502 opcodes.
 
 Generic iNES mapper-2 and mapper-3 bank writes are modeled without bus
-conflicts. NES 2.0, other mappers, PAL/Dendy timing, peripherals, expansion
-audio, and unofficial CPU opcodes are not yet supported. Battery-backed
+conflicts. Mapper-1 SUROM/SXROM 512 KiB outer PRG banking and multi-bank PRG
+RAM are not yet supported; images declaring 32 16 KiB PRG banks are rejected
+instead of being partially emulated. NES 2.0, other mappers, PAL/Dendy timing,
+peripherals, expansion audio, and unofficial CPU opcodes are not yet supported. Battery-backed
 cartridge RAM is emulated for a running machine but is not persisted to disk.
 Passing header inspection therefore means a cartridge fits the supported
 format; it is not a promise that every game is already behaviorally compatible.

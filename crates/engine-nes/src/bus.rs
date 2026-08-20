@@ -271,6 +271,7 @@ impl NesBus {
 
 impl CpuBus for NesBus {
     fn read(&mut self, address: u16) -> u8 {
+        self.cartridge.note_cpu_read_cycle();
         // $4015 is unusual: only bit 5 is supplied by open bus, and the read
         // clears the frame IRQ without replacing the bus latch.
         if address == 0x4015 {
@@ -293,6 +294,7 @@ impl CpuBus for NesBus {
     }
 
     fn write(&mut self, address: u16, value: u8) {
+        let consecutive_cpu_write = self.cartridge.note_cpu_write_cycle();
         self.open_bus = value;
         match address {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)] = value,
@@ -315,7 +317,8 @@ impl CpuBus for NesBus {
             }
             0x4018..=0x5fff => {}
             0x6000..=0xffff => {
-                self.cartridge.cpu_write(address, value);
+                self.cartridge
+                    .cpu_write_cycle(address, value, consecutive_cpu_write);
             }
         }
     }
