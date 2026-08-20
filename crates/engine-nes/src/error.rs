@@ -47,7 +47,7 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedMapper(mapper) => {
                 write!(
                     formatter,
-                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), CNROM (3), and MMC3 (4)"
+                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), CNROM (3), MMC3 (4), and AxROM (7)"
                 )
             }
             Self::UnsupportedFourScreenMirroring(1) => formatter
@@ -56,6 +56,8 @@ impl fmt::Display for CartridgeError {
                 .write_str("UxROM (mapper 2) supports horizontal or vertical mirroring, not four-screen mirroring"),
             Self::UnsupportedFourScreenMirroring(3) => formatter
                 .write_str("CNROM (mapper 3) supports horizontal or vertical mirroring, not four-screen mirroring"),
+            Self::UnsupportedFourScreenMirroring(7) => formatter
+                .write_str("AxROM (mapper 7) uses mapper-controlled one-screen mirroring, not four-screen mirroring"),
             Self::UnsupportedFourScreenMirroring(mapper) => {
                 write!(formatter, "mapper {mapper} does not support four-screen mirroring")
             }
@@ -78,6 +80,10 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedPrgRomBanks { mapper: 4, banks } => write!(
                 formatter,
                 "MMC3 (mapper 4) requires 1-32 power-of-two 16 KiB PRG ROM banks, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 7, banks } => write!(
+                formatter,
+                "AxROM (mapper 7) requires 2-16 power-of-two 16 KiB PRG ROM banks in the supported 256 KiB subset, found {banks}"
             ),
             Self::UnsupportedPrgRomBanks { mapper, banks } => write!(
                 formatter,
@@ -102,6 +108,10 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedChrRomBanks { mapper: 4, banks } => write!(
                 formatter,
                 "MMC3 (mapper 4) supports 8 KiB CHR RAM or 1-32 power-of-two 8 KiB CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 7, banks } => write!(
+                formatter,
+                "AxROM (mapper 7) requires 8 KiB CHR RAM and no CHR ROM banks, found {banks}"
             ),
             Self::UnsupportedChrRomBanks { mapper, banks } => write!(
                 formatter,

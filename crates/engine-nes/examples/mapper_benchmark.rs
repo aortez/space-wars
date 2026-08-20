@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use engine_nes::{
     AudioOutput, CpuBus, MachineConfig, NesMachine, VideoOutput,
-    test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, UxromBuilder},
+    test_rom::{AxromBuilder, CnromBuilder, Mmc1Builder, Mmc3Builder, UxromBuilder},
 };
 
 const DEFAULT_BANK_WRITES: u64 = 2_000_000;
@@ -41,6 +41,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mmc3_benchmark_rom(),
         bank_writes,
         8,
+    )?;
+    run_workload(
+        "generated-axrom-bank-switch-v1",
+        &axrom_benchmark_rom(),
+        bank_writes,
+        7,
     )?;
     Ok(())
 }
@@ -195,5 +201,25 @@ fn mmc3_benchmark_rom() -> Vec<u8> {
         ],
     );
     rom.set_vectors(0xe000, 0xe000, 0xe000);
+    rom.build()
+}
+
+fn axrom_benchmark_rom() -> Vec<u8> {
+    let mut rom = AxromBuilder::new(8);
+    let program = [
+        0xa2, 0x00, // LDX #$00
+        0x8a, // loop: TXA
+        0x29, 0x07, // AND #$07
+        0x8d, 0x00, 0x80, // STA $8000: select a 32 KiB PRG bank.
+        0xad, 0x00, 0x90, // LDA $9000: mapped read.
+        0x95, 0x00, // STA $00,X
+        0xe8, // INX
+        0x4c, 0x02, 0x80, // JMP loop.
+    ];
+    for bank in 0..rom.prg_bank_count() {
+        rom.write_bank(bank, 0, &program);
+        rom.write_bank(bank, 0x1000, &[bank as u8]);
+    }
+    rom.set_vectors(0x8000, 0x8000, 0x8000);
     rom.build()
 }

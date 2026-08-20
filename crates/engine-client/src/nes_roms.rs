@@ -369,7 +369,9 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use engine_nes::test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder};
+    use engine_nes::test_rom::{
+        AxromBuilder, CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder,
+    };
 
     fn write_rom(path: &Path) {
         fs::write(path, NromBuilder::new_16k().build()).unwrap();
@@ -493,6 +495,24 @@ mod tests {
         assert!(matches!(
             entry.compatibility,
             NesRomCompatibility::Supported(CartridgeMetadata { mapper: 4, .. })
+        ));
+    }
+
+    #[test]
+    fn catalog_accepts_mapper_seven_cartridges() {
+        let config = tempfile::tempdir().unwrap();
+        let directory = config.path().join(ROM_DIRECTORY_NAME);
+        fs::create_dir(&directory).unwrap();
+        fs::write(directory.join("axrom.nes"), AxromBuilder::new(8).build()).unwrap();
+
+        let mut catalog = NesRomCatalog::new(config.path());
+        catalog.refresh().unwrap();
+
+        let entry = &catalog.entries()[0];
+        assert!(entry.is_supported());
+        assert!(matches!(
+            entry.compatibility,
+            NesRomCompatibility::Supported(CartridgeMetadata { mapper: 7, .. })
         ));
     }
 

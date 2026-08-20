@@ -358,6 +358,69 @@ impl Mmc3Builder {
 }
 
 #[derive(Clone, Debug)]
+pub struct AxromBuilder {
+    prg: Vec<u8>,
+}
+
+impl AxromBuilder {
+    pub fn new(prg_banks: usize) -> Self {
+        assert!(
+            (1..=8).contains(&prg_banks) && prg_banks.is_power_of_two(),
+            "AxROM test images require 1-8 power-of-two 32 KiB PRG banks"
+        );
+        Self {
+            prg: vec![0xea; prg_banks * 2 * PRG_BANK_LEN],
+        }
+    }
+
+    pub fn prg_bank_count(&self) -> usize {
+        self.prg.len() / (2 * PRG_BANK_LEN)
+    }
+
+    pub fn write_bank(&mut self, bank: usize, offset: usize, bytes: &[u8]) {
+        let bank_len = 2 * PRG_BANK_LEN;
+        assert!(
+            bank < self.prg_bank_count(),
+            "AxROM PRG bank is out of range"
+        );
+        let start = bank
+            .checked_mul(bank_len)
+            .and_then(|start| start.checked_add(offset))
+            .expect("ROM write overflow");
+        let end = start.checked_add(bytes.len()).expect("ROM write overflow");
+        assert!(offset < bank_len, "ROM write starts outside a PRG bank");
+        assert!(
+            end <= (bank + 1) * bank_len,
+            "ROM write crosses a PRG bank boundary"
+        );
+        self.prg[start..end].copy_from_slice(bytes);
+    }
+
+    pub fn set_vectors(&mut self, nmi: u16, reset: u16, irq: u16) {
+        let vectors = [nmi.to_le_bytes(), reset.to_le_bytes(), irq.to_le_bytes()];
+        for bank in 0..self.prg_bank_count() {
+            let mut offset = 0x7ffa;
+            for vector in vectors {
+                self.write_bank(bank, offset, &vector);
+                offset += 2;
+            }
+        }
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        let mut image = Vec::with_capacity(HEADER_LEN + self.prg.len());
+        image.extend_from_slice(b"NES\x1a");
+        image.push((self.prg.len() / PRG_BANK_LEN) as u8);
+        image.push(0);
+        image.push(0x70);
+        image.push(0);
+        image.extend_from_slice(&[0; 8]);
+        image.extend_from_slice(&self.prg);
+        image
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct UxromBuilder {
     prg: Vec<u8>,
     flags6: u8,
@@ -612,5 +675,25 @@ mod tests {
             &image[vectors..chr_start],
             &[0x23, 0xe1, 0x56, 0xe4, 0x89, 0xe7]
         );
+    }
+
+    #[test]
+    fn builds_mapper_seven_with_vectors_in_every_switchable_bank() {
+        let mut builder = AxromBuilder::new(8);
+        builder.write_bank(5, 0x123, &[0xa5, 0x5a]);
+        builder.set_vectors(0x8123, 0x8456, 0x8789);
+        let image = builder.build();
+        assert_eq!(image[4], 16);
+        assert_eq!(image[5], 0);
+        assert_eq!(image[6], 0x70);
+        let bank_len = 2 * PRG_BANK_LEN;
+        assert_eq!(image[HEADER_LEN + 5 * bank_len + 0x123], 0xa5);
+        for bank in 0..8 {
+            let vectors = HEADER_LEN + bank * bank_len + 0x7ffa;
+            assert_eq!(
+                &image[vectors..vectors + 6],
+                &[0x23, 0x81, 0x56, 0x84, 0x89, 0x87]
+            );
+        }
     }
 }

@@ -22,9 +22,9 @@ bug. Hardware documentation and focused conformance tests remain authoritative.
 ## Adding a mapper
 
 `Cartridge` retains the public mapper-independent facade while an exhaustive
-internal `MapperState` enum provides static NROM, MMC1, UxROM, CNROM, and MMC3 dispatch in
-`crates/engine-nes/src/cartridge.rs`. Add new hardware as another explicit enum
-variant; do not fork the cartridge facade or machine bus.
+internal `MapperState` enum provides static NROM, MMC1, UxROM, CNROM, MMC3, and
+AxROM dispatch in `crates/engine-nes/src/cartridge.rs`. Add new hardware as
+another explicit enum variant; do not fork the cartridge facade or machine bus.
 
 1. Parse and bounds-check the mapper's legal PRG/CHR layouts in
    `CartridgeImage::parse`. Keep immutable ROM bytes in shared `Arc` storage and

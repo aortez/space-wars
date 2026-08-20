@@ -80,18 +80,24 @@ The library currently accepts:
   1/2 KiB CHR windows, horizontal, vertical, or fixed four-screen mirroring,
   PRG-RAM enable/write protection, and filtered PPU-A12 scanline IRQs using
   the MMC3B/MMC3C counter behavior;
+- mapper 7 / AxROM for the conventional 256 KiB iNES subset with 2-16
+  power-of-two 16 KiB PRG ROM banks (one to eight switchable 32 KiB banks),
+  8 KiB CHR RAM, no PRG RAM, and mapper-controlled lower or upper one-screen
+  mirroring;
 - mapper-0 horizontal, vertical, or four-screen mirroring and optional trainers;
 - NTSC execution; and
 - the 151 official RP2A03/6502 opcodes.
 
-Generic iNES mapper-2 and mapper-3 bank writes are modeled without bus
-conflicts. Mapper-1 SUROM/SXROM 512 KiB outer PRG banking and multi-bank PRG
-RAM are not yet supported; images declaring 32 16 KiB PRG banks are rejected
-instead of being partially emulated. Mapper 4 currently means conventional
-MMC3: MMC6-specific RAM behavior and mapper variants assigned distinct iNES
-numbers, including TLSROM/TKSROM single-screen banking and TQROM mixed CHR
-ROM/RAM, are not included. NES 2.0, other mappers, PAL/Dendy timing,
-peripherals, expansion audio, and unofficial CPU opcodes are not yet supported.
+Generic iNES mapper-2, mapper-3, and mapper-7 bank writes are modeled without
+bus conflicts. Mapper-1 SUROM/SXROM 512 KiB outer PRG banking and multi-bank
+PRG RAM are not yet supported; images declaring 32 16 KiB PRG banks are
+rejected instead of being partially emulated. Mapper 4 currently means
+conventional MMC3: MMC6-specific RAM behavior and mapper variants assigned
+distinct iNES numbers, including TLSROM/TKSROM single-screen banking and TQROM
+mixed CHR ROM/RAM, are not included. Mapper 7 512 KiB extensions that use bank
+bit 3 are also outside the conventional subset. NES 2.0, other mappers,
+PAL/Dendy timing, peripherals, expansion audio, and unofficial CPU opcodes are
+not yet supported.
 Battery-backed cartridge RAM is emulated for a running machine but is not persisted to disk.
 Passing header inspection therefore means a cartridge fits the supported
 format; it is not a promise that every game is already behaviorally compatible.

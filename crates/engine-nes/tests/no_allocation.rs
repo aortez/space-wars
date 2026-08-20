@@ -2,7 +2,7 @@ use std::alloc::System;
 
 use engine_nes::{
     ControllerButtons, MachineConfig, NesMachine,
-    test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder},
+    test_rom::{AxromBuilder, CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder},
 };
 use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
 
@@ -185,6 +185,38 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     );
     mmc3.set_vectors(0xe000, 0xe000, 0xe000);
     let mut switching = NesMachine::from_ines(&mmc3.build(), MachineConfig::default()).unwrap();
+    switching.step_instruction().unwrap(); // Reset.
+    switching.step_instruction().unwrap(); // LDX #$00.
+
+    let region = Region::new(GLOBAL);
+    for _ in 0..10_000 {
+        switching.step_instruction().unwrap();
+    }
+    let stats = region.change();
+    assert_eq!(stats.allocations, 0);
+    assert_eq!(stats.deallocations, 0);
+    assert_eq!(stats.reallocations, 0);
+    assert_eq!(stats.bytes_allocated, 0);
+    assert_eq!(stats.bytes_deallocated, 0);
+    assert_eq!(stats.bytes_reallocated, 0);
+
+    let mut axrom = AxromBuilder::new(8);
+    let program = [
+        0xa2, 0x00, // LDX #$00
+        0x8a, // loop: TXA
+        0x29, 0x07, // AND #$07
+        0x8d, 0x00, 0x80, // STA $8000: select a 32 KiB PRG bank.
+        0xad, 0x00, 0x90, // LDA $9000: mapped read.
+        0x95, 0x00, // STA $00,X
+        0xe8, // INX
+        0x4c, 0x02, 0x80, // JMP loop.
+    ];
+    for bank in 0..axrom.prg_bank_count() {
+        axrom.write_bank(bank, 0, &program);
+        axrom.write_bank(bank, 0x1000, &[bank as u8]);
+    }
+    axrom.set_vectors(0x8000, 0x8000, 0x8000);
+    let mut switching = NesMachine::from_ines(&axrom.build(), MachineConfig::default()).unwrap();
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDX #$00.
 

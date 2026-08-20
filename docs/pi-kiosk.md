@@ -164,9 +164,9 @@ includes output checksum validation, while tail cost is reported separately as
    controller's `/dev/input/event*` node.
 7. At the launcher, confirm the pad badge appears and Start launches the saved
    scenario without a mouse.
-8. Add a known supported NROM, MMC1, UxROM, CNROM, or MMC3 test cartridge to
-   `/var/lib/spacewars/roms`, confirm it appears in NES Library with cartridge
-   metadata, and launch it with the pad.
+8. Add a known supported NROM, MMC1, UxROM, CNROM, MMC3, or AxROM test
+   cartridge to `/var/lib/spacewars/roms`, confirm it appears in NES Library
+   with cartridge metadata, and launch it with the pad.
 9. Confirm NES d-pad, A, B, Select, and Start input, host Start+Select, audio,
    pause, restart, launcher return, and relaunch. Confirm a held transition
    button is not forwarded until all controls return to neutral.

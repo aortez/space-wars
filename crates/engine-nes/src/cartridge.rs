@@ -183,6 +183,23 @@ impl CartridgeImage {
                     });
                 }
             }
+            7 => {
+                if flags6 & 0x08 != 0 {
+                    return Err(CartridgeError::UnsupportedFourScreenMirroring(mapper));
+                }
+                if !(2..=16).contains(&prg_banks) || !prg_banks.is_power_of_two() {
+                    return Err(CartridgeError::UnsupportedPrgRomBanks {
+                        mapper,
+                        banks: prg_banks,
+                    });
+                }
+                if chr_banks != 0 {
+                    return Err(CartridgeError::UnsupportedChrRomBanks {
+                        mapper,
+                        banks: chr_banks,
+                    });
+                }
+            }
             _ => return Err(CartridgeError::UnsupportedMapper(mapper)),
         }
 
@@ -292,6 +309,10 @@ pub enum MapperSnapshot {
         irq_pending: bool,
         ppu_a12_high: bool,
         a12_low_start_clock: u64,
+    },
+    Axrom {
+        selected_prg_bank: u8,
+        upper_nametable: bool,
     },
 }
 
@@ -447,9 +468,17 @@ impl Mmc3State {
 enum MapperState {
     Nrom,
     Mmc1(Mmc1State),
-    Uxrom { selected_prg_bank: u8 },
-    Cnrom { selected_chr_bank: u8 },
+    Uxrom {
+        selected_prg_bank: u8,
+    },
+    Cnrom {
+        selected_chr_bank: u8,
+    },
     Mmc3(Mmc3State),
+    Axrom {
+        selected_prg_bank: u8,
+        upper_nametable: bool,
+    },
 }
 
 impl MapperState {
@@ -464,6 +493,10 @@ impl MapperState {
                 selected_chr_bank: 0,
             },
             4 => Self::Mmc3(Mmc3State::new(mirroring)),
+            7 => Self::Axrom {
+                selected_prg_bank: 0,
+                upper_nametable: false,
+            },
             _ => unreachable!("cartridge images reject unsupported mappers"),
         }
     }
@@ -494,6 +527,13 @@ impl MapperState {
                 irq_pending,
                 ppu_a12_high: state.ppu_a12_high,
                 a12_low_start_clock: state.a12_low_start_clock,
+            },
+            Self::Axrom {
+                selected_prg_bank,
+                upper_nametable,
+            } => MapperSnapshot::Axrom {
+                selected_prg_bank,
+                upper_nametable,
             },
         }
     }
@@ -592,6 +632,13 @@ impl Cartridge {
                     let offset = bank * PRG_ROM_HALF_BANK_LEN + usize::from(address & 0x1fff);
                     self.image.prg_rom[offset]
                 }
+                MapperState::Axrom {
+                    selected_prg_bank, ..
+                } => {
+                    let bank = usize::from(*selected_prg_bank) % self.prg_full_bank_count();
+                    let offset = bank * (2 * PRG_ROM_BANK_LEN) + usize::from(address - 0x8000);
+                    self.image.prg_rom[offset]
+                }
             }),
             _ => None,
         }
@@ -636,6 +683,13 @@ impl Cartridge {
                         if clear_irq {
                             self.mapper_irq_pending = false;
                         }
+                    }
+                    MapperState::Axrom {
+                        selected_prg_bank,
+                        upper_nametable,
+                    } => {
+                        *selected_prg_bank = (value & 7) % (prg_bank_count / 2);
+                        *upper_nametable = value & 0x10 != 0;
                     }
                 }
                 true
@@ -694,6 +748,14 @@ impl Cartridge {
                     state.mirroring
                 }
             }
+            MapperState::Axrom {
+                upper_nametable: false,
+                ..
+            } => Mirroring::OneScreenLower,
+            MapperState::Axrom {
+                upper_nametable: true,
+                ..
+            } => Mirroring::OneScreenUpper,
             MapperState::Nrom | MapperState::Uxrom { .. } | MapperState::Cnrom { .. } => {
                 self.image.metadata.mirroring
             }
@@ -731,7 +793,8 @@ impl Cartridge {
             MapperState::Nrom
             | MapperState::Mmc1(_)
             | MapperState::Uxrom { .. }
-            | MapperState::Cnrom { .. } => false,
+            | MapperState::Cnrom { .. }
+            | MapperState::Axrom { .. } => false,
         };
         if assert_irq {
             self.mapper_irq_pending = true;
@@ -752,6 +815,10 @@ impl Cartridge {
 
     fn prg_half_bank_count(&self) -> usize {
         self.image.prg_rom.len() / PRG_ROM_HALF_BANK_LEN
+    }
+
+    fn prg_full_bank_count(&self) -> usize {
+        self.image.prg_rom.len() / (2 * PRG_ROM_BANK_LEN)
     }
 
     fn chr_bank_count(&self) -> usize {
@@ -816,7 +883,7 @@ impl Cartridge {
                 bank %= self.chr_quarter_bank_count();
                 bank * CHR_ROM_QUARTER_BANK_LEN + (address & (CHR_ROM_QUARTER_BANK_LEN - 1))
             }
-            MapperState::Nrom | MapperState::Uxrom { .. } => address,
+            MapperState::Nrom | MapperState::Uxrom { .. } | MapperState::Axrom { .. } => address,
         }
     }
 
@@ -824,6 +891,7 @@ impl Cartridge {
         match &self.mapper {
             MapperState::Mmc1(state) => state.prg_bank & 0x10 == 0,
             MapperState::Mmc3(state) => state.prg_ram_enabled,
+            MapperState::Axrom { .. } => false,
             MapperState::Nrom | MapperState::Uxrom { .. } | MapperState::Cnrom { .. } => true,
         }
     }
@@ -874,6 +942,13 @@ impl Cartridge {
                 sink.write_bool(self.mapper_irq_pending);
                 sink.write_bool(state.ppu_a12_high);
                 sink.write_u64(state.a12_low_start_clock);
+            }
+            MapperState::Axrom {
+                selected_prg_bank,
+                upper_nametable,
+            } => {
+                sink.write_u8(*selected_prg_bank);
+                sink.write_bool(*upper_nametable);
             }
         }
     }
@@ -978,6 +1053,19 @@ impl Cartridge {
                 state.ppu_a12_high = reader.read_bool()?;
                 state.a12_low_start_clock = reader.read_u64()?;
             }
+            MapperState::Axrom {
+                selected_prg_bank,
+                upper_nametable,
+            } => {
+                let bank = reader.read_u8()?;
+                if usize::from(bank) >= self.image.prg_rom.len() / (2 * PRG_ROM_BANK_LEN) {
+                    return Err(StateError::InvalidPayload(
+                        "AxROM PRG bank is outside the cartridge",
+                    ));
+                }
+                *selected_prg_bank = bank;
+                *upper_nametable = reader.read_bool()?;
+            }
         }
         Ok(())
     }
@@ -1000,7 +1088,9 @@ impl Cartridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_rom::{CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder};
+    use crate::test_rom::{
+        AxromBuilder, CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder,
+    };
 
     #[test]
     fn parses_nrom_and_mirrors_one_prg_bank() {
@@ -1169,6 +1259,43 @@ mod tests {
                 mapper: 4,
                 banks: 3,
             })
+        );
+    }
+
+    #[test]
+    fn parses_axrom_and_rejects_out_of_scope_layouts() {
+        let bytes = AxromBuilder::new(8).build();
+        let image = CartridgeImage::parse(&bytes).unwrap();
+        assert_eq!(image.metadata().mapper, 7);
+        assert_eq!(image.metadata().prg_rom_len, 16 * PRG_ROM_BANK_LEN);
+        assert_eq!(image.metadata().chr_rom_len, 0);
+        assert!(image.metadata().chr_is_ram);
+
+        let mut invalid_prg = bytes.clone();
+        invalid_prg[4] = 32;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_prg),
+            Err(CartridgeError::UnsupportedPrgRomBanks {
+                mapper: 7,
+                banks: 32,
+            })
+        );
+
+        let mut invalid_chr = bytes.clone();
+        invalid_chr[5] = 1;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_chr),
+            Err(CartridgeError::UnsupportedChrRomBanks {
+                mapper: 7,
+                banks: 1,
+            })
+        );
+
+        let mut invalid_mirroring = bytes;
+        invalid_mirroring[6] |= 0x08;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_mirroring),
+            Err(CartridgeError::UnsupportedFourScreenMirroring(7))
         );
     }
 
