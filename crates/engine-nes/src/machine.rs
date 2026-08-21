@@ -51,14 +51,14 @@ pub struct FrameResult<'a> {
     pub audio_samples: &'a [i16],
 }
 
-pub const STATE_HASH_VERSION: u16 = 2;
-pub const SAVESTATE_FORMAT_VERSION: u16 = 2;
+pub const STATE_HASH_VERSION: u16 = 3;
+pub const SAVESTATE_FORMAT_VERSION: u16 = 3;
 pub const MAX_SAVESTATE_PAYLOAD_BYTES: usize = 128 * 1024;
 
 const SAVESTATE_MAGIC: [u8; 8] = *b"SWNESST\0";
 const SAVESTATE_FLAGS: u16 = 0;
 const SAVESTATE_HEADER_BYTES: usize = 8 + 2 + 2 + 4 + 8 + 4 + 8;
-const STATE_HASH_DOMAIN: &[u8] = b"space-wars-engine-nes-authoritative-state-v2\0";
+const STATE_HASH_DOMAIN: &[u8] = b"space-wars-engine-nes-authoritative-state-v3\0";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StateHash {
@@ -572,7 +572,8 @@ impl NesMachine {
         // CPU/APU boundary. Retaining this one-slot pipeline also keeps a flag
         // transition late in an opcode-fetch cycle from being observed by the
         // instruction's already-completed interrupt poll.
-        self.cpu.set_irq_line(self.apu_irq_line_sample);
+        self.cpu
+            .set_irq_line(self.apu_irq_line_sample || self.bus.cartridge().irq_pending());
         self.apu_irq_line_sample = self.bus.apu().irq_pending();
         let dma_was_active = self.oam_dma.is_some() || self.dmc_dma.is_some();
         let cycle = if let (Some(dmc_dma), Some(oam_dma)) = (self.dmc_dma, self.oam_dma) {

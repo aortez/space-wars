@@ -13,9 +13,21 @@ pub enum CartridgeError {
     InvalidMagic([u8; 4]),
     UnsupportedNes2,
     UnsupportedConsoleType(u8),
+    UnsupportedPalTiming,
     UnsupportedMapper(u16),
-    UnsupportedPrgRomBanks(u8),
-    UnsupportedChrRomBanks(u8),
+    UnsupportedFourScreenMirroring(u16),
+    UnsupportedPrgRomBanks {
+        mapper: u16,
+        banks: u8,
+    },
+    UnsupportedPrgRamBanks {
+        mapper: u16,
+        banks: u8,
+    },
+    UnsupportedChrRomBanks {
+        mapper: u16,
+        banks: u8,
+    },
     Truncated {
         expected_at_least: usize,
         actual: usize,
@@ -37,19 +49,89 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedConsoleType(kind) => {
                 write!(formatter, "unsupported iNES console type {kind}")
             }
+            Self::UnsupportedPalTiming => {
+                formatter.write_str("PAL iNES cartridges are not supported")
+            }
             Self::UnsupportedMapper(mapper) => {
                 write!(
                     formatter,
-                    "unsupported mapper {mapper}; only NROM (0) is supported"
+                    "unsupported mapper {mapper}; supported mappers are NROM (0), MMC1 (1), UxROM (2), CNROM (3), MMC3 (4), and AxROM (7)"
                 )
             }
-            Self::UnsupportedPrgRomBanks(banks) => write!(
+            Self::UnsupportedFourScreenMirroring(1) => formatter
+                .write_str("MMC1 (mapper 1) uses mapper-controlled mirroring, not four-screen mirroring"),
+            Self::UnsupportedFourScreenMirroring(2) => formatter
+                .write_str("UxROM (mapper 2) supports horizontal or vertical mirroring, not four-screen mirroring"),
+            Self::UnsupportedFourScreenMirroring(3) => formatter
+                .write_str("CNROM (mapper 3) supports horizontal or vertical mirroring, not four-screen mirroring"),
+            Self::UnsupportedFourScreenMirroring(7) => formatter
+                .write_str("AxROM (mapper 7) uses mapper-controlled one-screen mirroring, not four-screen mirroring"),
+            Self::UnsupportedFourScreenMirroring(mapper) => {
+                write!(formatter, "mapper {mapper} does not support four-screen mirroring")
+            }
+            Self::UnsupportedPrgRomBanks { mapper: 0, banks } => write!(
                 formatter,
-                "NROM requires one or two 16 KiB PRG ROM banks, found {banks}"
+                "NROM (mapper 0) requires one or two 16 KiB PRG ROM banks, found {banks}"
             ),
-            Self::UnsupportedChrRomBanks(banks) => write!(
+            Self::UnsupportedPrgRomBanks { mapper: 1, banks } => write!(
                 formatter,
-                "NROM supports zero or one 8 KiB CHR ROM bank, found {banks}"
+                "MMC1 (mapper 1) requires 2-16 power-of-two 16 KiB PRG ROM banks in the supported 256 KiB SxROM subset, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 2, banks } => write!(
+                formatter,
+                "UxROM (mapper 2) requires 2-128 power-of-two 16 KiB PRG ROM banks, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 3, banks } => write!(
+                formatter,
+                "CNROM (mapper 3) requires one or two 16 KiB PRG ROM banks, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 4, banks } => write!(
+                formatter,
+                "MMC3 (mapper 4) requires 1-32 power-of-two 16 KiB PRG ROM banks, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper: 7, banks } => write!(
+                formatter,
+                "AxROM (mapper 7) requires 2-16 power-of-two 16 KiB PRG ROM banks in the supported 256 KiB subset, found {banks}"
+            ),
+            Self::UnsupportedPrgRomBanks { mapper, banks } => write!(
+                formatter,
+                "mapper {mapper} does not support {banks} 16 KiB PRG ROM banks"
+            ),
+            Self::UnsupportedPrgRamBanks { mapper: 1, banks } => write!(
+                formatter,
+                "MMC1 (mapper 1) supports at most one 8 KiB PRG RAM bank, found {banks}"
+            ),
+            Self::UnsupportedPrgRamBanks { mapper, banks } => write!(
+                formatter,
+                "mapper {mapper} does not support {banks} 8 KiB PRG RAM banks"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 0, banks } => write!(
+                formatter,
+                "NROM (mapper 0) supports zero or one 8 KiB CHR ROM bank, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 1, banks } => write!(
+                formatter,
+                "MMC1 (mapper 1) supports 8 KiB CHR RAM or 1-16 power-of-two 8 KiB CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 2, banks } => write!(
+                formatter,
+                "UxROM (mapper 2) requires 8 KiB CHR RAM and no CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 3, banks } => write!(
+                formatter,
+                "CNROM (mapper 3) requires two or four 8 KiB CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 4, banks } => write!(
+                formatter,
+                "MMC3 (mapper 4) supports 8 KiB CHR RAM or 1-32 power-of-two 8 KiB CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper: 7, banks } => write!(
+                formatter,
+                "AxROM (mapper 7) requires 8 KiB CHR RAM and no CHR ROM banks, found {banks}"
+            ),
+            Self::UnsupportedChrRomBanks { mapper, banks } => write!(
+                formatter,
+                "mapper {mapper} does not support {banks} 8 KiB CHR ROM banks"
             ),
             Self::Truncated {
                 expected_at_least,

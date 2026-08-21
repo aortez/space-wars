@@ -6,7 +6,7 @@ use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, 
 
 use super::{
     BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario, PlayerPanelState,
-    RenderBackend, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
+    RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
     ScenarioStartMode,
 };
 use crate::input::ClientInput;
@@ -22,6 +22,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         game_over: true,
         native_video: false,
         captures_gamepad_start: false,
+        captures_gamepad_select: false,
     },
     controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick or d-pad left/right turns, RT or d-pad up thrusts, LT or d-pad down brakes, B reverses, RB closes wings, A fires laser, X fires cannon, Start pauses, Select shows controls. Zoom is available in the pause menu.",
     create,
@@ -36,6 +37,7 @@ fn create(
     settings: &Settings,
     _viewport: Viewport,
     mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let state = match mode {
         ScenarioStartMode::Normal => {

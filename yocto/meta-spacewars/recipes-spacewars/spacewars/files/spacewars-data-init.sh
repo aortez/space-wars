@@ -5,12 +5,13 @@ set -eu
 
 DATA_DIR="/data/spacewars"
 CONFIG_DIR="$DATA_DIR/config"
+ROM_DIR="$CONFIG_DIR/roms"
 COREDUMP_DIR="$DATA_DIR/coredumps"
 VAR_LIB_LINK="/var/lib/spacewars"
 
-mkdir -p "$CONFIG_DIR" "$COREDUMP_DIR"
+mkdir -p "$CONFIG_DIR" "$ROM_DIR" "$COREDUMP_DIR"
 chown -R spacewars:spacewars "$DATA_DIR"
-chmod 755 "$DATA_DIR" "$CONFIG_DIR" "$COREDUMP_DIR"
+chmod 755 "$DATA_DIR" "$CONFIG_DIR" "$ROM_DIR" "$COREDUMP_DIR"
 
 mkdir -p /var/lib
 if [ -e "$VAR_LIB_LINK" ] && [ ! -L "$VAR_LIB_LINK" ]; then

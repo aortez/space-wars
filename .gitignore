@@ -19,5 +19,9 @@ Thumbs.db
 # Codex local state.
 .codex
 
+# Local runtime data. ROMs and other user-owned data must not enter source
+# control; sync-data.sh copies supported datasets to the kiosk data partition.
+/data/
+
 # Local Wine prefix for testing Windows builds.
 .wine-prefix/

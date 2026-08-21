@@ -9,6 +9,7 @@ device has been identified and explicitly confirmed.
 - Binary: `/usr/bin/engine-client`
 - Persistent settings directory: `/var/lib/spacewars`
 - Persistent settings file: `/var/lib/spacewars/settings.toml`
+- Persistent user ROM library: `/var/lib/spacewars/roms`
 - Recommended renderer: `raster`
 - Initial raster scale: `2.0`
 
@@ -17,6 +18,25 @@ The Yocto image creates a persistent `/data/spacewars/config` directory and
 links `/var/lib/spacewars` to it on boot. The standalone example systemd unit
 uses `StateDirectory=spacewars`, which lets systemd create `/var/lib/spacewars`
 and assign ownership to the service user on non-Yocto test images.
+
+The Yocto data initializer and the client both ensure that
+`/var/lib/spacewars/roms` exists. Copy legally obtained `.nes` files there as
+the `spacewars` service user, then return to the launcher to rescan the
+directory. The library lives on the same persistent data path as settings, so
+an A/B system update does not replace it. See
+[`nes-rom-library.md`](nes-rom-library.md) for compatibility and controls.
+
+From the repository root, maintain the kiosk library without checking ROMs
+into source control:
+
+```sh
+mkdir -p data/roms
+./sync-data.sh --dry-run
+./sync-data.sh
+```
+
+The sync is additive unless `--delete` is explicitly supplied. Override the
+default `spacewars@spacewars.local` target with `--host` and `--user`.
 
 ## Build Image
 
@@ -144,16 +164,22 @@ includes output checksum validation, while tail cost is reported separately as
    controller's `/dev/input/event*` node.
 7. At the launcher, confirm the pad badge appears and Start launches the saved
    scenario without a mouse.
-8. Confirm analog turn/thrust/brake, weapons, wings, zoom, pause, and controls
+8. Add a known supported NROM, MMC1, UxROM, CNROM, MMC3, or AxROM test
+   cartridge to `/var/lib/spacewars/roms`, confirm it appears in NES Library
+   with cartridge metadata, and launch it with the pad.
+9. Confirm NES d-pad, A, B, Select, and Start input, host Start+Select, audio,
+   pause, restart, launcher return, and relaunch. Confirm a held transition
+   button is not forwarded until all controls return to neutral.
+10. Confirm analog turn/thrust/brake, weapons, wings, zoom, pause, and controls
    overlay mappings work for both player seats.
-9. Confirm disconnect auto-pauses with a banner, keyboard remains usable, and
+11. Confirm disconnect auto-pauses with a banner, keyboard remains usable, and
    reconnect returns the pad to its original seat.
-10. Confirm the D-pad or left stick moves the highlighted launcher, pause, and
+12. Confirm the D-pad or left stick moves the highlighted launcher, pause, and
     game-over choices; A selects, B goes back, and Start launches or resumes.
-11. Confirm both players' controls work with the attached keyboard where the
+13. Confirm both players' controls work with the attached keyboard where the
     selected backend exposes keyboard events.
-12. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
-13. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
+14. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
+15. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
 
 ## Service Installation Sketch
 

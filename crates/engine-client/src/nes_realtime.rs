@@ -529,15 +529,33 @@ impl WorkerMode {
 #[derive(Debug)]
 struct WorkerControl {
     mode: AtomicU8,
-    wait_lock: Mutex<()>,
+    progress: Mutex<WorkerProgress>,
     changed: Condvar,
+}
+
+#[derive(Debug, Default)]
+struct WorkerProgress {
+    frame_active: bool,
+}
+
+struct ActiveWorkerFrame<'a> {
+    control: &'a WorkerControl,
+}
+
+impl Drop for ActiveWorkerFrame<'_> {
+    fn drop(&mut self) {
+        let mut progress = lock_unpoisoned(&self.control.progress);
+        debug_assert!(progress.frame_active);
+        progress.frame_active = false;
+        self.control.changed.notify_all();
+    }
 }
 
 impl WorkerControl {
     fn new() -> Self {
         Self {
             mode: AtomicU8::new(WorkerMode::Paused as u8),
-            wait_lock: Mutex::new(()),
+            progress: Mutex::new(WorkerProgress::default()),
             changed: Condvar::new(),
         }
     }
@@ -547,23 +565,40 @@ impl WorkerControl {
     }
 
     fn set_mode(&self, mode: WorkerMode) {
-        let _guard = lock_unpoisoned(&self.wait_lock);
+        let _progress = lock_unpoisoned(&self.progress);
         self.mode.store(mode as u8, Ordering::Release);
         self.changed.notify_all();
     }
 
+    fn try_begin_frame(&self) -> Option<ActiveWorkerFrame<'_>> {
+        let mut progress = lock_unpoisoned(&self.progress);
+        if self.mode() != WorkerMode::Running {
+            return None;
+        }
+        debug_assert!(!progress.frame_active);
+        progress.frame_active = true;
+        Some(ActiveWorkerFrame { control: self })
+    }
+
+    fn wait_until_frame_boundary(&self) {
+        let mut progress = lock_unpoisoned(&self.progress);
+        while progress.frame_active {
+            progress = wait_unpoisoned(&self.changed, progress);
+        }
+    }
+
     fn wait_until_running_or_stopped(&self) -> WorkerMode {
-        let mut guard = lock_unpoisoned(&self.wait_lock);
+        let mut progress = lock_unpoisoned(&self.progress);
         loop {
             match self.mode() {
-                WorkerMode::Paused => guard = wait_unpoisoned(&self.changed, guard),
+                WorkerMode::Paused => progress = wait_unpoisoned(&self.changed, progress),
                 mode => return mode,
             }
         }
     }
 
     fn wait_until_deadline_or_change(&self, deadline: Instant) -> WorkerMode {
-        let mut guard = lock_unpoisoned(&self.wait_lock);
+        let mut progress = lock_unpoisoned(&self.progress);
         loop {
             let mode = self.mode();
             if mode != WorkerMode::Running {
@@ -574,8 +609,8 @@ impl WorkerControl {
                 return mode;
             }
             let timeout = deadline.saturating_duration_since(now);
-            let (next_guard, result) = wait_timeout_unpoisoned(&self.changed, guard, timeout);
-            guard = next_guard;
+            let (next_progress, result) = wait_timeout_unpoisoned(&self.changed, progress, timeout);
+            progress = next_progress;
             if result.timed_out() {
                 return self.mode();
             }
@@ -683,6 +718,9 @@ impl NesRealtimeRuntime {
             WorkerMode::Running
         };
         if self.shared.control.mode() == desired {
+            if paused {
+                self.shared.control.wait_until_frame_boundary();
+            }
             return;
         }
         if !paused && lock_unpoisoned(&self.shared.runtime_error).is_some() {
@@ -691,6 +729,10 @@ impl NesRealtimeRuntime {
         self.shared.input.neutralize();
         if paused {
             self.shared.control.set_mode(desired);
+            // A frame already executing when pause was requested is allowed to
+            // reach its safe boundary. Once this returns, no later telemetry,
+            // audio, or video can arrive from that frame.
+            self.shared.control.wait_until_frame_boundary();
             if let Some(audio) = &self.shared.audio {
                 audio.set_paused(true);
             }
@@ -809,6 +851,12 @@ fn run_worker<C: RealtimeNesCore>(mut core: C, shared: Arc<RuntimeShared>) {
                 && Instant::now() >= pacer.deadline()
                 && catch_up_frames < MAX_CATCH_UP_FRAMES
             {
+                // Starting a frame and requesting pause are serialized by the
+                // control mutex. The guard acknowledges the completed boundary
+                // to a pausing host on every exit path.
+                let Some(_active_frame) = shared.control.try_begin_frame() else {
+                    break;
+                };
                 let input = shared.input.latest();
                 let sampled_at = shared.epoch.elapsed();
                 let output = match core
@@ -1024,6 +1072,52 @@ mod tests {
     }
 
     #[test]
+    fn pause_acknowledgement_waits_for_an_active_frame_boundary() {
+        let control = Arc::new(WorkerControl::new());
+        control.set_mode(WorkerMode::Running);
+
+        let (frame_started_tx, frame_started_rx) = std::sync::mpsc::channel();
+        let (release_frame_tx, release_frame_rx) = std::sync::mpsc::channel();
+        let worker_control = Arc::clone(&control);
+        let worker = std::thread::spawn(move || {
+            let active_frame = worker_control
+                .try_begin_frame()
+                .expect("running worker should begin a frame");
+            frame_started_tx.send(()).unwrap();
+            release_frame_rx.recv().unwrap();
+            drop(active_frame);
+        });
+        frame_started_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("worker did not enter the frame");
+
+        let (mode_changed_tx, mode_changed_rx) = std::sync::mpsc::channel();
+        let (pause_done_tx, pause_done_rx) = std::sync::mpsc::channel();
+        let pause_control = Arc::clone(&control);
+        let pauser = std::thread::spawn(move || {
+            pause_control.set_mode(WorkerMode::Paused);
+            mode_changed_tx.send(()).unwrap();
+            pause_control.wait_until_frame_boundary();
+            pause_done_tx.send(()).unwrap();
+        });
+        mode_changed_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("pause mode was not set");
+        assert_eq!(
+            pause_done_rx.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        );
+
+        release_frame_tx.send(()).unwrap();
+        pause_done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("pause did not acknowledge the completed frame boundary");
+        worker.join().unwrap();
+        pauser.join().unwrap();
+        assert_eq!(control.mode(), WorkerMode::Paused);
+    }
+
+    #[test]
     fn rational_pacer_accumulates_exact_ntsc_fraction_without_rounding_each_frame() {
         let origin = Instant::now();
         let mut pacer = RationalPacer::new(origin);
@@ -1227,11 +1321,10 @@ mod tests {
             });
 
             runtime.stop_and_join();
+            assert!(runtime.worker.is_none());
             let stopped = runtime.telemetry();
             assert!(!stopped.audio_active);
             assert_eq!(stopped.audio_queue_depth_samples, 0);
-            std::thread::sleep(Duration::from_millis(20));
-            assert_eq!(runtime.telemetry().emulated_frames, stopped.emulated_frames);
         }
     }
 

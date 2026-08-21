@@ -123,6 +123,7 @@ pub struct Settings {
     pub audio: AudioSettings,
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
+    pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
@@ -169,6 +170,13 @@ impl Default for AudioSettings {
 #[serde(default)]
 pub struct ControlBindings {
     // Keymap lands here once the input schema is defined.
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NesSettings {
+    /// SHA-256 identity of the last user cartridge selected in the launcher.
+    pub selected_rom_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

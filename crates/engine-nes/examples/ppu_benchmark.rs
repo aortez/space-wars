@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let rom = fs::read(path)?;
         (
             NesMachine::from_ines(&rom, config)?,
-            "external-nrom-full-machine-frame-v2",
+            "external-cartridge-full-machine-frame-v2",
             fnv1a(&rom),
         )
     } else {

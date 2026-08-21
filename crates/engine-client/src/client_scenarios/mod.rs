@@ -12,6 +12,7 @@ use crate::nes_realtime::{RealtimeTelemetry, RealtimeVideoConsumer};
 use crate::render::{FrameLayout, Viewport};
 
 mod falling;
+mod nes;
 mod null;
 mod pizza;
 mod rover_lab;
@@ -47,6 +48,13 @@ pub struct BenchmarkConfiguration {
 pub enum ScenarioStartMode {
     Normal,
     Benchmark(BenchmarkConfiguration),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub enum ScenarioAsset {
+    #[default]
+    None,
+    NesRom(crate::nes_roms::NesRomAsset),
 }
 
 impl ScenarioStartMode {
@@ -130,6 +138,7 @@ pub struct ScenarioCapabilities {
     pub game_over: bool,
     pub native_video: bool,
     pub captures_gamepad_start: bool,
+    pub captures_gamepad_select: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -167,9 +176,11 @@ type ScenarioFactory = fn(
     &Settings,
     Viewport,
     ScenarioStartMode,
+    &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError>;
 
 impl ScenarioRegistration {
+    #[cfg(test)]
     pub fn create(
         &'static self,
         seed: u64,
@@ -177,10 +188,21 @@ impl ScenarioRegistration {
         viewport: Viewport,
         mode: ScenarioStartMode,
     ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+        self.create_with_asset(seed, settings, viewport, mode, &ScenarioAsset::None)
+    }
+
+    pub fn create_with_asset(
+        &'static self,
+        seed: u64,
+        settings: &Settings,
+        viewport: Viewport,
+        mode: ScenarioStartMode,
+        asset: &ScenarioAsset,
+    ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
         if mode.is_benchmark() && !self.capabilities.benchmark {
             return Err(ScenarioCreateError::BenchmarkUnsupported { name: self.id });
         }
-        (self.create)(seed, settings, viewport, mode)
+        (self.create)(seed, settings, viewport, mode, asset)
     }
 }
 
@@ -321,6 +343,7 @@ impl std::error::Error for ScenarioCreateError {}
 static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
     falling::REGISTRATION,
+    nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
     spacewars::REGISTRATION,
@@ -351,6 +374,7 @@ mod tests {
         _settings: &Settings,
         _viewport: Viewport,
         _mode: ScenarioStartMode,
+        _asset: &ScenarioAsset,
     ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
         Err(ScenarioCreateError::MissingAsset {
             name: "missing-test",
@@ -368,6 +392,7 @@ mod tests {
             game_over: false,
             native_video: true,
             captures_gamepad_start: true,
+            captures_gamepad_select: true,
         },
         controls_help: "",
         create: missing_asset_factory,
@@ -380,7 +405,7 @@ mod tests {
             launcher_registrations()
                 .map(|registration| registration.id)
                 .collect::<Vec<_>>(),
-            vec!["falling", "pizza", "rover-lab", "spacewars"]
+            vec!["falling", "nes", "pizza", "rover-lab", "spacewars"]
         );
     }
 

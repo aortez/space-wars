@@ -251,7 +251,8 @@ mod tests {
     use std::sync::Mutex;
 
     use engine_common::{
-        AudioSettings, LaunchSettings, RendererSetting, SpacewarsSettings, VideoSettings,
+        AudioSettings, LaunchSettings, NesSettings, RendererSetting, SpacewarsSettings,
+        VideoSettings,
     };
 
     use super::*;
@@ -350,6 +351,9 @@ mod tests {
                 renderer: RendererSetting::Raster,
                 raster_scale: 2.0,
             },
+            nes: NesSettings {
+                selected_rom_id: Some("0123456789abcdef".into()),
+            },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,
                 asteroids_enabled: false,
@@ -374,6 +378,10 @@ mod tests {
         assert_eq!(reloaded.settings.launch.seed, 42);
         assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
+        assert_eq!(
+            reloaded.settings.nes.selected_rom_id.as_deref(),
+            Some("0123456789abcdef")
+        );
         assert_eq!(reloaded.settings.spacewars.universe_radius, 2400);
         assert!(!reloaded.settings.spacewars.asteroids_enabled);
         assert_eq!(

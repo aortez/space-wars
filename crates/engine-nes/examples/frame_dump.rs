@@ -1,4 +1,4 @@
-//! Runs a mapper-0 ROM to a deterministic frame boundary and writes a PNG.
+//! Runs a supported ROM to a deterministic frame boundary and writes a PNG.
 
 use std::{
     env,

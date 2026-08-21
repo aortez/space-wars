@@ -124,6 +124,7 @@ impl GamepadPump {
     fn tick(&mut self, window: &MainWindow) {
         self.observe_mode(window);
         while let Some(event) = self.gilrs.next_event() {
+            let gamepad_id = event.id;
             let id = usize::from(event.id);
             match event.event {
                 EventType::Connected => {
@@ -177,7 +178,7 @@ impl GamepadPump {
                     if is_pad_activity(event_type) {
                         self.ui_driver = Some(seat);
                     }
-                    self.route_button_edge(window, seat, event_type);
+                    self.route_button_edge(window, seat, gamepad_id, event_type);
                 }
             }
             self.observe_mode(window);
@@ -192,7 +193,13 @@ impl GamepadPump {
         }
     }
 
-    fn route_button_edge(&mut self, window: &MainWindow, seat: usize, event: EventType) {
+    fn route_button_edge(
+        &mut self,
+        window: &MainWindow,
+        seat: usize,
+        gamepad_id: GamepadId,
+        event: EventType,
+    ) {
         if !self.mode_handoff.accepts_input(seat) {
             return;
         }
@@ -215,7 +222,22 @@ impl GamepadPump {
             return;
         }
 
-        match gameplay_button_route(button, window.get_scenario_captures_gamepad_start()) {
+        let captures_start = window.get_scenario_captures_gamepad_start();
+        let captures_select = window.get_scenario_captures_gamepad_select();
+        let gamepad = self.gilrs.gamepad(gamepad_id);
+        if native_console_menu_chord(
+            button,
+            captures_start,
+            captures_select,
+            gamepad.is_pressed(Button::Start),
+            gamepad.is_pressed(Button::Select),
+        ) {
+            self.begin_handoff();
+            self.input.borrow_mut().press(GameKey::Controls);
+            return;
+        }
+
+        match gameplay_button_route(button, captures_start, captures_select) {
             Some(GameplayButtonRoute::HostPause) => {
                 self.begin_handoff();
                 self.input.borrow_mut().press(GameKey::Pause);
@@ -315,13 +337,29 @@ enum GameplayButtonRoute {
 fn gameplay_button_route(
     button: Button,
     scenario_captures_start: bool,
+    scenario_captures_select: bool,
 ) -> Option<GameplayButtonRoute> {
     match button {
         Button::Start if scenario_captures_start => Some(GameplayButtonRoute::Scenario),
         Button::Start => Some(GameplayButtonRoute::HostPause),
+        Button::Select if scenario_captures_select => Some(GameplayButtonRoute::Scenario),
         Button::Select => Some(GameplayButtonRoute::HostControls),
         _ => None,
     }
+}
+
+fn native_console_menu_chord(
+    button: Button,
+    scenario_captures_start: bool,
+    scenario_captures_select: bool,
+    start_pressed: bool,
+    select_pressed: bool,
+) -> bool {
+    scenario_captures_start
+        && scenario_captures_select
+        && start_pressed
+        && select_pressed
+        && matches!(button, Button::Start | Button::Select)
 }
 
 fn apply_controller_profile(gilrs: &mut Gilrs, id: GamepadId) {
@@ -678,19 +716,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scenario_can_capture_start_without_losing_the_host_controls_button() {
+    fn native_console_captures_start_and_select_without_losing_host_controls() {
         assert_eq!(
-            gameplay_button_route(Button::Start, true),
+            gameplay_button_route(Button::Start, true, true),
             Some(GameplayButtonRoute::Scenario)
         );
         assert_eq!(
-            gameplay_button_route(Button::Start, false),
+            gameplay_button_route(Button::Start, false, false),
             Some(GameplayButtonRoute::HostPause)
         );
         assert_eq!(
-            gameplay_button_route(Button::Select, true),
+            gameplay_button_route(Button::Select, true, true),
+            Some(GameplayButtonRoute::Scenario)
+        );
+        assert_eq!(
+            gameplay_button_route(Button::Select, false, false),
             Some(GameplayButtonRoute::HostControls)
         );
+        assert!(native_console_menu_chord(
+            Button::Select,
+            true,
+            true,
+            true,
+            true
+        ));
+        assert!(!native_console_menu_chord(
+            Button::Select,
+            true,
+            true,
+            false,
+            true
+        ));
     }
 
     #[test]

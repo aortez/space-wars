@@ -19,7 +19,7 @@ use slint::{
 
 use crate::MainWindow;
 use crate::client_scenarios::{
-    self, BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario,
+    self, BenchmarkCounts, BenchmarkStepMetrics, CenterPanelState, ClientScenario, ScenarioAsset,
     ScenarioCreateError, ScenarioRegistration, ScenarioStartMode,
 };
 pub use crate::client_scenarios::{BenchmarkConfiguration, RenderBackend};
@@ -46,6 +46,7 @@ pub struct ScenarioLoopOptions {
     pub controls: Option<SharedScenarioControls>,
     pub input: Option<SharedInput>,
     pub settings: Settings,
+    pub asset: ScenarioAsset,
 }
 
 impl Default for ScenarioLoopOptions {
@@ -58,6 +59,7 @@ impl Default for ScenarioLoopOptions {
             controls: None,
             input: None,
             settings: Settings::default(),
+            asset: ScenarioAsset::None,
         }
     }
 }
@@ -398,6 +400,7 @@ pub fn start_scenario_loop(
         controls,
         input,
         settings,
+        asset,
     } = options;
     let scenario_name = scenario.to_string();
     let initial_viewport = Viewport::from_window(window.window());
@@ -406,12 +409,13 @@ pub fn start_scenario_loop(
     } else {
         ScenarioStartMode::Normal
     };
-    let mut scenario = HostedScenario::new(
+    let mut scenario = HostedScenario::new_with_asset(
         &scenario_name,
         seed,
         &settings,
         initial_viewport,
         start_mode,
+        &asset,
     )?;
     scenario.set_viewport(initial_viewport);
     let tick_model = scenario.tick_model();
@@ -1009,13 +1013,15 @@ fn restart_scenario(
     settings: &Settings,
     viewport: Viewport,
 ) -> Result<(), HostError> {
+    let asset = scenario.asset.clone();
     replace_scenario(scenario, || {
-        HostedScenario::new(
+        HostedScenario::new_with_asset(
             scenario_name,
             seed,
             settings,
             viewport,
             ScenarioStartMode::Normal,
+            &asset,
         )
     })?;
     *accumulator = Duration::ZERO;
@@ -1050,13 +1056,15 @@ fn start_benchmark_scenario(
     settings: &Settings,
     viewport: Viewport,
 ) -> Result<(), HostError> {
+    let asset = scenario.asset.clone();
     replace_scenario(scenario, || {
-        HostedScenario::new(
+        HostedScenario::new_with_asset(
             scenario_name,
             seed,
             settings,
             viewport,
             ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
+            &asset,
         )
     })?;
     *accumulator = Duration::ZERO;
@@ -1718,6 +1726,7 @@ fn duration_ms(duration: Duration) -> f64 {
 
 pub(crate) struct HostedScenario {
     inner: Box<dyn ClientScenario>,
+    asset: ScenarioAsset,
 }
 
 impl HostedScenario {
@@ -1728,10 +1737,21 @@ impl HostedScenario {
         viewport: Viewport,
         mode: ScenarioStartMode,
     ) -> Result<Self, HostError> {
+        Self::new_with_asset(name, seed, settings, viewport, mode, &ScenarioAsset::None)
+    }
+
+    pub(crate) fn new_with_asset(
+        name: &str,
+        seed: u64,
+        settings: &Settings,
+        viewport: Viewport,
+        mode: ScenarioStartMode,
+        asset: &ScenarioAsset,
+    ) -> Result<Self, HostError> {
         let registration = client_scenarios::registration(name)
             .ok_or_else(|| HostError::UnknownScenario { name: name.into() })?;
         let inner = registration
-            .create(seed, settings, viewport, mode)
+            .create_with_asset(seed, settings, viewport, mode, asset)
             .map_err(|error| match error {
                 ScenarioCreateError::BenchmarkUnsupported { .. } => {
                     HostError::BenchmarkUnsupported { name: name.into() }
@@ -1741,7 +1761,10 @@ impl HostedScenario {
                     source,
                 },
             })?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            asset: asset.clone(),
+        })
     }
 
     pub(crate) fn registration(&self) -> &'static ScenarioRegistration {
@@ -1952,23 +1975,6 @@ mod tests {
         }
     }
 
-    fn wait_for_stable_realtime_frames(scenario: &HostedScenario) -> u64 {
-        let deadline = Instant::now() + Duration::from_secs(1);
-        let mut last = scenario.realtime_telemetry().unwrap().emulated_frames;
-        let mut unchanged_since = Instant::now();
-        loop {
-            assert!(Instant::now() < deadline, "realtime worker did not settle");
-            std::thread::sleep(Duration::from_millis(2));
-            let current = scenario.realtime_telemetry().unwrap().emulated_frames;
-            if current != last {
-                last = current;
-                unchanged_since = Instant::now();
-            } else if unchanged_since.elapsed() >= Duration::from_millis(30) {
-                return current;
-            }
-        }
-    }
-
     fn settings_from_config(config: &SpacewarsConfig) -> Settings {
         let mut settings = Settings::default();
         settings.spacewars.universe_radius = config.universe_radius;
@@ -2108,6 +2114,66 @@ mod tests {
     }
 
     #[test]
+    fn user_cartridge_uses_the_native_nes_runtime_and_survives_restart() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("falling-copy.nes");
+        std::fs::write(&path, scenario_falling::FALLING_ROM).unwrap();
+        let asset = ScenarioAsset::NesRom(crate::nes_roms::load_path(&path).unwrap());
+        let settings = Settings::default();
+        let mut scenario = HostedScenario::new_with_asset(
+            "nes",
+            0,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+            &asset,
+        )
+        .unwrap();
+
+        assert!(scenario.registration().capabilities.native_video);
+        assert!(scenario.registration().capabilities.captures_gamepad_select);
+        scenario.publish_realtime_actions(
+            &[scenario_nes::NesAction::set_controllers(
+                [engine_nes::ControllerButtons::NONE; 2],
+            )],
+            Instant::now(),
+        );
+        scenario.set_realtime_paused(false);
+        wait_for(Duration::from_secs(1), || {
+            scenario.realtime_telemetry().unwrap().emulated_frames >= 1
+        });
+
+        let mut accumulator = Duration::ZERO;
+        let mut input = ClientInput::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+        restart_scenario(
+            &mut scenario,
+            "nes",
+            0,
+            &mut accumulator,
+            &mut input,
+            &mut paused,
+            &mut benchmark_active,
+            &settings,
+            TEST_VIEWPORT,
+        )
+        .unwrap();
+        assert!(!paused);
+        scenario.publish_realtime_actions(
+            &[scenario_nes::NesAction::set_controllers(
+                [engine_nes::ControllerButtons::NONE; 2],
+            )],
+            Instant::now(),
+        );
+        scenario.set_realtime_paused(false);
+        wait_for(Duration::from_secs(1), || {
+            scenario.realtime_telemetry().unwrap().emulated_frames >= 1
+        });
+        scenario.shutdown_realtime();
+    }
+
+    #[test]
     fn realtime_worker_uses_hardware_pacing_instead_of_ui_elapsed() {
         let mut scenario = hosted_scenario("falling", 0).unwrap();
         let mut input = ClientInput::default();
@@ -2172,7 +2238,7 @@ mod tests {
     }
 
     #[test]
-    fn falling_worker_stops_across_pause_restart_launcher_and_relaunch() {
+    fn falling_worker_handles_pause_restart_launcher_and_relaunch() {
         let mut scenario = hosted_scenario("falling", 7).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::ZERO;
@@ -2220,12 +2286,6 @@ mod tests {
             &[],
         );
         assert!(paused);
-        let paused_at = wait_for_stable_realtime_frames(&scenario);
-        std::thread::sleep(Duration::from_millis(40));
-        assert_eq!(
-            scenario.realtime_telemetry().unwrap().emulated_frames,
-            paused_at
-        );
 
         controls.request_restart();
         let restart = step_scenario(
@@ -2289,13 +2349,6 @@ mod tests {
             &[],
         );
         assert!(result.return_to_launcher);
-        std::thread::sleep(Duration::from_millis(20));
-        let stopped_at = scenario.realtime_telemetry().unwrap().emulated_frames;
-        std::thread::sleep(Duration::from_millis(40));
-        assert_eq!(
-            scenario.realtime_telemetry().unwrap().emulated_frames,
-            stopped_at
-        );
 
         let relaunched = hosted_scenario("falling", 7).unwrap();
         assert_eq!(relaunched.realtime_telemetry().unwrap().emulated_frames, 0);

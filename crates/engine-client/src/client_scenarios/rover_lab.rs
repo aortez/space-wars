@@ -4,8 +4,8 @@ use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickMod
 use scenario_rover_lab::{RoverLabAction, RoverLabConfig, RoverLabScenario, RoverLabState};
 
 use super::{
-    ClientScenario, RenderBackend, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
-    ScenarioStartMode,
+    ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
+    ScenarioRegistration, ScenarioStartMode,
 };
 use crate::input::{ClientInput, GameKey};
 use crate::render::{FrameLayout, Viewport};
@@ -20,6 +20,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         game_over: false,
         native_video: false,
         captures_gamepad_start: false,
+        captures_gamepad_select: false,
     },
     controls_help: "Rover Lab: d-pad right drives forward, d-pad left drives in reverse, B or d-pad down brakes, and holding then releasing A jumps. The pause menu can restart the lab. Keyboard: W forward, S brake, X reverse, hold/release Space to jump, R reset.",
     create,
@@ -34,6 +35,7 @@ fn create(
     _settings: &Settings,
     _viewport: Viewport,
     _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(RoverLabClientScenario {
         state: RoverLabScenario::init(RoverLabConfig::default(), seed),

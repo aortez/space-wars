@@ -43,6 +43,10 @@ Examples:
   ./update.sh
   ./update.sh --skip-build
   ./update.sh --target 192.168.1.108 --dry-run
+
+User ROM data is persistent and deployed separately:
+  ./sync-data.sh --dry-run
+  ./sync-data.sh
 EOF
 }
 

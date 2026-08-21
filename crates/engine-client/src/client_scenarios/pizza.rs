@@ -4,8 +4,8 @@ use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickMod
 use scenario_pizza::{PizzaBounds, PizzaConfig, PizzaScenario, PizzaState};
 
 use super::{
-    BenchmarkCounts, BenchmarkStepMetrics, ClientScenario, RenderBackend, ScenarioCapabilities,
-    ScenarioCreateError, ScenarioRegistration, ScenarioStartMode,
+    BenchmarkCounts, BenchmarkStepMetrics, ClientScenario, RenderBackend, ScenarioAsset,
+    ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration, ScenarioStartMode,
 };
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
@@ -20,6 +20,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         game_over: false,
         native_video: false,
         captures_gamepad_start: false,
+        captures_gamepad_select: false,
     },
     controls_help: "Pizza: click empty space to create a ball, or click an existing ball to grab it. Drag for a rubbery pull and release to fling.",
     create,
@@ -34,6 +35,7 @@ fn create(
     settings: &Settings,
     viewport: Viewport,
     mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     let setup = settings.pizza.normalized();
     let bounds = PizzaBounds::from_aspect_ratio(viewport.aspect_ratio());

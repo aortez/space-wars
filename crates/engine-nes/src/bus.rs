@@ -1,7 +1,7 @@
 use crate::{
     Apu, ApuSnapshot, AudioOutput, CHR_MEMORY_BYTES, Cartridge, ControllerButtons, ControllerPort,
-    ControllerSnapshot, DmcDmaRequest, OamDmaAlignment, Ppu, PpuCycle, RamInit, StateError,
-    VideoOutput,
+    ControllerSnapshot, DmcDmaRequest, MapperSnapshot, OamDmaAlignment, Ppu, PpuCycle, RamInit,
+    StateError, VideoOutput,
     cartridge::PRG_RAM_BYTES,
     state_codec::{StateReader, StateSink},
 };
@@ -19,6 +19,7 @@ pub struct MemorySnapshot {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BusSnapshot {
     pub memory: MemorySnapshot,
+    pub mapper: MapperSnapshot,
     pub apu_io_registers: [u8; APU_IO_REGISTER_BYTES],
     pub apu: ApuSnapshot,
     pub controllers: [ControllerSnapshot; 2],
@@ -50,7 +51,7 @@ pub trait CpuBus {
     fn write(&mut self, address: u16, value: u8);
 }
 
-/// CPU-visible NES address space for a mapper-0 machine.
+/// CPU-visible NES address space for one machine.
 ///
 /// The bus owns the PPU because CPU register accesses and PPU cartridge reads
 /// must observe one mutable machine state. The machine scheduler remains
@@ -81,9 +82,10 @@ impl NesBus {
         };
         let mut apu = Apu::new(audio_output);
         apu.set_dma_alignment(dma_alignment);
+        let observe_mapper_ppu_addresses = cartridge.observes_ppu_addresses();
         Self {
             ram: Box::new([ram_value; 0x800]),
-            ppu: Ppu::new(video_output),
+            ppu: Ppu::new_with_mapper_observer(video_output, observe_mapper_ppu_addresses),
             apu,
             apu_io_registers: [0; 0x18],
             controllers: [ControllerPort::default(); 2],
@@ -120,6 +122,7 @@ impl NesBus {
     pub fn snapshot(&self) -> BusSnapshot {
         BusSnapshot {
             memory: self.memory_snapshot(),
+            mapper: self.cartridge.mapper_snapshot(),
             apu_io_registers: self.apu_io_registers,
             apu: self.apu.snapshot(),
             controllers: [
@@ -167,7 +170,7 @@ impl NesBus {
     }
 
     pub(crate) fn clock_ppu(&mut self) -> PpuCycle {
-        self.ppu.clock(&self.cartridge)
+        self.ppu.clock(&mut self.cartridge)
     }
 
     pub(crate) fn clock_apu(&mut self) {
@@ -269,6 +272,7 @@ impl NesBus {
 
 impl CpuBus for NesBus {
     fn read(&mut self, address: u16) -> u8 {
+        self.cartridge.note_cpu_read_cycle();
         // $4015 is unusual: only bit 5 is supplied by open bus, and the read
         // clears the frame IRQ without replacing the bus latch.
         if address == 0x4015 {
@@ -278,7 +282,7 @@ impl CpuBus for NesBus {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)],
             0x2000..=0x3fff => self
                 .ppu
-                .cpu_read_register(usize::from(address & 7), &self.cartridge),
+                .cpu_read_register(usize::from(address & 7), &mut self.cartridge),
             0x4000..=0x4014 => self.open_bus,
             0x4015 => unreachable!("$4015 returns before the general bus read"),
             0x4016 => (self.open_bus & 0xe0) | self.controllers[0].read_serial(),
@@ -291,6 +295,7 @@ impl CpuBus for NesBus {
     }
 
     fn write(&mut self, address: u16, value: u8) {
+        let consecutive_cpu_write = self.cartridge.note_cpu_write_cycle();
         self.open_bus = value;
         match address {
             0x0000..=0x1fff => self.ram[usize::from(address & 0x07ff)] = value,
@@ -313,7 +318,8 @@ impl CpuBus for NesBus {
             }
             0x4018..=0x5fff => {}
             0x6000..=0xffff => {
-                self.cartridge.cpu_write(address, value);
+                self.cartridge
+                    .cpu_write_cycle(address, value, consecutive_cpu_write);
             }
         }
     }
