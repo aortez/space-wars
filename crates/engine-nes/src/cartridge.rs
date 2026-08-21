@@ -89,6 +89,8 @@ impl CartridgeImage {
         let chr_banks = bytes[5];
         let flags6 = bytes[6];
         let flags7 = bytes[7];
+        let prg_ram_banks = bytes[8];
+        let flags9 = bytes[9];
 
         if flags7 & 0x0c == 0x08 {
             return Err(CartridgeError::UnsupportedNes2);
@@ -96,6 +98,9 @@ impl CartridgeImage {
         let console_type = flags7 & 0x03;
         if console_type != 0 {
             return Err(CartridgeError::UnsupportedConsoleType(console_type));
+        }
+        if flags9 & 1 != 0 {
+            return Err(CartridgeError::UnsupportedPalTiming);
         }
 
         let mapper = u16::from(flags6 >> 4) | u16::from(flags7 & 0xf0);
@@ -117,6 +122,12 @@ impl CartridgeImage {
             1 => {
                 if flags6 & 0x08 != 0 {
                     return Err(CartridgeError::UnsupportedFourScreenMirroring(mapper));
+                }
+                if prg_ram_banks > 1 {
+                    return Err(CartridgeError::UnsupportedPrgRamBanks {
+                        mapper,
+                        banks: prg_ram_banks,
+                    });
                 }
                 if !(2..=16).contains(&prg_banks) || !prg_banks.is_power_of_two() {
                     return Err(CartridgeError::UnsupportedPrgRomBanks {
@@ -383,10 +394,17 @@ struct Mmc3State {
 
 impl Mmc3State {
     const fn new(mirroring: Mirroring) -> Self {
+        // Four-screen VRAM is fixed board wiring, not a value held by MMC3's
+        // horizontal/vertical mirroring register. Cartridge::mirroring keeps
+        // enforcing the board layout while $A000 remains ignored.
+        let register_mirroring = match mirroring {
+            Mirroring::Vertical => Mirroring::Vertical,
+            _ => Mirroring::Horizontal,
+        };
         Self {
             bank_select: 0,
             bank_registers: [0; 8],
-            mirroring,
+            mirroring: register_mirroring,
             prg_ram_enabled: true,
             prg_ram_write_protected: false,
             irq_latch: 0,
@@ -1154,6 +1172,20 @@ mod tests {
         let chr_ram = CartridgeImage::parse(&Mmc1Builder::with_chr_ram(2).build()).unwrap();
         assert!(chr_ram.metadata().chr_is_ram);
 
+        let mut one_prg_ram_bank = bytes.clone();
+        one_prg_ram_bank[8] = 1;
+        assert!(CartridgeImage::parse(&one_prg_ram_bank).is_ok());
+
+        let mut invalid_prg_ram = bytes.clone();
+        invalid_prg_ram[8] = 2;
+        assert_eq!(
+            CartridgeImage::parse(&invalid_prg_ram),
+            Err(CartridgeError::UnsupportedPrgRamBanks {
+                mapper: 1,
+                banks: 2,
+            })
+        );
+
         let mut invalid_prg = bytes.clone();
         invalid_prg[4] = 32;
         assert_eq!(
@@ -1345,6 +1377,13 @@ mod tests {
         assert_eq!(
             CartridgeImage::parse(&bytes),
             Err(CartridgeError::UnsupportedNes2)
+        );
+
+        let mut bytes = valid.clone();
+        bytes[9] = 1;
+        assert_eq!(
+            CartridgeImage::parse(&bytes),
+            Err(CartridgeError::UnsupportedPalTiming)
         );
 
         let mut bytes = valid.clone();

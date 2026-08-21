@@ -90,8 +90,9 @@ The library currently accepts:
 
 Generic iNES mapper-2, mapper-3, and mapper-7 bank writes are modeled without
 bus conflicts. Mapper-1 SUROM/SXROM 512 KiB outer PRG banking and multi-bank
-PRG RAM are not yet supported; images declaring 32 16 KiB PRG banks are
-rejected instead of being partially emulated. Mapper 4 currently means
+PRG RAM are not yet supported; images declaring 32 16 KiB PRG ROM banks or
+more than one 8 KiB PRG RAM bank are rejected instead of being partially
+emulated. Mapper 4 currently means
 conventional MMC3: MMC6-specific RAM behavior and mapper variants assigned
 distinct iNES numbers, including TLSROM/TKSROM single-screen banking and TQROM
 mixed CHR ROM/RAM, are not included. Mapper 7 512 KiB extensions that use bank

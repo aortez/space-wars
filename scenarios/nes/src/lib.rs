@@ -324,7 +324,7 @@ fn crop_fits_frame(crop: NativeVideoCrop) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use engine_nes::test_rom::NromBuilder;
+    use engine_nes::test_rom::{Mmc3Builder, NromBuilder};
 
     fn state() -> NesScenarioState {
         NesScenarioState::try_from_ines(&NromBuilder::new_16k().build(), AudioOutput::Disabled)
@@ -366,6 +366,17 @@ mod tests {
         assert_eq!(decoded.frame_id, state.machine().ppu().frame_id());
         assert_eq!(decoded.state_hash, state.machine().state_hash().value);
         assert_eq!(decoded.controllers, [ControllerButtons::NONE; 2]);
+    }
+
+    #[test]
+    fn observation_supports_four_screen_mmc3_cartridges() {
+        let mut rom = Mmc3Builder::with_chr_rom(2, 1);
+        rom.set_four_screen(true);
+        let state = NesScenarioState::try_from_ines(&rom.build(), AudioOutput::Disabled).unwrap();
+
+        let observation = NesScenario::observe(&state);
+        let decoded = NesObservation::decode(&observation).unwrap();
+        assert_eq!(decoded.state_hash, state.machine().state_hash().value);
     }
 
     #[test]

@@ -13,9 +13,14 @@ pub enum CartridgeError {
     InvalidMagic([u8; 4]),
     UnsupportedNes2,
     UnsupportedConsoleType(u8),
+    UnsupportedPalTiming,
     UnsupportedMapper(u16),
     UnsupportedFourScreenMirroring(u16),
     UnsupportedPrgRomBanks {
+        mapper: u16,
+        banks: u8,
+    },
+    UnsupportedPrgRamBanks {
         mapper: u16,
         banks: u8,
     },
@@ -43,6 +48,9 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedNes2 => formatter.write_str("NES 2.0 cartridges are not supported"),
             Self::UnsupportedConsoleType(kind) => {
                 write!(formatter, "unsupported iNES console type {kind}")
+            }
+            Self::UnsupportedPalTiming => {
+                formatter.write_str("PAL iNES cartridges are not supported")
             }
             Self::UnsupportedMapper(mapper) => {
                 write!(
@@ -88,6 +96,14 @@ impl fmt::Display for CartridgeError {
             Self::UnsupportedPrgRomBanks { mapper, banks } => write!(
                 formatter,
                 "mapper {mapper} does not support {banks} 16 KiB PRG ROM banks"
+            ),
+            Self::UnsupportedPrgRamBanks { mapper: 1, banks } => write!(
+                formatter,
+                "MMC1 (mapper 1) supports at most one 8 KiB PRG RAM bank, found {banks}"
+            ),
+            Self::UnsupportedPrgRamBanks { mapper, banks } => write!(
+                formatter,
+                "mapper {mapper} does not support {banks} 8 KiB PRG RAM banks"
             ),
             Self::UnsupportedChrRomBanks { mapper: 0, banks } => write!(
                 formatter,

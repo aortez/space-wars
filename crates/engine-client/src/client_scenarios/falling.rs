@@ -90,9 +90,11 @@ fn is_unsupported_cartridge(error: &CartridgeError) -> bool {
         error,
         CartridgeError::UnsupportedNes2
             | CartridgeError::UnsupportedConsoleType(_)
+            | CartridgeError::UnsupportedPalTiming
             | CartridgeError::UnsupportedMapper(_)
             | CartridgeError::UnsupportedFourScreenMirroring(_)
             | CartridgeError::UnsupportedPrgRomBanks { .. }
+            | CartridgeError::UnsupportedPrgRamBanks { .. }
             | CartridgeError::UnsupportedChrRomBanks { .. }
     )
 }

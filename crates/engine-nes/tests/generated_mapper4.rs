@@ -21,6 +21,12 @@ fn mapped_rom() -> Vec<u8> {
     rom.build()
 }
 
+fn four_screen_rom() -> Vec<u8> {
+    let mut rom = Mmc3Builder::with_chr_rom(2, 1);
+    rom.set_four_screen(true);
+    rom.build()
+}
+
 #[test]
 fn mmc3_switches_eight_kib_prg_windows_in_both_modes() {
     let image = CartridgeImage::parse(&mapped_rom()).unwrap();
@@ -124,6 +130,30 @@ fn mmc3_controls_mirroring_and_prg_ram_protection() {
     let mut cartridge = Cartridge::new(image);
     assert!(cartridge.cpu_write(0xa000, 1));
     assert_eq!(cartridge.mirroring(), Mirroring::FourScreen);
+}
+
+#[test]
+fn four_screen_mmc3_supports_hashes_snapshots_checkpoints_and_savestates() {
+    let rom = four_screen_rom();
+    let mut machine = NesMachine::from_ines(&rom, MachineConfig::default()).unwrap();
+    assert_eq!(machine.bus().cartridge().mirroring(), Mirroring::FourScreen);
+
+    let expected_hash = machine.state_hash();
+    let expected_snapshot = machine.snapshot();
+    let checkpoint = machine.checkpoint();
+    let savestate = machine.save_state();
+
+    write_bank_register(machine.bus_mut().cartridge_mut(), 6, 1, 0);
+    assert_ne!(machine.state_hash(), expected_hash);
+    machine.restore(&checkpoint).unwrap();
+    assert_eq!(machine.state_hash(), expected_hash);
+    assert_eq!(machine.snapshot(), expected_snapshot);
+
+    let mut loaded = NesMachine::from_ines(&rom, MachineConfig::default()).unwrap();
+    loaded.load_state(&savestate).unwrap();
+    assert_eq!(loaded.state_hash(), expected_hash);
+    assert_eq!(loaded.snapshot(), expected_snapshot);
+    assert_eq!(loaded.bus().cartridge().mirroring(), Mirroring::FourScreen);
 }
 
 fn irq_rom() -> Vec<u8> {

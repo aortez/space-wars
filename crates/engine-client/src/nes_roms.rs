@@ -538,6 +538,37 @@ mod tests {
     }
 
     #[test]
+    fn catalog_rejects_pal_and_multi_bank_mmc1_prg_ram_headers() {
+        let config = tempfile::tempdir().unwrap();
+        let directory = config.path().join(ROM_DIRECTORY_NAME);
+        fs::create_dir(&directory).unwrap();
+
+        let mut pal = NromBuilder::new_16k().build();
+        pal[9] = 1;
+        fs::write(directory.join("pal.nes"), pal).unwrap();
+
+        let mut multi_bank_prg_ram = Mmc1Builder::with_chr_rom(8, 4).build();
+        multi_bank_prg_ram[8] = 2;
+        fs::write(directory.join("multi-ram.nes"), multi_bank_prg_ram).unwrap();
+
+        let mut catalog = NesRomCatalog::new(config.path());
+        catalog.refresh().unwrap();
+
+        assert_eq!(catalog.entries().len(), 2);
+        assert!(catalog.entries().iter().any(|entry| matches!(
+            entry.compatibility,
+            NesRomCompatibility::Rejected(CartridgeError::UnsupportedPalTiming)
+        )));
+        assert!(catalog.entries().iter().any(|entry| matches!(
+            entry.compatibility,
+            NesRomCompatibility::Rejected(CartridgeError::UnsupportedPrgRamBanks {
+                mapper: 1,
+                banks: 2,
+            })
+        )));
+    }
+
+    #[test]
     fn identical_cartridges_are_deduplicated_by_content() {
         let config = tempfile::tempdir().unwrap();
         let directory = config.path().join(ROM_DIRECTORY_NAME);
