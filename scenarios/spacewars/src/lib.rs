@@ -72,6 +72,7 @@ const SPACEPORT_DEPTH_FACTOR: f32 = 0.4;
 const SPACEPORT_MAX_ARC_ANGLE: f32 = 2.7488937;
 const SPACEPORT_OUTER_POINTS: usize = 15;
 const SPACEPORT_INNER_POINTS: usize = 7;
+const SPACEPORT_APPROACH_EPSILON: f32 = 1.0e-5;
 const SPACEPORT_DAMPING: f32 = 0.94;
 const SPACEPORT_PULL_SCALE: f32 = 3.0;
 const FLAG_CENTER_RADIUS: f32 = 6.0;
@@ -808,6 +809,76 @@ pub struct PlanetObservationV1 {
     pub capture_progress: f32,
     pub local_spaceport_position: Vec2,
     pub local_spaceport_velocity: Vec2,
+}
+
+/// A collision-free staging point on a spaceport's outward axis.
+///
+/// The position and velocity use the same actor-local frame as the containing
+/// [`ShipObservationV1`]. The velocity is extrapolated along the rotating
+/// planet wrapper, so a controller can match a moving approach point without
+/// knowing the scenario's orbit or wrapper implementation.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct SpaceportApproachObservationV1 {
+    pub local_position: Vec2,
+    pub local_velocity: Vec2,
+    pub local_outward: Vec2,
+}
+
+impl PlanetObservationV1 {
+    /// Derive a safe staging point outside the planet on its spaceport axis.
+    ///
+    /// `clearance` is measured outward from the planet surface. Callers can
+    /// include their collision radius and a policy-specific maneuver margin.
+    pub fn spaceport_approach(&self, clearance: f32) -> SpaceportApproachObservationV1 {
+        let port_offset = self.local_spaceport_position - self.local_position;
+        let port_radius = port_offset.length();
+        let local_outward = if port_radius > SPACEPORT_APPROACH_EPSILON {
+            port_offset / port_radius
+        } else {
+            Vec2::Y
+        };
+        self.moving_surface_approach(local_outward, clearance)
+    }
+
+    /// Derive a moving staging point on any outward axis around the planet.
+    ///
+    /// This is useful for first reaching a safe holding ring before tracking a
+    /// rotating spaceport. The returned velocity includes both center motion
+    /// and wrapper rotation inferred from the observed port motion.
+    pub fn moving_surface_approach(
+        &self,
+        local_outward: Vec2,
+        clearance: f32,
+    ) -> SpaceportApproachObservationV1 {
+        let port_offset = self.local_spaceport_position - self.local_position;
+        let port_radius_squared = port_offset.length_squared();
+        let fallback_outward = if port_radius_squared > SPACEPORT_APPROACH_EPSILON {
+            port_offset.normalized()
+        } else {
+            Vec2::Y
+        };
+        let local_outward = if local_outward.length_squared() > SPACEPORT_APPROACH_EPSILON {
+            local_outward.normalized()
+        } else {
+            fallback_outward
+        };
+        let approach_radius = self.radius + clearance.max(0.0);
+        let approach_offset = local_outward * approach_radius;
+        let port_velocity_delta = self.local_spaceport_velocity - self.local_velocity;
+        let wrapper_omega = if port_radius_squared > SPACEPORT_APPROACH_EPSILON {
+            (port_offset.x * port_velocity_delta.y - port_offset.y * port_velocity_delta.x)
+                / port_radius_squared
+        } else {
+            0.0
+        };
+        let wrapper_velocity = Vec2::new(-approach_offset.y, approach_offset.x) * wrapper_omega;
+
+        SpaceportApproachObservationV1 {
+            local_position: self.local_position + approach_offset,
+            local_velocity: self.local_velocity + wrapper_velocity,
+            local_outward,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -10833,6 +10904,52 @@ mod tests {
         assert_eq!(
             observation.hazards.last().unwrap().id.value(),
             10_000 - (SHIP_SENSOR_MAX_HAZARDS - 1) as u64
+        );
+    }
+
+    #[test]
+    fn ship_observation_derives_a_rigidly_moving_spaceport_approach() {
+        let mut state = init_default(29);
+        state.planets[0].wrapper_angle = 0.73;
+        state.planets[0].wrapper_omega = -0.41;
+        let ship = &state.ships[0];
+        let planet = &state.planets[0];
+        let frame = ShipObservationFrame::new(ship);
+        let clearance = 23.0;
+        let world_outward = (spaceport_center(planet) - planet.position).normalized();
+        let world_position = planet.position + world_outward * (planet.radius + clearance);
+        let expected_position = frame.position(world_position);
+        let expected_velocity =
+            frame.vector(planet_surface_velocity(planet, world_position) - ship.velocity);
+
+        let observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_1,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        let approach = observation.planets[0].spaceport_approach(clearance);
+
+        assert_vec_close(approach.local_position, expected_position);
+        assert_vec_close(approach.local_velocity, expected_velocity);
+        assert_vec_close(
+            approach.local_outward,
+            frame.vector(world_outward).normalized(),
+        );
+        assert_close(
+            (approach.local_position - observation.planets[0].local_position).length(),
+            planet.radius + clearance,
+        );
+
+        let local_outward = Vec2::new(-0.6, 0.8);
+        let holding = observation.planets[0].moving_surface_approach(local_outward, clearance);
+        let world_outward =
+            (frame.right * local_outward.x + frame.forward * local_outward.y).normalized();
+        let world_position = planet.position + world_outward * (planet.radius + clearance);
+        assert_vec_close(holding.local_position, frame.position(world_position));
+        assert_vec_close(
+            holding.local_velocity,
+            frame.vector(planet_surface_velocity(planet, world_position) - ship.velocity),
         );
     }
 
