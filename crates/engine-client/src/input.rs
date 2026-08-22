@@ -7,13 +7,14 @@ use std::rc::Rc;
 use engine_common::{Action, PointerPhase, RenderPoint};
 use engine_nes::ControllerButtons;
 use scenario_spacewars::{
-    ControlSource, ShipIntent, ShipIntentEncoder, SpacewarsAction, SpacewarsScenario,
+    PlayerId, ShipIntent, ShipIntentEncoder, ShipSensorProfile, SpacewarsAction, SpacewarsScenario,
     SpacewarsState,
 };
 use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
+use spacewars_ai::{BrainReset, RuleShipBrain, ShipBrain};
 
 use crate::MainWindow;
 
@@ -221,8 +222,11 @@ impl ClientInput {
         &mut self,
         state: &SpacewarsState,
         benchmark_active: bool,
+        bot_players: [bool; 2],
     ) -> Vec<Action> {
-        let mut actions = self.spacewars_controls.actions(state, benchmark_active);
+        let mut actions = self
+            .spacewars_controls
+            .actions(state, benchmark_active, bot_players);
         let pressed = self.pressed.borrow();
         for controls in [P1_CONTROLS, P2_CONTROLS] {
             if pressed.contains(&controls.zoom_in) {
@@ -432,8 +436,18 @@ const P2_CONTROLS: PlayerControlMap = PlayerControlMap {
 
 struct SpacewarsControls {
     seats: [ControlSeat; 2],
-    benchmark_sources: [BenchmarkSource; 2],
+    rule_brains: [RuleShipBrain; 2],
+    brain_contexts: [Option<BrainReset>; 2],
+    active_sources: [SpacewarsControlMode; 2],
     encoder: ShipIntentEncoder,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum SpacewarsControlMode {
+    #[default]
+    Human,
+    RuleBot,
+    Benchmark,
 }
 
 impl SpacewarsControls {
@@ -445,27 +459,95 @@ impl SpacewarsControls {
         p2.add_source(GamepadSource::new(gamepads, 1));
         Self {
             seats: [p1, p2],
-            benchmark_sources: [BenchmarkSource, BenchmarkSource],
+            rule_brains: [RuleShipBrain::default(), RuleShipBrain::default()],
+            brain_contexts: [None, None],
+            active_sources: [SpacewarsControlMode::Human; 2],
             encoder: ShipIntentEncoder::default(),
         }
     }
 
-    fn actions(&mut self, state: &SpacewarsState, benchmark_active: bool) -> Vec<Action> {
+    fn actions(
+        &mut self,
+        state: &SpacewarsState,
+        benchmark_active: bool,
+        bot_players: [bool; 2],
+    ) -> Vec<Action> {
         let mut actions = Vec::new();
-        for player in 0..self.seats.len() {
-            let intent = if benchmark_active {
-                self.benchmark_sources[player].intent(state, player)
+        for (player, bot_player) in bot_players.into_iter().enumerate() {
+            let mode = if benchmark_active {
+                SpacewarsControlMode::Benchmark
+            } else if bot_player {
+                SpacewarsControlMode::RuleBot
             } else {
-                self.seats[player].intent(state, player)
+                SpacewarsControlMode::Human
+            };
+
+            // Always send a neutral frame before a different source can take
+            // over. Besides making live handoff predictable, this releases any
+            // held laser/thrust state left by the previous source.
+            let intent = if self.active_sources[player] != mode {
+                self.active_sources[player] = mode;
+                self.brain_contexts[player] = None;
+                ShipIntent::default()
+            } else {
+                match mode {
+                    SpacewarsControlMode::Human => self.seats[player].intent(),
+                    SpacewarsControlMode::RuleBot => self.rule_bot_intent(state, player),
+                    SpacewarsControlMode::Benchmark => {
+                        SpacewarsScenario::benchmark_intent(state, player)
+                    }
+                }
             };
             actions.extend(self.encoder.encode(player, intent));
         }
         actions
     }
 
+    fn rule_bot_intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
+        let Some(actor) = PlayerId::from_index(player) else {
+            return ShipIntent::default();
+        };
+        let context = BrainReset {
+            actor,
+            episode_seed: state.seed,
+        };
+        if self.brain_contexts[player] != Some(context) {
+            self.rule_brains[player].reset(context);
+            self.brain_contexts[player] = Some(context);
+        }
+        let Some(observation) =
+            SpacewarsScenario::observe_ship(state, actor, ShipSensorProfile::FullMapRadar)
+        else {
+            return ShipIntent::default();
+        };
+        let intent = self.rule_brains[player].intent(&observation);
+        if state.tick.is_multiple_of(60) {
+            let telemetry = self.rule_brains[player].telemetry();
+            tracing::debug!(
+                player = player + 1,
+                tick = state.tick,
+                goal = ?telemetry.goal,
+                target = ?telemetry.target,
+                hazard = ?telemetry.hazard,
+                distance = telemetry.target_distance,
+                heading_error = telemetry.heading_error,
+                ?intent,
+                "Spacewars rule-bot telemetry."
+            );
+        }
+        intent
+    }
+
     fn reset(&mut self) {
         self.encoder.reset();
+        self.rule_brains = [RuleShipBrain::default(), RuleShipBrain::default()];
+        self.brain_contexts = [None, None];
+        self.active_sources = [SpacewarsControlMode::Human; 2];
     }
+}
+
+trait ControlSource {
+    fn intent(&mut self) -> ShipIntent;
 }
 
 struct ControlSeat {
@@ -483,11 +565,11 @@ impl ControlSeat {
         self.sources.push(Box::new(source));
     }
 
-    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
+    fn intent(&mut self) -> ShipIntent {
         self.sources
             .iter_mut()
             .fold(ShipIntent::default(), |intent, source| {
-                intent.merged_with(source.intent(state, player))
+                intent.merged_with(source.intent())
             })
     }
 }
@@ -504,7 +586,7 @@ impl KeyboardSource {
 }
 
 impl ControlSource for KeyboardSource {
-    fn intent(&mut self, _state: &SpacewarsState, _player: usize) -> ShipIntent {
+    fn intent(&mut self) -> ShipIntent {
         let pressed = self.pressed.borrow();
         let thrust = if pressed.contains(&self.controls.thrust) {
             1.0
@@ -547,7 +629,7 @@ impl GamepadSource {
 }
 
 impl ControlSource for GamepadSource {
-    fn intent(&mut self, _state: &SpacewarsState, _player: usize) -> ShipIntent {
+    fn intent(&mut self) -> ShipIntent {
         let gamepads = self.gamepads.borrow();
         let Some(gamepad) = gamepads.seat(self.seat) else {
             return ShipIntent::default();
@@ -611,14 +693,6 @@ fn shape_axis(value: f32, deadzone: f32, signed: bool) -> f32 {
 
     let normalized = (magnitude - deadzone) / (1.0 - deadzone);
     normalized * normalized * value.signum()
-}
-
-struct BenchmarkSource;
-
-impl ControlSource for BenchmarkSource {
-    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
-        SpacewarsScenario::benchmark_intent(state, player)
-    }
 }
 
 fn mapped_key_event(event: &WindowEvent) -> Option<(GameKey, ElementState)> {
@@ -693,7 +767,7 @@ mod tests {
 
     fn take_spacewars_actions(input: &mut ClientInput) -> Vec<Action> {
         let state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 0);
-        input.actions_for_spacewars(&state, false)
+        input.actions_for_spacewars(&state, false, [false; 2])
     }
 
     #[test]
@@ -1145,5 +1219,52 @@ mod tests {
             amount: 1.0,
         }));
         assert!(!has_action(&actions, 0, SpacewarsActionKind::ZoomOut));
+    }
+
+    #[test]
+    fn rule_bot_waits_one_neutral_frame_before_taking_control() {
+        let state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 7);
+        let mut input = ClientInput::default();
+
+        let first = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
+        assert!(!first.iter().any(|action| action.player() == 1));
+
+        let second = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
+        assert!(second.iter().any(|action| matches!(
+            action,
+            ScenarioAction::SetTurn { player: 1, rate } if rate.abs() > 0.0
+        )));
+
+        input.reset_spacewars_controls();
+        let after_reset = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
+        assert!(!after_reset.iter().any(|action| action.player() == 1));
+    }
+
+    #[test]
+    fn changing_p2_from_human_to_bot_releases_held_controls_first() {
+        let state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 7);
+        let mut input = ClientInput::default();
+        input.press(GameKey::P2Laser);
+
+        let human = decoded(&input.actions_for_spacewars(&state, false, [false; 2]));
+        assert!(human.contains(&ScenarioAction::SetLaser {
+            player: 1,
+            on: true,
+        }));
+
+        let handoff = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
+        assert_eq!(
+            handoff,
+            vec![ScenarioAction::SetLaser {
+                player: 1,
+                on: false,
+            }]
+        );
+
+        let controlled = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
+        assert!(controlled.iter().any(|action| matches!(
+            action,
+            ScenarioAction::SetTurn { player: 1, rate } if rate.abs() > 0.0
+        )));
     }
 }

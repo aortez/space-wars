@@ -595,6 +595,14 @@ pub const DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 pub const MIN_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 15.0;
 pub const MAX_SPACEWARS_PLAYER_VIEW_HEIGHT: f32 = 30_000.0;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SpacewarsController {
+    #[default]
+    Human,
+    RuleBot,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SpacewarsSettings {
@@ -612,6 +620,8 @@ pub struct SpacewarsSettings {
     pub player_1_view_height: f32,
     #[serde(default = "default_spacewars_player_view_height")]
     pub player_2_view_height: f32,
+    #[serde(default)]
+    pub player_2_controller: SpacewarsController,
 }
 
 impl Default for SpacewarsSettings {
@@ -624,6 +634,7 @@ impl Default for SpacewarsSettings {
             player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
             player_1_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
             player_2_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            player_2_controller: SpacewarsController::Human,
         }
     }
 }
@@ -645,6 +656,7 @@ impl SpacewarsSettings {
             ),
             player_1_view_height: normalize_spacewars_player_view_height(self.player_1_view_height),
             player_2_view_height: normalize_spacewars_player_view_height(self.player_2_view_height),
+            player_2_controller: self.player_2_controller,
         }
     }
 }
