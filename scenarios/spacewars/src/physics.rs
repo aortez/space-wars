@@ -64,9 +64,20 @@ pub(super) fn spacewars_rover_spec() -> RoverSpec {
         wheel_brake_torque: 120.0,
         collision_groups: CollisionGroups::new(
             GROUP_ROVER,
-            GROUP_BODY | GROUP_WORLD | GROUP_ROVER_SURFACE,
+            GROUP_BODY | GROUP_WORLD | GROUP_DEBRIS | GROUP_ROVER_SURFACE,
         ),
         ..RoverSpec::default()
+    }
+}
+
+pub(super) fn spacewars_rover_spawn_pose(planet: &PlanetState) -> RoverSpawnPose {
+    let spec = spacewars_rover_spec();
+    let up_angle = planet.wrapper_angle + core::f32::consts::PI;
+    let up = Vec2::from_radians(up_angle);
+    RoverSpawnPose {
+        wheel_center: planet.position
+            + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + spec.wheel_radius + 0.03),
+        up_angle,
     }
 }
 
@@ -75,6 +86,7 @@ pub(super) enum MechanicalEntity {
     World,
     Body(BodyId),
     Ship(usize),
+    Rover(u64),
     Debris(u64),
 }
 
@@ -269,7 +281,9 @@ impl SpacewarsPhysics {
         let entity = match entity {
             MechanicalEntity::Ship(index) => ship_entity(index),
             MechanicalEntity::Debris(id) => PhysicsId::new(id),
-            MechanicalEntity::World | MechanicalEntity::Body(_) => return false,
+            MechanicalEntity::World | MechanicalEntity::Body(_) | MechanicalEntity::Rover(_) => {
+                return false;
+            }
         };
         self.world
             .apply_velocity_delta(primary_body(entity), delta_velocity, true)
@@ -287,6 +301,14 @@ impl SpacewarsPhysics {
             self.world.motion(bodies[1])?,
             self.world.motion(bodies[2])?,
         ])
+    }
+
+    pub fn rover_total_mass(&self, rover: &RoverState) -> Option<f32> {
+        self.rover_entry(rover)?
+            .assembly
+            .bodies()
+            .into_iter()
+            .try_fold(0.0, |total, body| Some(total + self.world.body_mass(body)?))
     }
 
     pub fn apply_rover_velocity_delta(
@@ -410,17 +432,10 @@ impl SpacewarsPhysics {
         planet: &PlanetState,
     ) -> Option<RoverPhysicsEntry> {
         let spec = spacewars_rover_spec();
-        let up_angle = planet.wrapper_angle + core::f32::consts::PI;
-        let up = Vec2::from_radians(up_angle);
-        let wheel_center = planet.position
-            + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + spec.wheel_radius + 0.03);
         let assembly = RoverAssembly::insert_at(
             &mut self.world,
             rover_entity(rover.id),
-            RoverSpawnPose {
-                wheel_center,
-                up_angle,
-            },
+            spacewars_rover_spawn_pose(planet),
             spec,
         )?;
 
@@ -501,8 +516,7 @@ impl SpacewarsPhysics {
                 max_distance,
                 solid: false,
                 include_sensors: false,
-                // Combat damage is deliberately outside this first rover slice.
-                collision_groups: CollisionGroups::new(u32::MAX, !GROUP_ROVER),
+                collision_groups: CollisionGroups::new(u32::MAX, GROUP_ALL_SOLIDS),
                 exclude_entity: Some(ship_entity(shooter)),
             },
         )?;
@@ -1129,6 +1143,9 @@ fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
         ),
         value if (SHIP_ENTITY_BASE..SHIP_ENTITY_BASE + 2).contains(&value) => {
             Some(MechanicalEntity::Ship((value - SHIP_ENTITY_BASE) as usize))
+        }
+        value if (ROVER_ENTITY_BASE..DEBRIS_ENTITY_BASE).contains(&value) => {
+            Some(MechanicalEntity::Rover(value - ROVER_ENTITY_BASE))
         }
         value if value >= DEBRIS_ENTITY_BASE => Some(MechanicalEntity::Debris(value)),
         _ => None,

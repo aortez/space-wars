@@ -161,12 +161,23 @@ Spacewars' implemented mapping is:
 
 - planets and orbiting spaceports: fixed or kinematic bodies;
 - ships, escape pods, asteroids, and collision-relevant debris: dynamic bodies;
+- rovers: three-body dynamic assemblies whose chassis and independent wheels
+  are joined by motorized suspension constraints;
 - spaceport and capture volumes: sensors with explicit collision roles;
 - thrusters, braking, gravity, and ejection: forces or impulses;
 - cannon shells: dynamic bodies with selective CCD;
 - lasers: ray casts;
 - damage: a deterministic rule over normalized contact impulse events;
 - visual particles and trails: lightweight scenario storage.
+
+Rover construction, ownership, health, patrol intent, and death are Spacewars
+state. Eligible owned planets advance a normalized six-second construction
+state before inserting one rover at the lifecycle boundary. Laser ray hits and
+armed debris contacts are mapped back to the stable rover ID; Spacewars turns
+those typed events into damage. On death or an ownership change, the assembly
+is removed at the next reconciliation and six bounded ordinary debris pieces
+inherit the final Rapier motion of the chassis and wheels. No rover pose or
+contact response is duplicated in gameplay code.
 
 Pizza balls opt into both sourcing and responding to gravity. Spacewars keeps
 its established gameplay policy: suns and planets are direct source-only
