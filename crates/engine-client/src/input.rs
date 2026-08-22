@@ -318,6 +318,25 @@ impl ClientInput {
         self.spacewars_controls.reset();
     }
 
+    pub(crate) fn runtime_diagnostics_revision(&self) -> u64 {
+        self.spacewars_controls.diagnostics_revision
+    }
+
+    pub(crate) fn runtime_diagnostics_text(&self) -> String {
+        let diagnostics = self
+            .spacewars_controls
+            .bot_diagnostics
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        if diagnostics.is_empty() {
+            "No active rule-bot diagnostics.".into()
+        } else {
+            diagnostics.join("\n\n")
+        }
+    }
+
     pub(crate) fn clear(&mut self) {
         self.clear_keyboard();
         self.pointer_events.clear();
@@ -329,9 +348,12 @@ impl ClientInput {
     }
 
     fn handle_focus_loss(&mut self) {
+        // Focus changes are routine on desktop: switching applications and
+        // invoking screenshot tools both generate them. Release momentary
+        // keyboard/pointer input so controls cannot stick, but leave pausing to
+        // an explicit request or an actual controller disconnect.
         self.cancel_pointer();
         self.clear_keyboard();
-        self.press(GameKey::ForcePause);
     }
 
     pub(crate) fn take_pointer_events(&mut self) -> Vec<ScreenPointerEvent> {
@@ -440,6 +462,8 @@ struct SpacewarsControls {
     brain_contexts: [Option<BrainReset>; 2],
     active_sources: [SpacewarsControlMode; 2],
     encoder: ShipIntentEncoder,
+    bot_diagnostics: [Option<String>; 2],
+    diagnostics_revision: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -463,6 +487,8 @@ impl SpacewarsControls {
             brain_contexts: [None, None],
             active_sources: [SpacewarsControlMode::Human; 2],
             encoder: ShipIntentEncoder::default(),
+            bot_diagnostics: std::array::from_fn(|_| None),
+            diagnostics_revision: 0,
         }
     }
 
@@ -481,6 +507,12 @@ impl SpacewarsControls {
             } else {
                 SpacewarsControlMode::Human
             };
+
+            if mode != SpacewarsControlMode::RuleBot
+                && self.bot_diagnostics[player].take().is_some()
+            {
+                self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
+            }
 
             // Always send a neutral frame before a different source can take
             // over. Besides making live handoff predictable, this releases any
@@ -523,17 +555,103 @@ impl SpacewarsControls {
         let intent = self.rule_brains[player].intent(&observation);
         if state.tick.is_multiple_of(60) {
             let telemetry = self.rule_brains[player].telemetry();
+            let target_planet = telemetry.target_planet.and_then(|target| {
+                observation
+                    .planets
+                    .iter()
+                    .find(|planet| planet.id == target)
+            });
             tracing::debug!(
                 player = player + 1,
                 tick = state.tick,
                 goal = ?telemetry.goal,
                 target = ?telemetry.target,
+                target_planet = ?telemetry.target_planet,
+                port_phase = ?telemetry.port_phase,
                 hazard = ?telemetry.hazard,
                 distance = telemetry.target_distance,
                 heading_error = telemetry.heading_error,
+                desired_speed = telemetry.desired_speed,
+                relative_speed = telemetry.relative_speed,
+                docked_planet = ?observation.own_ship.docked_planet,
+                planet_owner = ?target_planet.and_then(|planet| planet.owner),
+                capturing_player = ?target_planet.and_then(|planet| planet.capturing_player),
+                capture_progress = target_planet.map_or(0.0, |planet| planet.capture_progress),
                 ?intent,
                 "Spacewars rule-bot telemetry."
             );
+            let target = target_planet.map_or_else(
+                || "none".into(),
+                |planet| {
+                    format!(
+                        "id={:?} owner={:?} capturing={:?} progress={:.3} radius={:.3} center_local={:?} port_local={:?} port_velocity_local={:?} surface_clearance={:.3}",
+                        planet.id,
+                        planet.owner,
+                        planet.capturing_player,
+                        planet.capture_progress,
+                        planet.radius,
+                        planet.local_position,
+                        planet.local_spaceport_position,
+                        planet.local_spaceport_velocity,
+                        planet.local_position.length()
+                            - planet.radius
+                            - observation.own_ship.collision_radius,
+                    )
+                },
+            );
+            let docked = observation.own_ship.docked_planet.map_or_else(
+                || "none".into(),
+                |docked| {
+                    observation
+                        .planets
+                        .iter()
+                        .find(|planet| planet.id == docked)
+                        .map_or_else(
+                            || format!("id={docked:?} observation=missing"),
+                            |planet| {
+                                format!(
+                                    "id={:?} owner={:?} surface_clearance={:.3} port_distance={:.3}",
+                                    planet.id,
+                                    planet.owner,
+                                    planet.local_position.length()
+                                        - planet.radius
+                                        - observation.own_ship.collision_radius,
+                                    planet.local_spaceport_position.length(),
+                                )
+                            },
+                        )
+                },
+            );
+            let ship = &state.ships[player];
+            self.bot_diagnostics[player] = Some(format!(
+                "player={} tick={} planets={} winner={:?}\nbrain goal={:?} target={:?} target_planet={:?} phase={:?} hazard={:?} distance={:.3} heading_error={:.3} desired_speed={:.3} relative_speed={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nship form={:?} position={:?} velocity={:?} omega={:.3} observed_wings_closed={} docked_planet={:?}\ntarget {target}\ndocked {docked}",
+                player + 1,
+                state.tick,
+                state.players[player].planet_count,
+                state.winner,
+                telemetry.goal,
+                telemetry.target,
+                telemetry.target_planet,
+                telemetry.port_phase,
+                telemetry.hazard,
+                telemetry.target_distance,
+                telemetry.heading_error,
+                telemetry.desired_speed,
+                telemetry.relative_speed,
+                intent.turn,
+                intent.thrust,
+                intent.brake,
+                intent.wings_closed,
+                intent.laser,
+                intent.cannon,
+                observation.own_ship.form,
+                ship.position,
+                ship.velocity,
+                ship.omega,
+                observation.own_ship.wings_closed,
+                observation.own_ship.docked_planet,
+            ));
+            self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
         }
         intent
     }
@@ -543,6 +661,8 @@ impl SpacewarsControls {
         self.rule_brains = [RuleShipBrain::default(), RuleShipBrain::default()];
         self.brain_contexts = [None, None];
         self.active_sources = [SpacewarsControlMode::Human; 2];
+        self.bot_diagnostics = std::array::from_fn(|_| None);
+        self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
     }
 }
 
@@ -813,7 +933,7 @@ mod tests {
     }
 
     #[test]
-    fn focus_loss_releases_controls_and_requests_a_host_pause() {
+    fn focus_loss_releases_controls_without_requesting_a_host_pause() {
         let mut input = ClientInput::default();
         input.press(GameKey::NesA);
         input.push_pointer_event(ScreenPointerEvent {
@@ -826,7 +946,6 @@ mod tests {
 
         assert_eq!(input.nes_controller_buttons(0), ControllerButtons::NONE);
         assert!(input.has_pointer_cancellation());
-        assert!(input.take_force_pause_requested());
         assert!(!input.take_force_pause_requested());
     }
 
@@ -1234,6 +1353,10 @@ mod tests {
             action,
             ScenarioAction::SetTurn { player: 1, rate } if rate.abs() > 0.0
         )));
+        let diagnostics = input.runtime_diagnostics_text();
+        assert!(diagnostics.contains("player=2 tick=0"));
+        assert!(diagnostics.contains("brain goal=Attack"));
+        assert!(diagnostics.contains("docked none"));
 
         input.reset_spacewars_controls();
         let after_reset = decoded(&input.actions_for_spacewars(&state, false, [false, true]));

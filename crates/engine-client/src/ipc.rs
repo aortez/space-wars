@@ -30,6 +30,7 @@ struct ControlRequest {
 #[derive(Debug)]
 enum ControlCommand {
     Screenshot { output: PathBuf },
+    Status,
 }
 
 #[cfg(unix)]
@@ -162,6 +163,12 @@ fn parse_command(body: &str) -> Result<ControlCommand, String> {
                 output: PathBuf::from(output),
             })
         }
+        Some("status") => {
+            if lines.next().is_some() {
+                return Err("too many command lines".into());
+            }
+            Ok(ControlCommand::Status)
+        }
         Some(command) => Err(format!("unknown command {command:?}")),
         None => Err("empty command".into()),
     }
@@ -176,6 +183,7 @@ fn handle_request(window: &MainWindow, request: ControlRequest) {
                 .ok(format!("screenshot saved to {}", output.display())),
             Err(err) => request.response.error(err.to_string()),
         },
+        ControlCommand::Status => request.response.ok(window.get_runtime_diagnostics()),
     }
 }
 
@@ -221,11 +229,21 @@ mod tests {
             ControlCommand::Screenshot { output } => {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
+            ControlCommand::Status => panic!("expected screenshot command"),
         }
     }
 
     #[test]
     fn reject_extra_lines() {
         assert!(parse_command("screenshot\n/tmp/shot.png\nextra\n").is_err());
+    }
+
+    #[test]
+    fn parse_status_command() {
+        assert!(matches!(
+            parse_command("status\n"),
+            Ok(ControlCommand::Status)
+        ));
+        assert!(parse_command("status\nextra\n").is_err());
     }
 }

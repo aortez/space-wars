@@ -426,6 +426,9 @@ pub fn start_scenario_loop(
         input.clear();
         input.reset_spacewars_controls();
     }
+    window.set_runtime_diagnostics(SharedString::from(format!(
+        "scenario={scenario_name}\npaused=false\nNo active rule-bot diagnostics."
+    )));
     let controls = controls.unwrap_or_else(new_scenario_controls);
 
     let timer = Timer::default();
@@ -496,6 +499,8 @@ pub fn start_scenario_loop(
     }
 
     let mut last_realtime_emulated_frames = 0;
+    let mut last_diagnostics_revision = u64::MAX;
+    let mut last_diagnostics_paused = true;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
         let Some(window) = weak_window.upgrade() else {
             return;
@@ -586,6 +591,18 @@ pub fn start_scenario_loop(
             window.set_scenario_error_text(SharedString::from(format!(
                 "Scenario stopped: {error}. Restart or return to the launcher."
             )));
+        }
+
+        let diagnostics_revision = input.runtime_diagnostics_revision();
+        if diagnostics_revision != last_diagnostics_revision
+            || paused != last_diagnostics_paused
+        {
+            window.set_runtime_diagnostics(SharedString::from(format!(
+                "scenario={scenario_name}\npaused={paused}\n{}",
+                input.runtime_diagnostics_text()
+            )));
+            last_diagnostics_revision = diagnostics_revision;
+            last_diagnostics_paused = paused;
         }
 
         scenario.record_realtime_displayed_loop_iteration();

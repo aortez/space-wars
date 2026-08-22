@@ -106,9 +106,21 @@ hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
 
 To try the first Spacewars AI opponent, open Spacewars settings in the launcher
 and change **Player 2** from **human** to **rule bot**. **Small Duel** is the
-clearest test bed; the bot currently focuses on one-on-one pursuit, collision
-avoidance, and weapons rather than planet-capture strategy. The ordinary
-two-human setup remains the default.
+clearest combat test bed. In worlds with planets, the bot selects uncaptured
+spaceports, matches their orbital and wrapper motion, captures them, and
+departs for another target; an escape pod instead seeks an owned port for
+rebuilding. The ordinary two-human setup remains the default.
+
+On Unix, query the latest live rule-bot and docking diagnostics through the
+client control socket:
+
+```sh
+printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
+```
+
+The snapshot is refreshed once per second and includes the brain phase and
+intent, ship motion, target planet, actual docked planet, and surface/port
+clearance. This keeps diagnostic formatting out of the simulation hot path.
 
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a
