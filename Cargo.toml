@@ -6,6 +6,7 @@ members = [
     "crates/engine-gravity",
     "crates/engine-nes",
     "crates/engine-rapier",
+    "crates/spacewars-ai",
     "crates/engine-client",
     "crates/spacewars-cli",
     "crates/engine-agent",
@@ -56,6 +57,7 @@ engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
+spacewars-ai = { path = "crates/spacewars-ai" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }

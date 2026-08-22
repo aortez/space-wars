@@ -7,7 +7,8 @@
 mod physics;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, BinaryHeap},
+    num::NonZeroU64,
     time::{Duration, Instant},
 };
 
@@ -32,6 +33,7 @@ use engine_rapier::{
     world::{BodyMotion, PhysicsStepMetrics},
 };
 use physics::{MechanicalContact, MechanicalEntity};
+use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 use engine_core::constants::COLLISION_TRANSLATION_SCALAR;
@@ -63,7 +65,7 @@ const MAX_PLANET_RADIUS: f32 = 150.0;
 const MIN_PLANET_SPACING: f32 = 10.0;
 const MAX_PLANET_SPACING: f32 = 50.0;
 const PLANET_MASS_DENSITY: f32 = 750.0;
-const PLANET_ORBIT_PERIOD_SCALAR: f32 = 14.0;
+const PLANET_ORBIT_PERIOD_SCALAR: f32 = 5.0;
 const BODY_BOUNDS_RADIUS_SCALE: f32 = 0.99;
 const SPACEPORT_ARC_LENGTH: f32 = 94.24778;
 const SPACEPORT_DEPTH_FACTOR: f32 = 0.4;
@@ -173,6 +175,81 @@ const GRAVITY_ROVER_FRAME_TAG: u64 = 6;
 const ROVER_BODY_COUNT: u64 = 3;
 
 pub const SPACEWARS_PLAYER_COUNT: usize = 2;
+
+/// Stable identity for a player-controlled actor within one Spacewars episode.
+///
+/// Scenario actions still carry their compact wire-format player index. AI and
+/// observation APIs use this type so callers cannot accidentally confuse a
+/// player with another indexed entity such as a planet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum PlayerId {
+    #[serde(rename = "player_1")]
+    Player1,
+    #[serde(rename = "player_2")]
+    Player2,
+}
+
+impl PlayerId {
+    pub const PLAYER_1: Self = Self::Player1;
+    pub const PLAYER_2: Self = Self::Player2;
+
+    pub const fn from_index(index: usize) -> Option<Self> {
+        match index {
+            0 => Some(Self::PLAYER_1),
+            1 => Some(Self::PLAYER_2),
+            _ => None,
+        }
+    }
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Player1 => 0,
+            Self::Player2 => 1,
+        }
+    }
+
+    pub const fn opponent(self) -> Self {
+        match self {
+            Self::Player1 => Self::Player2,
+            Self::Player2 => Self::Player1,
+        }
+    }
+}
+
+/// Stable index for a planet. Spacewars planets persist for the episode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct PlanetId(u32);
+
+impl PlanetId {
+    pub const fn from_index(index: usize) -> Option<Self> {
+        if index <= u32::MAX as usize {
+            Some(Self(index as u32))
+        } else {
+            None
+        }
+    }
+
+    pub const fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+/// Monotonic scenario entity identity, not a Rapier body or collider handle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct DebrisId(NonZeroU64);
+
+impl DebrisId {
+    pub const fn from_value(value: u64) -> Option<Self> {
+        match NonZeroU64::new(value) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    pub const fn value(self) -> u64 {
+        self.0.get()
+    }
+}
 
 const SHIP_THRUST_FORCE: f32 = 50_000.0;
 const SHIP_TURN_FORCE: f32 = 200.0;
@@ -461,7 +538,8 @@ pub struct DebrisState {
     physics_id: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DebrisKind {
     Asteroid,
     Fragment,
@@ -621,7 +699,8 @@ pub struct ShipState {
     death_impulse: Vec2,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ShipForm {
     Ship,
     EscapePod,
@@ -638,6 +717,108 @@ pub enum WingBehavior {
     None,
     Close,
     Open,
+}
+
+/// Named perception policy used to construct versioned ship observations.
+///
+/// `FullMapRadar` exposes both ships and every strategic body, matching the
+/// global awareness already available through local-play radar. Tactical
+/// debris is range- and count-bounded so one controller cannot turn a dense
+/// asteroid field into an unbounded per-tick allocation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShipSensorProfile {
+    #[default]
+    FullMapRadar,
+}
+
+pub const SHIP_SENSOR_HAZARD_RANGE: f32 = 600.0;
+pub const SHIP_SENSOR_MAX_HAZARDS: usize = 64;
+
+/// A ship observation's coordinate frame.
+///
+/// Positions and vectors use the observing ship as the origin. Positive `x`
+/// is to its right and positive `y` is forward. This keeps policy inputs
+/// independent of world position and camera orientation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ShipObservationV1 {
+    pub tick: u64,
+    pub delta_seconds: f32,
+    pub actor: PlayerId,
+    pub sensor_profile: ShipSensorProfile,
+    pub own_ship: OwnShipObservationV1,
+    pub opponent: Option<ShipContactObservationV1>,
+    pub universe: UniverseObservationV1,
+    pub sun: Option<CelestialBodyObservationV1>,
+    pub planets: Vec<PlanetObservationV1>,
+    pub hazards: Vec<HazardObservationV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct OwnShipObservationV1 {
+    pub id: PlayerId,
+    /// Absolute linear velocity expressed in the local ship frame.
+    pub local_velocity: Vec2,
+    pub angular_velocity: f32,
+    pub collision_radius: f32,
+    pub form: ShipForm,
+    pub life_fraction: f32,
+    pub eliminated: bool,
+    pub wings_closed: bool,
+    pub laser_available: bool,
+    pub cannon_ready: bool,
+    pub docked_planet: Option<PlanetId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ShipContactObservationV1 {
+    pub id: PlayerId,
+    pub local_position: Vec2,
+    /// Contact velocity minus observer velocity, in the observer frame.
+    pub local_velocity: Vec2,
+    pub local_forward: Vec2,
+    pub angular_velocity: f32,
+    pub collision_radius: f32,
+    pub form: ShipForm,
+    pub life_fraction: f32,
+    pub eliminated: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct UniverseObservationV1 {
+    pub local_center: Vec2,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CelestialBodyObservationV1 {
+    pub local_position: Vec2,
+    pub local_velocity: Vec2,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PlanetObservationV1 {
+    pub id: PlanetId,
+    pub local_position: Vec2,
+    pub local_velocity: Vec2,
+    pub radius: f32,
+    pub owner: Option<PlayerId>,
+    pub capturing_player: Option<PlayerId>,
+    pub capture_progress: f32,
+    pub local_spaceport_position: Vec2,
+    pub local_spaceport_velocity: Vec2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct HazardObservationV1 {
+    pub id: DebrisId,
+    pub kind: DebrisKind,
+    pub owner: Option<PlayerId>,
+    pub local_position: Vec2,
+    /// Hazard velocity minus observer velocity, in the observer frame.
+    pub local_velocity: Vec2,
+    pub radius: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -715,11 +896,6 @@ impl ShipIntent {
             cannon: self_intent.cannon || other.cannon,
         }
     }
-}
-
-/// Host-side sources implement this without leaking device events into the sim.
-pub trait ControlSource {
-    fn intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent;
 }
 
 #[derive(Debug, Clone)]
@@ -1235,6 +1411,146 @@ impl SpacewarsScenario {
             suspension_lengths: snapshot.suspension_lengths,
             life: rover.life,
             life_max: rover.life_max,
+        })
+    }
+
+    /// Build the stable, versioned controller view for one ship.
+    ///
+    /// This is intentionally a projection rather than a reference to
+    /// [`SpacewarsState`]. Brains can inspect only declared sensor data and
+    /// cannot mutate authoritative scenario state.
+    pub fn observe_ship(
+        state: &SpacewarsState,
+        actor: PlayerId,
+        sensor_profile: ShipSensorProfile,
+    ) -> Option<ShipObservationV1> {
+        let ship = state.ships.get(actor.index())?;
+        let player = state.players.get(actor.index())?;
+        let frame = ShipObservationFrame::new(ship);
+        let docked_planet = state
+            .spaceport_contacts
+            .iter()
+            .find(|contact| contact.ship == actor.index())
+            .and_then(|contact| PlanetId::from_index(contact.planet));
+
+        let own_ship = OwnShipObservationV1 {
+            id: actor,
+            local_velocity: frame.vector(ship.velocity),
+            angular_velocity: ship.omega,
+            collision_radius: ship_low_bounds(&ship_triangles(ship)).radius,
+            form: ship.form,
+            life_fraction: normalized_life_fraction(ship.life, ship.life_max),
+            eliminated: player.eliminated,
+            wings_closed: ship.wings_closed,
+            laser_available: !player.eliminated && ship.form == ShipForm::Ship,
+            cannon_ready: !player.eliminated
+                && ship.form == ShipForm::Ship
+                && ship.cannon_cooldown_remaining <= 0.0,
+            docked_planet,
+        };
+
+        let opponent_id = actor.opponent();
+        let opponent = state
+            .ships
+            .get(opponent_id.index())
+            .zip(state.players.get(opponent_id.index()))
+            .map(|(contact, contact_player)| ShipContactObservationV1 {
+                id: opponent_id,
+                local_position: frame.position(contact.position),
+                local_velocity: frame.vector(contact.velocity - ship.velocity),
+                local_forward: frame.vector(contact.direction),
+                angular_velocity: contact.omega,
+                collision_radius: ship_low_bounds(&ship_triangles(contact)).radius,
+                form: contact.form,
+                life_fraction: normalized_life_fraction(contact.life, contact.life_max),
+                eliminated: contact_player.eliminated,
+            });
+
+        let sun = state.sun.map(|sun| CelestialBodyObservationV1 {
+            local_position: frame.position(sun.position),
+            local_velocity: frame.vector(-ship.velocity),
+            radius: sun.radius,
+        });
+
+        let planets = state
+            .planets
+            .iter()
+            .enumerate()
+            .map(|(index, planet)| {
+                let id = PlanetId(index as u32);
+                let center_velocity = planet_surface_velocity(planet, planet.position);
+                let spaceport_position = spaceport_center(planet);
+                let spaceport_velocity = planet_surface_velocity(planet, spaceport_position);
+                PlanetObservationV1 {
+                    id,
+                    local_position: frame.position(planet.position),
+                    local_velocity: frame.vector(center_velocity - ship.velocity),
+                    radius: planet.radius,
+                    owner: planet.owner_id.and_then(PlayerId::from_index),
+                    capturing_player: planet.capturing_player_id.and_then(PlayerId::from_index),
+                    capture_progress: capture_progress(planet),
+                    local_spaceport_position: frame.position(spaceport_position),
+                    local_spaceport_velocity: frame.vector(spaceport_velocity - ship.velocity),
+                }
+            })
+            .collect();
+
+        let hazard_range_squared = SHIP_SENSOR_HAZARD_RANGE * SHIP_SENSOR_HAZARD_RANGE;
+        let mut nearest_hazards = BinaryHeap::with_capacity(SHIP_SENSOR_MAX_HAZARDS + 1);
+        for debris in state
+            .debris
+            .iter()
+            .filter(|debris| !debris.dead && debris.physics_id != 0)
+        {
+            let Some(id) = DebrisId::from_value(debris.physics_id) else {
+                continue;
+            };
+            let local_position = frame.position(debris.position);
+            let distance_squared = local_position.length_squared();
+            if distance_squared > hazard_range_squared {
+                continue;
+            }
+            nearest_hazards.push(RankedHazardObservation {
+                distance_squared,
+                observation: HazardObservationV1 {
+                    id,
+                    kind: debris.kind,
+                    owner: debris.owner_id.and_then(PlayerId::from_index),
+                    local_position,
+                    local_velocity: frame.vector(debris.velocity - ship.velocity),
+                    radius: debris.radius,
+                },
+            });
+            if nearest_hazards.len() > SHIP_SENSOR_MAX_HAZARDS {
+                nearest_hazards.pop();
+            }
+        }
+        let mut hazards = nearest_hazards
+            .into_iter()
+            .map(|ranked| ranked.observation)
+            .collect::<Vec<_>>();
+        hazards.sort_by(|a, b| {
+            a.local_position
+                .length_squared()
+                .total_cmp(&b.local_position.length_squared())
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        let universe_radius = state.config.universe_radius as f32;
+        Some(ShipObservationV1 {
+            tick: state.tick,
+            delta_seconds: state.config.delta_time(),
+            actor,
+            sensor_profile,
+            own_ship,
+            opponent,
+            universe: UniverseObservationV1 {
+                local_center: frame.position(Vec2::splat(universe_radius)),
+                radius: universe_radius,
+            },
+            sun,
+            planets,
+            hazards,
         })
     }
 
@@ -4010,6 +4326,35 @@ fn spaceport_points(planet: &PlanetState) -> Vec<Vec2> {
         .collect()
 }
 
+fn spaceport_center(planet: &PlanetState) -> Vec2 {
+    let depth = planet.radius * SPACEPORT_DEPTH_FACTOR;
+    let angle = SPACEPORT_ARC_LENGTH / planet.radius;
+    let mut sum = Vec2::ZERO;
+
+    for index in 0..SPACEPORT_OUTER_POINTS {
+        let theta = index as f32 * angle / SPACEPORT_OUTER_POINTS as f32;
+        sum += Vec2::new(theta.cos() * planet.radius, theta.sin() * planet.radius);
+    }
+
+    if angle < SPACEPORT_MAX_ARC_ANGLE {
+        for index in 0..SPACEPORT_INNER_POINTS {
+            let theta =
+                (SPACEPORT_INNER_POINTS - index - 1) as f32 * angle / SPACEPORT_INNER_POINTS as f32;
+            sum += Vec2::new(theta.cos() * depth, theta.sin() * depth);
+        }
+    } else {
+        let first = Vec2::new(planet.radius, 0.0);
+        let theta = (SPACEPORT_OUTER_POINTS - 1) as f32 * angle / SPACEPORT_OUTER_POINTS as f32;
+        let last = Vec2::new(theta.cos() * planet.radius, theta.sin() * planet.radius);
+        for index in 0..SPACEPORT_INNER_POINTS {
+            sum += (first - last) / SPACEPORT_INNER_POINTS as f32 * (index as f32 + 1.0) + last;
+        }
+    }
+
+    let count = (SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS) as f32;
+    planet.position + (sum / count).rotate_radians(planet.wrapper_angle)
+}
+
 fn spaceport_local_points(planet_radius: f32) -> Vec<Vec2> {
     let depth = planet_radius * SPACEPORT_DEPTH_FACTOR;
     let angle = SPACEPORT_ARC_LENGTH / planet_radius;
@@ -4143,6 +4488,75 @@ fn planet_surface_velocity(planet: &PlanetState, world_position: Vec2) -> Vec2 {
     let spin_velocity =
         surface_offset.rotate_radians(core::f32::consts::FRAC_PI_2) * planet.wrapper_omega;
     orbit_velocity + spin_velocity
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ShipObservationFrame {
+    origin: Vec2,
+    right: Vec2,
+    forward: Vec2,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RankedHazardObservation {
+    distance_squared: f32,
+    observation: HazardObservationV1,
+}
+
+impl PartialEq for RankedHazardObservation {
+    fn eq(&self, other: &Self) -> bool {
+        self.distance_squared
+            .total_cmp(&other.distance_squared)
+            .is_eq()
+            && self.observation.id == other.observation.id
+    }
+}
+
+impl Eq for RankedHazardObservation {}
+
+impl PartialOrd for RankedHazardObservation {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RankedHazardObservation {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.distance_squared
+            .total_cmp(&other.distance_squared)
+            .then_with(|| self.observation.id.cmp(&other.observation.id))
+    }
+}
+
+impl ShipObservationFrame {
+    fn new(ship: &ShipState) -> Self {
+        let forward = if ship.direction.length_squared() > REALLY_SMALL {
+            ship.direction.normalized()
+        } else {
+            Vec2::Y
+        };
+        Self {
+            origin: ship.position,
+            right: forward.rotate_radians(-core::f32::consts::FRAC_PI_2),
+            forward,
+        }
+    }
+
+    fn position(self, world_position: Vec2) -> Vec2 {
+        self.vector(world_position - self.origin)
+    }
+
+    fn vector(self, world_vector: Vec2) -> Vec2 {
+        Vec2::new(world_vector.dot(self.right), world_vector.dot(self.forward))
+    }
+}
+
+fn normalized_life_fraction(life: f32, life_max: f32) -> f32 {
+    if life_max > 0.0 {
+        (life / life_max).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }
 
 impl DebrisState {
@@ -7030,14 +7444,18 @@ mod tests {
         let mut planet = test_planet(Vec2::new(100.0, 200.0), 50.0);
         let points = spaceport_points(&planet);
         let bounds = spaceport_physics(0, &planet).bounds;
+        let center = spaceport_center(&planet);
 
         planet.wrapper_angle = core::f32::consts::FRAC_PI_2;
         let rotated_bounds = spaceport_physics(0, &planet).bounds;
+        let rotated_center = spaceport_center(&planet);
 
         assert_eq!(
             points.len(),
             SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS
         );
+        assert_vec_close(center, bounds.center);
+        assert_vec_close(rotated_center, rotated_bounds.center);
         assert!(bounds.radius > 0.0);
         assert_close(
             bounds.center.distance_to(planet.position),
@@ -10349,5 +10767,88 @@ mod tests {
         assert_eq!(mark.radius, ROVER_OVERVIEW_RADIUS);
         assert_eq!(mark.fill, Some(Fill::new(owner_color)));
         assert_eq!(mark.stroke, Some(Stroke::new(RenderColor::WHITE, 0.75)));
+    }
+
+    #[test]
+    fn ship_observation_uses_actor_local_coordinates_and_typed_identity() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        let state = SpacewarsScenario::init(config, 19);
+
+        let p1 = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_1,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        let p2 = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+
+        assert_eq!(p1.actor, PlayerId::PLAYER_1);
+        assert_eq!(p1.own_ship.id, PlayerId::PLAYER_1);
+        assert_eq!(p1.opponent.unwrap().id, PlayerId::PLAYER_2);
+        assert_vec_close(p1.opponent.unwrap().local_position, Vec2::new(0.0, 50.0));
+        assert_vec_close(p2.opponent.unwrap().local_position, Vec2::new(0.0, -50.0));
+        assert_eq!(p1.own_ship.local_velocity, Vec2::ZERO);
+        assert_eq!(p1.sensor_profile, ShipSensorProfile::FullMapRadar);
+    }
+
+    #[test]
+    fn ship_observation_bounds_and_deterministically_orders_tactical_hazards() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        let mut state = SpacewarsScenario::init(config, 23);
+        let origin = state.ships[0].position;
+        state.debris = (0..(SHIP_SENSOR_MAX_HAZARDS + 12))
+            .map(|index| {
+                let mut debris = DebrisState::new(
+                    DebrisKind::Asteroid,
+                    origin + Vec2::new(0.0, (index + 1) as f32),
+                    Vec2::ZERO,
+                    1.0,
+                    ASTEROID_DAMAGE_SCALAR,
+                    Color::DIM_GREY,
+                );
+                debris.physics_id = 10_000 - index as u64;
+                debris
+            })
+            .collect();
+
+        let observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_1,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+
+        assert_eq!(observation.hazards.len(), SHIP_SENSOR_MAX_HAZARDS);
+        assert!(observation.hazards.windows(2).all(|pair| {
+            pair[0].local_position.length_squared() <= pair[1].local_position.length_squared()
+        }));
+        assert_eq!(observation.hazards[0].id.value(), 10_000);
+        assert_eq!(
+            observation.hazards.last().unwrap().id.value(),
+            10_000 - (SHIP_SENSOR_MAX_HAZARDS - 1) as u64
+        );
+    }
+
+    #[test]
+    fn ship_observation_v1_round_trips_as_a_standalone_payload() {
+        let state = SpacewarsScenario::init(SpacewarsConfig::default(), 37);
+        let observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_1,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+
+        let bytes = bincode::serialize(&observation).unwrap();
+        let replay: ShipObservationV1 = bincode::deserialize(&bytes).unwrap();
+
+        assert_eq!(replay, observation);
     }
 }

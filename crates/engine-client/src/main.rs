@@ -30,7 +30,7 @@ use engine_common::{
     MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_PIZZA_BALL_SPAWN_RATE,
     MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
     MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, PizzaSettings,
-    RendererSetting, Settings, SpacewarsSettings,
+    RendererSetting, Settings, SpacewarsController, SpacewarsSettings,
 };
 #[cfg(test)]
 use engine_core::SpacewarsConfig;
@@ -560,6 +560,9 @@ fn show_launcher(
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
+        setup.player_2_controller,
+    )));
     let pizza = settings.pizza.normalized();
     window
         .set_launcher_pizza_desired_balls_text(SharedString::from(pizza.desired_balls.to_string()));
@@ -1064,7 +1067,7 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 7,
+        "spacewars" => 8,
         "pizza" => 5,
         "falling" => 1,
         "nes" => 2,
@@ -1155,6 +1158,14 @@ fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32
             window.set_launcher_player_health_text(SharedString::from(next.to_string()));
             window.set_launcher_spacewars_preset(SharedString::from(PRESET_CUSTOM));
         }
+        6 => {
+            let next = cycle_label(
+                window.get_launcher_p2_controller().as_str(),
+                &["human", "rule bot"],
+                delta,
+            );
+            window.set_launcher_p2_controller(SharedString::from(next));
+        }
         _ => {}
     }
 }
@@ -1222,7 +1233,16 @@ fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
 
     let preset = window.get_launcher_spacewars_preset();
     match spacewars_preset_from_label(preset.as_str()) {
-        Ok(Some(setup)) => set_spacewars_setup_fields(&window, &setup),
+        Ok(Some(mut setup)) => {
+            match spacewars_controller_from_label(window.get_launcher_p2_controller().as_str()) {
+                Ok(controller) => setup.player_2_controller = controller,
+                Err(message) => {
+                    window.set_launcher_error_text(SharedString::from(message));
+                    return;
+                }
+            }
+            set_spacewars_setup_fields(&window, &setup);
+        }
         Ok(None) => {}
         Err(message) => window.set_launcher_error_text(SharedString::from(message)),
     }
@@ -1467,6 +1487,9 @@ fn set_spacewars_setup_fields(window: &MainWindow, setup: &SpacewarsSettings) {
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
+        setup.player_2_controller,
+    )));
     window.set_launcher_p1_zoom_text(SharedString::from(format_float_setting(
         setup.player_1_view_height,
     )));
@@ -1487,7 +1510,9 @@ fn spacewars_preset_from_label(label: &str) -> Result<Option<SpacewarsSettings>,
 }
 
 fn preset_label_for_setup(setup: &SpacewarsSettings) -> &'static str {
-    let setup = setup.normalized();
+    let mut setup = setup.normalized();
+    // Controller selection is orthogonal to the world/gameplay preset.
+    setup.player_2_controller = SpacewarsController::Human;
     if setup == original_spacewars_preset() {
         PRESET_ORIGINAL
     } else if setup == small_duel_spacewars_preset() {
@@ -1581,7 +1606,7 @@ fn launch_options_from_window(window: &MainWindow) -> Result<EffectiveLaunch, St
 }
 
 fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings, String> {
-    spacewars_setup_from_values(
+    let mut setup = spacewars_setup_from_values(
         window.get_launcher_universe_radius_text().as_str(),
         window.get_launcher_use_planets().as_str(),
         window.get_launcher_asteroids_enabled().as_str(),
@@ -1589,7 +1614,10 @@ fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings,
         window.get_launcher_player_health_text().as_str(),
         window.get_launcher_p1_zoom_text().as_str(),
         window.get_launcher_p2_zoom_text().as_str(),
-    )
+    )?;
+    setup.player_2_controller =
+        spacewars_controller_from_label(window.get_launcher_p2_controller().as_str())?;
+    Ok(setup.normalized())
 }
 
 fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String> {
@@ -1671,9 +1699,25 @@ fn spacewars_setup_from_values(
             MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
             MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
         )?,
+        player_2_controller: SpacewarsController::Human,
     };
 
     Ok(setup.normalized())
+}
+
+fn spacewars_controller_label(controller: SpacewarsController) -> &'static str {
+    match controller {
+        SpacewarsController::Human => "human",
+        SpacewarsController::RuleBot => "rule bot",
+    }
+}
+
+fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, String> {
+    match label.trim() {
+        "human" => Ok(SpacewarsController::Human),
+        "rule bot" => Ok(SpacewarsController::RuleBot),
+        other => Err(format!("Unknown Spacewars controller {other:?}.")),
+    }
 }
 
 fn pizza_setup_from_values(
@@ -2059,6 +2103,11 @@ mod tests {
         assert_eq!(setup.player_health_percent, 250);
         assert_eq!(setup.player_1_view_height, 420.0);
         assert_eq!(setup.player_2_view_height, 640.0);
+        assert_eq!(setup.player_2_controller, SpacewarsController::Human);
+        assert_eq!(
+            spacewars_controller_from_label("rule bot").unwrap(),
+            SpacewarsController::RuleBot
+        );
 
         let clamped =
             spacewars_setup_from_values("99999", "on", "off", "9999", "0", "1", "99999").unwrap();
@@ -2107,6 +2156,7 @@ mod tests {
         assert!(
             spacewars_setup_from_values("1200", "on", "on", "20", "100", "320", "far").is_err()
         );
+        assert!(spacewars_controller_from_label("mystery").is_err());
     }
 
     #[test]
@@ -2162,6 +2212,10 @@ mod tests {
             preset_label_for_setup(&small_duel_spacewars_preset()),
             PRESET_SMALL_DUEL
         );
+
+        let mut duel_with_bot = small_duel_spacewars_preset();
+        duel_with_bot.player_2_controller = SpacewarsController::RuleBot;
+        assert_eq!(preset_label_for_setup(&duel_with_bot), PRESET_SMALL_DUEL);
 
         let mut custom = SpacewarsSettings::default();
         custom.universe_radius = 1800;
@@ -2268,6 +2322,7 @@ mod tests {
                 player_health_percent: 250,
                 player_1_view_height: 420.0,
                 player_2_view_height: 640.0,
+                player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
                 desired_balls: 321,
@@ -2340,6 +2395,7 @@ mod tests {
             player_health_percent: 250,
             player_1_view_height: 420.0,
             player_2_view_height: 640.0,
+            player_2_controller: SpacewarsController::RuleBot,
         };
 
         let config = spacewars_config_from_settings(&settings);

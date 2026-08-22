@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickModel};
+use engine_common::{
+    Action, RenderFrame, Scenario, Settings, SpacewarsController, StepResult, TickModel,
+};
 use engine_core::SpacewarsConfig;
 use scenario_spacewars::{ShipForm, SpacewarsBenchmarkCounts, SpacewarsScenario, SpacewarsState};
 
@@ -30,6 +32,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 
 pub(crate) struct SpacewarsClientScenario {
     pub(crate) state: Box<SpacewarsState>,
+    player_2_rule_bot: bool,
 }
 
 fn create(
@@ -39,6 +42,8 @@ fn create(
     mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    let player_2_rule_bot = mode == ScenarioStartMode::Normal
+        && settings.spacewars.player_2_controller == SpacewarsController::RuleBot;
     let state = match mode {
         ScenarioStartMode::Normal => {
             SpacewarsScenario::init(spacewars_config_from_settings(settings), seed)
@@ -47,6 +52,7 @@ fn create(
     };
     Ok(Box::new(SpacewarsClientScenario {
         state: Box::new(state),
+        player_2_rule_bot,
     }))
 }
 
@@ -64,7 +70,11 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
-        input.actions_for_spacewars(&self.state, benchmark_active)
+        input.actions_for_spacewars(
+            &self.state,
+            benchmark_active,
+            [false, self.player_2_rule_bot],
+        )
     }
 
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
@@ -196,6 +206,9 @@ fn spacewars_config_from_settings(settings: &Settings) -> SpacewarsConfig {
     for player in &mut config.players {
         player.health_percent = setup.player_health_percent;
     }
+    if setup.player_2_controller == SpacewarsController::RuleBot {
+        config.players[1].name = "Rule Bot".into();
+    }
     config
 }
 
@@ -279,5 +292,59 @@ fn player_panel_state(state: &SpacewarsState, player_index: usize) -> PlayerPane
         status: format!("{label}: {percent}%"),
         status_fraction,
         color: player.color,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client_scenarios::BenchmarkConfiguration;
+
+    #[test]
+    fn normal_launch_installs_and_labels_the_opt_in_rule_bot() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_2_controller = SpacewarsController::RuleBot;
+
+        let scenario = create(
+            29,
+            &settings,
+            Viewport::new(1280.0, 720.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let scenario = scenario
+            .as_any()
+            .downcast_ref::<SpacewarsClientScenario>()
+            .unwrap();
+
+        assert!(scenario.player_2_rule_bot);
+        assert_eq!(scenario.state.players[1].name, "Rule Bot");
+        assert_eq!(
+            player_panel_state(&scenario.state, 1).name,
+            "Player 2: Rule Bot"
+        );
+    }
+
+    #[test]
+    fn benchmark_launch_keeps_its_deterministic_benchmark_controller() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_2_controller = SpacewarsController::RuleBot;
+
+        let scenario = create(
+            29,
+            &settings,
+            Viewport::new(1280.0, 720.0),
+            ScenarioStartMode::Benchmark(BenchmarkConfiguration::default()),
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let scenario = scenario
+            .as_any()
+            .downcast_ref::<SpacewarsClientScenario>()
+            .unwrap();
+
+        assert!(!scenario.player_2_rule_bot);
+        assert_eq!(scenario.state.players[1].name, "Player 2");
     }
 }

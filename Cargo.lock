@@ -1487,6 +1487,7 @@ dependencies = [
  "sha2",
  "slint",
  "slint-build",
+ "spacewars-ai",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
  "tracing",
@@ -4619,11 +4620,13 @@ dependencies = [
 name = "scenario-spacewars"
 version = "0.1.0"
 dependencies = [
+ "bincode 1.3.3",
  "engine-common",
  "engine-core",
  "engine-gravity",
  "engine-rapier",
  "image",
+ "serde",
 ]
 
 [[package]]
@@ -5045,6 +5048,15 @@ dependencies = [
  "web-sys",
  "windows-sys 0.61.2",
  "x11rb",
+]
+
+[[package]]
+name = "spacewars-ai"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "engine-core",
+ "scenario-spacewars",
 ]
 
 [[package]]

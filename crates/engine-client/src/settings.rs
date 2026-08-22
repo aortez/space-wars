@@ -251,8 +251,8 @@ mod tests {
     use std::sync::Mutex;
 
     use engine_common::{
-        AudioSettings, LaunchSettings, NesSettings, RendererSetting, SpacewarsSettings,
-        VideoSettings,
+        AudioSettings, LaunchSettings, NesSettings, RendererSetting, SpacewarsController,
+        SpacewarsSettings, VideoSettings,
     };
 
     use super::*;
@@ -359,6 +359,7 @@ mod tests {
                 asteroids_enabled: false,
                 asteroid_probability_per_sec: 80.0,
                 player_health_percent: 250,
+                player_2_controller: SpacewarsController::RuleBot,
                 ..Default::default()
             },
             ..Default::default()
@@ -389,6 +390,10 @@ mod tests {
             80.0
         );
         assert_eq!(reloaded.settings.spacewars.player_health_percent, 250);
+        assert_eq!(
+            reloaded.settings.spacewars.player_2_controller,
+            SpacewarsController::RuleBot
+        );
     }
 
     #[test]

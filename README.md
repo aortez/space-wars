@@ -104,6 +104,12 @@ Rover Lab uses d-pad left/right to drive, `B` or d-pad down to brake, and a
 hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
 `S` brake, `X` reverse, `Space` jump, and `R` reset.
 
+To try the first Spacewars AI opponent, open Spacewars settings in the launcher
+and change **Player 2** from **human** to **rule bot**. **Small Duel** is the
+clearest test bed; the bot currently focuses on one-on-one pursuit, collision
+avoidance, and weapons rather than planet-capture strategy. The ordinary
+two-human setup remains the default.
+
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a
 gamepad-only player can restart or return to the launcher. Keyboard equivalents
