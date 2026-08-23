@@ -62,8 +62,9 @@ version.
 
 - `reset(BrainReset)` installs an actor and episode seed;
 - `intent(&ShipObservationV1)` produces one normalized controller intent;
-- `telemetry()` reports the current goal, target, hazard, range, and heading
-  error without granting state access.
+- `telemetry()` reports the current goal, target, hazard, avoided celestial
+  body and surface clearance, range, and heading error without granting state
+  access.
 
 When a host changes between human, rule-bot, or benchmark control, it forwards
 one neutral intent before the new source. This releases held thrust and weapons
@@ -87,6 +88,9 @@ The first deterministic bot is selectable for Player 2 in the launcher. It:
 - treats a sensed docking contact as authoritative over its planned target,
   capturing an unexpected unowned port or relaunching from an owned one;
 - seeks an owned spaceport for rebuilding when reduced to an escape pod;
+- preserves pod steering authority during avoidance, rebuild navigation, and
+  fallback survival turns instead of combining those turns with angular
+  braking;
 - uses fast wings only for long, aligned pursuit;
 - fires laser/cannon only inside configured alignment and range windows;
 - falls back to simple escape behavior when a pod has no accessible port.
@@ -105,13 +109,109 @@ repair, defend, and attack goals against each other or use personality weights.
 Small Duel remains the clearest combat test; a normal planet world exercises
 the docking path.
 
+## Headless evaluation
+
+`engine-agent` now embeds the Spacewars scenario and runs the same
+observation/brain/intent/action loop without rendering, audio, or realtime
+pacing. An episode explicitly records its world preset, seed, tick limit, and
+versioned controller identity. Batches walk a configurable seed sequence and
+can install an idle or rule controller independently in each player seat.
+The `standard-no-asteroids` preset changes only the standard configuration's
+asteroid spawn rate, providing a controlled navigation baseline without
+redefining normal gameplay.
+
+The named `navigation-v1` suite turns that baseline into a reproducible
+contract: seeds 0 through 5, rule-brain self-play, a 36,000-tick ceiling, no
+random asteroids, and deliberately high ship health. Collisions and docking
+physics remain active. This keeps accidental destruction from truncating the
+experiment while preserving the contacts that navigation guidance must avoid.
+
+The evaluator is allowed to read authoritative state to measure captures,
+ship losses, rebuilds, eliminations, collision incidents, docking, departures,
+and outcomes. Body and ship collision incidents re-arm after 30 contact-free
+ticks, preventing a sustained or briefly flickering scrape from dominating the
+count; debris and laser hits are already discrete events. Docking contact
+transitions count port sessions, while each capture or rebuild opens its own
+pending departure window. A window completes only after the craft reaches 90
+world units of surface clearance beyond its collision hull. Keeping these
+windows independent preserves attribution even if a fast craft reaches another
+port before clearing the previous window. This does not widen the controller
+boundary: each rule brain still receives only `ShipObservationV1`, and every
+intent still passes through `ShipIntentEncoder` and ordinary scenario actions
+before `Scenario::step()`.
+
+Each deterministic episode summary includes its action stream and selected
+outcome-relevant terminal state in a SHA-256 trace fingerprint. Wall-clock
+throughput is reported only at the batch layer and is intentionally excluded
+from deterministic comparisons. Versioned JSON output provides the first
+artifact format for regression suites and later training experiments.
+
+An opt-in per-player navigation trace sits on the evaluator side of the same
+boundary. It samples semantic brain and docking transitions immediately, then
+adds a heartbeat every 300 ticks while a post-capture departure is unfinished.
+The sample combines `BrainTelemetry`, the emitted `ShipIntent`, dock/contact
+state, planet surface clearance, and outward velocity. Collecting it does not
+alter controller actions or the deterministic episode fingerprint, and normal
+untraced batches do not pay its extra observation cost.
+
+The first traced baseline isolated two unfinished departures. In seed 4,
+Player 2 captured planet 3 at tick 2,714 and remained docked through tick
+36,000; seed 2 left Player 1 similarly docked after its fourth capture. Both
+brains remained in `Depart`, continuously requesting a turn plus brake without
+ever starting thrust, roughly 45–50 units inside the surface. Two effects made
+that state self-sustaining: the general brake canceled the requested angular
+motion, and the broad asymmetric ship hull could bridge the inner planet and a
+spaceport wall while trying to turn.
+
+The departure repair is intentionally split at the controller/physics
+boundary. Rule policy `rule_ship_v2` introduced a departure maneuver that does
+not apply the omnidirectional brake
+while aligning for launch; spaceport contact already damps and centers linear
+motion. A docked full ship that is actively maneuvering to leave keeps its
+ordinary collision groups and mass but temporarily uses a body-sized circular
+solver collider, so it remains contained while being free to rotate. A
+zero-mass copy of the normal hull preserves the established spaceport sensor
+footprint during that maneuver. The full physical hull remains in use while
+landing and capturing, and is restored when departure/ejection maneuvering
+ends. Escape pods retain their ordinary compact hull.
+
+Rule policy `rule_ship_v3` accounts for the pod actuator's different meaning:
+releasing its brake provides automatic forward cruise, while applying the
+brake damps angular as well as linear velocity. A pod therefore suppresses a
+requested brake while it has a meaningful heading correction during body or
+hazard avoidance, rebuild-port navigation, and fallback survival. Unlike a
+ship, it cannot hover while matching a moving staging ring's velocity. Pod
+rendezvous and approach transitions are therefore position-driven geometric
+waypoints; ingress still has to establish a real, ownership-approved spaceport
+contact. If that contact is lost before the eight-second rebuild completes,
+the remembered `Docked` phase returns to `Ingress` and actively reacquires the
+port. Full-ship staging and capture behavior retain their position-and-velocity
+requirements. Body-avoidance telemetry records whether the active obstacle is
+the sun or a stable planet ID together with signed hull-to-surface clearance,
+and the interactive control-socket status also includes the episode seed so a
+live failure can be reproduced exactly.
+
+The pod rebuild regression runs seeds 0 through 5 in 10,000-radius generated
+worlds, targets outer `PlanetId(9)`, and starts with the tangential fixed-speed
+flyby that previously produced a permanent orbit. Every run must observe
+approach, ingress, physical docking, at least 480 docked ticks, restoration to
+a full ship, departure, and 90 units of safe surface clearance. A focused
+contact-loss test separately verifies that an incomplete rebuild returns to
+ingress instead of remaining logically docked in empty space.
+
+The former seed-4 characterization is now a bounded regression test. Within
+4,000 ticks Player 2 captures planet 3, reaches the evaluator's 90-unit safe
+clearance within one 300-tick trace heartbeat, and has no unfinished capture
+departure at episode end. The complete six-seed `navigation-v1` run records 36
+captures and 36 safe capture departures; neither previously observed deadlock
+remains.
+
 ## Next slices
 
 1. Add a slower strategic state machine for capture, repair, defend, and combat
    goals, including commitment and hysteresis.
-2. Add deterministic repair and full escape-pod rebuild episodes around the
-   moving-spaceport fixture.
-3. Surface brain telemetry in developer HUD/IPC tooling.
-4. Let `engine-agent` run the same observation/brain/action loop headlessly.
-5. Add policy adapters and batched observation storage only after the rule path
+2. Compare each strategy revision against the baseline outcomes and traces.
+3. Promote additional scenario transitions to typed evaluator events when
+   state-difference metrics are no longer expressive enough.
+4. Add policy adapters and batched observation storage only after the rule path
    gives us stable semantics and measurable workloads.
