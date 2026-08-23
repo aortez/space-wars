@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 engine-core = { workspace = true }
 scenario-spacewars = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 engine-common = { workspace = true }

@@ -13,7 +13,9 @@ path = "src/main.rs"
 [dependencies]
 engine-common = { workspace = true }
 engine-core = { workspace = true }
-scenario-null = { workspace = true }
+scenario-spacewars = { workspace = true }
+spacewars-ai = { workspace = true }
 clap = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }

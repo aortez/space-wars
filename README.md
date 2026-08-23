@@ -122,6 +122,72 @@ The snapshot is refreshed once per second and includes the brain phase and
 intent, ship motion, target planet, actual docked planet, and surface/port
 clearance. This keeps diagnostic formatting out of the simulation hot path.
 
+## Run headless AI episodes
+
+`engine-agent` embeds Spacewars directly and runs fixed-timestep controller
+episodes without a window, renderer, audio, or realtime pacing. Its defaults
+match the interactive AI setup: an idle Player 1 against the rule bot in the
+standard planet world.
+
+Run ten consecutive seeds and report aggregate outcomes and throughput:
+
+```sh
+cargo run --release -p engine-agent -- \
+  --seed 0 --episodes 10 --max-ticks 36000
+```
+
+Run rule-bot self-play in Small Duel and emit a versioned JSON report:
+
+```sh
+cargo run --release -p engine-agent -- \
+  --preset deathmatch --player-1 rule --player-2 rule \
+  --seed 0 --episodes 10 --output json > agent-report.json
+```
+
+Episode reports include the winner or tick-limit outcome, captures, ship
+losses, rebuilds, eliminations, collision incidents, docking/departure outcomes,
+final planet/form/health state, canonical action count, and a deterministic
+trace fingerprint. The batch summary adds winner counts and measured ticks and
+simulated seconds per wall second.
+`--seed-step` changes the interval between seeds; setting it to zero repeats
+the same seed for reproducibility or throughput measurements. Release builds
+are recommended whenever performance numbers matter.
+
+Run the checked-in navigation baseline with one stable command:
+
+```sh
+cargo run --release -p engine-agent -- --suite navigation-v1
+```
+
+`navigation-v1` fixes seeds 0 through 5, rule-brain self-play, 36,000 ticks per
+episode, no random asteroids, and very high ship health. Planet and ship
+collisions remain enabled and are measured, but they should not terminate a
+navigation episode. Body/ship contact metrics re-arm only after 30 quiet ticks,
+so a sustained or briefly flickering scrape counts as one incident. Docking
+metrics report contact entries and exits. A capture/rebuild departure succeeds
+only after the craft clears the planet surface by 90 world units beyond its
+collision hull.
+
+For ad hoc controlled runs, `--preset standard-no-asteroids` is identical to
+the standard world except that random asteroid spawning is disabled. The
+ordinary `standard` preset continues to match normal gameplay.
+
+Trace one controller's navigation decisions without changing the simulation:
+
+```sh
+cargo run --release -p engine-agent -- \
+  --preset navigation --seed 4 --player-1 rule --player-2 rule \
+  --trace-player 2
+```
+
+The event trace records brain/port transitions, captures, safe departures, and
+a five-second heartbeat while a captured departure remains unfinished. Each
+sample includes docking state, surface clearance, outward speed, world
+velocity, guidance telemetry, contacts, and the emitted intent. `--output json`
+includes the same structured events for offline comparison. Tracing is
+available on custom batches rather than named suites so the suite contract and
+its normal report size remain fixed.
+
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a
 gamepad-only player can restart or return to the launcher. Keyboard equivalents

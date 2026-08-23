@@ -15,8 +15,15 @@ use scenario_spacewars::{
     DebrisId, HazardObservationV1, PlanetId, PlanetObservationV1, PlayerId, ShipForm, ShipIntent,
     ShipObservationV1,
 };
+use serde::Serialize;
 
 const TARGET_EPSILON: f32 = 1.0e-5;
+
+/// Stable policy identity stored in episode artifacts.
+///
+/// Bump this when rule-brain decision semantics change enough that evaluation
+/// results should no longer be compared as the same policy version.
+pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v1";
 
 /// Episode context supplied whenever a host installs or restarts a brain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +41,8 @@ pub trait ShipBrain {
     fn telemetry(&self) -> BrainTelemetry;
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BrainGoal {
     #[default]
     Idle,
@@ -46,7 +54,8 @@ pub enum BrainGoal {
     Rebuild,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum PortNavigationPhase {
     Rendezvous,
     Approach,
@@ -55,7 +64,7 @@ pub enum PortNavigationPhase {
     Depart,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct BrainTelemetry {
     pub actor: Option<PlayerId>,
     pub goal: BrainGoal,

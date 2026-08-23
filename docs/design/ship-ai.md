@@ -105,13 +105,75 @@ repair, defend, and attack goals against each other or use personality weights.
 Small Duel remains the clearest combat test; a normal planet world exercises
 the docking path.
 
+## Headless evaluation
+
+`engine-agent` now embeds the Spacewars scenario and runs the same
+observation/brain/intent/action loop without rendering, audio, or realtime
+pacing. An episode explicitly records its world preset, seed, tick limit, and
+versioned controller identity. Batches walk a configurable seed sequence and
+can install an idle or rule controller independently in each player seat.
+The `standard-no-asteroids` preset changes only the standard configuration's
+asteroid spawn rate, providing a controlled navigation baseline without
+redefining normal gameplay.
+
+The named `navigation-v1` suite turns that baseline into a reproducible
+contract: seeds 0 through 5, rule-brain self-play, a 36,000-tick ceiling, no
+random asteroids, and deliberately high ship health. Collisions and docking
+physics remain active. This keeps accidental destruction from truncating the
+experiment while preserving the contacts that navigation guidance must avoid.
+
+The evaluator is allowed to read authoritative state to measure captures,
+ship losses, rebuilds, eliminations, collision incidents, docking, departures,
+and outcomes. Body and ship collision incidents re-arm after 30 contact-free
+ticks, preventing a sustained or briefly flickering scrape from dominating the
+count; debris and laser hits are already discrete events. A docking session
+records whether capture or rebuilding happened there, and counts successful
+departure only after the craft reaches 90 world units of surface clearance
+beyond its collision hull. This does not widen the controller boundary: each
+rule brain still receives only `ShipObservationV1`, and every intent still
+passes through `ShipIntentEncoder` and ordinary scenario actions before
+`Scenario::step()`.
+
+Each deterministic episode summary includes its action stream and selected
+outcome-relevant terminal state in a SHA-256 trace fingerprint. Wall-clock
+throughput is reported only at the batch layer and is intentionally excluded
+from deterministic comparisons. Versioned JSON output provides the first
+artifact format for regression suites and later training experiments.
+
+An opt-in per-player navigation trace sits on the evaluator side of the same
+boundary. It samples semantic brain and docking transitions immediately, then
+adds a heartbeat every 300 ticks while a post-capture departure is unfinished.
+The sample combines `BrainTelemetry`, the emitted `ShipIntent`, dock/contact
+state, planet surface clearance, and outward velocity. Collecting it does not
+alter controller actions or the deterministic episode fingerprint, and normal
+untraced batches do not pay its extra observation cost.
+
+The first traced baseline isolated two unfinished departures. In seed 4,
+Player 2 captures planet 3 at tick 2,714 and remains docked through tick 36,000;
+seed 2 leaves Player 1 similarly docked after its fourth capture. Both brains
+remain in `Depart`, continuously request a turn plus brake, never request
+thrust, and stay roughly 45–50 units inside the surface. Their measured hull
+rotation repeatedly reverses while the turn command does not. The evidence
+points to a dock-bay rotation deadlock: solid contact opposes the attempted
+alignment, while the general brake removes angular authority along with linear
+motion.
+
+A bounded characterization test now reproduces the seed-4 failure at tick
+4,000. It pins the capture at tick 2,714 and verifies that Player 2 remains
+docked on planet 3 for the next 1,286 ticks with negative surface clearance,
+full turn, full brake, and no thrust. This assertion is intentionally a
+temporary bug contract; the departure repair should invert it to require safe
+clearance within the same budget.
+
 ## Next slices
 
-1. Add a slower strategic state machine for capture, repair, defend, and combat
+1. Turn the seed-4/Player-2 departure into a regression test, then test removing
+   the pre-launch brake while retaining the spaceport's existing positional
+   damping. Confirm the seed-2 failure and the complete `navigation-v1` suite.
+2. Add a slower strategic state machine for capture, repair, defend, and combat
    goals, including commitment and hysteresis.
-2. Add deterministic repair and full escape-pod rebuild episodes around the
-   moving-spaceport fixture.
-3. Surface brain telemetry in developer HUD/IPC tooling.
-4. Let `engine-agent` run the same observation/brain/action loop headlessly.
+3. Compare each strategy revision against the baseline outcomes and traces.
+4. Promote additional scenario transitions to typed evaluator events when
+   state-difference metrics are no longer expressive enough.
 5. Add policy adapters and batched observation storage only after the rule path
    gives us stable semantics and measurable workloads.
