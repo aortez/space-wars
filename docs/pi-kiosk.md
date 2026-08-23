@@ -165,10 +165,18 @@ Query the active scenario without interrupting the kiosk UI:
 spacewars-cli status
 ```
 
-The once-per-second snapshot reports the scenario, pause and benchmark state,
-renderer, raster scale, measured FPS/UPS, and cumulative frame/update counts.
-Scenario-specific diagnostics follow those fields when available. The default
-control socket is `/tmp/spacewars-control.sock`; pass `--socket` or set
+Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
+
+```sh
+spacewars-cli host benchmark --timeout 3s
+```
+
+The command starts through the same lifecycle callbacks as the visible UI,
+then polls until status reports benchmark mode with a new scenario revision.
+Polling has an explicit deadline and does not block the Slint event loop. Each
+new revision resets its frame/update counters; measured FPS/UPS refresh once per
+second. Scenario-specific diagnostics follow those fields when available. The
+default control socket is `/tmp/spacewars-control.sock`; pass `--socket` or set
 `SPACEWARS_CONTROL_SOCKET` when using a different path.
 
 ## Host Dry Run

@@ -117,10 +117,19 @@ On Unix, query the running client through its control socket:
 spacewars-cli status
 ```
 
-The snapshot is refreshed once per second and includes scenario and pause
-state, renderer and raster scale, live FPS/UPS, cumulative frame/update
-counters, and any rule-bot docking diagnostics. This keeps diagnostic
-formatting out of the simulation hot path.
+Start or restart the selected scenario's visual benchmark and wait until the
+host confirms a new scenario instance:
+
+```sh
+spacewars-cli host benchmark --timeout 3s
+```
+
+The command polls observable status with a deadline, so a following sampler or
+screenshot starts inside the benchmark window without a fixed delay. Status
+includes a monotonic scenario revision; performance counters reset for each
+revision. Rate measurements are refreshed once per second and include pause
+state, renderer and raster scale, FPS/UPS, frame/update counters, and any
+rule-bot docking diagnostics.
 
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a

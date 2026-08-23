@@ -7,6 +7,7 @@ use std::hint::black_box;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use engine_common::{
@@ -36,6 +37,7 @@ use crate::render::{self, Viewport};
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
+static NEXT_SCENARIO_REVISION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone)]
 pub struct ScenarioLoopOptions {
@@ -434,10 +436,12 @@ pub fn start_scenario_loop(
     let mut accumulator = Duration::ZERO;
     let mut paused = false;
     let mut benchmark_active = start_benchmark;
+    let mut scenario_revision = next_scenario_revision();
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
     window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
         &scenario_name,
+        scenario_revision,
         paused,
         benchmark_active,
         renderer,
@@ -507,6 +511,7 @@ pub fn start_scenario_loop(
 
     let mut last_realtime_emulated_frames = 0;
     let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
+    let mut last_diagnostics_scenario_revision = scenario_revision;
     let mut last_diagnostics_paused = paused;
     let mut last_diagnostics_benchmark_active = benchmark_active;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
@@ -571,6 +576,8 @@ pub fn start_scenario_loop(
             window.set_scenario_error_text(SharedString::from(error_text));
         }
         if step_result.scenario_replaced {
+            scenario_revision = next_scenario_revision();
+            performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             match replace_realtime_presenter(
                 &window,
@@ -616,12 +623,14 @@ pub fn start_scenario_loop(
         let diagnostics_revision = input.runtime_diagnostics_revision();
         if performance_sample_completed
             || diagnostics_revision != last_diagnostics_revision
+            || scenario_revision != last_diagnostics_scenario_revision
             || paused != last_diagnostics_paused
             || benchmark_active != last_diagnostics_benchmark_active
         {
             let input_diagnostics = input.runtime_diagnostics_text();
             window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
                 &scenario_name,
+                scenario_revision,
                 paused,
                 benchmark_active,
                 renderer,
@@ -630,6 +639,7 @@ pub fn start_scenario_loop(
                 &input_diagnostics,
             )));
             last_diagnostics_revision = diagnostics_revision;
+            last_diagnostics_scenario_revision = scenario_revision;
             last_diagnostics_paused = paused;
             last_diagnostics_benchmark_active = benchmark_active;
         }
@@ -1186,6 +1196,7 @@ impl PerformanceStats {
 
 fn runtime_diagnostics_text(
     scenario_name: &str,
+    scenario_revision: u64,
     paused: bool,
     benchmark_active: bool,
     renderer: RenderBackend,
@@ -1194,10 +1205,14 @@ fn runtime_diagnostics_text(
     input_diagnostics: &str,
 ) -> String {
     format!(
-        "scenario={scenario_name}\npaused={paused}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
+        "scenario={scenario_name}\nscenario_revision={scenario_revision}\npaused={paused}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
         renderer.label(),
         performance.diagnostics_text(),
     )
+}
+
+fn next_scenario_revision() -> u64 {
+    NEXT_SCENARIO_REVISION.fetch_add(1, Ordering::Relaxed)
 }
 
 fn performance_target_label(tick_model: TickModel) -> String {
@@ -2204,6 +2219,7 @@ mod tests {
         assert_eq!(
             runtime_diagnostics_text(
                 "pizza",
+                17,
                 false,
                 true,
                 RenderBackend::Raster,
@@ -2211,7 +2227,7 @@ mod tests {
                 &stats,
                 "No active rule-bot diagnostics.",
             ),
-            "scenario=pizza\npaused=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
+            "scenario=pizza\nscenario_revision=17\npaused=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
         );
     }
 
