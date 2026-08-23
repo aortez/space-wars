@@ -61,9 +61,12 @@ The image recipe builds `engine-client` with the `engine-client/pi-kiosk`
 feature, which selects Slint `linuxkms` plus the software renderer instead of
 the full desktop backend set. Gamepads are read directly from
 `/dev/input/event*` through gilrs/libudev and do not depend on the Slint display
-backend. The feature still includes Slint's Winit physical-key adapter for the
-desktop keyboard fallback; Pi validation must separately confirm whether
-keyboard events are available on the selected display backend.
+backend. Slint's LinuxKMS backend reads touchscreens through libinput on the
+same seatd session used for DRM access and presents touches to `TouchArea`
+components as pointer input. The feature still includes Slint's Winit
+physical-key adapter for the desktop keyboard fallback; Pi validation must
+separately confirm whether keyboard events are available on the selected
+display backend.
 
 ## Launch Command
 
@@ -113,6 +116,41 @@ HyperPixel connector exposed by the Pi 5 overlay.
 The HyperPixel panel reports a physical `480x800` portrait mode. The kiosk
 service sets `SLINT_KMS_ROTATION=90`, which makes Slint's LinuxKMS renderer
 present a rotated landscape surface while keeping the boot overlay unchanged.
+The HyperPixel device-tree overlay also swaps the touchscreen axes and inverts
+one axis. These display and input transforms are independent, so they must be
+checked together on the assembled device. DirtSim's current Pi 5 configuration
+uses a 270-degree display rotation; that is useful evidence that the hardware
+path works, but it is not a safe value to copy without accounting for the
+screen's physical mounting orientation.
+
+Slint 1.13's LinuxKMS backend rotates the rendered output but does not apply
+that rotation to absolute libinput coordinates. Space-Wars carries a small
+backend patch that applies the inverse of `SLINT_KMS_ROTATION` to touchscreen
+and absolute-pointer events. With the kiosk's 90-degree output rotation, the
+normalized input correction is `(x, y) → (y, 1 - x)`.
+
+## Touchscreen Diagnostic
+
+The launcher, settings, pause, controls, and game-over menus use Slint
+`TouchArea` components. Open **Controls → Touch Test** to check the complete
+touch path. The diagnostic shows four numbered corner targets, the last logical
+coordinates and phase, and a crosshair that should stay beneath the finger.
+All four targets turn green when the input orientation agrees with the display.
+`Esc`, controller `B`, or the on-screen **Done** button exits the test.
+
+To start directly in the diagnostic while adjusting a new image or display,
+run:
+
+```sh
+SLINT_BACKEND=linuxkms-software \
+SLINT_DRM_OUTPUT=DPI-1 \
+SLINT_KMS_ROTATION=90 \
+engine-client --fullscreen --touch-test --config-dir /var/lib/spacewars
+```
+
+Only change the display rotation or touchscreen overlay parameters after
+recording which physical corner activates each numbered target. This separates
+rotation from mirroring and avoids trying combinations blindly.
 
 `--config-dir /var/lib/spacewars` is kept in the command even though
 `SPACEWARS_CONFIG_DIR=/var/lib/spacewars` is also useful in services. The CLI
@@ -160,26 +198,31 @@ includes output checksum validation, while tail cost is reported separately as
    NES JSON rows.
 4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0`.
 5. Confirm fullscreen display startup.
-6. Confirm `spacewars` belongs to the `input` group and can read the attached
-   controller's `/dev/input/event*` node.
-7. At the launcher, confirm the pad badge appears and Start launches the saved
+6. Confirm `spacewars` belongs to the `input` group and Slint/seatd can read the
+   HyperPixel touchscreen and the attached controller under `/dev/input/`.
+7. Open **Controls → Touch Test**, tap targets 1 through 4 clockwise, and confirm
+   each target turns green while the crosshair remains beneath the finger.
+8. Tap through the launcher, settings, controls, pause, and game-over menus;
+   confirm pressed feedback appears and every visible action is reachable at
+   the rotated `800x480` logical size.
+9. At the launcher, confirm the pad badge appears and Start launches the saved
    scenario without a mouse.
-8. Add a known supported NROM, MMC1, UxROM, CNROM, MMC3, or AxROM test
+10. Add a known supported NROM, MMC1, UxROM, CNROM, MMC3, or AxROM test
    cartridge to `/var/lib/spacewars/roms`, confirm it appears in NES Library
    with cartridge metadata, and launch it with the pad.
-9. Confirm NES d-pad, A, B, Select, and Start input, host Start+Select, audio,
+11. Confirm NES d-pad, A, B, Select, and Start input, host Start+Select, audio,
    pause, restart, launcher return, and relaunch. Confirm a held transition
    button is not forwarded until all controls return to neutral.
-10. Confirm analog turn/thrust/brake, weapons, wings, zoom, pause, and controls
+12. Confirm analog turn/thrust/brake, weapons, wings, zoom, pause, and controls
    overlay mappings work for both player seats.
-11. Confirm disconnect auto-pauses with a banner, keyboard remains usable, and
+13. Confirm disconnect auto-pauses with a banner, keyboard remains usable, and
    reconnect returns the pad to its original seat.
-12. Confirm the D-pad or left stick moves the highlighted launcher, pause, and
-    game-over choices; A selects, B goes back, and Start launches or resumes.
-13. Confirm both players' controls work with the attached keyboard where the
-    selected backend exposes keyboard events.
-14. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
-15. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
+14. Confirm the D-pad or left stick moves the highlighted launcher, pause, and
+   game-over choices; A selects, B goes back, and Start launches or resumes.
+15. Confirm both players' controls work with the attached keyboard where the
+   selected backend exposes keyboard events.
+16. Confirm settings are written back to `/var/lib/spacewars/settings.toml`.
+17. Capture benchmark FPS at raster scales `1.0`, `2.0`, and `3.0`.
 
 ## Service Installation Sketch
 

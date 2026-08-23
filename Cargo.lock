@@ -2277,8 +2277,6 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "i-slint-backend-linuxkms"
 version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efe95e5c81a08027a03535d69aa025740275b11fb613abf555441ce074001119"
 dependencies = [
  "bytemuck",
  "calloop 0.14.4",
@@ -2396,8 +2394,6 @@ dependencies = [
 [[package]]
 name = "i-slint-core"
 version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68d10fc4c25a22e757784acf7da950223762477329f01d73e1c9cfa0749bf51a"
 dependencies = [
  "auto_enums",
  "bitflags 2.11.1",

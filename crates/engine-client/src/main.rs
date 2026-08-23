@@ -138,6 +138,10 @@ struct Args {
     /// Pi/kiosk launch mode: fullscreen, direct launch, and no forced desktop backend.
     #[arg(long, conflicts_with = "windowed")]
     kiosk: bool,
+
+    /// Open the on-screen touchscreen orientation diagnostic over the launcher.
+    #[arg(long)]
+    touch_test: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
@@ -366,7 +370,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
 
-    if args.uses_debug_render() {
+    if args.touch_test {
+        show_launcher(
+            &window,
+            &effective_launch,
+            &settings.read().unwrap(),
+            &rom_catalog,
+        );
+        window.set_touch_test_visible(true);
+    } else if args.uses_debug_render() {
         *render_timer.borrow_mut() = Some(host::start_debug_render_loop(
             &window,
             args.debug_triangles,
@@ -575,6 +587,7 @@ fn show_launcher(
     window.set_launcher_settings_focus_index(0);
     window.set_launcher_settings_visible(false);
     window.set_launcher_controls_visible(false);
+    window.set_touch_test_visible(false);
     window.set_launcher_visible(true);
 }
 
@@ -886,7 +899,11 @@ fn install_ui_navigation(window: &MainWindow) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
-    if window.get_launcher_visible() {
+    if window.get_touch_test_visible() {
+        if matches!(action, UiAction::Back | UiAction::Controls) {
+            window.set_touch_test_visible(false);
+        }
+    } else if window.get_launcher_visible() {
         handle_launcher_ui_action(window, action);
     } else if window.get_game_over_visible() {
         handle_game_over_ui_action(window, action);
@@ -898,11 +915,24 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
 fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_controls_visible() {
         match action {
-            UiAction::Back | UiAction::Confirm | UiAction::Controls => {
+            UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
+                window.set_launcher_controls_focus_index(
+                    ui_navigation::moved_launcher_controls_selection(
+                        window.get_launcher_controls_focus_index(),
+                        action,
+                    ),
+                );
+            }
+            UiAction::Confirm => match window.get_launcher_controls_focus_index() {
+                0 => window.set_launcher_controls_visible(false),
+                1 => window.set_touch_test_visible(true),
+                2 => window.invoke_launcher_start_game(),
+                _ => {}
+            },
+            UiAction::Back | UiAction::Controls => {
                 window.set_launcher_controls_visible(false);
             }
             UiAction::Start => window.invoke_launcher_start_game(),
-            _ => {}
         }
         return;
     }
@@ -1966,6 +1996,7 @@ mod tests {
             fullscreen: false,
             windowed: false,
             kiosk: false,
+            touch_test: false,
         }
     }
 
@@ -2254,6 +2285,14 @@ mod tests {
         args.seed = Some(42);
         args.renderer = Some(RendererArg::Raster);
         args.raster_scale = Some(2.0);
+        assert!(!should_launch_directly(&args));
+    }
+
+    #[test]
+    fn touch_test_opens_without_direct_scenario_launch() {
+        let args = Args::try_parse_from(["engine-client", "--touch-test"]).unwrap();
+
+        assert!(args.touch_test);
         assert!(!should_launch_directly(&args));
     }
 

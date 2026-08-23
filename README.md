@@ -136,6 +136,10 @@ The Pi image launches the scenario selector fullscreen:
 engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 ```
 
+The launcher and host menus accept direct touchscreen taps. Open **Controls →
+Touch Test**, or add `--touch-test` to the launch command, to verify corner
+mapping and display rotation on the assembled kiosk.
+
 `--fullscreen` leaves the launcher visible so a scenario can be selected while
 requesting fullscreen presentation. The image selects Slint's LinuxKMS backend
 with `SLINT_BACKEND`; `--kiosk` remains available when booting directly into the
