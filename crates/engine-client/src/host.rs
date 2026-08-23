@@ -1544,9 +1544,15 @@ struct BenchmarkRow {
     avg_physics_ms: f64,
     avg_snapshot_ms: f64,
     avg_rapier_step_ms: f64,
+    avg_rapier_update_ms: f64,
+    avg_rapier_user_changes_ms: f64,
+    avg_rapier_kinematic_interpolation_ms: f64,
+    avg_rapier_collision_detection_ms: f64,
     avg_rapier_broad_phase_ms: f64,
+    avg_rapier_final_broad_phase_ms: f64,
     avg_rapier_narrow_phase_ms: f64,
     avg_rapier_island_ms: f64,
+    avg_rapier_island_constraints_ms: f64,
     avg_rapier_solver_ms: f64,
     avg_rapier_ccd_ms: f64,
     avg_render_ms: f64,
@@ -1648,8 +1654,25 @@ impl BenchmarkRow {
             avg_physics_ms: avg_ms(sample.scenario_metrics.physics_time, frames),
             avg_snapshot_ms: avg_ms(sample.scenario_metrics.snapshot_time, frames),
             avg_rapier_step_ms: avg_ms(sample.scenario_metrics.rapier_step_time, frames),
+            avg_rapier_update_ms: avg_ms(sample.scenario_metrics.rapier_update_time, frames),
+            avg_rapier_user_changes_ms: avg_ms(
+                sample.scenario_metrics.rapier_user_changes_time,
+                frames,
+            ),
+            avg_rapier_kinematic_interpolation_ms: avg_ms(
+                sample.scenario_metrics.rapier_kinematic_interpolation_time,
+                frames,
+            ),
+            avg_rapier_collision_detection_ms: avg_ms(
+                sample.scenario_metrics.rapier_collision_detection_time,
+                frames,
+            ),
             avg_rapier_broad_phase_ms: avg_ms(
                 sample.scenario_metrics.rapier_broad_phase_time,
+                frames,
+            ),
+            avg_rapier_final_broad_phase_ms: avg_ms(
+                sample.scenario_metrics.rapier_final_broad_phase_time,
                 frames,
             ),
             avg_rapier_narrow_phase_ms: avg_ms(
@@ -1657,6 +1680,10 @@ impl BenchmarkRow {
                 frames,
             ),
             avg_rapier_island_ms: avg_ms(sample.scenario_metrics.rapier_island_time, frames),
+            avg_rapier_island_constraints_ms: avg_ms(
+                sample.scenario_metrics.rapier_island_constraints_time,
+                frames,
+            ),
             avg_rapier_solver_ms: avg_ms(sample.scenario_metrics.rapier_solver_time, frames),
             avg_rapier_ccd_ms: avg_ms(sample.scenario_metrics.rapier_ccd_time, frames),
             avg_render_ms: avg_ms(sample.render_time, frames),
@@ -1696,7 +1723,7 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     writeln!(
         writer,
-        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
+        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_update_ms,avg_rapier_user_changes_ms,avg_rapier_kinematic_interpolation_ms,avg_rapier_collision_detection_ms,avg_rapier_broad_phase_ms,avg_rapier_final_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_island_constraints_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
@@ -1748,9 +1775,15 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_physics_ms),
         format!("{:.3}", row.avg_snapshot_ms),
         format!("{:.3}", row.avg_rapier_step_ms),
+        format!("{:.3}", row.avg_rapier_update_ms),
+        format!("{:.3}", row.avg_rapier_user_changes_ms),
+        format!("{:.3}", row.avg_rapier_kinematic_interpolation_ms),
+        format!("{:.3}", row.avg_rapier_collision_detection_ms),
         format!("{:.3}", row.avg_rapier_broad_phase_ms),
+        format!("{:.3}", row.avg_rapier_final_broad_phase_ms),
         format!("{:.3}", row.avg_rapier_narrow_phase_ms),
         format!("{:.3}", row.avg_rapier_island_ms),
+        format!("{:.3}", row.avg_rapier_island_constraints_ms),
         format!("{:.3}", row.avg_rapier_solver_ms),
         format!("{:.3}", row.avg_rapier_ccd_ms),
         format!("{:.3}", row.avg_render_ms),
