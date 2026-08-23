@@ -426,9 +426,6 @@ pub fn start_scenario_loop(
         input.clear();
         input.reset_spacewars_controls();
     }
-    window.set_runtime_diagnostics(SharedString::from(format!(
-        "scenario={scenario_name}\npaused=false\nNo active rule-bot diagnostics."
-    )));
     let controls = controls.unwrap_or_else(new_scenario_controls);
 
     let timer = Timer::default();
@@ -438,6 +435,16 @@ pub fn start_scenario_loop(
     let mut paused = false;
     let mut benchmark_active = start_benchmark;
     let mut performance = PerformanceStats::new(tick_model, last_tick);
+    let input_diagnostics = input.borrow().runtime_diagnostics_text();
+    window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
+        &scenario_name,
+        paused,
+        benchmark_active,
+        renderer,
+        raster_scale,
+        &performance,
+        &input_diagnostics,
+    )));
     let mut raster_renderer = raster::RasterRenderer::new();
     let mut native_video_renderer = NativeVideoRenderer::new();
     let mut presented_native_frame_id = None;
@@ -499,8 +506,9 @@ pub fn start_scenario_loop(
     }
 
     let mut last_realtime_emulated_frames = 0;
-    let mut last_diagnostics_revision = u64::MAX;
-    let mut last_diagnostics_paused = true;
+    let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
+    let mut last_diagnostics_paused = paused;
+    let mut last_diagnostics_benchmark_active = benchmark_active;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
         let Some(window) = weak_window.upgrade() else {
             return;
@@ -593,18 +601,6 @@ pub fn start_scenario_loop(
             )));
         }
 
-        let diagnostics_revision = input.runtime_diagnostics_revision();
-        if diagnostics_revision != last_diagnostics_revision
-            || paused != last_diagnostics_paused
-        {
-            window.set_runtime_diagnostics(SharedString::from(format!(
-                "scenario={scenario_name}\npaused={paused}\n{}",
-                input.runtime_diagnostics_text()
-            )));
-            last_diagnostics_revision = diagnostics_revision;
-            last_diagnostics_paused = paused;
-        }
-
         scenario.record_realtime_displayed_loop_iteration();
         let updates = if let Some(telemetry) = scenario.realtime_telemetry() {
             let updates = telemetry
@@ -616,7 +612,27 @@ pub fn start_scenario_loop(
         } else {
             step_result.updates
         };
-        performance.record_frame(now, updates);
+        let performance_sample_completed = performance.record_frame(now, updates);
+        let diagnostics_revision = input.runtime_diagnostics_revision();
+        if performance_sample_completed
+            || diagnostics_revision != last_diagnostics_revision
+            || paused != last_diagnostics_paused
+            || benchmark_active != last_diagnostics_benchmark_active
+        {
+            let input_diagnostics = input.runtime_diagnostics_text();
+            window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
+                &scenario_name,
+                paused,
+                benchmark_active,
+                renderer,
+                raster_scale,
+                &performance,
+                &input_diagnostics,
+            )));
+            last_diagnostics_revision = diagnostics_revision;
+            last_diagnostics_paused = paused;
+            last_diagnostics_benchmark_active = benchmark_active;
+        }
         let performance_text = performance.display_text();
         set_center_panel(
             &window,
@@ -1107,6 +1123,8 @@ struct PerformanceStats {
     sample_started: Instant,
     frames_in_sample: u32,
     updates_in_sample: u32,
+    frames_total: u64,
+    updates_total: u64,
     measured_fps: Option<f32>,
     measured_ups: Option<f32>,
 }
@@ -1118,19 +1136,23 @@ impl PerformanceStats {
             sample_started: now,
             frames_in_sample: 0,
             updates_in_sample: 0,
+            frames_total: 0,
+            updates_total: 0,
             measured_fps: None,
             measured_ups: None,
         }
     }
 
-    fn record_frame(&mut self, now: Instant, updates: usize) {
+    fn record_frame(&mut self, now: Instant, updates: usize) -> bool {
         self.frames_in_sample += 1;
         self.updates_in_sample += updates as u32;
+        self.frames_total = self.frames_total.saturating_add(1);
+        self.updates_total = self.updates_total.saturating_add(updates as u64);
 
         let elapsed = now.saturating_duration_since(self.sample_started);
         let elapsed_secs = elapsed.as_secs_f32();
         if elapsed_secs < 1.0 {
-            return;
+            return false;
         }
 
         self.measured_fps = Some(self.frames_in_sample as f32 / elapsed_secs);
@@ -1138,6 +1160,7 @@ impl PerformanceStats {
         self.sample_started = now;
         self.frames_in_sample = 0;
         self.updates_in_sample = 0;
+        true
     }
 
     fn display_text(&self) -> String {
@@ -1148,6 +1171,33 @@ impl PerformanceStats {
             measured_label(self.measured_ups)
         )
     }
+
+    fn diagnostics_text(&self) -> String {
+        format!(
+            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}",
+            self.target_label,
+            measured_diagnostics_label(self.measured_fps),
+            measured_diagnostics_label(self.measured_ups),
+            self.frames_total,
+            self.updates_total,
+        )
+    }
+}
+
+fn runtime_diagnostics_text(
+    scenario_name: &str,
+    paused: bool,
+    benchmark_active: bool,
+    renderer: RenderBackend,
+    raster_scale: f32,
+    performance: &PerformanceStats,
+    input_diagnostics: &str,
+) -> String {
+    format!(
+        "scenario={scenario_name}\npaused={paused}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
+        renderer.label(),
+        performance.diagnostics_text(),
+    )
 }
 
 fn performance_target_label(tick_model: TickModel) -> String {
@@ -1161,6 +1211,12 @@ fn performance_target_label(tick_model: TickModel) -> String {
 fn measured_label(value: Option<f32>) -> String {
     value
         .map(|value| format!("{:.0}", value.max(0.0)))
+        .unwrap_or_else(|| "--".into())
+}
+
+fn measured_diagnostics_label(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{:.1}", value.max(0.0)))
         .unwrap_or_else(|| "--".into())
 }
 
@@ -2085,12 +2141,42 @@ mod tests {
         let mut stats = PerformanceStats::new(TickModel::FixedTimestep { hz: 60 }, start);
 
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS -- | UPS --");
+        assert_eq!(
+            stats.diagnostics_text(),
+            "performance_target=60 Hz\nfps=--\nups=--\nframes_total=0\nupdates_total=0"
+        );
 
         for frame in 1..=60 {
-            stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1);
+            let sample_completed =
+                stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1);
+            assert_eq!(sample_completed, frame == 60);
         }
 
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS 60 | UPS 60");
+        assert_eq!(
+            stats.diagnostics_text(),
+            "performance_target=60 Hz\nfps=60.0\nups=60.0\nframes_total=60\nupdates_total=60"
+        );
+    }
+
+    #[test]
+    fn runtime_diagnostics_include_launch_state_and_performance() {
+        let start = Instant::now();
+        let mut stats = PerformanceStats::new(TickModel::Variable, start);
+        stats.record_frame(start + Duration::from_secs(1), 3);
+
+        assert_eq!(
+            runtime_diagnostics_text(
+                "pizza",
+                false,
+                true,
+                RenderBackend::Raster,
+                2.0,
+                &stats,
+                "No active rule-bot diagnostics.",
+            ),
+            "scenario=pizza\npaused=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
+        );
     }
 
     #[test]

@@ -111,16 +111,16 @@ spaceports, matches their orbital and wrapper motion, captures them, and
 departs for another target; an escape pod instead seeks an owned port for
 rebuilding. The ordinary two-human setup remains the default.
 
-On Unix, query the latest live rule-bot and docking diagnostics through the
-client control socket:
+On Unix, query the running client through its control socket:
 
 ```sh
-printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
+spacewars-cli status
 ```
 
-The snapshot is refreshed once per second and includes the brain phase and
-intent, ship motion, target planet, actual docked planet, and surface/port
-clearance. This keeps diagnostic formatting out of the simulation hot path.
+The snapshot is refreshed once per second and includes scenario and pause
+state, renderer and raster scale, live FPS/UPS, cumulative frame/update
+counters, and any rule-bot docking diagnostics. This keeps diagnostic
+formatting out of the simulation hot path.
 
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a

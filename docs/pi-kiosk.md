@@ -157,6 +157,20 @@ rotation from mirroring and avoids trying combinations blindly.
 flag makes the service command self-contained, while the environment variable is
 still available for helper tools and manual sessions.
 
+## Runtime Diagnostics
+
+Query the active scenario without interrupting the kiosk UI:
+
+```sh
+spacewars-cli status
+```
+
+The once-per-second snapshot reports the scenario, pause and benchmark state,
+renderer, raster scale, measured FPS/UPS, and cumulative frame/update counts.
+Scenario-specific diagnostics follow those fields when available. The default
+control socket is `/tmp/spacewars-control.sock`; pass `--socket` or set
+`SPACEWARS_CONTROL_SOCKET` when using a different path.
+
 ## Host Dry Run
 
 Before launching the UI on the Pi, run the deterministic benchmark without a
