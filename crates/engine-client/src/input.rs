@@ -563,12 +563,15 @@ impl SpacewarsControls {
             });
             tracing::debug!(
                 player = player + 1,
+                seed = state.seed,
                 tick = state.tick,
                 goal = ?telemetry.goal,
                 target = ?telemetry.target,
                 target_planet = ?telemetry.target_planet,
                 port_phase = ?telemetry.port_phase,
                 hazard = ?telemetry.hazard,
+                avoided_body = ?telemetry.avoided_body,
+                avoidance_surface_clearance = ?telemetry.avoidance_surface_clearance,
                 distance = telemetry.target_distance,
                 heading_error = telemetry.heading_error,
                 desired_speed = telemetry.desired_speed,
@@ -580,6 +583,9 @@ impl SpacewarsControls {
                 ?intent,
                 "Spacewars rule-bot telemetry."
             );
+            let avoidance_surface_clearance = telemetry
+                .avoidance_surface_clearance
+                .map_or_else(|| "none".into(), |clearance| format!("{clearance:.3}"));
             let target = target_planet.map_or_else(
                 || "none".into(),
                 |planet| {
@@ -624,8 +630,9 @@ impl SpacewarsControls {
             );
             let ship = &state.ships[player];
             self.bot_diagnostics[player] = Some(format!(
-                "player={} tick={} planets={} winner={:?}\nbrain goal={:?} target={:?} target_planet={:?} phase={:?} hazard={:?} distance={:.3} heading_error={:.3} desired_speed={:.3} relative_speed={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nship form={:?} position={:?} velocity={:?} omega={:.3} observed_wings_closed={} docked_planet={:?}\ntarget {target}\ndocked {docked}",
+                "player={} seed={} tick={} planets={} winner={:?}\nbrain goal={:?} target={:?} target_planet={:?} phase={:?} hazard={:?} avoided_body={:?} avoidance_surface_clearance={} distance={:.3} heading_error={:.3} desired_speed={:.3} relative_speed={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nship form={:?} position={:?} velocity={:?} omega={:.3} observed_wings_closed={} docked_planet={:?}\ntarget {target}\ndocked {docked}",
                 player + 1,
+                state.seed,
                 state.tick,
                 state.players[player].planet_count,
                 state.winner,
@@ -634,6 +641,8 @@ impl SpacewarsControls {
                 telemetry.target_planet,
                 telemetry.port_phase,
                 telemetry.hazard,
+                telemetry.avoided_body,
+                avoidance_surface_clearance,
                 telemetry.target_distance,
                 telemetry.heading_error,
                 telemetry.desired_speed,
@@ -1354,8 +1363,9 @@ mod tests {
             ScenarioAction::SetTurn { player: 1, rate } if rate.abs() > 0.0
         )));
         let diagnostics = input.runtime_diagnostics_text();
-        assert!(diagnostics.contains("player=2 tick=0"));
+        assert!(diagnostics.contains("player=2 seed=7 tick=0"));
         assert!(diagnostics.contains("brain goal=Attack"));
+        assert!(diagnostics.contains("avoided_body=None avoidance_surface_clearance=none"));
         assert!(diagnostics.contains("docked none"));
 
         input.reset_spacewars_controls();

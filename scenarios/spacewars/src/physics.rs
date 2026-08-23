@@ -53,6 +53,10 @@ const GROUP_ALL_SOLIDS: u32 =
 
 const PLANET_SURFACE_SEGMENTS: usize = 24;
 const WORLD_SURFACE_SEGMENTS: usize = 192;
+// The full ship silhouette is intentionally broad, but that shape can bridge
+// the inner planet and a spaceport wall while the craft turns in the bay. Use
+// a body-sized, rotation-invariant contact shape during active port maneuvers.
+const DOCKED_SHIP_COLLIDER_RADIUS: f32 = 2.5;
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
     RoverSpec {
@@ -116,6 +120,7 @@ struct ShipColliderKey {
     form: ShipForm,
     wing_theta: u32,
     docked: bool,
+    compact: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,7 +201,7 @@ impl SpacewarsPhysics {
             let _ = physics.insert_planet(index, planet);
         }
         for (index, ship) in ships.iter().enumerate() {
-            let _ = physics.insert_ship(index, ship, false);
+            let _ = physics.insert_ship(index, ship, false, false);
         }
         physics
     }
@@ -255,14 +260,24 @@ impl SpacewarsPhysics {
         }
 
         for (index, ship) in ships.iter().enumerate() {
+            let sensor_docked = docked_ships[index];
+            let docked = sensor_docked || ship.spaceport_ejection.is_some();
+            // Preserve normal arrival/capture mechanics until the controls
+            // indicate an intentional departure maneuver.
+            let compact = ship.spaceport_ejection.is_some()
+                || (sensor_docked
+                    && ship.brake <= 0.0
+                    && (ship.turn.abs() > f32::EPSILON || ship.thrust.abs() > f32::EPSILON));
             let key = ShipColliderKey {
                 form: ship.form,
                 wing_theta: ship.wing_theta.to_bits(),
-                docked: docked_ships[index] || ship.spaceport_ejection.is_some(),
+                docked,
+                compact,
             };
             if self.ship_keys[index] != Some(key) {
                 lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
-                lifecycle.added += usize::from(self.insert_ship(index, ship, key.docked));
+                lifecycle.added +=
+                    usize::from(self.insert_ship(index, ship, key.docked, key.compact));
             } else {
                 synchronize_ship_to_physics(&mut self.world, index, ship);
             }
@@ -674,9 +689,9 @@ impl SpacewarsPhysics {
         inserted
     }
 
-    fn insert_ship(&mut self, index: usize, ship: &ShipState, docked: bool) -> bool {
+    fn insert_ship(&mut self, index: usize, ship: &ShipState, docked: bool, compact: bool) -> bool {
         let entity = ship_entity(index);
-        let collider = ship_collider(entity, ship, docked);
+        let colliders = ship_colliders(entity, ship, docked, compact);
         let inserted = self.world.insert_body(
             primary_body(entity),
             BodySpec {
@@ -691,13 +706,14 @@ impl SpacewarsPhysics {
                 additional_solver_iterations: 2,
                 ..BodySpec::default()
             },
-            &[collider],
+            &colliders,
         );
         debug_assert!(inserted);
         self.ship_keys[index] = Some(ShipColliderKey {
             form: ship.form,
             wing_theta: ship.wing_theta.to_bits(),
             docked,
+            compact,
         });
         inserted
     }
@@ -892,17 +908,46 @@ fn ship_local_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     ]
 }
 
-fn ship_collider(entity: PhysicsId, ship: &ShipState, docked: bool) -> ColliderSpec {
-    let hull = ship_collision_hull(ship);
-    let density = ship.mass() / polygon_area(&hull).max(f32::EPSILON);
+fn ship_colliders(
+    entity: PhysicsId,
+    ship: &ShipState,
+    docked: bool,
+    compact: bool,
+) -> Vec<ColliderSpec> {
+    debug_assert!(!compact || docked);
     let groups = ship_collision_groups(ship, docked);
-    let mut collider = ColliderSpec::convex_polygon(collider_id(entity, SHIP_HULL_ROLE, 0), hull);
-    collider.density = density;
+    let primary_id = collider_id(entity, SHIP_HULL_ROLE, 0);
+    let compact_while_docked = compact && ship.form == ShipForm::Ship;
+    let hull = ship_collision_hull(ship);
+    let (mut collider, area) = if compact_while_docked {
+        (
+            ColliderSpec::ball(primary_id, DOCKED_SHIP_COLLIDER_RADIUS),
+            core::f32::consts::PI * DOCKED_SHIP_COLLIDER_RADIUS.powi(2),
+        )
+    } else {
+        let area = polygon_area(&hull);
+        (ColliderSpec::convex_polygon(primary_id, hull.clone()), area)
+    };
+    collider.density = ship.mass() / area.max(f32::EPSILON);
     collider.friction = 0.0;
     collider.restitution = DEFAULT_ELASTICITY;
     collider.collision_groups = groups;
     collider.solver_groups = groups;
-    collider
+    let mut colliders = vec![collider];
+
+    if compact_while_docked {
+        // Retain the normal hull exclusively as a sensor probe. This keeps the
+        // established landing/capture footprint stable when the physical hull
+        // becomes compact, preventing shallow contacts from flickering.
+        let mut probe = ColliderSpec::convex_polygon(collider_id(entity, SHIP_HULL_ROLE, 1), hull);
+        probe.density = 0.0;
+        probe.sensor = true;
+        probe.collision_groups = CollisionGroups::new(groups.memberships, GROUP_SPACEPORT_SENSOR);
+        probe.solver_groups = CollisionGroups::NONE;
+        colliders.push(probe);
+    }
+
+    colliders
 }
 
 /// Build one stable convex collision silhouette from the independently rendered
@@ -1255,7 +1300,9 @@ mod tests {
                 }
             }
 
-            let collider = ship_collider(ship_entity(0), ship, false);
+            let mut colliders = ship_colliders(ship_entity(0), ship, false, false);
+            assert_eq!(colliders.len(), 1);
+            let collider = colliders.pop().unwrap();
             let engine_rapier::world::ColliderShape::ConvexPolygon { vertices } = collider.shape
             else {
                 panic!("ship should use one convex polygon");
@@ -1270,6 +1317,48 @@ mod tests {
             ship_collision_hull(&ship),
             ship_collision_hull(&closed_ship)
         );
+    }
+
+    #[test]
+    fn docked_ship_uses_a_compact_rotation_invariant_collider() {
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::ZERO, engine_core::Color::WHITE, 1.0 / 60.0);
+        let open_hull = ship_collision_hull(&ship);
+        let open = ship_colliders(ship_entity(0), &ship, true, true);
+        ship.wing_theta = super::super::MAX_WING_THETA;
+        let closed = ship_colliders(ship_entity(0), &ship, true, true);
+
+        assert_eq!(open.len(), 2);
+        assert_eq!(closed.len(), 2);
+        let engine_rapier::world::ColliderShape::Ball { radius } = open[0].shape else {
+            panic!("docked ship should use one circular collider");
+        };
+        assert_eq!(radius, DOCKED_SHIP_COLLIDER_RADIUS);
+        assert_eq!(
+            closed[0].shape,
+            engine_rapier::world::ColliderShape::Ball { radius }
+        );
+        assert!(
+            (open[0].density * core::f32::consts::PI * radius.powi(2) - ship.mass()).abs() < 1.0e-4
+        );
+        assert!(open[1].sensor);
+        assert_eq!(open[1].density, 0.0);
+        assert_eq!(open[1].solver_groups, CollisionGroups::NONE);
+        assert_eq!(
+            open[1].shape,
+            engine_rapier::world::ColliderShape::ConvexPolygon {
+                vertices: open_hull
+            }
+        );
+
+        assert!(matches!(
+            ship_colliders(ship_entity(0), &ship, false, false)[0].shape,
+            engine_rapier::world::ColliderShape::ConvexPolygon { .. }
+        ));
+        assert!(matches!(
+            ship_colliders(ship_entity(0), &ship, true, false)[0].shape,
+            engine_rapier::world::ColliderShape::ConvexPolygon { .. }
+        ));
     }
 
     #[test]

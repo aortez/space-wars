@@ -1461,9 +1461,11 @@ dependencies = [
  "clap",
  "engine-common",
  "engine-core",
- "scenario-null",
- "tracing",
- "tracing-subscriber",
+ "scenario-spacewars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "spacewars-ai",
 ]
 
 [[package]]
@@ -5053,6 +5055,7 @@ dependencies = [
  "engine-common",
  "engine-core",
  "scenario-spacewars",
+ "serde",
 ]
 
 [[package]]
