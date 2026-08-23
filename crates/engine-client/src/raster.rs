@@ -746,6 +746,7 @@ impl<'a> Canvas<'a> {
         let radius_squared = radius * radius;
         let source_right = source_x + copy_width - 1;
         let alpha = (255.0 * opacity.clamp(0.0, 1.0)).round() as u8;
+        let background_blend = BackgroundBlendTable::new(alpha);
 
         for row in 0..copy_height {
             let source_row = source_y + row;
@@ -772,7 +773,11 @@ impl<'a> Canvas<'a> {
                 .iter_mut()
                 .zip(&source[src_start..src_start + len])
             {
-                blend_rgb_pixel(destination, *source, alpha);
+                if *destination == BACKGROUND {
+                    *destination = background_blend.blend(*source);
+                } else {
+                    blend_rgb_pixel(destination, *source, alpha);
+                }
             }
         }
     }
@@ -937,6 +942,40 @@ struct RasterColor {
 enum SpanFillMode {
     Normal,
     BackgroundFastPath { blended_background: Rgb8Pixel },
+}
+
+struct BackgroundBlendTable {
+    red: [u8; 256],
+    green: [u8; 256],
+    blue: [u8; 256],
+}
+
+impl BackgroundBlendTable {
+    fn new(alpha: u8) -> Self {
+        let alpha = u32::from(alpha);
+        let inverse_alpha = 255 - alpha;
+        let mut table = Self {
+            red: [0; 256],
+            green: [0; 256],
+            blue: [0; 256],
+        };
+        for source in 0_u16..=255 {
+            let index = usize::from(source);
+            let source = source as u8;
+            table.red[index] = blend_channel(source, BACKGROUND.r, alpha, inverse_alpha);
+            table.green[index] = blend_channel(source, BACKGROUND.g, alpha, inverse_alpha);
+            table.blue[index] = blend_channel(source, BACKGROUND.b, alpha, inverse_alpha);
+        }
+        table
+    }
+
+    fn blend(&self, source: Rgb8Pixel) -> Rgb8Pixel {
+        Rgb8Pixel {
+            r: self.red[usize::from(source.r)],
+            g: self.green[usize::from(source.g)],
+            b: self.blue[usize::from(source.b)],
+        }
+    }
 }
 
 fn project(camera: Camera2, point: RenderPoint, viewport: Viewport) -> PixelPoint {
@@ -1689,7 +1728,19 @@ mod tests {
                     b: (index * 47) as u8,
                 })
                 .collect::<Vec<_>>();
-            let mut expected = vec![BACKGROUND; (DESTINATION_WIDTH * DESTINATION_HEIGHT) as usize];
+            let mut expected = (0..DESTINATION_WIDTH * DESTINATION_HEIGHT)
+                .map(|index| {
+                    if index % 3 == 0 {
+                        BACKGROUND
+                    } else {
+                        Rgb8Pixel {
+                            r: (index * 11) as u8,
+                            g: (index * 23) as u8,
+                            b: (index * 37) as u8,
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
             let mut actual = expected.clone();
 
             reference_blit_circle_with_opacity(
