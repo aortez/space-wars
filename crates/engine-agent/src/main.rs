@@ -99,12 +99,14 @@ impl From<PresetArg> for SpacewarsPreset {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SuiteArg {
     NavigationV1,
+    StrategyV1,
 }
 
 impl From<SuiteArg> for EvaluationSuite {
     fn from(value: SuiteArg) -> Self {
         match value {
             SuiteArg::NavigationV1 => Self::NavigationV1,
+            SuiteArg::StrategyV1 => Self::StrategyV1,
         }
     }
 }
@@ -184,13 +186,16 @@ fn print_text_report(report: &RunReport) {
     }
     for episode in &report.episodes {
         println!(
-            "seed={} outcome={} ticks={} sim={:.1}s captures={:?} losses={:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} planets={:?} actions={} trace={}",
+            "seed={} controllers={:?} outcome={} ticks={} sim={:.1}s captures={:?} losses={:?} losses(planet/sun)={:?}/{:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} planets={:?} strategy={:?} actions={} trace={}",
             episode.seed,
+            episode.controllers,
             episode.outcome,
             episode.ticks,
             episode.simulated_seconds,
             episode.captures,
             episode.ship_losses,
+            episode.planet_impact_losses,
+            episode.sun_impact_losses,
             episode.rebuilds,
             episode.body_contacts,
             episode.ship_contacts,
@@ -201,6 +206,7 @@ fn print_text_report(report: &RunReport) {
             episode.safe_capture_departures,
             episode.safe_rebuild_departures,
             episode.final_planet_counts,
+            episode.strategy,
             episode.actions_emitted,
             episode
                 .trace_sha256
@@ -209,11 +215,26 @@ fn print_text_report(report: &RunReport) {
         );
         for event in &episode.navigation_trace {
             println!(
-                "  nav tick={} p={} reason={:?} goal={:?} phase={:?} target={:?} docked={:?} pending={:?} age={} focus={:?} clearance={} outward={} port-omega={} velocity=({:.1},{:.1}) speed={:.1} rotation={:.2} port-rotation={} omega(control/measured)={:.2}/{:.2} heading={:.2} desired={:.1} relative={:.1} contact(body/ship)={}/{} intent(turn={:.2} thrust={:.1} brake={:.1} wings={} laser={} cannon={})",
+                "  nav tick={} p={} reason={:?} strategy={:?} strategy-target={:?}/{:?} strategy-score={} strategy-reason={:?} goal={:?} avoid={:?} avoid-clearance={} avoid-outward={} predictive={} avoid-closest={} avoid-predicted-clearance={} avoid-age={}/{} assist={}/{} phase={:?} target={:?} docked={:?} pending={:?} age={} focus={:?} clearance={} outward={} port-distance={} port-omega={} velocity=({:.1},{:.1}) speed={:.1} rotation={:.2} port-rotation={} omega(control/measured)={:.2}/{:.2} heading={:.2} desired={:.1} relative={:.1} contact(body/ship)={}/{} intent(turn={:.2} thrust={:.1} brake={:.1} wings={} laser={} cannon={})",
                 event.tick,
                 event.player.index() + 1,
                 event.reasons,
+                event.strategy.goal,
+                event.strategy.target,
+                event.strategy.target_planet,
+                optional_f32(event.strategy.selected_score),
+                event.strategy.selection_reason,
                 event.goal,
+                event.avoided_body,
+                optional_f32(event.avoidance_surface_clearance),
+                optional_f32(event.avoidance_outward_speed),
+                event.avoidance_predictive,
+                optional_f32(event.avoidance_seconds_until_closest),
+                optional_f32(event.avoidance_predicted_surface_clearance),
+                event.avoidance_age_ticks,
+                event.avoidance_stalled_ticks,
+                event.avoidance_escape_assist,
+                event.avoidance_emergency_escape_assist,
                 event.port_phase,
                 event.target_planet,
                 event.docked_planet,
@@ -222,6 +243,7 @@ fn print_text_report(report: &RunReport) {
                 event.focus_planet,
                 optional_f32(event.surface_clearance),
                 optional_f32(event.outward_speed),
+                optional_f32(event.spaceport_distance),
                 optional_f32(event.spaceport_angular_speed),
                 event.world_velocity[0],
                 event.world_velocity[1],
@@ -246,7 +268,7 @@ fn print_text_report(report: &RunReport) {
     }
     let summary = &report.summary;
     println!(
-        "episodes={} winners={:?} tick_limits={} ticks={} wall={:.3}s ticks/s={:.0} realtime={:.1}x captures={:?} losses={:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?}",
+        "episodes={} winners={:?} tick_limits={} ticks={} wall={:.3}s ticks/s={:.0} realtime={:.1}x captures={:?} losses={:?} losses(planet/sun)={:?}/{:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} strategy={:?} policies={:?}",
         summary.episodes,
         summary.winner_counts,
         summary.tick_limits,
@@ -256,6 +278,8 @@ fn print_text_report(report: &RunReport) {
         summary.simulated_seconds_per_wall_second,
         summary.captures,
         summary.ship_losses,
+        summary.planet_impact_losses,
+        summary.sun_impact_losses,
         summary.rebuilds,
         summary.body_contacts,
         summary.ship_contacts,
@@ -265,6 +289,8 @@ fn print_text_report(report: &RunReport) {
         summary.port_departures,
         summary.safe_capture_departures,
         summary.safe_rebuild_departures,
+        summary.strategy,
+        summary.policy_metrics,
     );
 }
 

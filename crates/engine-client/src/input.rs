@@ -1,26 +1,41 @@
 //! Client-side keyboard state and original Spacewars control mapping.
 
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
+use std::fmt::Write as _;
 use std::rc::Rc;
 
 use engine_common::{Action, PointerPhase, RenderPoint};
+use engine_core::Vec2;
 use engine_nes::ControllerButtons;
 use scenario_spacewars::{
-    PlayerId, ShipIntent, ShipIntentEncoder, ShipSensorProfile, SpacewarsAction, SpacewarsScenario,
-    SpacewarsState,
+    BodyId, PlanetId, PlayerId, ShipForm, ShipIntent, ShipIntentEncoder, ShipObservationV1,
+    ShipSensorProfile, SpacewarsAction, SpacewarsScenario, SpacewarsState,
 };
 use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
-use spacewars_ai::{BrainReset, RuleShipBrain, ShipBrain};
+use spacewars_ai::{AvoidanceBody, BrainReset, BrainTelemetry, RuleShipBrain, ShipBrain};
 
 use crate::MainWindow;
 
 pub(crate) type SharedInput = Rc<RefCell<ClientInput>>;
 pub(crate) type SharedGamepadInput = Rc<RefCell<GamepadInput>>;
 type SharedKeyboardState = Rc<RefCell<BTreeSet<GameKey>>>;
+
+// Ten hertz is frequent enough to explain guidance and collision behavior
+// without turning diagnostics into another per-frame workload. Event
+// transitions are sampled immediately between these periodic samples.
+const FLIGHT_SAMPLE_RATE_HZ: u32 = 10;
+const FLIGHT_RECENT_CAPACITY: usize = 180;
+const FLIGHT_ENCOUNTER_PRE_SAMPLES: usize = 60;
+const FLIGHT_ENCOUNTER_CAPACITY: usize = 180;
+// Rapier contact manifolds can disappear for a frame while two bodies remain
+// in the same physical scrape. Keep one incident alive until contact has been
+// absent for half a second at the nominal 60 Hz simulation rate.
+const FLIGHT_CONTACT_REARM_TICKS: u64 = 30;
+const BODY_PREDICTION_HORIZON_SECONDS: f32 = 5.0;
 
 pub(crate) fn new_shared_input() -> (SharedInput, SharedGamepadInput) {
     let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
@@ -337,6 +352,13 @@ impl ClientInput {
         }
     }
 
+    pub(crate) fn paused_runtime_diagnostics_text(&self) -> String {
+        let mut diagnostics = self.runtime_diagnostics_text();
+        diagnostics.push_str("\n\n");
+        diagnostics.push_str(&self.spacewars_controls.flight_history_text());
+        diagnostics
+    }
+
     pub(crate) fn clear(&mut self) {
         self.clear_keyboard();
         self.pointer_events.clear();
@@ -456,6 +478,546 @@ const P2_CONTROLS: PlayerControlMap = PlayerControlMap {
     zoom_out: GameKey::P2ZoomOut,
 };
 
+const FLIGHT_EVENT_INITIAL: u16 = 1 << 0;
+const FLIGHT_EVENT_AVOIDANCE_CHANGED: u16 = 1 << 1;
+const FLIGHT_EVENT_CONTACT_CHANGED: u16 = 1 << 2;
+const FLIGHT_EVENT_ASSIST_CHANGED: u16 = 1 << 3;
+const FLIGHT_EVENT_EMERGENCY_CHANGED: u16 = 1 << 4;
+const FLIGHT_EVENT_FORM_CHANGED: u16 = 1 << 5;
+const FLIGHT_EVENT_DOCK_CHANGED: u16 = 1 << 6;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FlightEpisodeContext {
+    seed: u64,
+    universe_radius: u32,
+    asteroid_probability_per_sec: f32,
+    planets: bool,
+    fps: u32,
+    player_health_percent: [u32; 2],
+}
+
+impl FlightEpisodeContext {
+    fn from_state(state: &SpacewarsState) -> Self {
+        Self {
+            seed: state.seed,
+            universe_radius: state.config.universe_radius,
+            asteroid_probability_per_sec: state.config.asteroid_probability_per_sec,
+            planets: state.config.use_planets,
+            fps: state.config.fps,
+            player_health_percent: [
+                state.config.players[0].health_percent,
+                state.config.players[1].health_percent,
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PredictedBodyApproach {
+    body: AvoidanceBody,
+    local_position: Vec2,
+    local_velocity: Vec2,
+    current_clearance: f32,
+    time_to_impact: Option<f32>,
+    closest_time: f32,
+    closest_clearance: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BotFlightSample {
+    seed: u64,
+    tick: u64,
+    events: u16,
+    telemetry: BrainTelemetry,
+    intent: ShipIntent,
+    form: ShipForm,
+    life_fraction: f32,
+    wings_closed: bool,
+    docked_planet: Option<PlanetId>,
+    position: Vec2,
+    velocity: Vec2,
+    omega: f32,
+    contact: Option<BodyId>,
+    contact_incident: Option<BodyId>,
+    predicted_approach: Option<PredictedBodyApproach>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FlightContactIncident {
+    body: BodyId,
+    last_seen_tick: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FlightEncounterTrigger {
+    BodyContact(BodyId),
+    EscapeAssist(Option<AvoidanceBody>),
+    EmergencyEscape(Option<AvoidanceBody>),
+}
+
+impl std::fmt::Display for FlightEncounterTrigger {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BodyContact(body) => write!(formatter, "body_contact:{body:?}"),
+            Self::EscapeAssist(body) => write!(formatter, "escape_assist:{body:?}"),
+            Self::EmergencyEscape(body) => write!(formatter, "emergency_escape:{body:?}"),
+        }
+    }
+}
+
+struct FlightEncounterCapture {
+    trigger: FlightEncounterTrigger,
+    trigger_tick: u64,
+    samples: Vec<BotFlightSample>,
+    collecting: bool,
+}
+
+struct BotFlightHistory {
+    context: Option<FlightEpisodeContext>,
+    recent: VecDeque<BotFlightSample>,
+    encounter: Option<FlightEncounterCapture>,
+    last_sample_tick: Option<u64>,
+    initialized: bool,
+    previous_avoided_body: Option<AvoidanceBody>,
+    contact_incident: Option<FlightContactIncident>,
+    previous_escape_assist: bool,
+    previous_emergency_assist: bool,
+    previous_form: ShipForm,
+    previous_docked_planet: Option<PlanetId>,
+}
+
+impl Default for BotFlightHistory {
+    fn default() -> Self {
+        Self {
+            context: None,
+            recent: VecDeque::with_capacity(FLIGHT_RECENT_CAPACITY),
+            encounter: None,
+            last_sample_tick: None,
+            initialized: false,
+            previous_avoided_body: None,
+            contact_incident: None,
+            previous_escape_assist: false,
+            previous_emergency_assist: false,
+            previous_form: ShipForm::Ship,
+            previous_docked_planet: None,
+        }
+    }
+}
+
+impl BotFlightHistory {
+    fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.recent.is_empty() && self.encounter.is_none()
+    }
+
+    fn record(
+        &mut self,
+        state: &SpacewarsState,
+        observation: &ShipObservationV1,
+        telemetry: BrainTelemetry,
+        intent: ShipIntent,
+    ) {
+        let context = FlightEpisodeContext::from_state(state);
+        if self.context != Some(context) {
+            self.clear();
+            self.context = Some(context);
+        }
+
+        let contact = state
+            .body_collisions
+            .iter()
+            .find(|collision| collision.ship == observation.actor.index())
+            .map(|collision| collision.body);
+        // Accepted spaceport contact is intentionally represented in each
+        // sample, but it is not a crash and should not replace a mechanical
+        // encounter capture.
+        let mechanical_contact = contact.filter(|body| {
+            !matches!(
+                (body, observation.own_ship.docked_planet),
+                (BodyId::Planet(index), Some(planet)) if *index == planet.index()
+            )
+        });
+
+        let previous_contact_incident = self.contact_incident.map(|incident| incident.body);
+        if self.contact_incident.is_some_and(|incident| {
+            state.tick.saturating_sub(incident.last_seen_tick) >= FLIGHT_CONTACT_REARM_TICKS
+        }) {
+            self.contact_incident = None;
+        }
+        let mut mechanical_contact_started = false;
+        if let Some(body) = mechanical_contact {
+            match self.contact_incident.as_mut() {
+                Some(incident) if incident.body == body => incident.last_seen_tick = state.tick,
+                _ => {
+                    self.contact_incident = Some(FlightContactIncident {
+                        body,
+                        last_seen_tick: state.tick,
+                    });
+                    mechanical_contact_started = true;
+                }
+            }
+        }
+        let contact_incident = self.contact_incident.map(|incident| incident.body);
+
+        let mut events = 0;
+        if !self.initialized {
+            events |= FLIGHT_EVENT_INITIAL;
+        } else {
+            if telemetry.avoided_body != self.previous_avoided_body {
+                events |= FLIGHT_EVENT_AVOIDANCE_CHANGED;
+            }
+            if contact_incident != previous_contact_incident {
+                events |= FLIGHT_EVENT_CONTACT_CHANGED;
+            }
+            if telemetry.avoidance_escape_assist != self.previous_escape_assist {
+                events |= FLIGHT_EVENT_ASSIST_CHANGED;
+            }
+            if telemetry.avoidance_emergency_escape_assist != self.previous_emergency_assist {
+                events |= FLIGHT_EVENT_EMERGENCY_CHANGED;
+            }
+            if observation.own_ship.form != self.previous_form {
+                events |= FLIGHT_EVENT_FORM_CHANGED;
+            }
+            if observation.own_ship.docked_planet != self.previous_docked_planet {
+                events |= FLIGHT_EVENT_DOCK_CHANGED;
+            }
+        }
+
+        let escape_assist_started =
+            telemetry.avoidance_escape_assist && !self.previous_escape_assist;
+        let emergency_assist_started =
+            telemetry.avoidance_emergency_escape_assist && !self.previous_emergency_assist;
+        let sample_due = events != 0
+            || self.last_sample_tick.is_none_or(|last_tick| {
+                state.tick.saturating_sub(last_tick)
+                    >= flight_sample_interval_ticks(state.config.fps)
+            });
+
+        self.initialized = true;
+        self.previous_avoided_body = telemetry.avoided_body;
+        self.previous_escape_assist = telemetry.avoidance_escape_assist;
+        self.previous_emergency_assist = telemetry.avoidance_emergency_escape_assist;
+        self.previous_form = observation.own_ship.form;
+        self.previous_docked_planet = observation.own_ship.docked_planet;
+
+        if !sample_due {
+            return;
+        }
+
+        let ship = &state.ships[observation.actor.index()];
+        let sample = BotFlightSample {
+            seed: state.seed,
+            tick: state.tick,
+            events,
+            telemetry,
+            intent,
+            form: observation.own_ship.form,
+            life_fraction: observation.own_ship.life_fraction,
+            wings_closed: observation.own_ship.wings_closed,
+            docked_planet: observation.own_ship.docked_planet,
+            position: ship.position,
+            velocity: ship.velocity,
+            omega: ship.omega,
+            contact,
+            contact_incident,
+            predicted_approach: predicted_body_approach(observation),
+        };
+        self.push_recent(sample);
+        self.last_sample_tick = Some(state.tick);
+
+        let trigger = if mechanical_contact_started {
+            mechanical_contact.map(FlightEncounterTrigger::BodyContact)
+        } else if emergency_assist_started {
+            Some(FlightEncounterTrigger::EmergencyEscape(
+                telemetry.avoided_body,
+            ))
+        } else if escape_assist_started {
+            Some(FlightEncounterTrigger::EscapeAssist(telemetry.avoided_body))
+        } else {
+            None
+        };
+
+        let can_start_encounter = self
+            .encounter
+            .as_ref()
+            .is_none_or(|encounter| !encounter.collecting);
+        if let Some(trigger) = trigger.filter(|_| can_start_encounter) {
+            let start = self
+                .recent
+                .len()
+                .saturating_sub(FLIGHT_ENCOUNTER_PRE_SAMPLES);
+            let mut samples = Vec::with_capacity(FLIGHT_ENCOUNTER_CAPACITY);
+            samples.extend(self.recent.iter().skip(start).copied());
+            self.encounter = Some(FlightEncounterCapture {
+                trigger,
+                trigger_tick: state.tick,
+                samples,
+                collecting: true,
+            });
+        } else if let Some(encounter) = self.encounter.as_mut().filter(|encounter| {
+            encounter.collecting
+                && encounter
+                    .samples
+                    .last()
+                    .is_none_or(|last| last.tick != sample.tick)
+        }) {
+            encounter.samples.push(sample);
+            if encounter.samples.len() >= FLIGHT_ENCOUNTER_CAPACITY {
+                encounter.collecting = false;
+            }
+        }
+    }
+
+    fn push_recent(&mut self, sample: BotFlightSample) {
+        if self.recent.len() == FLIGHT_RECENT_CAPACITY {
+            self.recent.pop_front();
+        }
+        self.recent.push_back(sample);
+    }
+
+    fn write_text(&self, player: usize, output: &mut String) {
+        let _ = writeln!(
+            output,
+            "flight_history player={} sample_rate_hz={} sample_interval_ticks={} recent_capacity={} encounter_pre_samples={} encounter_capacity={} contact_rearm_ticks={}",
+            player + 1,
+            FLIGHT_SAMPLE_RATE_HZ,
+            self.context
+                .map_or(1, |context| flight_sample_interval_ticks(context.fps)),
+            FLIGHT_RECENT_CAPACITY,
+            FLIGHT_ENCOUNTER_PRE_SAMPLES,
+            FLIGHT_ENCOUNTER_CAPACITY,
+            FLIGHT_CONTACT_REARM_TICKS,
+        );
+        output.push_str(
+            "flight_intent_order=(turn,thrust,brake,wings_closed,laser,cannon) prediction_horizon_seconds=5\n",
+        );
+        if let Some(context) = self.context {
+            let _ = writeln!(
+                output,
+                "episode seed={} universe_radius={} asteroid_probability_per_sec={:.3} planets={} fps={} player_health_percent={:?}",
+                context.seed,
+                context.universe_radius,
+                context.asteroid_probability_per_sec,
+                context.planets,
+                context.fps,
+                context.player_health_percent,
+            );
+        }
+
+        let encounter_last_tick = if let Some(encounter) = &self.encounter {
+            let _ = writeln!(
+                output,
+                "encounter trigger={} trigger_tick={} collecting={} samples={}",
+                encounter.trigger,
+                encounter.trigger_tick,
+                encounter.collecting,
+                encounter.samples.len(),
+            );
+            for sample in &encounter.samples {
+                write_flight_sample(output, sample);
+            }
+            encounter.samples.last().map(|sample| sample.tick)
+        } else {
+            None
+        };
+
+        let recent = self
+            .recent
+            .iter()
+            .filter(|sample| encounter_last_tick.is_none_or(|tick| sample.tick > tick))
+            .collect::<Vec<_>>();
+        if !recent.is_empty() {
+            let _ = writeln!(output, "recent samples={}", recent.len());
+            for sample in recent {
+                write_flight_sample(output, sample);
+            }
+        }
+    }
+}
+
+fn flight_sample_interval_ticks(fps: u32) -> u64 {
+    u64::from((fps.saturating_add(FLIGHT_SAMPLE_RATE_HZ / 2) / FLIGHT_SAMPLE_RATE_HZ).max(1))
+}
+
+fn predicted_body_approach(observation: &ShipObservationV1) -> Option<PredictedBodyApproach> {
+    let mut best = observation.sun.map(|sun| {
+        body_approach(
+            AvoidanceBody::Sun,
+            sun.local_position,
+            sun.local_velocity,
+            sun.radius + observation.own_ship.collision_radius,
+        )
+    });
+    for planet in &observation.planets {
+        let candidate = body_approach(
+            AvoidanceBody::Planet(planet.id),
+            planet.local_position,
+            planet.local_velocity,
+            planet.radius + observation.own_ship.collision_radius,
+        );
+        if best.is_none_or(|current| body_approach_precedes(candidate, current)) {
+            best = Some(candidate);
+        }
+    }
+    best
+}
+
+fn body_approach(
+    body: AvoidanceBody,
+    local_position: Vec2,
+    local_velocity: Vec2,
+    collision_radius: f32,
+) -> PredictedBodyApproach {
+    let speed_squared = local_velocity.length_squared();
+    let current_clearance = local_position.length() - collision_radius;
+    if speed_squared <= 1.0e-6 {
+        return PredictedBodyApproach {
+            body,
+            local_position,
+            local_velocity,
+            current_clearance,
+            time_to_impact: (current_clearance <= 0.0).then_some(0.0),
+            closest_time: 0.0,
+            closest_clearance: current_clearance,
+        };
+    }
+
+    let closest_time = (-local_position.dot(local_velocity) / speed_squared)
+        .clamp(0.0, BODY_PREDICTION_HORIZON_SECONDS);
+    let closest_clearance =
+        (local_position + local_velocity * closest_time).length() - collision_radius;
+    let time_to_impact = if current_clearance <= 0.0 {
+        Some(0.0)
+    } else {
+        let b = 2.0 * local_position.dot(local_velocity);
+        let c = local_position.length_squared() - collision_radius * collision_radius;
+        let discriminant = b * b - 4.0 * speed_squared * c;
+        if discriminant < 0.0 {
+            None
+        } else {
+            let root = (-b - discriminant.sqrt()) / (2.0 * speed_squared);
+            (0.0..=BODY_PREDICTION_HORIZON_SECONDS)
+                .contains(&root)
+                .then_some(root)
+        }
+    };
+    PredictedBodyApproach {
+        body,
+        local_position,
+        local_velocity,
+        current_clearance,
+        time_to_impact,
+        closest_time,
+        closest_clearance,
+    }
+}
+
+fn body_approach_precedes(
+    candidate: PredictedBodyApproach,
+    current: PredictedBodyApproach,
+) -> bool {
+    match (candidate.time_to_impact, current.time_to_impact) {
+        (Some(candidate_time), Some(current_time)) => candidate_time < current_time,
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => candidate.closest_clearance < current.closest_clearance,
+    }
+}
+
+fn write_flight_sample(output: &mut String, sample: &BotFlightSample) {
+    let prediction = sample.predicted_approach;
+    let _ = writeln!(
+        output,
+        "flight tick={} seed={} events={} form={:?} life={:.3} pos=({:.2},{:.2}) vel=({:.2},{:.2}) speed={:.2} omega={:.3} wings={} dock={:?} contact={:?} contact_incident={:?} strategy={:?} strategy_planet={:?} strategy_score={} strategy_age={} strategy_reason={:?} brain={:?} brain_planet={:?} port={:?} hazard={:?} avoid={:?} clearance={} outward={} predictive={} avoid_closest_time={} avoid_predicted_clearance={} avoid_age={} stalled={} assist={} emergency={} target_distance={:.3} heading={:.3} desired_speed={:.3} relative_speed={:.3} predict={:?} body_pos=({},{}) body_vel=({},{}) predict_clearance={} impact_time={} closest_time={} closest_clearance={} intent=({:.2},{:.2},{:.2},{},{},{})",
+        sample.tick,
+        sample.seed,
+        flight_event_text(sample.events),
+        sample.form,
+        sample.life_fraction,
+        sample.position.x,
+        sample.position.y,
+        sample.velocity.x,
+        sample.velocity.y,
+        sample.velocity.length(),
+        sample.omega,
+        sample.wings_closed,
+        sample.docked_planet,
+        sample.contact,
+        sample.contact_incident,
+        sample.telemetry.strategy.goal,
+        sample.telemetry.strategy.target_planet,
+        optional_f32(sample.telemetry.strategy.selected_score),
+        sample.telemetry.strategy.age_ticks,
+        sample.telemetry.strategy.selection_reason,
+        sample.telemetry.goal,
+        sample.telemetry.target_planet,
+        sample.telemetry.port_phase,
+        sample.telemetry.hazard,
+        sample.telemetry.avoided_body,
+        optional_f32(sample.telemetry.avoidance_surface_clearance),
+        optional_f32(sample.telemetry.avoidance_outward_speed),
+        sample.telemetry.avoidance_predictive,
+        optional_f32(sample.telemetry.avoidance_seconds_until_closest),
+        optional_f32(sample.telemetry.avoidance_predicted_surface_clearance),
+        sample.telemetry.avoidance_age_ticks,
+        sample.telemetry.avoidance_stalled_ticks,
+        sample.telemetry.avoidance_escape_assist,
+        sample.telemetry.avoidance_emergency_escape_assist,
+        sample.telemetry.target_distance,
+        sample.telemetry.heading_error,
+        sample.telemetry.desired_speed,
+        sample.telemetry.relative_speed,
+        prediction.map(|approach| approach.body),
+        optional_f32(prediction.map(|approach| approach.local_position.x)),
+        optional_f32(prediction.map(|approach| approach.local_position.y)),
+        optional_f32(prediction.map(|approach| approach.local_velocity.x)),
+        optional_f32(prediction.map(|approach| approach.local_velocity.y)),
+        optional_f32(prediction.map(|approach| approach.current_clearance)),
+        optional_f32(prediction.and_then(|approach| approach.time_to_impact)),
+        optional_f32(prediction.map(|approach| approach.closest_time)),
+        optional_f32(prediction.map(|approach| approach.closest_clearance)),
+        sample.intent.turn,
+        sample.intent.thrust,
+        sample.intent.brake,
+        sample.intent.wings_closed,
+        sample.intent.laser,
+        sample.intent.cannon,
+    );
+}
+
+fn flight_event_text(events: u16) -> String {
+    let names = [
+        (FLIGHT_EVENT_INITIAL, "initial"),
+        (FLIGHT_EVENT_AVOIDANCE_CHANGED, "avoidance"),
+        (FLIGHT_EVENT_CONTACT_CHANGED, "contact"),
+        (FLIGHT_EVENT_ASSIST_CHANGED, "assist"),
+        (FLIGHT_EVENT_EMERGENCY_CHANGED, "emergency"),
+        (FLIGHT_EVENT_FORM_CHANGED, "form"),
+        (FLIGHT_EVENT_DOCK_CHANGED, "dock"),
+    ];
+    let mut output = String::new();
+    for (flag, name) in names {
+        if events & flag == 0 {
+            continue;
+        }
+        if !output.is_empty() {
+            output.push('|');
+        }
+        output.push_str(name);
+    }
+    if output.is_empty() {
+        output.push('-');
+    }
+    output
+}
+
+fn optional_f32(value: Option<f32>) -> String {
+    value.map_or_else(|| "-".into(), |value| format!("{value:.3}"))
+}
+
 struct SpacewarsControls {
     seats: [ControlSeat; 2],
     rule_brains: [RuleShipBrain; 2],
@@ -463,6 +1025,7 @@ struct SpacewarsControls {
     active_sources: [SpacewarsControlMode; 2],
     encoder: ShipIntentEncoder,
     bot_diagnostics: [Option<String>; 2],
+    flight_histories: [BotFlightHistory; 2],
     diagnostics_revision: u64,
 }
 
@@ -488,6 +1051,7 @@ impl SpacewarsControls {
             active_sources: [SpacewarsControlMode::Human; 2],
             encoder: ShipIntentEncoder::default(),
             bot_diagnostics: std::array::from_fn(|_| None),
+            flight_histories: std::array::from_fn(|_| BotFlightHistory::default()),
             diagnostics_revision: 0,
         }
     }
@@ -511,6 +1075,7 @@ impl SpacewarsControls {
             if mode != SpacewarsControlMode::RuleBot
                 && self.bot_diagnostics[player].take().is_some()
             {
+                self.flight_histories[player].clear();
                 self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
             }
 
@@ -553,8 +1118,9 @@ impl SpacewarsControls {
             return ShipIntent::default();
         };
         let intent = self.rule_brains[player].intent(&observation);
+        let telemetry = self.rule_brains[player].telemetry();
+        self.flight_histories[player].record(state, &observation, telemetry, intent);
         if state.tick.is_multiple_of(60) {
-            let telemetry = self.rule_brains[player].telemetry();
             let target_planet = telemetry.target_planet.and_then(|target| {
                 observation
                     .planets
@@ -565,6 +1131,13 @@ impl SpacewarsControls {
                 player = player + 1,
                 seed = state.seed,
                 tick = state.tick,
+                strategy_goal = ?telemetry.strategy.goal,
+                strategy_target = ?telemetry.strategy.target,
+                strategy_target_planet = ?telemetry.strategy.target_planet,
+                strategy_score = ?telemetry.strategy.selected_score,
+                strategy_age_ticks = telemetry.strategy.age_ticks,
+                strategy_reason = ?telemetry.strategy.selection_reason,
+                strategy_scores = ?telemetry.strategy.scores,
                 goal = ?telemetry.goal,
                 target = ?telemetry.target,
                 target_planet = ?telemetry.target_planet,
@@ -572,6 +1145,17 @@ impl SpacewarsControls {
                 hazard = ?telemetry.hazard,
                 avoided_body = ?telemetry.avoided_body,
                 avoidance_surface_clearance = ?telemetry.avoidance_surface_clearance,
+                avoidance_outward_speed = ?telemetry.avoidance_outward_speed,
+                avoidance_predictive = telemetry.avoidance_predictive,
+                avoidance_seconds_until_closest = ?telemetry.avoidance_seconds_until_closest,
+                avoidance_predicted_surface_clearance = ?telemetry
+                    .avoidance_predicted_surface_clearance,
+                avoidance_age_ticks = telemetry.avoidance_age_ticks,
+                avoidance_stalled_ticks = telemetry.avoidance_stalled_ticks,
+                avoidance_escape_assist = telemetry.avoidance_escape_assist,
+                avoidance_emergency_escape_assist = telemetry
+                    .avoidance_emergency_escape_assist,
+                life_fraction = observation.own_ship.life_fraction,
                 distance = telemetry.target_distance,
                 heading_error = telemetry.heading_error,
                 desired_speed = telemetry.desired_speed,
@@ -585,6 +1169,15 @@ impl SpacewarsControls {
             );
             let avoidance_surface_clearance = telemetry
                 .avoidance_surface_clearance
+                .map_or_else(|| "none".into(), |clearance| format!("{clearance:.3}"));
+            let avoidance_outward_speed = telemetry
+                .avoidance_outward_speed
+                .map_or_else(|| "none".into(), |speed| format!("{speed:.3}"));
+            let avoidance_seconds_until_closest = telemetry
+                .avoidance_seconds_until_closest
+                .map_or_else(|| "none".into(), |seconds| format!("{seconds:.3}"));
+            let avoidance_predicted_surface_clearance = telemetry
+                .avoidance_predicted_surface_clearance
                 .map_or_else(|| "none".into(), |clearance| format!("{clearance:.3}"));
             let target = target_planet.map_or_else(
                 || "none".into(),
@@ -630,12 +1223,19 @@ impl SpacewarsControls {
             );
             let ship = &state.ships[player];
             self.bot_diagnostics[player] = Some(format!(
-                "player={} seed={} tick={} planets={} winner={:?}\nbrain goal={:?} target={:?} target_planet={:?} phase={:?} hazard={:?} avoided_body={:?} avoidance_surface_clearance={} distance={:.3} heading_error={:.3} desired_speed={:.3} relative_speed={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nship form={:?} position={:?} velocity={:?} omega={:.3} observed_wings_closed={} docked_planet={:?}\ntarget {target}\ndocked {docked}",
+                "player={} seed={} tick={} planets={} winner={:?}\nstrategy goal={:?} target={:?} target_planet={:?} score={:?} age_ticks={} reason={:?} scores={:?}\nbrain goal={:?} target={:?} target_planet={:?} phase={:?} hazard={:?} avoided_body={:?} avoidance_surface_clearance={} avoidance_outward_speed={} avoidance_predictive={} avoidance_seconds_until_closest={} avoidance_predicted_surface_clearance={} avoidance_age_ticks={} avoidance_stalled_ticks={} avoidance_escape_assist={} avoidance_emergency_escape_assist={} distance={:.3} heading_error={:.3} desired_speed={:.3} relative_speed={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nship form={:?} life_fraction={:.3} position={:?} velocity={:?} omega={:.3} observed_wings_closed={} docked_planet={:?}\ntarget {target}\ndocked {docked}",
                 player + 1,
                 state.seed,
                 state.tick,
                 state.players[player].planet_count,
                 state.winner,
+                telemetry.strategy.goal,
+                telemetry.strategy.target,
+                telemetry.strategy.target_planet,
+                telemetry.strategy.selected_score,
+                telemetry.strategy.age_ticks,
+                telemetry.strategy.selection_reason,
+                telemetry.strategy.scores,
                 telemetry.goal,
                 telemetry.target,
                 telemetry.target_planet,
@@ -643,6 +1243,14 @@ impl SpacewarsControls {
                 telemetry.hazard,
                 telemetry.avoided_body,
                 avoidance_surface_clearance,
+                avoidance_outward_speed,
+                telemetry.avoidance_predictive,
+                avoidance_seconds_until_closest,
+                avoidance_predicted_surface_clearance,
+                telemetry.avoidance_age_ticks,
+                telemetry.avoidance_stalled_ticks,
+                telemetry.avoidance_escape_assist,
+                telemetry.avoidance_emergency_escape_assist,
                 telemetry.target_distance,
                 telemetry.heading_error,
                 telemetry.desired_speed,
@@ -654,6 +1262,7 @@ impl SpacewarsControls {
                 intent.laser,
                 intent.cannon,
                 observation.own_ship.form,
+                observation.own_ship.life_fraction,
                 ship.position,
                 ship.velocity,
                 ship.omega,
@@ -665,12 +1274,32 @@ impl SpacewarsControls {
         intent
     }
 
+    fn flight_history_text(&self) -> String {
+        let mut output = String::new();
+        let mut found = false;
+        for (player, history) in self.flight_histories.iter().enumerate() {
+            if history.is_empty() {
+                continue;
+            }
+            if found {
+                output.push('\n');
+            }
+            history.write_text(player, &mut output);
+            found = true;
+        }
+        if !found {
+            output.push_str("No rule-bot flight history captured.");
+        }
+        output
+    }
+
     fn reset(&mut self) {
         self.encoder.reset();
         self.rule_brains = [RuleShipBrain::default(), RuleShipBrain::default()];
         self.brain_contexts = [None, None];
         self.active_sources = [SpacewarsControlMode::Human; 2];
         self.bot_diagnostics = std::array::from_fn(|_| None);
+        self.flight_histories = std::array::from_fn(|_| BotFlightHistory::default());
         self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
     }
 }
@@ -1366,6 +1995,10 @@ mod tests {
         assert!(diagnostics.contains("player=2 seed=7 tick=0"));
         assert!(diagnostics.contains("brain goal=Attack"));
         assert!(diagnostics.contains("avoided_body=None avoidance_surface_clearance=none"));
+        assert!(diagnostics.contains(
+            "avoidance_outward_speed=none avoidance_predictive=false avoidance_seconds_until_closest=none avoidance_predicted_surface_clearance=none avoidance_age_ticks=0 avoidance_stalled_ticks=0 avoidance_escape_assist=false avoidance_emergency_escape_assist=false"
+        ));
+        assert!(diagnostics.contains("ship form=Ship life_fraction=1.000"));
         assert!(diagnostics.contains("docked none"));
 
         input.reset_spacewars_controls();
@@ -1399,5 +2032,146 @@ mod tests {
             action,
             ScenarioAction::SetTurn { player: 1, rate } if rate.abs() > 0.0
         )));
+    }
+
+    #[test]
+    fn body_prediction_reports_time_to_planet_impact() {
+        let state = SpacewarsScenario::init(SpacewarsConfig::default(), 17);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.sun = None;
+        observation.planets.truncate(1);
+        let planet = &mut observation.planets[0];
+        planet.local_position = Vec2::new(0.0, 100.0);
+        planet.local_velocity = Vec2::new(0.0, -20.0);
+        planet.radius = 20.0;
+        let planet_id = planet.id;
+        let planet_radius = planet.radius;
+
+        let approach = predicted_body_approach(&observation).unwrap();
+        let expected_time = (100.0 - planet_radius - observation.own_ship.collision_radius) / 20.0;
+
+        assert_eq!(approach.body, AvoidanceBody::Planet(planet_id));
+        assert!(
+            (approach.current_clearance
+                - (100.0 - planet_radius - observation.own_ship.collision_radius))
+                .abs()
+                < 0.001
+        );
+        assert!((approach.time_to_impact.unwrap() - expected_time).abs() < 0.001);
+        assert_eq!(approach.closest_time, BODY_PREDICTION_HORIZON_SECONDS);
+        assert!(approach.closest_clearance < 0.0);
+    }
+
+    #[test]
+    fn flight_history_preserves_pre_contact_samples_after_recent_window_rolls() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 23);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        let planet = observation.planets[0].id;
+        let mut telemetry = BrainTelemetry::default();
+        let mut history = BotFlightHistory::default();
+
+        for tick in 0..19 {
+            state.tick = tick;
+            observation.tick = tick;
+            history.record(&state, &observation, telemetry, ShipIntent::default());
+        }
+
+        state.tick = 19;
+        observation.tick = 19;
+        state
+            .body_collisions
+            .push(scenario_spacewars::BodyCollision {
+                ship: PlayerId::PLAYER_2.index(),
+                body: BodyId::Planet(planet.index()),
+            });
+        telemetry.avoided_body = Some(AvoidanceBody::Planet(planet));
+        telemetry.avoidance_escape_assist = true;
+        history.record(&state, &observation, telemetry, ShipIntent::default());
+
+        // Contact manifolds flicker every other tick during one continuous
+        // scrape. That must remain the original incident instead of replacing
+        // the completed capture and discarding its lead-in.
+        for tick in 20..1_500 {
+            state.tick = tick;
+            observation.tick = tick;
+            state.body_collisions.clear();
+            if tick % 2 == 1 {
+                state
+                    .body_collisions
+                    .push(scenario_spacewars::BodyCollision {
+                        ship: PlayerId::PLAYER_2.index(),
+                        body: BodyId::Planet(planet.index()),
+                    });
+            }
+            history.record(&state, &observation, telemetry, ShipIntent::default());
+        }
+
+        let encounter = history.encounter.as_ref().unwrap();
+        assert_eq!(encounter.trigger_tick, 19);
+        assert_eq!(encounter.samples.first().unwrap().tick, 0);
+        assert!(
+            encounter.samples.iter().any(
+                |sample| sample.tick == 19 && sample.events & FLIGHT_EVENT_CONTACT_CHANGED != 0
+            )
+        );
+        assert!(!encounter.collecting);
+        assert_eq!(encounter.samples.len(), FLIGHT_ENCOUNTER_CAPACITY);
+        assert_eq!(history.recent.len(), FLIGHT_RECENT_CAPACITY);
+        assert!(history.recent.front().unwrap().tick > 19);
+
+        let mut input = ClientInput::default();
+        input.spacewars_controls.flight_histories[1] = history;
+        assert!(!input.runtime_diagnostics_text().contains("flight_history"));
+        let paused = input.paused_runtime_diagnostics_text();
+        assert!(paused.contains("flight_history player=2"));
+        assert!(paused.contains("contact_rearm_ticks=30"));
+        assert!(paused.contains("episode seed=23"));
+        assert!(paused.contains("trigger=body_contact:Planet(0) trigger_tick=19"));
+        assert!(paused.contains("events=avoidance|contact|assist"));
+        assert!(paused.contains("contact_incident=Some(Planet(0))"));
+        assert!(paused.contains("impact_time="));
+    }
+
+    #[test]
+    fn accepted_spaceport_contact_does_not_start_a_crash_capture() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 29);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        let planet = observation.planets[0].id;
+        observation.own_ship.docked_planet = Some(planet);
+        state
+            .body_collisions
+            .push(scenario_spacewars::BodyCollision {
+                ship: PlayerId::PLAYER_2.index(),
+                body: BodyId::Planet(planet.index()),
+            });
+
+        let mut history = BotFlightHistory::default();
+        history.record(
+            &state,
+            &observation,
+            BrainTelemetry::default(),
+            ShipIntent::default(),
+        );
+
+        assert!(history.encounter.is_none());
+        assert_eq!(
+            history.recent.back().unwrap().contact,
+            Some(BodyId::Planet(planet.index()))
+        );
     }
 }

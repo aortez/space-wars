@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 
 use std::{
+    collections::BTreeMap,
     fmt,
     time::{Duration, Instant},
 };
@@ -20,14 +21,17 @@ use scenario_spacewars::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use spacewars_ai::{
-    BrainGoal, BrainReset, BrainTelemetry, PortNavigationPhase, RULE_SHIP_BRAIN_POLICY_ID,
-    RuleShipBrain, ShipBrain,
+    AvoidanceBody, BrainGoal, BrainReset, BrainTelemetry, PortNavigationPhase,
+    RULE_SHIP_BRAIN_POLICY_ID, RuleShipBrain, ShipBrain, StrategicGoal, StrategyTelemetry,
 };
 
-pub const REPORT_SCHEMA_VERSION: u32 = 1;
+pub const REPORT_SCHEMA_VERSION: u32 = 2;
 pub const NAVIGATION_V1_SUITE_ID: &str = "navigation_v1";
 pub const NAVIGATION_V1_SEEDS: [u64; 6] = [0, 1, 2, 3, 4, 5];
 pub const NAVIGATION_V1_MAX_TICKS: u64 = 36_000;
+pub const STRATEGY_V1_SUITE_ID: &str = "strategy_v1";
+pub const STRATEGY_V1_SEEDS: [u64; 4] = [0, 1, 2, 3];
+pub const STRATEGY_V1_MAX_TICKS: u64 = 18_000;
 const NAVIGATION_HEALTH_PERCENT: u32 = 100_000;
 const NAVIGATION_SAFE_DEPARTURE_CLEARANCE: f32 = 90.0;
 const CONTACT_INCIDENT_REARM_TICKS: u64 = 30;
@@ -81,12 +85,14 @@ impl SpacewarsPreset {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvaluationSuite {
     NavigationV1,
+    StrategyV1,
 }
 
 impl EvaluationSuite {
     pub const fn id(self) -> &'static str {
         match self {
             Self::NavigationV1 => NAVIGATION_V1_SUITE_ID,
+            Self::StrategyV1 => STRATEGY_V1_SUITE_ID,
         }
     }
 
@@ -102,6 +108,25 @@ impl EvaluationSuite {
                     trace_player: None,
                 })
                 .collect(),
+            Self::StrategyV1 => {
+                let mut configs = Vec::with_capacity(STRATEGY_V1_SEEDS.len() * 3);
+                for seed in STRATEGY_V1_SEEDS {
+                    for controllers in [
+                        [ControllerKind::Rule, ControllerKind::Idle],
+                        [ControllerKind::Idle, ControllerKind::Rule],
+                        [ControllerKind::Rule, ControllerKind::Rule],
+                    ] {
+                        configs.push(EpisodeConfig {
+                            seed,
+                            preset: SpacewarsPreset::StandardNoAsteroids,
+                            controllers,
+                            max_ticks: STRATEGY_V1_MAX_TICKS,
+                            trace_player: None,
+                        });
+                    }
+                }
+                configs
+            }
         }
     }
 }
@@ -224,7 +249,18 @@ pub struct NavigationTraceEvent {
     pub tick: u64,
     pub player: PlayerId,
     pub reasons: Vec<NavigationTraceReason>,
+    pub strategy: StrategyTelemetry,
     pub goal: BrainGoal,
+    pub avoided_body: Option<AvoidanceBody>,
+    pub avoidance_surface_clearance: Option<f32>,
+    pub avoidance_outward_speed: Option<f32>,
+    pub avoidance_predictive: bool,
+    pub avoidance_seconds_until_closest: Option<f32>,
+    pub avoidance_predicted_surface_clearance: Option<f32>,
+    pub avoidance_age_ticks: u64,
+    pub avoidance_stalled_ticks: u64,
+    pub avoidance_escape_assist: bool,
+    pub avoidance_emergency_escape_assist: bool,
     pub target_planet: Option<usize>,
     pub port_phase: Option<PortNavigationPhase>,
     pub docked_planet: Option<usize>,
@@ -233,6 +269,7 @@ pub struct NavigationTraceEvent {
     pub pending_capture_ticks: Option<u64>,
     pub surface_clearance: Option<f32>,
     pub outward_speed: Option<f32>,
+    pub spaceport_distance: Option<f32>,
     pub spaceport_angular_speed: Option<f32>,
     pub world_velocity: [f32; 2],
     pub world_speed: f32,
@@ -249,6 +286,76 @@ pub struct NavigationTraceEvent {
     pub intent: NavigationTraceIntent,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct StrategyMetrics {
+    pub objective_selections: u64,
+    pub idle_ticks: u64,
+    pub survive_ticks: u64,
+    pub attack_ticks: u64,
+    pub capture_ticks: u64,
+    pub repair_ticks: u64,
+    pub defend_ticks: u64,
+    pub rebuild_ticks: u64,
+}
+
+impl StrategyMetrics {
+    fn observe_goal(&mut self, goal: StrategicGoal) {
+        let ticks = match goal {
+            StrategicGoal::Idle => &mut self.idle_ticks,
+            StrategicGoal::Survive => &mut self.survive_ticks,
+            StrategicGoal::Attack => &mut self.attack_ticks,
+            StrategicGoal::Capture => &mut self.capture_ticks,
+            StrategicGoal::Repair => &mut self.repair_ticks,
+            StrategicGoal::Defend => &mut self.defend_ticks,
+            StrategicGoal::Rebuild => &mut self.rebuild_ticks,
+        };
+        *ticks += 1;
+    }
+
+    fn add_assign(&mut self, other: Self) {
+        self.objective_selections += other.objective_selections;
+        self.idle_ticks += other.idle_ticks;
+        self.survive_ticks += other.survive_ticks;
+        self.attack_ticks += other.attack_ticks;
+        self.capture_ticks += other.capture_ticks;
+        self.repair_ticks += other.repair_ticks;
+        self.defend_ticks += other.defend_ticks;
+        self.rebuild_ticks += other.rebuild_ticks;
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PolicyMetrics {
+    pub controller: ControllerKind,
+    pub policy_id: &'static str,
+    /// One episode contributes once for each seat using this policy.
+    pub seat_episodes: u64,
+    pub ticks: u64,
+    pub captures: u64,
+    pub ship_losses: u64,
+    pub planet_impact_losses: u64,
+    pub sun_impact_losses: u64,
+    pub rebuilds: u64,
+    pub body_contacts: u64,
+}
+
+impl PolicyMetrics {
+    fn new(controller: ControllerDescriptor) -> Self {
+        Self {
+            controller: controller.kind,
+            policy_id: controller.policy_id,
+            seat_episodes: 0,
+            ticks: 0,
+            captures: 0,
+            ship_losses: 0,
+            planet_impact_losses: 0,
+            sun_impact_losses: 0,
+            rebuilds: 0,
+            body_contacts: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EpisodeSummary {
     pub seed: u64,
@@ -260,6 +367,8 @@ pub struct EpisodeSummary {
     pub outcome: EpisodeOutcome,
     pub captures: [u64; SPACEWARS_PLAYER_COUNT],
     pub ship_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    pub planet_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    pub sun_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
     pub rebuilds: [u64; SPACEWARS_PLAYER_COUNT],
     pub eliminations: [u64; SPACEWARS_PLAYER_COUNT],
     pub body_contacts: [u64; SPACEWARS_PLAYER_COUNT],
@@ -273,6 +382,7 @@ pub struct EpisodeSummary {
     pub final_planet_counts: [usize; SPACEWARS_PLAYER_COUNT],
     pub final_ship_forms: [ShipForm; SPACEWARS_PLAYER_COUNT],
     pub final_life_fractions: [f32; SPACEWARS_PLAYER_COUNT],
+    pub strategy: [StrategyMetrics; SPACEWARS_PLAYER_COUNT],
     pub actions_emitted: u64,
     pub trace_sha256: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -288,6 +398,8 @@ pub struct BatchSummary {
     pub tick_limits: u32,
     pub captures: [u64; SPACEWARS_PLAYER_COUNT],
     pub ship_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    pub planet_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    pub sun_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
     pub rebuilds: [u64; SPACEWARS_PLAYER_COUNT],
     pub body_contacts: [u64; SPACEWARS_PLAYER_COUNT],
     pub ship_contacts: [u64; SPACEWARS_PLAYER_COUNT],
@@ -297,6 +409,8 @@ pub struct BatchSummary {
     pub port_departures: [u64; SPACEWARS_PLAYER_COUNT],
     pub safe_capture_departures: [u64; SPACEWARS_PLAYER_COUNT],
     pub safe_rebuild_departures: [u64; SPACEWARS_PLAYER_COUNT],
+    pub strategy: [StrategyMetrics; SPACEWARS_PLAYER_COUNT],
+    pub policy_metrics: Vec<PolicyMetrics>,
     pub wall_seconds: f64,
     pub ticks_per_wall_second: f64,
     pub simulated_seconds_per_wall_second: f64,
@@ -344,7 +458,7 @@ impl std::error::Error for RunError {}
 
 enum SeatController {
     Idle,
-    Rule(RuleShipBrain),
+    Rule(Box<RuleShipBrain>),
 }
 
 impl SeatController {
@@ -357,7 +471,7 @@ impl SeatController {
                     actor,
                     episode_seed,
                 });
-                Self::Rule(brain)
+                Self::Rule(Box::new(brain))
             }
         }
     }
@@ -383,8 +497,47 @@ impl SeatController {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct StrategyIdentity {
+    goal: StrategicGoal,
+    target: Option<PlayerId>,
+    target_planet: Option<usize>,
+}
+
+impl From<StrategyTelemetry> for StrategyIdentity {
+    fn from(telemetry: StrategyTelemetry) -> Self {
+        Self {
+            goal: telemetry.goal,
+            target: telemetry.target,
+            target_planet: telemetry.target_planet.map(|planet| planet.index()),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct StrategyMetricTracker {
+    previous: Option<StrategyIdentity>,
+    metrics: StrategyMetrics,
+}
+
+impl StrategyMetricTracker {
+    fn observe(&mut self, telemetry: StrategyTelemetry) {
+        let identity = telemetry.into();
+        if self.previous != Some(identity) {
+            self.metrics.objective_selections += 1;
+            self.previous = Some(identity);
+        }
+        self.metrics.observe_goal(telemetry.goal);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct NavigationTraceSemantic {
+    strategy: StrategyIdentity,
     goal: BrainGoal,
+    avoided_body: Option<AvoidanceBody>,
+    avoidance_predictive: bool,
+    avoidance_escape_assist: bool,
+    avoidance_emergency_escape_assist: bool,
     target_planet: Option<usize>,
     port_phase: Option<PortNavigationPhase>,
     docked_planet: Option<usize>,
@@ -445,7 +598,12 @@ impl NavigationTraceCollector {
         };
         let docked_planet = docked_planet(state, player);
         let semantic = NavigationTraceSemantic {
+            strategy: telemetry.strategy.into(),
             goal: telemetry.goal,
+            avoided_body: telemetry.avoided_body,
+            avoidance_predictive: telemetry.avoidance_predictive,
+            avoidance_escape_assist: telemetry.avoidance_escape_assist,
+            avoidance_emergency_escape_assist: telemetry.avoidance_emergency_escape_assist,
             target_planet: telemetry.target_planet.map(|planet| planet.index()),
             port_phase: telemetry.port_phase,
             docked_planet,
@@ -503,7 +661,19 @@ impl NavigationTraceCollector {
                 tick: state.tick,
                 player: self.player,
                 reasons,
+                strategy: telemetry.strategy,
                 goal: telemetry.goal,
+                avoided_body: telemetry.avoided_body,
+                avoidance_surface_clearance: telemetry.avoidance_surface_clearance,
+                avoidance_outward_speed: telemetry.avoidance_outward_speed,
+                avoidance_predictive: telemetry.avoidance_predictive,
+                avoidance_seconds_until_closest: telemetry.avoidance_seconds_until_closest,
+                avoidance_predicted_surface_clearance: telemetry
+                    .avoidance_predicted_surface_clearance,
+                avoidance_age_ticks: telemetry.avoidance_age_ticks,
+                avoidance_stalled_ticks: telemetry.avoidance_stalled_ticks,
+                avoidance_escape_assist: telemetry.avoidance_escape_assist,
+                avoidance_emergency_escape_assist: telemetry.avoidance_emergency_escape_assist,
                 target_planet: semantic.target_planet,
                 port_phase: telemetry.port_phase,
                 docked_planet,
@@ -513,6 +683,7 @@ impl NavigationTraceCollector {
                     .map(|pending| state.tick.saturating_sub(pending.tick)),
                 surface_clearance: geometry.map(|geometry| geometry.surface_clearance),
                 outward_speed: geometry.map(|geometry| geometry.outward_speed),
+                spaceport_distance: geometry.map(|geometry| geometry.spaceport_distance),
                 spaceport_angular_speed: geometry.map(|geometry| geometry.spaceport_angular_speed),
                 world_velocity: [ship.velocity.x, ship.velocity.y],
                 world_speed: ship.velocity.length(),
@@ -568,6 +739,7 @@ impl NavigationTraceCollector {
 struct TracePlanetGeometry {
     surface_clearance: f32,
     outward_speed: f32,
+    spaceport_distance: f32,
     spaceport_angular_speed: f32,
     spaceport_rotation: f32,
 }
@@ -602,6 +774,7 @@ fn trace_planet_geometry(
     Some(TracePlanetGeometry {
         surface_clearance: distance - planet.radius - observation.own_ship.collision_radius,
         outward_speed,
+        spaceport_distance: planet.local_spaceport_position.length(),
         spaceport_angular_speed,
         spaceport_rotation,
     })
@@ -619,6 +792,8 @@ struct TransitionTracker {
     pending_rebuild_departures: [Vec<usize>; SPACEWARS_PLAYER_COUNT],
     captures: [u64; SPACEWARS_PLAYER_COUNT],
     ship_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    planet_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
+    sun_impact_losses: [u64; SPACEWARS_PLAYER_COUNT],
     rebuilds: [u64; SPACEWARS_PLAYER_COUNT],
     eliminations: [u64; SPACEWARS_PLAYER_COUNT],
     body_contacts: [u64; SPACEWARS_PLAYER_COUNT],
@@ -652,6 +827,8 @@ impl TransitionTracker {
             pending_rebuild_departures: std::array::from_fn(|_| Vec::new()),
             captures: [0; SPACEWARS_PLAYER_COUNT],
             ship_losses: [0; SPACEWARS_PLAYER_COUNT],
+            planet_impact_losses: [0; SPACEWARS_PLAYER_COUNT],
+            sun_impact_losses: [0; SPACEWARS_PLAYER_COUNT],
             rebuilds: [0; SPACEWARS_PLAYER_COUNT],
             eliminations: [0; SPACEWARS_PLAYER_COUNT],
             body_contacts: [0; SPACEWARS_PLAYER_COUNT],
@@ -727,6 +904,16 @@ impl TransitionTracker {
             let rebuilt = match (self.previous_forms[player], form) {
                 (ShipForm::Ship, ShipForm::EscapePod) => {
                     self.ship_losses[player] += 1;
+                    if body_collisions.iter().any(|contact| {
+                        contact.ship == player && matches!(contact.body, BodyId::Planet(_))
+                    }) {
+                        self.planet_impact_losses[player] += 1;
+                    }
+                    if body_collisions.iter().any(|contact| {
+                        contact.ship == player && matches!(contact.body, BodyId::Sun)
+                    }) {
+                        self.sun_impact_losses[player] += 1;
+                    }
                     false
                 }
                 (ShipForm::EscapePod, ShipForm::Ship) => {
@@ -877,6 +1064,8 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
     ];
     let mut encoder = ShipIntentEncoder::default();
     let mut transitions = TransitionTracker::new(&state);
+    let mut strategy_trackers: [StrategyMetricTracker; SPACEWARS_PLAYER_COUNT] =
+        std::array::from_fn(|_| StrategyMetricTracker::default());
     let mut navigation_trace = config
         .trace_player
         .map(|player| NavigationTraceCollector::new(&state, player));
@@ -891,8 +1080,9 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
         for (player, controller) in controllers.iter_mut().enumerate() {
             let actor = PlayerId::from_index(player).expect("Spacewars has exactly two players");
             let intent = controller.intent(&state, actor)?;
+            let telemetry = controller.telemetry();
+            strategy_trackers[player].observe(telemetry.strategy);
             if config.trace_player == Some(actor) {
-                let telemetry = controller.telemetry();
                 if let Some(collector) = &mut navigation_trace {
                     collector.observe(&state, telemetry, intent, false);
                 }
@@ -931,6 +1121,8 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
         outcome,
         captures: transitions.captures,
         ship_losses: transitions.ship_losses,
+        planet_impact_losses: transitions.planet_impact_losses,
+        sun_impact_losses: transitions.sun_impact_losses,
         rebuilds: transitions.rebuilds,
         eliminations: transitions.eliminations,
         body_contacts: transitions.body_contacts,
@@ -951,6 +1143,7 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
                 0.0
             }
         }),
+        strategy: strategy_trackers.map(|tracker| tracker.metrics),
         actions_emitted,
         trace_sha256: format!("{:x}", trace.finalize()),
         navigation_trace,
@@ -1014,6 +1207,8 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
     let mut tick_limits = 0_u32;
     let mut captures = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut ship_losses = [0_u64; SPACEWARS_PLAYER_COUNT];
+    let mut planet_impact_losses = [0_u64; SPACEWARS_PLAYER_COUNT];
+    let mut sun_impact_losses = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut rebuilds = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut body_contacts = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut ship_contacts = [0_u64; SPACEWARS_PLAYER_COUNT];
@@ -1023,6 +1218,8 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
     let mut port_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut safe_capture_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut safe_rebuild_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
+    let mut strategy = [StrategyMetrics::default(); SPACEWARS_PLAYER_COUNT];
+    let mut policy_metrics = BTreeMap::new();
     let mut total_ticks = 0_u64;
     let mut total_simulated_seconds = 0.0;
     for episode in episodes {
@@ -1033,8 +1230,23 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
             EpisodeOutcome::TickLimit => tick_limits += 1,
         }
         for player in 0..SPACEWARS_PLAYER_COUNT {
+            let controller = episode.controllers[player];
+            let policy = policy_metrics
+                .entry(controller.policy_id)
+                .or_insert_with(|| PolicyMetrics::new(controller));
+            policy.seat_episodes += 1;
+            policy.ticks += episode.ticks;
+            policy.captures += episode.captures[player];
+            policy.ship_losses += episode.ship_losses[player];
+            policy.planet_impact_losses += episode.planet_impact_losses[player];
+            policy.sun_impact_losses += episode.sun_impact_losses[player];
+            policy.rebuilds += episode.rebuilds[player];
+            policy.body_contacts += episode.body_contacts[player];
+
             captures[player] += episode.captures[player];
             ship_losses[player] += episode.ship_losses[player];
+            planet_impact_losses[player] += episode.planet_impact_losses[player];
+            sun_impact_losses[player] += episode.sun_impact_losses[player];
             rebuilds[player] += episode.rebuilds[player];
             body_contacts[player] += episode.body_contacts[player];
             ship_contacts[player] += episode.ship_contacts[player];
@@ -1044,6 +1256,7 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
             port_departures[player] += episode.port_departures[player];
             safe_capture_departures[player] += episode.safe_capture_departures[player];
             safe_rebuild_departures[player] += episode.safe_rebuild_departures[player];
+            strategy[player].add_assign(episode.strategy[player]);
         }
     }
 
@@ -1056,6 +1269,8 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
         tick_limits,
         captures,
         ship_losses,
+        planet_impact_losses,
+        sun_impact_losses,
         rebuilds,
         body_contacts,
         ship_contacts,
@@ -1065,6 +1280,8 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
         port_departures,
         safe_capture_departures,
         safe_rebuild_departures,
+        strategy,
+        policy_metrics: policy_metrics.into_values().collect(),
         wall_seconds,
         ticks_per_wall_second: total_ticks as f64 / measured_seconds,
         simulated_seconds_per_wall_second: total_simulated_seconds / measured_seconds,
@@ -1203,6 +1420,19 @@ mod tests {
         assert_eq!(first, replay);
         assert!(first.actions_emitted > 0);
         assert_eq!(first.trace_sha256.len(), 64);
+        for metrics in first.strategy {
+            assert!(metrics.objective_selections > 0);
+            assert_eq!(
+                metrics.idle_ticks
+                    + metrics.survive_ticks
+                    + metrics.attack_ticks
+                    + metrics.capture_ticks
+                    + metrics.repair_ticks
+                    + metrics.defend_ticks
+                    + metrics.rebuild_ticks,
+                first.ticks
+            );
+        }
     }
 
     #[test]
@@ -1276,6 +1506,33 @@ mod tests {
                 && config.max_ticks == NAVIGATION_V1_MAX_TICKS
                 && config.trace_player.is_none()
         }));
+    }
+
+    #[test]
+    fn strategy_suite_covers_seeds_side_swaps_and_self_play() {
+        let configs = EvaluationSuite::StrategyV1.episode_configs();
+
+        assert_eq!(EvaluationSuite::StrategyV1.id(), STRATEGY_V1_SUITE_ID);
+        assert_eq!(configs.len(), STRATEGY_V1_SEEDS.len() * 3);
+        for (seed, group) in STRATEGY_V1_SEEDS.into_iter().zip(configs.chunks_exact(3)) {
+            assert!(group.iter().all(|config| {
+                config.seed == seed
+                    && config.preset == SpacewarsPreset::StandardNoAsteroids
+                    && config.max_ticks == STRATEGY_V1_MAX_TICKS
+                    && config.trace_player.is_none()
+            }));
+            assert_eq!(
+                group
+                    .iter()
+                    .map(|config| config.controllers)
+                    .collect::<Vec<_>>(),
+                vec![
+                    [ControllerKind::Rule, ControllerKind::Idle],
+                    [ControllerKind::Idle, ControllerKind::Rule],
+                    [ControllerKind::Rule, ControllerKind::Rule],
+                ]
+            );
+        }
     }
 
     #[test]
@@ -1462,12 +1719,38 @@ mod tests {
 
         assert_eq!(tracker.captures, [0, 1]);
         assert_eq!(tracker.ship_losses, [0, 1]);
+        assert_eq!(tracker.planet_impact_losses, [0, 0]);
+        assert_eq!(tracker.sun_impact_losses, [0, 0]);
         assert_eq!(tracker.rebuilds, [0, 1]);
         assert_eq!(tracker.eliminations, [0, 1]);
         assert_eq!(tracker.port_dockings, [0, 1]);
         assert_eq!(tracker.port_departures, [0, 1]);
         assert_eq!(tracker.safe_capture_departures, [0, 1]);
         assert_eq!(tracker.safe_rebuild_departures, [0, 1]);
+    }
+
+    #[test]
+    fn loss_metrics_attribute_same_tick_planet_and_sun_impacts() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 27);
+        let mut tracker = TransitionTracker::new(&state);
+
+        state.body_collisions = vec![
+            BodyCollision {
+                ship: 0,
+                body: BodyId::Planet(0),
+            },
+            BodyCollision {
+                ship: 1,
+                body: BodyId::Sun,
+            },
+        ];
+        state.ships[0].form = ShipForm::EscapePod;
+        state.ships[1].form = ShipForm::EscapePod;
+        tracker.observe(&state);
+
+        assert_eq!(tracker.ship_losses, [1, 1]);
+        assert_eq!(tracker.planet_impact_losses, [1, 0]);
+        assert_eq!(tracker.sun_impact_losses, [0, 1]);
     }
 
     #[test]
@@ -1581,9 +1864,40 @@ mod tests {
         .unwrap();
         let json = serde_json::to_string(&report).unwrap();
 
-        assert!(json.contains("\"schema_version\":1"));
+        assert!(json.contains("\"schema_version\":2"));
         assert!(json.contains("\"policy_id\":\"idle_v1\""));
         assert!(json.contains("\"trace_sha256\""));
+        assert!(json.contains("\"objective_selections\""));
+        assert!(json.contains("\"policy_metrics\""));
+        assert!(json.contains("\"planet_impact_losses\""));
+    }
+
+    #[test]
+    fn batch_metrics_aggregate_losses_by_controller_policy() {
+        let report = run_batch(BatchConfig {
+            controllers: [ControllerKind::Idle, ControllerKind::Rule],
+            episodes: 2,
+            max_ticks: 1,
+            ..BatchConfig::default()
+        })
+        .unwrap();
+
+        let idle = report
+            .summary
+            .policy_metrics
+            .iter()
+            .find(|metrics| metrics.policy_id == ControllerKind::Idle.policy_id())
+            .unwrap();
+        let rule = report
+            .summary
+            .policy_metrics
+            .iter()
+            .find(|metrics| metrics.policy_id == ControllerKind::Rule.policy_id())
+            .unwrap();
+        assert_eq!(idle.seat_episodes, 2);
+        assert_eq!(idle.ticks, 2);
+        assert_eq!(rule.seat_episodes, 2);
+        assert_eq!(rule.ticks, 2);
     }
 
     #[test]

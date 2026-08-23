@@ -427,7 +427,7 @@ pub fn start_scenario_loop(
         input.reset_spacewars_controls();
     }
     window.set_runtime_diagnostics(SharedString::from(format!(
-        "scenario={scenario_name}\npaused=false\nNo active rule-bot diagnostics."
+        "scenario={scenario_name}\npaused=false\ngame_over=false\nNo active rule-bot diagnostics."
     )));
     let controls = controls.unwrap_or_else(new_scenario_controls);
 
@@ -501,6 +501,7 @@ pub fn start_scenario_loop(
     let mut last_realtime_emulated_frames = 0;
     let mut last_diagnostics_revision = u64::MAX;
     let mut last_diagnostics_paused = true;
+    let mut last_diagnostics_game_over = true;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
         let Some(window) = weak_window.upgrade() else {
             return;
@@ -594,15 +595,24 @@ pub fn start_scenario_loop(
         }
 
         let diagnostics_revision = input.runtime_diagnostics_revision();
+        let game_over = scenario.is_game_over();
+        let diagnostics_frozen = paused || game_over;
         if diagnostics_revision != last_diagnostics_revision
             || paused != last_diagnostics_paused
+            || game_over != last_diagnostics_game_over
         {
-            window.set_runtime_diagnostics(SharedString::from(format!(
-                "scenario={scenario_name}\npaused={paused}\n{}",
+            let diagnostics = if diagnostics_frozen {
+                input.paused_runtime_diagnostics_text()
+            } else {
                 input.runtime_diagnostics_text()
+            };
+            window.set_runtime_diagnostics(SharedString::from(format!(
+                "scenario={scenario_name}\npaused={paused}\ngame_over={game_over}\n{}",
+                diagnostics,
             )));
             last_diagnostics_revision = diagnostics_revision;
             last_diagnostics_paused = paused;
+            last_diagnostics_game_over = game_over;
         }
 
         scenario.record_realtime_displayed_loop_iteration();

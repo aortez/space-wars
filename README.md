@@ -121,11 +121,36 @@ client control socket:
 printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
 ```
 
-The snapshot is refreshed once per second and includes the world seed, brain
-phase and intent, ship motion, target planet, actual docked planet, and
-surface/port clearance. During body avoidance it also identifies the sun or
-planet being avoided and reports the craft's signed surface clearance. This
-keeps diagnostic formatting out of the simulation hot path.
+The snapshot is refreshed once per second and includes the world seed,
+persistent strategic objective and utility scores, current brain maneuver and
+intent, ship form and life fraction, motion, target planet, actual docked
+planet, and surface/port clearance. During body avoidance it also identifies
+the sun or planet being avoided and reports signed surface clearance, outward
+speed, whether the maneuver is predictive, predicted closest time/clearance,
+maneuver age, time without clearance progress, and whether normal or emergency
+escape assist has engaged. This keeps diagnostic formatting out of the
+simulation hot path.
+
+Pause the game before querying a suspicious encounter. A paused or game-over
+status also contains each rule bot's bounded flight recorder: periodic 10 Hz
+samples, immediate maneuver/contact/form transitions, current controls, world
+motion, body clearance, and a five-second linear closest-approach/impact
+prediction.
+The recorder retains the recent 18-second window. On a mechanical body contact
+or escape-assist transition it separately preserves roughly six seconds of
+lead-in and continues the encounter capture for roughly twelve seconds, so a
+long-running scrape cannot erase how it began. Mechanical contact must remain
+absent for 30 ticks before a new incident can trigger, so a flickering Rapier
+manifold cannot replace that original lead-in. Episode seed and the relevant
+world settings are included in the capture. No per-sample strings are built
+until the game is paused.
+
+The paused response can be long; saving it makes inspection easier:
+
+```sh
+printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock \
+  > /tmp/spacewars-bot-status.txt
+```
 
 ## Run headless AI episodes
 
@@ -151,9 +176,10 @@ cargo run --release -p engine-agent -- \
 
 Episode reports include the winner or tick-limit outcome, captures, ship
 losses, rebuilds, eliminations, collision incidents, docking/departure outcomes,
-final planet/form/health state, canonical action count, and a deterministic
-trace fingerprint. The batch summary adds winner counts and measured ticks and
-simulated seconds per wall second.
+final planet/form/health state, strategic objective selections and tick counts,
+canonical action count, and a deterministic trace fingerprint. The batch
+summary adds winner counts and measured ticks and simulated seconds per wall
+second.
 `--seed-step` changes the interval between seeds; setting it to zero repeats
 the same seed for reproducibility or throughput measurements. Release builds
 are recommended whenever performance numbers matter.
@@ -173,6 +199,21 @@ metrics report contact entries and exits. A capture/rebuild departure succeeds
 only after the craft clears the planet surface by 90 world units beyond its
 collision hull.
 
+Run the ordinary-health strategy comparison suite:
+
+```sh
+cargo run --release -p engine-agent -- --suite strategy-v1
+```
+
+`strategy-v1` runs four seeds with the rule bot in each side against an idle
+seat, then in self-play. Random asteroids are disabled while ordinary damage,
+repair, ship loss, pod rebuilding, capture, and combat remain active. Its
+per-player strategy metrics make commitment, goal switching, and time spent on
+capture, repair, defense, combat, and rebuilding directly comparable between
+policy revisions. Loss reports separately count transitions that coincide with
+a mechanical planet or sun impact, and batch summaries aggregate those values
+by controller policy rather than only by player seat.
+
 For ad hoc controlled runs, `--preset standard-no-asteroids` is identical to
 the standard world except that random asteroid spawning is disabled. The
 ordinary `standard` preset continues to match normal gameplay.
@@ -185,13 +226,14 @@ cargo run --release -p engine-agent -- \
   --trace-player 2
 ```
 
-The event trace records brain/port transitions, captures, safe departures, and
-a five-second heartbeat while a captured departure remains unfinished. Each
-sample includes docking state, surface clearance, outward speed, world
-velocity, guidance telemetry, contacts, and the emitted intent. `--output json`
-includes the same structured events for offline comparison. Tracing is
-available on custom batches rather than named suites so the suite contract and
-its normal report size remain fixed.
+The event trace records strategic and brain/port transitions, captures, safe
+departures, and a five-second heartbeat while a captured departure remains
+unfinished. Each sample includes the persistent objective and selection
+reason, docking state, surface clearance, outward speed, world velocity,
+guidance telemetry, body-avoidance progress and escape-assist state, contacts,
+and the emitted intent. `--output json` includes the same structured events for
+offline comparison. Tracing is available on custom batches rather than named
+suites so the suite contract and its normal report size remain fixed.
 
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a
