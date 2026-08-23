@@ -1563,6 +1563,7 @@ struct BenchmarkRow {
     avg_raster_player_debris_ms: f64,
     avg_raster_player_particles_ms: f64,
     avg_raster_player_other_ms: f64,
+    avg_raster_other_frames_ms: f64,
     avg_raster_overview_refresh_ms: f64,
     avg_raster_overview_blit_ms: f64,
     avg_raster_overview_live_ms: f64,
@@ -1678,6 +1679,7 @@ impl BenchmarkRow {
             avg_raster_player_debris_ms: avg_ms(sample.raster_timings.player_debris, frames),
             avg_raster_player_particles_ms: avg_ms(sample.raster_timings.player_particles, frames),
             avg_raster_player_other_ms: avg_ms(sample.raster_timings.player_other, frames),
+            avg_raster_other_frames_ms: avg_ms(sample.raster_timings.other_frames, frames),
             avg_raster_overview_refresh_ms: avg_ms(sample.raster_timings.overview_refresh, frames),
             avg_raster_overview_blit_ms: avg_ms(sample.raster_timings.overview_blit, frames),
             avg_raster_overview_live_ms: avg_ms(sample.raster_timings.overview_live, frames),
@@ -1694,7 +1696,7 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     writeln!(
         writer,
-        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
+        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
@@ -1765,6 +1767,7 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_raster_player_debris_ms),
         format!("{:.3}", row.avg_raster_player_particles_ms),
         format!("{:.3}", row.avg_raster_player_other_ms),
+        format!("{:.3}", row.avg_raster_other_frames_ms),
         format!("{:.3}", row.avg_raster_overview_refresh_ms),
         format!("{:.3}", row.avg_raster_overview_blit_ms),
         format!("{:.3}", row.avg_raster_overview_live_ms),
