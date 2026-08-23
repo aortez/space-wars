@@ -71,8 +71,10 @@ scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
 # Slint 1.13's software snapshot path reuses the display rotation and panics for
-# non-square windows rotated by 90 or 270 degrees. Keep the patch local until an
-# upstream release renders snapshots in logical window orientation.
+# non-square windows rotated by 90 or 270 degrees. Its system-font path also
+# remaps font files for every metrics and shaping operation; retain owned face
+# data for the lifetime of each cached font. Keep these patches local until an
+# upstream release provides both fixes.
 i-slint-core = { path = "vendor/i-slint-core" }
 # LinuxKMS rotates rendered output but leaves absolute libinput coordinates in
 # panel orientation. Apply the inverse output rotation before dispatching them.

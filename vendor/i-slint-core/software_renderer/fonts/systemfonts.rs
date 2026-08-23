@@ -14,27 +14,41 @@ use super::super::PhysicalLength;
 use super::vectorfont::VectorFont;
 
 crate::thread_local! {
-    static FONTDUE_FONTS: RefCell<HashMap<fontdb::ID, Rc<fontdue::Font>>> = Default::default();
+    static SYSTEM_FONTS: RefCell<HashMap<fontdb::ID, CachedSystemFont>> = Default::default();
 }
 
-fn get_or_create_fontdue_font(fontdb: &fontdb::Database, id: fontdb::ID) -> Rc<fontdue::Font> {
-    FONTDUE_FONTS.with(|font_cache| {
+#[derive(Clone)]
+struct CachedSystemFont {
+    fontdue_font: Rc<fontdue::Font>,
+    face_data: Rc<[u8]>,
+    face_index: u32,
+}
+
+fn get_or_create_system_font(fontdb: &fontdb::Database, id: fontdb::ID) -> CachedSystemFont {
+    SYSTEM_FONTS.with(|font_cache| {
         font_cache
             .borrow_mut()
             .entry(id)
             .or_insert_with(|| {
                 fontdb
                     .with_face_data(id, |face_data, font_index| {
-                        fontdue::Font::from_bytes(
-                            face_data,
+                        // fontdb maps file-backed fonts for each with_face_data() call. Retain an
+                        // owned copy so metrics and shaping do not reopen the same file per item.
+                        let face_data: Rc<[u8]> = face_data.into();
+                        let fontdue_font = fontdue::Font::from_bytes(
+                            face_data.clone(),
                             fontdue::FontSettings {
                                 collection_index: font_index,
                                 scale: 40.,
                                 ..Default::default()
                             },
                         )
-                        .expect("fatal: fontdue is unable to parse truetype font")
-                        .into()
+                        .expect("fatal: fontdue is unable to parse truetype font");
+                        CachedSystemFont {
+                            fontdue_font: fontdue_font.into(),
+                            face_data,
+                            face_index: font_index,
+                        }
                     })
                     .unwrap()
             })
@@ -55,8 +69,14 @@ pub fn match_font(
         sharedfontdb::FONT_DB.with(|fonts| {
             let borrowed_fontdb = fonts.borrow();
             borrowed_fontdb.query_with_family(query, Some(family_str)).map(|font_id| {
-                let fontdue_font = get_or_create_fontdue_font(&borrowed_fontdb, font_id);
-                VectorFont::new(font_id, fontdue_font.clone(), requested_pixel_size)
+                let font = get_or_create_system_font(&borrowed_fontdb, font_id);
+                VectorFont::new(
+                    font_id,
+                    font.fontdue_font,
+                    font.face_data,
+                    font.face_index,
+                    requested_pixel_size,
+                )
             })
         })
     })
@@ -73,8 +93,14 @@ pub fn fallbackfont(font_request: &super::FontRequest, scale_factor: ScaleFactor
             .query_with_family(query, None)
             .expect("fatal: query for fallback font returned empty font list");
 
-        let fontdue_font = get_or_create_fontdue_font(fonts, fallback_font_id);
-        VectorFont::new(fallback_font_id, fontdue_font, requested_pixel_size)
+        let font = get_or_create_system_font(fonts, fallback_font_id);
+        VectorFont::new(
+            fallback_font_id,
+            font.fontdue_font,
+            font.face_data,
+            font.face_index,
+            requested_pixel_size,
+        )
     })
 }
 
