@@ -1394,17 +1394,22 @@ fn handle_launcher_start(
             }
             scenario_controls.borrow_mut().clear();
             *timer_slot = Some(timer);
-            window.set_launcher_visible(false);
-            window.set_launcher_settings_visible(false);
-            window.set_launcher_controls_visible(false);
-            window.set_ingame_menu_visible(false);
-            window.set_ingame_controls_visible(false);
-            window.set_game_over_visible(false);
+            hide_launcher_surfaces(&window);
         }
         Err(err) => {
             window.set_launcher_error_text(SharedString::from(err.to_string()));
         }
     }
+}
+
+fn hide_launcher_surfaces(window: &MainWindow) {
+    window.set_launcher_visible(false);
+    window.set_launcher_settings_visible(false);
+    window.set_launcher_controls_visible(false);
+    window.set_touch_test_visible(false);
+    window.set_ingame_menu_visible(false);
+    window.set_ingame_controls_visible(false);
+    window.set_game_over_visible(false);
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2294,6 +2299,41 @@ mod tests {
 
         assert!(args.touch_test);
         assert!(!should_launch_directly(&args));
+    }
+
+    #[test]
+    fn successful_launch_hides_touch_test_and_menu_overlays() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+
+        struct TestPlatform;
+
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer)
+                    as Rc<dyn WindowAdapter>)
+            }
+        }
+
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_visible(true);
+        window.set_launcher_settings_visible(true);
+        window.set_launcher_controls_visible(true);
+        window.set_touch_test_visible(true);
+        window.set_ingame_menu_visible(true);
+        window.set_ingame_controls_visible(true);
+        window.set_game_over_visible(true);
+
+        hide_launcher_surfaces(&window);
+
+        assert!(!window.get_launcher_visible());
+        assert!(!window.get_launcher_settings_visible());
+        assert!(!window.get_launcher_controls_visible());
+        assert!(!window.get_touch_test_visible());
+        assert!(!window.get_ingame_menu_visible());
+        assert!(!window.get_ingame_controls_visible());
+        assert!(!window.get_game_over_visible());
     }
 
     #[test]
