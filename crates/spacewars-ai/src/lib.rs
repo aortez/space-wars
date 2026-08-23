@@ -23,7 +23,7 @@ const TARGET_EPSILON: f32 = 1.0e-5;
 ///
 /// Bump this when rule-brain decision semantics change enough that evaluation
 /// results should no longer be compared as the same policy version.
-pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v1";
+pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v2";
 
 /// Episode context supplied whenever a host installs or restarts a brain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -719,7 +719,10 @@ impl RuleShipBrain {
             return ShipIntent {
                 turn: heading.turn,
                 thrust: if departure_burn_started { 1.0 } else { 0.0 },
-                brake: if departure_burn_started { 0.0 } else { 1.0 },
+                // Spaceport contact already damps and centers linear motion.
+                // Leaving the general brake off preserves angular authority
+                // while the ship turns inside the bay before launch.
+                brake: 0.0,
                 wings_closed: observation.own_ship.form == ShipForm::Ship && departure_burn_started,
                 ..ShipIntent::default()
             };
@@ -1173,13 +1176,14 @@ mod tests {
             departure_burn_started: false,
         });
 
-        brain.intent(&observation);
+        let depart_intent = brain.intent(&observation);
 
         assert_eq!(brain.telemetry().target_planet, Some(docked_planet));
         assert_eq!(
             brain.telemetry().port_phase,
             Some(PortNavigationPhase::Depart)
         );
+        assert_eq!(depart_intent.brake, 0.0);
 
         observation.planets[1].owner = None;
         let mut capture_brain = RuleShipBrain::default();

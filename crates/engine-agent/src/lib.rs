@@ -607,14 +607,6 @@ fn trace_planet_geometry(
     })
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct DockingSession {
-    planet: usize,
-    captured: bool,
-    rebuilt: bool,
-    in_contact: bool,
-}
-
 #[derive(Debug)]
 struct TransitionTracker {
     previous_planet_owners: Vec<Option<usize>>,
@@ -622,7 +614,9 @@ struct TransitionTracker {
     previous_eliminated: [bool; SPACEWARS_PLAYER_COUNT],
     body_contact_history: Vec<(BodyCollision, u64)>,
     ship_contact_history: Vec<(ShipCollision, u64)>,
-    docking_sessions: [Option<DockingSession>; SPACEWARS_PLAYER_COUNT],
+    previous_docked_planets: [Option<usize>; SPACEWARS_PLAYER_COUNT],
+    pending_capture_departures: [Vec<usize>; SPACEWARS_PLAYER_COUNT],
+    pending_rebuild_departures: [Vec<usize>; SPACEWARS_PLAYER_COUNT],
     captures: [u64; SPACEWARS_PLAYER_COUNT],
     ship_losses: [u64; SPACEWARS_PLAYER_COUNT],
     rebuilds: [u64; SPACEWARS_PLAYER_COUNT],
@@ -653,14 +647,9 @@ impl TransitionTracker {
                 .copied()
                 .map(|contact| (contact, state.tick))
                 .collect(),
-            docking_sessions: std::array::from_fn(|player| {
-                docked_planet(state, player).map(|planet| DockingSession {
-                    planet,
-                    captured: false,
-                    rebuilt: false,
-                    in_contact: true,
-                })
-            }),
+            previous_docked_planets: std::array::from_fn(|player| docked_planet(state, player)),
+            pending_capture_departures: std::array::from_fn(|_| Vec::new()),
+            pending_rebuild_departures: std::array::from_fn(|_| Vec::new()),
             captures: [0; SPACEWARS_PLAYER_COUNT],
             ship_losses: [0; SPACEWARS_PLAYER_COUNT],
             rebuilds: [0; SPACEWARS_PLAYER_COUNT],
@@ -748,7 +737,23 @@ impl TransitionTracker {
             };
             self.previous_forms[player] = form;
 
-            self.update_docking_session(state, player, rebuilt, captured_planet);
+            if let Some(planet) = captured_planet {
+                self.pending_capture_departures[player].push(planet);
+            }
+            if rebuilt && let Some(planet) = docked_planet(state, player) {
+                self.pending_rebuild_departures[player].push(planet);
+            }
+            self.update_docking_transition(state, player);
+            self.safe_capture_departures[player] += complete_safe_departures(
+                state,
+                player,
+                &mut self.pending_capture_departures[player],
+            );
+            self.safe_rebuild_departures[player] += complete_safe_departures(
+                state,
+                player,
+                &mut self.pending_rebuild_departures[player],
+            );
 
             let eliminated = state.players[player].eliminated;
             if eliminated && !self.previous_eliminated[player] {
@@ -758,52 +763,35 @@ impl TransitionTracker {
         }
     }
 
-    fn update_docking_session(
-        &mut self,
-        state: &SpacewarsState,
-        player: usize,
-        rebuilt: bool,
-        captured_planet: Option<usize>,
-    ) {
+    fn update_docking_transition(&mut self, state: &SpacewarsState, player: usize) {
         let current_planet = docked_planet(state, player);
-        let mut completed = None;
-        if let Some(session) = &mut self.docking_sessions[player] {
-            session.captured |= captured_planet == Some(session.planet);
-            session.rebuilt |= rebuilt;
-
-            let in_contact = current_planet == Some(session.planet);
-            if session.in_contact && !in_contact {
+        let previous_planet = self.previous_docked_planets[player];
+        if previous_planet != current_planet {
+            if previous_planet.is_some() {
                 self.port_departures[player] += 1;
-            } else if !session.in_contact && in_contact {
+            }
+            if current_planet.is_some() {
                 self.port_dockings[player] += 1;
             }
-            session.in_contact = in_contact;
-
-            if !in_contact && has_safe_planet_clearance(state, player, session.planet) {
-                completed = Some(*session);
-            }
         }
-
-        if let Some(completed) = completed {
-            self.safe_capture_departures[player] += u64::from(completed.captured);
-            self.safe_rebuild_departures[player] += u64::from(completed.rebuilt);
-            self.docking_sessions[player] = None;
-        }
-
-        if self.docking_sessions[player].is_some() {
-            return;
-        }
-        let Some(planet) = current_planet else {
-            return;
-        };
-        self.port_dockings[player] += 1;
-        self.docking_sessions[player] = Some(DockingSession {
-            planet,
-            captured: captured_planet == Some(planet),
-            rebuilt,
-            in_contact: true,
-        });
+        self.previous_docked_planets[player] = current_planet;
     }
+}
+
+fn complete_safe_departures(
+    state: &SpacewarsState,
+    player: usize,
+    pending_planets: &mut Vec<usize>,
+) -> u64 {
+    let current_planet = docked_planet(state, player);
+    let mut completed = 0;
+    pending_planets.retain(|&planet| {
+        let safely_departed =
+            current_planet != Some(planet) && has_safe_planet_clearance(state, player, planet);
+        completed += u64::from(safely_departed);
+        !safely_departed
+    });
+    completed
 }
 
 fn docked_planet(state: &SpacewarsState, player: usize) -> Option<usize> {
@@ -1369,10 +1357,7 @@ mod tests {
     }
 
     #[test]
-    fn seed_four_reproduces_player_two_departure_deadlock() {
-        // Characterize the known failure before changing departure guidance.
-        // Once repaired, this fixture should be inverted to require a safe
-        // departure within the same bounded episode.
+    fn seed_four_player_two_safely_departs_within_bounded_episode() {
         let episode = run_episode(EpisodeConfig {
             seed: 4,
             preset: SpacewarsPreset::Navigation,
@@ -1383,10 +1368,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(episode.outcome, EpisodeOutcome::TickLimit);
-        assert_eq!(episode.captures[PlayerId::PLAYER_2.index()], 1);
+        let player = PlayerId::PLAYER_2.index();
+        assert!(episode.captures[player] >= 1);
         assert_eq!(
-            episode.safe_capture_departures[PlayerId::PLAYER_2.index()],
-            0
+            episode.safe_capture_departures[player], episode.captures[player],
+            "every capture should be followed by safe clearance"
         );
 
         let capture = episode
@@ -1394,10 +1380,25 @@ mod tests {
             .iter()
             .find(|event| event.reasons.contains(&NavigationTraceReason::Capture))
             .unwrap();
-        assert_eq!(capture.tick, 2_714);
         assert_eq!(capture.docked_planet, Some(3));
         assert_eq!(capture.pending_capture_planet, Some(3));
         assert_eq!(capture.pending_capture_ticks, Some(0));
+
+        let departure = episode
+            .navigation_trace
+            .iter()
+            .find(|event| {
+                event
+                    .reasons
+                    .contains(&NavigationTraceReason::SafeDeparture)
+                    && event.pending_capture_planet == Some(3)
+            })
+            .expect("Player 2 should clear planet 3 after capturing it");
+        assert!(departure.tick > capture.tick);
+        assert!(departure.tick - capture.tick <= NAVIGATION_TRACE_HEARTBEAT_TICKS);
+        assert!(departure.surface_clearance.unwrap() >= NAVIGATION_SAFE_DEPARTURE_CLEARANCE);
+        assert_eq!(departure.intent.brake, 0.0);
+        assert_eq!(departure.intent.thrust, 1.0);
 
         let terminal = episode.navigation_trace.last().unwrap();
         assert!(
@@ -1405,14 +1406,8 @@ mod tests {
                 .reasons
                 .contains(&NavigationTraceReason::EpisodeEnd)
         );
-        assert_eq!(terminal.port_phase, Some(PortNavigationPhase::Depart));
-        assert_eq!(terminal.docked_planet, Some(3));
-        assert_eq!(terminal.pending_capture_planet, Some(3));
-        assert_eq!(terminal.pending_capture_ticks, Some(1_286));
-        assert!(terminal.surface_clearance.unwrap() < 0.0);
-        assert_eq!(terminal.intent.turn, -1.0);
-        assert_eq!(terminal.intent.brake, 1.0);
-        assert_eq!(terminal.intent.thrust, 0.0);
+        assert_eq!(terminal.pending_capture_planet, None);
+        assert_eq!(terminal.pending_capture_ticks, None);
     }
 
     #[test]
@@ -1498,6 +1493,37 @@ mod tests {
         assert_eq!(tracker.port_departures, [1, 0]);
         assert_eq!(tracker.safe_capture_departures, [0, 0]);
         assert_eq!(tracker.body_contacts, [0, 0]);
+    }
+
+    #[test]
+    fn back_to_back_captures_keep_independent_safe_departures() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 12);
+        let mut tracker = TransitionTracker::new(&state);
+        state.planets[0].position = engine_core::Vec2::ZERO;
+        state.planets[1].position = engine_core::Vec2::X * 20.0;
+        state.ships[0].position = engine_core::Vec2::ZERO;
+
+        state.spaceport_contacts =
+            vec![scenario_spacewars::SpaceportContact { ship: 0, planet: 0 }];
+        state.planets[0].owner_id = Some(0);
+        tracker.observe(&state);
+
+        // Reach and capture the next nearby port before attaining the first
+        // port's 90-unit safe-clearance threshold.
+        state.spaceport_contacts =
+            vec![scenario_spacewars::SpaceportContact { ship: 0, planet: 1 }];
+        state.planets[1].owner_id = Some(0);
+        tracker.observe(&state);
+        assert_eq!(tracker.captures, [2, 0]);
+        assert_eq!(tracker.safe_capture_departures, [0, 0]);
+
+        state.spaceport_contacts.clear();
+        state.ships[0].position = engine_core::Vec2::X * 2_000.0;
+        tracker.observe(&state);
+
+        assert_eq!(tracker.port_dockings, [2, 0]);
+        assert_eq!(tracker.port_departures, [2, 0]);
+        assert_eq!(tracker.safe_capture_departures, [2, 0]);
     }
 
     #[test]

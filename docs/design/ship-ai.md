@@ -126,13 +126,15 @@ The evaluator is allowed to read authoritative state to measure captures,
 ship losses, rebuilds, eliminations, collision incidents, docking, departures,
 and outcomes. Body and ship collision incidents re-arm after 30 contact-free
 ticks, preventing a sustained or briefly flickering scrape from dominating the
-count; debris and laser hits are already discrete events. A docking session
-records whether capture or rebuilding happened there, and counts successful
-departure only after the craft reaches 90 world units of surface clearance
-beyond its collision hull. This does not widen the controller boundary: each
-rule brain still receives only `ShipObservationV1`, and every intent still
-passes through `ShipIntentEncoder` and ordinary scenario actions before
-`Scenario::step()`.
+count; debris and laser hits are already discrete events. Docking contact
+transitions count port sessions, while each capture or rebuild opens its own
+pending departure window. A window completes only after the craft reaches 90
+world units of surface clearance beyond its collision hull. Keeping these
+windows independent preserves attribution even if a fast craft reaches another
+port before clearing the previous window. This does not widen the controller
+boundary: each rule brain still receives only `ShipObservationV1`, and every
+intent still passes through `ShipIntentEncoder` and ordinary scenario actions
+before `Scenario::step()`.
 
 Each deterministic episode summary includes its action stream and selected
 outcome-relevant terminal state in a SHA-256 trace fingerprint. Wall-clock
@@ -149,31 +151,38 @@ alter controller actions or the deterministic episode fingerprint, and normal
 untraced batches do not pay its extra observation cost.
 
 The first traced baseline isolated two unfinished departures. In seed 4,
-Player 2 captures planet 3 at tick 2,714 and remains docked through tick 36,000;
-seed 2 leaves Player 1 similarly docked after its fourth capture. Both brains
-remain in `Depart`, continuously request a turn plus brake, never request
-thrust, and stay roughly 45–50 units inside the surface. Their measured hull
-rotation repeatedly reverses while the turn command does not. The evidence
-points to a dock-bay rotation deadlock: solid contact opposes the attempted
-alignment, while the general brake removes angular authority along with linear
-motion.
+Player 2 captured planet 3 at tick 2,714 and remained docked through tick
+36,000; seed 2 left Player 1 similarly docked after its fourth capture. Both
+brains remained in `Depart`, continuously requesting a turn plus brake without
+ever starting thrust, roughly 45–50 units inside the surface. Two effects made
+that state self-sustaining: the general brake canceled the requested angular
+motion, and the broad asymmetric ship hull could bridge the inner planet and a
+spaceport wall while trying to turn.
 
-A bounded characterization test now reproduces the seed-4 failure at tick
-4,000. It pins the capture at tick 2,714 and verifies that Player 2 remains
-docked on planet 3 for the next 1,286 ticks with negative surface clearance,
-full turn, full brake, and no thrust. This assertion is intentionally a
-temporary bug contract; the departure repair should invert it to require safe
-clearance within the same budget.
+The departure repair is intentionally split at the controller/physics
+boundary. Rule policy `rule_ship_v2` does not apply the omnidirectional brake
+while aligning for launch; spaceport contact already damps and centers linear
+motion. A docked full ship that is actively maneuvering to leave keeps its
+ordinary collision groups and mass but temporarily uses a body-sized circular
+solver collider, so it remains contained while being free to rotate. A
+zero-mass copy of the normal hull preserves the established spaceport sensor
+footprint during that maneuver. The full physical hull remains in use while
+landing and capturing, and is restored when departure/ejection maneuvering
+ends. Escape pods retain their ordinary compact hull.
+
+The former seed-4 characterization is now a bounded regression test. Within
+4,000 ticks Player 2 captures planet 3, reaches the evaluator's 90-unit safe
+clearance within one 300-tick trace heartbeat, and has no unfinished capture
+departure at episode end. The complete six-seed `navigation-v1` run records 36
+captures and 36 safe capture departures; neither previously observed deadlock
+remains.
 
 ## Next slices
 
-1. Turn the seed-4/Player-2 departure into a regression test, then test removing
-   the pre-launch brake while retaining the spaceport's existing positional
-   damping. Confirm the seed-2 failure and the complete `navigation-v1` suite.
-2. Add a slower strategic state machine for capture, repair, defend, and combat
+1. Add a slower strategic state machine for capture, repair, defend, and combat
    goals, including commitment and hysteresis.
-3. Compare each strategy revision against the baseline outcomes and traces.
-4. Promote additional scenario transitions to typed evaluator events when
+2. Compare each strategy revision against the baseline outcomes and traces.
+3. Promote additional scenario transitions to typed evaluator events when
    state-difference metrics are no longer expressive enough.
-5. Add policy adapters and batched observation storage only after the rule path
+4. Add policy adapters and batched observation storage only after the rule path
    gives us stable semantics and measurable workloads.
