@@ -109,7 +109,10 @@ and change **Player 2** from **human** to **rule bot**. **Small Duel** is the
 clearest combat test bed. In worlds with planets, the bot selects uncaptured
 spaceports, matches their orbital and wrapper motion, captures them, and
 departs for another target; an escape pod instead seeks an owned port for
-rebuilding. The ordinary two-human setup remains the default.
+rebuilding. Pods treat the moving staging rings as geometric waypoints rather
+than trying to hover at ship-only velocity tolerances, and reacquire an owned
+port if contact is lost before the rebuild completes. The ordinary two-human
+setup remains the default.
 
 On Unix, query the latest live rule-bot and docking diagnostics through the
 client control socket:
@@ -118,9 +121,11 @@ client control socket:
 printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
 ```
 
-The snapshot is refreshed once per second and includes the brain phase and
-intent, ship motion, target planet, actual docked planet, and surface/port
-clearance. This keeps diagnostic formatting out of the simulation hot path.
+The snapshot is refreshed once per second and includes the world seed, brain
+phase and intent, ship motion, target planet, actual docked planet, and
+surface/port clearance. During body avoidance it also identifies the sun or
+planet being avoided and reports the craft's signed surface clearance. This
+keeps diagnostic formatting out of the simulation hot path.
 
 ## Run headless AI episodes
 

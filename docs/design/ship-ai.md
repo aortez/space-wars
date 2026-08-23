@@ -62,8 +62,9 @@ version.
 
 - `reset(BrainReset)` installs an actor and episode seed;
 - `intent(&ShipObservationV1)` produces one normalized controller intent;
-- `telemetry()` reports the current goal, target, hazard, range, and heading
-  error without granting state access.
+- `telemetry()` reports the current goal, target, hazard, avoided celestial
+  body and surface clearance, range, and heading error without granting state
+  access.
 
 When a host changes between human, rule-bot, or benchmark control, it forwards
 one neutral intent before the new source. This releases held thrust and weapons
@@ -87,6 +88,9 @@ The first deterministic bot is selectable for Player 2 in the launcher. It:
 - treats a sensed docking contact as authoritative over its planned target,
   capturing an unexpected unowned port or relaunching from an owned one;
 - seeks an owned spaceport for rebuilding when reduced to an escape pod;
+- preserves pod steering authority during avoidance, rebuild navigation, and
+  fallback survival turns instead of combining those turns with angular
+  braking;
 - uses fast wings only for long, aligned pursuit;
 - fires laser/cannon only inside configured alignment and range windows;
 - falls back to simple escape behavior when a pod has no accessible port.
@@ -160,7 +164,8 @@ motion, and the broad asymmetric ship hull could bridge the inner planet and a
 spaceport wall while trying to turn.
 
 The departure repair is intentionally split at the controller/physics
-boundary. Rule policy `rule_ship_v2` does not apply the omnidirectional brake
+boundary. Rule policy `rule_ship_v2` introduced a departure maneuver that does
+not apply the omnidirectional brake
 while aligning for launch; spaceport contact already damps and centers linear
 motion. A docked full ship that is actively maneuvering to leave keeps its
 ordinary collision groups and mass but temporarily uses a body-sized circular
@@ -169,6 +174,30 @@ zero-mass copy of the normal hull preserves the established spaceport sensor
 footprint during that maneuver. The full physical hull remains in use while
 landing and capturing, and is restored when departure/ejection maneuvering
 ends. Escape pods retain their ordinary compact hull.
+
+Rule policy `rule_ship_v3` accounts for the pod actuator's different meaning:
+releasing its brake provides automatic forward cruise, while applying the
+brake damps angular as well as linear velocity. A pod therefore suppresses a
+requested brake while it has a meaningful heading correction during body or
+hazard avoidance, rebuild-port navigation, and fallback survival. Unlike a
+ship, it cannot hover while matching a moving staging ring's velocity. Pod
+rendezvous and approach transitions are therefore position-driven geometric
+waypoints; ingress still has to establish a real, ownership-approved spaceport
+contact. If that contact is lost before the eight-second rebuild completes,
+the remembered `Docked` phase returns to `Ingress` and actively reacquires the
+port. Full-ship staging and capture behavior retain their position-and-velocity
+requirements. Body-avoidance telemetry records whether the active obstacle is
+the sun or a stable planet ID together with signed hull-to-surface clearance,
+and the interactive control-socket status also includes the episode seed so a
+live failure can be reproduced exactly.
+
+The pod rebuild regression runs seeds 0 through 5 in 10,000-radius generated
+worlds, targets outer `PlanetId(9)`, and starts with the tangential fixed-speed
+flyby that previously produced a permanent orbit. Every run must observe
+approach, ingress, physical docking, at least 480 docked ticks, restoration to
+a full ship, departure, and 90 units of safe surface clearance. A focused
+contact-loss test separately verifies that an incomplete rebuild returns to
+ingress instead of remaining logically docked in empty space.
 
 The former seed-4 characterization is now a bounded regression test. Within
 4,000 ticks Player 2 captures planet 3, reaches the evaluator's 90-unit safe

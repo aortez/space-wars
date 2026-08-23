@@ -23,7 +23,7 @@ const TARGET_EPSILON: f32 = 1.0e-5;
 ///
 /// Bump this when rule-brain decision semantics change enough that evaluation
 /// results should no longer be compared as the same policy version.
-pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v2";
+pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v3";
 
 /// Episode context supplied whenever a host installs or restarts a brain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +64,13 @@ pub enum PortNavigationPhase {
     Depart,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AvoidanceBody {
+    Sun,
+    Planet(PlanetId),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct BrainTelemetry {
     pub actor: Option<PlayerId>,
@@ -72,6 +79,8 @@ pub struct BrainTelemetry {
     pub target_planet: Option<PlanetId>,
     pub port_phase: Option<PortNavigationPhase>,
     pub hazard: Option<DebrisId>,
+    pub avoided_body: Option<AvoidanceBody>,
+    pub avoidance_surface_clearance: Option<f32>,
     pub target_distance: f32,
     pub heading_error: f32,
     pub desired_speed: f32,
@@ -87,6 +96,8 @@ impl Default for BrainTelemetry {
             target_planet: None,
             port_phase: None,
             hazard: None,
+            avoided_body: None,
+            avoidance_surface_clearance: None,
             target_distance: 0.0,
             heading_error: 0.0,
             desired_speed: 0.0,
@@ -123,6 +134,21 @@ pub fn guide_heading(local_target: Vec2, angular_velocity: f32) -> HeadingGuidan
         error_radians,
         turn,
         aligned: error_radians.abs() <= 0.08,
+    }
+}
+
+/// Preserve a pod's angular authority while it is turning toward a target.
+///
+/// Spacewars pods cruise automatically when the brake is released, while the
+/// brake damps both linear and angular velocity. Combining a meaningful
+/// heading correction with braking therefore makes the pod cancel its own
+/// escape turn. Ships have independent thrust and steering, so their requested
+/// brake remains unchanged.
+fn steering_safe_brake(form: ShipForm, heading: HeadingGuidance, requested_brake: f32) -> f32 {
+    if form == ShipForm::EscapePod && !heading.aligned {
+        0.0
+    } else {
+        requested_brake
     }
 }
 
@@ -370,6 +396,13 @@ struct PortNavigation {
     departure_burn_started: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct BodyAvoidance {
+    body: AvoidanceBody,
+    direction: Vec2,
+    surface_clearance: f32,
+}
+
 /// Deterministic first-generation Spacewars opponent.
 ///
 /// It avoids imminent collisions, fights in planet-free worlds, and uses a
@@ -497,9 +530,8 @@ impl RuleShipBrain {
             if !keep_target {
                 self.port_navigation = None;
             } else {
-                if observation.own_ship.docked_planet == Some(navigation.planet)
-                    && navigation.phase != PortNavigationPhase::Depart
-                {
+                let docked_here = observation.own_ship.docked_planet == Some(navigation.planet);
+                if docked_here && navigation.phase != PortNavigationPhase::Depart {
                     navigation.phase = PortNavigationPhase::Docked;
                 }
                 let completed = planet.is_some_and(|planet| match navigation.goal {
@@ -509,6 +541,16 @@ impl RuleShipBrain {
                 });
                 if navigation.phase == PortNavigationPhase::Docked && completed {
                     navigation.phase = PortNavigationPhase::Depart;
+                } else if navigation.goal == BrainGoal::Rebuild
+                    && observation.own_ship.form == ShipForm::EscapePod
+                    && navigation.phase == PortNavigationPhase::Docked
+                    && !docked_here
+                {
+                    // Contact is authoritative, not the remembered phase. A
+                    // fast pod can clip the sensor before the rebuild timer is
+                    // complete; returning to ingress makes it reacquire the
+                    // port instead of waiting forever in empty space.
+                    navigation.phase = PortNavigationPhase::Ingress;
                 }
                 self.port_navigation = Some(navigation);
             }
@@ -538,8 +580,18 @@ impl RuleShipBrain {
             PortNavigationPhase::Approach => planet.spaceport_approach(clearance),
             _ => return,
         };
-        if target.local_position.length() <= self.config.spaceport_staging_tolerance
-            && target.local_velocity.length() <= self.config.spaceport_staging_velocity_tolerance
+        let reached_staging_position =
+            target.local_position.length() <= self.config.spaceport_staging_tolerance;
+        let matched_staging_velocity =
+            target.local_velocity.length() <= self.config.spaceport_staging_velocity_tolerance;
+        // A full ship can independently steer and throttle, so it should
+        // establish a stable position-and-velocity match before changing
+        // targets. A pod auto-cruises whenever its brake is released and
+        // cannot hold that same moving-ring match. Reaching the ring is enough
+        // to advance it toward the concrete spaceport instead of orbiting the
+        // radial rendezvous point forever.
+        if reached_staging_position
+            && (observation.own_ship.form == ShipForm::EscapePod || matched_staging_velocity)
         {
             navigation.phase = match navigation.phase {
                 PortNavigationPhase::Rendezvous => PortNavigationPhase::Approach,
@@ -571,22 +623,29 @@ impl RuleShipBrain {
         &self,
         observation: &ShipObservationV1,
         port_navigation: Option<PortNavigation>,
-    ) -> Option<Vec2> {
-        let mut nearest: Option<(f32, Vec2)> = None;
-        let mut consider = |position: Vec2, velocity: Vec2, radius: f32, clearance: f32| {
-            let surface_distance =
-                position.length() - radius - observation.own_ship.collision_radius;
-            let closing = position.dot(velocity) < 0.0;
-            if surface_distance > clearance || (!closing && surface_distance > clearance * 0.35) {
-                return;
-            }
-            if nearest.is_none_or(|(distance, _)| surface_distance < distance) {
-                nearest = Some((surface_distance, -position));
-            }
-        };
+    ) -> Option<BodyAvoidance> {
+        let mut nearest: Option<BodyAvoidance> = None;
+        let mut consider =
+            |body: AvoidanceBody, position: Vec2, velocity: Vec2, radius: f32, clearance: f32| {
+                let surface_distance =
+                    position.length() - radius - observation.own_ship.collision_radius;
+                let closing = position.dot(velocity) < 0.0;
+                if surface_distance > clearance || (!closing && surface_distance > clearance * 0.35)
+                {
+                    return;
+                }
+                if nearest.is_none_or(|avoidance| surface_distance < avoidance.surface_clearance) {
+                    nearest = Some(BodyAvoidance {
+                        body,
+                        direction: -position,
+                        surface_clearance: surface_distance,
+                    });
+                }
+            };
 
         if let Some(sun) = observation.sun {
             consider(
+                AvoidanceBody::Sun,
                 sun.local_position,
                 sun.local_velocity,
                 sun.radius,
@@ -607,13 +666,14 @@ impl RuleShipBrain {
                 self.config.body_clearance
             };
             consider(
+                AvoidanceBody::Planet(planet.id),
                 planet.local_position,
                 planet.local_velocity,
                 planet.radius,
                 clearance,
             );
         }
-        nearest.map(|(_, direction)| direction)
+        nearest
     }
 
     fn avoidance_intent(
@@ -622,6 +682,8 @@ impl RuleShipBrain {
         direction: Vec2,
         goal: BrainGoal,
         hazard: Option<DebrisId>,
+        avoided_body: Option<AvoidanceBody>,
+        avoidance_surface_clearance: Option<f32>,
     ) -> ShipIntent {
         let heading = guide_heading(direction, observation.own_ship.angular_velocity);
         let navigation = self.port_navigation;
@@ -630,10 +692,17 @@ impl RuleShipBrain {
             target_planet: navigation.map(|navigation| navigation.planet),
             port_phase: navigation.map(|navigation| navigation.phase),
             hazard,
+            avoided_body,
+            avoidance_surface_clearance,
             target_distance: direction.length(),
             heading_error: heading.error_radians,
             ..BrainTelemetry::default()
         });
+        let requested_brake = if heading.error_radians.abs() >= 0.65 {
+            1.0
+        } else {
+            0.0
+        };
         ShipIntent {
             turn: heading.turn,
             thrust: if heading.error_radians.abs() < 0.65 {
@@ -641,11 +710,7 @@ impl RuleShipBrain {
             } else {
                 0.0
             },
-            brake: if heading.error_radians.abs() >= 0.65 {
-                1.0
-            } else {
-                0.0
-            },
+            brake: steering_safe_brake(observation.own_ship.form, heading, requested_brake),
             ..ShipIntent::default()
         }
     }
@@ -795,7 +860,7 @@ impl RuleShipBrain {
             && navigation.phase == PortNavigationPhase::Rendezvous
             && guidance.target_distance > self.config.spaceport_cruise_distance
             && guidance.heading.error_radians.abs() < 0.12;
-        let (thrust, brake) = if observation.own_ship.form == ShipForm::EscapePod {
+        let (thrust, requested_brake) = if observation.own_ship.form == ShipForm::EscapePod {
             if guidance.thrust >= 0.75 {
                 (1.0, 0.0)
             } else {
@@ -804,6 +869,8 @@ impl RuleShipBrain {
         } else {
             (guidance.thrust, guidance.brake)
         };
+        let brake =
+            steering_safe_brake(observation.own_ship.form, guidance.heading, requested_brake);
         ShipIntent {
             turn: guidance.heading.turn,
             thrust,
@@ -857,8 +924,15 @@ impl ShipBrain for RuleShipBrain {
             _ => {}
         }
 
-        if let Some(direction) = self.body_avoidance(observation, self.port_navigation) {
-            return self.avoidance_intent(observation, direction, BrainGoal::AvoidBody, None);
+        if let Some(avoidance) = self.body_avoidance(observation, self.port_navigation) {
+            return self.avoidance_intent(
+                observation,
+                avoidance.direction,
+                BrainGoal::AvoidBody,
+                None,
+                Some(avoidance.body),
+                Some(avoidance.surface_clearance),
+            );
         }
 
         if let Some(threat) = earliest_collision_threat(
@@ -872,6 +946,8 @@ impl ShipBrain for RuleShipBrain {
                 threat.avoidance_direction,
                 BrainGoal::AvoidHazard,
                 Some(threat.hazard),
+                None,
+                None,
             );
         }
 
@@ -910,10 +986,11 @@ impl ShipBrain for RuleShipBrain {
                 ..BrainTelemetry::default()
             });
             let aligned = heading.error_radians.abs() < 0.65;
+            let requested_brake = if aligned { 0.0 } else { 1.0 };
             return ShipIntent {
                 turn: heading.turn,
                 thrust: if aligned { 1.0 } else { 0.0 },
-                brake: if aligned { 0.0 } else { 1.0 },
+                brake: steering_safe_brake(observation.own_ship.form, heading, requested_brake),
                 ..ShipIntent::default()
             };
         }
@@ -1148,6 +1225,454 @@ mod tests {
     }
 
     #[test]
+    fn pod_staging_is_position_driven_while_ship_staging_requires_velocity_match() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 21);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        let target_planet = observation.planets[0].id;
+        let brain_config = RuleShipBrainConfig::default();
+        let staging_radius = observation.planets[0].radius
+            + observation.own_ship.collision_radius
+            + brain_config.spaceport_staging_margin;
+        observation.planets[0].local_position = -Vec2::Y * staging_radius;
+        observation.planets[0].local_spaceport_position =
+            observation.planets[0].local_position + Vec2::X * observation.planets[0].radius;
+        observation.planets[0].local_velocity = Vec2::X * 100.0;
+        observation.planets[0].local_spaceport_velocity = Vec2::X * 100.0;
+
+        observation.own_ship.form = ShipForm::EscapePod;
+        observation.planets[0].owner = Some(PlayerId::PLAYER_2);
+        let mut pod_brain = RuleShipBrain::new(brain_config);
+        pod_brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+        pod_brain.port_navigation = Some(PortNavigation {
+            goal: BrainGoal::Rebuild,
+            planet: target_planet,
+            phase: PortNavigationPhase::Rendezvous,
+            departure_burn_started: false,
+        });
+
+        pod_brain.refresh_port_navigation(&observation);
+
+        assert_eq!(
+            pod_brain.port_navigation.unwrap().phase,
+            PortNavigationPhase::Approach
+        );
+
+        observation.own_ship.form = ShipForm::Ship;
+        observation.planets[0].owner = None;
+        let mut ship_brain = RuleShipBrain::new(brain_config);
+        ship_brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+        ship_brain.port_navigation = Some(PortNavigation {
+            goal: BrainGoal::Capture,
+            planet: target_planet,
+            phase: PortNavigationPhase::Rendezvous,
+            departure_burn_started: false,
+        });
+
+        ship_brain.refresh_port_navigation(&observation);
+
+        assert_eq!(
+            ship_brain.port_navigation.unwrap().phase,
+            PortNavigationPhase::Rendezvous
+        );
+    }
+
+    #[test]
+    fn escape_pod_steers_around_unowned_planet_without_braking() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 23);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.own_ship.form = ShipForm::EscapePod;
+        observation.sun = None;
+        observation.hazards.clear();
+        for (index, planet) in observation.planets.iter_mut().enumerate() {
+            planet.owner = None;
+            let offset = Vec2::new(2_000.0 + index as f32 * 200.0, 2_000.0);
+            let port_axis = (planet.local_spaceport_position - planet.local_position).normalized();
+            planet.local_position = offset;
+            planet.local_spaceport_position = offset + port_axis * planet.radius * 0.7;
+            planet.local_velocity = Vec2::ZERO;
+            planet.local_spaceport_velocity = Vec2::ZERO;
+        }
+        observation.planets[1].owner = Some(PlayerId::PLAYER_2);
+        let rebuild_planet = observation.planets[1].id;
+        let avoided_planet = observation.planets[0].id;
+        observation.planets[0].radius = 40.0;
+        observation.planets[0].local_position = Vec2::new(100.0, 0.0);
+        observation.planets[0].local_velocity = Vec2::new(-10.0, 0.0);
+        let expected_surface_clearance = 100.0 - 40.0 - observation.own_ship.collision_radius;
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        let intent = brain.intent(&observation);
+
+        assert_eq!(brain.telemetry().goal, BrainGoal::AvoidBody);
+        assert_eq!(brain.telemetry().target_planet, Some(rebuild_planet));
+        assert_eq!(
+            brain.telemetry().port_phase,
+            Some(PortNavigationPhase::Rendezvous)
+        );
+        assert_eq!(
+            brain.telemetry().avoided_body,
+            Some(AvoidanceBody::Planet(avoided_planet))
+        );
+        assert_close(
+            brain.telemetry().avoidance_surface_clearance.unwrap(),
+            expected_surface_clearance,
+        );
+        assert!(intent.turn < 0.0);
+        assert_eq!(intent.brake, 0.0);
+    }
+
+    #[test]
+    fn escape_pod_physically_clears_an_unowned_planet_while_seeking_rebuild() {
+        let config = SpacewarsConfig {
+            universe_radius: 10_000,
+            asteroid_probability_per_sec: 0.0,
+            use_starfield: false,
+            use_sounds: false,
+            ..SpacewarsConfig::default()
+        };
+        let mut state = SpacewarsScenario::init(config, 25);
+        state.sun = None;
+        for (index, planet) in state.planets.iter_mut().enumerate() {
+            planet.position = Vec2::new(2_000.0 + index as f32 * 250.0, 2_000.0);
+            planet.owner_id = None;
+        }
+        state.planets[0].position = Vec2::ZERO;
+        state.planets[1].position = Vec2::new(-2_000.0, -1_500.0);
+        state.planets[1].owner_id = Some(PlayerId::PLAYER_2.index());
+        state.players[1].planet_count = 1;
+        state.ships[0].position = Vec2::new(-3_000.0, 3_000.0);
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[1].life = 0.0;
+        state.ships[1].dead = true;
+        SpacewarsScenario::step(&mut state, &[], DT);
+        assert_eq!(state.ships[1].form, ShipForm::EscapePod);
+        state.debris.clear();
+
+        let pod_radius = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap()
+        .own_ship
+        .collision_radius;
+        let obstacle_radius = state.planets[0].radius;
+        let initial_surface_clearance = 45.0;
+        state.ships[1].position =
+            Vec2::X * (obstacle_radius + pod_radius + initial_surface_clearance);
+        state.ships[1].velocity = Vec2::new(-15.0, 0.0);
+        state.ships[1].rotation_radians = 0.0;
+        state.ships[1].direction = Vec2::Y;
+        state.ships[1].omega = 0.0;
+
+        let obstacle = PlanetId::from_index(0).unwrap();
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+        let mut encoder = ShipIntentEncoder::default();
+        let mut maximum_surface_clearance = initial_surface_clearance;
+
+        for tick in 0..600 {
+            let observation = SpacewarsScenario::observe_ship(
+                &state,
+                PlayerId::PLAYER_2,
+                ShipSensorProfile::FullMapRadar,
+            )
+            .unwrap();
+            let intent = brain.intent(&observation);
+            if tick == 0 {
+                assert_eq!(brain.telemetry().goal, BrainGoal::AvoidBody);
+                assert_eq!(
+                    brain.telemetry().avoided_body,
+                    Some(AvoidanceBody::Planet(obstacle))
+                );
+                assert!(intent.turn.abs() > 0.0);
+                assert_eq!(intent.brake, 0.0);
+            }
+            let actions = encoder.encode(PlayerId::PLAYER_2.index(), intent);
+            SpacewarsScenario::step(&mut state, &actions, DT);
+            let surface_clearance = state.ships[1]
+                .position
+                .distance_to(state.planets[0].position)
+                - obstacle_radius
+                - pod_radius;
+            maximum_surface_clearance = maximum_surface_clearance.max(surface_clearance);
+            if surface_clearance >= brain.config.body_clearance + 20.0 {
+                break;
+            }
+        }
+
+        assert!(
+            maximum_surface_clearance >= brain.config.body_clearance + 20.0,
+            "pod did not clear the unowned planet; maximum surface clearance {maximum_surface_clearance:.3}, telemetry {:?}, position {:?}, velocity {:?}",
+            brain.telemetry(),
+            state.ships[1].position,
+            state.ships[1].velocity,
+        );
+    }
+
+    fn assert_rule_brain_pod_rebuild_cycle(seed: u64) {
+        let config = SpacewarsConfig {
+            universe_radius: 5_000,
+            asteroid_probability_per_sec: 0.0,
+            use_starfield: false,
+            use_sounds: false,
+            ..SpacewarsConfig::default()
+        };
+        let mut state = SpacewarsScenario::init(config, seed);
+        let target_planet_index = 9;
+        assert!(state.planets.len() > target_planet_index);
+        for planet in &mut state.planets {
+            planet.owner_id = None;
+        }
+        state.planets[target_planet_index].owner_id = Some(PlayerId::PLAYER_2.index());
+        state.players[1].planet_count = 1;
+        state.ships[1].life = 0.0;
+        state.ships[1].dead = true;
+        SpacewarsScenario::step(&mut state, &[], DT);
+        assert_eq!(state.ships[1].form, ShipForm::EscapePod);
+        state.debris.clear();
+
+        let pod_radius = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap()
+        .own_ship
+        .collision_radius;
+        let target_planet_state = state.planets[target_planet_index];
+        state.ships[1].position = target_planet_state.position
+            + Vec2::X * (target_planet_state.radius + pod_radius + 60.0);
+        state.ships[1].velocity = Vec2::Y * 150.0;
+        state.ships[1].rotation_radians = 0.0;
+        state.ships[1].direction = Vec2::Y;
+        state.ships[1].omega = 0.0;
+
+        let target_planet = PlanetId::from_index(target_planet_index).unwrap();
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+        let mut encoder = ShipIntentEncoder::default();
+        let mut saw_approach = false;
+        let mut saw_ingress = false;
+        let mut saw_docked = false;
+        let mut saw_rebuilt = false;
+        let mut saw_depart = false;
+        let mut saw_safe_departure = false;
+        let mut first_docked_tick = None;
+        let mut first_rebuilt_tick = None;
+        let mut minimum_target_distance = f32::INFINITY;
+        let mut docking_entries = 0_u64;
+        let mut continuous_docked_ticks = 0_u64;
+        let mut maximum_docked_ticks = 0_u64;
+        let mut was_docked = false;
+
+        for _ in 0..7_200 {
+            let observation = SpacewarsScenario::observe_ship(
+                &state,
+                PlayerId::PLAYER_2,
+                ShipSensorProfile::FullMapRadar,
+            )
+            .unwrap();
+            let intent = brain.intent(&observation);
+            let telemetry = brain.telemetry();
+            minimum_target_distance = minimum_target_distance.min(telemetry.target_distance);
+            saw_approach |= telemetry.port_phase == Some(PortNavigationPhase::Approach);
+            saw_ingress |= telemetry.port_phase == Some(PortNavigationPhase::Ingress);
+            let docked = observation.own_ship.docked_planet == Some(target_planet);
+            if docked {
+                saw_docked = true;
+                first_docked_tick.get_or_insert(state.tick);
+                if !was_docked {
+                    docking_entries += 1;
+                }
+                continuous_docked_ticks += 1;
+                maximum_docked_ticks = maximum_docked_ticks.max(continuous_docked_ticks);
+            } else {
+                continuous_docked_ticks = 0;
+            }
+            was_docked = docked;
+            if observation.own_ship.form == ShipForm::Ship {
+                saw_rebuilt = true;
+                first_rebuilt_tick.get_or_insert(state.tick);
+            }
+            saw_depart |= saw_rebuilt
+                && telemetry.target_planet == Some(target_planet)
+                && telemetry.port_phase == Some(PortNavigationPhase::Depart);
+            if saw_depart && observation.own_ship.docked_planet != Some(target_planet) {
+                let target = observation
+                    .planets
+                    .iter()
+                    .find(|planet| planet.id == target_planet)
+                    .unwrap();
+                let surface_clearance = target.local_position.length()
+                    - target.radius
+                    - observation.own_ship.collision_radius;
+                saw_safe_departure = surface_clearance >= brain.config.body_clearance;
+            }
+            if saw_safe_departure {
+                break;
+            }
+
+            let actions = encoder.encode(PlayerId::PLAYER_2.index(), intent);
+            SpacewarsScenario::step(&mut state, &actions, DT);
+        }
+
+        assert!(saw_approach, "seed {seed} never reached port approach");
+        assert!(saw_ingress, "seed {seed} never began port ingress");
+        assert!(
+            saw_docked,
+            "seed {seed} pod never docked; minimum target distance {minimum_target_distance:.3}, telemetry {:?}, position {:?}, velocity {:?}",
+            brain.telemetry(),
+            state.ships[1].position,
+            state.ships[1].velocity,
+        );
+        assert!(
+            saw_rebuilt,
+            "seed {seed} docked pod never rebuilt; entries {docking_entries}, longest contact {maximum_docked_ticks} ticks, telemetry {:?}, form {:?}, docked {:?}, position {:?}, velocity {:?}",
+            brain.telemetry(),
+            state.ships[1].form,
+            SpacewarsScenario::observe_ship(
+                &state,
+                PlayerId::PLAYER_2,
+                ShipSensorProfile::FullMapRadar,
+            )
+            .unwrap()
+            .own_ship
+            .docked_planet,
+            state.ships[1].position,
+            state.ships[1].velocity,
+        );
+        assert!(
+            first_rebuilt_tick.unwrap() - first_docked_tick.unwrap() >= 480,
+            "seed {seed} rebuild bypassed the eight-second dock timer"
+        );
+        assert!(saw_depart, "seed {seed} rebuilt ship never began departure");
+        assert!(
+            saw_safe_departure,
+            "seed {seed} rebuilt ship never safely departed"
+        );
+    }
+
+    #[test]
+    fn rule_brain_pod_docks_rebuilds_and_safely_departs() {
+        for seed in [0, 1, 2, 3, 4, 5] {
+            assert_rule_brain_pod_rebuild_cycle(seed);
+        }
+    }
+
+    #[test]
+    fn escape_pod_rendezvous_turn_does_not_apply_the_brake() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 27);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.own_ship.form = ShipForm::EscapePod;
+        observation.own_ship.local_velocity = Vec2::ZERO;
+        observation.own_ship.angular_velocity = 0.0;
+        observation.sun = None;
+        observation.hazards.clear();
+        for (index, planet) in observation.planets.iter_mut().enumerate() {
+            planet.owner = None;
+            let offset = Vec2::new(2_000.0 + index as f32 * 200.0, 2_000.0);
+            let port_axis = (planet.local_spaceport_position - planet.local_position).normalized();
+            planet.local_position = offset;
+            planet.local_spaceport_position = offset + port_axis * planet.radius * 0.7;
+            planet.local_velocity = Vec2::ZERO;
+            planet.local_spaceport_velocity = Vec2::ZERO;
+        }
+        let rebuild_planet = observation.planets[1].id;
+        observation.planets[1].owner = Some(PlayerId::PLAYER_2);
+        observation.planets[1].local_position = Vec2::new(0.0, -2_000.0);
+        observation.planets[1].local_spaceport_position = Vec2::new(0.0, -1_950.0);
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        let intent = brain.intent(&observation);
+
+        assert_eq!(brain.telemetry().goal, BrainGoal::Rebuild);
+        assert_eq!(brain.telemetry().target_planet, Some(rebuild_planet));
+        assert_eq!(
+            brain.telemetry().port_phase,
+            Some(PortNavigationPhase::Rendezvous)
+        );
+        assert!(intent.turn.abs() > 0.0);
+        assert_eq!(intent.brake, 0.0);
+    }
+
+    #[test]
+    fn escape_pod_survival_turn_does_not_apply_the_brake() {
+        let mut config = SpacewarsConfig::deathmatch();
+        config.asteroid_probability_per_sec = 0.0;
+        let state = SpacewarsScenario::init(config, 29);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.own_ship.form = ShipForm::EscapePod;
+        observation.own_ship.angular_velocity = 0.0;
+        observation.sun = None;
+        observation.hazards.clear();
+        observation.opponent.as_mut().unwrap().local_position = Vec2::new(-100.0, 0.0);
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        let intent = brain.intent(&observation);
+
+        assert_eq!(brain.telemetry().goal, BrainGoal::Survive);
+        assert!(intent.turn > 0.0);
+        assert_eq!(intent.brake, 0.0);
+    }
+
+    #[test]
     fn unexpected_docking_contact_overrides_the_planned_planet() {
         let config = SpacewarsConfig {
             asteroid_probability_per_sec: 0.0,
@@ -1206,6 +1731,53 @@ mod tests {
             Some(PortNavigationPhase::Docked)
         );
         assert_eq!(intent, ShipIntent::default());
+    }
+
+    #[test]
+    fn incomplete_pod_rebuild_reacquires_port_after_contact_loss() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 33);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.own_ship.form = ShipForm::EscapePod;
+        observation.sun = None;
+        observation.hazards.clear();
+        for (index, planet) in observation.planets.iter_mut().enumerate() {
+            planet.owner = None;
+            planet.local_position = Vec2::new(2_000.0 + index as f32 * 200.0, 2_000.0);
+        }
+        observation.planets[0].owner = Some(PlayerId::PLAYER_2);
+        let rebuild_planet = observation.planets[0].id;
+        let mut brain = RuleShipBrain::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        let _ = brain.intent(&observation);
+        observation.own_ship.docked_planet = Some(rebuild_planet);
+        let _ = brain.intent(&observation);
+        assert_eq!(
+            brain.telemetry().port_phase,
+            Some(PortNavigationPhase::Docked)
+        );
+
+        observation.own_ship.docked_planet = None;
+        let _ = brain.intent(&observation);
+
+        assert_eq!(brain.telemetry().goal, BrainGoal::Rebuild);
+        assert_eq!(brain.telemetry().target_planet, Some(rebuild_planet));
+        assert_eq!(
+            brain.telemetry().port_phase,
+            Some(PortNavigationPhase::Ingress)
+        );
     }
 
     #[test]
