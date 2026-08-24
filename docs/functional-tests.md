@@ -25,9 +25,10 @@ The initial workflows verify:
   launcher;
 - wrong-screen, stale-revision, unavailable-action, unavailable-control, and
   disabled-control rejections without state mutation;
-- launcher and gameplay screenshots; and
-- starting a real deterministic Spacewars scenario and observing `gameplay`
-  with a scenario instance revision.
+- launcher, gameplay, pause-menu, and benchmark screenshots; and
+- starting a real deterministic Spacewars scenario, pausing through the guarded
+  host API, observing the conditional Benchmark menu control, and activating it
+  to start a new benchmark scenario revision.
 
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
@@ -87,6 +88,6 @@ Keep functional tests black-box:
 5. Wait on observable predicates with deadlines; do not use transition sleeps.
 6. Assert both the postcondition and state that must remain unchanged on errors.
 
-Scenario pause, restart, and return-to-launcher coverage will be added when
-their explicit public lifecycle operations land. The current API deliberately
-does not reinterpret menu actions as gameplay controls.
+Scenario restart and return-to-launcher coverage will be added when their
+explicit public lifecycle operations land. The current API deliberately does
+not reinterpret menu actions as gameplay controls.

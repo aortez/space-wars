@@ -11,6 +11,7 @@ pub use client::{ControlClient, ControlClientError, UiStatePredicate};
 pub const UI_STATE_COMMAND: &str = "ui state";
 pub const UI_PRESS_COMMAND: &str = "ui press";
 pub const UI_ACTIVATE_COMMAND: &str = "ui activate";
+pub const HOST_PAUSE_COMMAND: &str = "host pause";
 pub const UI_STATE_SCHEMA_VERSION: u32 = 1;
 pub const NO_ACTIVE_SCENARIO_DIAGNOSTICS: &str = "No active scenario diagnostics.";
 
@@ -243,6 +244,42 @@ impl UiActivateRequest {
     pub fn to_json(&self) -> Result<String, ProtocolError> {
         validate_schema_version(self.schema_version)?;
         Ok(serde_json::to_string(self)?)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostPauseRequest {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub expected_screen: Option<UiScreen>,
+    #[serde(default)]
+    pub expected_revision: Option<u64>,
+}
+
+impl HostPauseRequest {
+    pub fn new() -> Self {
+        Self {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            expected_screen: None,
+            expected_revision: None,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
+        let request: Self = serde_json::from_str(json)?;
+        validate_schema_version(request.schema_version)?;
+        Ok(request)
+    }
+
+    pub fn to_json(&self) -> Result<String, ProtocolError> {
+        validate_schema_version(self.schema_version)?;
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
+impl Default for HostPauseRequest {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -601,6 +638,14 @@ mod tests {
         request.expected_revision = Some(5);
         assert_eq!(
             UiActivateRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+
+        let mut request = HostPauseRequest::new();
+        request.expected_screen = Some(UiScreen::Gameplay);
+        request.expected_revision = Some(6);
+        assert_eq!(
+            HostPauseRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
 

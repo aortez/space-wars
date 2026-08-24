@@ -199,6 +199,20 @@ The dedicated CI step runs these tests under the software renderer. See
 [Functional UI tests](docs/functional-tests.md) for local display options,
 current workflow coverage, and failure artifacts.
 
+Pause active gameplay and wait until the pause menu is observable:
+
+```sh
+spacewars-cli host pause --timeout 3s
+```
+
+The command observes the current UI revision, submits a guarded host request,
+and polls with the same overall deadline. From Spacewars, the visible Benchmark
+menu item can then be activated by ID:
+
+```sh
+spacewars-cli ui activate pause.benchmark --expect-screen pause.main
+```
+
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:
 

@@ -221,6 +221,16 @@ All supplied conditions must match. The CLI polling loop has a deadline and
 does not block the Slint event loop. A structured timeout includes the last UI
 state it observed.
 
+Pause active gameplay and wait for the visible pause menu:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.benchmark --expect-screen pause.main
+```
+
+`host pause` automatically guards the observed gameplay revision. The Benchmark
+control is present only when the active scenario supports it.
+
 Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
 
 ```sh

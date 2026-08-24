@@ -12,8 +12,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde_json::{Value, json};
 use spacewars_control::{
-    ControlClient, ControlClientError, ControlFailure, ControlFailureCode, UiAction,
-    UiActivateRequest, UiPressRequest, UiScreen, UiState, UiStatePredicate,
+    ControlClient, ControlClientError, ControlFailure, ControlFailureCode, HostPauseRequest,
+    UiAction, UiActivateRequest, UiPressRequest, UiScreen, UiState, UiStatePredicate,
 };
 use tempfile::{Builder, TempDir};
 
@@ -172,10 +172,15 @@ fn launcher_navigation_uses_the_public_control_api() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn launcher_can_start_real_gameplay() {
-    run_functional_test("launcher-start-gameplay", |harness| {
+fn launcher_can_start_spacewars_and_use_pause_benchmark() {
+    run_functional_test("launcher-spacewars-pause-benchmark", |harness| {
         let mut state = harness.wait_until_ready();
         assert_launcher_main(&state);
+
+        let unavailable = harness.expect_pause_failure(&state);
+        assert_eq!(unavailable.code, ControlFailureCode::WrongScreen);
+        assert_eq!(unavailable.current_state.as_ref(), Some(&state));
+        assert_eq!(harness.state(), state);
 
         let launcher_revision = state.revision;
         harness.activate_guarded("launcher.start", &state);
@@ -191,11 +196,51 @@ fn launcher_can_start_real_gameplay() {
         assert_eq!(state.screen, UiScreen::Gameplay);
         assert_eq!(state.active_scenario.as_deref(), Some("spacewars"));
         assert_eq!(state.selected_scenario, "spacewars");
-        assert!(state.scenario_revision.is_some());
+        let gameplay_scenario_revision = state
+            .scenario_revision
+            .expect("gameplay must report a scenario revision");
         assert!(!state.paused);
+        assert!(!state.benchmark_active);
         assert!(state.controls.is_empty());
         assert!(state.actions.is_empty());
         harness.capture_screenshot("gameplay.png");
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert!(!state.benchmark_active);
+        assert_eq!(
+            control_ids(&state),
+            [
+                "pause.resume",
+                "pause.restart",
+                "pause.benchmark",
+                "pause.controls",
+                "pause.return-to-launcher",
+            ]
+        );
+        harness.capture_screenshot("pause.png");
+
+        let benchmark_requested = harness.activate_guarded("pause.benchmark", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(benchmark_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(!state.paused);
+        assert!(state.benchmark_active);
+        assert_ne!(state.scenario_revision, Some(gameplay_scenario_revision));
+        harness.capture_screenshot("benchmark.png");
     });
 }
 
@@ -400,6 +445,46 @@ impl FunctionalHarness {
                 visited.insert(state.selected_scenario.clone()),
                 "scenario {target:?} is not reachable through launcher.scenario.next; visited {visited:?}"
             );
+        }
+    }
+
+    fn pause_guarded(&mut self, state: &UiState) -> UiState {
+        let request = pause_request(Some(state.screen), Some(state.revision));
+        let command = format!(
+            "host pause --expect-screen={} --expect-revision={}",
+            state.screen, state.revision
+        );
+        let result = self.client.host_pause_before(&request, request_deadline());
+        self.require_state_result(&command, result)
+    }
+
+    fn expect_pause_failure(&mut self, state: &UiState) -> ControlFailure {
+        let request = pause_request(Some(state.screen), Some(state.revision));
+        let command = format!(
+            "host pause --expect-screen={} --expect-revision={}",
+            state.screen, state.revision
+        );
+        match self.client.host_pause_before(&request, request_deadline()) {
+            Err(ControlClientError::Failure(failure)) => {
+                if let Some(state) = &failure.current_state {
+                    self.last_state = Some(state.clone());
+                }
+                self.history.push(json!({
+                    "elapsed_ms": self.elapsed_ms(),
+                    "command": command,
+                    "outcome": "rejected",
+                    "failure": failure,
+                }));
+                *failure
+            }
+            Ok(state) => {
+                self.record_state(&command, &state);
+                panic!("{command} succeeded, but a structured rejection was expected");
+            }
+            Err(error) => {
+                self.record_error(&command, &error);
+                panic!("{command} returned an unexpected error: {error}");
+            }
         }
     }
 
@@ -719,6 +804,16 @@ fn activate_request(
     expected_revision: Option<u64>,
 ) -> UiActivateRequest {
     let mut request = UiActivateRequest::new(control_id);
+    request.expected_screen = expected_screen;
+    request.expected_revision = expected_revision;
+    request
+}
+
+fn pause_request(
+    expected_screen: Option<UiScreen>,
+    expected_revision: Option<u64>,
+) -> HostPauseRequest {
+    let mut request = HostPauseRequest::new();
     request.expected_screen = expected_screen;
     request.expected_revision = expected_revision;
     request

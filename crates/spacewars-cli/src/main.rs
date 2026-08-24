@@ -9,8 +9,9 @@ use engine_common::DEFAULT_CONTROL_SOCKET;
 #[cfg(test)]
 use spacewars_control::UI_STATE_SCHEMA_VERSION;
 use spacewars_control::{
-    ControlClient, ControlClientError, ControlFailure, UiAction, UiActivateRequest, UiControl,
-    UiPressRequest, UiScreen, UiState, UiStatePredicate, parse_runtime_status,
+    ControlClient, ControlClientError, ControlFailure, HostPauseRequest, UiAction,
+    UiActivateRequest, UiControl, UiPressRequest, UiScreen, UiState, UiStatePredicate,
+    parse_runtime_status,
 };
 
 #[derive(Debug, Parser)]
@@ -184,6 +185,21 @@ impl From<UiScreenArg> for UiScreen {
 
 #[derive(Debug, Subcommand)]
 enum HostCommand {
+    /// Pause active gameplay and wait for the pause menu.
+    Pause {
+        /// Reject the request unless this exact UI revision is current.
+        #[arg(long)]
+        expect_revision: Option<u64>,
+
+        /// Maximum time for the pause menu to become visible.
+        #[arg(long, default_value = "3s", value_parser = parse_timeout)]
+        timeout: Duration,
+
+        /// Emit success or structured control failures as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Start a new benchmark instance and wait until the host confirms it.
     Benchmark {
         /// Maximum time to wait for a new benchmark instance.
@@ -281,6 +297,15 @@ fn run() -> Result<(), CliError> {
         )
         .map_err(|error| control_error(error, json)),
         Command::Host {
+            command:
+                HostCommand::Pause {
+                    expect_revision,
+                    timeout,
+                    json,
+                },
+        } => request_host_pause(&client, expect_revision, timeout, json)
+            .map_err(|error| control_error(error, json)),
+        Command::Host {
             command: HostCommand::Benchmark { timeout },
         } => request_benchmark(&client, timeout).map_err(human_error),
     }
@@ -363,6 +388,33 @@ fn request_ui_wait(
         ))));
     }
     print_ui_state(&client.wait_for_ui_state(&predicate, timeout)?, json)
+}
+
+fn request_host_pause(
+    client: &ControlClient,
+    expected_revision: Option<u64>,
+    timeout: Duration,
+    json: bool,
+) -> Result<(), ControlClientError> {
+    let deadline = Instant::now().checked_add(timeout).ok_or_else(|| {
+        ControlClientError::Failure(Box::new(ControlFailure::new(
+            spacewars_control::ControlFailureCode::Timeout,
+            "host pause timeout is too large",
+            None,
+        )))
+    })?;
+    let observed = client.ui_state_before(deadline)?;
+    let mut request = HostPauseRequest::new();
+    request.expected_screen = Some(UiScreen::Gameplay);
+    request.expected_revision = Some(expected_revision.unwrap_or(observed.revision));
+    let accepted = client.host_pause_before(&request, deadline)?;
+    let predicate = UiStatePredicate {
+        screen: Some(UiScreen::PauseMain),
+        scenario: accepted.active_scenario.clone(),
+        revision_after: Some(accepted.revision),
+    };
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    print_ui_state(&client.wait_for_ui_state(&predicate, remaining)?, json)
 }
 
 fn print_ui_state(state: &UiState, json: bool) -> Result<(), ControlClientError> {
@@ -533,6 +585,32 @@ mod tests {
             panic!("expected host benchmark command");
         };
         assert_eq!(timeout, Duration::from_secs(3));
+    }
+
+    #[test]
+    fn parses_host_pause_subcommand() {
+        let args = Args::try_parse_from([
+            "spacewars-cli",
+            "host",
+            "pause",
+            "--expect-revision",
+            "12",
+            "--timeout",
+            "750ms",
+            "--json",
+        ])
+        .unwrap();
+
+        assert!(matches!(
+            args.command,
+            Command::Host {
+                command: HostCommand::Pause {
+                    expect_revision: Some(12),
+                    timeout,
+                    json: true,
+                }
+            } if timeout == Duration::from_millis(750)
+        ));
     }
 
     #[test]
