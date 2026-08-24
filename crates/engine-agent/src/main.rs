@@ -4,7 +4,9 @@ use std::{io, process::ExitCode};
 
 use clap::{Parser, ValueEnum};
 use engine_agent::{
-    BatchConfig, ControllerKind, EvaluationSuite, RunReport, SpacewarsPreset, run_batch, run_suite,
+    BatchConfig, ComparedPolicyMetrics, ControllerKind, EvaluationSuite, PolicyComparisonProfile,
+    PolicyComparisonReport, RunReport, SpacewarsPreset, run_batch, run_policy_comparison,
+    run_suite, verify_suite_baseline,
 };
 use scenario_spacewars::PlayerId;
 
@@ -26,10 +28,54 @@ struct Args {
             "episodes",
             "max_ticks",
             "player_1",
-            "player_2"
+            "player_2",
+            "compare",
+            "baseline",
+            "candidate"
         ]
     )]
     suite: Option<SuiteArg>,
+
+    /// Require a named suite to match its checked-in deterministic baseline.
+    #[arg(long, requires = "suite", conflicts_with = "compare")]
+    verify: bool,
+
+    /// Run a fixed workload with baseline/candidate seats swapped per seed.
+    #[arg(
+        long,
+        value_enum,
+        requires = "candidate",
+        conflicts_with_all = [
+            "suite",
+            "verify",
+            "scenario",
+            "preset",
+            "seed",
+            "seed_step",
+            "episodes",
+            "max_ticks",
+            "player_1",
+            "player_2",
+            "trace_player"
+        ]
+    )]
+    compare: Option<ComparisonArg>,
+
+    /// Established controller used as the comparison baseline.
+    #[arg(long, value_enum, requires = "compare")]
+    baseline: Option<ControllerArg>,
+
+    /// New controller being evaluated.
+    #[arg(long, value_enum, requires = "compare")]
+    candidate: Option<ControllerArg>,
+
+    /// Override the comparison profile's first seed.
+    #[arg(long, requires = "compare")]
+    comparison_start_seed: Option<u64>,
+
+    /// Override the comparison profile's number of paired seeds.
+    #[arg(long, requires = "compare", value_parser = clap::value_parser!(u32).range(1..))]
+    comparison_episodes: Option<u32>,
 
     /// Scenario to evaluate.
     #[arg(long, value_enum, default_value = "spacewars")]
@@ -60,7 +106,7 @@ struct Args {
     player_1: ControllerArg,
 
     /// Controller installed in player seat 2.
-    #[arg(long, value_enum, default_value = "rule")]
+    #[arg(long, value_enum, default_value = "rule-v5")]
     player_2: ControllerArg,
 
     /// Record navigation events for player 1 or 2 in a custom batch.
@@ -102,6 +148,19 @@ enum SuiteArg {
     StrategyV1,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ComparisonArg {
+    StrategyV1,
+}
+
+impl From<ComparisonArg> for PolicyComparisonProfile {
+    fn from(value: ComparisonArg) -> Self {
+        match value {
+            ComparisonArg::StrategyV1 => Self::StrategyV1,
+        }
+    }
+}
+
 impl From<SuiteArg> for EvaluationSuite {
     fn from(value: SuiteArg) -> Self {
         match value {
@@ -114,14 +173,15 @@ impl From<SuiteArg> for EvaluationSuite {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ControllerArg {
     Idle,
-    Rule,
+    #[value(name = "rule-v5", alias = "rule")]
+    RuleV5,
 }
 
 impl From<ControllerArg> for ControllerKind {
     fn from(value: ControllerArg) -> Self {
         match value {
             ControllerArg::Idle => Self::Idle,
-            ControllerArg::Rule => Self::Rule,
+            ControllerArg::RuleV5 => Self::RuleV5,
         }
     }
 }
@@ -152,8 +212,35 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let report = if let Some(suite) = args.suite {
-        run_suite(suite.into())?
+    if let Some(comparison) = args.compare {
+        let baseline = args.baseline.unwrap_or(ControllerArg::RuleV5).into();
+        let candidate = args
+            .candidate
+            .expect("clap requires a candidate when comparison is selected")
+            .into();
+        let profile = PolicyComparisonProfile::from(comparison);
+        let mut config = profile.config(baseline, candidate);
+        if let Some(seed) = args.comparison_start_seed {
+            config.start_seed = seed;
+        }
+        if let Some(episodes) = args.comparison_episodes {
+            config.episodes = episodes;
+        }
+        let report = run_policy_comparison(config)?;
+        match args.output {
+            OutputArg::Text => print_policy_comparison_report(&report),
+            OutputArg::Json => {
+                let stdout = io::stdout();
+                serde_json::to_writer_pretty(stdout.lock(), &report)?;
+                println!();
+            }
+        }
+        return Ok(());
+    }
+
+    let suite = args.suite.map(EvaluationSuite::from);
+    let report = if let Some(suite) = suite {
+        run_suite(suite)?
     } else {
         match args.scenario {
             ScenarioArg::Spacewars => {}
@@ -169,6 +256,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    let verification = if args.verify {
+        Some(verify_suite_baseline(
+            suite.expect("clap requires a suite when verification is selected"),
+            &report,
+        )?)
+    } else {
+        None
+    };
+
     match args.output {
         OutputArg::Text => print_text_report(&report),
         OutputArg::Json => {
@@ -177,7 +273,47 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!();
         }
     }
+    if let Some(verification) = verification {
+        eprintln!(
+            "baseline={} status=match episodes={}",
+            verification.suite_id, verification.episodes
+        );
+    }
     Ok(())
+}
+
+fn print_policy_comparison_report(report: &PolicyComparisonReport) {
+    print_text_report(&report.run);
+    println!(
+        "comparison={} seed-pairs={} episode-runs={}",
+        report.workload_id.unwrap_or("custom"),
+        report.summary.seed_pairs,
+        report.summary.episode_runs,
+    );
+    print_compared_policy("baseline", &report.summary.baseline);
+    print_compared_policy("candidate", &report.summary.candidate);
+}
+
+fn print_compared_policy(role: &str, metrics: &ComparedPolicyMetrics) {
+    println!(
+        "{role}={} wins={} tick-limits={} captures={} losses={} losses(planet/sun)={}/{} rebuilds={} contacts(body/ship)={}/{} docks={} departures(port/safe-capture/safe-rebuild)={}/{}/{} planets-sum={} strategy={:?}",
+        metrics.controller.policy_id,
+        metrics.wins,
+        metrics.tick_limits,
+        metrics.captures,
+        metrics.ship_losses,
+        metrics.planet_impact_losses,
+        metrics.sun_impact_losses,
+        metrics.rebuilds,
+        metrics.body_contacts,
+        metrics.ship_contacts,
+        metrics.port_dockings,
+        metrics.port_departures,
+        metrics.safe_capture_departures,
+        metrics.safe_rebuild_departures,
+        metrics.final_planet_count_sum,
+        metrics.strategy,
+    );
 }
 
 fn print_text_report(report: &RunReport) {
@@ -300,4 +436,53 @@ fn optional_f32(value: Option<f32>) -> String {
 
 fn optional_u64(value: Option<u64>) -> String {
     value.map_or_else(|| "-".to_owned(), |value| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rule_alias_and_explicit_v5_select_the_same_concrete_controller() {
+        for value in ["rule", "rule-v5"] {
+            let args = Args::try_parse_from(["engine-agent", "--player-2", value]).unwrap();
+
+            assert!(matches!(args.player_2, ControllerArg::RuleV5));
+            assert_eq!(ControllerKind::from(args.player_2), ControllerKind::RuleV5);
+        }
+    }
+
+    #[test]
+    fn comparison_cli_captures_explicit_roles_and_profile() {
+        let args = Args::try_parse_from([
+            "engine-agent",
+            "--compare",
+            "strategy-v1",
+            "--baseline",
+            "rule-v5",
+            "--candidate",
+            "idle",
+            "--comparison-start-seed",
+            "100",
+            "--comparison-episodes",
+            "20",
+        ])
+        .unwrap();
+
+        assert!(matches!(args.compare, Some(ComparisonArg::StrategyV1)));
+        assert!(matches!(args.baseline, Some(ControllerArg::RuleV5)));
+        assert!(matches!(args.candidate, Some(ControllerArg::Idle)));
+        assert_eq!(args.comparison_start_seed, Some(100));
+        assert_eq!(args.comparison_episodes, Some(20));
+    }
+
+    #[test]
+    fn comparison_cli_requires_a_candidate() {
+        let error = Args::try_parse_from(["engine-agent", "--compare", "strategy-v1"]).unwrap_err();
+
+        assert_eq!(
+            error.kind(),
+            clap::error::ErrorKind::MissingRequiredArgument
+        );
+    }
 }

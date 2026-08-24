@@ -170,9 +170,15 @@ Run rule-bot self-play in Small Duel and emit a versioned JSON report:
 
 ```sh
 cargo run --release -p engine-agent -- \
-  --preset deathmatch --player-1 rule --player-2 rule \
+  --preset deathmatch --player-1 rule-v5 --player-2 rule-v5 \
   --seed 0 --episodes 10 --output json > agent-report.json
 ```
+
+Controller versions are explicit (`rule-v5`) so old and new brains can be run
+side by side. `rule` remains a convenience alias for the current default, but
+named suites and saved comparisons pin a concrete version. Reports record the
+identity returned by the instantiated brain rather than inferring it from the
+CLI spelling.
 
 Episode reports include the winner or tick-limit outcome, captures, ship
 losses, rebuilds, eliminations, collision incidents, docking/departure outcomes,
@@ -190,7 +196,7 @@ Run the checked-in navigation baseline with one stable command:
 cargo run --release -p engine-agent -- --suite navigation-v1
 ```
 
-`navigation-v1` fixes seeds 0 through 5, rule-brain self-play, 36,000 ticks per
+`navigation-v1` fixes seeds 0 through 5, `rule-v5` self-play, 36,000 ticks per
 episode, no random asteroids, and very high ship health. Planet and ship
 collisions remain enabled and are measured, but they should not terminate a
 navigation episode. Body/ship contact metrics re-arm only after 30 quiet ticks,
@@ -205,7 +211,7 @@ Run the ordinary-health strategy comparison suite:
 cargo run --release -p engine-agent -- --suite strategy-v1
 ```
 
-`strategy-v1` runs four seeds with the rule bot in each side against an idle
+`strategy-v1` runs four seeds with `rule-v5` in each side against an idle
 seat, then in self-play. Random asteroids are disabled while ordinary damage,
 repair, ship loss, pod rebuilding, capture, and combat remain active. Its
 per-player strategy metrics make commitment, goal switching, and time spent on
@@ -213,6 +219,48 @@ capture, repair, defense, combat, and rebuilding directly comparable between
 policy revisions. Loss reports separately count transitions that coincide with
 a mechanical planet or sun impact, and batch summaries aggregate those values
 by controller policy rather than only by player seat.
+
+Require either named suite to reproduce its checked-in episode fingerprints:
+
+```sh
+cargo run --locked --release -p engine-agent -- \
+  --suite navigation-v1 --verify
+cargo run --locked --release -p engine-agent -- \
+  --suite strategy-v1 --verify
+```
+
+Verification checks every seed, preset, controller policy ID, tick limit,
+terminal tick, and deterministic action/terminal-state SHA-256. It exits
+nonzero at the first mismatch and prints the expected and actual fingerprint.
+The manifests live in `crates/engine-agent/baselines/`, and CI runs both checks
+with Rust 1.89 on Linux. A new brain version should leave these v5 manifests
+unchanged; update a manifest only when an intentional shared scenario or
+physics change means the historical workload itself has changed.
+
+After registering a future controller such as `rule-v6`, compare it with v5 in
+one paired, side-neutral run:
+
+```sh
+cargo run --locked --release -p engine-agent -- \
+  --compare strategy-v1 --baseline rule-v5 --candidate rule-v6
+```
+
+The comparison profile uses the strategy-v1 world, seeds, and tick ceiling. It
+runs both `v5 versus v6` and `v6 versus v5` for every seed, then reports wins,
+tick limits, captures, loss causes, rebuilds, contacts, docking/departure
+outcomes, final territory, and strategy time separately for the baseline and
+candidate roles. `--output json` retains all individual episodes for paired
+offline analysis. Wall-clock throughput remains informational rather than a
+correctness gate.
+
+The profile's four seeds are a quick smoke comparison. Broaden it without
+changing the world contract when a candidate is ready for a longer run:
+
+```sh
+cargo run --locked --release -p engine-agent -- \
+  --compare strategy-v1 --baseline rule-v5 --candidate rule-v6 \
+  --comparison-start-seed 100 --comparison-episodes 100
+```
 
 For ad hoc controlled runs, `--preset standard-no-asteroids` is identical to
 the standard world except that random asteroid spawning is disabled. The
@@ -222,7 +270,7 @@ Trace one controller's navigation decisions without changing the simulation:
 
 ```sh
 cargo run --release -p engine-agent -- \
-  --preset navigation --seed 4 --player-1 rule --player-2 rule \
+  --preset navigation --seed 4 --player-1 rule-v5 --player-2 rule-v5 \
   --trace-player 2
 ```
 

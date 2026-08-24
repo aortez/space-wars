@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "suite_id": "strategy_v1",
+  "episodes": [
+    {
+      "seed": 0,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "idle_v1"],
+      "max_ticks": 18000,
+      "ticks": 3748,
+      "trace_sha256": "8d69a01e78f3957f9bf4455d3eca4931509b3da98ca5a289e277cb16127cd45e"
+    },
+    {
+      "seed": 0,
+      "preset": "standard_no_asteroids",
+      "controllers": ["idle_v1", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 1674,
+      "trace_sha256": "79d9e8dc36494d51ca7de51cefa0a1661960f324d1410f03dc8b0e8a86a716ab"
+    },
+    {
+      "seed": 0,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 9327,
+      "trace_sha256": "d0dc89ad769bee3df2668439b022882b8e841cea4c065bc8cacf1cd26842dd88"
+    },
+    {
+      "seed": 1,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "idle_v1"],
+      "max_ticks": 18000,
+      "ticks": 1950,
+      "trace_sha256": "9929dec69c54352f7bfbc5e3208d601760a35f1e516fb350bfa23e0fc4b7e798"
+    },
+    {
+      "seed": 1,
+      "preset": "standard_no_asteroids",
+      "controllers": ["idle_v1", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 1748,
+      "trace_sha256": "b2d7c7a36c44b89b333d9a4169baf4fa011cde4398568de59af45cafa97064c5"
+    },
+    {
+      "seed": 1,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 18000,
+      "trace_sha256": "fe61a088a7d4caf96e5623c93e5759428f0fd8f3a54931c8d0b3cc820ce1093e"
+    },
+    {
+      "seed": 2,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "idle_v1"],
+      "max_ticks": 18000,
+      "ticks": 1325,
+      "trace_sha256": "244291339445a5a9541102a420f218afec8fd45862c573b0d24fe5d0a24b01c7"
+    },
+    {
+      "seed": 2,
+      "preset": "standard_no_asteroids",
+      "controllers": ["idle_v1", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 401,
+      "trace_sha256": "0de1cd01393b752ffcfd78163285351aff720b22b445c5abc7b38cde525a660b"
+    },
+    {
+      "seed": 2,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 18000,
+      "trace_sha256": "329c088a7106c0a17e1fe510fa4666cd96bd7d4f5ee3c4cbe4f29a55dc908349"
+    },
+    {
+      "seed": 3,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "idle_v1"],
+      "max_ticks": 18000,
+      "ticks": 1449,
+      "trace_sha256": "c19b8ad31b304e14204123087f02cc2a4551ff70b225080b1f178de78790904c"
+    },
+    {
+      "seed": 3,
+      "preset": "standard_no_asteroids",
+      "controllers": ["idle_v1", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 1454,
+      "trace_sha256": "88fa4d0a81ea4096ba4f15765a7da456f72715b29a7c6d84dfef4538326f4530"
+    },
+    {
+      "seed": 3,
+      "preset": "standard_no_asteroids",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 18000,
+      "ticks": 17300,
+      "trace_sha256": "4914a96bb8af1fe34412068b9554912ca787b2e8485eb577344ce8ad0a9446bc"
+    }
+  ]
+}

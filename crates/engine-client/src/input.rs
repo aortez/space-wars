@@ -16,7 +16,7 @@ use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
 use slint::winit_030::winit::keyboard::{KeyCode, PhysicalKey};
 use slint::winit_030::{EventResult, WinitWindowAccessor};
-use spacewars_ai::{AvoidanceBody, BrainReset, BrainTelemetry, RuleShipBrain, ShipBrain};
+use spacewars_ai::{AvoidanceBody, BrainReset, BrainTelemetry, DEFAULT_BUILT_IN_POLICY, ShipBrain};
 
 use crate::MainWindow;
 
@@ -1020,7 +1020,7 @@ fn optional_f32(value: Option<f32>) -> String {
 
 struct SpacewarsControls {
     seats: [ControlSeat; 2],
-    rule_brains: [RuleShipBrain; 2],
+    rule_brains: [Box<dyn ShipBrain>; 2],
     brain_contexts: [Option<BrainReset>; 2],
     active_sources: [SpacewarsControlMode; 2],
     encoder: ShipIntentEncoder,
@@ -1046,7 +1046,7 @@ impl SpacewarsControls {
         p2.add_source(GamepadSource::new(gamepads, 1));
         Self {
             seats: [p1, p2],
-            rule_brains: [RuleShipBrain::default(), RuleShipBrain::default()],
+            rule_brains: std::array::from_fn(|_| DEFAULT_BUILT_IN_POLICY.create()),
             brain_contexts: [None, None],
             active_sources: [SpacewarsControlMode::Human; 2],
             encoder: ShipIntentEncoder::default(),
@@ -1295,7 +1295,7 @@ impl SpacewarsControls {
 
     fn reset(&mut self) {
         self.encoder.reset();
-        self.rule_brains = [RuleShipBrain::default(), RuleShipBrain::default()];
+        self.rule_brains = std::array::from_fn(|_| DEFAULT_BUILT_IN_POLICY.create());
         self.brain_contexts = [None, None];
         self.active_sources = [SpacewarsControlMode::Human; 2];
         self.bot_diagnostics = std::array::from_fn(|_| None);

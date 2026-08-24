@@ -44,6 +44,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libudev-dev
       - run: cargo test --locked --workspace --all-targets
 
+  spacewars-ai-regression:
+    name: Spacewars AI deterministic baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Verify navigation-v1 baseline
+        run: cargo run --locked --release -p engine-agent -- --suite navigation-v1 --verify
+      - name: Verify strategy-v1 baseline
+        run: cargo run --locked --release -p engine-agent -- --suite strategy-v1 --verify
+
   windows-client:
     name: Windows client
     runs-on: windows-latest

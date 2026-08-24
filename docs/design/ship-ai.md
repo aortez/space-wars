@@ -58,8 +58,9 @@ version.
 
 ## Brain lifecycle
 
-`ShipBrain` has three operations:
+`ShipBrain` has four operations:
 
+- `descriptor()` reports the concrete, stable policy identity;
 - `reset(BrainReset)` installs an actor and episode seed;
 - `intent(&ShipObservationV1)` produces one normalized controller intent;
 - `telemetry()` reports the current goal, target, hazard, avoided celestial
@@ -71,6 +72,58 @@ When a host changes between human, rule-bot, or benchmark control, it forwards
 one neutral intent before the new source. This releases held thrust and weapons
 and prevents transition inputs from leaking between controllers. Restart also
 clears the encoder, brain context, and active source.
+
+## Policy versions and registry
+
+`BuiltInPolicy` is the common registry used by interactive and headless hosts.
+Each entry creates a boxed `ShipBrain`, and every concrete brain reports its
+own `ShipBrainDescriptor`. The first retained implementation is
+`RuleShipBrainV5`, registered as `rule_ship_v5`. Adding v6 means adding a new
+type and registry entry while leaving v5 constructible; it does not mean adding
+version switches inside v5.
+
+The interactive launcher follows `DEFAULT_BUILT_IN_POLICY`, which is the
+meaning of the convenient `rule` selection. Reproducible evaluator inputs use
+the explicit `rule-v5` selection. Named suites such as `navigation-v1` and
+`strategy-v1` are permanently pinned to that concrete version and never follow
+the default alias. Episode artifacts obtain their policy ID from the
+instantiated brain, so the recorded identity cannot silently drift away from
+the implementation that emitted the actions.
+
+A change that can alter emitted intents under the same observation history
+requires a new policy version. Telemetry-only work and refactors proven to keep
+the deterministic action traces unchanged may retain the existing version.
+Experimental configurations can reuse guidance code, but must become their own
+registered policy before they are used for comparable evaluation artifacts.
+
+The checked-in evaluator baselines make that rule executable. Each named suite
+has a versioned JSON manifest containing its episode contract and SHA-256
+fingerprints. `--suite <name> --verify` compares a fresh release run with that
+manifest and fails at the first difference; Linux CI verifies both current
+suites using the declared Rust 1.89 toolchain. These hashes cover controller
+policy IDs, workload settings, canonical actions, terminal tick, and selected
+terminal state. Wall time is deliberately excluded.
+
+`PolicyComparisonProfile` separates a reusable world workload from the
+controllers installed in it. The strategy-v1 profile runs every seed twice,
+swapping baseline and candidate seats, and aggregates results by comparison
+role rather than player number or policy ID. Keeping the roles separate also
+makes a v5-versus-v5 run a useful symmetry check. Once v6 exists, the same path
+can compare v5 and v6 without altering either historical suite or assembling a
+manual command matrix.
+
+The intended contribution loop for a behavior-changing candidate is:
+
+1. retain the existing brain type and registry entry;
+2. add the candidate type, stable policy ID, registry entry, evaluator kind,
+   and explicit CLI spelling;
+3. run both named suites with `--verify` to prove the baseline still behaves
+   exactly as recorded;
+4. run `--compare strategy-v1 --baseline rule-v5 --candidate <new-policy>`;
+5. use `--comparison-start-seed` and `--comparison-episodes` for a larger
+   disjoint seed set after the four-seed smoke comparison;
+6. attach the JSON comparison report to the review when per-seed evidence is
+   useful.
 
 ## Current rule bot
 

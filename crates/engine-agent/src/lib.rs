@@ -18,14 +18,16 @@ use scenario_spacewars::{
     ShipCollision, ShipForm, ShipIntent, ShipIntentEncoder, ShipSensorProfile, SpacewarsScenario,
     SpacewarsState,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use spacewars_ai::{
-    AvoidanceBody, BrainGoal, BrainReset, BrainTelemetry, PortNavigationPhase,
-    RULE_SHIP_BRAIN_POLICY_ID, RuleShipBrain, ShipBrain, StrategicGoal, StrategyTelemetry,
+    AvoidanceBody, BrainGoal, BrainReset, BrainTelemetry, BuiltInPolicy, PortNavigationPhase,
+    ShipBrain, StrategicGoal, StrategyTelemetry,
 };
 
-pub const REPORT_SCHEMA_VERSION: u32 = 2;
+pub const REPORT_SCHEMA_VERSION: u32 = 3;
+pub const BASELINE_SCHEMA_VERSION: u32 = 1;
+pub const POLICY_COMPARISON_SCHEMA_VERSION: u32 = 1;
 pub const NAVIGATION_V1_SUITE_ID: &str = "navigation_v1";
 pub const NAVIGATION_V1_SEEDS: [u64; 6] = [0, 1, 2, 3, 4, 5];
 pub const NAVIGATION_V1_MAX_TICKS: u64 = 36_000;
@@ -36,24 +38,33 @@ const NAVIGATION_HEALTH_PERCENT: u32 = 100_000;
 const NAVIGATION_SAFE_DEPARTURE_CLEARANCE: f32 = 90.0;
 const CONTACT_INCIDENT_REARM_TICKS: u64 = 30;
 const NAVIGATION_TRACE_HEARTBEAT_TICKS: u64 = 300;
+const NAVIGATION_V1_BASELINE_JSON: &str = include_str!("../baselines/navigation-v1.json");
+const STRATEGY_V1_BASELINE_JSON: &str = include_str!("../baselines/strategy-v1.json");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ControllerKind {
     Idle,
-    Rule,
+    RuleV5,
 }
 
 impl ControllerKind {
+    pub const fn built_in_policy(self) -> Option<BuiltInPolicy> {
+        match self {
+            Self::Idle => None,
+            Self::RuleV5 => Some(BuiltInPolicy::RuleV5),
+        }
+    }
+
     pub const fn policy_id(self) -> &'static str {
         match self {
             Self::Idle => "idle_v1",
-            Self::Rule => RULE_SHIP_BRAIN_POLICY_ID,
+            Self::RuleV5 => BuiltInPolicy::RuleV5.descriptor().policy_id,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SpacewarsPreset {
     Standard,
@@ -103,7 +114,7 @@ impl EvaluationSuite {
                 .map(|seed| EpisodeConfig {
                     seed,
                     preset: SpacewarsPreset::Navigation,
-                    controllers: [ControllerKind::Rule; SPACEWARS_PLAYER_COUNT],
+                    controllers: [ControllerKind::RuleV5; SPACEWARS_PLAYER_COUNT],
                     max_ticks: NAVIGATION_V1_MAX_TICKS,
                     trace_player: None,
                 })
@@ -112,9 +123,9 @@ impl EvaluationSuite {
                 let mut configs = Vec::with_capacity(STRATEGY_V1_SEEDS.len() * 3);
                 for seed in STRATEGY_V1_SEEDS {
                     for controllers in [
-                        [ControllerKind::Rule, ControllerKind::Idle],
-                        [ControllerKind::Idle, ControllerKind::Rule],
-                        [ControllerKind::Rule, ControllerKind::Rule],
+                        [ControllerKind::RuleV5, ControllerKind::Idle],
+                        [ControllerKind::Idle, ControllerKind::RuleV5],
+                        [ControllerKind::RuleV5, ControllerKind::RuleV5],
                     ] {
                         configs.push(EpisodeConfig {
                             seed,
@@ -127,6 +138,48 @@ impl EvaluationSuite {
                 }
                 configs
             }
+        }
+    }
+
+    const fn baseline_json(self) -> &'static str {
+        match self {
+            Self::NavigationV1 => NAVIGATION_V1_BASELINE_JSON,
+            Self::StrategyV1 => STRATEGY_V1_BASELINE_JSON,
+        }
+    }
+}
+
+/// Fixed world workload used for paired policy comparisons.
+///
+/// Unlike [`EvaluationSuite`], a profile does not pin either controller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PolicyComparisonProfile {
+    StrategyV1,
+}
+
+impl PolicyComparisonProfile {
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::StrategyV1 => STRATEGY_V1_SUITE_ID,
+        }
+    }
+
+    pub const fn config(
+        self,
+        baseline: ControllerKind,
+        candidate: ControllerKind,
+    ) -> PolicyComparisonConfig {
+        match self {
+            Self::StrategyV1 => PolicyComparisonConfig {
+                workload_id: Some(STRATEGY_V1_SUITE_ID),
+                start_seed: STRATEGY_V1_SEEDS[0],
+                seed_step: 1,
+                episodes: STRATEGY_V1_SEEDS.len() as u32,
+                preset: SpacewarsPreset::StandardNoAsteroids,
+                baseline,
+                candidate,
+                max_ticks: STRATEGY_V1_MAX_TICKS,
+            },
         }
     }
 }
@@ -160,7 +213,7 @@ impl Default for EpisodeConfig {
         Self {
             seed: 0,
             preset: SpacewarsPreset::Standard,
-            controllers: [ControllerKind::Idle, ControllerKind::Rule],
+            controllers: [ControllerKind::Idle, ControllerKind::RuleV5],
             max_ticks: 36_000,
             trace_player: None,
         }
@@ -190,6 +243,27 @@ impl Default for BatchConfig {
             max_ticks: episode.max_ticks,
             trace_player: episode.trace_player,
         }
+    }
+}
+
+/// Deterministic paired comparison of two policies over the same seeds.
+///
+/// Every seed produces two episodes with the controller seats swapped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PolicyComparisonConfig {
+    pub workload_id: Option<&'static str>,
+    pub start_seed: u64,
+    pub seed_step: u64,
+    pub episodes: u32,
+    pub preset: SpacewarsPreset,
+    pub baseline: ControllerKind,
+    pub candidate: ControllerKind,
+    pub max_ticks: u64,
+}
+
+impl Default for PolicyComparisonConfig {
+    fn default() -> Self {
+        PolicyComparisonProfile::StrategyV1.config(ControllerKind::RuleV5, ControllerKind::RuleV5)
     }
 }
 
@@ -425,6 +499,228 @@ pub struct RunReport {
     pub summary: BatchSummary,
 }
 
+/// Stable subset of an episode used by checked-in deterministic baselines.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EpisodeFingerprint {
+    pub seed: u64,
+    pub preset: SpacewarsPreset,
+    pub controllers: [String; SPACEWARS_PLAYER_COUNT],
+    pub max_ticks: u64,
+    pub ticks: u64,
+    pub trace_sha256: String,
+}
+
+impl From<&EpisodeSummary> for EpisodeFingerprint {
+    fn from(episode: &EpisodeSummary) -> Self {
+        Self {
+            seed: episode.seed,
+            preset: episode.preset,
+            controllers: std::array::from_fn(|player| {
+                episode.controllers[player].policy_id.to_owned()
+            }),
+            max_ticks: episode.max_ticks,
+            ticks: episode.ticks,
+            trace_sha256: episode.trace_sha256.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct SuiteBaselineManifest {
+    schema_version: u32,
+    suite_id: String,
+    episodes: Vec<EpisodeFingerprint>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct BaselineVerification {
+    pub schema_version: u32,
+    pub suite_id: &'static str,
+    pub episodes: u32,
+}
+
+#[derive(Debug)]
+pub enum BaselineVerificationError {
+    InvalidManifest {
+        suite_id: &'static str,
+        source: serde_json::Error,
+    },
+    UnsupportedSchema {
+        suite_id: &'static str,
+        expected: u32,
+        actual: u32,
+    },
+    ManifestSuiteMismatch {
+        expected: &'static str,
+        actual: String,
+    },
+    ReportSuiteMismatch {
+        expected: &'static str,
+        actual: Option<&'static str>,
+    },
+    EpisodeCountMismatch {
+        suite_id: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    EpisodeMismatch {
+        suite_id: &'static str,
+        index: usize,
+        expected: Box<EpisodeFingerprint>,
+        actual: Box<EpisodeFingerprint>,
+    },
+}
+
+impl fmt::Display for BaselineVerificationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidManifest { suite_id, source } => {
+                write!(formatter, "invalid {suite_id} baseline manifest: {source}")
+            }
+            Self::UnsupportedSchema {
+                suite_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "unsupported {suite_id} baseline schema {actual}; expected {expected}"
+            ),
+            Self::ManifestSuiteMismatch { expected, actual } => write!(
+                formatter,
+                "baseline manifest names suite {actual}; expected {expected}"
+            ),
+            Self::ReportSuiteMismatch { expected, actual } => write!(
+                formatter,
+                "cannot verify report for suite {actual:?} against {expected}"
+            ),
+            Self::EpisodeCountMismatch {
+                suite_id,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "{suite_id} baseline contains {expected} episodes but the run produced {actual}"
+            ),
+            Self::EpisodeMismatch {
+                suite_id,
+                index,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "{suite_id} episode {index} differs from its baseline\nexpected: {expected:?}\n  actual: {actual:?}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for BaselineVerificationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::InvalidManifest { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ComparedPolicyMetrics {
+    pub controller: ControllerDescriptor,
+    pub episodes: u32,
+    pub wins: u32,
+    pub tick_limits: u32,
+    pub ticks: u64,
+    pub captures: u64,
+    pub ship_losses: u64,
+    pub planet_impact_losses: u64,
+    pub sun_impact_losses: u64,
+    pub rebuilds: u64,
+    pub eliminations: u64,
+    pub body_contacts: u64,
+    pub ship_contacts: u64,
+    pub debris_impacts: u64,
+    pub laser_hits_received: u64,
+    pub port_dockings: u64,
+    pub port_departures: u64,
+    pub safe_capture_departures: u64,
+    pub safe_rebuild_departures: u64,
+    pub final_planet_count_sum: u64,
+    pub strategy: StrategyMetrics,
+}
+
+impl ComparedPolicyMetrics {
+    fn new(controller: ControllerDescriptor) -> Self {
+        Self {
+            controller,
+            episodes: 0,
+            wins: 0,
+            tick_limits: 0,
+            ticks: 0,
+            captures: 0,
+            ship_losses: 0,
+            planet_impact_losses: 0,
+            sun_impact_losses: 0,
+            rebuilds: 0,
+            eliminations: 0,
+            body_contacts: 0,
+            ship_contacts: 0,
+            debris_impacts: 0,
+            laser_hits_received: 0,
+            port_dockings: 0,
+            port_departures: 0,
+            safe_capture_departures: 0,
+            safe_rebuild_departures: 0,
+            final_planet_count_sum: 0,
+            strategy: StrategyMetrics::default(),
+        }
+    }
+
+    fn observe(&mut self, episode: &EpisodeSummary, player: usize) {
+        self.episodes += 1;
+        self.ticks += episode.ticks;
+        match episode.outcome {
+            EpisodeOutcome::Winner { player: winner } if winner.index() == player => {
+                self.wins += 1;
+            }
+            EpisodeOutcome::TickLimit => self.tick_limits += 1,
+            EpisodeOutcome::Winner { .. } => {}
+        }
+        self.captures += episode.captures[player];
+        self.ship_losses += episode.ship_losses[player];
+        self.planet_impact_losses += episode.planet_impact_losses[player];
+        self.sun_impact_losses += episode.sun_impact_losses[player];
+        self.rebuilds += episode.rebuilds[player];
+        self.eliminations += episode.eliminations[player];
+        self.body_contacts += episode.body_contacts[player];
+        self.ship_contacts += episode.ship_contacts[player];
+        self.debris_impacts += episode.debris_impacts[player];
+        self.laser_hits_received += episode.laser_hits_received[player];
+        self.port_dockings += episode.port_dockings[player];
+        self.port_departures += episode.port_departures[player];
+        self.safe_capture_departures += episode.safe_capture_departures[player];
+        self.safe_rebuild_departures += episode.safe_rebuild_departures[player];
+        self.final_planet_count_sum += episode.final_planet_counts[player] as u64;
+        self.strategy.add_assign(episode.strategy[player]);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PolicyComparisonSummary {
+    pub seed_pairs: u32,
+    pub episode_runs: u32,
+    pub baseline: ComparedPolicyMetrics,
+    pub candidate: ComparedPolicyMetrics,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PolicyComparisonReport {
+    pub schema_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workload_id: Option<&'static str>,
+    pub summary: PolicyComparisonSummary,
+    pub run: RunReport,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunError {
     NoEpisodes,
@@ -458,28 +754,39 @@ impl std::error::Error for RunError {}
 
 enum SeatController {
     Idle,
-    Rule(Box<RuleShipBrain>),
+    Brain {
+        kind: ControllerKind,
+        brain: Box<dyn ShipBrain>,
+    },
 }
 
 impl SeatController {
     fn new(kind: ControllerKind, actor: PlayerId, episode_seed: u64) -> Self {
-        match kind {
-            ControllerKind::Idle => Self::Idle,
-            ControllerKind::Rule => {
-                let mut brain = RuleShipBrain::default();
-                brain.reset(BrainReset {
-                    actor,
-                    episode_seed,
-                });
-                Self::Rule(Box::new(brain))
-            }
+        let Some(policy) = kind.built_in_policy() else {
+            return Self::Idle;
+        };
+        let mut brain = policy.create();
+        brain.reset(BrainReset {
+            actor,
+            episode_seed,
+        });
+        Self::Brain { kind, brain }
+    }
+
+    fn descriptor(&self) -> ControllerDescriptor {
+        match self {
+            Self::Idle => ControllerKind::Idle.into(),
+            Self::Brain { kind, brain } => ControllerDescriptor {
+                kind: *kind,
+                policy_id: brain.descriptor().policy_id,
+            },
         }
     }
 
     fn intent(&mut self, state: &SpacewarsState, actor: PlayerId) -> Result<ShipIntent, RunError> {
         match self {
             Self::Idle => Ok(ShipIntent::default()),
-            Self::Rule(brain) => {
+            Self::Brain { brain, .. } => {
                 let observation =
                     SpacewarsScenario::observe_ship(state, actor, ShipSensorProfile::FullMapRadar)
                         .ok_or(RunError::MissingObservation { player: actor })?;
@@ -491,7 +798,7 @@ impl SeatController {
     fn telemetry(&self) -> BrainTelemetry {
         match self {
             Self::Idle => BrainTelemetry::default(),
-            Self::Rule(brain) => brain.telemetry(),
+            Self::Brain { brain, .. } => brain.telemetry(),
         }
     }
 }
@@ -1062,6 +1369,7 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
         SeatController::new(config.controllers[0], PlayerId::PLAYER_1, config.seed),
         SeatController::new(config.controllers[1], PlayerId::PLAYER_2, config.seed),
     ];
+    let controller_descriptors = controllers.each_ref().map(SeatController::descriptor);
     let mut encoder = ShipIntentEncoder::default();
     let mut transitions = TransitionTracker::new(&state);
     let mut strategy_trackers: [StrategyMetricTracker; SPACEWARS_PLAYER_COUNT] =
@@ -1071,7 +1379,7 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
         .map(|player| NavigationTraceCollector::new(&state, player));
     let mut last_traced_decision = None;
     let mut trace = Sha256::new();
-    initialize_trace(&mut trace, config);
+    initialize_trace(&mut trace, config, controller_descriptors);
     let mut actions_emitted = 0_u64;
 
     while state.winner.is_none() && state.tick < config.max_ticks {
@@ -1114,7 +1422,7 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
     Ok(EpisodeSummary {
         seed: config.seed,
         preset: config.preset,
-        controllers: config.controllers.map(ControllerDescriptor::from),
+        controllers: controller_descriptors,
         max_ticks: config.max_ticks,
         ticks: state.tick,
         simulated_seconds: state.tick as f64 / f64::from(ticks_per_second),
@@ -1181,6 +1489,125 @@ pub fn run_batch(config: BatchConfig) -> Result<RunReport, RunError> {
 
 pub fn run_suite(suite: EvaluationSuite) -> Result<RunReport, RunError> {
     run_episode_configs(Some(suite.id()), suite.episode_configs())
+}
+
+pub fn verify_suite_baseline(
+    suite: EvaluationSuite,
+    report: &RunReport,
+) -> Result<BaselineVerification, BaselineVerificationError> {
+    let manifest: SuiteBaselineManifest =
+        serde_json::from_str(suite.baseline_json()).map_err(|source| {
+            BaselineVerificationError::InvalidManifest {
+                suite_id: suite.id(),
+                source,
+            }
+        })?;
+    if manifest.schema_version != BASELINE_SCHEMA_VERSION {
+        return Err(BaselineVerificationError::UnsupportedSchema {
+            suite_id: suite.id(),
+            expected: BASELINE_SCHEMA_VERSION,
+            actual: manifest.schema_version,
+        });
+    }
+    if manifest.suite_id != suite.id() {
+        return Err(BaselineVerificationError::ManifestSuiteMismatch {
+            expected: suite.id(),
+            actual: manifest.suite_id,
+        });
+    }
+    if report.suite_id != Some(suite.id()) {
+        return Err(BaselineVerificationError::ReportSuiteMismatch {
+            expected: suite.id(),
+            actual: report.suite_id,
+        });
+    }
+    if manifest.episodes.len() != report.episodes.len() {
+        return Err(BaselineVerificationError::EpisodeCountMismatch {
+            suite_id: suite.id(),
+            expected: manifest.episodes.len(),
+            actual: report.episodes.len(),
+        });
+    }
+    for (index, (expected, episode)) in manifest
+        .episodes
+        .into_iter()
+        .zip(&report.episodes)
+        .enumerate()
+    {
+        let actual = EpisodeFingerprint::from(episode);
+        if actual != expected {
+            return Err(BaselineVerificationError::EpisodeMismatch {
+                suite_id: suite.id(),
+                index,
+                expected: Box::new(expected),
+                actual: Box::new(actual),
+            });
+        }
+    }
+    Ok(BaselineVerification {
+        schema_version: BASELINE_SCHEMA_VERSION,
+        suite_id: suite.id(),
+        episodes: report.episodes.len() as u32,
+    })
+}
+
+pub fn run_policy_comparison(
+    config: PolicyComparisonConfig,
+) -> Result<PolicyComparisonReport, RunError> {
+    if config.episodes == 0 {
+        return Err(RunError::NoEpisodes);
+    }
+    if config.max_ticks == 0 {
+        return Err(RunError::ZeroTickLimit);
+    }
+
+    let mut episode_configs = Vec::with_capacity((config.episodes as usize).saturating_mul(2));
+    for episode_index in 0..config.episodes {
+        let offset = config
+            .seed_step
+            .checked_mul(u64::from(episode_index))
+            .ok_or(RunError::SeedOverflow { episode_index })?;
+        let seed = config
+            .start_seed
+            .checked_add(offset)
+            .ok_or(RunError::SeedOverflow { episode_index })?;
+        for controllers in [
+            [config.baseline, config.candidate],
+            [config.candidate, config.baseline],
+        ] {
+            episode_configs.push(EpisodeConfig {
+                seed,
+                preset: config.preset,
+                controllers,
+                max_ticks: config.max_ticks,
+                trace_player: None,
+            });
+        }
+    }
+
+    let run = run_episode_configs(None, episode_configs)?;
+    let baseline_controller = run.episodes[0].controllers[0];
+    let candidate_controller = run.episodes[0].controllers[1];
+    let mut baseline = ComparedPolicyMetrics::new(baseline_controller);
+    let mut candidate = ComparedPolicyMetrics::new(candidate_controller);
+    for episodes in run.episodes.chunks_exact(2) {
+        baseline.observe(&episodes[0], 0);
+        candidate.observe(&episodes[0], 1);
+        baseline.observe(&episodes[1], 1);
+        candidate.observe(&episodes[1], 0);
+    }
+
+    Ok(PolicyComparisonReport {
+        schema_version: POLICY_COMPARISON_SCHEMA_VERSION,
+        workload_id: config.workload_id,
+        summary: PolicyComparisonSummary {
+            seed_pairs: config.episodes,
+            episode_runs: run.episodes.len() as u32,
+            baseline,
+            candidate,
+        },
+        run,
+    })
 }
 
 fn run_episode_configs(
@@ -1288,7 +1715,11 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
     }
 }
 
-fn initialize_trace(trace: &mut Sha256, config: EpisodeConfig) {
+fn initialize_trace(
+    trace: &mut Sha256,
+    config: EpisodeConfig,
+    controllers: [ControllerDescriptor; SPACEWARS_PLAYER_COUNT],
+) {
     trace.update(b"spacewars-episode-trace-v1");
     trace.update(config.seed.to_le_bytes());
     trace.update(config.max_ticks.to_le_bytes());
@@ -1298,8 +1729,8 @@ fn initialize_trace(trace: &mut Sha256, config: EpisodeConfig) {
         SpacewarsPreset::Navigation => 2,
         SpacewarsPreset::Deathmatch => 3,
     }]);
-    for controller in config.controllers {
-        let policy_id = controller.policy_id().as_bytes();
+    for controller in controllers {
+        let policy_id = controller.policy_id.as_bytes();
         trace.update((policy_id.len() as u64).to_le_bytes());
         trace.update(policy_id);
     }
@@ -1408,6 +1839,118 @@ mod tests {
     use super::*;
 
     #[test]
+    fn checked_in_baselines_match_their_named_suite_contracts() {
+        for suite in [EvaluationSuite::NavigationV1, EvaluationSuite::StrategyV1] {
+            let manifest: SuiteBaselineManifest =
+                serde_json::from_str(suite.baseline_json()).unwrap();
+            let configs = suite.episode_configs();
+
+            assert_eq!(manifest.schema_version, BASELINE_SCHEMA_VERSION);
+            assert_eq!(manifest.suite_id, suite.id());
+            assert_eq!(manifest.episodes.len(), configs.len());
+            for (fingerprint, config) in manifest.episodes.iter().zip(configs) {
+                assert_eq!(fingerprint.seed, config.seed);
+                assert_eq!(fingerprint.preset, config.preset);
+                assert_eq!(fingerprint.max_ticks, config.max_ticks);
+                assert_eq!(
+                    fingerprint.controllers,
+                    config
+                        .controllers
+                        .map(|controller| controller.policy_id().to_owned())
+                );
+                assert_eq!(fingerprint.trace_sha256.len(), 64);
+            }
+        }
+    }
+
+    #[test]
+    fn baseline_verification_rejects_an_incomplete_suite_run() {
+        let suite = EvaluationSuite::NavigationV1;
+        let report = run_episode_configs(
+            Some(suite.id()),
+            vec![EpisodeConfig {
+                max_ticks: 1,
+                ..suite.episode_configs()[0]
+            }],
+        )
+        .unwrap();
+
+        assert!(matches!(
+            verify_suite_baseline(suite, &report),
+            Err(BaselineVerificationError::EpisodeCountMismatch {
+                expected: 6,
+                actual: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn policy_comparison_pairs_each_seed_and_swaps_controller_seats() {
+        let report = run_policy_comparison(PolicyComparisonConfig {
+            workload_id: Some("test_v1"),
+            start_seed: 5,
+            seed_step: 2,
+            episodes: 2,
+            preset: SpacewarsPreset::StandardNoAsteroids,
+            baseline: ControllerKind::RuleV5,
+            candidate: ControllerKind::Idle,
+            max_ticks: 1,
+        })
+        .unwrap();
+
+        assert_eq!(report.workload_id, Some("test_v1"));
+        assert_eq!(report.run.episodes.len(), 4);
+        assert_eq!(
+            report
+                .run
+                .episodes
+                .iter()
+                .map(|episode| episode.seed)
+                .collect::<Vec<_>>(),
+            vec![5, 5, 7, 7]
+        );
+        assert_eq!(
+            report
+                .run
+                .episodes
+                .iter()
+                .map(|episode| episode.controllers.map(|controller| controller.kind))
+                .collect::<Vec<_>>(),
+            vec![
+                [ControllerKind::RuleV5, ControllerKind::Idle],
+                [ControllerKind::Idle, ControllerKind::RuleV5],
+                [ControllerKind::RuleV5, ControllerKind::Idle],
+                [ControllerKind::Idle, ControllerKind::RuleV5],
+            ]
+        );
+        assert_eq!(report.summary.seed_pairs, 2);
+        assert_eq!(report.summary.episode_runs, 4);
+        assert_eq!(report.summary.baseline.episodes, 4);
+        assert_eq!(report.summary.candidate.episodes, 4);
+        assert_eq!(
+            report.summary.baseline.ticks,
+            report.run.summary.total_ticks
+        );
+        assert_eq!(
+            report.summary.candidate.ticks,
+            report.run.summary.total_ticks
+        );
+    }
+
+    #[test]
+    fn same_policy_comparison_is_symmetric_between_roles() {
+        let report = run_policy_comparison(PolicyComparisonConfig {
+            episodes: 2,
+            max_ticks: 30,
+            ..PolicyComparisonConfig::default()
+        })
+        .unwrap();
+
+        assert_eq!(report.summary.baseline, report.summary.candidate);
+    }
+
+    #[test]
     fn identical_episode_configs_reproduce_the_same_summary_and_trace() {
         let config = EpisodeConfig {
             max_ticks: 120,
@@ -1433,6 +1976,19 @@ mod tests {
                 first.ticks
             );
         }
+    }
+
+    #[test]
+    fn evaluator_reports_the_instantiated_policy_version() {
+        let controller = SeatController::new(ControllerKind::RuleV5, PlayerId::PLAYER_2, 9);
+
+        assert_eq!(
+            controller.descriptor(),
+            ControllerDescriptor {
+                kind: ControllerKind::RuleV5,
+                policy_id: "rule_ship_v5",
+            }
+        );
     }
 
     #[test]
@@ -1502,7 +2058,7 @@ mod tests {
         );
         assert!(configs.iter().all(|config| {
             config.preset == SpacewarsPreset::Navigation
-                && config.controllers == [ControllerKind::Rule; SPACEWARS_PLAYER_COUNT]
+                && config.controllers == [ControllerKind::RuleV5; SPACEWARS_PLAYER_COUNT]
                 && config.max_ticks == NAVIGATION_V1_MAX_TICKS
                 && config.trace_player.is_none()
         }));
@@ -1527,9 +2083,9 @@ mod tests {
                     .map(|config| config.controllers)
                     .collect::<Vec<_>>(),
                 vec![
-                    [ControllerKind::Rule, ControllerKind::Idle],
-                    [ControllerKind::Idle, ControllerKind::Rule],
-                    [ControllerKind::Rule, ControllerKind::Rule],
+                    [ControllerKind::RuleV5, ControllerKind::Idle],
+                    [ControllerKind::Idle, ControllerKind::RuleV5],
+                    [ControllerKind::RuleV5, ControllerKind::RuleV5],
                 ]
             );
         }
@@ -1618,7 +2174,7 @@ mod tests {
         let episode = run_episode(EpisodeConfig {
             seed: 4,
             preset: SpacewarsPreset::Navigation,
-            controllers: [ControllerKind::Rule; SPACEWARS_PLAYER_COUNT],
+            controllers: [ControllerKind::RuleV5; SPACEWARS_PLAYER_COUNT],
             max_ticks: 4_000,
             trace_player: Some(PlayerId::PLAYER_2),
         })
@@ -1857,15 +2413,17 @@ mod tests {
     #[test]
     fn reports_are_machine_serializable() {
         let report = run_batch(BatchConfig {
-            controllers: [ControllerKind::Idle; SPACEWARS_PLAYER_COUNT],
+            controllers: [ControllerKind::Idle, ControllerKind::RuleV5],
             max_ticks: 1,
             ..BatchConfig::default()
         })
         .unwrap();
         let json = serde_json::to_string(&report).unwrap();
 
-        assert!(json.contains("\"schema_version\":2"));
+        assert!(json.contains("\"schema_version\":3"));
         assert!(json.contains("\"policy_id\":\"idle_v1\""));
+        assert!(json.contains("\"kind\":\"rule_v5\""));
+        assert!(json.contains("\"policy_id\":\"rule_ship_v5\""));
         assert!(json.contains("\"trace_sha256\""));
         assert!(json.contains("\"objective_selections\""));
         assert!(json.contains("\"policy_metrics\""));
@@ -1875,7 +2433,7 @@ mod tests {
     #[test]
     fn batch_metrics_aggregate_losses_by_controller_policy() {
         let report = run_batch(BatchConfig {
-            controllers: [ControllerKind::Idle, ControllerKind::Rule],
+            controllers: [ControllerKind::Idle, ControllerKind::RuleV5],
             episodes: 2,
             max_ticks: 1,
             ..BatchConfig::default()
@@ -1892,7 +2450,7 @@ mod tests {
             .summary
             .policy_metrics
             .iter()
-            .find(|metrics| metrics.policy_id == ControllerKind::Rule.policy_id())
+            .find(|metrics| metrics.policy_id == ControllerKind::RuleV5.policy_id())
             .unwrap();
         assert_eq!(idle.seat_episodes, 2);
         assert_eq!(idle.ticks, 2);

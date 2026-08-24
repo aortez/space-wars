@@ -19,11 +19,55 @@ use serde::Serialize;
 
 const TARGET_EPSILON: f32 = 1.0e-5;
 
-/// Stable policy identity stored in episode artifacts.
+/// Stable identity for a concrete ship-brain implementation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct ShipBrainDescriptor {
+    pub policy_id: &'static str,
+}
+
+/// Stable policy identity stored in episode artifacts for rule brain v5.
+pub const RULE_SHIP_BRAIN_V5_POLICY_ID: &str = "rule_ship_v5";
+
+/// Built-in, reproducible ship policies.
 ///
-/// Bump this when rule-brain decision semantics change enough that evaluation
-/// results should no longer be compared as the same policy version.
-pub const RULE_SHIP_BRAIN_POLICY_ID: &str = "rule_ship_v5";
+/// Existing variants are retained when a new policy is added so evaluators can
+/// run old and new brains in the same binary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BuiltInPolicy {
+    RuleV5,
+}
+
+/// Policy used by interactive hosts that request the unversioned rule bot.
+///
+/// Reproducible evaluation suites should select a concrete [`BuiltInPolicy`]
+/// instead of following this alias.
+pub const DEFAULT_BUILT_IN_POLICY: BuiltInPolicy = BuiltInPolicy::RuleV5;
+
+impl BuiltInPolicy {
+    pub const ALL: &'static [Self] = &[Self::RuleV5];
+
+    pub const fn descriptor(self) -> ShipBrainDescriptor {
+        match self {
+            Self::RuleV5 => ShipBrainDescriptor {
+                policy_id: RULE_SHIP_BRAIN_V5_POLICY_ID,
+            },
+        }
+    }
+
+    pub fn from_policy_id(policy_id: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|policy| policy.descriptor().policy_id == policy_id)
+    }
+
+    pub fn create(self) -> Box<dyn ShipBrain> {
+        match self {
+            Self::RuleV5 => Box::new(RuleShipBrainV5::default()),
+        }
+    }
+}
 
 /// Episode context supplied whenever a host installs or restarts a brain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,6 +78,8 @@ pub struct BrainReset {
 
 /// Stable controller boundary shared by interactive and headless hosts.
 pub trait ShipBrain {
+    fn descriptor(&self) -> ShipBrainDescriptor;
+
     fn reset(&mut self, reset: BrainReset);
 
     fn intent(&mut self, observation: &ShipObservationV1) -> ShipIntent;
@@ -726,7 +772,7 @@ struct PortContactLoss {
 /// persistent staged maneuver to enter, hold, and leave moving spaceports.
 /// Broader utility scoring and personality-driven strategy remain later work.
 #[derive(Debug, Clone, Default)]
-pub struct RuleShipBrain {
+pub struct RuleShipBrainV5 {
     config: RuleShipBrainConfig,
     actor: Option<PlayerId>,
     episode_seed: u64,
@@ -739,7 +785,7 @@ pub struct RuleShipBrain {
     port_contact_loss: Option<PortContactLoss>,
 }
 
-impl RuleShipBrain {
+impl RuleShipBrainV5 {
     pub fn new(config: RuleShipBrainConfig) -> Self {
         Self {
             config,
@@ -2029,7 +2075,11 @@ impl RuleShipBrain {
     }
 }
 
-impl ShipBrain for RuleShipBrain {
+impl ShipBrain for RuleShipBrainV5 {
+    fn descriptor(&self) -> ShipBrainDescriptor {
+        BuiltInPolicy::RuleV5.descriptor()
+    }
+
     fn reset(&mut self, reset: BrainReset) {
         self.actor = Some(reset.actor);
         self.episode_seed = reset.episode_seed;
@@ -2191,6 +2241,21 @@ mod tests {
     }
 
     #[test]
+    fn built_in_policy_registry_round_trips_and_builds_matching_brains() {
+        for &policy in BuiltInPolicy::ALL {
+            let descriptor = policy.descriptor();
+
+            assert_eq!(
+                BuiltInPolicy::from_policy_id(descriptor.policy_id),
+                Some(policy)
+            );
+            assert_eq!(policy.create().descriptor(), descriptor);
+        }
+        assert_eq!(BuiltInPolicy::from_policy_id("unknown"), None);
+        assert_eq!(DEFAULT_BUILT_IN_POLICY, BuiltInPolicy::RuleV5);
+    }
+
+    #[test]
     fn heading_error_matches_controller_turn_signs() {
         assert_close(shortest_heading_error(Vec2::Y), 0.0);
         assert_close(
@@ -2273,7 +2338,7 @@ mod tests {
         .unwrap();
         observation.opponent.as_mut().unwrap().local_position = Vec2::new(0.0, 900.0);
         observation.opponent.as_mut().unwrap().local_velocity = Vec2::ZERO;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2302,7 +2367,7 @@ mod tests {
         .unwrap();
         observation.opponent.as_mut().unwrap().local_position = Vec2::new(0.0, 100.0);
         observation.opponent.as_mut().unwrap().local_velocity = Vec2::new(0.0, -50.0);
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2340,7 +2405,7 @@ mod tests {
         observation.planets[1].local_position = -Vec2::Y * 700.0;
         observation.planets[1].local_spaceport_position = -Vec2::Y * 650.0;
         observation.opponent.as_mut().unwrap().local_position = Vec2::Y * 550.0;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
 
         assert!(brain.opponent_has_neutral_port_priority(&observation, observation.planets[0],));
         assert!(!brain.opponent_has_neutral_port_priority(&observation, observation.planets[1],));
@@ -2384,7 +2449,7 @@ mod tests {
         let mut brain_config = RuleShipBrainConfig::default();
         brain_config.strategy.capture_weight = 0.8;
         brain_config.strategy.switch_margin = 0.0;
-        let mut brain = RuleShipBrain::new(brain_config);
+        let mut brain = RuleShipBrainV5::new(brain_config);
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2439,7 +2504,7 @@ mod tests {
         observation.own_ship.life_fraction = 0.3;
         observation.planets[0].owner = Some(PlayerId::PLAYER_2);
         let repair_planet = observation.planets[0].id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2497,7 +2562,7 @@ mod tests {
         threatened.capture_progress = 0.4;
         threatened.local_position = Vec2::new(1_000.0, 1_000.0);
         let threatened_planet = threatened.id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2531,7 +2596,7 @@ mod tests {
         observation.sun = None;
         observation.hazards.clear();
         let opponent = observation.opponent.unwrap().id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2587,7 +2652,7 @@ mod tests {
         opponent.local_position = Vec2::Y * 50.0;
         observation.planets[0].owner = Some(opponent.id);
         let decisive_planet = observation.planets[0].id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2633,7 +2698,7 @@ mod tests {
         }
         observation.planets[1].owner = Some(PlayerId::PLAYER_2);
         let expected_planet = observation.planets[1].id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2678,7 +2743,7 @@ mod tests {
 
         observation.own_ship.form = ShipForm::EscapePod;
         observation.planets[0].owner = Some(PlayerId::PLAYER_2);
-        let mut pod_brain = RuleShipBrain::new(brain_config);
+        let mut pod_brain = RuleShipBrainV5::new(brain_config);
         pod_brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2699,7 +2764,7 @@ mod tests {
 
         observation.own_ship.form = ShipForm::Ship;
         observation.planets[0].owner = None;
-        let mut ship_brain = RuleShipBrain::new(brain_config);
+        let mut ship_brain = RuleShipBrainV5::new(brain_config);
         ship_brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2745,7 +2810,7 @@ mod tests {
         let rebuild_planet = observation.planets[0].id;
         observation.planets[0].owner = Some(PlayerId::PLAYER_2);
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2802,7 +2867,7 @@ mod tests {
         observation.planets[0].local_position = Vec2::new(100.0, 0.0);
         observation.planets[0].local_velocity = Vec2::new(-10.0, 0.0);
         let expected_surface_clearance = 100.0 - 40.0 - observation.own_ship.collision_radius;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2873,7 +2938,7 @@ mod tests {
         state.ships[1].omega = 0.0;
 
         let obstacle = PlanetId::from_index(0).unwrap();
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -2946,7 +3011,7 @@ mod tests {
             * (observation.planets[0].radius + observation.own_ship.collision_radius + 25.0);
         observation.planets[0].local_velocity = -Vec2::X * 5.0;
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3014,7 +3079,7 @@ mod tests {
         observation.own_ship.angular_velocity = 0.441;
         observation.own_ship.life_fraction = 0.323;
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3082,7 +3147,7 @@ mod tests {
         observation.own_ship.angular_velocity = 0.441;
         observation.own_ship.life_fraction = 0.323;
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3164,7 +3229,7 @@ mod tests {
 
         let obstacle = PlanetId::from_index(0).unwrap();
         let repair_target = PlanetId::from_index(1).unwrap();
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3309,7 +3374,7 @@ mod tests {
         state.ships[1].omega = 0.0;
 
         let obstacle = PlanetId::from_index(0).unwrap();
-        let mut brain = RuleShipBrain::new(RuleShipBrainConfig {
+        let mut brain = RuleShipBrainV5::new(RuleShipBrainConfig {
             body_avoidance_stall_ticks: 120,
             body_avoidance_stall_clearance: 100.0,
             ..RuleShipBrainConfig::default()
@@ -3405,7 +3470,7 @@ mod tests {
         state.ships[1].omega = 0.0;
 
         let target_planet = PlanetId::from_index(target_planet_index).unwrap();
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3548,7 +3613,7 @@ mod tests {
         observation.planets[1].owner = Some(PlayerId::PLAYER_2);
         observation.planets[1].local_position = Vec2::new(0.0, -2_000.0);
         observation.planets[1].local_spaceport_position = Vec2::new(0.0, -1_950.0);
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3582,7 +3647,7 @@ mod tests {
         observation.sun = None;
         observation.hazards.clear();
         observation.opponent.as_mut().unwrap().local_position = Vec2::new(-100.0, 0.0);
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3612,7 +3677,7 @@ mod tests {
         let docked_planet = observation.planets[1].id;
         observation.own_ship.docked_planet = Some(docked_planet);
         observation.planets[1].owner = Some(PlayerId::PLAYER_2);
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3634,7 +3699,7 @@ mod tests {
         assert_eq!(depart_intent.brake, 0.0);
 
         observation.planets[1].owner = None;
-        let mut capture_brain = RuleShipBrain::default();
+        let mut capture_brain = RuleShipBrainV5::default();
         capture_brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3678,7 +3743,7 @@ mod tests {
         }
         observation.planets[0].owner = Some(PlayerId::PLAYER_2);
         let rebuild_planet = observation.planets[0].id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3726,7 +3791,7 @@ mod tests {
         }
         observation.planets[0].owner = Some(PlayerId::PLAYER_2);
         let repair_planet = observation.planets[0].id;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3780,7 +3845,7 @@ mod tests {
             planet.owner = None;
             planet.local_position = Vec2::new(2_000.0 + index as f32 * 200.0, 2_000.0);
         }
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3848,7 +3913,7 @@ mod tests {
             - observation.planets[0].radius
             - observation.own_ship.collision_radius;
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3915,7 +3980,7 @@ mod tests {
         observation.planets[1].local_position = Vec2::new(90.0, 0.0);
         observation.planets[1].local_spaceport_position = Vec2::new(90.0, 60.0);
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3941,7 +4006,7 @@ mod tests {
         // Allowing a second body's controller to repeatedly cancel this
         // maneuver produced a deterministic 24,856-tick departure deadlock.
         observation.own_ship.docked_planet = Some(launch_planet);
-        let mut docked_brain = RuleShipBrain::default();
+        let mut docked_brain = RuleShipBrainV5::default();
         docked_brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -3990,7 +4055,7 @@ mod tests {
         observation.planets[0].local_velocity = Vec2::new(0.0, -200.0);
         observation.planets[0].local_spaceport_position = Vec2::new(100.0, 500.0);
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -4026,7 +4091,7 @@ mod tests {
         let first_preference =
             preferred_body_tangent_sign(planet.local_position, planet.local_velocity);
 
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -4087,8 +4152,8 @@ mod tests {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
         };
-        let mut first = RuleShipBrain::default();
-        let mut replay = RuleShipBrain::default();
+        let mut first = RuleShipBrainV5::default();
+        let mut replay = RuleShipBrainV5::default();
         first.reset(reset);
         replay.reset(reset);
 
@@ -4103,7 +4168,7 @@ mod tests {
         config.players[0].health_percent = 100;
         config.players[1].health_percent = 100;
         let mut state = SpacewarsScenario::init(config, 17);
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -4141,7 +4206,7 @@ mod tests {
         let mut state = SpacewarsScenario::init(config, 17);
         state.planets[0].owner_id = Some(PlayerId::PLAYER_1.index());
         state.players[0].planet_count = 1;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
@@ -4233,7 +4298,7 @@ mod tests {
             let mut state = SpacewarsScenario::init(config, seed);
             state.planets[0].owner_id = Some(PlayerId::PLAYER_1.index());
             state.players[0].planet_count = 1;
-            let mut brain = RuleShipBrain::default();
+            let mut brain = RuleShipBrainV5::default();
             brain.reset(BrainReset {
                 actor: PlayerId::PLAYER_2,
                 episode_seed: state.seed,
@@ -4348,7 +4413,7 @@ mod tests {
         let mut state = SpacewarsScenario::init(config, 0);
         state.planets[0].owner_id = Some(PlayerId::PLAYER_1.index());
         state.players[0].planet_count = 1;
-        let mut brain = RuleShipBrain::default();
+        let mut brain = RuleShipBrainV5::default();
         brain.reset(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: state.seed,
