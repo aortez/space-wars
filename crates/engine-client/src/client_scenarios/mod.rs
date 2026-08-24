@@ -98,9 +98,15 @@ pub struct BenchmarkStepMetrics {
     pub physics_time: Duration,
     pub snapshot_time: Duration,
     pub rapier_step_time: Duration,
+    pub rapier_update_time: Duration,
+    pub rapier_user_changes_time: Duration,
+    pub rapier_kinematic_interpolation_time: Duration,
+    pub rapier_collision_detection_time: Duration,
     pub rapier_broad_phase_time: Duration,
+    pub rapier_final_broad_phase_time: Duration,
     pub rapier_narrow_phase_time: Duration,
     pub rapier_island_time: Duration,
+    pub rapier_island_constraints_time: Duration,
     pub rapier_solver_time: Duration,
     pub rapier_ccd_time: Duration,
     pub added: usize,
@@ -120,9 +126,15 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
         self.physics_time += rhs.physics_time;
         self.snapshot_time += rhs.snapshot_time;
         self.rapier_step_time += rhs.rapier_step_time;
+        self.rapier_update_time += rhs.rapier_update_time;
+        self.rapier_user_changes_time += rhs.rapier_user_changes_time;
+        self.rapier_kinematic_interpolation_time += rhs.rapier_kinematic_interpolation_time;
+        self.rapier_collision_detection_time += rhs.rapier_collision_detection_time;
         self.rapier_broad_phase_time += rhs.rapier_broad_phase_time;
+        self.rapier_final_broad_phase_time += rhs.rapier_final_broad_phase_time;
         self.rapier_narrow_phase_time += rhs.rapier_narrow_phase_time;
         self.rapier_island_time += rhs.rapier_island_time;
+        self.rapier_island_constraints_time += rhs.rapier_island_constraints_time;
         self.rapier_solver_time += rhs.rapier_solver_time;
         self.rapier_ccd_time += rhs.rapier_ccd_time;
         self.added += rhs.added;

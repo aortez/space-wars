@@ -114,18 +114,31 @@ than trying to hover at ship-only velocity tolerances, and reacquire an owned
 port if contact is lost before the rebuild completes. The ordinary two-human
 setup remains the default.
 
-On Unix, query the latest live rule-bot and docking diagnostics through the
-client control socket:
+On Unix, query the running client through its control socket:
 
 ```sh
-printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
+spacewars-cli status
 ```
 
-The snapshot is refreshed once per second and includes the world seed, brain
-phase and intent, ship motion, target planet, actual docked planet, and
-surface/port clearance. During body avoidance it also identifies the sun or
-planet being avoided and reports the craft's signed surface clearance. This
-keeps diagnostic formatting out of the simulation hot path.
+The snapshot is refreshed once per second and includes a monotonic scenario
+revision, pause state, renderer and raster scale, FPS/UPS, and frame/update
+counters. Performance counters reset for each revision. When a rule bot is
+active, the snapshot also includes the world seed, brain phase and intent, ship
+motion, target planet, actual docked planet, and surface/port clearance. During
+body avoidance it identifies the sun or planet being avoided and reports the
+craft's signed surface clearance. This keeps diagnostic formatting out of the
+simulation hot path.
+
+Start or restart the selected scenario's visual benchmark and wait until the
+host confirms a new scenario instance:
+
+```sh
+spacewars-cli host benchmark --timeout 3s
+```
+
+The command polls observable status with a deadline, so a following sampler or
+screenshot starts inside the benchmark window without a fixed delay. Its
+successful response includes the new scenario revision.
 
 ## Run headless AI episodes
 
@@ -206,6 +219,10 @@ The Pi image launches the scenario selector fullscreen:
 ```sh
 engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 ```
+
+The launcher and host menus accept direct touchscreen taps. Open **Controls →
+Touch Test**, or add `--touch-test` to the launch command, to verify corner
+mapping and display rotation on the assembled kiosk.
 
 `--fullscreen` leaves the launcher visible so a scenario can be selected while
 requesting fullscreen presentation. The image selects Slint's LinuxKMS backend

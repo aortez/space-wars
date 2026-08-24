@@ -2,7 +2,7 @@
 //!
 //! The vector path turns every scenario primitive into Slint UI items. This
 //! renderer draws the same `RenderFrame` shape vocabulary into a small number
-//! of reusable RGBA buffers, then uploads one image to Slint.
+//! of reusable RGB buffers, then uploads one image to Slint.
 
 use std::time::{Duration, Instant};
 
@@ -10,7 +10,7 @@ use engine_common::{
     Camera2, RenderCircle, RenderColor, RenderFrame, RenderLayer, RenderLine, RenderPoint,
     RenderPolygon, RenderPrimitive, Stroke,
 };
-use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
+use slint::{Image, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
 
 use crate::render::{self, FrameLayout, Viewport};
 
@@ -32,12 +32,7 @@ const SPACEWARS_VIEW_RECTANGLE_LAYER: i32 = 8;
 const STARFIELD_CACHE_MIN_PRIMITIVES: usize = 128;
 const STARFIELD_CACHE_CELL_SIZE: f32 = 64.0;
 const STARFIELD_CACHE_MAX_ENTRIES: usize = 64;
-const BACKGROUND: Rgba8Pixel = Rgba8Pixel {
-    r: 5,
-    g: 5,
-    b: 20,
-    a: 255,
-};
+const BACKGROUND: Rgb8Pixel = Rgb8Pixel { r: 5, g: 5, b: 20 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RasterOptions {
@@ -144,7 +139,9 @@ pub struct RasterRenderResult {
 
 #[derive(Debug)]
 pub struct RasterRenderer {
-    buffers: Vec<SharedPixelBuffer<Rgba8Pixel>>,
+    // Primitive alpha is resolved while drawing. Keeping the completed frame RGB lets Slint's
+    // software renderer copy pixels directly instead of blending an already-opaque texture.
+    buffers: Vec<SharedPixelBuffer<Rgb8Pixel>>,
     width: u32,
     height: u32,
     active_buffer: usize,
@@ -235,7 +232,7 @@ impl RasterRenderer {
 
         self.frame_index = self.frame_index.wrapping_add(1);
         let started = Instant::now();
-        let image = Image::from_rgba8(self.buffers[buffer_index].clone());
+        let image = Image::from_rgb8(self.buffers[buffer_index].clone());
         timings.image += started.elapsed();
         RasterRenderResult { image, timings }
     }
@@ -272,7 +269,7 @@ struct OverviewBuffers {
 struct CachedRaster {
     width: u32,
     height: u32,
-    pixels: SharedPixelBuffer<Rgba8Pixel>,
+    pixels: SharedPixelBuffer<Rgb8Pixel>,
     valid: bool,
 }
 
@@ -455,11 +452,11 @@ pub fn primitive_count(frames: &[RenderFrame]) -> usize {
 struct Canvas<'a> {
     width: u32,
     height: u32,
-    pixels: &'a mut [Rgba8Pixel],
+    pixels: &'a mut [Rgb8Pixel],
 }
 
 impl<'a> Canvas<'a> {
-    fn new(width: u32, height: u32, pixels: &'a mut [Rgba8Pixel]) -> Self {
+    fn new(width: u32, height: u32, pixels: &'a mut [Rgb8Pixel]) -> Self {
         Self {
             width,
             height,
@@ -718,7 +715,7 @@ impl<'a> Canvas<'a> {
 
     fn blit_circle_with_opacity(
         &mut self,
-        source: &[Rgba8Pixel],
+        source: &[Rgb8Pixel],
         source_width: u32,
         source_height: u32,
         x: i32,
@@ -739,37 +736,48 @@ impl<'a> Canvas<'a> {
         let copy_height = source_height
             .saturating_sub(source_y)
             .min(self.height.saturating_sub(start_y));
+        if copy_width == 0 || copy_height == 0 {
+            return;
+        }
+
         let center_x = source_width as f32 * 0.5;
         let center_y = source_height as f32 * 0.5;
-        let radius_squared = center_x.min(center_y).powi(2);
+        let radius = center_x.min(center_y);
+        let radius_squared = radius * radius;
+        let source_right = source_x + copy_width - 1;
+        let alpha = (255.0 * opacity.clamp(0.0, 1.0)).round() as u8;
+        let background_blend = BackgroundBlendTable::new(alpha);
 
         for row in 0..copy_height {
-            let src_start = ((source_y + row) * source_width + source_x) as usize;
-            let dst_start = ((start_y + row) * self.width + start_x) as usize;
-            let len = copy_width as usize;
-            for (column, (destination, source)) in self.pixels[dst_start..dst_start + len]
+            let source_row = source_y + row;
+            let distance_y = source_row as f32 + 0.5 - center_y;
+            let remaining_radius_squared = radius_squared - distance_y * distance_y;
+            if remaining_radius_squared < 0.0 {
+                continue;
+            }
+
+            let half_span = remaining_radius_squared.sqrt();
+            let circle_left = (center_x - half_span - 0.5).ceil().max(0.0) as u32;
+            let circle_right = (center_x + half_span - 0.5).floor().max(0.0) as u32;
+            let left = source_x.max(circle_left);
+            let right = source_right.min(circle_right);
+            if left > right {
+                continue;
+            }
+
+            let src_start = (source_row * source_width + left) as usize;
+            let destination_x = start_x + left - source_x;
+            let dst_start = ((start_y + row) * self.width + destination_x) as usize;
+            let len = (right - left + 1) as usize;
+            for (destination, source) in self.pixels[dst_start..dst_start + len]
                 .iter_mut()
                 .zip(&source[src_start..src_start + len])
-                .enumerate()
             {
-                let source_pixel_x = source_x as f32 + column as f32 + 0.5;
-                let source_pixel_y = source_y as f32 + row as f32 + 0.5;
-                let distance_x = source_pixel_x - center_x;
-                let distance_y = source_pixel_y - center_y;
-                if distance_x * distance_x + distance_y * distance_y > radius_squared {
-                    continue;
+                if *destination == BACKGROUND {
+                    *destination = background_blend.blend(*source);
+                } else {
+                    blend_rgb_pixel(destination, *source, alpha);
                 }
-                let alpha = (source.a as f32 * opacity.clamp(0.0, 1.0)).round() as u8;
-                blend_pixel(
-                    destination,
-                    RasterColor {
-                        pixel: Rgba8Pixel {
-                            a: alpha,
-                            ..*source
-                        },
-                        opaque: alpha >= 250,
-                    },
-                );
             }
         }
     }
@@ -933,7 +941,41 @@ struct RasterColor {
 #[derive(Debug, Clone, Copy)]
 enum SpanFillMode {
     Normal,
-    BackgroundFastPath { blended_background: Rgba8Pixel },
+    BackgroundFastPath { blended_background: Rgb8Pixel },
+}
+
+struct BackgroundBlendTable {
+    red: [u8; 256],
+    green: [u8; 256],
+    blue: [u8; 256],
+}
+
+impl BackgroundBlendTable {
+    fn new(alpha: u8) -> Self {
+        let alpha = u32::from(alpha);
+        let inverse_alpha = 255 - alpha;
+        let mut table = Self {
+            red: [0; 256],
+            green: [0; 256],
+            blue: [0; 256],
+        };
+        for source in 0_u16..=255 {
+            let index = usize::from(source);
+            let source = source as u8;
+            table.red[index] = blend_channel(source, BACKGROUND.r, alpha, inverse_alpha);
+            table.green[index] = blend_channel(source, BACKGROUND.g, alpha, inverse_alpha);
+            table.blue[index] = blend_channel(source, BACKGROUND.b, alpha, inverse_alpha);
+        }
+        table
+    }
+
+    fn blend(&self, source: Rgb8Pixel) -> Rgb8Pixel {
+        Rgb8Pixel {
+            r: self.red[usize::from(source.r)],
+            g: self.green[usize::from(source.g)],
+            b: self.blue[usize::from(source.b)],
+        }
+    }
 }
 
 fn project(camera: Camera2, point: RenderPoint, viewport: Viewport) -> PixelPoint {
@@ -1066,12 +1108,12 @@ fn span_fill_mode_for_layer(layer_z: i32, color: RenderColor) -> SpanFillMode {
     SpanFillMode::BackgroundFastPath { blended_background }
 }
 
-fn clear_pixels(pixels: &mut [Rgba8Pixel]) {
+fn clear_pixels(pixels: &mut [Rgb8Pixel]) {
     pixels.fill(BACKGROUND);
 }
 
 fn fill_circle_pixels(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1116,7 +1158,7 @@ fn fill_circle_pixels(
 }
 
 fn stroke_circle_pixels(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1195,7 +1237,7 @@ fn stroke_circle_pixels(
 }
 
 fn fill_convex_polygon(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1221,7 +1263,7 @@ fn fill_convex_polygon(
 }
 
 fn fill_triangle(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1271,7 +1313,7 @@ fn fill_triangle(
 }
 
 fn draw_line_pixels(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1332,7 +1374,7 @@ fn draw_line_pixels(
 }
 
 fn draw_thin_line(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     clip: PixelClip,
     start: PixelPoint,
@@ -1370,7 +1412,7 @@ fn circle_covers_clip(center: PixelPoint, radius_sq: f32, clip: PixelClip) -> bo
 }
 
 fn fill_rect(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     clip: PixelClip,
     color: RasterColor,
@@ -1380,7 +1422,7 @@ fn fill_rect(
         let start = y as usize * width as usize + clip.min_x as usize;
         let end = y as usize * width as usize + clip.max_x as usize + 1;
         if color.opaque {
-            pixels[start..end].fill(color.pixel);
+            pixels[start..end].fill(rgb_pixel(color.pixel));
         } else {
             match fill_mode {
                 SpanFillMode::BackgroundFastPath { blended_background }
@@ -1399,7 +1441,7 @@ fn fill_rect(
 }
 
 fn fill_span(
-    pixels: &mut [Rgba8Pixel],
+    pixels: &mut [Rgb8Pixel],
     width: u32,
     height: u32,
     clip: PixelClip,
@@ -1422,7 +1464,7 @@ fn fill_span(
     let start = y as usize * width as usize + left as usize;
     let end = y as usize * width as usize + right as usize + 1;
     if color.opaque {
-        pixels[start..end].fill(color.pixel);
+        pixels[start..end].fill(rgb_pixel(color.pixel));
     } else {
         match fill_mode {
             SpanFillMode::BackgroundFastPath { blended_background }
@@ -1439,22 +1481,33 @@ fn fill_span(
     }
 }
 
-fn paint_pixel(pixels: &mut [Rgba8Pixel], width: u32, x: i32, y: i32, color: RasterColor) {
+fn paint_pixel(pixels: &mut [Rgb8Pixel], width: u32, x: i32, y: i32, color: RasterColor) {
     let index = y as usize * width as usize + x as usize;
     if color.opaque {
-        pixels[index] = color.pixel;
+        pixels[index] = rgb_pixel(color.pixel);
     } else {
         blend_pixel(&mut pixels[index], color);
     }
 }
 
-fn blend_pixel(destination: &mut Rgba8Pixel, source: RasterColor) {
-    let alpha = source.pixel.a as f32 / 255.0;
-    let inverse = 1.0 - alpha;
-    destination.r = blend_channel(source.pixel.r, destination.r, alpha, inverse);
-    destination.g = blend_channel(source.pixel.g, destination.g, alpha, inverse);
-    destination.b = blend_channel(source.pixel.b, destination.b, alpha, inverse);
-    destination.a = 255;
+fn blend_pixel(destination: &mut Rgb8Pixel, source: RasterColor) {
+    blend_rgb_pixel(destination, rgb_pixel(source.pixel), source.pixel.a);
+}
+
+fn blend_rgb_pixel(destination: &mut Rgb8Pixel, source: Rgb8Pixel, alpha: u8) {
+    let alpha = u32::from(alpha);
+    let inverse_alpha = 255 - alpha;
+    destination.r = blend_channel(source.r, destination.r, alpha, inverse_alpha);
+    destination.g = blend_channel(source.g, destination.g, alpha, inverse_alpha);
+    destination.b = blend_channel(source.b, destination.b, alpha, inverse_alpha);
+}
+
+fn rgb_pixel(pixel: Rgba8Pixel) -> Rgb8Pixel {
+    Rgb8Pixel {
+        r: pixel.r,
+        g: pixel.g,
+        b: pixel.b,
+    }
 }
 
 fn raster_color(color: RenderColor) -> RasterColor {
@@ -1474,8 +1527,8 @@ fn color_channel(value: f32) -> u8 {
     (value.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
-fn blend_channel(source: u8, destination: u8, alpha: f32, inverse_alpha: f32) -> u8 {
-    (source as f32 * alpha + destination as f32 * inverse_alpha).round() as u8
+fn blend_channel(source: u8, destination: u8, alpha: u32, inverse_alpha: u32) -> u8 {
+    ((u32::from(source) * alpha + u32::from(destination) * inverse_alpha + 127) / 255) as u8
 }
 
 #[cfg(test)]
@@ -1484,6 +1537,71 @@ mod tests {
     use engine_common::{
         Camera2, Fill, RenderCircle, RenderFrame, RenderLine, RenderPrimitive, Stroke,
     };
+
+    fn reference_blit_circle_with_opacity(
+        destination: &mut [Rgb8Pixel],
+        destination_width: u32,
+        destination_height: u32,
+        source: &[Rgb8Pixel],
+        source_width: u32,
+        source_height: u32,
+        x: i32,
+        y: i32,
+        opacity: f32,
+    ) {
+        if x >= destination_width as i32 || y >= destination_height as i32 {
+            return;
+        }
+
+        let start_x = x.max(0) as u32;
+        let start_y = y.max(0) as u32;
+        let source_x = (start_x as i32 - x) as u32;
+        let source_y = (start_y as i32 - y) as u32;
+        let copy_width = source_width
+            .saturating_sub(source_x)
+            .min(destination_width.saturating_sub(start_x));
+        let copy_height = source_height
+            .saturating_sub(source_y)
+            .min(destination_height.saturating_sub(start_y));
+        if copy_width == 0 || copy_height == 0 {
+            return;
+        }
+        let center_x = source_width as f32 * 0.5;
+        let center_y = source_height as f32 * 0.5;
+        let radius_squared = center_x.min(center_y).powi(2);
+
+        for row in 0..copy_height {
+            let src_start = ((source_y + row) * source_width + source_x) as usize;
+            let dst_start = ((start_y + row) * destination_width + start_x) as usize;
+            let len = copy_width as usize;
+            for (column, (destination, source)) in destination[dst_start..dst_start + len]
+                .iter_mut()
+                .zip(&source[src_start..src_start + len])
+                .enumerate()
+            {
+                let source_pixel_x = source_x as f32 + column as f32 + 0.5;
+                let source_pixel_y = source_y as f32 + row as f32 + 0.5;
+                let distance_x = source_pixel_x - center_x;
+                let distance_y = source_pixel_y - center_y;
+                if distance_x * distance_x + distance_y * distance_y > radius_squared {
+                    continue;
+                }
+
+                let alpha = (255.0 * opacity.clamp(0.0, 1.0)).round() as u8;
+                let alpha_fraction = f32::from(alpha) / 255.0;
+                let inverse_alpha = 1.0 - alpha_fraction;
+                destination.r = (f32::from(source.r) * alpha_fraction
+                    + f32::from(destination.r) * inverse_alpha)
+                    .round() as u8;
+                destination.g = (f32::from(source.g) * alpha_fraction
+                    + f32::from(destination.g) * inverse_alpha)
+                    .round() as u8;
+                destination.b = (f32::from(source.b) * alpha_fraction
+                    + f32::from(destination.b) * inverse_alpha)
+                    .round() as u8;
+            }
+        }
+    }
 
     #[test]
     fn rasterizes_filled_circle_into_image() {
@@ -1503,7 +1621,7 @@ mod tests {
             Viewport::new(100.0, 100.0),
             FrameLayout::EqualHorizontal,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
 
         assert!(
             pixels
@@ -1534,7 +1652,7 @@ mod tests {
             Viewport::new(100.0, 100.0),
             FrameLayout::EqualHorizontal,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
 
         assert!(pixels.as_slice().iter().any(|pixel| pixel.g > BACKGROUND.g));
     }
@@ -1556,13 +1674,13 @@ mod tests {
             Viewport::new(100.0, 100.0),
             FrameLayout::EqualHorizontal,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
 
         assert!(pixels.as_slice().iter().any(|pixel| pixel.r > 200));
     }
 
     #[test]
-    fn alpha_blend_changes_destination_without_clearing_alpha() {
+    fn alpha_blend_changes_rgb_destination() {
         let mut pixel = BACKGROUND;
         blend_pixel(
             &mut pixel,
@@ -1570,7 +1688,77 @@ mod tests {
         );
 
         assert!(pixel.r > BACKGROUND.r);
-        assert_eq!(pixel.a, 255);
+    }
+
+    #[test]
+    fn integer_blend_matches_float_reference() {
+        let channels = [0, 1, 2, 31, 63, 127, 128, 191, 254, 255];
+        for source in channels {
+            for destination in channels {
+                for alpha in 0_u32..=255 {
+                    let alpha_fraction = alpha as f32 / 255.0;
+                    let expected = (source as f32 * alpha_fraction
+                        + destination as f32 * (1.0 - alpha_fraction))
+                        .round() as u8;
+                    assert_eq!(
+                        blend_channel(source, destination, alpha, 255 - alpha),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn span_based_circle_blit_matches_per_pixel_reference() {
+        const DESTINATION_WIDTH: u32 = 11;
+        const DESTINATION_HEIGHT: u32 = 9;
+        let cases = [
+            (7, 5, 2, 1, 0.74),
+            (8, 8, -3, -2, 0.37),
+            (5, 9, 8, 6, 1.0),
+            (6, 4, -8, 2, 0.0),
+        ];
+
+        for (source_width, source_height, x, y, opacity) in cases {
+            let source = (0..source_width * source_height)
+                .map(|index| Rgb8Pixel {
+                    r: (index * 17) as u8,
+                    g: (index * 31) as u8,
+                    b: (index * 47) as u8,
+                })
+                .collect::<Vec<_>>();
+            let mut expected = (0..DESTINATION_WIDTH * DESTINATION_HEIGHT)
+                .map(|index| {
+                    if index % 3 == 0 {
+                        BACKGROUND
+                    } else {
+                        Rgb8Pixel {
+                            r: (index * 11) as u8,
+                            g: (index * 23) as u8,
+                            b: (index * 37) as u8,
+                        }
+                    }
+                })
+                .collect::<Vec<_>>();
+            let mut actual = expected.clone();
+
+            reference_blit_circle_with_opacity(
+                &mut expected,
+                DESTINATION_WIDTH,
+                DESTINATION_HEIGHT,
+                &source,
+                source_width,
+                source_height,
+                x,
+                y,
+                opacity,
+            );
+            Canvas::new(DESTINATION_WIDTH, DESTINATION_HEIGHT, &mut actual)
+                .blit_circle_with_opacity(&source, source_width, source_height, x, y, opacity);
+
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
@@ -1604,11 +1792,10 @@ mod tests {
         let raster_color = raster_color(color);
         let mut expected = vec![BACKGROUND; 8];
         let mut actual = vec![BACKGROUND; 8];
-        expected[3] = Rgba8Pixel {
+        expected[3] = Rgb8Pixel {
             r: 20,
             g: 30,
             b: 40,
-            a: 255,
         };
         actual[3] = expected[3];
         let clip = PixelClip::new(8, 1, 0, 7, 0, 0).expect("clip should be valid");
@@ -1649,7 +1836,7 @@ mod tests {
             Viewport::new(100.0, 50.0),
             FrameLayout::EqualHorizontal,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
         let right_pane_pixel = pixels.as_slice()[25 * 100 + 75];
 
         assert_eq!(right_pane_pixel, BACKGROUND);
@@ -1780,7 +1967,7 @@ mod tests {
             Viewport::new(100.0, 100.0),
             FrameLayout::SpacewarsLocalPlay,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
         let viewports = render::frame_viewports(
             Viewport::new(100.0, 100.0),
             frames.len(),
@@ -1821,7 +2008,7 @@ mod tests {
             Viewport::new(100.0, 100.0),
             FrameLayout::SpacewarsLocalPlay,
         );
-        let pixels = image.to_rgba8().expect("raster image should be rgba8");
+        let pixels = image.to_rgb8().expect("raster image should be rgb8");
         let minimap = render::frame_viewports(
             Viewport::new(100.0, 100.0),
             frames.len(),

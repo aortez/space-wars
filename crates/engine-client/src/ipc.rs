@@ -31,6 +31,7 @@ struct ControlRequest {
 enum ControlCommand {
     Screenshot { output: PathBuf },
     Status,
+    HostBenchmark,
 }
 
 #[cfg(unix)]
@@ -169,6 +170,12 @@ fn parse_command(body: &str) -> Result<ControlCommand, String> {
             }
             Ok(ControlCommand::Status)
         }
+        Some("host benchmark") => {
+            if lines.next().is_some() {
+                return Err("too many command lines".into());
+            }
+            Ok(ControlCommand::HostBenchmark)
+        }
         Some(command) => Err(format!("unknown command {command:?}")),
         None => Err("empty command".into()),
     }
@@ -184,6 +191,30 @@ fn handle_request(window: &MainWindow, request: ControlRequest) {
             Err(err) => request.response.error(err.to_string()),
         },
         ControlCommand::Status => request.response.ok(window.get_runtime_diagnostics()),
+        ControlCommand::HostBenchmark => {
+            if !window.get_scenario_benchmark_available() {
+                request
+                    .response
+                    .error("the selected scenario does not support benchmark mode");
+            } else if window.get_launcher_visible() {
+                window.invoke_launcher_start_benchmark();
+                if window.get_launcher_visible() {
+                    let detail = window.get_launcher_error_text();
+                    if detail.is_empty() {
+                        request
+                            .response
+                            .error("benchmark did not leave the launcher");
+                    } else {
+                        request.response.error(detail);
+                    }
+                } else {
+                    request.response.ok("benchmark requested");
+                }
+            } else {
+                window.invoke_ingame_start_benchmark();
+                request.response.ok("benchmark requested");
+            }
+        }
     }
 }
 
@@ -229,7 +260,9 @@ mod tests {
             ControlCommand::Screenshot { output } => {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
-            ControlCommand::Status => panic!("expected screenshot command"),
+            ControlCommand::Status | ControlCommand::HostBenchmark => {
+                panic!("expected screenshot command")
+            }
         }
     }
 
@@ -245,5 +278,14 @@ mod tests {
             Ok(ControlCommand::Status)
         ));
         assert!(parse_command("status\nextra\n").is_err());
+    }
+
+    #[test]
+    fn parse_host_benchmark_command() {
+        assert!(matches!(
+            parse_command("host benchmark\n"),
+            Ok(ControlCommand::HostBenchmark)
+        ));
+        assert!(parse_command("host benchmark\nextra\n").is_err());
     }
 }

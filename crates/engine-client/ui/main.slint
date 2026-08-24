@@ -116,9 +116,9 @@ component MenuButton inherits Rectangle {
     in property <bool> selected: false;
     callback activated();
 
-    background: root.selected ? #174f70 : #151a27;
-    border-color: root.selected ? #80d8ff : #596273;
-    border-width: root.selected ? 3px : 1px;
+    background: button-touch.pressed ? #236e96 : root.selected ? #174f70 : #151a27;
+    border-color: button-touch.pressed || root.selected ? #80d8ff : #596273;
+    border-width: button-touch.pressed || root.selected ? 3px : 1px;
     border-radius: 6px;
 
     Text {
@@ -126,14 +126,14 @@ component MenuButton inherits Rectangle {
         width: parent.width - 24px;
         height: parent.height;
         text: root.text;
-        color: root.selected ? #ffffff : #d9e1ec;
+        color: button-touch.pressed || root.selected ? #ffffff : #d9e1ec;
         font-size: 16px;
-        font-weight: root.selected ? 700 : 500;
+        font-weight: button-touch.pressed || root.selected ? 700 : 500;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
 
-    TouchArea {
+    button-touch := TouchArea {
         width: parent.width;
         height: parent.height;
         mouse-cursor: pointer;
@@ -167,9 +167,9 @@ component ChoiceRow inherits Rectangle {
 
     MenuButton {
         x: parent.width * 0.40;
-        y: 6px;
-        width: 48px;
-        height: parent.height - 12px;
+        y: 2px;
+        width: 52px;
+        height: parent.height - 4px;
         text: "‹";
         activated => {
             root.previous();
@@ -177,8 +177,8 @@ component ChoiceRow inherits Rectangle {
     }
 
     Text {
-        x: parent.width * 0.40 + 56px;
-        width: parent.width * 0.60 - 112px;
+        x: parent.width * 0.40 + 60px;
+        width: parent.width * 0.60 - 120px;
         height: parent.height;
         text: root.value;
         color: #ffffff;
@@ -191,13 +191,36 @@ component ChoiceRow inherits Rectangle {
 
     MenuButton {
         x: parent.width - 54px;
-        y: 6px;
-        width: 48px;
-        height: parent.height - 12px;
+        y: 2px;
+        width: 52px;
+        height: parent.height - 4px;
         text: "›";
         activated => {
             root.next();
         }
+    }
+}
+
+component TouchTestTarget inherits Rectangle {
+    in property <string> text;
+    in property <bool> hit: false;
+    in property <brush> idle-background;
+    in property <brush> idle-border;
+
+    background: root.hit ? #155b3a : root.idle-background;
+    border-color: root.hit ? #7dffb2 : root.idle-border;
+    border-width: 4px;
+    border-radius: 12px;
+
+    Text {
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 }
 
@@ -231,7 +254,17 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-controls-visible: false;
     in-out property <bool> launcher-settings-visible: false;
     in-out property <int> launcher-focus-index: 0;
+    in-out property <int> launcher-controls-focus-index: 0;
     in-out property <int> launcher-settings-focus-index: 0;
+    in-out property <bool> touch-test-visible: false;
+    in-out property <bool> touch-test-top-left-hit: false;
+    in-out property <bool> touch-test-top-right-hit: false;
+    in-out property <bool> touch-test-bottom-left-hit: false;
+    in-out property <bool> touch-test-bottom-right-hit: false;
+    in-out property <float> touch-test-x: 0;
+    in-out property <float> touch-test-y: 0;
+    in-out property <int> touch-test-count: 0;
+    in-out property <string> touch-test-phase: "waiting";
     in-out property <bool> ingame-menu-visible: false;
     in-out property <bool> ingame-controls-visible: false;
     in-out property <int> ingame-menu-focus-index: 0;
@@ -316,12 +349,29 @@ export component MainWindow inherits Window {
 
     changed launcher-controls-visible => {
         if (root.launcher-visible) {
+            if (root.launcher-controls-visible) {
+                root.launcher-controls-focus-index = 0;
+            }
             launcher-shortcuts.focus();
         }
     }
 
     changed launcher-settings-visible => {
         if (root.launcher-visible) {
+            launcher-shortcuts.focus();
+        }
+    }
+
+    changed touch-test-visible => {
+        if (root.touch-test-visible) {
+            root.touch-test-top-left-hit = false;
+            root.touch-test-top-right-hit = false;
+            root.touch-test-bottom-left-hit = false;
+            root.touch-test-bottom-right-hit = false;
+            root.touch-test-x = root.width / 2 / 1px;
+            root.touch-test-y = root.height / 2 / 1px;
+            root.touch-test-count = 0;
+            root.touch-test-phase = "waiting";
             launcher-shortcuts.focus();
         }
     }
@@ -591,7 +641,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 54px;
                 width: parent.width - 48px;
-                text: "D-pad chooses  ·  A selects  ·  B or Start resumes";
+                text: "Tap a choice  ·  D-pad chooses  ·  A selects  ·  B or Start resumes";
                 color: #80d8ff;
                 font-size: 14px;
                 horizontal-alignment: center;
@@ -717,7 +767,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: parent.height - 58px;
                 width: 150px;
-                height: 42px;
+                height: 44px;
                 text: "Back";
                 selected: true;
                 activated => {
@@ -730,7 +780,7 @@ export component MainWindow inherits Window {
                 x: parent.width - 174px;
                 y: parent.height - 58px;
                 width: 150px;
-                height: 42px;
+                height: 44px;
                 text: "Resume";
                 activated => {
                     root.ingame-resume();
@@ -781,7 +831,7 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 112px;
                 width: parent.width - 48px;
-                text: "A selects  ·  Start plays again  ·  B returns to launcher";
+                text: "Tap a choice  ·  A selects  ·  Start plays again  ·  B returns to launcher";
                 color: #80d8ff;
                 font-size: 13px;
                 horizontal-alignment: center;
@@ -1021,7 +1071,7 @@ export component MainWindow inherits Window {
                         x: 0px;
                         y: 296px;
                         width: parent.width;
-                        text: "D-pad / left stick chooses  ·  A selects  ·  Start launches";
+                        text: "Tap buttons directly  ·  D-pad / left stick chooses  ·  A selects";
                         color: #80d8ff;
                         font-size: 14px;
                         horizontal-alignment: center;
@@ -1050,7 +1100,7 @@ export component MainWindow inherits Window {
                         visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
                         x: 0px;
                         y: 0px;
-                        width: parent.width;
+                        width: root.launcher-scenario == "spacewars" ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: "Renderer";
                         value: root.launcher-renderer;
@@ -1067,9 +1117,9 @@ export component MainWindow inherits Window {
 
                     ChoiceRow {
                         visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
-                        x: 0px;
-                        y: 52px;
-                        width: parent.width;
+                        x: root.launcher-scenario == "spacewars" ? parent.width / 2 + 6px : 0px;
+                        y: root.launcher-scenario == "spacewars" ? 0px : 52px;
+                        width: root.launcher-scenario == "spacewars" ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: "Raster Scale";
                         value: root.launcher-raster-scale-text + "×";
@@ -1087,8 +1137,8 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
                         x: 0px;
-                        y: 104px;
-                        width: parent.width;
+                        y: 52px;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Preset";
                         value: root.launcher-spacewars-preset;
@@ -1105,9 +1155,9 @@ export component MainWindow inherits Window {
 
                     ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
-                        x: 0px;
-                        y: 156px;
-                        width: parent.width;
+                        x: parent.width / 2 + 6px;
+                        y: 52px;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Planets";
                         value: root.launcher-use-planets;
@@ -1125,8 +1175,8 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
                         x: 0px;
-                        y: 208px;
-                        width: parent.width;
+                        y: 104px;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Asteroids";
                         value: root.launcher-asteroids-enabled;
@@ -1143,9 +1193,9 @@ export component MainWindow inherits Window {
 
                     ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
-                        x: 0px;
-                        y: 260px;
-                        width: parent.width;
+                        x: parent.width / 2 + 6px;
+                        y: 104px;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Player Health";
                         value: root.launcher-player-health-text + "%";
@@ -1163,7 +1213,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
                         x: 0px;
-                        y: 312px;
+                        y: 156px;
                         width: parent.width;
                         height: 48px;
                         label: "Player 2";
@@ -1265,7 +1315,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "spacewars" ? 366px : root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
@@ -1277,7 +1327,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "spacewars" ? 366px : root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";
@@ -1314,7 +1364,7 @@ export component MainWindow inherits Window {
                         y: 168px;
                         width: parent.width - 36px;
                         height: 76px;
-                        text: "Menus: D-pad or left stick navigates, A selects, B goes back, Start launches or resumes. Pads are assigned P1 then P2 in connection order; keyboard remains available.";
+                        text: "Touchscreen: tap menu buttons directly. Controller: D-pad or left stick navigates, A selects, B goes back, and Start launches or resumes.";
                         color: #80d8ff;
                         font-size: 13px;
                         wrap: word-wrap;
@@ -1337,9 +1387,23 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: true;
+                        selected: root.launcher-controls-focus-index == 0;
                         activated => {
+                            root.launcher-controls-focus-index = 0;
                             root.launcher-controls-visible = false;
+                        }
+                    }
+
+                    MenuButton {
+                        x: (parent.width - self.width) / 2;
+                        y: parent.height - 58px;
+                        width: 160px;
+                        height: 44px;
+                        text: "Touch Test";
+                        selected: root.launcher-controls-focus-index == 1;
+                        activated => {
+                            root.launcher-controls-focus-index = 1;
+                            root.touch-test-visible = true;
                         }
                     }
 
@@ -1349,7 +1413,9 @@ export component MainWindow inherits Window {
                         width: 180px;
                         height: 44px;
                         text: "Start Game";
+                        selected: root.launcher-controls-focus-index == 2;
                         activated => {
+                            root.launcher-controls-focus-index = 2;
                             root.launcher-start-game();
                         }
                     }
@@ -1402,6 +1468,160 @@ export component MainWindow inherits Window {
             horizontal-alignment: center;
             vertical-alignment: center;
             overflow: elide;
+        }
+    }
+
+    Rectangle {
+        visible: root.touch-test-visible;
+        width: parent.width;
+        height: parent.height;
+        background: #050514;
+
+        touch-test-area := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: crosshair;
+
+            pointer-event(event) => {
+                root.touch-test-x = self.mouse-x / 1px;
+                root.touch-test-y = self.mouse-y / 1px;
+                if (event.kind == PointerEventKind.down) {
+                    root.touch-test-count += 1;
+                    root.touch-test-phase = "down";
+                } else if (event.kind == PointerEventKind.move) {
+                    root.touch-test-phase = "move";
+                } else if (event.kind == PointerEventKind.up) {
+                    root.touch-test-phase = "up";
+                } else if (event.kind == PointerEventKind.cancel) {
+                    root.touch-test-phase = "cancel";
+                }
+            }
+
+            clicked => {
+                if (self.mouse-x > root.width / 2 - 100px && self.mouse-x < root.width / 2 + 100px
+                    && self.mouse-y > root.height - 74px) {
+                    root.touch-test-visible = false;
+                } else if (self.mouse-x < 148px && self.mouse-y < 148px) {
+                    root.touch-test-top-left-hit = true;
+                } else if (self.mouse-x > root.width - 148px && self.mouse-y < 148px) {
+                    root.touch-test-top-right-hit = true;
+                } else if (self.mouse-x < 148px && self.mouse-y > root.height - 148px) {
+                    root.touch-test-bottom-left-hit = true;
+                } else if (self.mouse-x > root.width - 148px && self.mouse-y > root.height - 148px) {
+                    root.touch-test-bottom-right-hit = true;
+                }
+            }
+        }
+
+        Text {
+            x: 150px;
+            y: 16px;
+            width: parent.width - 300px;
+            height: 80px;
+            text: root.touch-test-top-left-hit && root.touch-test-top-right-hit
+                && root.touch-test-bottom-left-hit && root.touch-test-bottom-right-hit
+                ? "TOUCHSCREEN TEST\nAll four targets matched. Touch and display orientation agree."
+                : "TOUCHSCREEN TEST\nTap targets 1–4 clockwise. The crosshair should stay beneath your finger.";
+            color: root.touch-test-top-left-hit && root.touch-test-top-right-hit
+                && root.touch-test-bottom-left-hit && root.touch-test-bottom-right-hit
+                ? #7dffb2 : #c7d0dc;
+            font-size: 15px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+
+        TouchTestTarget {
+            x: 20px;
+            y: 20px;
+            width: 112px;
+            height: 112px;
+            text: "1\nTOP\nLEFT";
+            hit: root.touch-test-top-left-hit;
+            idle-background: #3a2038;
+            idle-border: #ff8ce6;
+        }
+
+        TouchTestTarget {
+            x: parent.width - 132px;
+            y: 20px;
+            width: 112px;
+            height: 112px;
+            text: "2\nTOP\nRIGHT";
+            hit: root.touch-test-top-right-hit;
+            idle-background: #20384d;
+            idle-border: #80d8ff;
+        }
+
+        TouchTestTarget {
+            x: parent.width - 132px;
+            y: parent.height - 132px;
+            width: 112px;
+            height: 112px;
+            text: "3\nBOTTOM\nRIGHT";
+            hit: root.touch-test-bottom-right-hit;
+            idle-background: #49361d;
+            idle-border: #ffd166;
+        }
+
+        TouchTestTarget {
+            x: 20px;
+            y: parent.height - 132px;
+            width: 112px;
+            height: 112px;
+            text: "4\nBOTTOM\nLEFT";
+            hit: root.touch-test-bottom-left-hit;
+            idle-background: #253d28;
+            idle-border: #9cff9c;
+        }
+
+        Rectangle {
+            visible: root.touch-test-count > 0;
+            x: root.touch-test-x * 1px - 14px;
+            y: root.touch-test-y * 1px - 14px;
+            width: 28px;
+            height: 28px;
+            background: #00000000;
+            border-color: root.touch-test-phase == "down" ? #ff7184 : #ffffff;
+            border-width: 4px;
+            border-radius: 14px;
+        }
+
+        Text {
+            x: 150px;
+            y: parent.height / 2 - 26px;
+            width: parent.width - 300px;
+            height: 52px;
+            text: "Touches " + root.touch-test-count + "  ·  x " + Math.round(root.touch-test-x)
+                + "  ·  y " + Math.round(root.touch-test-y) + "  ·  " + root.touch-test-phase;
+            color: #80d8ff;
+            font-size: 18px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: parent.height - 68px;
+            width: 200px;
+            height: 52px;
+            background: #174f70;
+            border-color: #80d8ff;
+            border-width: 2px;
+            border-radius: 8px;
+
+            Text {
+                width: parent.width;
+                height: parent.height;
+                text: "Done  ·  Esc / B";
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
     }
 

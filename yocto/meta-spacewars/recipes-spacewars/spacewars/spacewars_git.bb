@@ -50,7 +50,7 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service:True",
     ]
 
-    for top in ("crates", "scenarios"):
+    for top in ("crates", "scenarios", "vendor"):
         root_dir = os.path.join(srcroot, top)
         if not os.path.isdir(root_dir):
             continue

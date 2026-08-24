@@ -18,6 +18,10 @@ members = [
     "scenarios/rover-lab",
     "scenarios/spacewars",
 ]
+exclude = [
+    "vendor/i-slint-backend-linuxkms",
+    "vendor/i-slint-core",
+]
 
 [workspace.package]
 edition = "2024"
@@ -45,8 +49,8 @@ rapier2d = { version = "0.34", default-features = false, features = [
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-slint = { version = "1", default-features = false }
-slint-build = { version = "1" }
+slint = { version = "=1.13.1", default-features = false }
+slint-build = { version = "=1.13.1" }
 tempfile = "3"
 toml = "0.9"
 tracing = "0.1"
@@ -65,6 +69,17 @@ scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
+
+[patch.crates-io]
+# Slint 1.13's software snapshot path reuses the display rotation and panics for
+# non-square windows rotated by 90 or 270 degrees. Its system-font path also
+# remaps font files for every metrics and shaping operation; retain owned face
+# data for the lifetime of each cached font. Keep these patches local until an
+# upstream release provides both fixes.
+i-slint-core = { path = "vendor/i-slint-core" }
+# LinuxKMS rotates rendered output but leaves absolute libinput coordinates in
+# panel orientation. Apply the inverse output rotation before dispatching them.
+i-slint-backend-linuxkms = { path = "vendor/i-slint-backend-linuxkms" }
 
 [profile.release]
 # Cross-crate inlining materially improves the tightly interleaved NES
