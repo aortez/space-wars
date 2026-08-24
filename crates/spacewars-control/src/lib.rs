@@ -10,6 +10,7 @@ pub use client::{ControlClient, ControlClientError, UiStatePredicate};
 
 pub const UI_STATE_COMMAND: &str = "ui state";
 pub const UI_PRESS_COMMAND: &str = "ui press";
+pub const UI_ACTIVATE_COMMAND: &str = "ui activate";
 pub const UI_STATE_SCHEMA_VERSION: u32 = 1;
 pub const NO_ACTIVE_SCENARIO_DIAGNOSTICS: &str = "No active scenario diagnostics.";
 
@@ -213,6 +214,38 @@ impl UiPressRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UiActivateRequest {
+    pub schema_version: u32,
+    pub control_id: String,
+    #[serde(default)]
+    pub expected_screen: Option<UiScreen>,
+    #[serde(default)]
+    pub expected_revision: Option<u64>,
+}
+
+impl UiActivateRequest {
+    pub fn new(control_id: impl Into<String>) -> Self {
+        Self {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            control_id: control_id.into(),
+            expected_screen: None,
+            expected_revision: None,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
+        let request: Self = serde_json::from_str(json)?;
+        validate_schema_version(request.schema_version)?;
+        Ok(request)
+    }
+
+    pub fn to_json(&self) -> Result<String, ProtocolError> {
+        validate_schema_version(self.schema_version)?;
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ControlFailureCode {
@@ -220,6 +253,8 @@ pub enum ControlFailureCode {
     WrongScreen,
     StaleRevision,
     ActionUnavailable,
+    ControlUnavailable,
+    ControlDisabled,
     Timeout,
 }
 
@@ -230,6 +265,8 @@ impl fmt::Display for ControlFailureCode {
             Self::WrongScreen => "wrong-screen",
             Self::StaleRevision => "stale-revision",
             Self::ActionUnavailable => "action-unavailable",
+            Self::ControlUnavailable => "control-unavailable",
+            Self::ControlDisabled => "control-disabled",
             Self::Timeout => "timeout",
         };
         formatter.write_str(label)
@@ -531,12 +568,39 @@ mod tests {
     }
 
     #[test]
-    fn press_requests_and_structured_failures_round_trip() {
+    fn failure_code_names_are_stable() {
+        for (code, name) in [
+            (ControlFailureCode::InvalidRequest, "invalid-request"),
+            (ControlFailureCode::WrongScreen, "wrong-screen"),
+            (ControlFailureCode::StaleRevision, "stale-revision"),
+            (ControlFailureCode::ActionUnavailable, "action-unavailable"),
+            (
+                ControlFailureCode::ControlUnavailable,
+                "control-unavailable",
+            ),
+            (ControlFailureCode::ControlDisabled, "control-disabled"),
+            (ControlFailureCode::Timeout, "timeout"),
+        ] {
+            assert_eq!(code.to_string(), name);
+            assert_eq!(serde_json::to_string(&code).unwrap(), format!("\"{name}\""));
+        }
+    }
+
+    #[test]
+    fn mutation_requests_and_structured_failures_round_trip() {
         let mut request = UiPressRequest::new(UiAction::Confirm);
         request.expected_screen = Some(UiScreen::LauncherMain);
         request.expected_revision = Some(4);
         assert_eq!(
             UiPressRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+
+        let mut request = UiActivateRequest::new("launcher.settings");
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        request.expected_revision = Some(5);
+        assert_eq!(
+            UiActivateRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
 

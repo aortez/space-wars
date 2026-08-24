@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::{
-    ControlFailure, ControlFailureCode, ProtocolError, UI_PRESS_COMMAND, UI_STATE_COMMAND,
-    UiPressRequest, UiScreen, UiState,
+    ControlFailure, ControlFailureCode, ProtocolError, UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND,
+    UI_STATE_COMMAND, UiActivateRequest, UiPressRequest, UiScreen, UiState,
 };
 
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -54,6 +54,33 @@ impl ControlClient {
     pub fn ui_press(&self, request: &UiPressRequest) -> Result<UiState, ControlClientError> {
         let payload = request.to_json()?;
         self.parse_ui_state(self.request(&format!("{UI_PRESS_COMMAND}\n{payload}\n"))?)
+    }
+
+    pub fn ui_press_before(
+        &self,
+        request: &UiPressRequest,
+        deadline: Instant,
+    ) -> Result<UiState, ControlClientError> {
+        let payload = request.to_json()?;
+        self.parse_ui_state(
+            self.request_before(&format!("{UI_PRESS_COMMAND}\n{payload}\n"), deadline)?,
+        )
+    }
+
+    pub fn ui_activate(&self, request: &UiActivateRequest) -> Result<UiState, ControlClientError> {
+        let payload = request.to_json()?;
+        self.parse_ui_state(self.request(&format!("{UI_ACTIVATE_COMMAND}\n{payload}\n"))?)
+    }
+
+    pub fn ui_activate_before(
+        &self,
+        request: &UiActivateRequest,
+        deadline: Instant,
+    ) -> Result<UiState, ControlClientError> {
+        let payload = request.to_json()?;
+        self.parse_ui_state(
+            self.request_before(&format!("{UI_ACTIVATE_COMMAND}\n{payload}\n"), deadline)?,
+        )
     }
 
     pub fn wait_for_ui_state(

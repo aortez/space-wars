@@ -196,6 +196,19 @@ screen, stale revision, or unavailable action and includes the current state.
 Use `spacewars-cli ui press --help` to list valid action and screen names; the
 current screen's effective actions also appear in `ui state`.
 
+Activate a visible control by its stable inventory ID when automation should
+not depend on focus order:
+
+```sh
+spacewars-cli ui activate launcher.controls \
+  --expect-screen launcher.main --expect-revision 12
+spacewars-cli ui activate launcher.controls.touch-test --json
+```
+
+Activation runs through the same menu and host callbacks as the corresponding
+visible control. Unknown, hidden, or disabled controls fail structurally and
+include the current state.
+
 Poll for state conditions with a bounded client-side wait:
 
 ```sh

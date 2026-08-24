@@ -162,6 +162,19 @@ for a structured success or failure. `spacewars-cli ui press --help` lists all
 action and screen values, while `ui state` lists the actions accepted by the
 current screen.
 
+Activate a visible control directly by the stable ID reported by `ui state`:
+
+```sh
+spacewars-cli ui activate launcher.settings \
+  --expect-screen launcher.main --expect-revision 12
+spacewars-cli ui activate launcher.settings.renderer.next --json
+```
+
+Semantic activation uses the same menu-action and host callback paths as the
+visible controls without depending on focus order. Unknown, hidden, or disabled
+controls return structured failures with the current state; screen and revision
+guards behave the same as `ui press`.
+
 Wait for one or more state conditions without guessing at a delay:
 
 ```sh

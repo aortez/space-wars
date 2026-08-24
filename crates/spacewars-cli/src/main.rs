@@ -9,8 +9,8 @@ use engine_common::DEFAULT_CONTROL_SOCKET;
 #[cfg(test)]
 use spacewars_control::UI_STATE_SCHEMA_VERSION;
 use spacewars_control::{
-    ControlClient, ControlClientError, ControlFailure, UiAction, UiControl, UiPressRequest,
-    UiScreen, UiState, UiStatePredicate, parse_runtime_status,
+    ControlClient, ControlClientError, ControlFailure, UiAction, UiActivateRequest, UiControl,
+    UiPressRequest, UiScreen, UiState, UiStatePredicate, parse_runtime_status,
 };
 
 #[derive(Debug, Parser)]
@@ -68,6 +68,24 @@ enum UiCommand {
         expect_screen: Option<UiScreenArg>,
 
         /// Reject the action unless this exact UI revision is current.
+        #[arg(long)]
+        expect_revision: Option<u64>,
+
+        /// Emit success or structured control failures as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Activate one visible control by its stable ID.
+    Activate {
+        /// Stable control ID reported by `ui state`.
+        control_id: String,
+
+        /// Reject the activation unless this screen is currently visible.
+        #[arg(long, value_enum)]
+        expect_screen: Option<UiScreenArg>,
+
+        /// Reject the activation unless this exact UI revision is current.
         #[arg(long)]
         expect_revision: Option<u64>,
 
@@ -228,6 +246,22 @@ fn run() -> Result<(), CliError> {
         .map_err(|error| control_error(error, json)),
         Command::Ui {
             command:
+                UiCommand::Activate {
+                    control_id,
+                    expect_screen,
+                    expect_revision,
+                    json,
+                },
+        } => request_ui_activate(
+            &client,
+            control_id,
+            expect_screen.map(Into::into),
+            expect_revision,
+            json,
+        )
+        .map_err(|error| control_error(error, json)),
+        Command::Ui {
+            command:
                 UiCommand::Wait {
                     screen,
                     scenario,
@@ -300,6 +334,19 @@ fn request_ui_press(
     request.expected_screen = expected_screen;
     request.expected_revision = expected_revision;
     print_ui_state(&client.ui_press(&request)?, json)
+}
+
+fn request_ui_activate(
+    client: &ControlClient,
+    control_id: String,
+    expected_screen: Option<UiScreen>,
+    expected_revision: Option<u64>,
+    json: bool,
+) -> Result<(), ControlClientError> {
+    let mut request = UiActivateRequest::new(control_id);
+    request.expected_screen = expected_screen;
+    request.expected_revision = expected_revision;
+    print_ui_state(&client.ui_activate(&request)?, json)
 }
 
 fn request_ui_wait(
@@ -525,6 +572,34 @@ mod tests {
                     json: true,
                 }
             }
+        ));
+    }
+
+    #[test]
+    fn parses_ui_activate_with_preconditions() {
+        let args = Args::try_parse_from([
+            "spacewars-cli",
+            "ui",
+            "activate",
+            "launcher.settings",
+            "--expect-screen",
+            "launcher.main",
+            "--expect-revision",
+            "12",
+            "--json",
+        ])
+        .unwrap();
+
+        assert!(matches!(
+            args.command,
+            Command::Ui {
+                command: UiCommand::Activate {
+                    control_id,
+                    expect_screen: Some(UiScreenArg::LauncherMain),
+                    expect_revision: Some(12),
+                    json: true,
+                }
+            } if control_id == "launcher.settings"
         ));
     }
 

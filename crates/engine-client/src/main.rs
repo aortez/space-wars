@@ -15,6 +15,7 @@ mod nes_roms;
 mod raster;
 mod render;
 mod settings;
+mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;
 

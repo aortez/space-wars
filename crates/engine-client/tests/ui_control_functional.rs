@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use spacewars_control::{
     ControlClient, ControlClientError, ControlFailure, ControlFailureCode, UiAction,
-    UiPressRequest, UiScreen, UiState, UiStatePredicate,
+    UiActivateRequest, UiPressRequest, UiScreen, UiState, UiStatePredicate,
 };
 use tempfile::{Builder, TempDir};
 
@@ -55,10 +55,7 @@ fn launcher_navigation_uses_the_public_control_api() {
         );
         assert_eq!(selected_control(&state), "launcher.scenario");
 
-        state = harness.press_guarded(UiAction::Down, &state);
-        state = harness.press_guarded(UiAction::Right, &state);
-        assert_eq!(selected_control(&state), "launcher.settings");
-        state = harness.press_guarded(UiAction::Confirm, &state);
+        state = harness.activate_guarded("launcher.settings", &state);
         assert_eq!(state.screen, UiScreen::LauncherSettings);
         assert_eq!(
             control_ids(&state),
@@ -84,19 +81,16 @@ fn launcher_navigation_uses_the_public_control_api() {
         assert_eq!(state.actions, UiAction::ALL);
 
         let renderer_before = control_value(&state, "launcher.settings.renderer.next");
-        let adjusted = harness.press_guarded(UiAction::Right, &state);
+        let adjusted = harness.activate_guarded("launcher.settings.renderer.next", &state);
         assert!(adjusted.revision > state.revision);
         assert_ne!(
             control_value(&adjusted, "launcher.settings.renderer.next"),
             renderer_before
         );
-        state = harness.press_guarded(UiAction::Back, &adjusted);
+        state = harness.activate_guarded("launcher.settings.back", &adjusted);
         assert_eq!(state.screen, UiScreen::LauncherMain);
 
-        state = harness.press_guarded(UiAction::Up, &state);
-        state = harness.press_guarded(UiAction::Up, &state);
-        assert_eq!(selected_control(&state), "launcher.controls");
-        state = harness.press_guarded(UiAction::Confirm, &state);
+        state = harness.activate_guarded("launcher.controls", &state);
         assert_eq!(state.screen, UiScreen::LauncherControls);
         assert_eq!(
             control_ids(&state),
@@ -107,9 +101,7 @@ fn launcher_navigation_uses_the_public_control_api() {
             ]
         );
 
-        state = harness.press_guarded(UiAction::Down, &state);
-        assert_eq!(selected_control(&state), "launcher.controls.touch-test");
-        state = harness.press_guarded(UiAction::Confirm, &state);
+        state = harness.activate_guarded("launcher.controls.touch-test", &state);
         assert_eq!(state.screen, UiScreen::LauncherTouchTest);
         assert_eq!(control_ids(&state), ["launcher.touch-test.done"]);
         assert_eq!(state.actions, [UiAction::Back, UiAction::Controls]);
@@ -122,26 +114,34 @@ fn launcher_navigation_uses_the_public_control_api() {
         assert_eq!(unavailable.code, ControlFailureCode::ActionUnavailable);
         assert_eq!(unavailable.current_state.as_ref(), Some(&state));
 
-        state = harness.press_guarded(UiAction::Back, &state);
+        state = harness.activate_guarded("launcher.touch-test.done", &state);
         assert_eq!(state.screen, UiScreen::LauncherControls);
-        state = harness.press_guarded(UiAction::Back, &state);
+        state = harness.activate_guarded("launcher.controls.back", &state);
         assert_eq!(state.screen, UiScreen::LauncherMain);
 
-        let wrong_screen = harness.expect_press_failure(
-            UiAction::Down,
+        let wrong_screen = harness.expect_activate_failure(
+            "launcher.settings",
             Some(UiScreen::PauseMain),
             Some(state.revision),
         );
         assert_eq!(wrong_screen.code, ControlFailureCode::WrongScreen);
         assert_eq!(wrong_screen.current_state.as_ref(), Some(&state));
 
-        let stale = harness.expect_press_failure(
-            UiAction::Down,
+        let stale = harness.expect_activate_failure(
+            "launcher.settings",
             Some(UiScreen::LauncherMain),
             Some(state.revision.saturating_add(1)),
         );
         assert_eq!(stale.code, ControlFailureCode::StaleRevision);
         assert_eq!(stale.current_state.as_ref(), Some(&state));
+
+        let unavailable = harness.expect_activate_failure(
+            "launcher.missing",
+            Some(UiScreen::LauncherMain),
+            Some(state.revision),
+        );
+        assert_eq!(unavailable.code, ControlFailureCode::ControlUnavailable);
+        assert_eq!(unavailable.current_state.as_ref(), Some(&state));
 
         let unavailable = harness.expect_press_failure(
             UiAction::Back,
@@ -151,6 +151,20 @@ fn launcher_navigation_uses_the_public_control_api() {
         assert_eq!(unavailable.code, ControlFailureCode::ActionUnavailable);
         assert_eq!(unavailable.current_state.as_ref(), Some(&state));
 
+        let original_scenario = state.selected_scenario.clone();
+        state = harness.activate_until_scenario("nes", state);
+        assert!(!control_enabled(&state, "launcher.start"));
+        let disabled = harness.expect_activate_failure(
+            "launcher.start",
+            Some(UiScreen::LauncherMain),
+            Some(state.revision),
+        );
+        assert_eq!(disabled.code, ControlFailureCode::ControlDisabled);
+        assert_eq!(disabled.current_state.as_ref(), Some(&state));
+        assert_eq!(harness.state(), state);
+
+        state = harness.activate_until_scenario(&original_scenario, state);
+        assert!(control_enabled(&state, "launcher.start"));
         assert_eq!(harness.state(), state);
         harness.capture_screenshot("launcher.png");
     });
@@ -163,10 +177,8 @@ fn launcher_can_start_real_gameplay() {
         let mut state = harness.wait_until_ready();
         assert_launcher_main(&state);
 
-        state = harness.press_guarded(UiAction::Down, &state);
-        assert_eq!(selected_control(&state), "launcher.start");
         let launcher_revision = state.revision;
-        harness.press_guarded(UiAction::Confirm, &state);
+        harness.activate_guarded("launcher.start", &state);
 
         state = harness.wait_for(
             UiStatePredicate {
@@ -330,7 +342,7 @@ impl FunctionalHarness {
     }
 
     fn state(&mut self) -> UiState {
-        let result = self.client.ui_state();
+        let result = self.client.ui_state_before(request_deadline());
         self.require_state_result("ui state", result)
     }
 
@@ -350,8 +362,45 @@ impl FunctionalHarness {
             optional_screen(expected_screen),
             optional_revision(expected_revision)
         );
-        let result = self.client.ui_press(&request);
+        let result = self.client.ui_press_before(&request, request_deadline());
         self.require_state_result(&command, result)
+    }
+
+    fn activate_guarded(&mut self, control_id: &str, state: &UiState) -> UiState {
+        self.activate(control_id, Some(state.screen), Some(state.revision))
+    }
+
+    fn activate(
+        &mut self,
+        control_id: &str,
+        expected_screen: Option<UiScreen>,
+        expected_revision: Option<u64>,
+    ) -> UiState {
+        let request = activate_request(control_id, expected_screen, expected_revision);
+        let command = format!(
+            "ui activate {control_id:?} --expect-screen={} --expect-revision={}",
+            optional_screen(expected_screen),
+            optional_revision(expected_revision)
+        );
+        let result = self.client.ui_activate_before(&request, request_deadline());
+        self.require_state_result(&command, result)
+    }
+
+    fn activate_until_scenario(&mut self, target: &str, mut state: UiState) -> UiState {
+        if state.selected_scenario == target {
+            return state;
+        }
+        let mut visited = BTreeSet::from([state.selected_scenario.clone()]);
+        loop {
+            state = self.activate_guarded("launcher.scenario.next", &state);
+            if state.selected_scenario == target {
+                return state;
+            }
+            assert!(
+                visited.insert(state.selected_scenario.clone()),
+                "scenario {target:?} is not reachable through launcher.scenario.next; visited {visited:?}"
+            );
+        }
     }
 
     fn expect_press_failure(
@@ -366,7 +415,43 @@ impl FunctionalHarness {
             optional_screen(expected_screen),
             optional_revision(expected_revision)
         );
-        match self.client.ui_press(&request) {
+        match self.client.ui_press_before(&request, request_deadline()) {
+            Err(ControlClientError::Failure(failure)) => {
+                if let Some(state) = &failure.current_state {
+                    self.last_state = Some(state.clone());
+                }
+                self.history.push(json!({
+                    "elapsed_ms": self.elapsed_ms(),
+                    "command": command,
+                    "outcome": "rejected",
+                    "failure": failure,
+                }));
+                *failure
+            }
+            Ok(state) => {
+                self.record_state(&command, &state);
+                panic!("{command} succeeded, but a structured rejection was expected");
+            }
+            Err(error) => {
+                self.record_error(&command, &error);
+                panic!("{command} returned an unexpected error: {error}");
+            }
+        }
+    }
+
+    fn expect_activate_failure(
+        &mut self,
+        control_id: &str,
+        expected_screen: Option<UiScreen>,
+        expected_revision: Option<u64>,
+    ) -> ControlFailure {
+        let request = activate_request(control_id, expected_screen, expected_revision);
+        let command = format!(
+            "ui activate {control_id:?} --expect-screen={} --expect-revision={}",
+            optional_screen(expected_screen),
+            optional_revision(expected_revision)
+        );
+        match self.client.ui_activate_before(&request, request_deadline()) {
             Err(ControlClientError::Failure(failure)) => {
                 if let Some(state) = &failure.current_state {
                     self.last_state = Some(state.clone());
@@ -628,6 +713,17 @@ fn press_request(
     request
 }
 
+fn activate_request(
+    control_id: &str,
+    expected_screen: Option<UiScreen>,
+    expected_revision: Option<u64>,
+) -> UiActivateRequest {
+    let mut request = UiActivateRequest::new(control_id);
+    request.expected_screen = expected_screen;
+    request.expected_revision = expected_revision;
+    request
+}
+
 fn assert_launcher_main(state: &UiState) {
     assert_eq!(state.screen, UiScreen::LauncherMain);
     assert_eq!(state.active_scenario, None);
@@ -681,6 +777,15 @@ fn control_value<'a>(state: &'a UiState, id: &str) -> Option<&'a str> {
         .and_then(|control| control.value.as_deref())
 }
 
+fn control_enabled(state: &UiState, id: &str) -> bool {
+    state
+        .controls
+        .iter()
+        .find(|control| control.id == id)
+        .unwrap_or_else(|| panic!("{} does not expose control {id:?}", state.screen))
+        .enabled
+}
+
 fn optional_screen(screen: Option<UiScreen>) -> &'static str {
     screen.map(UiScreen::as_str).unwrap_or("none")
 }
@@ -689,6 +794,12 @@ fn optional_revision(revision: Option<u64>) -> String {
     revision
         .map(|revision| revision.to_string())
         .unwrap_or_else(|| "none".into())
+}
+
+fn request_deadline() -> Instant {
+    Instant::now()
+        .checked_add(TRANSITION_TIMEOUT)
+        .expect("functional-test request deadline must fit in Instant")
 }
 
 fn is_retryable_readiness_error(error: &ControlClientError) -> bool {

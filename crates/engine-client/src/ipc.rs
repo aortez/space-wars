@@ -18,9 +18,9 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    ControlFailure, ControlFailureCode, ProtocolError, RuntimeStatus, UI_PRESS_COMMAND,
-    UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction, UiControl, UiPressRequest, UiScreen,
-    UiState, parse_runtime_status,
+    ControlFailure, ControlFailureCode, ProtocolError, RuntimeStatus, UI_ACTIVATE_COMMAND,
+    UI_PRESS_COMMAND, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction, UiActivateRequest,
+    UiControl, UiPressRequest, UiScreen, UiState, parse_runtime_status,
 };
 
 use crate::MainWindow;
@@ -43,6 +43,7 @@ enum ControlCommand {
     Status,
     UiState,
     UiPress(UiPressRequest),
+    UiActivate(UiActivateRequest),
     HostBenchmark,
 }
 
@@ -260,16 +261,29 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
         }
         Some(UI_PRESS_COMMAND) => {
             let payload = lines.next().ok_or_else(|| {
-                invalid_press_request("ui press requires a JSON request on the second line")
+                invalid_mutation_request("ui press requires a JSON request on the second line")
             })?;
             if lines.next().is_some() {
-                return Err(invalid_press_request(
+                return Err(invalid_mutation_request(
                     "ui press accepts exactly one JSON request line",
                 ));
             }
             UiPressRequest::from_json(payload)
                 .map(ControlCommand::UiPress)
-                .map_err(|error| invalid_press_request(error.to_string()))
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
+        Some(UI_ACTIVATE_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("ui activate requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "ui activate accepts exactly one JSON request line",
+                ));
+            }
+            UiActivateRequest::from_json(payload)
+                .map(ControlCommand::UiActivate)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
         }
         Some("host benchmark") => {
             if lines.next().is_some() {
@@ -285,7 +299,7 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
 }
 
 #[cfg(unix)]
-fn invalid_press_request(message: impl Into<String>) -> CommandParseError {
+fn invalid_mutation_request(message: impl Into<String>) -> CommandParseError {
     CommandParseError::Structured(Box::new(ControlFailure::new(
         ControlFailureCode::InvalidRequest,
         message,
@@ -315,6 +329,9 @@ fn handle_request(
         }
         ControlCommand::UiPress(press) => {
             handle_ui_press(window, press, request.response, ui_state_tracker);
+        }
+        ControlCommand::UiActivate(activation) => {
+            handle_ui_activate(window, activation, request.response, ui_state_tracker);
         }
         ControlCommand::HostBenchmark => {
             if !window.get_scenario_benchmark_available() {
@@ -371,32 +388,46 @@ fn handle_ui_press(
 }
 
 #[cfg(unix)]
-fn validate_ui_press(request: &UiPressRequest, state: &UiState) -> Result<(), Box<ControlFailure>> {
-    if let Some(expected) = request.expected_screen
-        && state.screen != expected
-    {
-        return Err(Box::new(ControlFailure::new(
-            ControlFailureCode::WrongScreen,
-            format!(
-                "expected screen {expected}, but current screen is {}; inspect `spacewars-cli ui state` and retry",
-                state.screen
-            ),
-            Some(state.clone()),
-        )));
+fn handle_ui_activate(
+    window: &MainWindow,
+    request: UiActivateRequest,
+    response: ResponseWriter,
+    ui_state_tracker: &mut UiStateTracker,
+) {
+    let state = match ui_state(window, ui_state_tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+
+    if let Err(failure) = validate_ui_activate(&request, &state) {
+        response.control_failure(*failure);
+        return;
     }
 
-    if let Some(expected) = request.expected_revision
-        && state.revision != expected
-    {
-        return Err(Box::new(ControlFailure::new(
-            ControlFailureCode::StaleRevision,
+    if !crate::ui_activation::activate(window, &request.control_id) {
+        response.control_failure(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
             format!(
-                "expected UI revision {expected}, but current revision is {}; inspect `spacewars-cli ui state` and retry",
-                state.revision
+                "control {:?} is visible and enabled on {}, but has no semantic activation mapping",
+                request.control_id, state.screen
             ),
-            Some(state.clone()),
-        )));
+            Some(state),
+        ));
+        return;
     }
+
+    match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn validate_ui_press(request: &UiPressRequest, state: &UiState) -> Result<(), Box<ControlFailure>> {
+    validate_ui_preconditions(request.expected_screen, request.expected_revision, state)?;
 
     if !state.actions.contains(&request.action) {
         let available = if state.actions.is_empty() {
@@ -414,6 +445,87 @@ fn validate_ui_press(request: &UiPressRequest, state: &UiState) -> Result<(), Bo
             format!(
                 "action {} is unavailable on {}; available actions: {available}",
                 request.action, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_ui_activate(
+    request: &UiActivateRequest,
+    state: &UiState,
+) -> Result<(), Box<ControlFailure>> {
+    validate_ui_preconditions(request.expected_screen, request.expected_revision, state)?;
+
+    let Some(control) = state
+        .controls
+        .iter()
+        .find(|control| control.id == request.control_id)
+    else {
+        let available = if state.controls.is_empty() {
+            "none".into()
+        } else {
+            state
+                .controls
+                .iter()
+                .map(|control| control.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
+            format!(
+                "control {:?} is unavailable on {}; visible controls: {available}",
+                request.control_id, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    };
+
+    if !control.enabled {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ControlDisabled,
+            format!(
+                "control {:?} is disabled on {}; inspect `spacewars-cli ui state` and retry",
+                request.control_id, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_ui_preconditions(
+    expected_screen: Option<UiScreen>,
+    expected_revision: Option<u64>,
+    state: &UiState,
+) -> Result<(), Box<ControlFailure>> {
+    if let Some(expected) = expected_screen
+        && state.screen != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::WrongScreen,
+            format!(
+                "expected screen {expected}, but current screen is {}; inspect `spacewars-cli ui state` and retry",
+                state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    if let Some(expected) = expected_revision
+        && state.revision != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::StaleRevision,
+            format!(
+                "expected UI revision {expected}, but current revision is {}; inspect `spacewars-cli ui state` and retry",
+                state.revision
             ),
             Some(state.clone()),
         )));
@@ -537,6 +649,7 @@ mod tests {
             ControlCommand::Status
             | ControlCommand::UiState
             | ControlCommand::UiPress(_)
+            | ControlCommand::UiActivate(_)
             | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
@@ -584,6 +697,33 @@ mod tests {
             "ui press\n",
             "ui press\nnot-json\n",
             "ui press\n{}\nextra\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(failure))
+                    if failure.code == ControlFailureCode::InvalidRequest
+            ));
+        }
+    }
+
+    #[test]
+    fn parse_ui_activate_command_and_reject_invalid_payloads_structurally() {
+        let request = UiActivateRequest {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            control_id: "launcher.settings".into(),
+            expected_screen: Some(UiScreen::LauncherMain),
+            expected_revision: Some(12),
+        };
+        let body = format!("ui activate\n{}\n", request.to_json().unwrap());
+        assert!(matches!(
+            parse_command(&body),
+            Ok(ControlCommand::UiActivate(parsed)) if parsed == request
+        ));
+
+        for body in [
+            "ui activate\n",
+            "ui activate\nnot-json\n",
+            "ui activate\n{}\nextra\n",
         ] {
             assert!(matches!(
                 parse_command(body),
@@ -693,6 +833,53 @@ mod tests {
 
         request.action = UiAction::Start;
         assert_eq!(validate_ui_press(&request, &state), Ok(()));
+    }
+
+    #[test]
+    fn ui_activate_validation_checks_preconditions_visibility_and_enabled_state() {
+        let mut state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 7,
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm, UiAction::Start],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut request = UiActivateRequest::new("launcher.start");
+        request.expected_screen = Some(UiScreen::LauncherSettings);
+        request.expected_revision = Some(6);
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::WrongScreen
+        );
+
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::StaleRevision
+        );
+
+        request.expected_revision = Some(7);
+        request.control_id = "launcher.missing".into();
+        let unavailable = validate_ui_activate(&request, &state).unwrap_err();
+        assert_eq!(unavailable.code, ControlFailureCode::ControlUnavailable);
+        assert_eq!(unavailable.current_state, Some(state.clone()));
+
+        request.control_id = "launcher.start".into();
+        state.controls[0].enabled = false;
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::ControlDisabled
+        );
+
+        state.controls[0].enabled = true;
+        assert_eq!(validate_ui_activate(&request, &state), Ok(()));
     }
 
     #[test]

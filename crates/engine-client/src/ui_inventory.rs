@@ -662,6 +662,48 @@ mod tests {
     }
 
     #[test]
+    fn every_enabled_control_has_a_semantic_activation_mapping() {
+        for scenario in ["spacewars", "pizza", "rover-lab", "falling", "nes"] {
+            let context = context(scenario);
+            for screen in [
+                UiScreen::LauncherMain,
+                UiScreen::LauncherSettings,
+                UiScreen::LauncherControls,
+                UiScreen::LauncherTouchTest,
+            ] {
+                assert_inventory_is_activatable(screen, &context);
+            }
+        }
+
+        for benchmark_available in [false, true] {
+            let mut context = context("spacewars");
+            context.benchmark_available = benchmark_available;
+            for screen in [
+                UiScreen::Gameplay,
+                UiScreen::PauseMain,
+                UiScreen::PauseControls,
+                UiScreen::GameOver,
+            ] {
+                assert_inventory_is_activatable(screen, &context);
+            }
+        }
+    }
+
+    fn assert_inventory_is_activatable(screen: UiScreen, context: &UiInventoryContext) {
+        for control in inventory_for_screen(screen, context)
+            .controls
+            .into_iter()
+            .filter(|control| control.enabled)
+        {
+            assert!(
+                crate::ui_activation::supports(&control.id, context.benchmark_available),
+                "{} on {screen} has no semantic activation mapping",
+                control.id
+            );
+        }
+    }
+
+    #[test]
     fn errors_follow_the_screen_that_displays_them() {
         let mut context = context("spacewars");
         context.launcher_error = Some("launcher failed".into());

@@ -19,11 +19,12 @@ The initial workflows verify:
 
 - launcher state, inventory, accepted actions, and reachability of every menu
   choice;
+- ID-based activation of visible controls without depending on focus order;
 - opening, changing, and closing Spacewars Settings;
 - opening Controls, entering and leaving Touch Test, and returning to the
   launcher;
-- wrong-screen, stale-revision, and unavailable-action rejections without state
-  mutation;
+- wrong-screen, stale-revision, unavailable-action, unavailable-control, and
+  disabled-control rejections without state mutation;
 - launcher and gameplay screenshots; and
 - starting a real deterministic Spacewars scenario and observing `gameplay`
   with a scenario instance revision.
