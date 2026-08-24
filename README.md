@@ -201,17 +201,23 @@ cargo run --release -p engine-agent -- \
 ```
 
 Controller versions are explicit (`rule-v5`) so old and new brains can be run
-side by side. `rule` remains a convenience alias for the current default, but
-named suites and saved comparisons pin a concrete version. Reports record the
-identity returned by the instantiated brain rather than inferring it from the
-CLI spelling.
+side by side. The bounded port-replanning candidate is selectable as
+`rule-v6`, and the persistent multi-body escape candidate is `rule-v7`.
+`rule` remains a convenience alias for the V5 default while candidates are
+evaluated. Named suites and saved comparisons pin a concrete version. Reports
+record the identity returned by the instantiated brain rather than inferring
+it from the CLI spelling.
 
 Episode reports include the winner or tick-limit outcome, captures, ship
 losses, rebuilds, eliminations, collision incidents, docking/departure outcomes,
-final planet/form/health state, strategic objective selections and tick counts,
-canonical action count, and a deterministic trace fingerprint. The batch
-summary adds winner counts and measured ticks and simulated seconds per wall
-second.
+final planet/form/health state, strategic objective selections, port replans,
+multi-body escape activations, goal tick counts, canonical action count, and a
+deterministic trace fingerprint. Health telemetry records cumulative damage and
+healing in normalized full-health-bar units, the portion observed during body
+contact, minimum and mean ship health, ship/pod exposure, damaged and
+critical-health totals and longest streaks, mechanical body-contact ticks, and
+the longest sustained body contact. The batch summary adds winner counts and
+measured ticks and simulated seconds per wall second.
 `--seed-step` changes the interval between seeds; setting it to zero repeats
 the same seed for reproducibility or throughput measurements. Release builds
 are recommended whenever performance numbers matter.
@@ -223,13 +229,13 @@ cargo run --release -p engine-agent -- --suite navigation-v1
 ```
 
 `navigation-v1` fixes seeds 0 through 5, `rule-v5` self-play, 36,000 ticks per
-episode, no random asteroids, and very high ship health. Planet and ship
-collisions remain enabled and are measured, but they should not terminate a
-navigation episode. Body/ship contact metrics re-arm only after 30 quiet ticks,
-so a sustained or briefly flickering scrape counts as one incident. Docking
-metrics report contact entries and exits. A capture/rebuild departure succeeds
-only after the craft clears the planet surface by 90 world units beyond its
-collision hull.
+episode, no random asteroids, and 200 ship health (twice the normal value).
+Planet and ship collisions remain enabled and are measured. Body/ship contact
+metrics re-arm only after 30 quiet ticks, so a sustained or briefly flickering
+scrape counts as one incident; contact-duration metrics separately expose long
+scrapes. Docking metrics report contact entries and exits. A capture/rebuild
+departure succeeds only after the craft clears the planet surface by 90 world
+units beyond its collision hull.
 
 Run the ordinary-health strategy comparison suite:
 
@@ -263,8 +269,7 @@ with Rust 1.89 on Linux. A new brain version should leave these v5 manifests
 unchanged; update a manifest only when an intentional shared scenario or
 physics change means the historical workload itself has changed.
 
-After registering a future controller such as `rule-v6`, compare it with v5 in
-one paired, side-neutral run:
+Compare the V6 candidate with V5 in one paired, side-neutral strategy run:
 
 ```sh
 cargo run --locked --release -p engine-agent -- \
@@ -279,8 +284,28 @@ candidate roles. `--output json` retains all individual episodes for paired
 offline analysis. Wall-clock throughput remains informational rather than a
 correctness gate.
 
-The profile's four seeds are a quick smoke comparison. Broaden it without
-changing the world contract when a candidate is ready for a longer run:
+Compare V7 directly with the V6 behavior it composes:
+
+```sh
+cargo run --locked --release -p engine-agent -- \
+  --compare strategy-v1 --baseline rule-v6 --candidate rule-v7
+```
+
+V7 observes V6's ordinary body avoidance and takes over only after the chosen
+body switches twice within a short simultaneous-threat window. Its cumulative
+activation count is included in strategy metrics, so a comparison shows how
+often the added behavior actually ran.
+
+Use the same paired method with the long, double-health navigation workload:
+
+```sh
+cargo run --locked --release -p engine-agent -- \
+  --compare navigation-v1 --baseline rule-v5 --candidate rule-v6
+```
+
+The navigation profile's six seeds are a quick smoke comparison. Broaden it
+without changing the world contract when a candidate is ready for a longer
+run:
 
 ```sh
 cargo run --locked --release -p engine-agent -- \
@@ -304,10 +329,12 @@ The event trace records strategic and brain/port transitions, captures, safe
 departures, and a five-second heartbeat while a captured departure remains
 unfinished. Each sample includes the persistent objective and selection
 reason, docking state, surface clearance, outward speed, world velocity,
-guidance telemetry, body-avoidance progress and escape-assist state, contacts,
-and the emitted intent. `--output json` includes the same structured events for
-offline comparison. Tracing is available on custom batches rather than named
-suites so the suite contract and its normal report size remain fixed.
+guidance telemetry, body-avoidance progress and escape-assist state,
+port-attempt age/stall/obstruction, cumulative replans, active target cooldown,
+multi-body escape state/age/body count/activation count, contacts, and the
+emitted intent. `--output json` includes the same structured events for offline
+comparison. Tracing is available on custom batches rather than named suites so
+the suite contract and its normal report size remain fixed.
 
 Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
 cartridge. Press `Start` + `Select` together for the host controls menu so a

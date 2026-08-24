@@ -25,16 +25,16 @@ use spacewars_ai::{
     ShipBrain, StrategicGoal, StrategyTelemetry,
 };
 
-pub const REPORT_SCHEMA_VERSION: u32 = 3;
+pub const REPORT_SCHEMA_VERSION: u32 = 4;
 pub const BASELINE_SCHEMA_VERSION: u32 = 1;
-pub const POLICY_COMPARISON_SCHEMA_VERSION: u32 = 1;
+pub const POLICY_COMPARISON_SCHEMA_VERSION: u32 = 2;
 pub const NAVIGATION_V1_SUITE_ID: &str = "navigation_v1";
 pub const NAVIGATION_V1_SEEDS: [u64; 6] = [0, 1, 2, 3, 4, 5];
 pub const NAVIGATION_V1_MAX_TICKS: u64 = 36_000;
 pub const STRATEGY_V1_SUITE_ID: &str = "strategy_v1";
 pub const STRATEGY_V1_SEEDS: [u64; 4] = [0, 1, 2, 3];
 pub const STRATEGY_V1_MAX_TICKS: u64 = 18_000;
-const NAVIGATION_HEALTH_PERCENT: u32 = 100_000;
+const NAVIGATION_HEALTH_PERCENT: u32 = 200;
 const NAVIGATION_SAFE_DEPARTURE_CLEARANCE: f32 = 90.0;
 const CONTACT_INCIDENT_REARM_TICKS: u64 = 30;
 const NAVIGATION_TRACE_HEARTBEAT_TICKS: u64 = 300;
@@ -46,6 +46,8 @@ const STRATEGY_V1_BASELINE_JSON: &str = include_str!("../baselines/strategy-v1.j
 pub enum ControllerKind {
     Idle,
     RuleV5,
+    RuleV6,
+    RuleV7,
 }
 
 impl ControllerKind {
@@ -53,6 +55,8 @@ impl ControllerKind {
         match self {
             Self::Idle => None,
             Self::RuleV5 => Some(BuiltInPolicy::RuleV5),
+            Self::RuleV6 => Some(BuiltInPolicy::RuleV6),
+            Self::RuleV7 => Some(BuiltInPolicy::RuleV7),
         }
     }
 
@@ -60,6 +64,8 @@ impl ControllerKind {
         match self {
             Self::Idle => "idle_v1",
             Self::RuleV5 => BuiltInPolicy::RuleV5.descriptor().policy_id,
+            Self::RuleV6 => BuiltInPolicy::RuleV6.descriptor().policy_id,
+            Self::RuleV7 => BuiltInPolicy::RuleV7.descriptor().policy_id,
         }
     }
 }
@@ -154,12 +160,14 @@ impl EvaluationSuite {
 /// Unlike [`EvaluationSuite`], a profile does not pin either controller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PolicyComparisonProfile {
+    NavigationV1,
     StrategyV1,
 }
 
 impl PolicyComparisonProfile {
     pub const fn id(self) -> &'static str {
         match self {
+            Self::NavigationV1 => NAVIGATION_V1_SUITE_ID,
             Self::StrategyV1 => STRATEGY_V1_SUITE_ID,
         }
     }
@@ -170,6 +178,16 @@ impl PolicyComparisonProfile {
         candidate: ControllerKind,
     ) -> PolicyComparisonConfig {
         match self {
+            Self::NavigationV1 => PolicyComparisonConfig {
+                workload_id: Some(NAVIGATION_V1_SUITE_ID),
+                start_seed: NAVIGATION_V1_SEEDS[0],
+                seed_step: 1,
+                episodes: NAVIGATION_V1_SEEDS.len() as u32,
+                preset: SpacewarsPreset::Navigation,
+                baseline,
+                candidate,
+                max_ticks: NAVIGATION_V1_MAX_TICKS,
+            },
             Self::StrategyV1 => PolicyComparisonConfig {
                 workload_id: Some(STRATEGY_V1_SUITE_ID),
                 start_seed: STRATEGY_V1_SEEDS[0],
@@ -337,6 +355,16 @@ pub struct NavigationTraceEvent {
     pub avoidance_emergency_escape_assist: bool,
     pub target_planet: Option<usize>,
     pub port_phase: Option<PortNavigationPhase>,
+    pub port_attempt_age_ticks: u64,
+    pub port_attempt_stalled_ticks: u64,
+    pub port_attempt_obstructed_ticks: u64,
+    pub port_replan_count: u64,
+    pub cooled_port_planet: Option<usize>,
+    pub port_cooldown_remaining_ticks: u64,
+    pub multi_body_escape_active: bool,
+    pub multi_body_escape_age_ticks: u64,
+    pub multi_body_escape_body_count: u32,
+    pub multi_body_escape_activations: u64,
     pub docked_planet: Option<usize>,
     pub focus_planet: Option<usize>,
     pub pending_capture_planet: Option<usize>,
@@ -363,6 +391,8 @@ pub struct NavigationTraceEvent {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct StrategyMetrics {
     pub objective_selections: u64,
+    pub port_replans: u64,
+    pub multi_body_escape_activations: u64,
     pub idle_ticks: u64,
     pub survive_ticks: u64,
     pub attack_ticks: u64,
@@ -388,6 +418,8 @@ impl StrategyMetrics {
 
     fn add_assign(&mut self, other: Self) {
         self.objective_selections += other.objective_selections;
+        self.port_replans += other.port_replans;
+        self.multi_body_escape_activations += other.multi_body_escape_activations;
         self.idle_ticks += other.idle_ticks;
         self.survive_ticks += other.survive_ticks;
         self.attack_ticks += other.attack_ticks;
@@ -398,7 +430,79 @@ impl StrategyMetrics {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+/// Health and sustained-contact measurements for one controller seat.
+///
+/// Damage and healing are normalized to the configured maximum ship life, so
+/// `1.0` represents one complete health bar and cumulative values may exceed
+/// one after repairs or rebuild cycles. Escape-pod rebuild progress is not
+/// counted as ship damage or healing.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct HealthMetrics {
+    pub damage_taken_fraction: f64,
+    pub damage_while_in_body_contact_fraction: f64,
+    pub healing_received_fraction: f64,
+    pub minimum_life_fraction: f32,
+    pub mean_ship_life_fraction: f64,
+    pub ship_ticks: u64,
+    pub pod_ticks: u64,
+    pub damaged_ticks: u64,
+    pub critical_ticks: u64,
+    pub longest_damaged_streak_ticks: u64,
+    pub longest_critical_streak_ticks: u64,
+    pub body_contact_ticks: u64,
+    pub longest_body_contact_ticks: u64,
+}
+
+impl Default for HealthMetrics {
+    fn default() -> Self {
+        Self {
+            damage_taken_fraction: 0.0,
+            damage_while_in_body_contact_fraction: 0.0,
+            healing_received_fraction: 0.0,
+            minimum_life_fraction: 1.0,
+            mean_ship_life_fraction: 1.0,
+            ship_ticks: 0,
+            pod_ticks: 0,
+            damaged_ticks: 0,
+            critical_ticks: 0,
+            longest_damaged_streak_ticks: 0,
+            longest_critical_streak_ticks: 0,
+            body_contact_ticks: 0,
+            longest_body_contact_ticks: 0,
+        }
+    }
+}
+
+impl HealthMetrics {
+    fn add_episode(&mut self, other: Self) {
+        let combined_ship_ticks = self.ship_ticks + other.ship_ticks;
+        if combined_ship_ticks > 0 {
+            self.mean_ship_life_fraction = (self.mean_ship_life_fraction * self.ship_ticks as f64
+                + other.mean_ship_life_fraction * other.ship_ticks as f64)
+                / combined_ship_ticks as f64;
+        }
+        self.damage_taken_fraction += other.damage_taken_fraction;
+        self.damage_while_in_body_contact_fraction += other.damage_while_in_body_contact_fraction;
+        self.healing_received_fraction += other.healing_received_fraction;
+        self.minimum_life_fraction = self.minimum_life_fraction.min(other.minimum_life_fraction);
+        self.ship_ticks = combined_ship_ticks;
+        self.pod_ticks += other.pod_ticks;
+        self.damaged_ticks += other.damaged_ticks;
+        self.critical_ticks += other.critical_ticks;
+        self.longest_damaged_streak_ticks = self
+            .longest_damaged_streak_ticks
+            .max(other.longest_damaged_streak_ticks);
+        self.longest_critical_streak_ticks = self
+            .longest_critical_streak_ticks
+            .max(other.longest_critical_streak_ticks);
+        self.body_contact_ticks += other.body_contact_ticks;
+        self.longest_body_contact_ticks = self
+            .longest_body_contact_ticks
+            .max(other.longest_body_contact_ticks);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PolicyMetrics {
     pub controller: ControllerKind,
     pub policy_id: &'static str,
@@ -411,6 +515,7 @@ pub struct PolicyMetrics {
     pub sun_impact_losses: u64,
     pub rebuilds: u64,
     pub body_contacts: u64,
+    pub health: HealthMetrics,
 }
 
 impl PolicyMetrics {
@@ -426,6 +531,7 @@ impl PolicyMetrics {
             sun_impact_losses: 0,
             rebuilds: 0,
             body_contacts: 0,
+            health: HealthMetrics::default(),
         }
     }
 }
@@ -456,6 +562,7 @@ pub struct EpisodeSummary {
     pub final_planet_counts: [usize; SPACEWARS_PLAYER_COUNT],
     pub final_ship_forms: [ShipForm; SPACEWARS_PLAYER_COUNT],
     pub final_life_fractions: [f32; SPACEWARS_PLAYER_COUNT],
+    pub health: [HealthMetrics; SPACEWARS_PLAYER_COUNT],
     pub strategy: [StrategyMetrics; SPACEWARS_PLAYER_COUNT],
     pub actions_emitted: u64,
     pub trace_sha256: String,
@@ -483,6 +590,7 @@ pub struct BatchSummary {
     pub port_departures: [u64; SPACEWARS_PLAYER_COUNT],
     pub safe_capture_departures: [u64; SPACEWARS_PLAYER_COUNT],
     pub safe_rebuild_departures: [u64; SPACEWARS_PLAYER_COUNT],
+    pub health: [HealthMetrics; SPACEWARS_PLAYER_COUNT],
     pub strategy: [StrategyMetrics; SPACEWARS_PLAYER_COUNT],
     pub policy_metrics: Vec<PolicyMetrics>,
     pub wall_seconds: f64,
@@ -623,7 +731,7 @@ impl std::error::Error for BaselineVerificationError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ComparedPolicyMetrics {
     pub controller: ControllerDescriptor,
     pub episodes: u32,
@@ -645,6 +753,7 @@ pub struct ComparedPolicyMetrics {
     pub safe_capture_departures: u64,
     pub safe_rebuild_departures: u64,
     pub final_planet_count_sum: u64,
+    pub health: HealthMetrics,
     pub strategy: StrategyMetrics,
 }
 
@@ -671,6 +780,7 @@ impl ComparedPolicyMetrics {
             safe_capture_departures: 0,
             safe_rebuild_departures: 0,
             final_planet_count_sum: 0,
+            health: HealthMetrics::default(),
             strategy: StrategyMetrics::default(),
         }
     }
@@ -700,11 +810,12 @@ impl ComparedPolicyMetrics {
         self.safe_capture_departures += episode.safe_capture_departures[player];
         self.safe_rebuild_departures += episode.safe_rebuild_departures[player];
         self.final_planet_count_sum += episode.final_planet_counts[player] as u64;
+        self.health.add_episode(episode.health[player]);
         self.strategy.add_assign(episode.strategy[player]);
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PolicyComparisonSummary {
     pub seed_pairs: u32,
     pub episode_runs: u32,
@@ -827,13 +938,18 @@ struct StrategyMetricTracker {
 }
 
 impl StrategyMetricTracker {
-    fn observe(&mut self, telemetry: StrategyTelemetry) {
-        let identity = telemetry.into();
+    fn observe(&mut self, telemetry: BrainTelemetry) {
+        let identity = telemetry.strategy.into();
         if self.previous != Some(identity) {
             self.metrics.objective_selections += 1;
             self.previous = Some(identity);
         }
-        self.metrics.observe_goal(telemetry.goal);
+        self.metrics.port_replans = self.metrics.port_replans.max(telemetry.port_replan_count);
+        self.metrics.multi_body_escape_activations = self
+            .metrics
+            .multi_body_escape_activations
+            .max(telemetry.multi_body_escape_activations);
+        self.metrics.observe_goal(telemetry.strategy.goal);
     }
 }
 
@@ -847,6 +963,9 @@ struct NavigationTraceSemantic {
     avoidance_emergency_escape_assist: bool,
     target_planet: Option<usize>,
     port_phase: Option<PortNavigationPhase>,
+    port_replan_count: u64,
+    multi_body_escape_active: bool,
+    multi_body_escape_activations: u64,
     docked_planet: Option<usize>,
 }
 
@@ -913,6 +1032,9 @@ impl NavigationTraceCollector {
             avoidance_emergency_escape_assist: telemetry.avoidance_emergency_escape_assist,
             target_planet: telemetry.target_planet.map(|planet| planet.index()),
             port_phase: telemetry.port_phase,
+            port_replan_count: telemetry.port_replan_count,
+            multi_body_escape_active: telemetry.multi_body_escape_active,
+            multi_body_escape_activations: telemetry.multi_body_escape_activations,
             docked_planet,
         };
         let captured_planet = self.capture_transition(state);
@@ -983,6 +1105,16 @@ impl NavigationTraceCollector {
                 avoidance_emergency_escape_assist: telemetry.avoidance_emergency_escape_assist,
                 target_planet: semantic.target_planet,
                 port_phase: telemetry.port_phase,
+                port_attempt_age_ticks: telemetry.port_attempt_age_ticks,
+                port_attempt_stalled_ticks: telemetry.port_attempt_stalled_ticks,
+                port_attempt_obstructed_ticks: telemetry.port_attempt_obstructed_ticks,
+                port_replan_count: telemetry.port_replan_count,
+                cooled_port_planet: telemetry.cooled_port_planet.map(|planet| planet.index()),
+                port_cooldown_remaining_ticks: telemetry.port_cooldown_remaining_ticks,
+                multi_body_escape_active: telemetry.multi_body_escape_active,
+                multi_body_escape_age_ticks: telemetry.multi_body_escape_age_ticks,
+                multi_body_escape_body_count: telemetry.multi_body_escape_body_count,
+                multi_body_escape_activations: telemetry.multi_body_escape_activations,
                 docked_planet,
                 focus_planet,
                 pending_capture_planet: pending_capture.map(|pending| pending.planet),
@@ -1087,6 +1219,116 @@ fn trace_planet_geometry(
     })
 }
 
+#[derive(Debug, Clone, Copy)]
+struct PlayerHealthTracker {
+    previous_form: ShipForm,
+    previous_life_fraction: f32,
+    damaged_streak: u64,
+    critical_streak: u64,
+    body_contact_streak: u64,
+    metrics: HealthMetrics,
+}
+
+impl PlayerHealthTracker {
+    fn new(form: ShipForm, life: f32, life_max: f32) -> Self {
+        let life_fraction = normalized_health_fraction(life, life_max);
+        let mut metrics = HealthMetrics::default();
+        if form == ShipForm::Ship {
+            metrics.minimum_life_fraction = life_fraction;
+        }
+        Self {
+            previous_form: form,
+            previous_life_fraction: life_fraction,
+            damaged_streak: 0,
+            critical_streak: 0,
+            body_contact_streak: 0,
+            metrics,
+        }
+    }
+
+    fn observe(&mut self, form: ShipForm, life: f32, life_max: f32, body_contact: bool) {
+        let life_fraction = normalized_health_fraction(life, life_max);
+        let mut damage_taken = 0.0;
+        match (self.previous_form, form) {
+            (ShipForm::Ship, ShipForm::Ship) => {
+                let change = life_fraction - self.previous_life_fraction;
+                if change < 0.0 {
+                    damage_taken = f64::from(-change);
+                } else {
+                    self.metrics.healing_received_fraction += f64::from(change);
+                }
+            }
+            (ShipForm::Ship, ShipForm::EscapePod) => {
+                // Count destruction as consuming the ship's remaining health,
+                // but do not count any overkill or later pod rebuild progress.
+                damage_taken = f64::from(self.previous_life_fraction.max(0.0));
+                self.metrics.minimum_life_fraction = 0.0;
+            }
+            (ShipForm::EscapePod, ShipForm::Ship | ShipForm::EscapePod) => {}
+        }
+        self.metrics.damage_taken_fraction += damage_taken;
+        if body_contact {
+            self.metrics.damage_while_in_body_contact_fraction += damage_taken;
+        }
+
+        if form == ShipForm::Ship {
+            let previous_ship_ticks = self.metrics.ship_ticks;
+            self.metrics.ship_ticks += 1;
+            self.metrics.mean_ship_life_fraction = (self.metrics.mean_ship_life_fraction
+                * previous_ship_ticks as f64
+                + f64::from(life_fraction))
+                / self.metrics.ship_ticks as f64;
+            self.metrics.minimum_life_fraction =
+                self.metrics.minimum_life_fraction.min(life_fraction);
+            if life_fraction < 1.0 - f32::EPSILON {
+                self.metrics.damaged_ticks += 1;
+                self.damaged_streak = self.damaged_streak.saturating_add(1);
+                self.metrics.longest_damaged_streak_ticks = self
+                    .metrics
+                    .longest_damaged_streak_ticks
+                    .max(self.damaged_streak);
+            } else {
+                self.damaged_streak = 0;
+            }
+            if life_fraction <= 0.5 {
+                self.metrics.critical_ticks += 1;
+                self.critical_streak = self.critical_streak.saturating_add(1);
+                self.metrics.longest_critical_streak_ticks = self
+                    .metrics
+                    .longest_critical_streak_ticks
+                    .max(self.critical_streak);
+            } else {
+                self.critical_streak = 0;
+            }
+        } else {
+            self.metrics.pod_ticks += 1;
+            self.damaged_streak = 0;
+            self.critical_streak = 0;
+        }
+
+        if body_contact {
+            self.body_contact_streak = self.body_contact_streak.saturating_add(1);
+            self.metrics.body_contact_ticks += 1;
+            self.metrics.longest_body_contact_ticks = self
+                .metrics
+                .longest_body_contact_ticks
+                .max(self.body_contact_streak);
+        } else {
+            self.body_contact_streak = 0;
+        }
+        self.previous_form = form;
+        self.previous_life_fraction = life_fraction;
+    }
+}
+
+fn normalized_health_fraction(life: f32, life_max: f32) -> f32 {
+    if life_max > 0.0 {
+        (life / life_max).clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
 #[derive(Debug)]
 struct TransitionTracker {
     previous_planet_owners: Vec<Option<usize>>,
@@ -1111,6 +1353,7 @@ struct TransitionTracker {
     port_departures: [u64; SPACEWARS_PLAYER_COUNT],
     safe_capture_departures: [u64; SPACEWARS_PLAYER_COUNT],
     safe_rebuild_departures: [u64; SPACEWARS_PLAYER_COUNT],
+    health: [PlayerHealthTracker; SPACEWARS_PLAYER_COUNT],
 }
 
 impl TransitionTracker {
@@ -1146,6 +1389,10 @@ impl TransitionTracker {
             port_departures: [0; SPACEWARS_PLAYER_COUNT],
             safe_capture_departures: [0; SPACEWARS_PLAYER_COUNT],
             safe_rebuild_departures: [0; SPACEWARS_PLAYER_COUNT],
+            health: std::array::from_fn(|player| {
+                let ship = &state.ships[player];
+                PlayerHealthTracker::new(ship.form, ship.life, ship.life_max)
+            }),
         }
     }
 
@@ -1171,6 +1418,11 @@ impl TransitionTracker {
         }
 
         let body_collisions = mechanical_body_contacts(state);
+        for player in 0..SPACEWARS_PLAYER_COUNT {
+            let ship = &state.ships[player];
+            let body_contact = body_collisions.iter().any(|contact| contact.ship == player);
+            self.health[player].observe(ship.form, ship.life, ship.life_max, body_contact);
+        }
         for contact in
             rearmed_contacts(&body_collisions, &mut self.body_contact_history, state.tick)
         {
@@ -1389,7 +1641,7 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
             let actor = PlayerId::from_index(player).expect("Spacewars has exactly two players");
             let intent = controller.intent(&state, actor)?;
             let telemetry = controller.telemetry();
-            strategy_trackers[player].observe(telemetry.strategy);
+            strategy_trackers[player].observe(telemetry);
             if config.trace_player == Some(actor) {
                 if let Some(collector) = &mut navigation_trace {
                     collector.observe(&state, telemetry, intent, false);
@@ -1445,12 +1697,9 @@ pub fn run_episode(config: EpisodeConfig) -> Result<EpisodeSummary, RunError> {
         final_ship_forms: std::array::from_fn(|player| state.ships[player].form),
         final_life_fractions: std::array::from_fn(|player| {
             let ship = &state.ships[player];
-            if ship.life_max > 0.0 {
-                (ship.life / ship.life_max).clamp(0.0, 1.0)
-            } else {
-                0.0
-            }
+            normalized_health_fraction(ship.life, ship.life_max)
         }),
+        health: transitions.health.map(|tracker| tracker.metrics),
         strategy: strategy_trackers.map(|tracker| tracker.metrics),
         actions_emitted,
         trace_sha256: format!("{:x}", trace.finalize()),
@@ -1645,6 +1894,7 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
     let mut port_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut safe_capture_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
     let mut safe_rebuild_departures = [0_u64; SPACEWARS_PLAYER_COUNT];
+    let mut health = [HealthMetrics::default(); SPACEWARS_PLAYER_COUNT];
     let mut strategy = [StrategyMetrics::default(); SPACEWARS_PLAYER_COUNT];
     let mut policy_metrics = BTreeMap::new();
     let mut total_ticks = 0_u64;
@@ -1669,6 +1919,7 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
             policy.sun_impact_losses += episode.sun_impact_losses[player];
             policy.rebuilds += episode.rebuilds[player];
             policy.body_contacts += episode.body_contacts[player];
+            policy.health.add_episode(episode.health[player]);
 
             captures[player] += episode.captures[player];
             ship_losses[player] += episode.ship_losses[player];
@@ -1683,6 +1934,7 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
             port_departures[player] += episode.port_departures[player];
             safe_capture_departures[player] += episode.safe_capture_departures[player];
             safe_rebuild_departures[player] += episode.safe_rebuild_departures[player];
+            health[player].add_episode(episode.health[player]);
             strategy[player].add_assign(episode.strategy[player]);
         }
     }
@@ -1707,6 +1959,7 @@ fn summarize_batch(episodes: &[EpisodeSummary], wall_seconds: f64) -> BatchSumma
         port_departures,
         safe_capture_departures,
         safe_rebuild_departures,
+        health,
         strategy,
         policy_metrics: policy_metrics.into_values().collect(),
         wall_seconds,
@@ -1980,15 +2233,81 @@ mod tests {
 
     #[test]
     fn evaluator_reports_the_instantiated_policy_version() {
-        let controller = SeatController::new(ControllerKind::RuleV5, PlayerId::PLAYER_2, 9);
+        for (kind, policy_id) in [
+            (ControllerKind::RuleV5, "rule_ship_v5"),
+            (ControllerKind::RuleV6, "rule_ship_v6"),
+            (ControllerKind::RuleV7, "rule_ship_v7"),
+        ] {
+            let controller = SeatController::new(kind, PlayerId::PLAYER_2, 9);
 
-        assert_eq!(
-            controller.descriptor(),
-            ControllerDescriptor {
-                kind: ControllerKind::RuleV5,
-                policy_id: "rule_ship_v5",
-            }
-        );
+            assert_eq!(
+                controller.descriptor(),
+                ControllerDescriptor { kind, policy_id }
+            );
+        }
+    }
+
+    #[test]
+    fn strategy_metrics_count_cumulative_port_replans_once() {
+        let mut tracker = StrategyMetricTracker::default();
+        for (port_replan_count, multi_body_escape_activations) in
+            [(0, 0), (1, 1), (1, 1), (2, 3), (2, 3)]
+        {
+            tracker.observe(BrainTelemetry {
+                port_replan_count,
+                multi_body_escape_activations,
+                ..BrainTelemetry::default()
+            });
+        }
+
+        assert_eq!(tracker.metrics.port_replans, 2);
+        assert_eq!(tracker.metrics.multi_body_escape_activations, 3);
+        assert_eq!(tracker.metrics.objective_selections, 1);
+        assert_eq!(tracker.metrics.idle_ticks, 5);
+    }
+
+    #[test]
+    fn health_metrics_normalize_damage_healing_and_contact_duration() {
+        let mut tracker = PlayerHealthTracker::new(ShipForm::Ship, 100.0, 100.0);
+
+        tracker.observe(ShipForm::Ship, 80.0, 100.0, false);
+        tracker.observe(ShipForm::Ship, 90.0, 100.0, true);
+        tracker.observe(ShipForm::Ship, 40.0, 100.0, true);
+        tracker.observe(ShipForm::EscapePod, 0.0, 100.0, true);
+        // Pod rebuild progress and the completed rebuild are not ship healing.
+        tracker.observe(ShipForm::EscapePod, 50.0, 100.0, false);
+        tracker.observe(ShipForm::Ship, 100.0, 100.0, false);
+
+        assert!((tracker.metrics.damage_taken_fraction - 1.1).abs() < 1.0e-6);
+        assert!((tracker.metrics.damage_while_in_body_contact_fraction - 0.9).abs() < 1.0e-6);
+        assert!((tracker.metrics.healing_received_fraction - 0.1).abs() < 1.0e-6);
+        assert_eq!(tracker.metrics.minimum_life_fraction, 0.0);
+        assert!((tracker.metrics.mean_ship_life_fraction - 0.775).abs() < 1.0e-6);
+        assert_eq!(tracker.metrics.ship_ticks, 4);
+        assert_eq!(tracker.metrics.pod_ticks, 2);
+        assert_eq!(tracker.metrics.damaged_ticks, 3);
+        assert_eq!(tracker.metrics.critical_ticks, 1);
+        assert_eq!(tracker.metrics.longest_damaged_streak_ticks, 3);
+        assert_eq!(tracker.metrics.longest_critical_streak_ticks, 1);
+        assert_eq!(tracker.metrics.body_contact_ticks, 3);
+        assert_eq!(tracker.metrics.longest_body_contact_ticks, 3);
+    }
+
+    #[test]
+    fn aggregate_health_uses_a_ship_tick_weighted_mean() {
+        let mut aggregate = HealthMetrics {
+            mean_ship_life_fraction: 0.75,
+            ship_ticks: 2,
+            ..HealthMetrics::default()
+        };
+        aggregate.add_episode(HealthMetrics {
+            mean_ship_life_fraction: 0.25,
+            ship_ticks: 1,
+            ..HealthMetrics::default()
+        });
+
+        assert_eq!(aggregate.ship_ticks, 3);
+        assert!((aggregate.mean_ship_life_fraction - 7.0 / 12.0).abs() < 1.0e-12);
     }
 
     #[test]
@@ -2034,10 +2353,12 @@ mod tests {
     }
 
     #[test]
-    fn navigation_preset_removes_asteroids_and_raises_ship_health() {
+    fn navigation_preset_removes_asteroids_and_doubles_ship_health() {
         let config = SpacewarsPreset::Navigation.config();
+        let normal_health = SpacewarsConfig::default().players[0].health_percent;
 
         assert_eq!(config.asteroid_probability_per_sec, 0.0);
+        assert_eq!(NAVIGATION_HEALTH_PERCENT, normal_health * 2);
         assert!(
             config
                 .players
@@ -2062,6 +2383,20 @@ mod tests {
                 && config.max_ticks == NAVIGATION_V1_MAX_TICKS
                 && config.trace_player.is_none()
         }));
+    }
+
+    #[test]
+    fn navigation_comparison_reuses_the_named_world_contract() {
+        let config = PolicyComparisonProfile::NavigationV1
+            .config(ControllerKind::RuleV5, ControllerKind::RuleV6);
+
+        assert_eq!(config.workload_id, Some(NAVIGATION_V1_SUITE_ID));
+        assert_eq!(config.start_seed, NAVIGATION_V1_SEEDS[0]);
+        assert_eq!(config.episodes, NAVIGATION_V1_SEEDS.len() as u32);
+        assert_eq!(config.preset, SpacewarsPreset::Navigation);
+        assert_eq!(config.max_ticks, NAVIGATION_V1_MAX_TICKS);
+        assert_eq!(config.baseline, ControllerKind::RuleV5);
+        assert_eq!(config.candidate, ControllerKind::RuleV6);
     }
 
     #[test]
@@ -2420,14 +2755,19 @@ mod tests {
         .unwrap();
         let json = serde_json::to_string(&report).unwrap();
 
-        assert!(json.contains("\"schema_version\":3"));
+        assert!(json.contains("\"schema_version\":4"));
         assert!(json.contains("\"policy_id\":\"idle_v1\""));
         assert!(json.contains("\"kind\":\"rule_v5\""));
         assert!(json.contains("\"policy_id\":\"rule_ship_v5\""));
         assert!(json.contains("\"trace_sha256\""));
         assert!(json.contains("\"objective_selections\""));
+        assert!(json.contains("\"port_replans\""));
         assert!(json.contains("\"policy_metrics\""));
         assert!(json.contains("\"planet_impact_losses\""));
+        assert!(json.contains("\"damage_taken_fraction\""));
+        assert!(json.contains("\"mean_ship_life_fraction\""));
+        assert!(json.contains("\"pod_ticks\""));
+        assert!(json.contains("\"longest_body_contact_ticks\""));
     }
 
     #[test]
@@ -2456,6 +2796,8 @@ mod tests {
         assert_eq!(idle.ticks, 2);
         assert_eq!(rule.seat_episodes, 2);
         assert_eq!(rule.ticks, 2);
+        assert_eq!(idle.health, report.summary.health[0]);
+        assert_eq!(rule.health, report.summary.health[1]);
     }
 
     #[test]

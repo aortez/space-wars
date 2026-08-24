@@ -8,15 +8,15 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "0a1be75d1a5de48ad22b08d366f8d4e2b94887e663b8e25a60b72d4f9d774d5a"
+      "trace_sha256": "dee6e8d6fd53614f09080df4f4df400f213eea8aa90d2d01a1c92367471aed4b"
     },
     {
       "seed": 1,
       "preset": "navigation",
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
-      "ticks": 36000,
-      "trace_sha256": "463dade110e4be0388e5acb430f8006fe0e177e95665bc34c8db79538a02d356"
+      "ticks": 17367,
+      "trace_sha256": "9a5b9d5513a5385a6c7b54bcbe54cbc727e19748dcce7a0fd7f0f9c98026db4f"
     },
     {
       "seed": 2,
@@ -24,23 +24,23 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "214d8251e73c2b978adbd0b515bfbf92a130ade0de10ad8f04f586dc9e8550b0"
+      "trace_sha256": "d4e5b51c681389d3c170f8fc8c0b287998fec7306944a83040fc9b3763f96e84"
     },
     {
       "seed": 3,
       "preset": "navigation",
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
-      "ticks": 36000,
-      "trace_sha256": "048b84958b806183afbe97d1614f555fea17b73e0f05410665867a4d7716ff9c"
+      "ticks": 29668,
+      "trace_sha256": "df63e9a3d9091836b73293621d09a9a56e6922f076e68e7b31c9e4b78134cbf1"
     },
     {
       "seed": 4,
       "preset": "navigation",
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
-      "ticks": 36000,
-      "trace_sha256": "6e920ec71f0a13116064ee2d0ddd9dbde4bfe697e820994cdc6de0ce8aae5f9d"
+      "ticks": 21352,
+      "trace_sha256": "475842aaee1f729a983a9ef39aa6a7e131157c7c0aa318c373595434d46332bd"
     },
     {
       "seed": 5,
@@ -48,7 +48,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "b08f556344df468d1f1034c8558076d17b2a5e87a9935d804911cb34700d31aa"
+      "trace_sha256": "f1d682723036b4af1305fecf03cd152b3506c007bb61028ad554f747df531f9c"
     }
   ]
 }

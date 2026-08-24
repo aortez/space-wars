@@ -65,8 +65,9 @@ version.
 - `intent(&ShipObservationV1)` produces one normalized controller intent;
 - `telemetry()` reports the current goal, target, hazard, avoided celestial
   body, surface clearance, outward speed, predicted closest approach,
-  avoidance age/stall state, range, and heading error without granting state
-  access.
+  avoidance age/stall state, port-attempt progress and cooldown state,
+  multi-body escape state and cumulative activations, range, and heading error
+  without granting state access.
 
 When a host changes between human, rule-bot, or benchmark control, it forwards
 one neutral intent before the new source. This releases held thrust and weapons
@@ -77,16 +78,20 @@ clears the encoder, brain context, and active source.
 
 `BuiltInPolicy` is the common registry used by interactive and headless hosts.
 Each entry creates a boxed `ShipBrain`, and every concrete brain reports its
-own `ShipBrainDescriptor`. The first retained implementation is
-`RuleShipBrainV5`, registered as `rule_ship_v5`. Adding v6 means adding a new
-type and registry entry while leaving v5 constructible; it does not mean adding
-version switches inside v5.
+own `ShipBrainDescriptor`. The retained implementations are
+`RuleShipBrainV5`, registered as `rule_ship_v5`, and the bounded port-replanning
+candidate `RuleShipBrainV6`, registered as `rule_ship_v6`, plus the persistent
+multi-body escape candidate `RuleShipBrainV7`, registered as `rule_ship_v7`.
+V6 composes V5, and V7 in turn composes V6; each layer adds state above its
+predecessor. Older versions remain independently constructible and have no
+runtime version switch.
 
 The interactive launcher follows `DEFAULT_BUILT_IN_POLICY`, which is the
-meaning of the convenient `rule` selection. Reproducible evaluator inputs use
-the explicit `rule-v5` selection. Named suites such as `navigation-v1` and
-`strategy-v1` are permanently pinned to that concrete version and never follow
-the default alias. Episode artifacts obtain their policy ID from the
+meaning of the convenient `rule` selection. It remains pinned to V5 while V6
+and V7 are evaluated. Reproducible evaluator inputs use the explicit
+`rule-v5`, `rule-v6`, or `rule-v7` selection. Named suites such as
+`navigation-v1` and `strategy-v1` are permanently pinned to V5 and never
+follow the default alias. Episode artifacts obtain their policy ID from the
 instantiated brain, so the recorded identity cannot silently drift away from
 the implementation that emitted the actions.
 
@@ -105,12 +110,12 @@ policy IDs, workload settings, canonical actions, terminal tick, and selected
 terminal state. Wall time is deliberately excluded.
 
 `PolicyComparisonProfile` separates a reusable world workload from the
-controllers installed in it. The strategy-v1 profile runs every seed twice,
-swapping baseline and candidate seats, and aggregates results by comparison
-role rather than player number or policy ID. Keeping the roles separate also
-makes a v5-versus-v5 run a useful symmetry check. Once v6 exists, the same path
-can compare v5 and v6 without altering either historical suite or assembling a
-manual command matrix.
+controllers installed in it. The navigation-v1 and strategy-v1 profiles run
+every seed twice, swapping baseline and candidate seats, and aggregate results
+by comparison role rather than player number or policy ID. Keeping the roles
+separate also makes a v5-versus-v5 run a useful symmetry check. The same path
+compares V5, V6, and V7 without altering either historical suite or assembling
+a manual command matrix.
 
 The intended contribution loop for a behavior-changing candidate is:
 
@@ -119,9 +124,10 @@ The intended contribution loop for a behavior-changing candidate is:
    and explicit CLI spelling;
 3. run both named suites with `--verify` to prove the baseline still behaves
    exactly as recorded;
-4. run `--compare strategy-v1 --baseline rule-v5 --candidate <new-policy>`;
+4. run both named comparison profiles against the candidate's direct
+   predecessor;
 5. use `--comparison-start-seed` and `--comparison-episodes` for a larger
-   disjoint seed set after the four-seed smoke comparison;
+   disjoint seed set after the fixed smoke comparison;
 6. attach the JSON comparison report to the review when per-seed evidence is
    useful.
 
@@ -224,6 +230,50 @@ known port corridor first, then enables ordinary avoidance and the bounded
 origin re-entry guard. If the full ship is destroyed before that transition,
 its pod invalidates `Depart` and immediately reselects an owned rebuild port.
 
+Rule policy `rule_ship_v6` is an explicit candidate layered over the unchanged
+V5 core. It measures progress toward the active moving rendezvous, approach,
+or ingress target and separately counts ticks spent avoiding that target
+planet. A phase can fail only after a long no-progress interval or bounded
+terminal-phase timeout, repeated target-planet obstruction, and the presence
+of another valid port for the same capture, repair, or rebuild purpose. The
+failed target is then excluded for a bounded cooldown and the selection reason
+is reported as `target_cooldown`. It never abandons the only owned repair or
+rebuild port. A synthetic permanently obstructed port is the positive
+regression; seed 4's roughly 1,500-tick slow approach is a false-positive guard
+that must still dock without replanning.
+
+Rule policy `rule_ship_v7` composes that complete V6 controller and addresses
+a narrower guidance failure. V6 deliberately chooses one most urgent body per
+tick; where sun and planet clearance zones overlap, tiny clearance changes can
+make that choice alternate and reverse the commanded turn before the ship
+escapes either body. V7 first requires at least two simultaneously reactive
+bodies and two selected-body changes inside a 30-tick window. It therefore
+does not replace an ordinary one-frame encounter merely because two bodies are
+nearby.
+
+Once that oscillation is proven, V7 evaluates 32 deterministic directions 300
+world units ahead and chooses the route that maximizes the worst projected
+clearance across all current threats. The direction is stored relative to the
+two most constrained body centers, so it remains stable as the ship turns
+without requiring hidden world orientation in the observation. The route is
+latched until both anchor bodies exceed their ordinary clearance plus a
+30-unit release margin. Docked and atomic departure maneuvers remain owned by
+V6. Telemetry reports whether the route is active, its age and initial body
+count, and the cumulative activation count.
+
+The focused regression places a sun and planet on opposite sides of the ship
+and alternates their clearance by one unit. V6 switches bodies on every tick;
+V7 proves the oscillation, chooses one shared exit, and holds its steering
+until both bodies are clear. Paired evaluation keeps V7 explicit rather than
+changing the V5 interactive default. On 10 fresh navigation seed-pairs V7
+recorded 100 captures and 17 losses versus V6's 87 and 25. Its incident count
+was slightly higher (339 versus 318), but sustained body-contact time fell from
+51,871 to 46,506 ticks. On the fixed six-seed profile V7 recorded 65 captures,
+eight losses, 243 incidents, and 22,609 contact ticks versus V6's 58, 14, 277,
+and 56,774. On 20 fresh strategy seed-pairs it recorded 116 captures and 34
+losses versus V6's 106 and 35. Those results justify the two-switch trigger
+while leaving promotion of the default as a separate decision.
+
 The initial deterministic priorities are:
 
 - an escape pod must rebuild at an owned port, or evade if none exists;
@@ -255,15 +305,17 @@ redefining normal gameplay.
 
 The named `navigation-v1` suite turns that baseline into a reproducible
 contract: seeds 0 through 5, rule-brain self-play, a 36,000-tick ceiling, no
-random asteroids, and deliberately high ship health. Collisions and docking
-physics remain active. This keeps accidental destruction from truncating the
-experiment while preserving the contacts that navigation guidance must avoid.
+random asteroids, and 200 ship health (twice normal). Collisions and docking
+physics remain active. This gives navigation failures additional time to
+resolve without making the ships effectively immortal, while preserving the
+contacts that navigation guidance must avoid.
 
 The named `strategy-v1` suite uses ordinary health and no random asteroids. For
 each of four seeds it runs the rule policy in both sides against an idle seat
 and then in self-play. Episode and aggregate reports count objective selections
-and ticks spent idle, surviving, attacking, capturing, repairing, defending,
-and rebuilding. The first run exposed a policy that chased an enemy escape pod
+and port replans, plus ticks spent idle, surviving, attacking, capturing,
+repairing, defending, and rebuilding. The first run exposed a policy that
+chased an enemy escape pod
 for the remainder of a 300-second episode; the resulting focused regression
 now requires territorial capture to outrank that chase.
 
@@ -275,6 +327,14 @@ aggregate these metrics by versioned controller policy so side-swapped suites
 remain interpretable. Body and ship collision incidents re-arm after 30
 contact-free ticks, preventing a sustained or briefly flickering scrape from
 dominating the count; debris and laser hits are already discrete events.
+Separate normalized health metrics accumulate damage and healing in full-health
+bar units, including damage observed while a mechanical body contact is active.
+They retain minimum and ship-tick-weighted mean health, separate ship and pod
+exposure, and count both total and longest continuous damaged and critical
+periods. Mechanical body-contact ticks and the longest continuous contact
+complement incident counts, distinguishing a harmless tap from one long scrape.
+Pod rebuild progress and the pod-to-ship transition are excluded from ship
+healing and mean ship health.
 Docking contact transitions count port sessions, while each capture or rebuild
 opens its own pending departure window. A window completes only after the
 craft reaches 90 world units of surface clearance beyond its collision hull. Keeping these
@@ -294,7 +354,9 @@ An opt-in per-player navigation trace sits on the evaluator side of the same
 boundary. It samples semantic brain and docking transitions immediately, then
 adds a heartbeat every 300 ticks while a post-capture departure is unfinished.
 The sample combines `BrainTelemetry`, the emitted `ShipIntent`, dock/contact
-state, planet surface clearance, and outward velocity. Collecting it does not
+state, planet surface clearance, outward velocity, port-attempt age/stall and
+target-obstruction counts, cumulative replans, active cooldown, and V7
+multi-body escape state/age/body count/activations. Collecting it does not
 alter controller actions or the deterministic episode fingerprint, and normal
 untraced batches do not pay its extra observation cost.
 
@@ -406,26 +468,36 @@ recovery, the current run records 52 captures and 52 safe departures. Neither
 previously observed navigation deadlock returned.
 
 With the final v5 contact authority, physical docking hold, and bounded
-departure re-entry guard, the same six-seed suite records 77 captures, all 77
-followed by safe capture departure. It also records one planet-impact ship
-loss and one successful rebuild. That is substantially more throughput than
-the v3 baseline and no unfinished capture departure, but it is not a zero-loss
-claim. The exact policy ID is part of every result so this comparison does not
-silently replace the v4 baseline.
+departure re-entry guard, the current double-health six-seed suite records 69
+captures, 68 followed by safe capture departure. It also records 15 ship
+losses—eight coincident with planet impacts and seven with sun impacts—and ten
+successful rebuilds. The lower health ceiling deliberately stops hiding these
+survival failures; three episodes now reach a winner before the tick limit. The
+exact policy ID is part of every result so this comparison does not silently
+replace the v4 baseline.
 
 The ordinary-health `strategy-v1` result is deliberately less flattering. The
-final v5 run records 40 rule-policy captures, nine ship losses—three coincident
-with planet impacts and six with sun impacts—and six rebuilds. The targeted
+current v5 run records 35 rule-policy captures, eight ship losses—two
+coincident with planet impacts and six with sun impacts—and five rebuilds. The
 interactive planet trap and stale post-destruction departure are now preserved
 as regressions, while this suite makes clear that total body survival and sun
 avoidance remain unsolved. Capture throughput and recovery improved during the
 slice, but those are not substitutes for reducing the measured loss count.
 
+V6 remains a candidate rather than the default because the paired evidence is
+mixed. On the fixed double-health navigation profile it recorded 63 captures,
+15 losses, and 320 body-contact incidents versus V5's 66, 13, and 281; contact
+duration was likewise slightly worse at 58,538 versus 55,577 ticks. Fresh
+ordinary-health seeds 100 through 119 were nearly neutral: 103 captures to 104,
+34 losses to 32, and 550 contacts to 584. These runs validate the bounded
+outcome and evaluator plumbing, but do not justify moving
+`DEFAULT_BUILT_IN_POLICY` away from V5.
+
 ## Next slices
 
-1. Give a repeatedly obstructed rendezvous/ingress a bounded failure outcome
-   and target cooldown, then measure the seed-4 sun/port overlap rather than
-   letting tactical avoidance and strategic capture alternate indefinitely.
+1. Broaden V6 comparisons and interactive traces, then improve path choice or
+   sun escape where cooldown replans trade capture throughput for fewer body
+   contacts.
 2. Tune strategy weights and thresholds through `strategy-v1` plus interactive
    play-testing, preserving explicit policy versions and comparison artifacts.
 3. Add declared personality configurations only after the default policy has
