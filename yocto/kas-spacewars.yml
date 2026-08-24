@@ -56,6 +56,7 @@ local_conf_header:
     INIT_MANAGER = "systemd"
     PACKAGECONFIG:append:pn-systemd = " coredump"
     hostname:pn-base-files = "spacewars"
+    DEFAULT_TIMEZONE = "America/Los_Angeles"
 
     IMAGE_FSTYPES = "wic.gz wic.bmap ext4.gz"
     WKS_FILE = "sdimage-ab.wks.in"
