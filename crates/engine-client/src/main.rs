@@ -40,6 +40,7 @@ use scenario_pizza::{
 };
 use settings::LoadStatus;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, VecModel};
+use spacewars_control::NO_ACTIVE_SCENARIO_DIAGNOSTICS;
 use tracing_subscriber::EnvFilter;
 use ui_navigation::UiAction;
 
@@ -549,6 +550,7 @@ fn show_launcher(
     window.set_ingame_controls_visible(false);
     window.set_game_over_visible(false);
     window.set_scenario_error_text(SharedString::from(""));
+    clear_runtime_diagnostics(window);
     let scenario_names = host::launcher_scenario_names()
         .into_iter()
         .map(SharedString::from)
@@ -1397,9 +1399,14 @@ fn handle_launcher_start(
             hide_launcher_surfaces(&window);
         }
         Err(err) => {
+            clear_runtime_diagnostics(&window);
             window.set_launcher_error_text(SharedString::from(err.to_string()));
         }
     }
+}
+
+fn clear_runtime_diagnostics(window: &MainWindow) {
+    window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
 }
 
 fn hide_launcher_surfaces(window: &MainWindow) {
@@ -1831,6 +1838,7 @@ fn start_scenario_from_launch(
     asset: client_scenarios::ScenarioAsset,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
+    window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
     apply_scenario_metadata(window, launch.scenario.as_str());
     host::start_scenario_loop(
         window,
@@ -2324,6 +2332,9 @@ mod tests {
         window.set_ingame_menu_visible(true);
         window.set_ingame_controls_visible(true);
         window.set_game_over_visible(true);
+        window.set_runtime_diagnostics(SharedString::from(
+            "scenario=pizza\nscenario_revision=3\npaused=false\nbenchmark_active=false",
+        ));
 
         hide_launcher_surfaces(&window);
 
@@ -2334,6 +2345,12 @@ mod tests {
         assert!(!window.get_ingame_menu_visible());
         assert!(!window.get_ingame_controls_visible());
         assert!(!window.get_game_over_visible());
+
+        clear_runtime_diagnostics(&window);
+        assert_eq!(
+            window.get_runtime_diagnostics().as_str(),
+            NO_ACTIVE_SCENARIO_DIAGNOSTICS
+        );
     }
 
     #[test]

@@ -4,6 +4,9 @@ use std::time::{Duration, Instant};
 
 use clap::{Parser, Subcommand};
 use engine_common::DEFAULT_CONTROL_SOCKET;
+#[cfg(test)]
+use spacewars_control::UI_STATE_SCHEMA_VERSION;
+use spacewars_control::{UI_STATE_COMMAND, UiState, parse_runtime_status};
 
 #[derive(Debug, Parser)]
 #[command(name = "spacewars-cli", about = "Space-Wars runtime control helper")]
@@ -27,10 +30,26 @@ enum Command {
         output: PathBuf,
     },
 
+    /// Inspect or control the visible UI.
+    Ui {
+        #[command(subcommand)]
+        command: UiCommand,
+    },
+
     /// Control the lifecycle of the selected or active scenario.
     Host {
         #[command(subcommand)]
         command: HostCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum UiCommand {
+    /// Print the current screen and scenario state.
+    State {
+        /// Emit the versioned state object as JSON.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -54,6 +73,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Command::Status => request_status(&socket)?,
         Command::Screenshot { output } => request_screenshot(&socket, output)?,
+        Command::Ui {
+            command: UiCommand::State { json },
+        } => request_ui_state(&socket, json)?,
         Command::Host {
             command: HostCommand::Benchmark { timeout },
         } => request_benchmark(&socket, timeout)?,
@@ -80,6 +102,17 @@ fn request_screenshot(socket: &Path, output: PathBuf) -> Result<(), Box<dyn std:
 fn request_status(socket: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let message = fetch_status(socket)?;
     println!("{message}");
+    Ok(())
+}
+
+#[cfg(unix)]
+fn request_ui_state(socket: &Path, json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let state = UiState::from_json(&send_request(socket, &format!("{UI_STATE_COMMAND}\n"))?)?;
+    if json {
+        println!("{}", state.to_pretty_json()?);
+    } else {
+        println!("{}", format_ui_state(&state));
+    }
     Ok(())
 }
 
@@ -194,44 +227,18 @@ fn parse_response(response: &str) -> Result<&str, String> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RuntimeStatus {
-    scenario_revision: Option<u64>,
-    benchmark_active: bool,
-}
-
-fn parse_runtime_status(status: &str) -> Result<RuntimeStatus, String> {
-    let scenario_revision = status_value(status, "scenario_revision")
-        .map(|value| {
-            value
-                .parse()
-                .map_err(|_| "status has an invalid scenario_revision".to_string())
-        })
-        .transpose()?;
-    let benchmark_active = status_value(status, "benchmark_active")
-        .map(|value| {
-            value
-                .parse()
-                .map_err(|_| "status has an invalid benchmark_active".to_string())
-        })
-        .transpose()?;
-
-    let benchmark_active = match (scenario_revision, benchmark_active) {
-        (Some(_), Some(benchmark_active)) => benchmark_active,
-        (None, None) if status.trim() == "No active scenario diagnostics." => false,
-        _ => return Err("status has incomplete scenario diagnostics".into()),
-    };
-
-    Ok(RuntimeStatus {
-        scenario_revision,
-        benchmark_active,
-    })
-}
-
-fn status_value<'a>(status: &'a str, key: &str) -> Option<&'a str> {
-    status
-        .lines()
-        .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
+fn format_ui_state(state: &UiState) -> String {
+    format!(
+        "schema_version={}\nrevision={}\nscreen={}\nactive_scenario={}\nselected_scenario={}\nscenario_revision={}\npaused={}\nbenchmark_active={}",
+        state.schema_version,
+        state.revision,
+        state.screen,
+        state.active_scenario.as_deref().unwrap_or("none"),
+        state.selected_scenario,
+        format_scenario_revision(state.scenario_revision),
+        state.paused,
+        state.benchmark_active,
+    )
 }
 
 fn format_scenario_revision(revision: Option<u64>) -> String {
@@ -280,6 +287,11 @@ fn request_status(_socket: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(not(unix))]
+fn request_ui_state(_socket: &Path, _json: bool) -> Result<(), Box<dyn std::error::Error>> {
+    Err("spacewars-cli ui state requires Unix domain sockets".into())
+}
+
+#[cfg(not(unix))]
 fn request_benchmark(_socket: &Path, _timeout: Duration) -> Result<(), Box<dyn std::error::Error>> {
     Err("spacewars-cli host benchmark requires Unix domain sockets".into())
 }
@@ -309,6 +321,18 @@ mod tests {
     }
 
     #[test]
+    fn parses_ui_state_json_subcommand() {
+        let args = Args::try_parse_from(["spacewars-cli", "ui", "state", "--json"]).unwrap();
+
+        assert!(matches!(
+            args.command,
+            Command::Ui {
+                command: UiCommand::State { json: true }
+            }
+        ));
+    }
+
+    #[test]
     fn accepts_multiline_success_response() {
         assert_eq!(
             parse_response("ok scenario=pizza\nfps=59.8\nframes_total=123\n").unwrap(),
@@ -329,25 +353,22 @@ mod tests {
     }
 
     #[test]
-    fn parses_runtime_status_needed_for_benchmark_wait() {
+    fn formats_human_readable_ui_state() {
+        let state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 8,
+            screen: spacewars_control::UiScreen::PauseMain,
+            active_scenario: Some("pizza".into()),
+            selected_scenario: "pizza".into(),
+            scenario_revision: Some(3),
+            paused: true,
+            benchmark_active: false,
+        };
+
         assert_eq!(
-            parse_runtime_status(
-                "scenario=spacewars\nscenario_revision=9\nbenchmark_active=true\nfps=60.0\n"
-            )
-            .unwrap(),
-            RuntimeStatus {
-                scenario_revision: Some(9),
-                benchmark_active: true,
-            }
+            format_ui_state(&state),
+            "schema_version=1\nrevision=8\nscreen=pause.main\nactive_scenario=pizza\nselected_scenario=pizza\nscenario_revision=3\npaused=true\nbenchmark_active=false"
         );
-        assert_eq!(
-            parse_runtime_status("No active scenario diagnostics.").unwrap(),
-            RuntimeStatus {
-                scenario_revision: None,
-                benchmark_active: false,
-            }
-        );
-        assert!(parse_runtime_status("benchmark_active=true\n").is_err());
     }
 
     #[test]

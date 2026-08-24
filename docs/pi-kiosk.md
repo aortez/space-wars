@@ -165,6 +165,20 @@ Query the active scenario without interrupting the kiosk UI:
 spacewars-cli status
 ```
 
+Query the visible screen and distinguish the launcher selection from the active
+scenario:
+
+```sh
+spacewars-cli ui state
+spacewars-cli ui state --json
+```
+
+The versioned JSON snapshot includes the UI revision, exact screen, selected and
+active scenario IDs, scenario instance revision, and pause/benchmark state. A
+launcher snapshot always has no active scenario, including after returning from
+gameplay. `status` remains available for detailed performance and
+scenario-specific diagnostics.
+
 Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
 
 ```sh
