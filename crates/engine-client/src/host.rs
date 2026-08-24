@@ -1136,6 +1136,11 @@ fn start_benchmark_scenario(
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
     let visible = paused && !window.get_launcher_visible();
+    if visible && !window.get_ingame_menu_visible() {
+        // Reset focus before exposing the menu so external state observers do
+        // not see a transient selection carried over from the previous pause.
+        window.set_ingame_menu_focus_index(0);
+    }
     window.set_ingame_menu_visible(visible);
     if !visible {
         window.set_ingame_controls_visible(false);

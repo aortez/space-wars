@@ -172,8 +172,8 @@ fn launcher_navigation_uses_the_public_control_api() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn launcher_can_start_spacewars_and_use_pause_benchmark() {
-    run_functional_test("launcher-spacewars-pause-benchmark", |harness| {
+fn launcher_can_run_the_spacewars_menu_lifecycle() {
+    run_functional_test("launcher-spacewars-menu-lifecycle", |harness| {
         let mut state = harness.wait_until_ready();
         assert_launcher_main(&state);
 
@@ -239,8 +239,91 @@ fn launcher_can_start_spacewars_and_use_pause_benchmark() {
         );
         assert!(!state.paused);
         assert!(state.benchmark_active);
-        assert_ne!(state.scenario_revision, Some(gameplay_scenario_revision));
+        let benchmark_scenario_revision = state
+            .scenario_revision
+            .expect("benchmark must report a scenario revision");
+        assert_ne!(benchmark_scenario_revision, gameplay_scenario_revision);
         harness.capture_screenshot("benchmark.png");
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert!(state.benchmark_active);
+
+        let restart_requested = harness.activate_guarded("pause.restart", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(restart_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        let restarted_scenario_revision = state
+            .scenario_revision
+            .expect("restarted gameplay must report a scenario revision");
+        assert_ne!(restarted_scenario_revision, benchmark_scenario_revision);
+        assert!(!state.paused);
+        assert!(!state.benchmark_active);
+        assert!(state.controls.is_empty());
+        assert!(state.actions.is_empty());
+        harness.capture_screenshot("restarted-gameplay.png");
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert!(!state.benchmark_active);
+
+        let return_from_revision = state.revision;
+        harness.activate_guarded("pause.return-to-launcher", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::LauncherMain),
+                scenario: None,
+                revision_after: Some(return_from_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_launcher_main(&state);
+        assert_eq!(state.scenario_revision, None);
+        assert!(!state.paused);
+        assert!(!state.benchmark_active);
+        assert_eq!(state.error, None);
+        harness.capture_screenshot("returned-launcher.png");
+
+        let returned_launcher_revision = state.revision;
+        harness.activate_guarded("launcher.start", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("spacewars".into()),
+                revision_after: Some(returned_launcher_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        let relaunched_scenario_revision = state
+            .scenario_revision
+            .expect("relaunched gameplay must report a scenario revision");
+        assert_ne!(relaunched_scenario_revision, restarted_scenario_revision);
+        assert!(!state.paused);
+        assert!(!state.benchmark_active);
+        assert!(state.controls.is_empty());
+        assert!(state.actions.is_empty());
+        harness.capture_screenshot("relaunched-gameplay.png");
     });
 }
 

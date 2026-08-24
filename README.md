@@ -213,6 +213,20 @@ menu item can then be activated by ID:
 spacewars-cli ui activate pause.benchmark --expect-screen pause.main
 ```
 
+The other pause-menu lifecycle choices use the same semantic API. Restart is an
+asynchronous host transition, so scripts can wait for gameplay before taking
+their next action:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.restart --expect-screen pause.main
+spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main
+spacewars-cli ui wait --screen launcher.main --timeout 3s
+```
+
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:
 

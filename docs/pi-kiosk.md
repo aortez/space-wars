@@ -231,6 +231,18 @@ spacewars-cli ui activate pause.benchmark --expect-screen pause.main
 `host pause` automatically guards the observed gameplay revision. The Benchmark
 control is present only when the active scenario supports it.
 
+Restart a round or return to the launcher through the same visible pause menu:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.restart --expect-screen pause.main
+spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main
+spacewars-cli ui wait --screen launcher.main --timeout 3s
+```
+
 Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
 
 ```sh
