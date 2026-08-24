@@ -15,6 +15,7 @@ engine-common = { workspace = true }
 engine-core = { workspace = true }
 engine-nes = { workspace = true }
 spacewars-ai = { workspace = true }
+spacewars-control = { workspace = true }
 scenario-falling = { workspace = true }
 scenario-nes = { workspace = true }
 scenario-null = { workspace = true }

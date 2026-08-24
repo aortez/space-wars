@@ -129,6 +129,20 @@ body avoidance it identifies the sun or planet being avoided and reports the
 craft's signed surface clearance. This keeps diagnostic formatting out of the
 simulation hot path.
 
+Inspect the visible UI screen and its selected and active scenarios separately:
+
+```sh
+spacewars-cli ui state
+spacewars-cli ui state --json
+```
+
+The JSON form is a versioned automation contract. It reports the exact launcher,
+gameplay, pause, controls, touch-test, or game-over screen; a monotonic UI
+revision; the active scenario instance revision; and pause and benchmark state.
+Returning to the launcher clears active-scenario state while preserving the
+launcher selection. The existing `status` command remains the detailed
+performance and scenario diagnostics interface.
+
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:
 
