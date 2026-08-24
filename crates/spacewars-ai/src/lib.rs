@@ -27,6 +27,10 @@ pub struct ShipBrainDescriptor {
 
 /// Stable policy identity stored in episode artifacts for rule brain v5.
 pub const RULE_SHIP_BRAIN_V5_POLICY_ID: &str = "rule_ship_v5";
+/// Stable policy identity stored in episode artifacts for rule brain v6.
+pub const RULE_SHIP_BRAIN_V6_POLICY_ID: &str = "rule_ship_v6";
+/// Stable policy identity stored in episode artifacts for rule brain v7.
+pub const RULE_SHIP_BRAIN_V7_POLICY_ID: &str = "rule_ship_v7";
 
 /// Built-in, reproducible ship policies.
 ///
@@ -36,6 +40,8 @@ pub const RULE_SHIP_BRAIN_V5_POLICY_ID: &str = "rule_ship_v5";
 #[serde(rename_all = "snake_case")]
 pub enum BuiltInPolicy {
     RuleV5,
+    RuleV6,
+    RuleV7,
 }
 
 /// Policy used by interactive hosts that request the unversioned rule bot.
@@ -45,12 +51,18 @@ pub enum BuiltInPolicy {
 pub const DEFAULT_BUILT_IN_POLICY: BuiltInPolicy = BuiltInPolicy::RuleV5;
 
 impl BuiltInPolicy {
-    pub const ALL: &'static [Self] = &[Self::RuleV5];
+    pub const ALL: &'static [Self] = &[Self::RuleV5, Self::RuleV6, Self::RuleV7];
 
     pub const fn descriptor(self) -> ShipBrainDescriptor {
         match self {
             Self::RuleV5 => ShipBrainDescriptor {
                 policy_id: RULE_SHIP_BRAIN_V5_POLICY_ID,
+            },
+            Self::RuleV6 => ShipBrainDescriptor {
+                policy_id: RULE_SHIP_BRAIN_V6_POLICY_ID,
+            },
+            Self::RuleV7 => ShipBrainDescriptor {
+                policy_id: RULE_SHIP_BRAIN_V7_POLICY_ID,
             },
         }
     }
@@ -65,6 +77,8 @@ impl BuiltInPolicy {
     pub fn create(self) -> Box<dyn ShipBrain> {
         match self {
             Self::RuleV5 => Box::new(RuleShipBrainV5::default()),
+            Self::RuleV6 => Box::new(RuleShipBrainV6::default()),
+            Self::RuleV7 => Box::new(RuleShipBrainV7::default()),
         }
     }
 }
@@ -129,6 +143,7 @@ pub enum StrategySelectionReason {
     Invalidated,
     HigherUtility,
     DockingContact,
+    TargetCooldown,
 }
 
 /// Best utility currently available for each strategic goal class.
@@ -185,7 +200,7 @@ pub enum PortNavigationPhase {
     Depart,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AvoidanceBody {
     Sun,
@@ -200,6 +215,16 @@ pub struct BrainTelemetry {
     pub target: Option<PlayerId>,
     pub target_planet: Option<PlanetId>,
     pub port_phase: Option<PortNavigationPhase>,
+    pub port_attempt_age_ticks: u64,
+    pub port_attempt_stalled_ticks: u64,
+    pub port_attempt_obstructed_ticks: u64,
+    pub port_replan_count: u64,
+    pub cooled_port_planet: Option<PlanetId>,
+    pub port_cooldown_remaining_ticks: u64,
+    pub multi_body_escape_active: bool,
+    pub multi_body_escape_age_ticks: u64,
+    pub multi_body_escape_body_count: u32,
+    pub multi_body_escape_activations: u64,
     pub hazard: Option<DebrisId>,
     pub avoided_body: Option<AvoidanceBody>,
     pub avoidance_surface_clearance: Option<f32>,
@@ -226,6 +251,16 @@ impl Default for BrainTelemetry {
             target: None,
             target_planet: None,
             port_phase: None,
+            port_attempt_age_ticks: 0,
+            port_attempt_stalled_ticks: 0,
+            port_attempt_obstructed_ticks: 0,
+            port_replan_count: 0,
+            cooled_port_planet: None,
+            port_cooldown_remaining_ticks: 0,
+            multi_body_escape_active: false,
+            multi_body_escape_age_ticks: 0,
+            multi_body_escape_body_count: 0,
+            multi_body_escape_activations: 0,
             hazard: None,
             avoided_body: None,
             avoidance_surface_clearance: None,
@@ -289,6 +324,50 @@ fn steering_safe_brake(form: ShipForm, heading: HeadingGuidance, requested_brake
     } else {
         requested_brake
     }
+}
+
+fn body_escape_controls(
+    config: RuleShipBrainConfig,
+    observation: &ShipObservationV1,
+    direction: Vec2,
+    predictive: bool,
+    escape_assist: bool,
+    emergency_escape_assist: bool,
+) -> (ShipIntent, HeadingGuidance) {
+    let heading = guide_heading(direction, observation.own_ship.angular_velocity);
+    let heading_error = heading.error_radians.abs();
+    // A forecast maneuver should shed velocity while establishing its
+    // tangent instead of accelerating merely because the desired heading is
+    // within the broader emergency-escape cone.
+    let forward_aligned = heading_error < if predictive { 0.2 } else { 0.65 };
+    let reverse_escape = observation.own_ship.form == ShipForm::Ship
+        && emergency_escape_assist
+        && PI - heading_error < 0.65;
+    let requested_brake = if forward_aligned || reverse_escape {
+        0.0
+    } else if predictive || escape_assist {
+        config.body_avoidance_turn_brake.clamp(0.0, 0.9)
+    } else {
+        1.0
+    };
+    let intent = ShipIntent {
+        turn: heading.turn,
+        thrust: if forward_aligned {
+            1.0
+        } else if reverse_escape {
+            -1.0
+        } else {
+            0.0
+        },
+        // A stalled escape drops to a partial brake so the turn command can
+        // build angular velocity. A low-health emergency also uses a
+        // rear-aligned reverse burn immediately rather than waiting to point
+        // the nose outward. Pods suppress braking whenever they steer because
+        // releasing their brake is also their thrust.
+        brake: steering_safe_brake(observation.own_ship.form, heading, requested_brake),
+        ..ShipIntent::default()
+    };
+    (intent, heading)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -625,6 +704,65 @@ impl Default for RuleShipBrainConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RuleShipBrainV6Config {
+    pub core: RuleShipBrainConfig,
+    /// Cumulative target-distance improvement that resets the stall timer.
+    pub port_attempt_progress_distance: f32,
+    /// A port phase with no meaningful progress fails after this many ticks.
+    pub port_attempt_stall_ticks: u64,
+    /// Avoiding the target planet must occupy this many phase ticks before
+    /// the attempt is considered obstructed.
+    pub port_attempt_obstruction_ticks: u64,
+    /// Approach and ingress receive this bounded total time when obstruction
+    /// has been observed, even if the moving port occasionally gets closer.
+    pub port_attempt_phase_timeout_ticks: u64,
+    /// A failed target remains unavailable long enough to try another port.
+    pub port_target_cooldown_ticks: u64,
+}
+
+impl Default for RuleShipBrainV6Config {
+    fn default() -> Self {
+        Self {
+            core: RuleShipBrainConfig::default(),
+            port_attempt_progress_distance: 20.0,
+            port_attempt_stall_ticks: 1_800,
+            port_attempt_obstruction_ticks: 600,
+            port_attempt_phase_timeout_ticks: 1_800,
+            port_target_cooldown_ticks: 3_600,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RuleShipBrainV7Config {
+    pub core: RuleShipBrainV6Config,
+    /// Distance used to compare possible exits from overlapping body zones.
+    pub multi_body_escape_lookahead_distance: f32,
+    /// Extra clearance required before a latched escape maneuver is released.
+    pub multi_body_escape_release_margin: f32,
+    /// Angular resolution of the deterministic exit-direction search.
+    pub multi_body_escape_direction_samples: u32,
+    /// Time allowed for repeated nearest-body selection changes to prove that
+    /// independent avoidance commands are oscillating.
+    pub multi_body_escape_switch_window_ticks: u64,
+    /// Selection changes required before V7 replaces V6's single-body route.
+    pub multi_body_escape_switch_count: u32,
+}
+
+impl Default for RuleShipBrainV7Config {
+    fn default() -> Self {
+        Self {
+            core: RuleShipBrainV6Config::default(),
+            multi_body_escape_lookahead_distance: 300.0,
+            multi_body_escape_release_margin: 30.0,
+            multi_body_escape_direction_samples: 32,
+            multi_body_escape_switch_window_ticks: 30,
+            multi_body_escape_switch_count: 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum StrategicObjective {
     Rebuild(PlanetId),
@@ -766,6 +904,65 @@ struct PortContactLoss {
     started_tick: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PortAttemptProgress {
+    goal: BrainGoal,
+    planet: PlanetId,
+    phase: PortNavigationPhase,
+    attempt_started_tick: u64,
+    phase_started_tick: u64,
+    last_progress_tick: u64,
+    progress_reference_distance: f32,
+    obstructed_ticks: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PortTargetCooldown {
+    goal: BrainGoal,
+    planet: PlanetId,
+    until_tick: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct MultiBodyThreat {
+    body: AvoidanceBody,
+    local_position: Vec2,
+    surface_clearance: f32,
+    required_clearance: f32,
+}
+
+impl MultiBodyThreat {
+    fn clearance_deficit(self) -> f32 {
+        self.surface_clearance - self.required_clearance
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct MultiBodyEscapePlan {
+    anchors: [AvoidanceBody; 2],
+    direction_offset_radians: f32,
+    started_tick: u64,
+    body_count: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MultiBodySwitchTracker {
+    started_tick: u64,
+    last_body: AvoidanceBody,
+    switches: u32,
+}
+
+impl PortTargetCooldown {
+    const fn objective(self) -> Option<StrategicObjective> {
+        match self.goal {
+            BrainGoal::Capture => Some(StrategicObjective::Capture(self.planet)),
+            BrainGoal::Repair => Some(StrategicObjective::Repair(self.planet)),
+            BrainGoal::Rebuild => Some(StrategicObjective::Rebuild(self.planet)),
+            _ => None,
+        }
+    }
+}
+
 /// Deterministic first-generation Spacewars opponent.
 ///
 /// It avoids imminent collisions, fights in planet-free worlds, and uses a
@@ -783,6 +980,7 @@ pub struct RuleShipBrainV5 {
     predictive_body_avoidance_plan: Option<PredictiveBodyAvoidancePlan>,
     recent_departure: Option<RecentDeparture>,
     port_contact_loss: Option<PortContactLoss>,
+    objective_exclusions: Vec<StrategicObjective>,
 }
 
 impl RuleShipBrainV5 {
@@ -822,6 +1020,22 @@ impl RuleShipBrainV5 {
     fn weighted_score(utility: f32, weight: f32) -> f32 {
         let score = utility * weight.max(0.0);
         if score.is_finite() { score } else { 0.0 }
+    }
+
+    fn apply_objective_exclusions(
+        &self,
+        candidates: &mut Vec<StrategyCandidate>,
+        scores: &mut StrategyScores,
+    ) {
+        if self.objective_exclusions.is_empty() {
+            return;
+        }
+
+        candidates.retain(|candidate| !self.objective_exclusions.contains(&candidate.objective));
+        *scores = StrategyScores::default();
+        for candidate in candidates {
+            scores.record(candidate.objective.goal(), candidate.score);
+        }
     }
 
     fn opponent_has_neutral_port_priority(
@@ -888,6 +1102,7 @@ impl RuleShipBrainV5 {
                 scores.record(candidate.objective.goal(), candidate.score);
                 candidates.push(candidate);
             }
+            self.apply_objective_exclusions(&mut candidates, &mut scores);
             if candidates.is_empty() {
                 if let Some(opponent) = opponent {
                     let candidate = StrategyCandidate {
@@ -1013,6 +1228,8 @@ impl RuleShipBrainV5 {
             candidates.push(candidate);
         }
 
+        self.apply_objective_exclusions(&mut candidates, &mut scores);
+
         if candidates.is_empty() {
             candidates.push(StrategyCandidate {
                 objective: StrategicObjective::Idle,
@@ -1040,6 +1257,9 @@ impl RuleShipBrainV5 {
         observation: &ShipObservationV1,
         objective: StrategicObjective,
     ) -> bool {
+        if self.objective_exclusions.contains(&objective) {
+            return false;
+        }
         let planet = |target| {
             observation
                 .planets
@@ -1470,6 +1690,31 @@ impl RuleShipBrainV5 {
             && lateral_distance <= self.config.spaceport_corridor_half_width
     }
 
+    fn port_phase_target_distance(
+        &self,
+        observation: &ShipObservationV1,
+        navigation: PortNavigation,
+    ) -> Option<f32> {
+        let planet = observation
+            .planets
+            .iter()
+            .find(|planet| planet.id == navigation.planet)?;
+        let clearance =
+            observation.own_ship.collision_radius + self.config.spaceport_staging_margin;
+        let distance = match navigation.phase {
+            PortNavigationPhase::Rendezvous => planet
+                .moving_surface_approach(-planet.local_position, clearance)
+                .local_position
+                .length(),
+            PortNavigationPhase::Approach => {
+                planet.spaceport_approach(clearance).local_position.length()
+            }
+            PortNavigationPhase::Ingress => planet.local_spaceport_position.length(),
+            PortNavigationPhase::Docked | PortNavigationPhase::Depart => return None,
+        };
+        Some(distance)
+    }
+
     fn body_avoidance(
         &mut self,
         observation: &ShipObservationV1,
@@ -1697,7 +1942,18 @@ impl RuleShipBrainV5 {
         hazard: Option<DebrisId>,
         body_status: Option<BodyAvoidanceStatus>,
     ) -> ShipIntent {
-        let heading = guide_heading(direction, observation.own_ship.angular_velocity);
+        let predictive = body_status.is_some_and(|status| status.avoidance.predictive);
+        let escape_assist = body_status.is_some_and(|status| status.escape_assist);
+        let emergency_escape_assist =
+            body_status.is_some_and(|status| status.emergency_escape_assist);
+        let (intent, heading) = body_escape_controls(
+            self.config,
+            observation,
+            direction,
+            predictive,
+            escape_assist,
+            emergency_escape_assist,
+        );
         let navigation = self.port_navigation;
         self.set_telemetry(
             observation,
@@ -1710,7 +1966,7 @@ impl RuleShipBrainV5 {
                 avoidance_surface_clearance: body_status
                     .map(|status| status.avoidance.surface_clearance),
                 avoidance_outward_speed: body_status.map(|status| status.avoidance.outward_speed),
-                avoidance_predictive: body_status.is_some_and(|status| status.avoidance.predictive),
+                avoidance_predictive: predictive,
                 avoidance_seconds_until_closest: body_status
                     .map(|status| status.avoidance.seconds_until_closest),
                 avoidance_predicted_surface_clearance: body_status
@@ -1721,47 +1977,14 @@ impl RuleShipBrainV5 {
                 avoidance_stalled_ticks: body_status.map_or(0, |status| {
                     observation.tick.saturating_sub(status.last_progress_tick)
                 }),
-                avoidance_escape_assist: body_status.is_some_and(|status| status.escape_assist),
-                avoidance_emergency_escape_assist: body_status
-                    .is_some_and(|status| status.emergency_escape_assist),
+                avoidance_escape_assist: escape_assist,
+                avoidance_emergency_escape_assist: emergency_escape_assist,
                 target_distance: direction.length(),
                 heading_error: heading.error_radians,
                 ..BrainTelemetry::default()
             },
         );
-        let heading_error = heading.error_radians.abs();
-        let predictive = body_status.is_some_and(|status| status.avoidance.predictive);
-        // A forecast maneuver should shed velocity while establishing its
-        // tangent instead of accelerating merely because the desired heading
-        // is within the broader emergency-escape cone.
-        let forward_aligned = heading_error < if predictive { 0.2 } else { 0.65 };
-        let reverse_escape = observation.own_ship.form == ShipForm::Ship
-            && body_status.is_some_and(|status| status.emergency_escape_assist)
-            && PI - heading_error < 0.65;
-        let requested_brake = if forward_aligned || reverse_escape {
-            0.0
-        } else if predictive || body_status.is_some_and(|status| status.escape_assist) {
-            self.config.body_avoidance_turn_brake.clamp(0.0, 0.9)
-        } else {
-            1.0
-        };
-        ShipIntent {
-            turn: heading.turn,
-            thrust: if forward_aligned {
-                1.0
-            } else if reverse_escape {
-                -1.0
-            } else {
-                0.0
-            },
-            // A stalled escape drops to a partial brake so the turn command
-            // can build angular velocity. A low-health emergency also uses a
-            // rear-aligned reverse burn immediately rather than waiting to
-            // point the nose outward. Pods suppress braking whenever they
-            // steer because releasing their brake is also their thrust.
-            brake: steering_safe_brake(observation.own_ship.form, heading, requested_brake),
-            ..ShipIntent::default()
-        }
+        intent
     }
 
     fn docked_intent(
@@ -2089,6 +2312,7 @@ impl ShipBrain for RuleShipBrainV5 {
         self.predictive_body_avoidance_plan = None;
         self.recent_departure = None;
         self.port_contact_loss = None;
+        self.objective_exclusions.clear();
         self.telemetry = BrainTelemetry {
             actor: self.actor,
             ..BrainTelemetry::default()
@@ -2220,6 +2444,604 @@ impl ShipBrain for RuleShipBrainV5 {
 
     fn telemetry(&self) -> BrainTelemetry {
         self.telemetry
+    }
+}
+
+/// Candidate rule policy that adds bounded port-attempt replanning above the
+/// unchanged v5 strategy and guidance implementation.
+#[derive(Debug, Clone)]
+pub struct RuleShipBrainV6 {
+    config: RuleShipBrainV6Config,
+    inner: RuleShipBrainV5,
+    port_attempt: Option<PortAttemptProgress>,
+    port_target_cooldowns: Vec<PortTargetCooldown>,
+    port_replan_count: u64,
+}
+
+impl Default for RuleShipBrainV6 {
+    fn default() -> Self {
+        Self::new(RuleShipBrainV6Config::default())
+    }
+}
+
+impl RuleShipBrainV6 {
+    pub fn new(config: RuleShipBrainV6Config) -> Self {
+        Self {
+            inner: RuleShipBrainV5::new(config.core),
+            config,
+            port_attempt: None,
+            port_target_cooldowns: Vec::new(),
+            port_replan_count: 0,
+        }
+    }
+
+    fn prune_port_target_cooldowns(&mut self, tick: u64) {
+        self.port_target_cooldowns
+            .retain(|cooldown| tick < cooldown.until_tick);
+    }
+
+    fn sync_objective_exclusions(&mut self) {
+        self.inner.objective_exclusions.clear();
+        self.inner.objective_exclusions.extend(
+            self.port_target_cooldowns
+                .iter()
+                .filter_map(|cooldown| cooldown.objective()),
+        );
+    }
+
+    fn sync_port_attempt(
+        &mut self,
+        observation: &ShipObservationV1,
+        preceding_avoided_body: Option<AvoidanceBody>,
+    ) {
+        let Some(navigation) = self.inner.port_navigation.filter(|navigation| {
+            matches!(
+                navigation.phase,
+                PortNavigationPhase::Rendezvous
+                    | PortNavigationPhase::Approach
+                    | PortNavigationPhase::Ingress
+            )
+        }) else {
+            self.port_attempt = None;
+            return;
+        };
+        let Some(target_distance) = self
+            .inner
+            .port_phase_target_distance(observation, navigation)
+        else {
+            self.port_attempt = None;
+            return;
+        };
+
+        let same_target = self.port_attempt.is_some_and(|attempt| {
+            attempt.goal == navigation.goal && attempt.planet == navigation.planet
+        });
+        if !same_target {
+            self.port_attempt = Some(PortAttemptProgress {
+                goal: navigation.goal,
+                planet: navigation.planet,
+                phase: navigation.phase,
+                attempt_started_tick: observation.tick,
+                phase_started_tick: observation.tick,
+                last_progress_tick: observation.tick,
+                progress_reference_distance: target_distance,
+                obstructed_ticks: 0,
+            });
+            return;
+        }
+
+        let attempt = self.port_attempt.as_mut().unwrap();
+        if attempt.phase != navigation.phase {
+            attempt.phase = navigation.phase;
+            attempt.phase_started_tick = observation.tick;
+            attempt.last_progress_tick = observation.tick;
+            attempt.progress_reference_distance = target_distance;
+            attempt.obstructed_ticks = 0;
+            return;
+        }
+
+        let progress_distance = self.config.port_attempt_progress_distance.max(0.0);
+        if target_distance <= attempt.progress_reference_distance - progress_distance {
+            attempt.progress_reference_distance = target_distance;
+            attempt.last_progress_tick = observation.tick;
+        }
+        if preceding_avoided_body == Some(AvoidanceBody::Planet(navigation.planet)) {
+            attempt.obstructed_ticks = attempt.obstructed_ticks.saturating_add(1);
+        }
+    }
+
+    fn best_alternative_port(
+        &self,
+        observation: &ShipObservationV1,
+        failed_attempt: PortAttemptProgress,
+    ) -> Option<(StrategyCandidate, StrategyScores)> {
+        let (mut candidates, _) = self.inner.strategy_candidates(observation);
+        let failed_objective = PortTargetCooldown {
+            goal: failed_attempt.goal,
+            planet: failed_attempt.planet,
+            until_tick: observation.tick,
+        }
+        .objective()?;
+        candidates.retain(|candidate| candidate.objective != failed_objective);
+        let mut scores = StrategyScores::default();
+        for candidate in &candidates {
+            scores.record(candidate.objective.goal(), candidate.score);
+        }
+        let mut best: Option<StrategyCandidate> = None;
+        for candidate in candidates.into_iter().filter(|candidate| {
+            candidate
+                .objective
+                .port_goal()
+                .is_some_and(|(goal, planet)| {
+                    goal == failed_attempt.goal && planet != failed_attempt.planet
+                })
+        }) {
+            let replace = best.is_none_or(|current| {
+                candidate.score.total_cmp(&current.score).is_gt()
+                    || (candidate.score.total_cmp(&current.score).is_eq()
+                        && candidate.objective < current.objective)
+            });
+            if replace {
+                best = Some(candidate);
+            }
+        }
+        best.map(|candidate| (candidate, scores))
+    }
+
+    fn should_replan_port(
+        &self,
+        observation: &ShipObservationV1,
+    ) -> Option<(PortAttemptProgress, StrategyCandidate, StrategyScores)> {
+        let attempt = self.port_attempt?;
+        let repeatedly_obstructed =
+            attempt.obstructed_ticks >= self.config.port_attempt_obstruction_ticks;
+        let stalled = observation.tick.saturating_sub(attempt.last_progress_tick)
+            >= self.config.port_attempt_stall_ticks
+            && repeatedly_obstructed;
+        let terminal_phase_timed_out =
+            matches!(
+                attempt.phase,
+                PortNavigationPhase::Approach | PortNavigationPhase::Ingress
+            ) && observation.tick.saturating_sub(attempt.phase_started_tick)
+                >= self.config.port_attempt_phase_timeout_ticks
+                && repeatedly_obstructed;
+        if !stalled && !terminal_phase_timed_out {
+            return None;
+        }
+        self.best_alternative_port(observation, attempt)
+            .map(|(candidate, scores)| (attempt, candidate, scores))
+    }
+
+    fn replan_port(
+        &mut self,
+        observation: &ShipObservationV1,
+        failed_attempt: PortAttemptProgress,
+        candidate: StrategyCandidate,
+        scores: StrategyScores,
+    ) {
+        let until_tick = observation
+            .tick
+            .saturating_add(self.config.port_target_cooldown_ticks);
+        if let Some(cooldown) = self.port_target_cooldowns.iter_mut().find(|cooldown| {
+            cooldown.goal == failed_attempt.goal && cooldown.planet == failed_attempt.planet
+        }) {
+            cooldown.until_tick = cooldown.until_tick.max(until_tick);
+        } else {
+            self.port_target_cooldowns.push(PortTargetCooldown {
+                goal: failed_attempt.goal,
+                planet: failed_attempt.planet,
+                until_tick,
+            });
+        }
+        self.sync_objective_exclusions();
+        self.inner.strategy = Some(StrategyState {
+            objective: candidate.objective,
+            selected_score: candidate.score,
+            scores,
+            selected_at_tick: observation.tick,
+            last_evaluated_tick: observation.tick,
+            selection_reason: StrategySelectionReason::TargetCooldown,
+        });
+        self.inner.port_navigation = None;
+        self.inner.port_contact_loss = None;
+        self.port_attempt = None;
+        self.port_replan_count = self.port_replan_count.saturating_add(1);
+    }
+
+    fn decorate_telemetry(&mut self, tick: u64) {
+        let mut telemetry = self.inner.telemetry;
+        if let Some(attempt) = self.port_attempt {
+            telemetry.port_attempt_age_ticks = tick.saturating_sub(attempt.attempt_started_tick);
+            telemetry.port_attempt_stalled_ticks = tick.saturating_sub(attempt.last_progress_tick);
+            telemetry.port_attempt_obstructed_ticks = attempt.obstructed_ticks;
+        }
+        telemetry.port_replan_count = self.port_replan_count;
+        if let Some(cooldown) = self
+            .port_target_cooldowns
+            .iter()
+            .max_by_key(|cooldown| cooldown.until_tick)
+        {
+            telemetry.cooled_port_planet = Some(cooldown.planet);
+            telemetry.port_cooldown_remaining_ticks = cooldown.until_tick.saturating_sub(tick);
+        }
+        self.inner.telemetry = telemetry;
+    }
+}
+
+impl ShipBrain for RuleShipBrainV6 {
+    fn descriptor(&self) -> ShipBrainDescriptor {
+        BuiltInPolicy::RuleV6.descriptor()
+    }
+
+    fn reset(&mut self, reset: BrainReset) {
+        self.inner.reset(reset);
+        self.port_attempt = None;
+        self.port_target_cooldowns.clear();
+        self.port_replan_count = 0;
+    }
+
+    fn intent(&mut self, observation: &ShipObservationV1) -> ShipIntent {
+        self.prune_port_target_cooldowns(observation.tick);
+        self.sync_objective_exclusions();
+        let preceding_avoided_body = self.inner.telemetry.avoided_body;
+        self.sync_port_attempt(observation, preceding_avoided_body);
+        if let Some((failed_attempt, candidate, scores)) = self.should_replan_port(observation) {
+            self.replan_port(observation, failed_attempt, candidate, scores);
+        }
+
+        let intent = self.inner.intent(observation);
+        // The core may have selected a target or advanced a phase this tick.
+        // Initialize that state without double-counting the preceding action's
+        // obstruction sample.
+        self.sync_port_attempt(observation, None);
+        self.decorate_telemetry(observation.tick);
+        intent
+    }
+
+    fn telemetry(&self) -> BrainTelemetry {
+        self.inner.telemetry()
+    }
+}
+
+/// Candidate rule policy that keeps v6 strategy and port replanning, then
+/// adds a persistent exit route when multiple celestial bodies demand
+/// contradictory avoidance commands at the same time.
+#[derive(Debug, Clone)]
+pub struct RuleShipBrainV7 {
+    config: RuleShipBrainV7Config,
+    inner: RuleShipBrainV6,
+    multi_body_escape_plan: Option<MultiBodyEscapePlan>,
+    multi_body_switch_tracker: Option<MultiBodySwitchTracker>,
+    multi_body_escape_activations: u64,
+}
+
+impl Default for RuleShipBrainV7 {
+    fn default() -> Self {
+        Self::new(RuleShipBrainV7Config::default())
+    }
+}
+
+impl RuleShipBrainV7 {
+    pub fn new(config: RuleShipBrainV7Config) -> Self {
+        Self {
+            inner: RuleShipBrainV6::new(config.core),
+            config,
+            multi_body_escape_plan: None,
+            multi_body_switch_tracker: None,
+            multi_body_escape_activations: 0,
+        }
+    }
+
+    fn body_local_position(observation: &ShipObservationV1, body: AvoidanceBody) -> Option<Vec2> {
+        match body {
+            AvoidanceBody::Sun => observation.sun.map(|sun| sun.local_position),
+            AvoidanceBody::Planet(id) => observation
+                .planets
+                .iter()
+                .find(|planet| planet.id == id)
+                .map(|planet| planet.local_position),
+        }
+    }
+
+    fn body_threats(
+        &self,
+        observation: &ShipObservationV1,
+        retain_latched_plan: bool,
+    ) -> Vec<MultiBodyThreat> {
+        let core = self.config.core.core;
+        let navigation = self.inner.inner.port_navigation;
+        let release_margin = if retain_latched_plan {
+            self.config.multi_body_escape_release_margin.max(0.0)
+        } else {
+            0.0
+        };
+        let mut threats = Vec::new();
+        let mut consider = |body: AvoidanceBody,
+                            local_position: Vec2,
+                            local_velocity: Vec2,
+                            radius: f32,
+                            required_clearance: f32| {
+            let surface_clearance =
+                local_position.length() - radius - observation.own_ship.collision_radius;
+            let outward_speed = if local_position.length_squared() > TARGET_EPSILON {
+                local_position.normalized().dot(local_velocity)
+            } else {
+                0.0
+            };
+            let relevant = if retain_latched_plan {
+                surface_clearance <= required_clearance + release_margin
+            } else {
+                surface_clearance <= required_clearance
+                    && !(outward_speed >= 0.0 && surface_clearance > required_clearance * 0.35)
+            };
+            if relevant {
+                threats.push(MultiBodyThreat {
+                    body,
+                    local_position,
+                    surface_clearance,
+                    required_clearance,
+                });
+            }
+        };
+
+        if let Some(sun) = observation.sun {
+            consider(
+                AvoidanceBody::Sun,
+                sun.local_position,
+                sun.local_velocity,
+                sun.radius,
+                core.body_clearance,
+            );
+        }
+        for planet in &observation.planets {
+            let target_navigation = navigation.filter(|navigation| navigation.planet == planet.id);
+            let required_clearance = if let Some(target_navigation) = target_navigation {
+                if target_navigation.phase != PortNavigationPhase::Rendezvous
+                    && self
+                        .inner
+                        .inner
+                        .port_corridor_contains_ship(observation, planet)
+                {
+                    continue;
+                }
+                core.spaceport_staging_margin
+            } else {
+                core.body_clearance
+            };
+            consider(
+                AvoidanceBody::Planet(planet.id),
+                planet.local_position,
+                planet.local_velocity,
+                planet.radius,
+                required_clearance,
+            );
+        }
+        threats.sort_by(|left, right| {
+            left.clearance_deficit()
+                .total_cmp(&right.clearance_deficit())
+                .then_with(|| left.body.cmp(&right.body))
+        });
+        threats
+    }
+
+    fn observe_multi_body_switches(
+        &mut self,
+        tick: u64,
+        selected_body: Option<AvoidanceBody>,
+    ) -> bool {
+        let Some(selected_body) = selected_body else {
+            self.multi_body_switch_tracker = None;
+            return false;
+        };
+        let window_ticks = self.config.multi_body_escape_switch_window_ticks.max(1);
+        let mut tracker = self
+            .multi_body_switch_tracker
+            .filter(|tracker| tick.saturating_sub(tracker.started_tick) <= window_ticks)
+            .unwrap_or(MultiBodySwitchTracker {
+                started_tick: tick,
+                last_body: selected_body,
+                switches: 0,
+            });
+        if tracker.last_body != selected_body {
+            tracker.last_body = selected_body;
+            tracker.switches = tracker.switches.saturating_add(1);
+        }
+        let triggered = tracker.switches >= self.config.multi_body_escape_switch_count.max(1);
+        self.multi_body_switch_tracker = if triggered { None } else { Some(tracker) };
+        triggered
+    }
+
+    fn select_escape_plan(
+        &self,
+        observation: &ShipObservationV1,
+        threats: &[MultiBodyThreat],
+    ) -> Option<MultiBodyEscapePlan> {
+        let [first, second, ..] = threats else {
+            return None;
+        };
+        let anchors = [first.body, second.body];
+        let anchor_axis = (second.local_position - first.local_position).normalized();
+        let anchor_axis = if anchor_axis.length_squared() > TARGET_EPSILON {
+            anchor_axis
+        } else {
+            Vec2::X
+        };
+        let lookahead = self.config.multi_body_escape_lookahead_distance.max(1.0);
+        let sample_count = self
+            .config
+            .multi_body_escape_direction_samples
+            .clamp(8, 128);
+        let current_travel =
+            if observation.own_ship.local_velocity.length_squared() > TARGET_EPSILON {
+                observation.own_ship.local_velocity.normalized()
+            } else {
+                Vec2::Y
+            };
+        let mut selected: Option<(f32, f32, f32, u32)> = None;
+        for sample in 0..sample_count {
+            let offset = 2.0 * PI * sample as f32 / sample_count as f32;
+            let direction = anchor_axis.rotate_radians(offset);
+            let mut minimum_margin = f32::INFINITY;
+            let mut margin_sum = 0.0;
+            for threat in threats {
+                let body_and_ship_radius =
+                    threat.local_position.length() - threat.surface_clearance;
+                let predicted_surface_clearance =
+                    (threat.local_position - direction * lookahead).length() - body_and_ship_radius;
+                let margin = predicted_surface_clearance - threat.required_clearance;
+                minimum_margin = minimum_margin.min(margin);
+                margin_sum += margin;
+            }
+            let average_margin = margin_sum / threats.len() as f32;
+            let travel_alignment = direction.dot(current_travel);
+            let candidate = (minimum_margin, average_margin, travel_alignment, sample);
+            let replaces = selected.is_none_or(|best| {
+                candidate
+                    .0
+                    .total_cmp(&best.0)
+                    .then_with(|| candidate.1.total_cmp(&best.1))
+                    .then_with(|| candidate.2.total_cmp(&best.2))
+                    .then_with(|| best.3.cmp(&candidate.3))
+                    .is_gt()
+            });
+            if replaces {
+                selected = Some(candidate);
+            }
+        }
+        let (_, _, _, sample) = selected?;
+        Some(MultiBodyEscapePlan {
+            anchors,
+            direction_offset_radians: 2.0 * PI * sample as f32 / sample_count as f32,
+            started_tick: observation.tick,
+            body_count: u32::try_from(threats.len()).unwrap_or(u32::MAX),
+        })
+    }
+
+    fn escape_direction(
+        observation: &ShipObservationV1,
+        plan: MultiBodyEscapePlan,
+        magnitude: f32,
+    ) -> Option<Vec2> {
+        let first = Self::body_local_position(observation, plan.anchors[0])?;
+        let second = Self::body_local_position(observation, plan.anchors[1])?;
+        let anchor_axis = (second - first).normalized();
+        let anchor_axis = if anchor_axis.length_squared() > TARGET_EPSILON {
+            anchor_axis
+        } else {
+            Vec2::X
+        };
+        Some(anchor_axis.rotate_radians(plan.direction_offset_radians) * magnitude.max(1.0))
+    }
+
+    fn decorate_telemetry(
+        &mut self,
+        observation: &ShipObservationV1,
+        direction: Option<Vec2>,
+        heading: Option<HeadingGuidance>,
+    ) {
+        let telemetry = &mut self.inner.inner.telemetry;
+        telemetry.multi_body_escape_active = self.multi_body_escape_plan.is_some();
+        telemetry.multi_body_escape_age_ticks = self
+            .multi_body_escape_plan
+            .map_or(0, |plan| observation.tick.saturating_sub(plan.started_tick));
+        telemetry.multi_body_escape_body_count = self
+            .multi_body_escape_plan
+            .map_or(0, |plan| plan.body_count);
+        telemetry.multi_body_escape_activations = self.multi_body_escape_activations;
+        if let Some(direction) = direction {
+            telemetry.goal = BrainGoal::AvoidBody;
+            telemetry.target_distance = direction.length();
+        }
+        if let Some(heading) = heading {
+            telemetry.heading_error = heading.error_radians;
+        }
+    }
+}
+
+impl ShipBrain for RuleShipBrainV7 {
+    fn descriptor(&self) -> ShipBrainDescriptor {
+        BuiltInPolicy::RuleV7.descriptor()
+    }
+
+    fn reset(&mut self, reset: BrainReset) {
+        self.inner.reset(reset);
+        self.multi_body_escape_plan = None;
+        self.multi_body_switch_tracker = None;
+        self.multi_body_escape_activations = 0;
+    }
+
+    fn intent(&mut self, observation: &ShipObservationV1) -> ShipIntent {
+        let inherited_intent = self.inner.intent(observation);
+        let inherited_telemetry = self.inner.telemetry();
+        let atomic_port_maneuver = matches!(
+            inherited_telemetry.port_phase,
+            Some(PortNavigationPhase::Docked | PortNavigationPhase::Depart)
+        );
+        if observation.own_ship.eliminated
+            || observation.own_ship.docked_planet.is_some()
+            || atomic_port_maneuver
+        {
+            self.multi_body_escape_plan = None;
+            self.multi_body_switch_tracker = None;
+            self.decorate_telemetry(observation, None, None);
+            return inherited_intent;
+        }
+
+        if let Some(plan) = self.multi_body_escape_plan {
+            let retained = self.body_threats(observation, true);
+            let tracked_body_remains = retained
+                .iter()
+                .any(|threat| plan.anchors.contains(&threat.body));
+            if !tracked_body_remains {
+                self.multi_body_escape_plan = None;
+                self.multi_body_switch_tracker = None;
+            }
+        }
+        if self.multi_body_escape_plan.is_none() && inherited_telemetry.goal == BrainGoal::AvoidBody
+        {
+            let threats = self.body_threats(observation, false);
+            let selected_body = inherited_telemetry
+                .avoided_body
+                .filter(|body| threats.iter().any(|threat| threat.body == *body));
+            let oscillating = threats.len() >= 2
+                && self.observe_multi_body_switches(observation.tick, selected_body);
+            if oscillating && let Some(plan) = self.select_escape_plan(observation, &threats) {
+                self.multi_body_escape_plan = Some(plan);
+                self.multi_body_escape_activations =
+                    self.multi_body_escape_activations.saturating_add(1);
+            }
+        } else if self.multi_body_escape_plan.is_none() {
+            self.multi_body_switch_tracker = None;
+        }
+
+        let Some(plan) = self.multi_body_escape_plan else {
+            self.decorate_telemetry(observation, None, None);
+            return inherited_intent;
+        };
+        let Some(direction) = Self::escape_direction(
+            observation,
+            plan,
+            self.config.multi_body_escape_lookahead_distance,
+        ) else {
+            self.multi_body_escape_plan = None;
+            self.multi_body_switch_tracker = None;
+            self.decorate_telemetry(observation, None, None);
+            return inherited_intent;
+        };
+        let (intent, heading) = body_escape_controls(
+            self.config.core.core,
+            observation,
+            direction,
+            false,
+            inherited_telemetry.avoidance_escape_assist,
+            inherited_telemetry.avoidance_emergency_escape_assist,
+        );
+        self.decorate_telemetry(observation, Some(direction), Some(heading));
+        intent
+    }
+
+    fn telemetry(&self) -> BrainTelemetry {
+        self.inner.telemetry()
     }
 }
 
@@ -4281,6 +5103,308 @@ mod tests {
             "brain did not select another uncaptured planet after departure; final telemetry: {:?}",
             brain.telemetry()
         );
+    }
+
+    #[test]
+    fn v6_preserves_seed_four_slow_but_successful_port_approach() {
+        let mut config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            use_starfield: false,
+            use_sounds: false,
+            ..SpacewarsConfig::default()
+        };
+        for player in &mut config.players {
+            player.health_percent = 100_000;
+        }
+        let mut state = SpacewarsScenario::init(config, 4);
+        let obstructed_planet = PlanetId::from_index(3).unwrap();
+        let mut brain = RuleShipBrainV6::default();
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+        let mut encoder = ShipIntentEncoder::default();
+        let mut saw_approach = false;
+        let mut saw_target_avoidance = false;
+        let mut maximum_avoidance_stall = 0;
+        let mut saw_docked = false;
+
+        for _ in 0..2_300 {
+            let observation = SpacewarsScenario::observe_ship(
+                &state,
+                PlayerId::PLAYER_2,
+                ShipSensorProfile::FullMapRadar,
+            )
+            .unwrap();
+            let intent = brain.intent(&observation);
+            let telemetry = brain.telemetry();
+            saw_approach |= telemetry.target_planet == Some(obstructed_planet)
+                && telemetry.port_phase == Some(PortNavigationPhase::Approach);
+            saw_target_avoidance |=
+                telemetry.avoided_body == Some(AvoidanceBody::Planet(obstructed_planet));
+            maximum_avoidance_stall =
+                maximum_avoidance_stall.max(telemetry.avoidance_stalled_ticks);
+            saw_docked |= telemetry.target_planet == Some(obstructed_planet)
+                && telemetry.port_phase == Some(PortNavigationPhase::Docked);
+            if saw_docked {
+                break;
+            }
+
+            let actions = encoder.encode(PlayerId::PLAYER_2.index(), intent);
+            SpacewarsScenario::step(&mut state, &actions, DT);
+        }
+
+        assert!(saw_approach, "seed 4 never entered the known approach");
+        assert!(
+            saw_target_avoidance,
+            "seed 4 never reproduced target-planet avoidance"
+        );
+        assert!(
+            maximum_avoidance_stall >= 600,
+            "seed 4 did not reproduce the sustained obstruction; maximum stall {maximum_avoidance_stall}"
+        );
+        assert!(saw_docked, "V6 abandoned an approach that V5 can complete");
+        assert_eq!(brain.telemetry().port_replan_count, 0);
+        assert_eq!(brain.telemetry().cooled_port_planet, None);
+    }
+
+    #[test]
+    fn v6_cools_a_repeatedly_obstructed_capture_target() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 8);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.sun = None;
+        observation.opponent = None;
+        observation.hazards.clear();
+        observation.planets.truncate(2);
+        let collision_radius = observation.own_ship.collision_radius;
+        for (index, planet) in observation.planets.iter_mut().enumerate() {
+            planet.owner = None;
+            planet.local_velocity = Vec2::ZERO;
+            planet.local_spaceport_velocity = Vec2::ZERO;
+            let distance = if index == 0 {
+                planet.radius + collision_radius + 5.0
+            } else {
+                2_000.0
+            };
+            planet.local_position = Vec2::X * distance;
+            planet.local_spaceport_position = planet.local_position + Vec2::Y * planet.radius;
+        }
+        let obstructed_planet = observation.planets[0].id;
+        let alternative_planet = observation.planets[1].id;
+        let brain_config = RuleShipBrainV6Config {
+            port_attempt_stall_ticks: 3,
+            port_attempt_obstruction_ticks: 2,
+            port_attempt_phase_timeout_ticks: 3,
+            port_target_cooldown_ticks: 20,
+            ..RuleShipBrainV6Config::default()
+        };
+        let mut brain = RuleShipBrainV6::new(brain_config);
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        for tick in 0..=3 {
+            observation.tick = tick;
+            let _ = brain.intent(&observation);
+        }
+
+        let telemetry = brain.telemetry();
+        assert_eq!(telemetry.port_replan_count, 1);
+        assert_eq!(telemetry.cooled_port_planet, Some(obstructed_planet));
+        assert_eq!(
+            telemetry.strategy.selection_reason,
+            Some(StrategySelectionReason::TargetCooldown)
+        );
+        assert_eq!(telemetry.strategy.target_planet, Some(alternative_planet));
+    }
+
+    #[test]
+    fn v6_does_not_abandon_the_only_rebuild_port() {
+        let config = SpacewarsConfig {
+            asteroid_probability_per_sec: 0.0,
+            ..SpacewarsConfig::default()
+        };
+        let state = SpacewarsScenario::init(config, 4);
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.sun = None;
+        observation.opponent = None;
+        observation.hazards.clear();
+        observation.planets.truncate(1);
+        observation.planets[0].owner = Some(PlayerId::PLAYER_2);
+        observation.own_ship.form = ShipForm::EscapePod;
+        let only_port = observation.planets[0].id;
+        let brain_config = RuleShipBrainV6Config {
+            port_attempt_stall_ticks: 1,
+            ..RuleShipBrainV6Config::default()
+        };
+        let mut brain = RuleShipBrainV6::new(brain_config);
+        brain.reset(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        });
+
+        let _ = brain.intent(&observation);
+        observation.tick += 1;
+        let _ = brain.intent(&observation);
+
+        let telemetry = brain.telemetry();
+        assert_eq!(telemetry.strategy.goal, StrategicGoal::Rebuild);
+        assert_eq!(telemetry.strategy.target_planet, Some(only_port));
+        assert_eq!(telemetry.port_replan_count, 0);
+        assert_eq!(telemetry.cooled_port_planet, None);
+    }
+
+    #[test]
+    fn v7_latches_one_exit_route_across_alternating_overlapping_bodies() {
+        let state = SpacewarsScenario::init(
+            SpacewarsConfig {
+                asteroid_probability_per_sec: 0.0,
+                ..SpacewarsConfig::default()
+            },
+            52,
+        );
+        let mut observation = SpacewarsScenario::observe_ship(
+            &state,
+            PlayerId::PLAYER_2,
+            ShipSensorProfile::FullMapRadar,
+        )
+        .unwrap();
+        observation.hazards.clear();
+        observation.planets.truncate(1);
+        observation.own_ship.local_velocity = Vec2::ZERO;
+        observation.own_ship.angular_velocity = 0.0;
+        let ship_radius = observation.own_ship.collision_radius;
+        let body_radius = 100.0;
+        let planet_id = observation.planets[0].id;
+        let planet = &mut observation.planets[0];
+        planet.radius = body_radius;
+        planet.owner = Some(PlayerId::PLAYER_1);
+        planet.capturing_player = None;
+        planet.local_velocity = Vec2::ZERO;
+        planet.local_spaceport_velocity = Vec2::ZERO;
+        let sun = observation
+            .sun
+            .as_mut()
+            .expect("standard worlds have a sun");
+        sun.radius = body_radius;
+        sun.local_velocity = Vec2::ZERO;
+
+        let mut v6 = RuleShipBrainV6::default();
+        let mut v7 = RuleShipBrainV7::default();
+        let reset = BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        };
+        v6.reset(reset);
+        v7.reset(reset);
+        let mut preceding_body = None;
+        let mut v6_body_switches = 0;
+        let mut v7_turn = None;
+
+        for tick in 0..8 {
+            observation.tick = tick;
+            let (sun_clearance, planet_clearance) = if tick % 2 == 0 {
+                (5.0, 6.0)
+            } else {
+                (6.0, 5.0)
+            };
+            observation.sun.as_mut().unwrap().local_position =
+                -Vec2::X * (body_radius + ship_radius + sun_clearance);
+            let planet = &mut observation.planets[0];
+            planet.local_position = Vec2::X * (body_radius + ship_radius + planet_clearance);
+            planet.local_spaceport_position = planet.local_position + Vec2::Y * body_radius;
+
+            let _ = v6.intent(&observation);
+            let avoided_body = v6.telemetry().avoided_body;
+            if preceding_body.is_some() && preceding_body != avoided_body {
+                v6_body_switches += 1;
+            }
+            preceding_body = avoided_body;
+
+            let v7_intent = v7.intent(&observation);
+            let telemetry = v7.telemetry();
+            if tick < 2 {
+                assert!(!telemetry.multi_body_escape_active);
+                assert_eq!(telemetry.multi_body_escape_activations, 0);
+            } else {
+                assert!(telemetry.multi_body_escape_active);
+                assert_eq!(telemetry.multi_body_escape_body_count, 2);
+                assert_eq!(telemetry.multi_body_escape_activations, 1);
+                if let Some(expected_turn) = v7_turn {
+                    assert_close(v7_intent.turn, expected_turn);
+                } else {
+                    v7_turn = Some(v7_intent.turn);
+                }
+                assert_eq!(v7_intent.thrust, 1.0);
+            }
+        }
+
+        assert_eq!(v6_body_switches, 7);
+        assert_eq!(preceding_body, Some(AvoidanceBody::Planet(planet_id)));
+
+        observation.tick = 8;
+        let released_clearance = RuleShipBrainConfig::default().body_clearance
+            + RuleShipBrainV7Config::default().multi_body_escape_release_margin
+            + 1.0;
+        observation.sun.as_mut().unwrap().local_position =
+            -Vec2::X * (body_radius + ship_radius + released_clearance);
+        let _ = v7.intent(&observation);
+
+        assert!(v7.telemetry().multi_body_escape_active);
+
+        observation.tick = 9;
+        observation.planets[0].local_position =
+            Vec2::X * (body_radius + ship_radius + released_clearance);
+        let _ = v7.intent(&observation);
+
+        assert!(!v7.telemetry().multi_body_escape_active);
+        assert_eq!(v7.telemetry().multi_body_escape_activations, 1);
+    }
+
+    #[test]
+    fn v7_delegates_exactly_to_v6_without_multi_body_oscillation() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 53);
+        let reset = BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: state.seed,
+        };
+        let mut v6 = RuleShipBrainV6::default();
+        let mut v7 = RuleShipBrainV7::default();
+        let mut encoder = ShipIntentEncoder::default();
+        v6.reset(reset);
+        v7.reset(reset);
+
+        for _ in 0..300 {
+            let observation = SpacewarsScenario::observe_ship(
+                &state,
+                PlayerId::PLAYER_2,
+                ShipSensorProfile::FullMapRadar,
+            )
+            .unwrap();
+            let v6_intent = v6.intent(&observation);
+            let v7_intent = v7.intent(&observation);
+
+            assert_eq!(v7_intent, v6_intent);
+            assert_eq!(v7.telemetry(), v6.telemetry());
+
+            let actions = encoder.encode(PlayerId::PLAYER_2.index(), v6_intent);
+            SpacewarsScenario::step(&mut state, &actions, DT);
+        }
     }
 
     #[test]
