@@ -60,15 +60,46 @@ impl fmt::Display for UiScreen {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UiControl {
+    pub id: String,
+    pub label: String,
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+}
+
+impl UiControl {
+    pub fn new(id: impl Into<String>, label: impl Into<String>, enabled: bool) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            enabled,
+            value: None,
+        }
+    }
+
+    pub fn with_value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiState {
     pub schema_version: u32,
     pub revision: u64,
     pub screen: UiScreen,
     pub active_scenario: Option<String>,
     pub selected_scenario: String,
+    #[serde(default)]
+    pub selected_control: Option<String>,
+    #[serde(default)]
+    pub controls: Vec<UiControl>,
     pub scenario_revision: Option<u64>,
     pub paused: bool,
     pub benchmark_active: bool,
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 impl UiState {
@@ -219,9 +250,16 @@ mod tests {
             screen: UiScreen::LauncherMain,
             active_scenario: None,
             selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.scenario".into()),
+            controls: vec![
+                UiControl::new("launcher.scenario.previous", "‹", true).with_value("spacewars"),
+                UiControl::new("launcher.scenario.next", "›", true).with_value("spacewars"),
+                UiControl::new("launcher.start", "Start Game", true),
+            ],
             scenario_revision: None,
             paused: false,
             benchmark_active: false,
+            error: None,
         }
     }
 
@@ -268,6 +306,38 @@ mod tests {
             UiState::from_json(&serde_json::to_string(&unsupported).unwrap()),
             Err(ProtocolError::UnsupportedSchemaVersion { .. })
         ));
+    }
+
+    #[test]
+    fn ui_state_additions_accept_the_original_v1_payload() {
+        let original = r#"{
+            "schema_version": 1,
+            "revision": 2,
+            "screen": "gameplay",
+            "active_scenario": "pizza",
+            "selected_scenario": "pizza",
+            "scenario_revision": 7,
+            "paused": false,
+            "benchmark_active": false
+        }"#;
+
+        let state = UiState::from_json(original).unwrap();
+
+        assert_eq!(state.selected_control, None);
+        assert!(state.controls.is_empty());
+        assert_eq!(state.error, None);
+    }
+
+    #[test]
+    fn control_values_are_optional_in_json() {
+        let json = sample_state().to_json().unwrap();
+        let controls = serde_json::from_str::<serde_json::Value>(&json).unwrap()["controls"]
+            .as_array()
+            .unwrap()
+            .clone();
+
+        assert_eq!(controls[0]["value"], "spacewars");
+        assert!(controls[2].get("value").is_none());
     }
 
     #[test]

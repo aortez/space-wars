@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use engine_common::DEFAULT_CONTROL_SOCKET;
 #[cfg(test)]
 use spacewars_control::UI_STATE_SCHEMA_VERSION;
-use spacewars_control::{UI_STATE_COMMAND, UiState, parse_runtime_status};
+use spacewars_control::{UI_STATE_COMMAND, UiControl, UiState, parse_runtime_status};
 
 #[derive(Debug, Parser)]
 #[command(name = "spacewars-cli", about = "Space-Wars runtime control helper")]
@@ -228,16 +228,35 @@ fn parse_response(response: &str) -> Result<&str, String> {
 }
 
 fn format_ui_state(state: &UiState) -> String {
-    format!(
-        "schema_version={}\nrevision={}\nscreen={}\nactive_scenario={}\nselected_scenario={}\nscenario_revision={}\npaused={}\nbenchmark_active={}",
+    let mut output = format!(
+        "schema_version={}\nrevision={}\nscreen={}\nactive_scenario={}\nselected_scenario={}\nselected_control={}\nscenario_revision={}\npaused={}\nbenchmark_active={}\nerror={}\ncontrols={}",
         state.schema_version,
         state.revision,
         state.screen,
         state.active_scenario.as_deref().unwrap_or("none"),
         state.selected_scenario,
+        state.selected_control.as_deref().unwrap_or("none"),
         format_scenario_revision(state.scenario_revision),
         state.paused,
         state.benchmark_active,
+        state.error.as_deref().unwrap_or("none"),
+        state.controls.len(),
+    );
+    for control in &state.controls {
+        output.push_str(&format_control(control));
+    }
+    output
+}
+
+fn format_control(control: &UiControl) -> String {
+    let value = control
+        .value
+        .as_deref()
+        .map(|value| format!(" value={value:?}"))
+        .unwrap_or_default();
+    format!(
+        "\ncontrol={} label={:?} enabled={}{}",
+        control.id, control.label, control.enabled, value
     )
 }
 
@@ -360,14 +379,20 @@ mod tests {
             screen: spacewars_control::UiScreen::PauseMain,
             active_scenario: Some("pizza".into()),
             selected_scenario: "pizza".into(),
+            selected_control: Some("pause.resume".into()),
+            controls: vec![
+                UiControl::new("pause.resume", "Resume", true),
+                UiControl::new("pause.restart", "Restart Round", true),
+            ],
             scenario_revision: Some(3),
             paused: true,
             benchmark_active: false,
+            error: Some("Paused by controller".into()),
         };
 
         assert_eq!(
             format_ui_state(&state),
-            "schema_version=1\nrevision=8\nscreen=pause.main\nactive_scenario=pizza\nselected_scenario=pizza\nscenario_revision=3\npaused=true\nbenchmark_active=false"
+            "schema_version=1\nrevision=8\nscreen=pause.main\nactive_scenario=pizza\nselected_scenario=pizza\nselected_control=pause.resume\nscenario_revision=3\npaused=true\nbenchmark_active=false\nerror=Paused by controller\ncontrols=2\ncontrol=pause.resume label=\"Resume\" enabled=true\ncontrol=pause.restart label=\"Restart Round\" enabled=true"
         );
     }
 

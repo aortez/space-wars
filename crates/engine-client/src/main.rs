@@ -15,6 +15,7 @@ mod nes_roms;
 mod raster;
 mod render;
 mod settings;
+mod ui_inventory;
 mod ui_navigation;
 
 use std::cell::RefCell;

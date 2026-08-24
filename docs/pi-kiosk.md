@@ -175,6 +175,9 @@ spacewars-cli ui state --json
 
 The versioned JSON snapshot includes the UI revision, exact screen, selected and
 active scenario IDs, scenario instance revision, and pause/benchmark state. A
+screen inventory identifies the selected control and every visible control by
+stable ID, label, and enabled state; settings arrows also include their current
+displayed value. Visible launcher or scenario errors appear in the same state. A
 launcher snapshot always has no active scenario, including after returning from
 gameplay. `status` remains available for detailed performance and
 scenario-specific diagnostics.

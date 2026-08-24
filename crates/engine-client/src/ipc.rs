@@ -18,11 +18,15 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    ProtocolError, RuntimeStatus, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiScreen, UiState,
-    parse_runtime_status,
+    ProtocolError, RuntimeStatus, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiControl, UiScreen,
+    UiState, parse_runtime_status,
 };
 
 use crate::MainWindow;
+#[cfg(unix)]
+use crate::ui_inventory::{
+    ScreenVisibility, UiInventoryContext, classify_screen, inventory_for_screen,
+};
 
 #[cfg(unix)]
 #[derive(Debug)]
@@ -41,26 +45,17 @@ enum ControlCommand {
 }
 
 #[cfg(unix)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct ScreenVisibility {
-    launcher: bool,
-    launcher_controls: bool,
-    launcher_settings: bool,
-    touch_test: bool,
-    ingame_menu: bool,
-    ingame_controls: bool,
-    game_over: bool,
-}
-
-#[cfg(unix)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct UiStateObservation {
     screen: UiScreen,
     active_scenario: Option<String>,
     selected_scenario: String,
+    selected_control: Option<String>,
+    controls: Vec<UiControl>,
     scenario_revision: Option<u64>,
     paused: bool,
     benchmark_active: bool,
+    error: Option<String>,
 }
 
 #[cfg(unix)]
@@ -84,9 +79,12 @@ impl UiStateTracker {
             screen: observation.screen,
             active_scenario: observation.active_scenario,
             selected_scenario: observation.selected_scenario,
+            selected_control: observation.selected_control,
+            controls: observation.controls,
             scenario_revision: observation.scenario_revision,
             paused: observation.paused,
             benchmark_active: observation.benchmark_active,
+            error: observation.error,
         }
     }
 }
@@ -304,15 +302,49 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         game_over: window.get_game_over_visible(),
     });
     let runtime = runtime_status_for_screen(screen, window.get_runtime_diagnostics().as_str())?;
+    let selected_scenario = window.get_launcher_scenario().to_string();
+    let inventory = inventory_for_screen(
+        screen,
+        &UiInventoryContext {
+            selected_scenario: selected_scenario.clone(),
+            launcher_focus_index: window.get_launcher_focus_index(),
+            launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
+            launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
+            ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
+            game_over_focus_index: window.get_game_over_focus_index(),
+            benchmark_available: window.get_scenario_benchmark_available(),
+            launch_available: selected_scenario != "nes" || window.get_launcher_nes_rom_supported(),
+            launcher_error: non_empty(window.get_launcher_error_text().as_str()),
+            scenario_error: non_empty(window.get_scenario_error_text().as_str()),
+            renderer: window.get_launcher_renderer().to_string(),
+            raster_scale: window.get_launcher_raster_scale_text().to_string(),
+            spacewars_preset: window.get_launcher_spacewars_preset().to_string(),
+            spacewars_planets: window.get_launcher_use_planets().to_string(),
+            spacewars_asteroids: window.get_launcher_asteroids_enabled().to_string(),
+            spacewars_player_health: window.get_launcher_player_health_text().to_string(),
+            spacewars_player_2: window.get_launcher_p2_controller().to_string(),
+            pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
+            pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
+        },
+    );
 
     Ok(tracker.observe(UiStateObservation {
         screen,
         active_scenario: runtime.active_scenario,
-        selected_scenario: window.get_launcher_scenario().into(),
+        selected_scenario,
+        selected_control: inventory.selected_control,
+        controls: inventory.controls,
         scenario_revision: runtime.scenario_revision,
         paused: runtime.paused,
         benchmark_active: runtime.benchmark_active,
+        error: inventory.error,
     }))
+}
+
+#[cfg(unix)]
+fn non_empty(text: &str) -> Option<String> {
+    (!text.is_empty()).then(|| text.into())
 }
 
 #[cfg(unix)]
@@ -324,29 +356,6 @@ fn runtime_status_for_screen(
         Ok(RuntimeStatus::inactive())
     } else {
         parse_runtime_status(diagnostics)
-    }
-}
-
-#[cfg(unix)]
-fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
-    if visibility.touch_test {
-        UiScreen::LauncherTouchTest
-    } else if visibility.launcher {
-        if visibility.launcher_controls {
-            UiScreen::LauncherControls
-        } else if visibility.launcher_settings {
-            UiScreen::LauncherSettings
-        } else {
-            UiScreen::LauncherMain
-        }
-    } else if visibility.game_over {
-        UiScreen::GameOver
-    } else if visibility.ingame_controls {
-        UiScreen::PauseControls
-    } else if visibility.ingame_menu {
-        UiScreen::PauseMain
-    } else {
-        UiScreen::Gameplay
     }
 }
 
@@ -431,113 +440,17 @@ mod tests {
     }
 
     #[test]
-    fn classifies_all_ui_screens() {
-        let cases = [
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherMain,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    launcher_settings: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherSettings,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    launcher_controls: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherControls,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    touch_test: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherTouchTest,
-            ),
-            (ScreenVisibility::default(), UiScreen::Gameplay),
-            (
-                ScreenVisibility {
-                    ingame_menu: true,
-                    ..Default::default()
-                },
-                UiScreen::PauseMain,
-            ),
-            (
-                ScreenVisibility {
-                    ingame_menu: true,
-                    ingame_controls: true,
-                    ..Default::default()
-                },
-                UiScreen::PauseControls,
-            ),
-            (
-                ScreenVisibility {
-                    game_over: true,
-                    ..Default::default()
-                },
-                UiScreen::GameOver,
-            ),
-        ];
-
-        for (visibility, expected) in cases {
-            assert_eq!(classify_screen(visibility), expected);
-        }
-    }
-
-    #[test]
-    fn classifies_the_topmost_visible_screen() {
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                launcher: true,
-                launcher_controls: true,
-                launcher_settings: true,
-                touch_test: true,
-                ingame_menu: true,
-                ingame_controls: true,
-                game_over: true,
-            }),
-            UiScreen::LauncherTouchTest
-        );
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                launcher: true,
-                launcher_controls: true,
-                launcher_settings: true,
-                game_over: true,
-                ..Default::default()
-            }),
-            UiScreen::LauncherControls
-        );
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                ingame_menu: true,
-                ingame_controls: true,
-                game_over: true,
-                ..Default::default()
-            }),
-            UiScreen::GameOver
-        );
-    }
-
-    #[test]
     fn ui_revision_changes_only_with_observed_state() {
         let observation = UiStateObservation {
             screen: UiScreen::Gameplay,
             active_scenario: Some("pizza".into()),
             selected_scenario: "pizza".into(),
+            selected_control: None,
+            controls: Vec::new(),
             scenario_revision: Some(7),
             paused: false,
             benchmark_active: false,
+            error: None,
         };
         let mut tracker = UiStateTracker::default();
 
@@ -550,6 +463,31 @@ mod tests {
         assert_eq!(first.revision, 1);
         assert_eq!(unchanged.revision, first.revision);
         assert_eq!(changed.revision, first.revision + 1);
+    }
+
+    #[test]
+    fn ui_revision_changes_with_inventory_state() {
+        let mut observation = UiStateObservation {
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "pizza".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut tracker = UiStateTracker::default();
+        let first = tracker.observe(observation.clone());
+
+        observation.controls[0].value = Some("ready".into());
+        let value_changed = tracker.observe(observation.clone());
+        observation.error = Some("Could not start".into());
+        let error_changed = tracker.observe(observation);
+
+        assert_eq!(value_changed.revision, first.revision + 1);
+        assert_eq!(error_changed.revision, value_changed.revision + 1);
     }
 
     #[test]

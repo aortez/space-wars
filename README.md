@@ -139,6 +139,9 @@ spacewars-cli ui state --json
 The JSON form is a versioned automation contract. It reports the exact launcher,
 gameplay, pause, controls, touch-test, or game-over screen; a monotonic UI
 revision; the active scenario instance revision; and pause and benchmark state.
+Each screen also reports its selected control, visible controls with stable IDs,
+labels and enabled state, and any visible error. Choice arrows include their
+current displayed value so settings changes advance the UI revision.
 Returning to the launcher clears active-scenario state while preserving the
 launcher selection. The existing `status` command remains the detailed
 performance and scenario diagnostics interface.
