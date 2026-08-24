@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.89.0
       - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev xauth xvfb
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - run: cargo test --locked --workspace --all-targets
       - name: Run black-box UI functional tests
         run: xvfb-run -a -s "-screen 0 1280x1024x24" cargo test --locked -p engine-client --test ui_control_functional -- --ignored --test-threads=1
