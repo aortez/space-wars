@@ -11,6 +11,7 @@ use crate::input::ClientInput;
 use crate::nes_realtime::{RealtimeTelemetry, RealtimeVideoConsumer};
 use crate::render::{FrameLayout, Viewport};
 
+mod clock;
 mod falling;
 mod nes;
 mod null;
@@ -354,6 +355,7 @@ impl std::error::Error for ScenarioCreateError {}
 
 static SCENARIOS: &[ScenarioRegistration] = &[
     null::REGISTRATION,
+    clock::REGISTRATION,
     falling::REGISTRATION,
     nes::REGISTRATION,
     pizza::REGISTRATION,
@@ -417,7 +419,7 @@ mod tests {
             launcher_registrations()
                 .map(|registration| registration.id)
                 .collect::<Vec<_>>(),
-            vec!["falling", "nes", "pizza", "rover-lab", "spacewars"]
+            vec!["clock", "falling", "nes", "pizza", "rover-lab", "spacewars"]
         );
     }
 

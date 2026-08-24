@@ -12,6 +12,7 @@ members = [
     "crates/spacewars-cli",
     "crates/engine-agent",
     "crates/engine-os-manager",
+    "scenarios/clock",
     "scenarios/falling",
     "scenarios/nes",
     "scenarios/null",
@@ -33,6 +34,7 @@ rust-version = "1.89"
 [workspace.dependencies]
 # External.
 bincode = "1"
+chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 cpal = "0.18.2"
 directories = "6"
@@ -65,6 +67,7 @@ engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
+scenario-clock = { path = "scenarios/clock" }
 scenario-falling = { path = "scenarios/falling" }
 scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
