@@ -75,6 +75,7 @@ pub struct ScenarioControls {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScenarioControlRequest {
+    Pause,
     Resume,
     Restart,
     Benchmark,
@@ -87,6 +88,10 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
 }
 
 impl ScenarioControls {
+    pub fn request_pause(&mut self) {
+        self.request = Some(ScenarioControlRequest::Pause);
+    }
+
     pub fn request_resume(&mut self) {
         self.request = Some(ScenarioControlRequest::Resume);
     }
@@ -820,6 +825,16 @@ fn step_scenario_inner(
 
     if let Some(request) = controls.take_request() {
         match request {
+            ScenarioControlRequest::Pause => {
+                if !scenario.is_game_over() {
+                    *paused = true;
+                    *accumulator = Duration::ZERO;
+                    deliver_pointer_cancellation(scenario, input, input_projections);
+                    input.clear();
+                    tracing::info!(benchmark = *benchmark_active, "paused by host control.");
+                }
+                return HostStepResult::default();
+            }
             ScenarioControlRequest::Resume => {
                 *paused = false;
                 *accumulator = Duration::ZERO;
@@ -1131,6 +1146,11 @@ fn start_benchmark_scenario(
 
 fn set_ingame_menu(window: &MainWindow, paused: bool) {
     let visible = paused && !window.get_launcher_visible();
+    if visible && !window.get_ingame_menu_visible() {
+        // Reset focus before exposing the menu so external state observers do
+        // not see a transient selection carried over from the previous pause.
+        window.set_ingame_menu_focus_index(0);
+    }
     window.set_ingame_menu_visible(visible);
     if !visible {
         window.set_ingame_controls_visible(false);
@@ -3238,13 +3258,34 @@ mod tests {
     }
 
     #[test]
-    fn scenario_controls_resume_restart_and_start_benchmark() {
+    fn scenario_controls_pause_resume_restart_and_start_benchmark() {
         let mut scenario = hosted_scenario("spacewars", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
-        let mut paused = true;
+        let mut paused = false;
         let mut benchmark_active = false;
+
+        controls.request_pause();
+        step_scenario(
+            &mut scenario,
+            "spacewars",
+            42,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(Duration::from_secs_f64(1.0 / 60.0)),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &Settings::default(),
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert!(paused);
+        assert_eq!(accumulator, Duration::ZERO);
 
         controls.request_resume();
         step_scenario(

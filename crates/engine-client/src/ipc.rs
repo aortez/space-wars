@@ -18,11 +18,17 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    ProtocolError, RuntimeStatus, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiScreen, UiState,
-    parse_runtime_status,
+    ControlFailure, ControlFailureCode, HOST_PAUSE_COMMAND, HostPauseRequest, ProtocolError,
+    RuntimeStatus, UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND, UI_STATE_COMMAND,
+    UI_STATE_SCHEMA_VERSION, UiAction, UiActivateRequest, UiControl, UiPressRequest, UiScreen,
+    UiState, parse_runtime_status,
 };
 
-use crate::MainWindow;
+#[cfg(unix)]
+use crate::ui_inventory::{
+    ScreenVisibility, UiInventoryContext, classify_screen, inventory_for_screen,
+};
+use crate::{MainWindow, host};
 
 #[cfg(unix)]
 #[derive(Debug)]
@@ -37,19 +43,17 @@ enum ControlCommand {
     Screenshot { output: PathBuf },
     Status,
     UiState,
+    UiPress(UiPressRequest),
+    UiActivate(UiActivateRequest),
+    HostPause(HostPauseRequest),
     HostBenchmark,
 }
 
 #[cfg(unix)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct ScreenVisibility {
-    launcher: bool,
-    launcher_controls: bool,
-    launcher_settings: bool,
-    touch_test: bool,
-    ingame_menu: bool,
-    ingame_controls: bool,
-    game_over: bool,
+#[derive(Debug)]
+enum CommandParseError {
+    Legacy(String),
+    Structured(Box<ControlFailure>),
 }
 
 #[cfg(unix)]
@@ -58,9 +62,13 @@ struct UiStateObservation {
     screen: UiScreen,
     active_scenario: Option<String>,
     selected_scenario: String,
+    selected_control: Option<String>,
+    controls: Vec<UiControl>,
+    actions: Vec<UiAction>,
     scenario_revision: Option<u64>,
     paused: bool,
     benchmark_active: bool,
+    error: Option<String>,
 }
 
 #[cfg(unix)]
@@ -84,9 +92,13 @@ impl UiStateTracker {
             screen: observation.screen,
             active_scenario: observation.active_scenario,
             selected_scenario: observation.selected_scenario,
+            selected_control: observation.selected_control,
+            controls: observation.controls,
+            actions: observation.actions,
             scenario_revision: observation.scenario_revision,
             paused: observation.paused,
             benchmark_active: observation.benchmark_active,
+            error: observation.error,
         }
     }
 }
@@ -106,6 +118,13 @@ impl ResponseWriter {
     fn error(mut self, message: impl AsRef<str>) {
         let _ = writeln!(self.stream, "error {}", message.as_ref());
     }
+
+    fn control_failure(self, failure: ControlFailure) {
+        match failure.to_json() {
+            Ok(json) => self.error(json),
+            Err(error) => self.error(error.to_string()),
+        }
+    }
 }
 
 pub fn control_socket_path() -> PathBuf {
@@ -115,7 +134,11 @@ pub fn control_socket_path() -> PathBuf {
 }
 
 #[cfg(unix)]
-pub fn start_control_server(window: &MainWindow, socket_path: PathBuf) -> Option<Timer> {
+pub fn start_control_server(
+    window: &MainWindow,
+    socket_path: PathBuf,
+    scenario_controls: host::SharedScenarioControls,
+) -> Option<Timer> {
     let (tx, rx) = mpsc::channel();
     if let Err(err) = spawn_listener(socket_path.clone(), tx) {
         tracing::warn!(
@@ -135,7 +158,7 @@ pub fn start_control_server(window: &MainWindow, socket_path: PathBuf) -> Option
         };
 
         while let Ok(request) = rx.try_recv() {
-            handle_request(&window, request, &mut ui_state_tracker);
+            handle_request(&window, request, &mut ui_state_tracker, &scenario_controls);
         }
     });
 
@@ -143,7 +166,11 @@ pub fn start_control_server(window: &MainWindow, socket_path: PathBuf) -> Option
 }
 
 #[cfg(not(unix))]
-pub fn start_control_server(_window: &MainWindow, _socket_path: PathBuf) -> Option<Timer> {
+pub fn start_control_server(
+    _window: &MainWindow,
+    _socket_path: PathBuf,
+    _scenario_controls: host::SharedScenarioControls,
+) -> Option<Timer> {
     tracing::info!("control socket is unavailable on this platform.");
     None
 }
@@ -190,8 +217,12 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
     let response = ResponseWriter { stream };
     let command = match parse_command(&body) {
         Ok(command) => command,
-        Err(message) => {
+        Err(CommandParseError::Legacy(message)) => {
             response.error(message);
+            return;
+        }
+        Err(CommandParseError::Structured(failure)) => {
+            response.control_failure(*failure);
             return;
         }
     };
@@ -205,18 +236,22 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
 }
 
 #[cfg(unix)]
-fn parse_command(body: &str) -> Result<ControlCommand, String> {
+fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
     let mut lines = body.lines();
     match lines.next() {
         Some("screenshot") => {
             let Some(output) = lines.next() else {
-                return Err("missing screenshot output path".into());
+                return Err(CommandParseError::Legacy(
+                    "missing screenshot output path".into(),
+                ));
             };
             if output.is_empty() {
-                return Err("screenshot output path must not be empty".into());
+                return Err(CommandParseError::Legacy(
+                    "screenshot output path must not be empty".into(),
+                ));
             }
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::Screenshot {
                 output: PathBuf::from(output),
@@ -224,25 +259,75 @@ fn parse_command(body: &str) -> Result<ControlCommand, String> {
         }
         Some("status") => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::Status)
         }
         Some(UI_STATE_COMMAND) => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::UiState)
         }
+        Some(UI_PRESS_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("ui press requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "ui press accepts exactly one JSON request line",
+                ));
+            }
+            UiPressRequest::from_json(payload)
+                .map(ControlCommand::UiPress)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
+        Some(UI_ACTIVATE_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("ui activate requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "ui activate accepts exactly one JSON request line",
+                ));
+            }
+            UiActivateRequest::from_json(payload)
+                .map(ControlCommand::UiActivate)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
+        Some(HOST_PAUSE_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("host pause requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "host pause accepts exactly one JSON request line",
+                ));
+            }
+            HostPauseRequest::from_json(payload)
+                .map(ControlCommand::HostPause)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some("host benchmark") => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::HostBenchmark)
         }
-        Some(command) => Err(format!("unknown command {command:?}")),
-        None => Err("empty command".into()),
+        Some(command) => Err(CommandParseError::Legacy(format!(
+            "unknown command {command:?}"
+        ))),
+        None => Err(CommandParseError::Legacy("empty command".into())),
     }
+}
+
+#[cfg(unix)]
+fn invalid_mutation_request(message: impl Into<String>) -> CommandParseError {
+    CommandParseError::Structured(Box::new(ControlFailure::new(
+        ControlFailureCode::InvalidRequest,
+        message,
+        None,
+    )))
 }
 
 #[cfg(unix)]
@@ -250,6 +335,7 @@ fn handle_request(
     window: &MainWindow,
     request: ControlRequest,
     ui_state_tracker: &mut UiStateTracker,
+    scenario_controls: &host::SharedScenarioControls,
 ) {
     match request.command {
         ControlCommand::Screenshot { output } => match write_window_screenshot(window, &output) {
@@ -264,6 +350,21 @@ fn handle_request(
                 Ok(json) => request.response.ok(json),
                 Err(error) => request.response.error(error.to_string()),
             }
+        }
+        ControlCommand::UiPress(press) => {
+            handle_ui_press(window, press, request.response, ui_state_tracker);
+        }
+        ControlCommand::UiActivate(activation) => {
+            handle_ui_activate(window, activation, request.response, ui_state_tracker);
+        }
+        ControlCommand::HostPause(pause) => {
+            handle_host_pause(
+                window,
+                pause,
+                request.response,
+                ui_state_tracker,
+                scenario_controls,
+            );
         }
         ControlCommand::HostBenchmark => {
             if !window.get_scenario_benchmark_available() {
@@ -293,6 +394,229 @@ fn handle_request(
 }
 
 #[cfg(unix)]
+fn handle_ui_press(
+    window: &MainWindow,
+    request: UiPressRequest,
+    response: ResponseWriter,
+    ui_state_tracker: &mut UiStateTracker,
+) {
+    let state = match ui_state(window, ui_state_tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+
+    if let Err(failure) = validate_ui_press(&request, &state) {
+        response.control_failure(*failure);
+        return;
+    }
+
+    window.invoke_ui_action(request.action.code());
+    match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn handle_ui_activate(
+    window: &MainWindow,
+    request: UiActivateRequest,
+    response: ResponseWriter,
+    ui_state_tracker: &mut UiStateTracker,
+) {
+    let state = match ui_state(window, ui_state_tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+
+    if let Err(failure) = validate_ui_activate(&request, &state) {
+        response.control_failure(*failure);
+        return;
+    }
+
+    if !crate::ui_activation::activate(window, &request.control_id) {
+        response.control_failure(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
+            format!(
+                "control {:?} is visible and enabled on {}, but has no semantic activation mapping",
+                request.control_id, state.screen
+            ),
+            Some(state),
+        ));
+        return;
+    }
+
+    match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn handle_host_pause(
+    window: &MainWindow,
+    request: HostPauseRequest,
+    response: ResponseWriter,
+    ui_state_tracker: &mut UiStateTracker,
+    scenario_controls: &host::SharedScenarioControls,
+) {
+    let state = match ui_state(window, ui_state_tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+
+    if let Err(failure) = validate_host_pause(&request, &state) {
+        response.control_failure(*failure);
+        return;
+    }
+
+    scenario_controls.borrow_mut().request_pause();
+    match state.to_json() {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn validate_ui_press(request: &UiPressRequest, state: &UiState) -> Result<(), Box<ControlFailure>> {
+    validate_ui_preconditions(request.expected_screen, request.expected_revision, state)?;
+
+    if !state.actions.contains(&request.action) {
+        let available = if state.actions.is_empty() {
+            "none".into()
+        } else {
+            state
+                .actions
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ActionUnavailable,
+            format!(
+                "action {} is unavailable on {}; available actions: {available}",
+                request.action, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_ui_activate(
+    request: &UiActivateRequest,
+    state: &UiState,
+) -> Result<(), Box<ControlFailure>> {
+    validate_ui_preconditions(request.expected_screen, request.expected_revision, state)?;
+
+    let Some(control) = state
+        .controls
+        .iter()
+        .find(|control| control.id == request.control_id)
+    else {
+        let available = if state.controls.is_empty() {
+            "none".into()
+        } else {
+            state
+                .controls
+                .iter()
+                .map(|control| control.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
+            format!(
+                "control {:?} is unavailable on {}; visible controls: {available}",
+                request.control_id, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    };
+
+    if !control.enabled {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ControlDisabled,
+            format!(
+                "control {:?} is disabled on {}; inspect `spacewars-cli ui state` and retry",
+                request.control_id, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_host_pause(
+    request: &HostPauseRequest,
+    state: &UiState,
+) -> Result<(), Box<ControlFailure>> {
+    validate_ui_preconditions(request.expected_screen, request.expected_revision, state)?;
+
+    if state.screen != UiScreen::Gameplay {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::WrongScreen,
+            format!(
+                "host pause requires gameplay, but current screen is {}; inspect `spacewars-cli ui state` and retry",
+                state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_ui_preconditions(
+    expected_screen: Option<UiScreen>,
+    expected_revision: Option<u64>,
+    state: &UiState,
+) -> Result<(), Box<ControlFailure>> {
+    if let Some(expected) = expected_screen
+        && state.screen != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::WrongScreen,
+            format!(
+                "expected screen {expected}, but current screen is {}; inspect `spacewars-cli ui state` and retry",
+                state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    if let Some(expected) = expected_revision
+        && state.revision != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::StaleRevision,
+            format!(
+                "expected UI revision {expected}, but current revision is {}; inspect `spacewars-cli ui state` and retry",
+                state.revision
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
         launcher: window.get_launcher_visible(),
@@ -304,15 +628,50 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         game_over: window.get_game_over_visible(),
     });
     let runtime = runtime_status_for_screen(screen, window.get_runtime_diagnostics().as_str())?;
+    let selected_scenario = window.get_launcher_scenario().to_string();
+    let inventory = inventory_for_screen(
+        screen,
+        &UiInventoryContext {
+            selected_scenario: selected_scenario.clone(),
+            launcher_focus_index: window.get_launcher_focus_index(),
+            launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
+            launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
+            ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
+            game_over_focus_index: window.get_game_over_focus_index(),
+            benchmark_available: window.get_scenario_benchmark_available(),
+            launch_available: selected_scenario != "nes" || window.get_launcher_nes_rom_supported(),
+            launcher_error: non_empty(window.get_launcher_error_text().as_str()),
+            scenario_error: non_empty(window.get_scenario_error_text().as_str()),
+            renderer: window.get_launcher_renderer().to_string(),
+            raster_scale: window.get_launcher_raster_scale_text().to_string(),
+            spacewars_preset: window.get_launcher_spacewars_preset().to_string(),
+            spacewars_planets: window.get_launcher_use_planets().to_string(),
+            spacewars_asteroids: window.get_launcher_asteroids_enabled().to_string(),
+            spacewars_player_health: window.get_launcher_player_health_text().to_string(),
+            spacewars_player_2: window.get_launcher_p2_controller().to_string(),
+            pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
+            pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
+        },
+    );
 
     Ok(tracker.observe(UiStateObservation {
         screen,
         active_scenario: runtime.active_scenario,
-        selected_scenario: window.get_launcher_scenario().into(),
+        selected_scenario,
+        selected_control: inventory.selected_control,
+        controls: inventory.controls,
+        actions: inventory.actions,
         scenario_revision: runtime.scenario_revision,
         paused: runtime.paused,
         benchmark_active: runtime.benchmark_active,
+        error: inventory.error,
     }))
+}
+
+#[cfg(unix)]
+fn non_empty(text: &str) -> Option<String> {
+    (!text.is_empty()).then(|| text.into())
 }
 
 #[cfg(unix)]
@@ -324,29 +683,6 @@ fn runtime_status_for_screen(
         Ok(RuntimeStatus::inactive())
     } else {
         parse_runtime_status(diagnostics)
-    }
-}
-
-#[cfg(unix)]
-fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
-    if visibility.touch_test {
-        UiScreen::LauncherTouchTest
-    } else if visibility.launcher {
-        if visibility.launcher_controls {
-            UiScreen::LauncherControls
-        } else if visibility.launcher_settings {
-            UiScreen::LauncherSettings
-        } else {
-            UiScreen::LauncherMain
-        }
-    } else if visibility.game_over {
-        UiScreen::GameOver
-    } else if visibility.ingame_controls {
-        UiScreen::PauseControls
-    } else if visibility.ingame_menu {
-        UiScreen::PauseMain
-    } else {
-        UiScreen::Gameplay
     }
 }
 
@@ -392,7 +728,12 @@ mod tests {
             ControlCommand::Screenshot { output } => {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
-            ControlCommand::Status | ControlCommand::UiState | ControlCommand::HostBenchmark => {
+            ControlCommand::Status
+            | ControlCommand::UiState
+            | ControlCommand::UiPress(_)
+            | ControlCommand::UiActivate(_)
+            | ControlCommand::HostPause(_)
+            | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
         }
@@ -422,6 +763,86 @@ mod tests {
     }
 
     #[test]
+    fn parse_ui_press_command_and_reject_invalid_payloads_structurally() {
+        let request = UiPressRequest {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            action: UiAction::Confirm,
+            expected_screen: Some(UiScreen::LauncherMain),
+            expected_revision: Some(12),
+        };
+        let body = format!("ui press\n{}\n", request.to_json().unwrap());
+        assert!(matches!(
+            parse_command(&body),
+            Ok(ControlCommand::UiPress(parsed)) if parsed == request
+        ));
+
+        for body in [
+            "ui press\n",
+            "ui press\nnot-json\n",
+            "ui press\n{}\nextra\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(failure))
+                    if failure.code == ControlFailureCode::InvalidRequest
+            ));
+        }
+    }
+
+    #[test]
+    fn parse_ui_activate_command_and_reject_invalid_payloads_structurally() {
+        let request = UiActivateRequest {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            control_id: "launcher.settings".into(),
+            expected_screen: Some(UiScreen::LauncherMain),
+            expected_revision: Some(12),
+        };
+        let body = format!("ui activate\n{}\n", request.to_json().unwrap());
+        assert!(matches!(
+            parse_command(&body),
+            Ok(ControlCommand::UiActivate(parsed)) if parsed == request
+        ));
+
+        for body in [
+            "ui activate\n",
+            "ui activate\nnot-json\n",
+            "ui activate\n{}\nextra\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(failure))
+                    if failure.code == ControlFailureCode::InvalidRequest
+            ));
+        }
+    }
+
+    #[test]
+    fn parse_host_pause_command_and_reject_invalid_payloads_structurally() {
+        let request = HostPauseRequest {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            expected_screen: Some(UiScreen::Gameplay),
+            expected_revision: Some(12),
+        };
+        let body = format!("host pause\n{}\n", request.to_json().unwrap());
+        assert!(matches!(
+            parse_command(&body),
+            Ok(ControlCommand::HostPause(parsed)) if parsed == request
+        ));
+
+        for body in [
+            "host pause\n",
+            "host pause\nnot-json\n",
+            "host pause\n{}\nextra\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(failure))
+                    if failure.code == ControlFailureCode::InvalidRequest
+            ));
+        }
+    }
+
+    #[test]
     fn parse_host_benchmark_command() {
         assert!(matches!(
             parse_command("host benchmark\n"),
@@ -431,113 +852,18 @@ mod tests {
     }
 
     #[test]
-    fn classifies_all_ui_screens() {
-        let cases = [
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherMain,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    launcher_settings: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherSettings,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    launcher_controls: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherControls,
-            ),
-            (
-                ScreenVisibility {
-                    launcher: true,
-                    touch_test: true,
-                    ..Default::default()
-                },
-                UiScreen::LauncherTouchTest,
-            ),
-            (ScreenVisibility::default(), UiScreen::Gameplay),
-            (
-                ScreenVisibility {
-                    ingame_menu: true,
-                    ..Default::default()
-                },
-                UiScreen::PauseMain,
-            ),
-            (
-                ScreenVisibility {
-                    ingame_menu: true,
-                    ingame_controls: true,
-                    ..Default::default()
-                },
-                UiScreen::PauseControls,
-            ),
-            (
-                ScreenVisibility {
-                    game_over: true,
-                    ..Default::default()
-                },
-                UiScreen::GameOver,
-            ),
-        ];
-
-        for (visibility, expected) in cases {
-            assert_eq!(classify_screen(visibility), expected);
-        }
-    }
-
-    #[test]
-    fn classifies_the_topmost_visible_screen() {
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                launcher: true,
-                launcher_controls: true,
-                launcher_settings: true,
-                touch_test: true,
-                ingame_menu: true,
-                ingame_controls: true,
-                game_over: true,
-            }),
-            UiScreen::LauncherTouchTest
-        );
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                launcher: true,
-                launcher_controls: true,
-                launcher_settings: true,
-                game_over: true,
-                ..Default::default()
-            }),
-            UiScreen::LauncherControls
-        );
-        assert_eq!(
-            classify_screen(ScreenVisibility {
-                ingame_menu: true,
-                ingame_controls: true,
-                game_over: true,
-                ..Default::default()
-            }),
-            UiScreen::GameOver
-        );
-    }
-
-    #[test]
     fn ui_revision_changes_only_with_observed_state() {
         let observation = UiStateObservation {
             screen: UiScreen::Gameplay,
             active_scenario: Some("pizza".into()),
             selected_scenario: "pizza".into(),
+            selected_control: None,
+            controls: Vec::new(),
+            actions: Vec::new(),
             scenario_revision: Some(7),
             paused: false,
             benchmark_active: false,
+            error: None,
         };
         let mut tracker = UiStateTracker::default();
 
@@ -550,6 +876,157 @@ mod tests {
         assert_eq!(first.revision, 1);
         assert_eq!(unchanged.revision, first.revision);
         assert_eq!(changed.revision, first.revision + 1);
+    }
+
+    #[test]
+    fn ui_revision_changes_with_inventory_state() {
+        let mut observation = UiStateObservation {
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "pizza".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut tracker = UiStateTracker::default();
+        let first = tracker.observe(observation.clone());
+
+        observation.controls[0].value = Some("ready".into());
+        let value_changed = tracker.observe(observation.clone());
+        observation.error = Some("Could not start".into());
+        let error_changed = tracker.observe(observation);
+
+        assert_eq!(value_changed.revision, first.revision + 1);
+        assert_eq!(error_changed.revision, value_changed.revision + 1);
+    }
+
+    #[test]
+    fn ui_press_validation_checks_screen_revision_and_available_action() {
+        let state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 7,
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm, UiAction::Start],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut request = UiPressRequest::new(UiAction::Confirm);
+        request.expected_screen = Some(UiScreen::LauncherSettings);
+        request.expected_revision = Some(6);
+        assert_eq!(
+            validate_ui_press(&request, &state).unwrap_err().code,
+            ControlFailureCode::WrongScreen
+        );
+
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        assert_eq!(
+            validate_ui_press(&request, &state).unwrap_err().code,
+            ControlFailureCode::StaleRevision
+        );
+
+        request.expected_revision = Some(7);
+        request.action = UiAction::Back;
+        let unavailable = validate_ui_press(&request, &state).unwrap_err();
+        assert_eq!(unavailable.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(unavailable.current_state, Some(state.clone()));
+
+        request.action = UiAction::Start;
+        assert_eq!(validate_ui_press(&request, &state), Ok(()));
+    }
+
+    #[test]
+    fn ui_activate_validation_checks_preconditions_visibility_and_enabled_state() {
+        let mut state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 7,
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm, UiAction::Start],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut request = UiActivateRequest::new("launcher.start");
+        request.expected_screen = Some(UiScreen::LauncherSettings);
+        request.expected_revision = Some(6);
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::WrongScreen
+        );
+
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::StaleRevision
+        );
+
+        request.expected_revision = Some(7);
+        request.control_id = "launcher.missing".into();
+        let unavailable = validate_ui_activate(&request, &state).unwrap_err();
+        assert_eq!(unavailable.code, ControlFailureCode::ControlUnavailable);
+        assert_eq!(unavailable.current_state, Some(state.clone()));
+
+        request.control_id = "launcher.start".into();
+        state.controls[0].enabled = false;
+        assert_eq!(
+            validate_ui_activate(&request, &state).unwrap_err().code,
+            ControlFailureCode::ControlDisabled
+        );
+
+        state.controls[0].enabled = true;
+        assert_eq!(validate_ui_activate(&request, &state), Ok(()));
+    }
+
+    #[test]
+    fn host_pause_validation_requires_current_gameplay() {
+        let mut state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 7,
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: UiAction::ALL.to_vec(),
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut request = HostPauseRequest::new();
+        request.expected_screen = Some(UiScreen::Gameplay);
+        request.expected_revision = Some(7);
+        assert_eq!(
+            validate_host_pause(&request, &state).unwrap_err().code,
+            ControlFailureCode::WrongScreen
+        );
+
+        state.screen = UiScreen::Gameplay;
+        state.active_scenario = Some("spacewars".into());
+        state.selected_control = None;
+        state.controls.clear();
+        state.actions.clear();
+        assert_eq!(validate_host_pause(&request, &state), Ok(()));
+
+        request.expected_revision = Some(6);
+        assert_eq!(
+            validate_host_pause(&request, &state).unwrap_err().code,
+            ControlFailureCode::StaleRevision
+        );
     }
 
     #[test]

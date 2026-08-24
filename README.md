@@ -163,9 +163,93 @@ spacewars-cli ui state --json
 The JSON form is a versioned automation contract. It reports the exact launcher,
 gameplay, pause, controls, touch-test, or game-over screen; a monotonic UI
 revision; the active scenario instance revision; and pause and benchmark state.
+Each screen also reports its accepted menu actions, selected control, visible
+controls with stable IDs, labels and enabled state, and any visible error. Choice
+arrows include their current displayed value so settings changes advance the UI
+revision.
 Returning to the launcher clears active-scenario state while preserving the
 launcher selection. The existing `status` command remains the detailed
 performance and scenario diagnostics interface.
+
+Route the same actions used by keyboards and gamepads through the visible menu:
+
+```sh
+spacewars-cli ui press down --expect-screen launcher.main
+spacewars-cli ui press confirm --expect-screen launcher.main --expect-revision 12
+```
+
+Every successful press prints the resulting UI state. Screen and revision
+preconditions make an observe-then-act sequence fail safely if the UI changed in
+between. A rejected action reports the current state and distinguishes a wrong
+screen, stale revision, and an action unavailable on that screen. Add `--json`
+for a structured success or failure. `spacewars-cli ui press --help` lists all
+action and screen values, while `ui state` lists the actions accepted by the
+current screen.
+
+Activate a visible control directly by the stable ID reported by `ui state`:
+
+```sh
+spacewars-cli ui activate launcher.settings \
+  --expect-screen launcher.main --expect-revision 12
+spacewars-cli ui activate launcher.settings.renderer.next --json
+```
+
+Semantic activation uses the same menu-action and host callback paths as the
+visible controls without depending on focus order. Unknown, hidden, or disabled
+controls return structured failures with the current state; screen and revision
+guards behave the same as `ui press`.
+
+Wait for one or more state conditions without guessing at a delay:
+
+```sh
+spacewars-cli ui wait --screen launcher.settings --timeout 2s
+spacewars-cli ui wait --screen gameplay --scenario spacewars \
+  --revision-after 12 --timeout 10s --json
+```
+
+Multiple conditions are combined. Waiting happens in the CLI by polling with a
+deadline, so it never blocks the Slint event loop; a timeout includes the last
+observed state.
+
+The public control API is exercised by black-box integration tests that launch
+the real client with isolated settings and socket paths:
+
+```sh
+xvfb-run -a cargo test -p engine-client --test ui_control_functional -- \
+  --ignored --test-threads=1
+```
+
+The dedicated CI step runs these tests under the software renderer. See
+[Functional UI tests](docs/functional-tests.md) for local display options,
+current workflow coverage, and failure artifacts.
+
+Pause active gameplay and wait until the pause menu is observable:
+
+```sh
+spacewars-cli host pause --timeout 3s
+```
+
+The command observes the current UI revision, submits a guarded host request,
+and polls with the same overall deadline. From Spacewars, the visible Benchmark
+menu item can then be activated by ID:
+
+```sh
+spacewars-cli ui activate pause.benchmark --expect-screen pause.main
+```
+
+The other pause-menu lifecycle choices use the same semantic API. Restart is an
+asynchronous host transition, so scripts can wait for gameplay before taking
+their next action:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.restart --expect-screen pause.main
+spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main
+spacewars-cli ui wait --screen launcher.main --timeout 3s
+```
 
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:

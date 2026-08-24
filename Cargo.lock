@@ -1486,6 +1486,8 @@ dependencies = [
  "scenario-pizza",
  "scenario-rover-lab",
  "scenario-spacewars",
+ "serde",
+ "serde_json",
  "sha2",
  "slint",
  "slint-build",

@@ -175,9 +175,73 @@ spacewars-cli ui state --json
 
 The versioned JSON snapshot includes the UI revision, exact screen, selected and
 active scenario IDs, scenario instance revision, and pause/benchmark state. A
-launcher snapshot always has no active scenario, including after returning from
-gameplay. `status` remains available for detailed performance and
-scenario-specific diagnostics.
+screen inventory identifies the accepted menu actions, selected control, and
+every visible control by stable ID, label, and enabled state; settings arrows
+also include their current displayed value. Visible launcher or scenario errors
+appear in the same state. A launcher snapshot always has no active scenario,
+including after returning from gameplay. `status` remains available for detailed
+performance and scenario-specific diagnostics.
+
+Drive the visible menu through the same action handler as keyboard and gamepad
+input. Preconditions protect an observe-then-act sequence from UI races:
+
+```sh
+spacewars-cli ui press down --expect-screen launcher.main
+spacewars-cli ui press confirm \
+  --expect-screen launcher.main --expect-revision 12 --json
+```
+
+A successful press returns the resulting state. A failure identifies a wrong
+screen, stale revision, or unavailable action and includes the current state.
+Use `spacewars-cli ui press --help` to list valid action and screen names; the
+current screen's effective actions also appear in `ui state`.
+
+Activate a visible control by its stable inventory ID when automation should
+not depend on focus order:
+
+```sh
+spacewars-cli ui activate launcher.controls \
+  --expect-screen launcher.main --expect-revision 12
+spacewars-cli ui activate launcher.controls.touch-test --json
+```
+
+Activation runs through the same menu and host callbacks as the corresponding
+visible control. Unknown, hidden, or disabled controls fail structurally and
+include the current state.
+
+Poll for state conditions with a bounded client-side wait:
+
+```sh
+spacewars-cli ui wait --screen launcher.settings --timeout 2s
+spacewars-cli ui wait --screen gameplay --scenario spacewars \
+  --revision-after 12 --timeout 10s --json
+```
+
+All supplied conditions must match. The CLI polling loop has a deadline and
+does not block the Slint event loop. A structured timeout includes the last UI
+state it observed.
+
+Pause active gameplay and wait for the visible pause menu:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.benchmark --expect-screen pause.main
+```
+
+`host pause` automatically guards the observed gameplay revision. The Benchmark
+control is present only when the active scenario supports it.
+
+Restart a round or return to the launcher through the same visible pause menu:
+
+```sh
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.restart --expect-screen pause.main
+spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+
+spacewars-cli host pause --timeout 3s
+spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main
+spacewars-cli ui wait --screen launcher.main --timeout 3s
+```
 
 Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
 

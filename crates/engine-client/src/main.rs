@@ -15,6 +15,8 @@ mod nes_roms;
 mod raster;
 mod render;
 mod settings;
+mod ui_activation;
+mod ui_inventory;
 mod ui_navigation;
 
 use std::cell::RefCell;
@@ -40,9 +42,8 @@ use scenario_pizza::{
 };
 use settings::LoadStatus;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, VecModel};
-use spacewars_control::NO_ACTIVE_SCENARIO_DIAGNOSTICS;
+use spacewars_control::{NO_ACTIVE_SCENARIO_DIAGNOSTICS, UiAction};
 use tracing_subscriber::EnvFilter;
-use ui_navigation::UiAction;
 
 slint::include_modules!();
 
@@ -345,11 +346,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     select_slint_backend(&args)?;
     let window = MainWindow::new()?;
-    let _control_server = ipc::start_control_server(&window, ipc::control_socket_path());
+    let scenario_controls = host::new_scenario_controls();
+    let _control_server = ipc::start_control_server(
+        &window,
+        ipc::control_socket_path(),
+        Rc::clone(&scenario_controls),
+    );
     let (input, gamepad_input) = input::new_shared_input();
     input::install_window_input(&window, Rc::clone(&input));
     let render_timer = Rc::new(RefCell::new(None));
-    let scenario_controls = host::new_scenario_controls();
     install_launcher_callbacks(
         &window,
         Rc::clone(&render_timer),
