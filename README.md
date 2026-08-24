@@ -174,6 +174,18 @@ Multiple conditions are combined. Waiting happens in the CLI by polling with a
 deadline, so it never blocks the Slint event loop; a timeout includes the last
 observed state.
 
+The public control API is exercised by black-box integration tests that launch
+the real client with isolated settings and socket paths:
+
+```sh
+xvfb-run -a cargo test -p engine-client --test ui_control_functional -- \
+  --ignored --test-threads=1
+```
+
+The dedicated CI step runs these tests under the software renderer. See
+[Functional UI tests](docs/functional-tests.md) for local display options,
+current workflow coverage, and failure artifacts.
+
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:
 
