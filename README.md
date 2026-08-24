@@ -139,12 +139,40 @@ spacewars-cli ui state --json
 The JSON form is a versioned automation contract. It reports the exact launcher,
 gameplay, pause, controls, touch-test, or game-over screen; a monotonic UI
 revision; the active scenario instance revision; and pause and benchmark state.
-Each screen also reports its selected control, visible controls with stable IDs,
-labels and enabled state, and any visible error. Choice arrows include their
-current displayed value so settings changes advance the UI revision.
+Each screen also reports its accepted menu actions, selected control, visible
+controls with stable IDs, labels and enabled state, and any visible error. Choice
+arrows include their current displayed value so settings changes advance the UI
+revision.
 Returning to the launcher clears active-scenario state while preserving the
 launcher selection. The existing `status` command remains the detailed
 performance and scenario diagnostics interface.
+
+Route the same actions used by keyboards and gamepads through the visible menu:
+
+```sh
+spacewars-cli ui press down --expect-screen launcher.main
+spacewars-cli ui press confirm --expect-screen launcher.main --expect-revision 12
+```
+
+Every successful press prints the resulting UI state. Screen and revision
+preconditions make an observe-then-act sequence fail safely if the UI changed in
+between. A rejected action reports the current state and distinguishes a wrong
+screen, stale revision, and an action unavailable on that screen. Add `--json`
+for a structured success or failure. `spacewars-cli ui press --help` lists all
+action and screen values, while `ui state` lists the actions accepted by the
+current screen.
+
+Wait for one or more state conditions without guessing at a delay:
+
+```sh
+spacewars-cli ui wait --screen launcher.settings --timeout 2s
+spacewars-cli ui wait --screen gameplay --scenario spacewars \
+  --revision-after 12 --timeout 10s --json
+```
+
+Multiple conditions are combined. Waiting happens in the CLI by polling with a
+deadline, so it never blocks the Slint event loop; a timeout includes the last
+observed state.
 
 Start or restart the selected scenario's visual benchmark and wait until the
 host confirms a new scenario instance:

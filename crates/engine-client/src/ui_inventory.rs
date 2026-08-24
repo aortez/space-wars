@@ -1,6 +1,6 @@
 //! Stable control inventory for each externally visible UI screen.
 
-use spacewars_control::{UiControl, UiScreen};
+use spacewars_control::{UiAction, UiControl, UiScreen};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ScreenVisibility {
@@ -63,6 +63,7 @@ pub(crate) struct UiInventoryContext {
 pub(crate) struct UiInventory {
     pub(crate) selected_control: Option<String>,
     pub(crate) controls: Vec<UiControl>,
+    pub(crate) actions: Vec<UiAction>,
     pub(crate) error: Option<String>,
 }
 
@@ -74,11 +75,13 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         UiScreen::LauncherTouchTest => UiInventory {
             selected_control: None,
             controls: vec![UiControl::new("launcher.touch-test.done", "Done", true)],
+            actions: vec![UiAction::Back, UiAction::Controls],
             error: None,
         },
         UiScreen::Gameplay => UiInventory {
             selected_control: None,
             controls: Vec::new(),
+            actions: Vec::new(),
             error: context.scenario_error.clone(),
         },
         UiScreen::PauseMain => pause_main_inventory(context),
@@ -87,6 +90,12 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             controls: vec![
                 UiControl::new("pause.controls.back", "Back", true),
                 UiControl::new("pause.controls.resume", "Resume", true),
+            ],
+            actions: vec![
+                UiAction::Confirm,
+                UiAction::Back,
+                UiAction::Start,
+                UiAction::Controls,
             ],
             error: context.scenario_error.clone(),
         },
@@ -98,6 +107,15 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             controls: vec![
                 UiControl::new("game-over.play-again", "Play Again", true),
                 UiControl::new("game-over.return-to-launcher", "Launcher", true),
+            ],
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+                UiAction::Confirm,
+                UiAction::Back,
+                UiAction::Start,
             ],
             error: context.scenario_error.clone(),
         },
@@ -125,6 +143,15 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.settings", "Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
             UiControl::new("launcher.quit", "Quit", true),
+        ],
+        actions: vec![
+            UiAction::Up,
+            UiAction::Down,
+            UiAction::Left,
+            UiAction::Right,
+            UiAction::Confirm,
+            UiAction::Start,
+            UiAction::Controls,
         ],
         error: context.launcher_error.clone(),
     }
@@ -247,6 +274,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
     UiInventory {
         selected_control: selected_from_index(selected_ids, context.launcher_settings_focus_index),
         controls,
+        actions: UiAction::ALL.to_vec(),
         error: context.launcher_error.clone(),
     }
 }
@@ -270,6 +298,7 @@ fn launcher_controls_inventory(context: &UiInventoryContext) -> UiInventory {
                 context.launch_available,
             ),
         ],
+        actions: UiAction::ALL.to_vec(),
         error: context.launcher_error.clone(),
     }
 }
@@ -293,6 +322,7 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
         controls,
+        actions: UiAction::ALL.to_vec(),
         error: context.scenario_error.clone(),
     }
 }
@@ -576,6 +606,58 @@ mod tests {
             let inventory = inventory_for_screen(screen, &context);
             assert_eq!(inventory.selected_control.as_deref(), selected);
             assert_eq!(control_ids(&inventory), ids);
+        }
+    }
+
+    #[test]
+    fn reports_only_actions_handled_by_each_screen() {
+        let context = context("spacewars");
+        let cases = [
+            (
+                UiScreen::LauncherMain,
+                vec![
+                    UiAction::Up,
+                    UiAction::Down,
+                    UiAction::Left,
+                    UiAction::Right,
+                    UiAction::Confirm,
+                    UiAction::Start,
+                    UiAction::Controls,
+                ],
+            ),
+            (UiScreen::LauncherSettings, UiAction::ALL.to_vec()),
+            (UiScreen::LauncherControls, UiAction::ALL.to_vec()),
+            (
+                UiScreen::LauncherTouchTest,
+                vec![UiAction::Back, UiAction::Controls],
+            ),
+            (UiScreen::Gameplay, vec![]),
+            (UiScreen::PauseMain, UiAction::ALL.to_vec()),
+            (
+                UiScreen::PauseControls,
+                vec![
+                    UiAction::Confirm,
+                    UiAction::Back,
+                    UiAction::Start,
+                    UiAction::Controls,
+                ],
+            ),
+            (
+                UiScreen::GameOver,
+                vec![
+                    UiAction::Up,
+                    UiAction::Down,
+                    UiAction::Left,
+                    UiAction::Right,
+                    UiAction::Confirm,
+                    UiAction::Back,
+                    UiAction::Start,
+                ],
+            ),
+        ];
+
+        for (screen, expected) in cases {
+            assert_eq!(inventory_for_screen(screen, &context).actions, expected);
         }
     }
 

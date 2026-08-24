@@ -41,9 +41,8 @@ use scenario_pizza::{
 };
 use settings::LoadStatus;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, Timer, VecModel};
-use spacewars_control::NO_ACTIVE_SCENARIO_DIAGNOSTICS;
+use spacewars_control::{NO_ACTIVE_SCENARIO_DIAGNOSTICS, UiAction};
 use tracing_subscriber::EnvFilter;
-use ui_navigation::UiAction;
 
 slint::include_modules!();
 

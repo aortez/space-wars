@@ -175,12 +175,38 @@ spacewars-cli ui state --json
 
 The versioned JSON snapshot includes the UI revision, exact screen, selected and
 active scenario IDs, scenario instance revision, and pause/benchmark state. A
-screen inventory identifies the selected control and every visible control by
-stable ID, label, and enabled state; settings arrows also include their current
-displayed value. Visible launcher or scenario errors appear in the same state. A
-launcher snapshot always has no active scenario, including after returning from
-gameplay. `status` remains available for detailed performance and
-scenario-specific diagnostics.
+screen inventory identifies the accepted menu actions, selected control, and
+every visible control by stable ID, label, and enabled state; settings arrows
+also include their current displayed value. Visible launcher or scenario errors
+appear in the same state. A launcher snapshot always has no active scenario,
+including after returning from gameplay. `status` remains available for detailed
+performance and scenario-specific diagnostics.
+
+Drive the visible menu through the same action handler as keyboard and gamepad
+input. Preconditions protect an observe-then-act sequence from UI races:
+
+```sh
+spacewars-cli ui press down --expect-screen launcher.main
+spacewars-cli ui press confirm \
+  --expect-screen launcher.main --expect-revision 12 --json
+```
+
+A successful press returns the resulting state. A failure identifies a wrong
+screen, stale revision, or unavailable action and includes the current state.
+Use `spacewars-cli ui press --help` to list valid action and screen names; the
+current screen's effective actions also appear in `ui state`.
+
+Poll for state conditions with a bounded client-side wait:
+
+```sh
+spacewars-cli ui wait --screen launcher.settings --timeout 2s
+spacewars-cli ui wait --screen gameplay --scenario spacewars \
+  --revision-after 12 --timeout 10s --json
+```
+
+All supplied conditions must match. The CLI polling loop has a deadline and
+does not block the Slint event loop. A structured timeout includes the last UI
+state it observed.
 
 Synchronize a sampler or screenshot with the start of a fresh visual benchmark:
 

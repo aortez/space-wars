@@ -1,37 +1,6 @@
 //! Backend-neutral menu actions shared by keyboards and gamepads.
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
-pub(crate) enum UiAction {
-    Up = 0,
-    Down = 1,
-    Left = 2,
-    Right = 3,
-    Confirm = 4,
-    Back = 5,
-    Start = 6,
-    Controls = 7,
-}
-
-impl UiAction {
-    pub(crate) const fn code(self) -> i32 {
-        self as i32
-    }
-
-    pub(crate) const fn from_code(code: i32) -> Option<Self> {
-        match code {
-            0 => Some(Self::Up),
-            1 => Some(Self::Down),
-            2 => Some(Self::Left),
-            3 => Some(Self::Right),
-            4 => Some(Self::Confirm),
-            5 => Some(Self::Back),
-            6 => Some(Self::Start),
-            7 => Some(Self::Controls),
-            _ => None,
-        }
-    }
-}
+use spacewars_control::UiAction;
 
 pub(crate) fn moved_selection(current: i32, item_count: i32, delta: i32) -> i32 {
     if item_count <= 0 {
@@ -94,16 +63,7 @@ mod tests {
 
     #[test]
     fn action_codes_round_trip() {
-        for action in [
-            UiAction::Up,
-            UiAction::Down,
-            UiAction::Left,
-            UiAction::Right,
-            UiAction::Confirm,
-            UiAction::Back,
-            UiAction::Start,
-            UiAction::Controls,
-        ] {
+        for action in UiAction::ALL {
             assert_eq!(UiAction::from_code(action.code()), Some(action));
         }
         assert_eq!(UiAction::from_code(99), None);

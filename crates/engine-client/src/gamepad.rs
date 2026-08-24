@@ -5,10 +5,10 @@ use std::time::{Duration, Instant};
 
 use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs, Mapping};
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
+use spacewars_control::UiAction;
 
 use crate::MainWindow;
 use crate::input::{self, GameKey, GamepadSeatInput, SharedGamepadInput, SharedInput};
-use crate::ui_navigation::UiAction;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const UI_REPEAT_DELAY: Duration = Duration::from_millis(350);

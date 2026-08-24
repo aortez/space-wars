@@ -4,7 +4,12 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+mod client;
+
+pub use client::{ControlClient, ControlClientError, UiStatePredicate};
+
 pub const UI_STATE_COMMAND: &str = "ui state";
+pub const UI_PRESS_COMMAND: &str = "ui press";
 pub const UI_STATE_SCHEMA_VERSION: u32 = 1;
 pub const NO_ACTIVE_SCENARIO_DIAGNOSTICS: &str = "No active scenario diagnostics.";
 
@@ -59,6 +64,78 @@ impl fmt::Display for UiScreen {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum UiAction {
+    Up,
+    Down,
+    Left,
+    Right,
+    Confirm,
+    Back,
+    Start,
+    Controls,
+}
+
+impl UiAction {
+    pub const ALL: [Self; 8] = [
+        Self::Up,
+        Self::Down,
+        Self::Left,
+        Self::Right,
+        Self::Confirm,
+        Self::Back,
+        Self::Start,
+        Self::Controls,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Up => "up",
+            Self::Down => "down",
+            Self::Left => "left",
+            Self::Right => "right",
+            Self::Confirm => "confirm",
+            Self::Back => "back",
+            Self::Start => "start",
+            Self::Controls => "controls",
+        }
+    }
+
+    pub const fn code(self) -> i32 {
+        match self {
+            Self::Up => 0,
+            Self::Down => 1,
+            Self::Left => 2,
+            Self::Right => 3,
+            Self::Confirm => 4,
+            Self::Back => 5,
+            Self::Start => 6,
+            Self::Controls => 7,
+        }
+    }
+
+    pub const fn from_code(code: i32) -> Option<Self> {
+        match code {
+            0 => Some(Self::Up),
+            1 => Some(Self::Down),
+            2 => Some(Self::Left),
+            3 => Some(Self::Right),
+            4 => Some(Self::Confirm),
+            5 => Some(Self::Back),
+            6 => Some(Self::Start),
+            7 => Some(Self::Controls),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for UiAction {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UiControl {
     pub id: String,
@@ -95,11 +172,108 @@ pub struct UiState {
     pub selected_control: Option<String>,
     #[serde(default)]
     pub controls: Vec<UiControl>,
+    #[serde(default)]
+    pub actions: Vec<UiAction>,
     pub scenario_revision: Option<u64>,
     pub paused: bool,
     pub benchmark_active: bool,
     #[serde(default)]
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UiPressRequest {
+    pub schema_version: u32,
+    pub action: UiAction,
+    #[serde(default)]
+    pub expected_screen: Option<UiScreen>,
+    #[serde(default)]
+    pub expected_revision: Option<u64>,
+}
+
+impl UiPressRequest {
+    pub fn new(action: UiAction) -> Self {
+        Self {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            action,
+            expected_screen: None,
+            expected_revision: None,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
+        let request: Self = serde_json::from_str(json)?;
+        validate_schema_version(request.schema_version)?;
+        Ok(request)
+    }
+
+    pub fn to_json(&self) -> Result<String, ProtocolError> {
+        validate_schema_version(self.schema_version)?;
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ControlFailureCode {
+    InvalidRequest,
+    WrongScreen,
+    StaleRevision,
+    ActionUnavailable,
+    Timeout,
+}
+
+impl fmt::Display for ControlFailureCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::InvalidRequest => "invalid-request",
+            Self::WrongScreen => "wrong-screen",
+            Self::StaleRevision => "stale-revision",
+            Self::ActionUnavailable => "action-unavailable",
+            Self::Timeout => "timeout",
+        };
+        formatter.write_str(label)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControlFailure {
+    pub schema_version: u32,
+    pub code: ControlFailureCode,
+    pub message: String,
+    #[serde(default)]
+    pub current_state: Option<UiState>,
+}
+
+impl ControlFailure {
+    pub fn new(
+        code: ControlFailureCode,
+        message: impl Into<String>,
+        current_state: Option<UiState>,
+    ) -> Self {
+        Self {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            code,
+            message: message.into(),
+            current_state,
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
+        let failure: Self = serde_json::from_str(json)?;
+        validate_schema_version(failure.schema_version)?;
+        Ok(failure)
+    }
+
+    pub fn to_json(&self) -> Result<String, ProtocolError> {
+        validate_schema_version(self.schema_version)?;
+        Ok(serde_json::to_string(self)?)
+    }
+
+    pub fn to_pretty_json(&self) -> Result<String, ProtocolError> {
+        validate_schema_version(self.schema_version)?;
+        Ok(serde_json::to_string_pretty(self)?)
+    }
 }
 
 impl UiState {
@@ -120,14 +294,18 @@ impl UiState {
     }
 
     fn validate(&self) -> Result<(), ProtocolError> {
-        if self.schema_version != UI_STATE_SCHEMA_VERSION {
-            return Err(ProtocolError::UnsupportedSchemaVersion {
-                found: self.schema_version,
-                supported: UI_STATE_SCHEMA_VERSION,
-            });
-        }
-        Ok(())
+        validate_schema_version(self.schema_version)
     }
+}
+
+fn validate_schema_version(schema_version: u32) -> Result<(), ProtocolError> {
+    if schema_version != UI_STATE_SCHEMA_VERSION {
+        return Err(ProtocolError::UnsupportedSchemaVersion {
+            found: schema_version,
+            supported: UI_STATE_SCHEMA_VERSION,
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -204,10 +382,10 @@ pub enum ProtocolError {
 impl fmt::Display for ProtocolError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Json(error) => write!(formatter, "invalid UI state JSON: {error}"),
+            Self::Json(error) => write!(formatter, "invalid control protocol JSON: {error}"),
             Self::UnsupportedSchemaVersion { found, supported } => write!(
                 formatter,
-                "unsupported UI state schema version {found}; this client supports version {supported}"
+                "unsupported control schema version {found}; this client supports version {supported}"
             ),
             Self::MissingRuntimeField(field) => {
                 write!(formatter, "runtime diagnostics are missing {field}")
@@ -255,6 +433,15 @@ mod tests {
                 UiControl::new("launcher.scenario.previous", "‹", true).with_value("spacewars"),
                 UiControl::new("launcher.scenario.next", "›", true).with_value("spacewars"),
                 UiControl::new("launcher.start", "Start Game", true),
+            ],
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Left,
+                UiAction::Right,
+                UiAction::Confirm,
+                UiAction::Start,
+                UiAction::Controls,
             ],
             scenario_revision: None,
             paused: false,
@@ -325,7 +512,43 @@ mod tests {
 
         assert_eq!(state.selected_control, None);
         assert!(state.controls.is_empty());
+        assert!(state.actions.is_empty());
         assert_eq!(state.error, None);
+    }
+
+    #[test]
+    fn action_names_codes_and_json_are_stable() {
+        for (code, action) in UiAction::ALL.into_iter().enumerate() {
+            assert_eq!(UiAction::from_code(code as i32), Some(action));
+            assert_eq!(action.code(), code as i32);
+            assert_eq!(action.to_string(), action.as_str());
+            assert_eq!(
+                serde_json::to_string(&action).unwrap(),
+                format!("\"{}\"", action.as_str())
+            );
+        }
+        assert_eq!(UiAction::from_code(99), None);
+    }
+
+    #[test]
+    fn press_requests_and_structured_failures_round_trip() {
+        let mut request = UiPressRequest::new(UiAction::Confirm);
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        request.expected_revision = Some(4);
+        assert_eq!(
+            UiPressRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+
+        let failure = ControlFailure::new(
+            ControlFailureCode::StaleRevision,
+            "expected revision 3 but current revision is 4",
+            Some(sample_state()),
+        );
+        assert_eq!(
+            ControlFailure::from_json(&failure.to_json().unwrap()).unwrap(),
+            failure
+        );
     }
 
     #[test]

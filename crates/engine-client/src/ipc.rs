@@ -18,7 +18,8 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    ProtocolError, RuntimeStatus, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiControl, UiScreen,
+    ControlFailure, ControlFailureCode, ProtocolError, RuntimeStatus, UI_PRESS_COMMAND,
+    UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction, UiControl, UiPressRequest, UiScreen,
     UiState, parse_runtime_status,
 };
 
@@ -41,7 +42,15 @@ enum ControlCommand {
     Screenshot { output: PathBuf },
     Status,
     UiState,
+    UiPress(UiPressRequest),
     HostBenchmark,
+}
+
+#[cfg(unix)]
+#[derive(Debug)]
+enum CommandParseError {
+    Legacy(String),
+    Structured(Box<ControlFailure>),
 }
 
 #[cfg(unix)]
@@ -52,6 +61,7 @@ struct UiStateObservation {
     selected_scenario: String,
     selected_control: Option<String>,
     controls: Vec<UiControl>,
+    actions: Vec<UiAction>,
     scenario_revision: Option<u64>,
     paused: bool,
     benchmark_active: bool,
@@ -81,6 +91,7 @@ impl UiStateTracker {
             selected_scenario: observation.selected_scenario,
             selected_control: observation.selected_control,
             controls: observation.controls,
+            actions: observation.actions,
             scenario_revision: observation.scenario_revision,
             paused: observation.paused,
             benchmark_active: observation.benchmark_active,
@@ -103,6 +114,13 @@ impl ResponseWriter {
 
     fn error(mut self, message: impl AsRef<str>) {
         let _ = writeln!(self.stream, "error {}", message.as_ref());
+    }
+
+    fn control_failure(self, failure: ControlFailure) {
+        match failure.to_json() {
+            Ok(json) => self.error(json),
+            Err(error) => self.error(error.to_string()),
+        }
     }
 }
 
@@ -188,8 +206,12 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
     let response = ResponseWriter { stream };
     let command = match parse_command(&body) {
         Ok(command) => command,
-        Err(message) => {
+        Err(CommandParseError::Legacy(message)) => {
             response.error(message);
+            return;
+        }
+        Err(CommandParseError::Structured(failure)) => {
+            response.control_failure(*failure);
             return;
         }
     };
@@ -203,18 +225,22 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
 }
 
 #[cfg(unix)]
-fn parse_command(body: &str) -> Result<ControlCommand, String> {
+fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
     let mut lines = body.lines();
     match lines.next() {
         Some("screenshot") => {
             let Some(output) = lines.next() else {
-                return Err("missing screenshot output path".into());
+                return Err(CommandParseError::Legacy(
+                    "missing screenshot output path".into(),
+                ));
             };
             if output.is_empty() {
-                return Err("screenshot output path must not be empty".into());
+                return Err(CommandParseError::Legacy(
+                    "screenshot output path must not be empty".into(),
+                ));
             }
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::Screenshot {
                 output: PathBuf::from(output),
@@ -222,25 +248,49 @@ fn parse_command(body: &str) -> Result<ControlCommand, String> {
         }
         Some("status") => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::Status)
         }
         Some(UI_STATE_COMMAND) => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::UiState)
         }
+        Some(UI_PRESS_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_press_request("ui press requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_press_request(
+                    "ui press accepts exactly one JSON request line",
+                ));
+            }
+            UiPressRequest::from_json(payload)
+                .map(ControlCommand::UiPress)
+                .map_err(|error| invalid_press_request(error.to_string()))
+        }
         Some("host benchmark") => {
             if lines.next().is_some() {
-                return Err("too many command lines".into());
+                return Err(CommandParseError::Legacy("too many command lines".into()));
             }
             Ok(ControlCommand::HostBenchmark)
         }
-        Some(command) => Err(format!("unknown command {command:?}")),
-        None => Err("empty command".into()),
+        Some(command) => Err(CommandParseError::Legacy(format!(
+            "unknown command {command:?}"
+        ))),
+        None => Err(CommandParseError::Legacy("empty command".into())),
     }
+}
+
+#[cfg(unix)]
+fn invalid_press_request(message: impl Into<String>) -> CommandParseError {
+    CommandParseError::Structured(Box::new(ControlFailure::new(
+        ControlFailureCode::InvalidRequest,
+        message,
+        None,
+    )))
 }
 
 #[cfg(unix)]
@@ -262,6 +312,9 @@ fn handle_request(
                 Ok(json) => request.response.ok(json),
                 Err(error) => request.response.error(error.to_string()),
             }
+        }
+        ControlCommand::UiPress(press) => {
+            handle_ui_press(window, press, request.response, ui_state_tracker);
         }
         ControlCommand::HostBenchmark => {
             if !window.get_scenario_benchmark_available() {
@@ -288,6 +341,85 @@ fn handle_request(
             }
         }
     }
+}
+
+#[cfg(unix)]
+fn handle_ui_press(
+    window: &MainWindow,
+    request: UiPressRequest,
+    response: ResponseWriter,
+    ui_state_tracker: &mut UiStateTracker,
+) {
+    let state = match ui_state(window, ui_state_tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+
+    if let Err(failure) = validate_ui_press(&request, &state) {
+        response.control_failure(*failure);
+        return;
+    }
+
+    window.invoke_ui_action(request.action.code());
+    match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn validate_ui_press(request: &UiPressRequest, state: &UiState) -> Result<(), Box<ControlFailure>> {
+    if let Some(expected) = request.expected_screen
+        && state.screen != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::WrongScreen,
+            format!(
+                "expected screen {expected}, but current screen is {}; inspect `spacewars-cli ui state` and retry",
+                state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    if let Some(expected) = request.expected_revision
+        && state.revision != expected
+    {
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::StaleRevision,
+            format!(
+                "expected UI revision {expected}, but current revision is {}; inspect `spacewars-cli ui state` and retry",
+                state.revision
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    if !state.actions.contains(&request.action) {
+        let available = if state.actions.is_empty() {
+            "none".into()
+        } else {
+            state
+                .actions
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(Box::new(ControlFailure::new(
+            ControlFailureCode::ActionUnavailable,
+            format!(
+                "action {} is unavailable on {}; available actions: {available}",
+                request.action, state.screen
+            ),
+            Some(state.clone()),
+        )));
+    }
+
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -335,6 +467,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         selected_scenario,
         selected_control: inventory.selected_control,
         controls: inventory.controls,
+        actions: inventory.actions,
         scenario_revision: runtime.scenario_revision,
         paused: runtime.paused,
         benchmark_active: runtime.benchmark_active,
@@ -401,7 +534,10 @@ mod tests {
             ControlCommand::Screenshot { output } => {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
-            ControlCommand::Status | ControlCommand::UiState | ControlCommand::HostBenchmark => {
+            ControlCommand::Status
+            | ControlCommand::UiState
+            | ControlCommand::UiPress(_)
+            | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
         }
@@ -431,6 +567,33 @@ mod tests {
     }
 
     #[test]
+    fn parse_ui_press_command_and_reject_invalid_payloads_structurally() {
+        let request = UiPressRequest {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            action: UiAction::Confirm,
+            expected_screen: Some(UiScreen::LauncherMain),
+            expected_revision: Some(12),
+        };
+        let body = format!("ui press\n{}\n", request.to_json().unwrap());
+        assert!(matches!(
+            parse_command(&body),
+            Ok(ControlCommand::UiPress(parsed)) if parsed == request
+        ));
+
+        for body in [
+            "ui press\n",
+            "ui press\nnot-json\n",
+            "ui press\n{}\nextra\n",
+        ] {
+            assert!(matches!(
+                parse_command(body),
+                Err(CommandParseError::Structured(failure))
+                    if failure.code == ControlFailureCode::InvalidRequest
+            ));
+        }
+    }
+
+    #[test]
     fn parse_host_benchmark_command() {
         assert!(matches!(
             parse_command("host benchmark\n"),
@@ -447,6 +610,7 @@ mod tests {
             selected_scenario: "pizza".into(),
             selected_control: None,
             controls: Vec::new(),
+            actions: Vec::new(),
             scenario_revision: Some(7),
             paused: false,
             benchmark_active: false,
@@ -473,6 +637,7 @@ mod tests {
             selected_scenario: "pizza".into(),
             selected_control: Some("launcher.start".into()),
             controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm],
             scenario_revision: None,
             paused: false,
             benchmark_active: false,
@@ -488,6 +653,46 @@ mod tests {
 
         assert_eq!(value_changed.revision, first.revision + 1);
         assert_eq!(error_changed.revision, value_changed.revision + 1);
+    }
+
+    #[test]
+    fn ui_press_validation_checks_screen_revision_and_available_action() {
+        let state = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 7,
+            screen: UiScreen::LauncherMain,
+            active_scenario: None,
+            selected_scenario: "spacewars".into(),
+            selected_control: Some("launcher.start".into()),
+            controls: vec![UiControl::new("launcher.start", "Start Game", true)],
+            actions: vec![UiAction::Confirm, UiAction::Start],
+            scenario_revision: None,
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        let mut request = UiPressRequest::new(UiAction::Confirm);
+        request.expected_screen = Some(UiScreen::LauncherSettings);
+        request.expected_revision = Some(6);
+        assert_eq!(
+            validate_ui_press(&request, &state).unwrap_err().code,
+            ControlFailureCode::WrongScreen
+        );
+
+        request.expected_screen = Some(UiScreen::LauncherMain);
+        assert_eq!(
+            validate_ui_press(&request, &state).unwrap_err().code,
+            ControlFailureCode::StaleRevision
+        );
+
+        request.expected_revision = Some(7);
+        request.action = UiAction::Back;
+        let unavailable = validate_ui_press(&request, &state).unwrap_err();
+        assert_eq!(unavailable.code, ControlFailureCode::ActionUnavailable);
+        assert_eq!(unavailable.current_state, Some(state.clone()));
+
+        request.action = UiAction::Start;
+        assert_eq!(validate_ui_press(&request, &state), Ok(()));
     }
 
     #[test]
