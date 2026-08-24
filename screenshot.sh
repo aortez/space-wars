@@ -14,7 +14,12 @@ REMOTE_FILE_QUOTED="$(quote_for_shell "${REMOTE_FILE}")"
 
 ssh "spacewars@${HOST}" "spacewars-cli screenshot ${REMOTE_FILE_QUOTED}"
 scp "spacewars@${HOST}:${REMOTE_FILE}" "${LOCAL_FILE}"
-ssh "spacewars@${HOST}" "journalctl -u spacewars-kiosk --no-pager" > "${LOG_FILE}"
+if ! ssh "spacewars@${HOST}" \
+    "journalctl -u spacewars-kiosk --no-pager" > "${LOG_FILE}" 2>/dev/null; then
+    ssh "spacewars@${HOST}" \
+        "systemctl --no-pager --full status spacewars-kiosk; systemctl show spacewars-kiosk --property=MainPID --property=NRestarts --property=ActiveState --property=SubState" \
+        > "${LOG_FILE}" 2>&1
+fi
 
 copy_to_clipboard() {
     if [[ -n "${WAYLAND_DISPLAY-}" || -n "${SWAYSOCK-}" ]]; then

@@ -7,6 +7,7 @@ use std::hint::black_box;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use engine_common::{
@@ -36,6 +37,7 @@ use crate::render::{self, Viewport};
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
+static NEXT_SCENARIO_REVISION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone)]
 pub struct ScenarioLoopOptions {
@@ -426,9 +428,6 @@ pub fn start_scenario_loop(
         input.clear();
         input.reset_spacewars_controls();
     }
-    window.set_runtime_diagnostics(SharedString::from(format!(
-        "scenario={scenario_name}\npaused=false\ngame_over=false\nNo active rule-bot diagnostics."
-    )));
     let controls = controls.unwrap_or_else(new_scenario_controls);
 
     let timer = Timer::default();
@@ -437,7 +436,21 @@ pub fn start_scenario_loop(
     let mut accumulator = Duration::ZERO;
     let mut paused = false;
     let mut benchmark_active = start_benchmark;
+    let mut scenario_revision = next_scenario_revision();
     let mut performance = PerformanceStats::new(tick_model, last_tick);
+    let initial_game_over = scenario.is_game_over();
+    let input_diagnostics = input.borrow().runtime_diagnostics_text();
+    window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
+        &scenario_name,
+        scenario_revision,
+        paused,
+        initial_game_over,
+        benchmark_active,
+        renderer,
+        raster_scale,
+        &performance,
+        &input_diagnostics,
+    )));
     let mut raster_renderer = raster::RasterRenderer::new();
     let mut native_video_renderer = NativeVideoRenderer::new();
     let mut presented_native_frame_id = None;
@@ -499,9 +512,11 @@ pub fn start_scenario_loop(
     }
 
     let mut last_realtime_emulated_frames = 0;
-    let mut last_diagnostics_revision = u64::MAX;
-    let mut last_diagnostics_paused = true;
-    let mut last_diagnostics_game_over = true;
+    let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
+    let mut last_diagnostics_scenario_revision = scenario_revision;
+    let mut last_diagnostics_paused = paused;
+    let mut last_diagnostics_game_over = initial_game_over;
+    let mut last_diagnostics_benchmark_active = benchmark_active;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
         let Some(window) = weak_window.upgrade() else {
             return;
@@ -564,6 +579,8 @@ pub fn start_scenario_loop(
             window.set_scenario_error_text(SharedString::from(error_text));
         }
         if step_result.scenario_replaced {
+            scenario_revision = next_scenario_revision();
+            performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             match replace_realtime_presenter(
                 &window,
@@ -594,27 +611,6 @@ pub fn start_scenario_loop(
             )));
         }
 
-        let diagnostics_revision = input.runtime_diagnostics_revision();
-        let game_over = scenario.is_game_over();
-        let diagnostics_frozen = paused || game_over;
-        if diagnostics_revision != last_diagnostics_revision
-            || paused != last_diagnostics_paused
-            || game_over != last_diagnostics_game_over
-        {
-            let diagnostics = if diagnostics_frozen {
-                input.paused_runtime_diagnostics_text()
-            } else {
-                input.runtime_diagnostics_text()
-            };
-            window.set_runtime_diagnostics(SharedString::from(format!(
-                "scenario={scenario_name}\npaused={paused}\ngame_over={game_over}\n{}",
-                diagnostics,
-            )));
-            last_diagnostics_revision = diagnostics_revision;
-            last_diagnostics_paused = paused;
-            last_diagnostics_game_over = game_over;
-        }
-
         scenario.record_realtime_displayed_loop_iteration();
         let updates = if let Some(telemetry) = scenario.realtime_telemetry() {
             let updates = telemetry
@@ -626,13 +622,43 @@ pub fn start_scenario_loop(
         } else {
             step_result.updates
         };
-        performance.record_frame(now, updates);
+        let performance_sample_completed = performance.record_frame(now, updates);
+        let diagnostics_revision = input.runtime_diagnostics_revision();
+        let game_over = scenario.is_game_over();
+        if performance_sample_completed
+            || diagnostics_revision != last_diagnostics_revision
+            || scenario_revision != last_diagnostics_scenario_revision
+            || paused != last_diagnostics_paused
+            || game_over != last_diagnostics_game_over
+            || benchmark_active != last_diagnostics_benchmark_active
+        {
+            let input_diagnostics = if paused || game_over {
+                input.paused_runtime_diagnostics_text()
+            } else {
+                input.runtime_diagnostics_text()
+            };
+            window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
+                &scenario_name,
+                scenario_revision,
+                paused,
+                game_over,
+                benchmark_active,
+                renderer,
+                raster_scale,
+                &performance,
+                &input_diagnostics,
+            )));
+            last_diagnostics_revision = diagnostics_revision;
+            last_diagnostics_scenario_revision = scenario_revision;
+            last_diagnostics_paused = paused;
+            last_diagnostics_game_over = game_over;
+            last_diagnostics_benchmark_active = benchmark_active;
+        }
         let performance_text = performance.display_text();
         set_center_panel(
             &window,
             scenario.center_panel_state(paused, benchmark_active, &performance_text),
         );
-        let game_over = scenario.is_game_over();
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
@@ -1117,6 +1143,8 @@ struct PerformanceStats {
     sample_started: Instant,
     frames_in_sample: u32,
     updates_in_sample: u32,
+    frames_total: u64,
+    updates_total: u64,
     measured_fps: Option<f32>,
     measured_ups: Option<f32>,
 }
@@ -1128,19 +1156,23 @@ impl PerformanceStats {
             sample_started: now,
             frames_in_sample: 0,
             updates_in_sample: 0,
+            frames_total: 0,
+            updates_total: 0,
             measured_fps: None,
             measured_ups: None,
         }
     }
 
-    fn record_frame(&mut self, now: Instant, updates: usize) {
+    fn record_frame(&mut self, now: Instant, updates: usize) -> bool {
         self.frames_in_sample += 1;
         self.updates_in_sample += updates as u32;
+        self.frames_total = self.frames_total.saturating_add(1);
+        self.updates_total = self.updates_total.saturating_add(updates as u64);
 
         let elapsed = now.saturating_duration_since(self.sample_started);
         let elapsed_secs = elapsed.as_secs_f32();
         if elapsed_secs < 1.0 {
-            return;
+            return false;
         }
 
         self.measured_fps = Some(self.frames_in_sample as f32 / elapsed_secs);
@@ -1148,6 +1180,7 @@ impl PerformanceStats {
         self.sample_started = now;
         self.frames_in_sample = 0;
         self.updates_in_sample = 0;
+        true
     }
 
     fn display_text(&self) -> String {
@@ -1158,6 +1191,39 @@ impl PerformanceStats {
             measured_label(self.measured_ups)
         )
     }
+
+    fn diagnostics_text(&self) -> String {
+        format!(
+            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}",
+            self.target_label,
+            measured_diagnostics_label(self.measured_fps),
+            measured_diagnostics_label(self.measured_ups),
+            self.frames_total,
+            self.updates_total,
+        )
+    }
+}
+
+fn runtime_diagnostics_text(
+    scenario_name: &str,
+    scenario_revision: u64,
+    paused: bool,
+    game_over: bool,
+    benchmark_active: bool,
+    renderer: RenderBackend,
+    raster_scale: f32,
+    performance: &PerformanceStats,
+    input_diagnostics: &str,
+) -> String {
+    format!(
+        "scenario={scenario_name}\nscenario_revision={scenario_revision}\npaused={paused}\ngame_over={game_over}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
+        renderer.label(),
+        performance.diagnostics_text(),
+    )
+}
+
+fn next_scenario_revision() -> u64 {
+    NEXT_SCENARIO_REVISION.fetch_add(1, Ordering::Relaxed)
 }
 
 fn performance_target_label(tick_model: TickModel) -> String {
@@ -1171,6 +1237,12 @@ fn performance_target_label(tick_model: TickModel) -> String {
 fn measured_label(value: Option<f32>) -> String {
     value
         .map(|value| format!("{:.0}", value.max(0.0)))
+        .unwrap_or_else(|| "--".into())
+}
+
+fn measured_diagnostics_label(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{:.1}", value.max(0.0)))
         .unwrap_or_else(|| "--".into())
 }
 
@@ -1498,9 +1570,15 @@ struct BenchmarkRow {
     avg_physics_ms: f64,
     avg_snapshot_ms: f64,
     avg_rapier_step_ms: f64,
+    avg_rapier_update_ms: f64,
+    avg_rapier_user_changes_ms: f64,
+    avg_rapier_kinematic_interpolation_ms: f64,
+    avg_rapier_collision_detection_ms: f64,
     avg_rapier_broad_phase_ms: f64,
+    avg_rapier_final_broad_phase_ms: f64,
     avg_rapier_narrow_phase_ms: f64,
     avg_rapier_island_ms: f64,
+    avg_rapier_island_constraints_ms: f64,
     avg_rapier_solver_ms: f64,
     avg_rapier_ccd_ms: f64,
     avg_render_ms: f64,
@@ -1517,6 +1595,7 @@ struct BenchmarkRow {
     avg_raster_player_debris_ms: f64,
     avg_raster_player_particles_ms: f64,
     avg_raster_player_other_ms: f64,
+    avg_raster_other_frames_ms: f64,
     avg_raster_overview_refresh_ms: f64,
     avg_raster_overview_blit_ms: f64,
     avg_raster_overview_live_ms: f64,
@@ -1601,8 +1680,25 @@ impl BenchmarkRow {
             avg_physics_ms: avg_ms(sample.scenario_metrics.physics_time, frames),
             avg_snapshot_ms: avg_ms(sample.scenario_metrics.snapshot_time, frames),
             avg_rapier_step_ms: avg_ms(sample.scenario_metrics.rapier_step_time, frames),
+            avg_rapier_update_ms: avg_ms(sample.scenario_metrics.rapier_update_time, frames),
+            avg_rapier_user_changes_ms: avg_ms(
+                sample.scenario_metrics.rapier_user_changes_time,
+                frames,
+            ),
+            avg_rapier_kinematic_interpolation_ms: avg_ms(
+                sample.scenario_metrics.rapier_kinematic_interpolation_time,
+                frames,
+            ),
+            avg_rapier_collision_detection_ms: avg_ms(
+                sample.scenario_metrics.rapier_collision_detection_time,
+                frames,
+            ),
             avg_rapier_broad_phase_ms: avg_ms(
                 sample.scenario_metrics.rapier_broad_phase_time,
+                frames,
+            ),
+            avg_rapier_final_broad_phase_ms: avg_ms(
+                sample.scenario_metrics.rapier_final_broad_phase_time,
                 frames,
             ),
             avg_rapier_narrow_phase_ms: avg_ms(
@@ -1610,6 +1706,10 @@ impl BenchmarkRow {
                 frames,
             ),
             avg_rapier_island_ms: avg_ms(sample.scenario_metrics.rapier_island_time, frames),
+            avg_rapier_island_constraints_ms: avg_ms(
+                sample.scenario_metrics.rapier_island_constraints_time,
+                frames,
+            ),
             avg_rapier_solver_ms: avg_ms(sample.scenario_metrics.rapier_solver_time, frames),
             avg_rapier_ccd_ms: avg_ms(sample.scenario_metrics.rapier_ccd_time, frames),
             avg_render_ms: avg_ms(sample.render_time, frames),
@@ -1632,6 +1732,7 @@ impl BenchmarkRow {
             avg_raster_player_debris_ms: avg_ms(sample.raster_timings.player_debris, frames),
             avg_raster_player_particles_ms: avg_ms(sample.raster_timings.player_particles, frames),
             avg_raster_player_other_ms: avg_ms(sample.raster_timings.player_other, frames),
+            avg_raster_other_frames_ms: avg_ms(sample.raster_timings.other_frames, frames),
             avg_raster_overview_refresh_ms: avg_ms(sample.raster_timings.overview_refresh, frames),
             avg_raster_overview_blit_ms: avg_ms(sample.raster_timings.overview_blit, frames),
             avg_raster_overview_live_ms: avg_ms(sample.raster_timings.overview_live, frames),
@@ -1648,7 +1749,7 @@ impl BenchmarkRow {
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
     writeln!(
         writer,
-        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
+        "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_update_ms,avg_rapier_user_changes_ms,avg_rapier_kinematic_interpolation_ms,avg_rapier_collision_detection_ms,avg_rapier_broad_phase_ms,avg_rapier_final_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_island_constraints_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
@@ -1700,9 +1801,15 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_physics_ms),
         format!("{:.3}", row.avg_snapshot_ms),
         format!("{:.3}", row.avg_rapier_step_ms),
+        format!("{:.3}", row.avg_rapier_update_ms),
+        format!("{:.3}", row.avg_rapier_user_changes_ms),
+        format!("{:.3}", row.avg_rapier_kinematic_interpolation_ms),
+        format!("{:.3}", row.avg_rapier_collision_detection_ms),
         format!("{:.3}", row.avg_rapier_broad_phase_ms),
+        format!("{:.3}", row.avg_rapier_final_broad_phase_ms),
         format!("{:.3}", row.avg_rapier_narrow_phase_ms),
         format!("{:.3}", row.avg_rapier_island_ms),
+        format!("{:.3}", row.avg_rapier_island_constraints_ms),
         format!("{:.3}", row.avg_rapier_solver_ms),
         format!("{:.3}", row.avg_rapier_ccd_ms),
         format!("{:.3}", row.avg_render_ms),
@@ -1719,6 +1826,7 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_raster_player_debris_ms),
         format!("{:.3}", row.avg_raster_player_particles_ms),
         format!("{:.3}", row.avg_raster_player_other_ms),
+        format!("{:.3}", row.avg_raster_other_frames_ms),
         format!("{:.3}", row.avg_raster_overview_refresh_ms),
         format!("{:.3}", row.avg_raster_overview_blit_ms),
         format!("{:.3}", row.avg_raster_overview_live_ms),
@@ -2095,12 +2203,44 @@ mod tests {
         let mut stats = PerformanceStats::new(TickModel::FixedTimestep { hz: 60 }, start);
 
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS -- | UPS --");
+        assert_eq!(
+            stats.diagnostics_text(),
+            "performance_target=60 Hz\nfps=--\nups=--\nframes_total=0\nupdates_total=0"
+        );
 
         for frame in 1..=60 {
-            stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1);
+            let sample_completed =
+                stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1);
+            assert_eq!(sample_completed, frame == 60);
         }
 
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS 60 | UPS 60");
+        assert_eq!(
+            stats.diagnostics_text(),
+            "performance_target=60 Hz\nfps=60.0\nups=60.0\nframes_total=60\nupdates_total=60"
+        );
+    }
+
+    #[test]
+    fn runtime_diagnostics_include_launch_state_and_performance() {
+        let start = Instant::now();
+        let mut stats = PerformanceStats::new(TickModel::Variable, start);
+        stats.record_frame(start + Duration::from_secs(1), 3);
+
+        assert_eq!(
+            runtime_diagnostics_text(
+                "pizza",
+                17,
+                false,
+                false,
+                true,
+                RenderBackend::Raster,
+                2.0,
+                &stats,
+                "No active rule-bot diagnostics.",
+            ),
+            "scenario=pizza\nscenario_revision=17\npaused=false\ngame_over=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
+        );
     }
 
     #[test]

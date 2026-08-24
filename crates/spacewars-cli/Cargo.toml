@@ -13,3 +13,4 @@ path = "src/main.rs"
 [dependencies]
 clap = { workspace = true }
 engine-common = { workspace = true }
+spacewars-control = { workspace = true }

@@ -23,8 +23,8 @@
       "preset": "standard_no_asteroids",
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
-      "ticks": 9327,
-      "trace_sha256": "d0dc89ad769bee3df2668439b022882b8e841cea4c065bc8cacf1cd26842dd88"
+      "ticks": 9311,
+      "trace_sha256": "10e3aa6e9e85c60c079aabc41d587229782f96ebd989c3875d4e33448e1be0b9"
     },
     {
       "seed": 1,
@@ -48,7 +48,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "fe61a088a7d4caf96e5623c93e5759428f0fd8f3a54931c8d0b3cc820ce1093e"
+      "trace_sha256": "330aee33d62ba7a991cab75bf79aeba35994852ef33dfc5a6b7e1cb70e12b42f"
     },
     {
       "seed": 2,
@@ -72,7 +72,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "329c088a7106c0a17e1fe510fa4666cd96bd7d4f5ee3c4cbe4f29a55dc908349"
+      "trace_sha256": "acf2b8d50682e6dee4fbd134d18f3c66f466cf63bb83b5d63256adc99179dac0"
     },
     {
       "seed": 3,
@@ -95,8 +95,8 @@
       "preset": "standard_no_asteroids",
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
-      "ticks": 17300,
-      "trace_sha256": "4914a96bb8af1fe34412068b9554912ca787b2e8485eb577344ce8ad0a9446bc"
+      "ticks": 18000,
+      "trace_sha256": "55c3b568250f55122afd665724988f35b86f424cf0470c8bf57d75c51143b922"
     }
   ]
 }

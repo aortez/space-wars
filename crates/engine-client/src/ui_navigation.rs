@@ -50,6 +50,14 @@ pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
     }
 }
 
+pub(crate) fn moved_launcher_controls_selection(current: i32, action: UiAction) -> i32 {
+    match action {
+        UiAction::Up | UiAction::Left => moved_selection(current, 3, -1),
+        UiAction::Down | UiAction::Right => moved_selection(current, 3, 1),
+        _ => current.clamp(0, 2),
+    }
+}
+
 pub(crate) fn moved_ingame_selection(
     current: i32,
     benchmark_available: bool,
@@ -108,6 +116,15 @@ mod tests {
         assert_eq!(moved_launcher_selection(2, UiAction::Down), 4);
         assert_eq!(moved_launcher_selection(4, UiAction::Left), 3);
         assert_eq!(moved_launcher_selection(3, UiAction::Down), 0);
+    }
+
+    #[test]
+    fn launcher_controls_navigation_reaches_touch_test() {
+        assert_eq!(moved_launcher_controls_selection(0, UiAction::Right), 1);
+        assert_eq!(moved_launcher_controls_selection(0, UiAction::Down), 1);
+        assert_eq!(moved_launcher_controls_selection(1, UiAction::Right), 2);
+        assert_eq!(moved_launcher_controls_selection(2, UiAction::Right), 0);
+        assert_eq!(moved_launcher_controls_selection(0, UiAction::Left), 2);
     }
 
     #[test]

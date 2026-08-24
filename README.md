@@ -114,22 +114,23 @@ than trying to hover at ship-only velocity tolerances, and reacquire an owned
 port if contact is lost before the rebuild completes. The ordinary two-human
 setup remains the default.
 
-On Unix, query the latest live rule-bot and docking diagnostics through the
-client control socket:
+On Unix, query the running client through its control socket:
 
 ```sh
-printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock
+spacewars-cli status
 ```
 
-The snapshot is refreshed once per second and includes the world seed,
-persistent strategic objective and utility scores, current brain maneuver and
-intent, ship form and life fraction, motion, target planet, actual docked
-planet, and surface/port clearance. During body avoidance it also identifies
-the sun or planet being avoided and reports signed surface clearance, outward
-speed, whether the maneuver is predictive, predicted closest time/clearance,
-maneuver age, time without clearance progress, and whether normal or emergency
-escape assist has engaged. This keeps diagnostic formatting out of the
-simulation hot path.
+The snapshot is refreshed once per second and includes a monotonic scenario
+revision, pause state, renderer and raster scale, FPS/UPS, and frame/update
+counters. Performance counters reset for each revision. When a rule bot is
+active, it also includes the world seed, persistent strategic objective and
+utility scores, current brain maneuver and intent, ship form and life fraction,
+motion, target planet, actual docked planet, and surface/port clearance. During
+body avoidance it identifies the sun or planet being avoided and reports signed
+surface clearance, outward speed, whether the maneuver is predictive, predicted
+closest time/clearance, maneuver age, time without clearance progress, and
+whether normal or emergency escape assist has engaged. This keeps diagnostic
+formatting out of the simulation hot path.
 
 Pause the game before querying a suspicious encounter. A paused or game-over
 status also contains each rule bot's bounded flight recorder: periodic 10 Hz
@@ -151,6 +152,31 @@ The paused response can be long; saving it makes inspection easier:
 printf 'status\n' | socat - UNIX-CONNECT:/tmp/spacewars-control.sock \
   > /tmp/spacewars-bot-status.txt
 ```
+
+Inspect the visible UI screen and its selected and active scenarios separately:
+
+```sh
+spacewars-cli ui state
+spacewars-cli ui state --json
+```
+
+The JSON form is a versioned automation contract. It reports the exact launcher,
+gameplay, pause, controls, touch-test, or game-over screen; a monotonic UI
+revision; the active scenario instance revision; and pause and benchmark state.
+Returning to the launcher clears active-scenario state while preserving the
+launcher selection. The existing `status` command remains the detailed
+performance and scenario diagnostics interface.
+
+Start or restart the selected scenario's visual benchmark and wait until the
+host confirms a new scenario instance:
+
+```sh
+spacewars-cli host benchmark --timeout 3s
+```
+
+The command polls observable status with a deadline, so a following sampler or
+screenshot starts inside the benchmark window without a fixed delay. Its
+successful response includes the new scenario revision.
 
 ## Run headless AI episodes
 
@@ -296,6 +322,10 @@ The Pi image launches the scenario selector fullscreen:
 ```sh
 engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 ```
+
+The launcher and host menus accept direct touchscreen taps. Open **Controls →
+Touch Test**, or add `--touch-test` to the launch command, to verify corner
+mapping and display rotation on the assembled kiosk.
 
 `--fullscreen` leaves the launcher visible so a scenario can be selected while
 requesting fullscreen presentation. The image selects Slint's LinuxKMS backend

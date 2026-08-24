@@ -833,8 +833,7 @@ impl SpacewarsPhysics {
                 angular_velocity: debris.omega,
                 gravity_scale: 0.0,
                 can_sleep: false,
-                ccd_enabled: debris.kind == DebrisKind::Shell
-                    || debris.radius <= CANNON_SHELL_RADIUS,
+                ccd_enabled: debris_uses_ccd(debris),
                 ..BodySpec::default()
             },
             &[collider],
@@ -842,6 +841,13 @@ impl SpacewarsPhysics {
         debug_assert!(inserted);
         inserted
     }
+}
+
+fn debris_uses_ccd(debris: &DebrisState) -> bool {
+    // Breakup fragments are non-damaging visual debris and can use discrete collision. Cannon
+    // shells and small damage-bearing asteroids retain CCD so fast gameplay impacts cannot tunnel.
+    debris.kind == DebrisKind::Shell
+        || (debris.kind == DebrisKind::Asteroid && debris.radius <= CANNON_SHELL_RADIUS)
 }
 
 fn synchronize_ship_to_physics(world: &mut PhysicsWorld, index: usize, ship: &ShipState) {
@@ -1295,6 +1301,39 @@ mod tests {
         assert_eq!(blocked_pod_groups(None), GROUP_POD_0 | GROUP_POD_1);
         assert_eq!(blocked_pod_groups(Some(0)), GROUP_POD_1);
         assert_eq!(blocked_pod_groups(Some(1)), GROUP_POD_0);
+    }
+
+    #[test]
+    fn only_gameplay_sensitive_debris_uses_ccd() {
+        let shell = DebrisState::new_shell(0, 1, Vec2::ZERO, Vec2::X * 300.0, 0.0);
+        let small_asteroid = DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::ZERO,
+            Vec2::X * 200.0,
+            CANNON_SHELL_RADIUS,
+            1.0,
+            engine_core::Color::WHITE,
+        );
+        let large_asteroid = DebrisState::new(
+            DebrisKind::Asteroid,
+            Vec2::ZERO,
+            Vec2::X * 200.0,
+            CANNON_SHELL_RADIUS + 0.1,
+            1.0,
+            engine_core::Color::WHITE,
+        );
+        let fragment = DebrisState::new_fragment(
+            Vec2::ZERO,
+            [Vec2::ZERO, Vec2::X, Vec2::Y],
+            Vec2::X * 200.0,
+            1.0,
+            engine_core::Color::WHITE,
+        );
+
+        assert!(debris_uses_ccd(&shell));
+        assert!(debris_uses_ccd(&small_asteroid));
+        assert!(!debris_uses_ccd(&large_asteroid));
+        assert!(!debris_uses_ccd(&fragment));
     }
 
     #[test]
