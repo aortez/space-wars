@@ -438,11 +438,13 @@ pub fn start_scenario_loop(
     let mut benchmark_active = start_benchmark;
     let mut scenario_revision = next_scenario_revision();
     let mut performance = PerformanceStats::new(tick_model, last_tick);
+    let initial_game_over = scenario.is_game_over();
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
     window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
         &scenario_name,
         scenario_revision,
         paused,
+        initial_game_over,
         benchmark_active,
         renderer,
         raster_scale,
@@ -513,6 +515,7 @@ pub fn start_scenario_loop(
     let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
     let mut last_diagnostics_scenario_revision = scenario_revision;
     let mut last_diagnostics_paused = paused;
+    let mut last_diagnostics_game_over = initial_game_over;
     let mut last_diagnostics_benchmark_active = benchmark_active;
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
         let Some(window) = weak_window.upgrade() else {
@@ -621,17 +624,24 @@ pub fn start_scenario_loop(
         };
         let performance_sample_completed = performance.record_frame(now, updates);
         let diagnostics_revision = input.runtime_diagnostics_revision();
+        let game_over = scenario.is_game_over();
         if performance_sample_completed
             || diagnostics_revision != last_diagnostics_revision
             || scenario_revision != last_diagnostics_scenario_revision
             || paused != last_diagnostics_paused
+            || game_over != last_diagnostics_game_over
             || benchmark_active != last_diagnostics_benchmark_active
         {
-            let input_diagnostics = input.runtime_diagnostics_text();
+            let input_diagnostics = if paused || game_over {
+                input.paused_runtime_diagnostics_text()
+            } else {
+                input.runtime_diagnostics_text()
+            };
             window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
                 &scenario_name,
                 scenario_revision,
                 paused,
+                game_over,
                 benchmark_active,
                 renderer,
                 raster_scale,
@@ -641,6 +651,7 @@ pub fn start_scenario_loop(
             last_diagnostics_revision = diagnostics_revision;
             last_diagnostics_scenario_revision = scenario_revision;
             last_diagnostics_paused = paused;
+            last_diagnostics_game_over = game_over;
             last_diagnostics_benchmark_active = benchmark_active;
         }
         let performance_text = performance.display_text();
@@ -648,7 +659,6 @@ pub fn start_scenario_loop(
             &window,
             scenario.center_panel_state(paused, benchmark_active, &performance_text),
         );
-        let game_over = scenario.is_game_over();
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
@@ -1198,6 +1208,7 @@ fn runtime_diagnostics_text(
     scenario_name: &str,
     scenario_revision: u64,
     paused: bool,
+    game_over: bool,
     benchmark_active: bool,
     renderer: RenderBackend,
     raster_scale: f32,
@@ -1205,7 +1216,7 @@ fn runtime_diagnostics_text(
     input_diagnostics: &str,
 ) -> String {
     format!(
-        "scenario={scenario_name}\nscenario_revision={scenario_revision}\npaused={paused}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
+        "scenario={scenario_name}\nscenario_revision={scenario_revision}\npaused={paused}\ngame_over={game_over}\nbenchmark_active={benchmark_active}\nrenderer={}\nraster_scale={raster_scale:.2}\n{}\n{input_diagnostics}",
         renderer.label(),
         performance.diagnostics_text(),
     )
@@ -2221,13 +2232,14 @@ mod tests {
                 "pizza",
                 17,
                 false,
+                false,
                 true,
                 RenderBackend::Raster,
                 2.0,
                 &stats,
                 "No active rule-bot diagnostics.",
             ),
-            "scenario=pizza\nscenario_revision=17\npaused=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
+            "scenario=pizza\nscenario_revision=17\npaused=false\ngame_over=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
         );
     }
 

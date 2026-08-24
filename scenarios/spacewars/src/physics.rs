@@ -17,8 +17,8 @@ use super::{
     DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
     RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING,
     SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_ARC_LENGTH, SPACEPORT_DEPTH_FACTOR,
-    SPACEPORT_OUTER_POINTS, ShipForm, ShipState, SunState, planet_surface_velocity, rotate_points,
-    spaceport_local_points,
+    SPACEPORT_OUTER_POINTS, SPACEPORT_PULL_SCALE, ShipForm, ShipState, SunState,
+    planet_surface_velocity, rotate_points, spaceport_docking_anchor, spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
@@ -55,7 +55,7 @@ const PLANET_SURFACE_SEGMENTS: usize = 24;
 const WORLD_SURFACE_SEGMENTS: usize = 192;
 // The full ship silhouette is intentionally broad, but that shape can bridge
 // the inner planet and a spaceport wall while the craft turns in the bay. Use
-// a body-sized, rotation-invariant contact shape during active port maneuvers.
+// a body-sized, rotation-invariant contact shape throughout a docked stay.
 const DOCKED_SHIP_COLLIDER_RADIUS: f32 = 2.5;
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
@@ -121,6 +121,7 @@ struct ShipColliderKey {
     wing_theta: u32,
     docked: bool,
     compact: bool,
+    constrained: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +149,7 @@ pub(super) struct SpacewarsPhysics {
     world: PhysicsWorld,
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
+    docked_planets: [Option<usize>; 2],
     planet_keys: Vec<Option<PlanetColliderKey>>,
     rovers: BTreeMap<u64, RoverPhysicsEntry>,
     debris_keys: BTreeMap<u64, DebrisColliderKey>,
@@ -162,7 +164,7 @@ pub(super) struct PhysicsReconcileInput<'a> {
     pub sun: Option<SunState>,
     pub planets: &'a [PlanetState],
     pub rovers: &'a [RoverState],
-    pub docked_ships: &'a [bool; 2],
+    pub docked_planets: &'a [Option<usize>; 2],
 }
 
 impl SpacewarsPhysics {
@@ -183,6 +185,7 @@ impl SpacewarsPhysics {
             }),
             sun_radius: None,
             ship_keys: [None, None],
+            docked_planets: [None, None],
             planet_keys: vec![None; planets.len()],
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
@@ -201,7 +204,7 @@ impl SpacewarsPhysics {
             let _ = physics.insert_planet(index, planet);
         }
         for (index, ship) in ships.iter().enumerate() {
-            let _ = physics.insert_ship(index, ship, false, false);
+            let _ = physics.insert_ship(index, ship, false, false, false);
         }
         physics
     }
@@ -215,7 +218,7 @@ impl SpacewarsPhysics {
             sun,
             planets,
             rovers,
-            docked_ships,
+            docked_planets,
         } = input;
         let mut lifecycle = PhysicsLifecycle::default();
         match sun {
@@ -259,25 +262,77 @@ impl SpacewarsPhysics {
             }
         }
 
-        for (index, ship) in ships.iter().enumerate() {
-            let sensor_docked = docked_ships[index];
-            let docked = sensor_docked || ship.spaceport_ejection.is_some();
-            // Preserve normal arrival/capture mechanics until the controls
-            // indicate an intentional departure maneuver.
-            let compact = ship.spaceport_ejection.is_some()
-                || (sensor_docked
-                    && ship.brake <= 0.0
-                    && (ship.turn.abs() > f32::EPSILON || ship.thrust.abs() > f32::EPSILON));
+        for (index, ship) in ships.iter_mut().enumerate() {
+            // A pod is captured automatically so it can rebuild. A full ship
+            // establishes the stronger docking hold with its brake; otherwise
+            // a ship that merely coasts through the bay would be latched there
+            // indefinitely. Once held, it may turn in place with the brake
+            // released, and actual thrust begins departure.
+            let held_planet = self.docked_planets[index];
+            let departure_control = ship.form == ShipForm::Ship
+                && held_planet.is_some()
+                && ship.brake <= 0.0
+                && ship.thrust.abs() > f32::EPSILON;
+            let can_establish_hold = ship.form == ShipForm::EscapePod || ship.brake > 0.0;
+            let can_retain_hold = held_planet.is_some() && !departure_control;
+            let sensor_docked_planet = if departure_control {
+                None
+            } else {
+                docked_planets[index]
+            };
+            // Keep an actively held ship in its stable docked representation
+            // across transient sensor gaps. A new intersection can always
+            // establish the hold again.
+            let retained_dock = can_retain_hold;
+            let docked_planet = sensor_docked_planet
+                .or_else(|| ship.spaceport_ejection.map(|ejection| ejection.planet))
+                .or_else(|| {
+                    retained_dock
+                        .then_some(self.docked_planets[index])
+                        .flatten()
+                })
+                .filter(|planet| *planet < planets.len());
+            let docked = docked_planet.is_some();
+            let constrained = docked
+                && (can_establish_hold || can_retain_hold)
+                && ship.spaceport_ejection.is_none();
+            // Only the deliberate physical hold is remembered. Raw sensor
+            // overlap is recomputed by Rapier and must not feed back into an
+            // automatic full-ship latch on the next tick.
+            self.docked_planets[index] = constrained.then_some(docked_planet).flatten();
+            let constrained_planet = docked_planet
+                .filter(|_| constrained)
+                .and_then(|index| planets.get(index));
+            if let Some(planet) = constrained_planet {
+                let center = spaceport_docking_anchor(planet);
+                let frame_velocity = planet_surface_velocity(planet, center);
+                // Docking is a gameplay constraint, not a free-orbit
+                // collision. Match the moving pad and close the remaining
+                // offset at a bounded linear rate after ship controls and
+                // wing animation have updated for this tick.
+                ship.velocity = frame_velocity + (center - ship.position) * SPACEPORT_PULL_SCALE;
+            }
+            // Once the full hull reaches the bay, retain it as a sensor probe
+            // and use the compact physical shape throughout the docked stay.
+            // This prevents a settling ship from bridging the cavity walls and
+            // being launched out between capture ticks.
+            let compact = ship.form == ShipForm::Ship && docked;
             let key = ShipColliderKey {
                 form: ship.form,
                 wing_theta: ship.wing_theta.to_bits(),
                 docked,
                 compact,
+                constrained,
             };
             if self.ship_keys[index] != Some(key) {
                 lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
-                lifecycle.added +=
-                    usize::from(self.insert_ship(index, ship, key.docked, key.compact));
+                lifecycle.added += usize::from(self.insert_ship(
+                    index,
+                    ship,
+                    key.docked,
+                    key.compact,
+                    key.constrained,
+                ));
             } else {
                 synchronize_ship_to_physics(&mut self.world, index, ship);
             }
@@ -497,7 +552,12 @@ impl SpacewarsPhysics {
     }
 
     pub fn spaceport_contacts(&self) -> Vec<(usize, usize)> {
-        let mut contacts = BTreeSet::new();
+        let mut contacts = self
+            .docked_planets
+            .iter()
+            .enumerate()
+            .filter_map(|(ship, planet)| planet.map(|planet| (ship, planet)))
+            .collect::<BTreeSet<_>>();
         for intersection in self.world.sensor_intersections() {
             let pair = [intersection.collider_a, intersection.collider_b];
             let Some(port) = pair
@@ -689,13 +749,24 @@ impl SpacewarsPhysics {
         inserted
     }
 
-    fn insert_ship(&mut self, index: usize, ship: &ShipState, docked: bool, compact: bool) -> bool {
+    fn insert_ship(
+        &mut self,
+        index: usize,
+        ship: &ShipState,
+        docked: bool,
+        compact: bool,
+        constrained: bool,
+    ) -> bool {
         let entity = ship_entity(index);
         let colliders = ship_colliders(entity, ship, docked, compact);
         let inserted = self.world.insert_body(
             primary_body(entity),
             BodySpec {
-                kind: BodyKind::Dynamic,
+                kind: if constrained {
+                    BodyKind::KinematicVelocity
+                } else {
+                    BodyKind::Dynamic
+                },
                 position: ship.position + ship_pivot(ship.form),
                 angle: ship.rotation_radians,
                 linear_velocity: ship.velocity,
@@ -714,6 +785,7 @@ impl SpacewarsPhysics {
             wing_theta: ship.wing_theta.to_bits(),
             docked,
             compact,
+            constrained,
         });
         inserted
     }
@@ -847,9 +919,9 @@ fn ship_collision_groups(ship: &ShipState, docked: bool) -> CollisionGroups {
         ShipForm::EscapePod if ship.owner_id == 0 => GROUP_POD_0,
         ShipForm::EscapePod => GROUP_POD_1,
     };
-    let mut filter = GROUP_BODY | GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR;
+    let mut filter = GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR;
     if !docked {
-        filter |= GROUP_ALL_SHIPS;
+        filter |= GROUP_BODY | GROUP_ALL_SHIPS;
     }
     if ship.form == ShipForm::EscapePod {
         filter |= GROUP_SPACEPORT_GATE;
@@ -1362,6 +1434,163 @@ mod tests {
     }
 
     #[test]
+    fn braking_docked_full_ship_latches_the_compact_kinematic_hold() {
+        let mut ships = [
+            ShipState::new_with_default_life(
+                0,
+                Vec2::new(100.0, 100.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+            ShipState::new_with_default_life(
+                1,
+                Vec2::new(300.0, 300.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+        ];
+        let config = super::super::SpacewarsConfig::default();
+        let (sun, planets) = super::super::build_world(&config, 0);
+        let mut physics =
+            SpacewarsPhysics::new(config.universe_radius as f32, &ships, sun, &planets);
+        let mut debris = Vec::new();
+        ships[0].brake = 1.0;
+
+        let lifecycle = physics.reconcile(PhysicsReconcileInput {
+            tick: 1,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[Some(0), None],
+        });
+
+        assert_eq!(lifecycle.removed, 1);
+        assert_eq!(lifecycle.added, 1);
+        assert_eq!(
+            physics.ship_keys[0],
+            Some(ShipColliderKey {
+                form: ShipForm::Ship,
+                wing_theta: 0.0_f32.to_bits(),
+                docked: true,
+                compact: true,
+                constrained: true,
+            })
+        );
+        assert!(!physics.ship_keys[1].unwrap().compact);
+
+        let docked_groups = ship_collision_groups(&ships[0], true);
+        assert_eq!(docked_groups.filter & GROUP_BODY, 0);
+        assert_ne!(docked_groups.filter & GROUP_SPACEPORT_SENSOR, 0);
+
+        let lifecycle = physics.reconcile(PhysicsReconcileInput {
+            tick: 2,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[None, None],
+        });
+        assert_eq!(lifecycle.removed, 0);
+        assert_eq!(lifecycle.added, 0);
+        assert!(physics.ship_keys[0].unwrap().docked);
+
+        ships[0].brake = 0.0;
+        ships[0].turn = 1.0;
+        let lifecycle = physics.reconcile(PhysicsReconcileInput {
+            tick: 3,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[None, None],
+        });
+        assert_eq!(lifecycle.removed, 0);
+        assert_eq!(lifecycle.added, 0);
+        assert!(physics.ship_keys[0].unwrap().constrained);
+
+        ships[0].thrust = 1.0;
+        let lifecycle = physics.reconcile(PhysicsReconcileInput {
+            tick: 4,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[None, None],
+        });
+        assert_eq!(lifecycle.removed, 1);
+        assert_eq!(lifecycle.added, 1);
+        assert_eq!(
+            physics.ship_keys[0],
+            Some(ShipColliderKey {
+                form: ShipForm::Ship,
+                wing_theta: 0.0_f32.to_bits(),
+                docked: false,
+                compact: false,
+                constrained: false,
+            })
+        );
+    }
+
+    #[test]
+    fn unbraked_full_ship_contact_does_not_become_a_persistent_hold() {
+        let mut ships = [
+            ShipState::new_with_default_life(
+                0,
+                Vec2::new(100.0, 100.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+            ShipState::new_with_default_life(
+                1,
+                Vec2::new(300.0, 300.0),
+                engine_core::Color::WHITE,
+                1.0 / 60.0,
+            ),
+        ];
+        let config = super::super::SpacewarsConfig::default();
+        let (sun, planets) = super::super::build_world(&config, 0);
+        let mut physics =
+            SpacewarsPhysics::new(config.universe_radius as f32, &ships, sun, &planets);
+        let mut debris = Vec::new();
+
+        physics.reconcile(PhysicsReconcileInput {
+            tick: 1,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[Some(0), None],
+        });
+        assert!(physics.ship_keys[0].unwrap().docked);
+        assert!(!physics.ship_keys[0].unwrap().constrained);
+        assert_eq!(physics.docked_planets[0], None);
+
+        physics.reconcile(PhysicsReconcileInput {
+            tick: 2,
+            dt_seconds: 1.0 / 60.0,
+            ships: &mut ships,
+            debris: &mut debris,
+            sun,
+            planets: &planets,
+            rovers: &[],
+            docked_planets: &[None, None],
+        });
+        assert!(!physics.ship_keys[0].unwrap().docked);
+        assert!(!physics.ship_keys[0].unwrap().constrained);
+    }
+
+    #[test]
     fn fast_glancing_asteroid_hit_uses_one_ship_hull() {
         let mut ships = [
             ShipState::new_with_default_life(
@@ -1404,7 +1633,7 @@ mod tests {
             sun: None,
             planets: &[],
             rovers: &[],
-            docked_ships: &[false; 2],
+            docked_planets: &[None; 2],
         });
         assert_eq!(lifecycle.added, 1);
         assert_eq!(physics.world.collider_count(), 4);

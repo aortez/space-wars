@@ -4,7 +4,9 @@ use std::{io, process::ExitCode};
 
 use clap::{Parser, ValueEnum};
 use engine_agent::{
-    BatchConfig, ControllerKind, EvaluationSuite, RunReport, SpacewarsPreset, run_batch, run_suite,
+    BatchConfig, ComparedPolicyMetrics, ControllerKind, EvaluationSuite, PolicyComparisonProfile,
+    PolicyComparisonReport, RunReport, SpacewarsPreset, run_batch, run_policy_comparison,
+    run_suite, verify_suite_baseline,
 };
 use scenario_spacewars::PlayerId;
 
@@ -26,10 +28,54 @@ struct Args {
             "episodes",
             "max_ticks",
             "player_1",
-            "player_2"
+            "player_2",
+            "compare",
+            "baseline",
+            "candidate"
         ]
     )]
     suite: Option<SuiteArg>,
+
+    /// Require a named suite to match its checked-in deterministic baseline.
+    #[arg(long, requires = "suite", conflicts_with = "compare")]
+    verify: bool,
+
+    /// Run a fixed workload with baseline/candidate seats swapped per seed.
+    #[arg(
+        long,
+        value_enum,
+        requires = "candidate",
+        conflicts_with_all = [
+            "suite",
+            "verify",
+            "scenario",
+            "preset",
+            "seed",
+            "seed_step",
+            "episodes",
+            "max_ticks",
+            "player_1",
+            "player_2",
+            "trace_player"
+        ]
+    )]
+    compare: Option<ComparisonArg>,
+
+    /// Established controller used as the comparison baseline.
+    #[arg(long, value_enum, requires = "compare")]
+    baseline: Option<ControllerArg>,
+
+    /// New controller being evaluated.
+    #[arg(long, value_enum, requires = "compare")]
+    candidate: Option<ControllerArg>,
+
+    /// Override the comparison profile's first seed.
+    #[arg(long, requires = "compare")]
+    comparison_start_seed: Option<u64>,
+
+    /// Override the comparison profile's number of paired seeds.
+    #[arg(long, requires = "compare", value_parser = clap::value_parser!(u32).range(1..))]
+    comparison_episodes: Option<u32>,
 
     /// Scenario to evaluate.
     #[arg(long, value_enum, default_value = "spacewars")]
@@ -60,7 +106,7 @@ struct Args {
     player_1: ControllerArg,
 
     /// Controller installed in player seat 2.
-    #[arg(long, value_enum, default_value = "rule")]
+    #[arg(long, value_enum, default_value = "rule-v5")]
     player_2: ControllerArg,
 
     /// Record navigation events for player 1 or 2 in a custom batch.
@@ -99,12 +145,27 @@ impl From<PresetArg> for SpacewarsPreset {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum SuiteArg {
     NavigationV1,
+    StrategyV1,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ComparisonArg {
+    StrategyV1,
+}
+
+impl From<ComparisonArg> for PolicyComparisonProfile {
+    fn from(value: ComparisonArg) -> Self {
+        match value {
+            ComparisonArg::StrategyV1 => Self::StrategyV1,
+        }
+    }
 }
 
 impl From<SuiteArg> for EvaluationSuite {
     fn from(value: SuiteArg) -> Self {
         match value {
             SuiteArg::NavigationV1 => Self::NavigationV1,
+            SuiteArg::StrategyV1 => Self::StrategyV1,
         }
     }
 }
@@ -112,14 +173,15 @@ impl From<SuiteArg> for EvaluationSuite {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum ControllerArg {
     Idle,
-    Rule,
+    #[value(name = "rule-v5", alias = "rule")]
+    RuleV5,
 }
 
 impl From<ControllerArg> for ControllerKind {
     fn from(value: ControllerArg) -> Self {
         match value {
             ControllerArg::Idle => Self::Idle,
-            ControllerArg::Rule => Self::Rule,
+            ControllerArg::RuleV5 => Self::RuleV5,
         }
     }
 }
@@ -150,8 +212,35 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let report = if let Some(suite) = args.suite {
-        run_suite(suite.into())?
+    if let Some(comparison) = args.compare {
+        let baseline = args.baseline.unwrap_or(ControllerArg::RuleV5).into();
+        let candidate = args
+            .candidate
+            .expect("clap requires a candidate when comparison is selected")
+            .into();
+        let profile = PolicyComparisonProfile::from(comparison);
+        let mut config = profile.config(baseline, candidate);
+        if let Some(seed) = args.comparison_start_seed {
+            config.start_seed = seed;
+        }
+        if let Some(episodes) = args.comparison_episodes {
+            config.episodes = episodes;
+        }
+        let report = run_policy_comparison(config)?;
+        match args.output {
+            OutputArg::Text => print_policy_comparison_report(&report),
+            OutputArg::Json => {
+                let stdout = io::stdout();
+                serde_json::to_writer_pretty(stdout.lock(), &report)?;
+                println!();
+            }
+        }
+        return Ok(());
+    }
+
+    let suite = args.suite.map(EvaluationSuite::from);
+    let report = if let Some(suite) = suite {
+        run_suite(suite)?
     } else {
         match args.scenario {
             ScenarioArg::Spacewars => {}
@@ -167,6 +256,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         })?
     };
 
+    let verification = if args.verify {
+        Some(verify_suite_baseline(
+            suite.expect("clap requires a suite when verification is selected"),
+            &report,
+        )?)
+    } else {
+        None
+    };
+
     match args.output {
         OutputArg::Text => print_text_report(&report),
         OutputArg::Json => {
@@ -175,7 +273,47 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!();
         }
     }
+    if let Some(verification) = verification {
+        eprintln!(
+            "baseline={} status=match episodes={}",
+            verification.suite_id, verification.episodes
+        );
+    }
     Ok(())
+}
+
+fn print_policy_comparison_report(report: &PolicyComparisonReport) {
+    print_text_report(&report.run);
+    println!(
+        "comparison={} seed-pairs={} episode-runs={}",
+        report.workload_id.unwrap_or("custom"),
+        report.summary.seed_pairs,
+        report.summary.episode_runs,
+    );
+    print_compared_policy("baseline", &report.summary.baseline);
+    print_compared_policy("candidate", &report.summary.candidate);
+}
+
+fn print_compared_policy(role: &str, metrics: &ComparedPolicyMetrics) {
+    println!(
+        "{role}={} wins={} tick-limits={} captures={} losses={} losses(planet/sun)={}/{} rebuilds={} contacts(body/ship)={}/{} docks={} departures(port/safe-capture/safe-rebuild)={}/{}/{} planets-sum={} strategy={:?}",
+        metrics.controller.policy_id,
+        metrics.wins,
+        metrics.tick_limits,
+        metrics.captures,
+        metrics.ship_losses,
+        metrics.planet_impact_losses,
+        metrics.sun_impact_losses,
+        metrics.rebuilds,
+        metrics.body_contacts,
+        metrics.ship_contacts,
+        metrics.port_dockings,
+        metrics.port_departures,
+        metrics.safe_capture_departures,
+        metrics.safe_rebuild_departures,
+        metrics.final_planet_count_sum,
+        metrics.strategy,
+    );
 }
 
 fn print_text_report(report: &RunReport) {
@@ -184,13 +322,16 @@ fn print_text_report(report: &RunReport) {
     }
     for episode in &report.episodes {
         println!(
-            "seed={} outcome={} ticks={} sim={:.1}s captures={:?} losses={:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} planets={:?} actions={} trace={}",
+            "seed={} controllers={:?} outcome={} ticks={} sim={:.1}s captures={:?} losses={:?} losses(planet/sun)={:?}/{:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} planets={:?} strategy={:?} actions={} trace={}",
             episode.seed,
+            episode.controllers,
             episode.outcome,
             episode.ticks,
             episode.simulated_seconds,
             episode.captures,
             episode.ship_losses,
+            episode.planet_impact_losses,
+            episode.sun_impact_losses,
             episode.rebuilds,
             episode.body_contacts,
             episode.ship_contacts,
@@ -201,6 +342,7 @@ fn print_text_report(report: &RunReport) {
             episode.safe_capture_departures,
             episode.safe_rebuild_departures,
             episode.final_planet_counts,
+            episode.strategy,
             episode.actions_emitted,
             episode
                 .trace_sha256
@@ -209,11 +351,26 @@ fn print_text_report(report: &RunReport) {
         );
         for event in &episode.navigation_trace {
             println!(
-                "  nav tick={} p={} reason={:?} goal={:?} phase={:?} target={:?} docked={:?} pending={:?} age={} focus={:?} clearance={} outward={} port-omega={} velocity=({:.1},{:.1}) speed={:.1} rotation={:.2} port-rotation={} omega(control/measured)={:.2}/{:.2} heading={:.2} desired={:.1} relative={:.1} contact(body/ship)={}/{} intent(turn={:.2} thrust={:.1} brake={:.1} wings={} laser={} cannon={})",
+                "  nav tick={} p={} reason={:?} strategy={:?} strategy-target={:?}/{:?} strategy-score={} strategy-reason={:?} goal={:?} avoid={:?} avoid-clearance={} avoid-outward={} predictive={} avoid-closest={} avoid-predicted-clearance={} avoid-age={}/{} assist={}/{} phase={:?} target={:?} docked={:?} pending={:?} age={} focus={:?} clearance={} outward={} port-distance={} port-omega={} velocity=({:.1},{:.1}) speed={:.1} rotation={:.2} port-rotation={} omega(control/measured)={:.2}/{:.2} heading={:.2} desired={:.1} relative={:.1} contact(body/ship)={}/{} intent(turn={:.2} thrust={:.1} brake={:.1} wings={} laser={} cannon={})",
                 event.tick,
                 event.player.index() + 1,
                 event.reasons,
+                event.strategy.goal,
+                event.strategy.target,
+                event.strategy.target_planet,
+                optional_f32(event.strategy.selected_score),
+                event.strategy.selection_reason,
                 event.goal,
+                event.avoided_body,
+                optional_f32(event.avoidance_surface_clearance),
+                optional_f32(event.avoidance_outward_speed),
+                event.avoidance_predictive,
+                optional_f32(event.avoidance_seconds_until_closest),
+                optional_f32(event.avoidance_predicted_surface_clearance),
+                event.avoidance_age_ticks,
+                event.avoidance_stalled_ticks,
+                event.avoidance_escape_assist,
+                event.avoidance_emergency_escape_assist,
                 event.port_phase,
                 event.target_planet,
                 event.docked_planet,
@@ -222,6 +379,7 @@ fn print_text_report(report: &RunReport) {
                 event.focus_planet,
                 optional_f32(event.surface_clearance),
                 optional_f32(event.outward_speed),
+                optional_f32(event.spaceport_distance),
                 optional_f32(event.spaceport_angular_speed),
                 event.world_velocity[0],
                 event.world_velocity[1],
@@ -246,7 +404,7 @@ fn print_text_report(report: &RunReport) {
     }
     let summary = &report.summary;
     println!(
-        "episodes={} winners={:?} tick_limits={} ticks={} wall={:.3}s ticks/s={:.0} realtime={:.1}x captures={:?} losses={:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?}",
+        "episodes={} winners={:?} tick_limits={} ticks={} wall={:.3}s ticks/s={:.0} realtime={:.1}x captures={:?} losses={:?} losses(planet/sun)={:?}/{:?} rebuilds={:?} contacts(body/ship)={:?}/{:?} impacts(debris/laser)={:?}/{:?} docks={:?} departures(port/safe-capture/safe-rebuild)={:?}/{:?}/{:?} strategy={:?} policies={:?}",
         summary.episodes,
         summary.winner_counts,
         summary.tick_limits,
@@ -256,6 +414,8 @@ fn print_text_report(report: &RunReport) {
         summary.simulated_seconds_per_wall_second,
         summary.captures,
         summary.ship_losses,
+        summary.planet_impact_losses,
+        summary.sun_impact_losses,
         summary.rebuilds,
         summary.body_contacts,
         summary.ship_contacts,
@@ -265,6 +425,8 @@ fn print_text_report(report: &RunReport) {
         summary.port_departures,
         summary.safe_capture_departures,
         summary.safe_rebuild_departures,
+        summary.strategy,
+        summary.policy_metrics,
     );
 }
 
@@ -274,4 +436,53 @@ fn optional_f32(value: Option<f32>) -> String {
 
 fn optional_u64(value: Option<u64>) -> String {
     value.map_or_else(|| "-".to_owned(), |value| value.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rule_alias_and_explicit_v5_select_the_same_concrete_controller() {
+        for value in ["rule", "rule-v5"] {
+            let args = Args::try_parse_from(["engine-agent", "--player-2", value]).unwrap();
+
+            assert!(matches!(args.player_2, ControllerArg::RuleV5));
+            assert_eq!(ControllerKind::from(args.player_2), ControllerKind::RuleV5);
+        }
+    }
+
+    #[test]
+    fn comparison_cli_captures_explicit_roles_and_profile() {
+        let args = Args::try_parse_from([
+            "engine-agent",
+            "--compare",
+            "strategy-v1",
+            "--baseline",
+            "rule-v5",
+            "--candidate",
+            "idle",
+            "--comparison-start-seed",
+            "100",
+            "--comparison-episodes",
+            "20",
+        ])
+        .unwrap();
+
+        assert!(matches!(args.compare, Some(ComparisonArg::StrategyV1)));
+        assert!(matches!(args.baseline, Some(ControllerArg::RuleV5)));
+        assert!(matches!(args.candidate, Some(ControllerArg::Idle)));
+        assert_eq!(args.comparison_start_seed, Some(100));
+        assert_eq!(args.comparison_episodes, Some(20));
+    }
+
+    #[test]
+    fn comparison_cli_requires_a_candidate() {
+        let error = Args::try_parse_from(["engine-agent", "--compare", "strategy-v1"]).unwrap_err();
+
+        assert_eq!(
+            error.kind(),
+            clap::error::ErrorKind::MissingRequiredArgument
+        );
+    }
 }

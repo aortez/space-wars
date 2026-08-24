@@ -1550,7 +1550,7 @@ impl SpacewarsScenario {
             .map(|(index, planet)| {
                 let id = PlanetId(index as u32);
                 let center_velocity = planet_surface_velocity(planet, planet.position);
-                let spaceport_position = spaceport_center(planet);
+                let spaceport_position = spaceport_docking_anchor(planet);
                 let spaceport_velocity = planet_surface_velocity(planet, spaceport_position);
                 PlanetObservationV1 {
                     id,
@@ -2465,10 +2465,13 @@ fn split_gravity_id(id: GravityId) -> (u64, u64) {
 }
 
 fn reconcile_physics(state: &mut SpacewarsState, dt_seconds: f32) -> physics::PhysicsLifecycle {
-    let mut docked_ships = [false; 2];
+    let mut docked_planets = [None; 2];
     for contact in &state.spaceport_contacts {
-        if let Some(docked) = docked_ships.get_mut(contact.ship) {
-            *docked = true;
+        if let Some(docked) = docked_planets
+            .get_mut(contact.ship)
+            .filter(|docked| docked.is_none())
+        {
+            *docked = Some(contact.planet);
         }
     }
 
@@ -2480,7 +2483,7 @@ fn reconcile_physics(state: &mut SpacewarsState, dt_seconds: f32) -> physics::Ph
         sun: state.sun,
         planets: &state.planets,
         rovers: &state.rovers,
-        docked_ships: &docked_ships,
+        docked_planets: &docked_planets,
     })
 }
 
@@ -2498,12 +2501,17 @@ fn resolve_physics_spaceport_contacts(
         if ship_index >= state.ships.len() {
             continue;
         }
-        let spaceport = spaceport_physics(planet_index, &planet);
-        if !spaceport_accepts_ship(state, ship_index, spaceport) {
+        if !spaceport_accepts_ship(state, ship_index, planet_index) {
             continue;
         }
 
-        resolve_spaceport_contact(&mut state.ships[ship_index], spaceport.bounds.center);
+        let docking_anchor = spaceport_docking_anchor(&planet);
+        let spaceport_velocity = planet_surface_velocity(&planet, docking_anchor);
+        resolve_spaceport_contact(
+            &mut state.ships[ship_index],
+            docking_anchor,
+            spaceport_velocity,
+        );
         accepted.insert((ship_index, planet_index));
         state.spaceport_contacts.push(SpaceportContact {
             ship: ship_index,
@@ -2832,6 +2840,7 @@ struct BodyPhysics {
     spaceport: Option<SpaceportPhysics>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 struct SpaceportPhysics {
     planet: usize,
@@ -3640,7 +3649,21 @@ fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
         });
 
         if let Some(spaceport) = contact.spaceport {
-            resolve_spaceport_contact(&mut state.ships[contact.ship], spaceport.bounds.center);
+            let docking_anchor = state
+                .planets
+                .get(spaceport.planet)
+                .map_or(spaceport.bounds.center, spaceport_docking_anchor);
+            let spaceport_velocity = state
+                .planets
+                .get(spaceport.planet)
+                .map_or(Vec2::ZERO, |planet| {
+                    planet_surface_velocity(planet, docking_anchor)
+                });
+            resolve_spaceport_contact(
+                &mut state.ships[contact.ship],
+                docking_anchor,
+                spaceport_velocity,
+            );
             events.spaceport_contacts.push(SpaceportContact {
                 ship: contact.ship,
                 planet: spaceport.planet,
@@ -3728,7 +3751,7 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
 
             if ship_high.intersects(&Bounds2::Circle(body.high)) {
                 let spaceport = body.spaceport.filter(|spaceport| {
-                    spaceport_accepts_ship(state, ship_index, *spaceport)
+                    spaceport_accepts_ship(state, ship_index, spaceport.planet)
                         && ship_high.intersects(&Bounds2::Circle(spaceport.bounds))
                 });
 
@@ -3751,11 +3774,7 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
     contacts
 }
 
-fn spaceport_accepts_ship(
-    state: &SpacewarsState,
-    ship_index: usize,
-    spaceport: SpaceportPhysics,
-) -> bool {
+fn spaceport_accepts_ship(state: &SpacewarsState, ship_index: usize, planet_index: usize) -> bool {
     let ship = &state.ships[ship_index];
     if ship.spaceport_reentry_lockout > 0.0 {
         return false;
@@ -3766,7 +3785,7 @@ fn spaceport_accepts_ship(
 
     state
         .planets
-        .get(spaceport.planet)
+        .get(planet_index)
         .is_some_and(|planet| planet.owner_id == Some(ship.owner_id))
 }
 
@@ -3806,11 +3825,15 @@ fn apply_body_collision_damage(ship: &mut ShipState) -> f32 {
     damage
 }
 
-fn resolve_spaceport_contact(ship: &mut ShipState, spaceport_center: Vec2) {
+fn resolve_spaceport_contact(
+    ship: &mut ShipState,
+    spaceport_center: Vec2,
+    spaceport_velocity: Vec2,
+) {
     let offset = spaceport_center - ship.position;
-    let force = offset.length() * SPACEPORT_PULL_SCALE;
-    ship.velocity *= SPACEPORT_DAMPING;
-    ship.velocity += offset * (force / ship.mass());
+    let relative_velocity = ship.velocity - spaceport_velocity;
+    ship.velocity = spaceport_velocity + relative_velocity * SPACEPORT_DAMPING;
+    ship.velocity += offset * (SPACEPORT_PULL_SCALE / ship.mass());
 }
 
 /// Process contacts saved by the previous physics tick before movement and weapons update.
@@ -4020,7 +4043,7 @@ fn eject_ships_from_spaceport(
     let Some(planet) = state.planets.get(planet_index).copied() else {
         return;
     };
-    let port_center = spaceport_physics(planet_index, &planet).bounds.center;
+    let port_center = spaceport_docking_anchor(&planet);
     let outward_offset = port_center - planet.position;
     let outward = if outward_offset.length_squared() <= REALLY_SMALL {
         Vec2::X
@@ -4343,6 +4366,7 @@ fn debris_bounds(debris: &DebrisState) -> Circle {
     Circle::new(debris.position, debris.radius)
 }
 
+#[cfg(test)]
 fn spaceport_physics(planet: usize, state: &PlanetState) -> SpaceportPhysics {
     SpaceportPhysics {
         planet,
@@ -4397,6 +4421,7 @@ fn spaceport_points(planet: &PlanetState) -> Vec<Vec2> {
         .collect()
 }
 
+#[cfg(test)]
 fn spaceport_center(planet: &PlanetState) -> Vec2 {
     let depth = planet.radius * SPACEPORT_DEPTH_FACTOR;
     let angle = SPACEPORT_ARC_LENGTH / planet.radius;
@@ -4424,6 +4449,14 @@ fn spaceport_center(planet: &PlanetState) -> Vec2 {
 
     let count = (SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS) as f32;
     planet.position + (sum / count).rotate_radians(planet.wrapper_angle)
+}
+
+fn spaceport_docking_anchor(planet: &PlanetState) -> Vec2 {
+    let depth = planet.radius * SPACEPORT_DEPTH_FACTOR;
+    let arc_angle = SPACEPORT_ARC_LENGTH / planet.radius
+        * (SPACEPORT_OUTER_POINTS.saturating_sub(1) as f32 / SPACEPORT_OUTER_POINTS as f32);
+    let local_anchor = Vec2::from_radians(arc_angle * 0.5) * ((planet.radius + depth) * 0.5);
+    planet.position + local_anchor.rotate_radians(planet.wrapper_angle)
 }
 
 fn spaceport_local_points(planet_radius: f32) -> Vec<Vec2> {
@@ -7536,6 +7569,29 @@ mod tests {
     }
 
     #[test]
+    fn tiny_planet_docking_anchor_stays_away_from_the_gravity_center() {
+        let mut planet = test_planet(Vec2::new(100.0, 200.0), 15.8457);
+        let former_centroid = spaceport_center(&planet);
+        let anchor = spaceport_docking_anchor(&planet);
+        let local_anchor = anchor - planet.position;
+        let expected_radius = planet.radius * (1.0 + SPACEPORT_DEPTH_FACTOR) * 0.5;
+
+        assert_close(local_anchor.length(), expected_radius);
+        assert!(
+            local_anchor.length() > (former_centroid - planet.position).length() * 2.5,
+            "docking anchor {} must stay well beyond former centroid {}",
+            local_anchor.length(),
+            (former_centroid - planet.position).length(),
+        );
+
+        planet.wrapper_angle = core::f32::consts::FRAC_PI_2;
+        assert_vec_close(
+            spaceport_docking_anchor(&planet),
+            planet.position + local_anchor.rotate_radians(planet.wrapper_angle),
+        );
+    }
+
+    #[test]
     fn body_collision_response_pushes_to_surface_and_reflects_velocity() {
         let mut ship =
             ShipState::new_with_default_life(0, Vec2::new(10.0, 0.0), Color::WHITE, 1.0 / 60.0);
@@ -7659,7 +7715,7 @@ mod tests {
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         let spaceport = spaceport_physics(0, &state.planets[0]);
         let start_position = spaceport.bounds.center - Vec2::X;
-        let offset = spaceport.bounds.center - start_position;
+        let offset = spaceport_docking_anchor(&state.planets[0]) - start_position;
         let start_life = state.ships[0].life;
         state.ships[0].position = start_position;
         state.ships[0].velocity = Vec2::ZERO;
@@ -7680,10 +7736,30 @@ mod tests {
         assert_eq!(state.ships[0].position, start_position);
         assert_vec_close(
             state.ships[0].velocity,
-            offset * (offset.length() * SPACEPORT_PULL_SCALE / SHIP_MASS),
+            offset * (SPACEPORT_PULL_SCALE / SHIP_MASS),
         );
         assert_eq!(state.ships[0].life, start_life);
         assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Active(0));
+    }
+
+    #[test]
+    fn spaceport_contact_damps_velocity_in_the_moving_port_frame() {
+        let mut ship =
+            ShipState::new_with_default_life(0, Vec2::new(10.0, 20.0), Color::WHITE, 1.0 / 60.0);
+        let spaceport_center = Vec2::new(13.0, 16.0);
+        let spaceport_velocity = Vec2::new(70.0, -25.0);
+        let relative_velocity = Vec2::new(20.0, -10.0);
+        ship.velocity = spaceport_velocity + relative_velocity;
+        let offset = spaceport_center - ship.position;
+
+        resolve_spaceport_contact(&mut ship, spaceport_center, spaceport_velocity);
+
+        assert_vec_close(
+            ship.velocity,
+            spaceport_velocity
+                + relative_velocity * SPACEPORT_DAMPING
+                + offset * (SPACEPORT_PULL_SCALE / SHIP_MASS),
+        );
     }
 
     #[test]
@@ -7768,7 +7844,7 @@ mod tests {
         forward.planets[0].owner_id = Some(0);
         forward.planets[0].capturing_player_id = Some(1);
         forward.planets[0].taking_ownership_time = 2.0;
-        let port_center = spaceport_physics(0, &forward.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&forward.planets[0]);
         for ship in &mut forward.ships {
             ship.position = port_center;
             ship.velocity = Vec2::ZERO;
@@ -7827,7 +7903,7 @@ mod tests {
         state.planets[0].owner_id = Some(0);
         refresh_player_planet_counts(&mut state);
         state.ships[0].change_to_escape_pod();
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         let outward = (port_center - state.planets[0].position).normalized();
         let starting_positions = [port_center, port_center];
         for (ship, position) in state.ships.iter_mut().zip(starting_positions) {
@@ -7857,7 +7933,7 @@ mod tests {
         state.planets[0].owner_id = Some(0);
         refresh_player_planet_counts(&mut state);
         state.ships[0].change_to_escape_pod();
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         state.ships[0].position = port_center;
         state.ships[0].velocity = Vec2::ZERO;
         state.ships[1].position = port_center;
@@ -7897,7 +7973,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         let outward = (port_center - state.planets[0].position).normalized();
         let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
         state.ships[0].position = port_center + tangent * 7.0;
@@ -7933,7 +8009,7 @@ mod tests {
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         state.planets[0].owner_id = Some(0);
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         let outward = (port_center - state.planets[0].position).normalized();
         let tangent = outward.rotate_radians(core::f32::consts::FRAC_PI_2);
         for (index, ship) in state.ships.iter_mut().enumerate() {
@@ -7985,7 +8061,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         let outward = (port_center - state.planets[0].position).normalized();
         state.ships[0].position = port_center;
         state.ships[0].velocity = Vec2::ZERO;
@@ -8020,7 +8096,7 @@ mod tests {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         let outward = (port_center - state.planets[0].position).normalized();
         state.ships[0].position = port_center;
         state.ships[0].velocity = Vec2::ZERO;
@@ -8068,7 +8144,7 @@ mod tests {
         state.planets[0].taking_ownership_time = 1.0;
         state.planets[0].building_new_ship_time = 2.0;
         state.ships[0].change_to_escape_pod();
-        let port_center = spaceport_physics(0, &state.planets[0]).bounds.center;
+        let port_center = spaceport_docking_anchor(&state.planets[0]);
         state.ships[0].position = port_center;
         state.ships[1].position = port_center;
         land_ships_on_planet(&mut state, &[0, 1], 0);
@@ -10916,7 +10992,7 @@ mod tests {
         let planet = &state.planets[0];
         let frame = ShipObservationFrame::new(ship);
         let clearance = 23.0;
-        let world_outward = (spaceport_center(planet) - planet.position).normalized();
+        let world_outward = (spaceport_docking_anchor(planet) - planet.position).normalized();
         let world_position = planet.position + world_outward * (planet.radius + clearance);
         let expected_position = frame.position(world_position);
         let expected_velocity =

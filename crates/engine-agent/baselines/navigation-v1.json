@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "suite_id": "navigation_v1",
+  "episodes": [
+    {
+      "seed": 0,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "0a1be75d1a5de48ad22b08d366f8d4e2b94887e663b8e25a60b72d4f9d774d5a"
+    },
+    {
+      "seed": 1,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "463dade110e4be0388e5acb430f8006fe0e177e95665bc34c8db79538a02d356"
+    },
+    {
+      "seed": 2,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "214d8251e73c2b978adbd0b515bfbf92a130ade0de10ad8f04f586dc9e8550b0"
+    },
+    {
+      "seed": 3,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "048b84958b806183afbe97d1614f555fea17b73e0f05410665867a4d7716ff9c"
+    },
+    {
+      "seed": 4,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "6e920ec71f0a13116064ee2d0ddd9dbde4bfe697e820994cdc6de0ce8aae5f9d"
+    },
+    {
+      "seed": 5,
+      "preset": "navigation",
+      "controllers": ["rule_ship_v5", "rule_ship_v5"],
+      "max_ticks": 36000,
+      "ticks": 36000,
+      "trace_sha256": "b08f556344df468d1f1034c8558076d17b2a5e87a9935d804911cb34700d31aa"
+    }
+  ]
+}
