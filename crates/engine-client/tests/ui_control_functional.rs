@@ -236,6 +236,7 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
                 "pause.restart",
                 "pause.controls",
                 "pause.return-to-launcher",
+                "pause.clock",
             ]
         );
 

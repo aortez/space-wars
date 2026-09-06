@@ -170,6 +170,8 @@ enum UiScreenArg {
     PauseMain,
     #[value(name = "pause.controls")]
     PauseControls,
+    #[value(name = "pause.clock")]
+    PauseClock,
     #[value(name = "game-over")]
     GameOver,
 }
@@ -184,6 +186,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::Gameplay => Self::Gameplay,
             UiScreenArg::PauseMain => Self::PauseMain,
             UiScreenArg::PauseControls => Self::PauseControls,
+            UiScreenArg::PauseClock => Self::PauseClock,
             UiScreenArg::GameOver => Self::GameOver,
         }
     }
@@ -770,11 +773,31 @@ mod tests {
     #[test]
     fn clock_commands_parse_guards_and_require_a_known_wait_phase() {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "state", "--json"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "events", "--json"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "falling"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "unknown"]).is_err());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger"]).is_err());
+        assert!(
+            Args::try_parse_from(["spacewars-cli", "clock", "wait", "--lifecycle", "idle"]).is_ok()
+        );
+        assert!(
+            Args::try_parse_from([
+                "spacewars-cli",
+                "clock",
+                "wait",
+                "--event",
+                "color-cycle",
+                "--phase",
+                "cycling"
+            ])
+            .is_ok()
+        );
         assert!(
             Args::try_parse_from([
                 "spacewars-cli",
                 "clock",
                 "trigger",
+                "color-cycle",
                 "--expect-scenario-revision",
                 "3",
                 "--expect-event-id",

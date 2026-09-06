@@ -12,7 +12,9 @@ enum ActivationFocus {
     TouchTest,
     PauseMain(i32),
     PauseControls,
+    PauseClock(i32),
     GameOver(i32),
+    Gameplay,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,8 +39,10 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::LauncherControls(index) => {
             window.set_launcher_controls_focus_index(index);
         }
-        ActivationFocus::TouchTest | ActivationFocus::PauseControls => {}
+        ActivationFocus::TouchTest | ActivationFocus::PauseControls | ActivationFocus::Gameplay => {
+        }
         ActivationFocus::PauseMain(index) => window.set_ingame_menu_focus_index(index),
+        ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
     handle_ui_action(window, target.action);
@@ -52,6 +56,10 @@ pub(crate) fn supports(control_id: &str, benchmark_available: bool) -> bool {
 
 fn activation_target(control_id: &str, benchmark_available: bool) -> Option<ActivationTarget> {
     let target = match control_id {
+        "gameplay.clock-controls" => ActivationTarget {
+            focus: ActivationFocus::Gameplay,
+            action: UiAction::Controls,
+        },
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
         "launcher.start" => launcher(1, UiAction::Confirm),
@@ -71,6 +79,17 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "pause.restart" => pause_main(1),
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
+        "pause.clock" => pause_main(4),
+        "pause.clock.time-format.previous" => pause_clock(0, UiAction::Left),
+        "pause.clock.time-format.next" => pause_clock(0, UiAction::Right),
+        "pause.clock.event-profile.previous" => pause_clock(1, UiAction::Left),
+        "pause.clock.event-profile.next" => pause_clock(1, UiAction::Right),
+        "pause.clock.falling" => pause_clock(2, UiAction::Confirm),
+        "pause.clock.color-cycle" => pause_clock(3, UiAction::Confirm),
+        "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
+        "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
+        "pause.clock.back" => pause_clock(5, UiAction::Confirm),
+        "pause.clock.preview" => pause_clock(6, UiAction::Confirm),
         "pause.return-to-launcher" => pause_main(3 + i32::from(benchmark_available)),
         "pause.controls.back" => ActivationTarget {
             focus: ActivationFocus::PauseControls,
@@ -105,8 +124,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.spacewars.planets"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.event-profile" => 3,
-        "launcher.settings.spacewars.asteroids" => 4,
-        "launcher.settings.spacewars.player-health" => 5,
+        "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.falling" => 4,
+        "launcher.settings.spacewars.player-health" | "launcher.settings.clock.color-cycle" => 5,
         "launcher.settings.spacewars.player-2" => 6,
         _ => return None,
     };
@@ -138,6 +157,13 @@ const fn pause_main(index: i32) -> ActivationTarget {
     ActivationTarget {
         focus: ActivationFocus::PauseMain(index),
         action: UiAction::Confirm,
+    }
+}
+
+const fn pause_clock(index: i32, action: UiAction) -> ActivationTarget {
+    ActivationTarget {
+        focus: ActivationFocus::PauseClock(index),
+        action,
     }
 }
 

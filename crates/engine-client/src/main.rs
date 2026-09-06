@@ -5,10 +5,13 @@
 //! scenario.
 
 mod client_scenarios;
+mod clock_controls;
 mod gamepad;
 mod host;
 mod input;
 mod ipc;
+#[cfg(test)]
+mod keyboard_tests;
 mod native_video;
 mod nes_audio;
 mod nes_realtime;
@@ -375,6 +378,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&rom_catalog),
     );
     install_ui_navigation(&window);
+    install_keyboard_navigation(&window, Rc::clone(&input));
+    clock_controls::install(
+        &window,
+        Rc::clone(&scenario_controls),
+        Arc::clone(&settings),
+        settings_path.clone(),
+    );
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
 
@@ -555,6 +565,8 @@ fn show_launcher(
     window.set_scenario_pointer_enabled(false);
     window.set_ingame_menu_visible(false);
     window.set_ingame_controls_visible(false);
+    window.set_ingame_clock_visible(false);
+    window.set_clock_controls_pending(false);
     window.set_game_over_visible(false);
     window.set_scenario_error_text(SharedString::from(""));
     clear_runtime_diagnostics(window);
@@ -596,6 +608,8 @@ fn show_launcher(
     window.set_launcher_clock_event_profile(SharedString::from(clock_event_profile_label(
         settings.clock.event_profile,
     )));
+    window.set_launcher_clock_falling_enabled(settings.clock.events.falling);
+    window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -913,6 +927,48 @@ fn install_ui_navigation(window: &MainWindow) {
     });
 }
 
+fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
+    let weak = window.as_weak();
+    window.on_keyboard_action(move |code, repeat| {
+        let Some(window) = weak.upgrade() else { return };
+        // Repeat may move selection, but must never repeatedly toggle a setting,
+        // restart, or pause/resume as the user holds a key across a transition.
+        let adjusts_setting = matches!(code, 2 | 3)
+            && (window.get_launcher_settings_visible()
+                || (window.get_ingame_clock_visible()
+                    && matches!(window.get_ingame_clock_focus_index(), 0 | 1 | 4)));
+        if (repeat && (!matches!(code, 0..=3) || adjusts_setting))
+            || window.get_clock_controls_pending()
+        {
+            return;
+        }
+        let menu = window.get_launcher_visible()
+            || window.get_ingame_menu_visible()
+            || window.get_game_over_visible()
+            || window.get_touch_test_visible();
+        if menu && let Some(action) = UiAction::from_code(code) {
+            handle_ui_action(&window, action);
+            return;
+        }
+        if window.get_launcher_visible() {
+            if code == 10 && !repeat {
+                window.invoke_launcher_start_benchmark();
+            }
+            return;
+        }
+        let key = match code {
+            5 => input::GameKey::Back,
+            7 => input::GameKey::Controls,
+            8 => input::GameKey::Pause,
+            9 => input::GameKey::Reset,
+            10 => input::GameKey::Benchmark,
+            11 => input::GameKey::ReturnLauncher,
+            _ => return,
+        };
+        input.borrow_mut().press(key);
+    });
+}
+
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_touch_test_visible() {
         if matches!(action, UiAction::Back | UiAction::Controls) {
@@ -924,6 +980,8 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
         handle_game_over_ui_action(window, action);
     } else if window.get_ingame_menu_visible() {
         handle_ingame_menu_ui_action(window, action);
+    } else if window.get_launcher_scenario() == "clock" && action == UiAction::Controls {
+        window.invoke_ingame_clock_open();
     }
 }
 
@@ -1049,6 +1107,10 @@ fn handle_game_over_ui_action(window: &MainWindow, action: UiAction) {
 }
 
 fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
+    if window.get_ingame_clock_visible() {
+        clock_controls::handle_action(window, action);
+        return;
+    }
     if window.get_ingame_controls_visible() {
         match action {
             UiAction::Back | UiAction::Confirm | UiAction::Controls => {
@@ -1065,7 +1127,7 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
             window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
                 window.get_ingame_menu_focus_index(),
-                benchmark_offset == 1,
+                benchmark_offset == 1 || window.get_launcher_scenario() == "clock",
                 action,
             ));
         }
@@ -1081,6 +1143,8 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
                 window.set_ingame_controls_visible(true);
             } else if selected == 3 + benchmark_offset {
                 window.invoke_ingame_return_launcher();
+            } else if selected == 4 && window.get_launcher_scenario() == "clock" {
+                clock_controls::open(window);
             }
         }
         UiAction::Back | UiAction::Start => window.invoke_ingame_resume(),
@@ -1114,7 +1178,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
-        "clock" => 5,
+        "clock" => 7,
         "falling" => 1,
         "nes" => 2,
         _ => 3,
@@ -1242,6 +1306,16 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 4 {
+        window.set_launcher_clock_falling_enabled(!window.get_launcher_clock_falling_enabled());
+        return;
+    }
+    if focus == 5 {
+        window.set_launcher_clock_color_cycle_enabled(
+            !window.get_launcher_clock_color_cycle_enabled(),
+        );
+        return;
+    }
     if focus == 3 {
         let next = cycle_label(
             window.get_launcher_clock_event_profile().as_str(),
@@ -1452,6 +1526,7 @@ fn hide_launcher_surfaces(window: &MainWindow) {
     window.set_touch_test_visible(false);
     window.set_ingame_menu_visible(false);
     window.set_ingame_controls_visible(false);
+    window.set_ingame_clock_visible(false);
     window.set_game_over_visible(false);
 }
 
@@ -1475,7 +1550,7 @@ fn persist_launcher_settings(
     let raster_scale = normalize_raster_scale(launch.raster_scale);
     let spacewars = selections.spacewars.normalized();
     let pizza = selections.pizza.normalized();
-    let clock = selections.clock.clone();
+    let clock = selections.clock;
     let nes_rom_id = selections.nes_rom_id.clone();
     let mut changed = false;
 
@@ -1654,12 +1729,12 @@ fn launcher_selections_from_window(
     let launch = launch_options_from_window(window)?;
     let (clock, spacewars, pizza) = match launch.scenario.as_str() {
         "spacewars" => (
-            current_settings.clock.clone(),
+            current_settings.clock,
             spacewars_setup_from_window(window)?,
             current_settings.pizza.clone(),
         ),
         "pizza" => (
-            current_settings.clock.clone(),
+            current_settings.clock,
             current_settings.spacewars.clone(),
             pizza_setup_from_window(window)?,
         ),
@@ -1669,7 +1744,7 @@ fn launcher_selections_from_window(
             current_settings.pizza.clone(),
         ),
         _ => (
-            current_settings.clock.clone(),
+            current_settings.clock,
             current_settings.spacewars.clone(),
             current_settings.pizza.clone(),
         ),
@@ -1728,6 +1803,10 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
         event_profile: clock_event_profile_from_label(
             window.get_launcher_clock_event_profile().as_str(),
         )?,
+        events: engine_common::ClockEvents {
+            falling: window.get_launcher_clock_falling_enabled(),
+            color_cycle: window.get_launcher_clock_color_cycle_enabled(),
+        },
     })
 }
 
@@ -2507,6 +2586,10 @@ mod tests {
             clock: ClockSettings {
                 time_format: ClockTimeFormat::TwelveHour,
                 event_profile: ClockEventProfile::Demo,
+                events: engine_common::ClockEvents {
+                    falling: false,
+                    color_cycle: true,
+                },
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

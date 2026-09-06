@@ -467,7 +467,7 @@ fn handle_clock_request(
             response.control_failure(*failure);
             return;
         }
-        if !controls.request_clock_fall() {
+        if !controls.request_clock_event(trigger.event) {
             response.control_failure(ControlFailure::new(
                 ControlFailureCode::ActionUnavailable,
                 "Another host control is pending",
@@ -498,12 +498,12 @@ fn validate_clock_trigger(
     } else if ui.screen != UiScreen::Gameplay || clock.paused {
         Some((
             ControlFailureCode::WrongScreen,
-            "Resume Clock gameplay before triggering a fall",
+            "Resume Clock gameplay before triggering an event",
         ))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
-            "Clock is busy; wait for idle before triggering another fall",
+            "Clock is busy; wait for idle before triggering another event",
         ))
     } else {
         None
@@ -748,6 +748,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         touch_test: window.get_touch_test_visible(),
         ingame_menu: window.get_ingame_menu_visible(),
         ingame_controls: window.get_ingame_controls_visible(),
+        ingame_clock: window.get_ingame_clock_visible(),
         game_over: window.get_game_over_visible(),
     });
     let runtime = runtime_status_for_screen(screen, window.get_runtime_diagnostics().as_str())?;
@@ -760,6 +761,13 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
             ingame_menu_focus_index: window.get_ingame_menu_focus_index(),
+            ingame_clock_focus_index: window.get_ingame_clock_focus_index(),
+            clock_preview: engine_common::ClockEventKind::ALL
+                .get(window.get_clock_preview_index() as usize)
+                .map_or("", |event| event.label())
+                .into(),
+            clock_controls_pending: window.get_clock_controls_pending(),
+            clock_settings_error: non_empty(window.get_clock_settings_error().as_str()),
             game_over_focus_index: window.get_game_over_focus_index(),
             benchmark_available: window.get_scenario_benchmark_available(),
             launch_available: selected_scenario != "nes" || window.get_launcher_nes_rom_supported(),
@@ -776,6 +784,8 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
             clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
+            clock_falling_enabled: window.get_launcher_clock_falling_enabled(),
+            clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );
@@ -887,7 +897,8 @@ mod tests {
             Ok(ControlCommand::ClockState)
         ));
         let request = ClockTriggerRequest {
-            schema_version: 1,
+            schema_version: spacewars_control::CLOCK_STATE_SCHEMA_VERSION,
+            event: engine_common::ClockEventKind::Falling,
             expected_scenario_revision: 9,
             expected_event_id: 2,
         };

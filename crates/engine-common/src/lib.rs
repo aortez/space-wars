@@ -189,11 +189,64 @@ pub enum ClockTimeFormat {
     TwentyFourHour,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClockSettings {
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
+    pub events: ClockEvents,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockEventKind {
+    Falling = 0,
+    ColorCycle = 1,
+}
+
+impl ClockEventKind {
+    pub const ALL: [Self; 2] = [Self::Falling, Self::ColorCycle];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Falling => "falling",
+            Self::ColorCycle => "color-cycle",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Falling => "Falling",
+            Self::ColorCycle => "Color Cycle",
+        }
+    }
+}
+
+/// Automatic event selection. Explicit previews also work for disabled events.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClockEvents {
+    pub falling: bool,
+    pub color_cycle: bool,
+}
+
+impl Default for ClockEvents {
+    fn default() -> Self {
+        Self {
+            falling: true,
+            color_cycle: true,
+        }
+    }
+}
+
+impl ClockEvents {
+    pub const fn enabled(self, kind: ClockEventKind) -> bool {
+        match kind {
+            ClockEventKind::Falling => self.falling,
+            ClockEventKind::ColorCycle => self.color_cycle,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
