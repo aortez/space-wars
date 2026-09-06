@@ -21,13 +21,20 @@ backend. Text diagnostics are a Slint overlay in either mode.
 
 - D-pad or left stick left/right: walk relative to local gravity.
 - Gamepad A: jump on press; release before jumping again.
+- Gamepad B: apply a repeatable off-center test shove; release before repeating.
 - Keyboard A/D or left/right arrows: walk; Space: jump.
+- Keyboard X: the same test shove. It pushes outward and in the facing direction.
 - Start or Esc: pause. R or the pause menu: restart.
 
 The camera follows the spaceling without rotating. Walking right goes clockwise
 around the planet; at the bottom, the spaceling is upside down on screen. The two
 orange slopes are real colliders. Short surface marks rotate with the planet,
 making moving-ground behavior visible. The spaceling is 1.8 world units tall.
+
+Press B/X after settling, then watch the spaceling tumble, land, and stand up.
+Try it facing either direction, on a slope, while jumping, or again during
+recovery. The red mark/line briefly shows the shove's application point and
+direction. This is a lab stimulus, not an attack or damage mechanic.
 
 ## Diagnostics
 
@@ -45,6 +52,13 @@ The orange indicator beside the spaceling shows gravity direction.
 - **Jumps/landings:** actual supported jumps and airborne-to-grounded
   transitions. The initial drop counts as a landing.
 - **Air:** current airtime when airborne; previous airtime when grounded.
+- **Balance:** orange is balanced, red is knocked down, yellow is recovering.
+  Grounded/airborne remains independent: lying on the ground is supported, not
+  necessarily balanced.
+- **Recovery:** progress through the minimum supported recovery duration. At
+  100%, the controller still waits for a sufficiently upright, settled pose.
+- **Knockdowns/recoveries/shoves:** actual transitions and applied test impulses,
+  not frames spent in a state or repeated held inputs.
 
 ## Model and scope
 
@@ -56,9 +70,48 @@ speed. Rapier alone integrates the body and resolves collisions.
 Grounded movement targets speed relative to actual supporting motion. Air
 control is weaker; releasing movement in flight does not brake. This is an
 arcade controller, including its limited air control, not simulated limb forces.
-With no gravity it retains its last up direction. A jump requires a fresh press
+With no gravity it retains its last up direction, but applies no upright or
+movement correction; linear and angular momentum remain physical. A jump requires a fresh press
 and walkable support, so walls, ceilings, and speculative distant contacts do
 not allow jumps.
+
+## Balance and recovery
+
+The controller compares actual velocity with the previous commanded velocity
+plus the supplied gravity step. An unexpected change of at least 12 units/s,
+or angular speed of at least 8 rad/s relative to support (world-frame in air),
+causes knockdown. These are arcade disturbance thresholds, not measured damage
+or a reconstruction of collision energy. Solver impacts are detected on the
+next controller tick; a shove applied before controls is detected immediately.
+Ordinary walking and jump/land cycles are regression-tested not to knock down.
+
+While knocked down, walking, jumping, air control, and upright correction are
+disabled. The same capsule gains ordinary contact friction (0.6, combined using
+the minimum material friction) so it can physically settle. In free space,
+there is no artificial angular damping or timed auto-recovery.
+
+Recovery starts after 0.25 seconds of continuous suitable support, with
+support-relative contact-point speed at most 2 units/s and relative angular
+speed at most 2 rad/s. It ramps bounded upright control and ground braking over
+at least 0.8 seconds. Completion also requires upright alignment within 0.15
+radians and relative angular speed below 0.8 rad/s. Player/bot walking and jump
+intent remain disabled until completion; holding jump during recovery cannot
+produce a buffered jump afterward.
+
+A 0.1-second contact grace period tolerates tiny gaps while physically standing
+up; progress does not advance during a gap. Longer gaps, a different support,
+removed support, loss of gravity, or another severe disturbance interrupt
+recovery. Removed support and loss of gravity cancel immediately. No pose is
+snapped, no new limbs/colliders appear, and no landing zone is involved.
+
+Balanced airborne self-righting uses 15% of normal angular acceleration. The
+knockdown/recovery thresholds live in `SpacelingBalanceSpec`; Rapier still owns
+mass, inertia, integration, and contact response. The lab shove is a physical
+impulse applied 0.6 units above the body center, sized for a 4-unit/s sideways
+and 6-unit/s outward velocity change with the default body. Rapier computes its
+rotational effect from the actual lever arm and inertia.
+
+## Fixture
 
 The lab uses the shared gravity solver with one source-only planet and one
 target-only spaceling. The character controller accepts any resulting gravity
@@ -79,10 +132,23 @@ cargo test -p scenario-spaceling-lab
 cargo test -p engine-client client_scenarios::spaceling_lab
 ```
 
+To retain raster geometry images for the knocked-down, recovering, and balanced
+poses (HUD text is checked separately as the Slint overlay):
+
+```sh
+SPACEWARS_SPACELING_ARTIFACTS=target/spaceling-poses cargo test -p engine-client \
+  knockback_frames_reach_both_renderers
+```
+
 Tests cover both walking directions and stopping, jump/release/landing,
 translating and rotating support, slopes, walls/ceilings, removal of support,
 zero gravity, bounded controls, malformed input, reproducible actions/restart,
-and complete laps over the lab obstacles.
+and complete laps over the lab obstacles. Balance tests include mild/severe
+shoves, real high-speed landings, physical tumbling and recovery, moving support,
+interrupted recovery, support removal/gaps, zero-gravity momentum, and held-input
+gating. The rotating-planet lab regresses shoves in both directions at multiple
+locations. Version-1 walking/jumping actions remain readable; version 2 adds
+held shove input and balance diagnostics in observations.
 
 The real-client functional workflow covers launcher selection, both renderers,
 pause, restart, return, and relaunch. It captures screenshots; use an existing

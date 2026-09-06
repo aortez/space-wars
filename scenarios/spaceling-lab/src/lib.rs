@@ -18,6 +18,7 @@ mod render;
 
 pub const FIXED_HZ: u32 = 60;
 const CONTROL_V1: u32 = 1;
+const CONTROL_V2: u32 = 2;
 const PLANET_ID: PhysicsId = PhysicsId::new(1);
 const SPACELING_ID: PhysicsId = PhysicsId::new(2);
 const PLANET_RADIUS: f32 = 20.0;
@@ -61,6 +62,10 @@ pub struct SpacelingLabState {
     pub airborne_ticks: u64,
     pub last_airtime_ticks: u64,
     pub landings: u64,
+    pub shove_held: bool,
+    pub shoves: u64,
+    pub last_shove: Option<ShoveDiagnostic>,
+    shove_was_held: bool,
     gait_phase: f32,
     facing: f32,
     was_grounded: bool,
@@ -68,6 +73,13 @@ pub struct SpacelingLabState {
     spaceling: SpacelingAssembly,
     physics: PhysicsWorld,
     gravity_solver: GravitySolver,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ShoveDiagnostic {
+    pub tick: u64,
+    pub point: Vec2,
+    pub velocity_delta: Vec2,
 }
 
 impl SpacelingLabState {
@@ -83,26 +95,38 @@ impl SpacelingLabState {
 pub struct SpacelingLabAction {
     pub walk: f32,
     pub jump_held: bool,
+    pub shove_held: bool,
 }
 
 impl SpacelingLabAction {
     pub fn control(walk: f32, jump_held: bool) -> Action {
+        Self::with_shove(walk, jump_held, false)
+    }
+
+    pub fn with_shove(walk: f32, jump_held: bool, shove_held: bool) -> Action {
         let mut payload = walk.to_le_bytes().to_vec();
         payload.push(u8::from(jump_held));
-        Action::scenario(CONTROL_V1, payload)
+        payload.push(u8::from(shove_held));
+        Action::scenario(CONTROL_V2, payload)
     }
 
     pub fn decode(action: &Action) -> Option<Self> {
         let Action::Scenario { kind, payload } = action else {
             return None;
         };
-        if *kind != CONTROL_V1 || payload.len() != 5 || payload[4] > 1 {
+        let expected_length = match *kind {
+            CONTROL_V1 => 5,
+            CONTROL_V2 => 6,
+            _ => return None,
+        };
+        if payload.len() != expected_length || payload[4..].iter().any(|value| *value > 1) {
             return None;
         }
         let walk = f32::from_le_bytes(payload[..4].try_into().ok()?);
         walk.is_finite().then_some(Self {
             walk: walk.clamp(-1.0, 1.0),
             jump_held: payload[4] != 0,
+            shove_held: payload.get(5).is_some_and(|value| *value != 0),
         })
     }
 }
@@ -160,6 +184,10 @@ impl Scenario for SpacelingLabScenario {
             airborne_ticks: 0,
             last_airtime_ticks: 0,
             landings: 0,
+            shove_held: false,
+            shove_was_held: false,
+            shoves: 0,
+            last_shove: None,
             gait_phase: 0.0,
             facing: 1.0,
             was_grounded: false,
@@ -184,6 +212,10 @@ impl Scenario for SpacelingLabScenario {
                 walk: action.walk,
                 jump_held: action.jump_held,
             };
+            state.shove_held = action.shove_held;
+        }
+        if state.control.walk.abs() > 0.01 {
+            state.facing = state.control.walk.signum();
         }
         state.planet.angle = (state.planet.angle + state.config.planet_angular_velocity * dt)
             .rem_euclid(std::f32::consts::TAU);
@@ -220,6 +252,35 @@ impl Scenario for SpacelingLabScenario {
             .expect("valid lab gravity")[1]
             .velocity_delta;
         state.gravity = delta / dt;
+        if state.shove_held && !state.shove_was_held {
+            let snapshot = state.spaceling_snapshot();
+            let up = if state.gravity.length_squared() > 1e-6 {
+                state.gravity.normalized() * -1.0
+            } else {
+                snapshot.up
+            };
+            let velocity_delta = Vec2::new(up.y, -up.x) * (4.0 * state.facing) + up * 6.0;
+            let point = snapshot.motion.position
+                + Vec2::new(0.0, 0.6).rotate_radians(snapshot.motion.angle);
+            let mass = state
+                .physics
+                .body_mass(state.spaceling.body())
+                .expect("lab body exists");
+            if state.physics.apply_impulse_at_point(
+                state.spaceling.body(),
+                velocity_delta * mass,
+                point,
+                true,
+            ) {
+                state.shoves += 1;
+                state.last_shove = Some(ShoveDiagnostic {
+                    tick: state.tick,
+                    point,
+                    velocity_delta,
+                });
+            }
+        }
+        state.shove_was_held = state.shove_held;
         state
             .spaceling
             .apply_control(&mut state.physics, state.control, state.gravity, dt);
@@ -242,20 +303,20 @@ impl Scenario for SpacelingLabScenario {
             state.airborne_ticks += 1;
         }
         state.was_grounded = spaceling.grounded();
-        if state.control.walk.abs() > 0.01 {
-            state.facing = state.control.walk.signum();
-        }
         StepResult::default()
     }
 
     fn observe(state: &Self::State) -> Observation {
         let spaceling = state.spaceling_snapshot();
-        let mut payload = vec![1]; // Observation version.
+        let mut payload = vec![2]; // Observation version: balance/recovery and lab shove.
         for value in [
             state.tick,
             spaceling.jumps,
             state.landings,
             state.airborne_ticks,
+            state.shoves,
+            spaceling.knockdowns,
+            spaceling.recoveries,
         ] {
             payload.extend_from_slice(&value.to_le_bytes());
         }
@@ -273,10 +334,23 @@ impl Scenario for SpacelingLabScenario {
             state.gravity.y,
             state.planet.angle,
             state.control.walk,
+            spaceling.recovery_progress,
+            spaceling.settled_seconds,
         ] {
             payload.extend_from_slice(&value.to_le_bytes());
         }
         payload.push(u8::from(state.control.jump_held));
+        payload.push(u8::from(state.shove_held));
+        payload.push(match spaceling.balance {
+            engine_rapier::spaceling::SpacelingBalance::Balanced => 0,
+            engine_rapier::spaceling::SpacelingBalance::KnockedDown => 1,
+            engine_rapier::spaceling::SpacelingBalance::Recovering => 2,
+        });
+        payload.push(u8::from(spaceling.last_knockdown.is_some()));
+        if let Some(disturbance) = spaceling.last_knockdown {
+            payload.extend_from_slice(&disturbance.velocity_change.to_le_bytes());
+            payload.extend_from_slice(&disturbance.angular_speed.to_le_bytes());
+        }
         payload.push(u8::from(spaceling.grounded()));
         if let Some(support) = spaceling.support {
             payload.extend_from_slice(&support.collider.entity.value().to_le_bytes());
@@ -287,6 +361,7 @@ impl Scenario for SpacelingLabScenario {
                 support.normal.y,
                 support.velocity.x,
                 support.velocity.y,
+                support.angular_velocity,
             ] {
                 payload.extend_from_slice(&value.to_le_bytes());
             }

@@ -164,6 +164,13 @@ Gravity supplies orientation and acceleration independently of terrain; limbs
 are visual geometry. This is an arcade controller, not a ragdoll or a claim
 that articulated crowds have been benchmarked.
 
+Spaceling balance is separate from contact support. Strong velocity disturbances
+or spin disable upright/locomotion control; the capsule settles with contact
+friction before gradually recovering. Off-center impulses use the canonical
+world's Rapier mass/inertia binding. Recovery does not introduce another body,
+pose snapping, free-space damping, or a terrain scan. See the
+[lab's balance model](../spaceling-lab.md#balance-and-recovery).
+
 Spacewars' implemented mapping is:
 
 - planets and orbiting spaceports: fixed or kinematic bodies;

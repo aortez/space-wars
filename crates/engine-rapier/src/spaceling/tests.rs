@@ -7,6 +7,8 @@ const GRAVITY: Vec2 = Vec2::new(0.0, -18.0);
 const FLOOR: PhysicsId = PhysicsId::new(1);
 const SPACELING: PhysicsId = PhysicsId::new(2);
 
+mod balance;
+
 fn tick(
     world: &mut PhysicsWorld,
     spaceling: &mut SpacelingAssembly,
@@ -106,6 +108,8 @@ fn jump_requires_a_new_press_and_real_support() {
     assert!(peak > 2.4);
     assert!(landed.grounded());
     assert_eq!(landed.jumps, 1);
+    assert_eq!(landed.balance, SpacelingBalance::Balanced);
+    assert_eq!(landed.knockdowns, 0, "ordinary jumps are not knockdowns");
     tick(
         &mut world,
         &mut spaceling,
@@ -304,6 +308,7 @@ fn idle_character_tracks_rotating_planet_and_contact_point_velocity() {
         if let Some(support) = snapshot.support {
             let expected = Vec2::new(-support.position.y, support.position.x) * 0.08;
             assert!((support.velocity - expected).length() < 0.001);
+            assert!((support.angular_velocity - 0.08).abs() < 0.001);
         }
     }
     let snapshot = spaceling.snapshot(&world).unwrap();

@@ -117,7 +117,9 @@ hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
 
 Spaceling Lab uses d-pad/left-stick left/right to walk and a press of gamepad `A`
 to jump. Keyboard equivalents are `A`/`D` or left/right arrows, `Space` to
-jump, and `R` to restart. Holding jump does not repeat it on landing.
+jump, and `R` to restart. Gamepad `B` or keyboard `X` applies an off-center
+test shove: the spaceling tumbles, settles, and recovers on physical support.
+Holding jump/shove does not repeat it; jump is not buffered during knockdown.
 
 To try the first Spacewars AI opponent, open Spacewars settings in the launcher
 and change **Player 2** from **human** to **rule bot**. **Small Duel** is the

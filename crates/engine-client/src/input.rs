@@ -267,10 +267,10 @@ impl ClientInput {
         (throttle, brake, gamepad.south)
     }
 
-    pub(crate) fn spaceling_gamepad_input(&self) -> (f32, bool) {
+    pub(crate) fn spaceling_gamepad_input(&self) -> (f32, bool, bool) {
         let gamepads = self.gamepads.borrow();
         let Some(gamepad) = gamepads.seat(0).filter(|gamepad| gamepad.connected) else {
-            return (0.0, false);
+            return (0.0, false, false);
         };
         let walk = match (gamepad.dpad_left, gamepad.dpad_right) {
             (false, true) => 1.0,
@@ -278,7 +278,7 @@ impl ClientInput {
             (true, true) => 0.0,
             (false, false) => shape_stick(gamepad.left_stick_x),
         };
-        (walk, gamepad.south)
+        (walk, gamepad.south, gamepad.east)
     }
 
     pub(crate) fn nes_controller_buttons(&self, player: usize) -> ControllerButtons {

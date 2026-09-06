@@ -1,6 +1,7 @@
 # Spacelings and natural surface support
 
-Status: first Spaceling Lab slice implemented and manually playtested. Tracks
+Status: basic Spaceling Lab and knockback/recovery implemented, regression-tested,
+and manually playtested. Tracks
 [issue #41](https://github.com/aortez/space-wars/issues/41).
 
 ## Naming
@@ -59,6 +60,33 @@ Automatic stair climbing, coyote time, jump buffering, ragdolls, NPC policy,
 inventory, damage, ship entry/exit, and Spacewars integration are follow-ups.
 Do not claim crowd performance from a single-spaceling demo; benchmark populations
 before choosing more expensive mechanics.
+
+## Second slice: knockback and recovery
+
+Keep physical support separate from balance (`Balanced`, `KnockedDown`,
+`Recovering`). The same single capsule handles all three; visual limbs are
+still not separately simulated. Off-center impulses use the canonical world's
+mass/inertia-aware binding, also available to future explosions and collisions.
+
+Unexpected velocity changes and excessive spin can overwhelm the controller.
+Knockdown disables locomotion and self-righting, enables ordinary contact
+friction, and waits for sustained settled support. Recovery ramps bounded
+angular correction and ground braking. Brief contact gaps have bounded grace;
+support removal, prolonged flight, gravity loss, or another strong hit aborts
+recovery. There is no free-space auto-recovery, pose snapping, or buffered jump.
+The supplied gravity step is accounted for in disturbance detection; it is not
+integrated a second time. The caller applies controls once per physics step.
+
+Spaceling Lab exposes a held-state, edge-triggered shove on gamepad B/keyboard X,
+with balance colors, recovery progress, transition counts, and a short impulse
+marker. Deterministic fixtures cover impacts, moving support, recovery loss,
+zero gravity, and normal movement remaining balanced. This remains the same
+player/bot-independent `SpacelingControl`; no NPC policy or damage is added.
+
+Next: a small Spacewars surface-outpost experiment to test shared-world actors,
+vehicle entry/exit, and useful surface interactions. Population measurements
+remain necessary before expanding to crowds; articulated ragdolls are optional
+follow-up work.
 
 ## Planet and ship direction
 

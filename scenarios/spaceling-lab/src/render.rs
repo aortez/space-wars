@@ -3,6 +3,7 @@ use engine_common::{
     RenderPrimitive, RenderText, Stroke, TextAnchor,
 };
 use engine_core::Vec2;
+use engine_rapier::spaceling::SpacelingBalance;
 
 use crate::{BUMPS, FIXED_HZ, SpacelingLabState};
 
@@ -11,6 +12,8 @@ const OUTLINE: RenderColor = RenderColor::rgb(0.28, 0.51, 0.6);
 const SUIT: RenderColor = RenderColor::rgb(1.0, 0.58, 0.23);
 const LIGHT: RenderColor = RenderColor::rgb(0.86, 0.93, 0.97);
 const CYAN: RenderColor = RenderColor::rgb(0.25, 0.93, 0.8);
+const RED: RenderColor = RenderColor::rgb(1.0, 0.3, 0.3);
+const YELLOW: RenderColor = RenderColor::rgb(1.0, 0.85, 0.3);
 
 pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
     let spaceling = state.spaceling_snapshot();
@@ -57,7 +60,14 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
     }
 
     let local = |x, y| center + Vec2::new(x, y).rotate_radians(spaceling.motion.angle);
-    let stride = if spaceling.grounded() {
+    let suit = match spaceling.balance {
+        SpacelingBalance::Balanced => SUIT,
+        SpacelingBalance::KnockedDown => RED,
+        SpacelingBalance::Recovering => YELLOW,
+    };
+    let stride = if spaceling.balance != SpacelingBalance::Balanced {
+        0.2
+    } else if spaceling.grounded() {
         state.gait_phase.sin()
             * (spaceling.relative_speed.abs() / state.spaceling_spec.walk_speed).min(1.0)
     } else {
@@ -68,7 +78,7 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
         let hip = local(side * 0.1, -0.15);
         let knee = local(side * 0.12 + swing * 0.18, -0.48);
         let foot = local(side * 0.12 + swing * 0.3, -0.82 + swing.abs() * 0.1);
-        limb(&mut frame, hip, knee, SUIT, 0.13);
+        limb(&mut frame, hip, knee, suit, 0.13);
         limb(&mut frame, knee, foot, LIGHT, 0.12);
         limb(
             &mut frame,
@@ -81,7 +91,7 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
             &mut frame,
             local(side * 0.22, 0.32),
             local(side * 0.36 - swing * 0.12, -0.1),
-            SUIT,
+            suit,
             0.12,
         );
     }
@@ -91,7 +101,7 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
             points: [(-0.23, -0.2), (0.23, -0.2), (0.26, 0.4), (-0.26, 0.4)]
                 .map(|(x, y)| point(local(x, y)))
                 .to_vec(),
-            fill: Some(Fill::new(SUIT)),
+            fill: Some(Fill::new(suit)),
             stroke: Some(Stroke::new(LIGHT, 1.2)),
         }),
     );
@@ -121,6 +131,20 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
         line(&mut frame, 5, start, end, SUIT, 1.5);
         circle(&mut frame, 5, end, 0.07, SUIT);
     }
+    if let Some(shove) = state
+        .last_shove
+        .filter(|shove| state.tick.saturating_sub(shove.tick) < u64::from(FIXED_HZ) / 2)
+    {
+        circle(&mut frame, 5, shove.point, 0.12, RED);
+        line(
+            &mut frame,
+            5,
+            shove.point,
+            shove.point + shove.velocity_delta * 0.25,
+            RED,
+            3.0,
+        );
+    }
 
     text(
         &mut frame,
@@ -132,9 +156,34 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
     text(
         &mut frame,
         center + Vec2::new(0.0, 9.6),
-        "D-pad / A,D / arrows: walk    A / Space: jump    Start / Esc: pause",
+        "D-pad / A,D / arrows: walk    A / Space: jump",
         LIGHT,
         14.0,
+    );
+    text(
+        &mut frame,
+        center + Vec2::new(0.0, 8.8),
+        "B / X: test shove    Start / Esc: pause    R: restart",
+        LIGHT,
+        14.0,
+    );
+    let balance = match spaceling.balance {
+        SpacelingBalance::Balanced => "BALANCED",
+        SpacelingBalance::KnockedDown => "KNOCKED DOWN",
+        SpacelingBalance::Recovering => "RECOVERING",
+    };
+    text(
+        &mut frame,
+        center + Vec2::new(0.0, -8.3),
+        format!(
+            "{balance}    recovery {:.0}%    knockdowns {}    recoveries {}    shoves {}",
+            spaceling.recovery_progress * 100.0,
+            spaceling.knockdowns,
+            spaceling.recoveries,
+            state.shoves,
+        ),
+        suit,
+        16.0,
     );
     let status = if spaceling.grounded() {
         "GROUNDED"

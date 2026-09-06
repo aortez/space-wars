@@ -582,5 +582,6 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M26a: ✅ Add a reusable single-body, gravity-relative spaceling controller with contact-based support, bounded movement/upright control, and press-to-jump.
 - M26b: ✅ Add a rotating-planet lab with two slope obstacles, keyboard/NES-gamepad input, visual limbs, and support/motion diagnostics. Raster views retain text as a Slint overlay.
 - M26c: ✅ Verify moving/rotating support, slope and wall classification, jump/land, support removal, no-gravity behavior, deterministic replay, full laps in both directions, and ordinary launcher lifecycle. Desktop vector and software-raster screenshots are checked; hardware gamepad feel awaits manual playtesting.
+- M26d: ✅ Separate physical support from balanced/knocked-down/recovering control. Add a physical off-center lab shove, bounded supported recovery, zero-gravity momentum preservation, balance diagnostics, and deterministic impact/recovery regressions. Manual knockback/recovery playtesting passed.
 - Follow-ups: population measurements, destructible terrain support, NPC intent, and exterior-base/ship interaction. Physical limbs and Spacewars integration are not part of the first slice.
 - Design: [spacelings and natural surface support](spacelings.md).

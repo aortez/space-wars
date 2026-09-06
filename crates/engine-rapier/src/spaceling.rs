@@ -19,6 +19,50 @@ pub struct SpacelingSpec {
     pub min_support_alignment: f32,
     pub max_angular_speed: f32,
     pub angular_acceleration: f32,
+    pub balance: SpacelingBalanceSpec,
+}
+
+/// Arcade thresholds, independent of terrain identity and controller source.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpacelingBalanceSpec {
+    /// Unexpected linear velocity change between controller ticks, in units/s.
+    pub knockdown_velocity_change: f32,
+    /// Angular speed relative to support (world-frame when airborne), in rad/s.
+    pub knockdown_angular_speed: f32,
+    pub settle_speed: f32,
+    pub settle_angular_speed: f32,
+    pub settle_seconds: f32,
+    pub recovery_seconds: f32,
+    /// Brief gaps during physical self-righting do not restart the whole attempt.
+    pub support_grace_seconds: f32,
+}
+
+impl Default for SpacelingBalanceSpec {
+    fn default() -> Self {
+        Self {
+            knockdown_velocity_change: 12.0,
+            knockdown_angular_speed: 8.0,
+            settle_speed: 2.0,
+            settle_angular_speed: 2.0,
+            settle_seconds: 0.25,
+            recovery_seconds: 0.8,
+            support_grace_seconds: 0.1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SpacelingBalance {
+    #[default]
+    Balanced,
+    KnockedDown,
+    Recovering,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpacelingDisturbance {
+    pub velocity_change: f32,
+    pub angular_speed: f32,
 }
 
 impl Default for SpacelingSpec {
@@ -33,6 +77,7 @@ impl Default for SpacelingSpec {
             min_support_alignment: 0.65,
             max_angular_speed: 5.0,
             angular_acceleration: 60.0,
+            balance: SpacelingBalanceSpec::default(),
         }
     }
 }
@@ -52,12 +97,21 @@ impl SpacelingSpec {
             self.jump_speed,
             self.max_angular_speed,
             self.angular_acceleration,
+            self.balance.knockdown_velocity_change,
+            self.balance.knockdown_angular_speed,
+            self.balance.settle_speed,
+            self.balance.settle_angular_speed,
+            self.balance.settle_seconds,
+            self.balance.recovery_seconds,
+            self.balance.support_grace_seconds,
         ]
         .into_iter()
         .all(|value| value.is_finite() && value > 0.0)
             && self.min_support_alignment.is_finite()
             && self.min_support_alignment > 0.0
             && self.min_support_alignment <= 1.0
+            && self.balance.knockdown_angular_speed > self.max_angular_speed
+            && self.balance.settle_angular_speed < self.balance.knockdown_angular_speed
     }
 }
 
@@ -75,6 +129,12 @@ pub struct SpacelingSnapshot {
     pub relative_speed: f32,
     pub contacts: usize,
     pub jumps: u64,
+    pub balance: SpacelingBalance,
+    pub recovery_progress: f32,
+    pub settled_seconds: f32,
+    pub knockdowns: u64,
+    pub recoveries: u64,
+    pub last_knockdown: Option<SpacelingDisturbance>,
 }
 
 impl SpacelingSnapshot {
@@ -91,6 +151,15 @@ pub struct SpacelingAssembly {
     up: Vec2,
     jump_was_held: bool,
     jumps: u64,
+    balance: SpacelingBalance,
+    settled_seconds: f32,
+    recovery_seconds: f32,
+    unsupported_seconds: f32,
+    recovery_support: Option<ColliderId>,
+    expected_velocity: Option<Vec2>,
+    knockdowns: u64,
+    recoveries: u64,
+    last_knockdown: Option<SpacelingDisturbance>,
 }
 
 impl SpacelingAssembly {
@@ -138,6 +207,15 @@ impl SpacelingAssembly {
             up: Vec2::new(0.0, 1.0).rotate_radians(angle),
             jump_was_held: false,
             jumps: 0,
+            balance: SpacelingBalance::Balanced,
+            settled_seconds: 0.0,
+            recovery_seconds: 0.0,
+            unsupported_seconds: 0.0,
+            recovery_support: None,
+            expected_velocity: None,
+            knockdowns: 0,
+            recoveries: 0,
+            last_knockdown: None,
         })
     }
 
@@ -145,7 +223,11 @@ impl SpacelingAssembly {
         self.body
     }
 
-    /// Call before the world step. Gravity itself is applied by the caller.
+    /// Call once before each world step. The caller applies the supplied gravity
+    /// acceleration over that same `dt`. The previous commanded velocity plus
+    /// gravity is a disturbance reference only, never a second pose integrator.
+    /// Solver impacts are noticed on the next controller tick; impulses applied
+    /// before this call are noticed immediately.
     /// Returns true only when this tick actually launches a supported jump.
     pub fn apply_control(
         &mut self,
@@ -157,27 +239,46 @@ impl SpacelingAssembly {
         if !dt.is_finite() || dt <= 0.0 {
             return false;
         }
-        if gravity.x.is_finite() && gravity.y.is_finite() && gravity.length_squared() > 1e-6 {
+        let gravity = if gravity.x.is_finite() && gravity.y.is_finite() {
+            gravity
+        } else {
+            Vec2::ZERO
+        };
+        let has_gravity = gravity.length_squared() > 1e-6;
+        if has_gravity {
             self.up = gravity.normalized() * -1.0;
         }
         let Some(snapshot) = self.snapshot(physics) else {
             return false;
         };
         let motion = snapshot.motion;
-        let desired_angle = self.up.y.atan2(self.up.x) - std::f32::consts::FRAC_PI_2;
-        let error = (desired_angle - motion.angle + std::f32::consts::PI)
-            .rem_euclid(std::f32::consts::TAU)
-            - std::f32::consts::PI;
-        let desired_rate =
-            (error * 12.0).clamp(-self.spec.max_angular_speed, self.spec.max_angular_speed);
+        self.update_balance(physics, &snapshot, has_gravity, dt);
+        // Consume held jump even while disabled; recovery must not buffer it.
+        let jump_pressed = control.jump_held && !self.jump_was_held;
+        self.jump_was_held = control.jump_held;
+        if self.balance == SpacelingBalance::KnockedDown || !has_gravity {
+            self.expected_velocity = Some(motion.linear_velocity + gravity * dt);
+            return false;
+        }
+
+        let recovering = self.balance == SpacelingBalance::Recovering;
+        let strength = if recovering {
+            (self.recovery_seconds / self.spec.balance.recovery_seconds).clamp(0.1, 1.0)
+        } else if snapshot.grounded() {
+            1.0
+        } else {
+            0.15
+        };
+        let desired_rate = (angle_error(self.up, motion.angle) * 12.0)
+            .clamp(-self.spec.max_angular_speed, self.spec.max_angular_speed);
         let rate = motion.angular_velocity
             + (desired_rate - motion.angular_velocity).clamp(
-                -self.spec.angular_acceleration * dt,
-                self.spec.angular_acceleration * dt,
+                -self.spec.angular_acceleration * strength * dt,
+                self.spec.angular_acceleration * strength * dt,
             );
         physics.set_velocity(self.body, motion.linear_velocity, rate, true);
 
-        let walk = if control.walk.is_finite() {
+        let walk = if !recovering && control.walk.is_finite() {
             control.walk.clamp(-1.0, 1.0)
         } else {
             0.0
@@ -185,7 +286,7 @@ impl SpacelingAssembly {
         let normal = snapshot.support.map_or(self.up, |contact| contact.normal);
         let tangent = right(normal);
         let acceleration = if snapshot.grounded() {
-            self.spec.ground_acceleration
+            self.spec.ground_acceleration * if recovering { strength } else { 1.0 }
         } else {
             self.spec.air_acceleration
         };
@@ -195,8 +296,7 @@ impl SpacelingAssembly {
                 .clamp(-acceleration * dt, acceleration * dt);
             physics.apply_velocity_delta(self.body, tangent * delta, true);
         }
-        let jump = control.jump_held && !self.jump_was_held && snapshot.grounded();
-        self.jump_was_held = control.jump_held;
+        let jump = jump_pressed && !recovering && snapshot.grounded();
         if jump {
             let support_velocity = snapshot.support.unwrap().velocity;
             let outward_speed = (motion.linear_velocity - support_velocity).dot(self.up);
@@ -207,7 +307,109 @@ impl SpacelingAssembly {
             );
             self.jumps += 1;
         }
+        self.expected_velocity = physics
+            .motion(self.body)
+            .map(|motion| motion.linear_velocity + gravity * dt);
         jump
+    }
+
+    fn update_balance(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        snapshot: &SpacelingSnapshot,
+        has_gravity: bool,
+        dt: f32,
+    ) {
+        let support_spin = snapshot
+            .support
+            .map_or(0.0, |support| support.angular_velocity);
+        let spin = (snapshot.motion.angular_velocity - support_spin).abs();
+        let shock = self.expected_velocity.map_or(0.0, |velocity| {
+            (snapshot.motion.linear_velocity - velocity).length()
+        });
+        let severe = shock >= self.spec.balance.knockdown_velocity_change
+            || spin >= self.spec.balance.knockdown_angular_speed;
+        if severe && self.balance != SpacelingBalance::KnockedDown {
+            self.set_balance(physics, SpacelingBalance::KnockedDown);
+            self.knockdowns += 1;
+            self.last_knockdown = Some(SpacelingDisturbance {
+                velocity_change: shock,
+                angular_speed: spin,
+            });
+        }
+        let stable = has_gravity
+            && snapshot.support.is_some_and(|support| {
+                contact_relative_velocity(snapshot.motion, support).length()
+                    <= self.spec.balance.settle_speed
+            })
+            && spin <= self.spec.balance.settle_angular_speed
+            && !severe;
+        match self.balance {
+            SpacelingBalance::Balanced => {}
+            SpacelingBalance::KnockedDown => {
+                let support = snapshot.support.map(|contact| contact.collider);
+                if !stable || support != self.recovery_support {
+                    self.settled_seconds = 0.0;
+                }
+                self.recovery_support = support;
+                if stable {
+                    self.settled_seconds += dt;
+                    if self.settled_seconds >= self.spec.balance.settle_seconds {
+                        self.set_balance(physics, SpacelingBalance::Recovering);
+                    }
+                }
+            }
+            SpacelingBalance::Recovering => {
+                let support = snapshot.support.map(|contact| contact.collider);
+                if support.is_none() {
+                    self.unsupported_seconds += dt;
+                } else {
+                    self.unsupported_seconds = 0.0;
+                }
+                let support_removed = self
+                    .recovery_support
+                    .is_none_or(|collider| physics.collider_handle(collider).is_none());
+                if !has_gravity
+                    || support_removed
+                    || (support.is_some() && support != self.recovery_support)
+                    || self.unsupported_seconds > self.spec.balance.support_grace_seconds
+                {
+                    self.set_balance(physics, SpacelingBalance::KnockedDown);
+                } else if support.is_some() {
+                    self.recovery_seconds += dt;
+                    if self.recovery_seconds >= self.spec.balance.recovery_seconds
+                        && stable
+                        && angle_error(self.up, snapshot.motion.angle).abs() < 0.15
+                        && spin < 0.8
+                    {
+                        self.set_balance(physics, SpacelingBalance::Balanced);
+                        self.recoveries += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    fn set_balance(&mut self, physics: &mut PhysicsWorld, balance: SpacelingBalance) {
+        self.balance = balance;
+        self.recovery_seconds = 0.0;
+        self.unsupported_seconds = 0.0;
+        self.settled_seconds = 0.0;
+        if balance != SpacelingBalance::Recovering {
+            self.recovery_support = None;
+        }
+        // A limp body needs ordinary contact friction to settle. Walking and
+        // recovering supply their own bounded traction, as in the baseline.
+        if let Some(collider) = physics
+            .collider_handle(self.collider)
+            .and_then(|handle| physics.raw.colliders.get_mut(handle))
+        {
+            collider.set_friction(if balance == SpacelingBalance::KnockedDown {
+                0.6
+            } else {
+                0.0
+            });
+        }
     }
 
     pub fn snapshot(&self, physics: &PhysicsWorld) -> Option<SpacelingSnapshot> {
@@ -222,7 +424,8 @@ impl SpacelingAssembly {
             let alignment = contact.normal.dot(self.up);
             if contact.separation > 0.04
                 || alignment < self.spec.min_support_alignment
-                || offset.dot(self.up) > -self.spec.half_segment * 0.5
+                // A prone capsule can be supported too; support is not balance.
+                || offset.dot(self.up) > -self.spec.radius * 0.25
                 || (point_velocity - contact.velocity).dot(contact.normal) > 1.0
             {
                 continue;
@@ -258,8 +461,30 @@ impl SpacelingAssembly {
             relative_speed: relative_velocity.dot(right(normal)),
             contacts,
             jumps: self.jumps,
+            balance: self.balance,
+            recovery_progress: if self.balance == SpacelingBalance::Recovering {
+                (self.recovery_seconds / self.spec.balance.recovery_seconds).min(1.0)
+            } else {
+                0.0
+            },
+            settled_seconds: self.settled_seconds,
+            knockdowns: self.knockdowns,
+            recoveries: self.recoveries,
+            last_knockdown: self.last_knockdown,
         })
     }
+}
+
+fn angle_error(up: Vec2, angle: f32) -> f32 {
+    let desired = up.y.atan2(up.x) - std::f32::consts::FRAC_PI_2;
+    (desired - angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+        - std::f32::consts::PI
+}
+
+fn contact_relative_velocity(motion: BodyMotion, contact: SurfaceContact) -> Vec2 {
+    let offset = contact.position - motion.position;
+    motion.linear_velocity + Vec2::new(-offset.y, offset.x) * motion.angular_velocity
+        - contact.velocity
 }
 
 fn right(up: Vec2) -> Vec2 {
