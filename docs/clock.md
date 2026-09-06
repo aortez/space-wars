@@ -171,6 +171,9 @@ tests and screenshots.
 
 ## Device captures
 
+The stored captures retain their original RGB pixels; their alpha channels were
+repaired to make them fully opaque in browsers.
+
 Captured on the local Raspberry Pi 5, 800×480 LinuxKMS software output with
 raster scale 2.0 (2026-09-06). The captured fall reported 60 FPS / 60 updates per
 second and 17 bodies / 47 colliders; reforming and idle reported zero physics

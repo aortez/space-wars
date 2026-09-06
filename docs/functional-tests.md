@@ -68,6 +68,12 @@ non-overlap, eligible-repeat avoidance, and deterministic mixed-event replay.
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
 
+Each successful screenshot is decoded as an eight-bit RGBA PNG and checked for
+nonzero dimensions, fully opaque pixels, and more than one RGB color. Checking
+only the PNG signature can miss transparent or blank captures. The display-free
+`rotated_snapshot` integration test additionally checks opacity, RGB content,
+logical dimensions, and restoration of all four software output rotations.
+
 ## Run locally
 
 On Debian or Ubuntu, install the virtual display tools once:

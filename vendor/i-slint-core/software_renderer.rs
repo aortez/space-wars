@@ -939,12 +939,14 @@ impl RendererSealed for SoftwareRenderer {
 
         let mut target_buffer_with_alpha =
             SharedPixelBuffer::<Rgba8Pixel>::new(target_buffer.width(), target_buffer.height());
+        // The software render target is RGB, so every snapshot pixel is opaque.
         for (target_pixel, source_pixel) in target_buffer_with_alpha
             .make_mut_slice()
             .iter_mut()
             .zip(target_buffer.as_slice().iter())
         {
             *target_pixel.rgb_mut() = *source_pixel;
+            target_pixel.a = 255;
         }
         Ok(target_buffer_with_alpha)
     }
