@@ -16,9 +16,9 @@ use super::{
     BODY_BOUNDS_RADIUS_SCALE, BodyId, CANNON_SHELL_RADIUS, DEFAULT_ELASTICITY, DebrisKind,
     DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
     RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING,
-    SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_ARC_LENGTH, SPACEPORT_DEPTH_FACTOR,
-    SPACEPORT_OUTER_POINTS, SPACEPORT_PULL_SCALE, ShipForm, ShipState, SunState,
-    planet_surface_velocity, rotate_points, spaceport_docking_anchor, spaceport_local_points,
+    SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE, ShipForm, ShipState,
+    SunState, planet_surface_velocity, rotate_points, spaceport_docking_anchor,
+    spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
@@ -31,7 +31,6 @@ const DEBRIS_ENTITY_BASE: u64 = 100_000;
 const WORLD_ROLE: ColliderRole = ColliderRole::new(1);
 const BODY_SURFACE_ROLE: ColliderRole = ColliderRole::new(2);
 const SPACEPORT_SENSOR_ROLE: ColliderRole = ColliderRole::new(3);
-const SPACEPORT_GATE_ROLE: ColliderRole = ColliderRole::new(4);
 const SHIP_HULL_ROLE: ColliderRole = ColliderRole::new(5);
 const DEBRIS_ROLE: ColliderRole = ColliderRole::new(6);
 const ROVER_SURFACE_ROLE: ColliderRole = ColliderRole::new(7);
@@ -43,20 +42,19 @@ const GROUP_POD_1: u32 = 1 << 3;
 const GROUP_DEBRIS: u32 = 1 << 4;
 const GROUP_BODY: u32 = 1 << 5;
 const GROUP_WORLD: u32 = 1 << 6;
-const GROUP_SPACEPORT_GATE: u32 = 1 << 7;
 const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
 const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
 const GROUP_ALL_SOLIDS: u32 =
-    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_SPACEPORT_GATE | GROUP_ROVER;
+    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER;
 
-const PLANET_SURFACE_SEGMENTS: usize = 24;
 const WORLD_SURFACE_SEGMENTS: usize = 192;
-// The full ship silhouette is intentionally broad, but that shape can bridge
-// the inner planet and a spaceport wall while the craft turns in the bay. Use
-// a body-sized, rotation-invariant contact shape throughout a docked stay.
+// The full ship silhouette is intentionally broad. Use a body-sized,
+// rotation-invariant contact shape throughout a landed stay so turning on the
+// surface berth cannot introduce a new planet overlap.
 const DOCKED_SHIP_COLLIDER_RADIUS: f32 = 2.5;
+const CONTACT_REARM_TICKS: u64 = 6;
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
     RoverSpec {
@@ -101,6 +99,12 @@ pub(super) struct MechanicalContact {
     pub point: Option<Vec2>,
     pub normal: Vec2,
     pub impulse_magnitude: f32,
+    /// Pre-solver speed closing along the contact normal. Unlike impulse,
+    /// this excludes positional correction and sustained support force.
+    pub closing_speed: f32,
+    /// True only on the first observed solver step for this entity pair.
+    /// Sustained support forces remain contacts without becoming fresh impacts.
+    pub started: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -127,7 +131,6 @@ struct ShipColliderKey {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct PlanetColliderKey {
     radius: u32,
-    owner_id: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -150,6 +153,9 @@ pub(super) struct SpacewarsPhysics {
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
     docked_planets: [Option<usize>; 2],
+    tick: u64,
+    contact_last_seen: BTreeMap<(MechanicalEntity, MechanicalEntity), u64>,
+    pre_step_motions: BTreeMap<MechanicalEntity, BodyMotion>,
     planet_keys: Vec<Option<PlanetColliderKey>>,
     rovers: BTreeMap<u64, RoverPhysicsEntry>,
     debris_keys: BTreeMap<u64, DebrisColliderKey>,
@@ -186,6 +192,9 @@ impl SpacewarsPhysics {
             sun_radius: None,
             ship_keys: [None, None],
             docked_planets: [None, None],
+            tick: 0,
+            contact_last_seen: BTreeMap::new(),
+            pre_step_motions: BTreeMap::new(),
             planet_keys: vec![None; planets.len()],
             rovers: BTreeMap::new(),
             debris_keys: BTreeMap::new(),
@@ -220,6 +229,7 @@ impl SpacewarsPhysics {
             rovers,
             docked_planets,
         } = input;
+        self.tick = tick;
         let mut lifecycle = PhysicsLifecycle::default();
         match sun {
             Some(sun) if self.sun_radius != Some(sun.radius.to_bits()) => {
@@ -248,7 +258,6 @@ impl SpacewarsPhysics {
         for (index, planet) in planets.iter().enumerate() {
             let key = PlanetColliderKey {
                 radius: planet.radius.to_bits(),
-                owner_id: planet.owner_id,
             };
             if self.planet_keys[index] != Some(key) {
                 lifecycle.removed += usize::from(self.world.remove_entity(planet_entity(index)));
@@ -265,7 +274,7 @@ impl SpacewarsPhysics {
         for (index, ship) in ships.iter_mut().enumerate() {
             // A pod is captured automatically so it can rebuild. A full ship
             // establishes the stronger docking hold with its brake; otherwise
-            // a ship that merely coasts through the bay would be latched there
+            // a ship that merely coasts across the pad would be latched there
             // indefinitely. Once held, it may turn in place with the brake
             // released, and actual thrust begins departure.
             let held_planet = self.docked_planets[index];
@@ -312,10 +321,9 @@ impl SpacewarsPhysics {
                 // wing animation have updated for this tick.
                 ship.velocity = frame_velocity + (center - ship.position) * SPACEPORT_PULL_SCALE;
             }
-            // Once the full hull reaches the bay, retain it as a sensor probe
+            // Once the full hull reaches the pad, retain it as a sensor probe
             // and use the compact physical shape throughout the docked stay.
-            // This prevents a settling ship from bridging the cavity walls and
-            // being launched out between capture ticks.
+            // This keeps the touchdown footprint stable while the ship turns.
             let compact = ship.form == ShipForm::Ship && docked;
             let key = ShipColliderKey {
                 form: ship.form,
@@ -344,7 +352,78 @@ impl SpacewarsPhysics {
     }
 
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
+        self.capture_pre_step_motions();
         self.world.step(dt_seconds)
+    }
+
+    pub fn ship_is_constrained(&self, index: usize) -> bool {
+        self.ship_keys
+            .get(index)
+            .and_then(|key| *key)
+            .is_some_and(|key| key.constrained)
+    }
+
+    fn capture_pre_step_motions(&mut self) {
+        let mut motions = BTreeMap::new();
+        let mut capture = |entity, body| {
+            if let Some(motion) = self.world.motion(body) {
+                motions.insert(entity, motion);
+            }
+        };
+
+        if self.sun_radius.is_some() {
+            capture(
+                MechanicalEntity::Body(BodyId::Sun),
+                primary_body(sun_entity()),
+            );
+        }
+        for (index, key) in self.planet_keys.iter().enumerate() {
+            if key.is_some() {
+                capture(
+                    MechanicalEntity::Body(BodyId::Planet(index)),
+                    primary_body(planet_entity(index)),
+                );
+            }
+        }
+        for index in 0..self.ship_keys.len() {
+            if self.ship_keys[index].is_some() {
+                capture(
+                    MechanicalEntity::Ship(index),
+                    primary_body(ship_entity(index)),
+                );
+            }
+        }
+        for id in self.debris_keys.keys().copied() {
+            capture(
+                MechanicalEntity::Debris(id),
+                primary_body(PhysicsId::new(id)),
+            );
+        }
+        self.pre_step_motions = motions;
+    }
+
+    fn contact_closing_speed(
+        &self,
+        a: MechanicalEntity,
+        b: MechanicalEntity,
+        point: Option<Vec2>,
+        normal: Vec2,
+    ) -> f32 {
+        let velocity_at = |entity| {
+            let motion = self.pre_step_motions.get(&entity)?;
+            let mut velocity = motion.linear_velocity;
+            if let Some(point) = point {
+                let lever = point - motion.position;
+                velocity += Vec2::new(
+                    -motion.angular_velocity * lever.y,
+                    motion.angular_velocity * lever.x,
+                );
+            }
+            Some(velocity)
+        };
+        let velocity_a = velocity_at(a).unwrap_or(Vec2::ZERO);
+        let velocity_b = velocity_at(b).unwrap_or(Vec2::ZERO);
+        (-(velocity_b - velocity_a).dot(normal)).max(0.0)
     }
 
     pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
@@ -533,8 +612,9 @@ impl SpacewarsPhysics {
         })
     }
 
-    pub fn contacts(&self) -> Vec<MechanicalContact> {
-        self.world
+    pub fn contacts(&mut self) -> Vec<MechanicalContact> {
+        let mut contacts = self
+            .world
             .contact_events()
             .iter()
             .filter_map(|event| {
@@ -546,18 +626,32 @@ impl SpacewarsPhysics {
                     point: event.point,
                     normal: event.normal,
                     impulse_magnitude: event.impulse_magnitude,
+                    closing_speed: self.contact_closing_speed(a, b, event.point, event.normal),
+                    started: false,
                 })
             })
-            .collect()
+            .collect::<Vec<_>>();
+        let current_pairs = contacts
+            .iter()
+            .map(|contact| ordered_entity_pair(contact.a, contact.b))
+            .collect::<BTreeSet<_>>();
+        for contact in &mut contacts {
+            let pair = ordered_entity_pair(contact.a, contact.b);
+            contact.started = self
+                .contact_last_seen
+                .get(&pair)
+                .is_none_or(|last_seen| self.tick.saturating_sub(*last_seen) > CONTACT_REARM_TICKS);
+        }
+        for pair in current_pairs {
+            self.contact_last_seen.insert(pair, self.tick);
+        }
+        self.contact_last_seen
+            .retain(|_, last_seen| self.tick.saturating_sub(*last_seen) <= CONTACT_REARM_TICKS);
+        contacts
     }
 
-    pub fn spaceport_contacts(&self) -> Vec<(usize, usize)> {
-        let mut contacts = self
-            .docked_planets
-            .iter()
-            .enumerate()
-            .filter_map(|(ship, planet)| planet.map(|planet| (ship, planet)))
-            .collect::<BTreeSet<_>>();
+    pub fn spaceport_contacts(&self) -> Vec<(usize, usize, bool)> {
+        let mut contacts = BTreeMap::new();
         for intersection in self.world.sensor_intersections() {
             let pair = [intersection.collider_a, intersection.collider_b];
             let Some(port) = pair
@@ -572,9 +666,17 @@ impl SpacewarsPhysics {
             let Some(planet) = planet_index(port.entity) else {
                 continue;
             };
-            contacts.insert((ship, planet));
+            contacts.entry((ship, planet)).or_insert(false);
         }
-        contacts.into_iter().collect()
+        for (ship, planet) in self.docked_planets.iter().copied().enumerate() {
+            if let Some(planet) = planet {
+                contacts.insert((ship, planet), true);
+            }
+        }
+        contacts
+            .into_iter()
+            .map(|((ship, planet), landed)| (ship, planet, landed))
+            .collect()
     }
 
     pub fn cast_laser(
@@ -694,9 +796,8 @@ impl SpacewarsPhysics {
         let entity = planet_entity(index);
         let body_groups = CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
         let mut colliders = planet_solid_colliders(entity, planet.radius, body_groups);
-        // Ships retain the legacy segmented, frictionless, elastic surface and
-        // spaceport cavity. Rovers get a smooth traction surface on the same
-        // kinematic body so their suspension is not launched by segment seams.
+        // Ships use one continuous frictionless, elastic surface. Rovers get a
+        // separate traction surface on the same kinematic body.
         let mut rover_surface = ColliderSpec::ball(
             collider_id(entity, ROVER_SURFACE_ROLE, 0),
             planet.radius * BODY_BOUNDS_RADIUS_SCALE,
@@ -717,18 +818,7 @@ impl SpacewarsPhysics {
         sensor.collision_groups = CollisionGroups::new(GROUP_SPACEPORT_SENSOR, GROUP_ALL_SHIPS);
         sensor.solver_groups = CollisionGroups::NONE;
 
-        let gate_points = planet_gate(planet.radius);
-        let mut gate =
-            ColliderSpec::polyline(collider_id(entity, SPACEPORT_GATE_ROLE, 0), gate_points);
-        gate.density = 0.0;
-        gate.friction = 0.0;
-        gate.restitution = PLANET_ELASTICITY;
-        gate.collision_groups =
-            CollisionGroups::new(GROUP_SPACEPORT_GATE, blocked_pod_groups(planet.owner_id));
-        gate.solver_groups = gate.collision_groups;
-
         colliders.push(sensor);
-        colliders.push(gate);
 
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -744,7 +834,6 @@ impl SpacewarsPhysics {
         debug_assert!(inserted);
         self.planet_keys[index] = Some(PlanetColliderKey {
             radius: planet.radius.to_bits(),
-            owner_id: planet.owner_id,
         });
         inserted
     }
@@ -923,9 +1012,6 @@ fn ship_collision_groups(ship: &ShipState, docked: bool) -> CollisionGroups {
     if !docked {
         filter |= GROUP_BODY | GROUP_ALL_SHIPS;
     }
-    if ship.form == ShipForm::EscapePod {
-        filter |= GROUP_SPACEPORT_GATE;
-    }
     CollisionGroups::new(membership, filter)
 }
 
@@ -941,14 +1027,6 @@ fn debris_collision_groups(owner_id: Option<usize>, armed: bool) -> CollisionGro
         GROUP_BODY | GROUP_WORLD | GROUP_DEBRIS | ships
     };
     CollisionGroups::new(GROUP_DEBRIS, filter)
-}
-
-fn blocked_pod_groups(owner_id: Option<usize>) -> u32 {
-    match owner_id {
-        Some(0) => GROUP_POD_1,
-        Some(1) => GROUP_POD_0,
-        _ => GROUP_POD_0 | GROUP_POD_1,
-    }
 }
 
 fn ship_local_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
@@ -1123,78 +1201,16 @@ fn planet_solid_colliders(
     radius: f32,
     groups: CollisionGroups,
 ) -> Vec<ColliderSpec> {
-    let outer_radius = radius * BODY_BOUNDS_RADIUS_SCALE;
-    let inner_radius = radius * SPACEPORT_DEPTH_FACTOR * BODY_BOUNDS_RADIUS_SCALE;
-    let mut center = ColliderSpec::ball(collider_id(entity, BODY_SURFACE_ROLE, 0), inner_radius);
-    center.density = 0.0;
-    center.friction = 0.0;
-    center.restitution = PLANET_ELASTICITY;
-    center.collision_groups = groups;
-    center.solver_groups = groups;
-
-    let gap_end = port_gap_end(radius);
-    let mut colliders = Vec::with_capacity(PLANET_SURFACE_SEGMENTS + 1);
-    colliders.push(center);
-    for index in 0..PLANET_SURFACE_SEGMENTS {
-        let theta_a = gap_end
-            + (core::f32::consts::TAU - gap_end) * index as f32 / PLANET_SURFACE_SEGMENTS as f32;
-        let theta_b = gap_end
-            + (core::f32::consts::TAU - gap_end) * (index + 1) as f32
-                / PLANET_SURFACE_SEGMENTS as f32;
-        let mut sector = ColliderSpec::convex_polygon(
-            collider_id(entity, BODY_SURFACE_ROLE, index as u16 + 1),
-            vec![
-                Vec2::from_radians(theta_a) * inner_radius,
-                Vec2::from_radians(theta_a) * outer_radius,
-                Vec2::from_radians(theta_b) * outer_radius,
-                Vec2::from_radians(theta_b) * inner_radius,
-            ],
-        );
-        sector.density = 0.0;
-        sector.friction = 0.0;
-        sector.restitution = PLANET_ELASTICITY;
-        sector.collision_groups = groups;
-        sector.solver_groups = groups;
-        colliders.push(sector);
-    }
-    colliders
-}
-
-#[cfg(test)]
-fn planet_ring_sectors(radius: f32) -> Vec<[Vec2; 4]> {
-    let outer_radius = radius * BODY_BOUNDS_RADIUS_SCALE;
-    let inner_radius = radius * SPACEPORT_DEPTH_FACTOR * BODY_BOUNDS_RADIUS_SCALE;
-    let gap_end = port_gap_end(radius);
-    (0..PLANET_SURFACE_SEGMENTS)
-        .map(|index| {
-            let theta_a = gap_end
-                + (core::f32::consts::TAU - gap_end) * index as f32
-                    / PLANET_SURFACE_SEGMENTS as f32;
-            let theta_b = gap_end
-                + (core::f32::consts::TAU - gap_end) * (index + 1) as f32
-                    / PLANET_SURFACE_SEGMENTS as f32;
-            [
-                Vec2::from_radians(theta_a) * inner_radius,
-                Vec2::from_radians(theta_a) * outer_radius,
-                Vec2::from_radians(theta_b) * outer_radius,
-                Vec2::from_radians(theta_b) * inner_radius,
-            ]
-        })
-        .collect()
-}
-
-fn planet_gate(radius: f32) -> Vec<Vec2> {
-    let collision_radius = radius * BODY_BOUNDS_RADIUS_SCALE;
-    [
-        Vec2::from_radians(0.0) * collision_radius,
-        Vec2::from_radians(port_gap_end(radius)) * collision_radius,
-    ]
-    .to_vec()
-}
-
-fn port_gap_end(radius: f32) -> f32 {
-    let angle = SPACEPORT_ARC_LENGTH / radius;
-    (SPACEPORT_OUTER_POINTS - 1) as f32 * angle / SPACEPORT_OUTER_POINTS as f32
+    let mut surface = ColliderSpec::ball(
+        collider_id(entity, BODY_SURFACE_ROLE, 0),
+        radius * BODY_BOUNDS_RADIUS_SCALE,
+    );
+    surface.density = 0.0;
+    surface.friction = 0.0;
+    surface.restitution = PLANET_ELASTICITY;
+    surface.collision_groups = groups;
+    surface.solver_groups = groups;
+    vec![surface]
 }
 
 fn debris_signature(debris: &DebrisState) -> u64 {
@@ -1257,6 +1273,13 @@ fn ship_index(entity: PhysicsId) -> Option<usize> {
         .then(|| (value - SHIP_ENTITY_BASE) as usize)
 }
 
+fn ordered_entity_pair(
+    a: MechanicalEntity,
+    b: MechanicalEntity,
+) -> (MechanicalEntity, MechanicalEntity) {
+    if a <= b { (a, b) } else { (b, a) }
+}
+
 fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
     match entity.value() {
         WORLD_ENTITY_VALUE => Some(MechanicalEntity::World),
@@ -1280,27 +1303,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn planet_solid_ring_has_a_real_spaceport_cavity() {
+    fn planet_ship_surface_is_one_continuous_circle() {
         let radius = 100.0;
-        let sectors = planet_ring_sectors(radius);
-        let first_outer = sectors[0][1];
-        let last_outer = sectors.last().expect("last sector")[2];
-        let gap_chord = first_outer.distance_to(last_outer);
-
-        assert!(gap_chord > radius * 0.25);
-        assert!((first_outer.length() - radius * BODY_BOUNDS_RADIUS_SCALE).abs() < 0.001);
-        assert!(
-            (sectors[0][0].length() - radius * SPACEPORT_DEPTH_FACTOR * BODY_BOUNDS_RADIUS_SCALE)
-                .abs()
-                < 0.001
+        let colliders = planet_solid_colliders(
+            planet_entity(0),
+            radius,
+            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS),
         );
-    }
 
-    #[test]
-    fn port_gate_only_blocks_pods_without_access() {
-        assert_eq!(blocked_pod_groups(None), GROUP_POD_0 | GROUP_POD_1);
-        assert_eq!(blocked_pod_groups(Some(0)), GROUP_POD_1);
-        assert_eq!(blocked_pod_groups(Some(1)), GROUP_POD_0);
+        assert_eq!(colliders.len(), 1);
+        assert_eq!(
+            colliders[0].shape,
+            engine_rapier::world::ColliderShape::Ball {
+                radius: radius * BODY_BOUNDS_RADIUS_SCALE
+            }
+        );
+        assert_eq!(colliders[0].collision_groups.memberships, GROUP_BODY);
     }
 
     #[test]

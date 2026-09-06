@@ -9,8 +9,8 @@ use engine_common::{Action, PointerPhase, RenderPoint};
 use engine_core::Vec2;
 use engine_nes::ControllerButtons;
 use scenario_spacewars::{
-    BodyId, PlanetId, PlayerId, ShipForm, ShipIntent, ShipIntentEncoder, ShipObservationV1,
-    ShipSensorProfile, SpacewarsAction, SpacewarsScenario, SpacewarsState,
+    BodyId, BodyImpact, PlanetId, PlayerId, ShipForm, ShipIntent, ShipIntentEncoder,
+    ShipObservationV1, ShipSensorProfile, SpacewarsAction, SpacewarsScenario, SpacewarsState,
 };
 use slint::ComponentHandle;
 use slint::winit_030::winit::event::{ElementState, WindowEvent};
@@ -338,15 +338,19 @@ impl ClientInput {
     }
 
     pub(crate) fn runtime_diagnostics_text(&self) -> String {
-        let diagnostics = self
-            .spacewars_controls
-            .bot_diagnostics
-            .iter()
-            .flatten()
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut diagnostics = Vec::new();
+        if !self.spacewars_controls.player_diagnostics.is_empty() {
+            diagnostics.push(self.spacewars_controls.player_diagnostics.clone());
+        }
+        diagnostics.extend(
+            self.spacewars_controls
+                .bot_diagnostics
+                .iter()
+                .flatten()
+                .cloned(),
+        );
         if diagnostics.is_empty() {
-            "No active rule-bot diagnostics.".into()
+            "No active Spacewars diagnostics.".into()
         } else {
             diagnostics.join("\n\n")
         }
@@ -1024,9 +1028,17 @@ struct SpacewarsControls {
     brain_contexts: [Option<BrainReset>; 2],
     active_sources: [SpacewarsControlMode; 2],
     encoder: ShipIntentEncoder,
+    player_diagnostics: String,
+    last_body_impacts: [Option<RecordedBodyImpact>; 2],
     bot_diagnostics: [Option<String>; 2],
     flight_histories: [BotFlightHistory; 2],
     diagnostics_revision: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct RecordedBodyImpact {
+    tick: u64,
+    impact: BodyImpact,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -1050,6 +1062,8 @@ impl SpacewarsControls {
             brain_contexts: [None, None],
             active_sources: [SpacewarsControlMode::Human; 2],
             encoder: ShipIntentEncoder::default(),
+            player_diagnostics: String::new(),
+            last_body_impacts: [None; 2],
             bot_diagnostics: std::array::from_fn(|_| None),
             flight_histories: std::array::from_fn(|_| BotFlightHistory::default()),
             diagnostics_revision: 0,
@@ -1063,6 +1077,8 @@ impl SpacewarsControls {
         bot_players: [bool; 2],
     ) -> Vec<Action> {
         let mut actions = Vec::new();
+        let mut intents = [ShipIntent::default(); 2];
+        let mut modes = [SpacewarsControlMode::Human; 2];
         for (player, bot_player) in bot_players.into_iter().enumerate() {
             let mode = if benchmark_active {
                 SpacewarsControlMode::Benchmark
@@ -1071,6 +1087,7 @@ impl SpacewarsControls {
             } else {
                 SpacewarsControlMode::Human
             };
+            modes[player] = mode;
 
             if mode != SpacewarsControlMode::RuleBot
                 && self.bot_diagnostics[player].take().is_some()
@@ -1095,9 +1112,93 @@ impl SpacewarsControls {
                     }
                 }
             };
+            intents[player] = intent;
             actions.extend(self.encoder.encode(player, intent));
         }
+        self.update_player_diagnostics(state, modes, intents);
         actions
+    }
+
+    fn update_player_diagnostics(
+        &mut self,
+        state: &SpacewarsState,
+        modes: [SpacewarsControlMode; 2],
+        intents: [ShipIntent; 2],
+    ) {
+        for impact in &state.body_impacts {
+            if let Some(last_impact) = self.last_body_impacts.get_mut(impact.ship) {
+                *last_impact = Some(RecordedBodyImpact {
+                    tick: state.tick,
+                    impact: *impact,
+                });
+            }
+        }
+
+        // Keep the status command inexpensive while never dropping the
+        // one-tick event that explains a real collision.
+        if !state.tick.is_multiple_of(6) && state.body_impacts.is_empty() {
+            return;
+        }
+
+        self.player_diagnostics.clear();
+        for player in 0..state.ships.len() {
+            if player > 0 {
+                self.player_diagnostics.push('\n');
+            }
+            let ship = &state.ships[player];
+            let life_fraction = if ship.life_max > 0.0 {
+                (ship.life / ship.life_max).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let landing = state
+                .spaceport_contacts
+                .iter()
+                .find(|contact| contact.ship == player)
+                .map_or_else(
+                    || "none".into(),
+                    |contact| format!("planet={} phase={:?}", contact.planet, contact.phase),
+                );
+            let body_contacts = state
+                .body_collisions
+                .iter()
+                .filter(|contact| contact.ship == player)
+                .map(|contact| format!("{:?}", contact.body))
+                .collect::<Vec<_>>()
+                .join(",");
+            let last_impact = self.last_body_impacts[player].map_or_else(
+                || "none".into(),
+                |recorded| {
+                    format!(
+                        "tick={} body={:?} speed={:.3} damage={:.3}",
+                        recorded.tick,
+                        recorded.impact.body,
+                        recorded.impact.speed,
+                        recorded.impact.damage,
+                    )
+                },
+            );
+            let intent = intents[player];
+            let _ = write!(
+                self.player_diagnostics,
+                "player={} control={} tick={} form={:?} life_fraction={:.3} position={:?} velocity={:?} omega={:.3}\nintent turn={:.3} thrust={:.3} brake={:.3} wings_closed={} laser={} cannon={}\nlanding={landing} body_contacts=[{body_contacts}] last_body_impact={last_impact}",
+                player + 1,
+                modes[player].label(),
+                state.tick,
+                ship.form,
+                life_fraction,
+                ship.position,
+                ship.velocity,
+                ship.omega,
+                intent.turn,
+                intent.thrust,
+                intent.brake,
+                intent.wings_closed,
+                intent.laser,
+                intent.cannon,
+            );
+        }
+        self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
     }
 
     fn rule_bot_intent(&mut self, state: &SpacewarsState, player: usize) -> ShipIntent {
@@ -1298,9 +1399,21 @@ impl SpacewarsControls {
         self.rule_brains = std::array::from_fn(|_| DEFAULT_BUILT_IN_POLICY.create());
         self.brain_contexts = [None, None];
         self.active_sources = [SpacewarsControlMode::Human; 2];
+        self.player_diagnostics.clear();
+        self.last_body_impacts = [None; 2];
         self.bot_diagnostics = std::array::from_fn(|_| None);
         self.flight_histories = std::array::from_fn(|_| BotFlightHistory::default());
         self.diagnostics_revision = self.diagnostics_revision.wrapping_add(1);
+    }
+}
+
+impl SpacewarsControlMode {
+    const fn label(self) -> &'static str {
+        match self {
+            Self::Human => "human",
+            Self::RuleBot => "rule_bot",
+            Self::Benchmark => "benchmark",
+        }
     }
 }
 
@@ -1511,7 +1624,10 @@ mod tests {
     use super::*;
     use engine_common::Scenario;
     use engine_core::SpacewarsConfig;
-    use scenario_spacewars::{SpacewarsAction as ScenarioAction, SpacewarsActionKind};
+    use scenario_spacewars::{
+        BodyCollision, SpaceportContact, SpaceportContactPhase, SpacewarsAction as ScenarioAction,
+        SpacewarsActionKind,
+    };
 
     fn decoded(actions: &[Action]) -> Vec<ScenarioAction> {
         actions.iter().filter_map(ScenarioAction::decode).collect()
@@ -2004,6 +2120,48 @@ mod tests {
         input.reset_spacewars_controls();
         let after_reset = decoded(&input.actions_for_spacewars(&state, false, [false, true]));
         assert!(!after_reset.iter().any(|action| action.player() == 1));
+    }
+
+    #[test]
+    fn runtime_diagnostics_cover_human_landing_and_last_body_impact() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::deathmatch(), 7);
+        state.body_collisions = vec![BodyCollision {
+            ship: 0,
+            body: BodyId::Planet(0),
+        }];
+        state.body_impacts = vec![BodyImpact {
+            ship: 0,
+            body: BodyId::Planet(0),
+            speed: 84.0,
+            damage: 8.4,
+        }];
+        state.spaceport_contacts = vec![SpaceportContact {
+            ship: 0,
+            planet: 0,
+            phase: SpaceportContactPhase::Landed,
+        }];
+        let mut input = ClientInput::default();
+
+        let _ = input.actions_for_spacewars(&state, false, [false; 2]);
+        let diagnostics = input.runtime_diagnostics_text();
+
+        assert!(diagnostics.contains("player=1 control=human tick=0"));
+        assert!(diagnostics.contains("landing=planet=0 phase=Landed"));
+        assert!(diagnostics.contains("body_contacts=[Planet(0)]"));
+        assert!(
+            diagnostics
+                .contains("last_body_impact=tick=0 body=Planet(0) speed=84.000 damage=8.400")
+        );
+        assert!(diagnostics.contains("player=2 control=human tick=0"));
+
+        state.tick = 6;
+        state.body_impacts.clear();
+        let _ = input.actions_for_spacewars(&state, false, [false; 2]);
+        assert!(
+            input
+                .runtime_diagnostics_text()
+                .contains("last_body_impact=tick=0 body=Planet(0) speed=84.000 damage=8.400")
+        );
     }
 
     #[test]
