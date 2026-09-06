@@ -260,6 +260,34 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn previous_clock_settings_default_to_calm_and_profiles_round_trip() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[clock]\ntime_format = \"12-hour\"\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(
+            loaded.settings.clock.event_profile,
+            engine_common::ClockEventProfile::Calm
+        );
+        assert_eq!(
+            loaded.settings.clock.time_format,
+            ClockTimeFormat::TwelveHour
+        );
+        for profile in [
+            engine_common::ClockEventProfile::Off,
+            engine_common::ClockEventProfile::Calm,
+            engine_common::ClockEventProfile::Demo,
+        ] {
+            loaded.settings.clock.event_profile = profile;
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.clock,
+                loaded.settings.clock
+            );
+        }
+    }
+
+    #[test]
     fn missing_file_yields_defaults_and_needs_writeback() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");

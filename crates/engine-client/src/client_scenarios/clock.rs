@@ -24,7 +24,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Clock follows the device's local time and needs no in-scenario controls. Use the host pause menu to restart it or return to the launcher.",
+    controls_help: "Clock follows local device time. In Settings, choose Calm for occasional falling digits, Demo for frequent falls, or Off for a static face. Bars tumble, then reform with the latest time. Pause freezes the animation. Use spacewars-cli clock to inspect or trigger a fall.",
     create,
 };
 
@@ -54,6 +54,7 @@ fn create(
         ClockConfig {
             aspect_ratio: viewport.aspect_ratio(),
             time_format: settings.clock.time_format,
+            event_profile: settings.clock.event_profile,
         },
         seed,
     );
@@ -96,6 +97,42 @@ impl ClientScenario for ClockClientScenario {
 
     fn set_viewport(&mut self, viewport: Viewport) {
         self.state.set_aspect_ratio(viewport.aspect_ratio());
+    }
+
+    fn clock_state(&self) -> Option<spacewars_control::ClockState> {
+        Some(spacewars_control::ClockState {
+            schema_version: spacewars_control::CLOCK_STATE_SCHEMA_VERSION,
+            scenario_revision: 0, // Stamped by the host, not the scenario.
+            paused: false,
+            profile: match self.state.event_profile() {
+                engine_common::ClockEventProfile::Off => "off",
+                engine_common::ClockEventProfile::Calm => "calm",
+                engine_common::ClockEventProfile::Demo => "demo",
+            }
+            .into(),
+            phase: self.state.phase().as_str().into(),
+            event_id: self.state.event_id(),
+            phase_tick: self.state.phase_tick(),
+            simulation_tick: self.state.simulation_tick(),
+            next_event_tick: self.state.next_event_tick(),
+            body_count: self.state.body_count(),
+            collider_count: self.state.collider_count(),
+            reading: self
+                .state
+                .reading()
+                .map(|reading| [reading.hour(), reading.minute(), reading.second()]),
+            display_digits: self.state.display().digits,
+            can_trigger: self.state.can_trigger_fall(),
+            trigger_pending: false,
+        })
+    }
+
+    fn trigger_clock_fall(&mut self) {
+        // Synchronize wall time at the client edge, including immediately after
+        // a pause, before choosing which lit bars to release.
+        let mut actions = self.actions_for_reading(local_clock_reading());
+        actions.push(ClockAction::trigger_fall());
+        ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
     }
 
     #[cfg(test)]

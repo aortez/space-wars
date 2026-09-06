@@ -57,6 +57,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
     pub(crate) clock_time_format: String,
+    pub(crate) clock_event_profile: String,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -253,10 +254,16 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.time-format",
                 &context.clock_time_format,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.event-profile",
+                &context.clock_event_profile,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.clock.time-format",
+                "launcher.settings.clock.event-profile",
                 "launcher.settings.back",
             ]
         }
@@ -381,6 +388,7 @@ mod tests {
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
             clock_time_format: "24-hour".into(),
+            clock_event_profile: "Calm".into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -527,7 +535,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 8, "launcher.settings.clock.time-format"),
+            ("clock", 10, "launcher.settings.clock.event-profile"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -538,7 +546,7 @@ mod tests {
             context.launcher_settings_focus_index = match scenario {
                 "spacewars" => 6,
                 "pizza" => 3,
-                "clock" => 2,
+                "clock" => 3,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,

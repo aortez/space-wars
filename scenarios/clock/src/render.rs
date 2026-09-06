@@ -1,11 +1,13 @@
 use engine_common::{
-    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive,
-    RenderText, Stroke, TextAnchor,
+    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive, Stroke,
 };
 
-use crate::{ClockState, digits};
+use crate::{
+    ClockState, REFORMING_TICKS, SegmentRepresentation, digits,
+    layout::{CAMERA_HEIGHT, FACE_WIDTH_UNITS, Layout},
+};
+use engine_core::Vec2;
 
-const CAMERA_HEIGHT: f32 = 480.0;
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
 const INACTIVE_CELL_LAYER: i32 = 2;
@@ -20,54 +22,8 @@ const ACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.33, 0.94, 0.91);
 const ACTIVE_CELL_EDGE_COLOR: RenderColor = RenderColor::rgb(0.72, 1.0, 0.96);
 const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 
-const DIGIT_ORIGINS: [f32; 4] = [0.0, 7.0, 17.0, 24.0];
-const FACE_WIDTH_UNITS: f32 = 30.0;
-const FACE_HEIGHT_UNITS: f32 = 9.0;
 const COLON_X_UNITS: f32 = 14.5;
 const COLON_Y_UNITS: [f32; 2] = [2.25, 5.75];
-
-#[derive(Debug, Clone, Copy)]
-struct Layout {
-    bounds_min: RenderPoint,
-    bounds_max: RenderPoint,
-    pitch: f32,
-    face_origin: RenderPoint,
-    floor_y: f32,
-}
-
-impl Layout {
-    fn new(aspect_ratio: f32) -> Self {
-        let world_width = CAMERA_HEIGHT * aspect_ratio;
-        let bounds_min = RenderPoint::new(-world_width * 0.5, -CAMERA_HEIGHT * 0.5);
-        let bounds_max = RenderPoint::new(world_width * 0.5, CAMERA_HEIGHT * 0.5);
-        let floor_y = bounds_min.y + CAMERA_HEIGHT * 0.16;
-        let horizontal_margin = (world_width * 0.06).max(16.0);
-        let face_bottom = floor_y + CAMERA_HEIGHT * 0.08;
-        let face_top = bounds_max.y - CAMERA_HEIGHT * 0.10;
-        let pitch = ((world_width - horizontal_margin * 2.0) / FACE_WIDTH_UNITS)
-            .min((face_top - face_bottom) / (FACE_HEIGHT_UNITS + 1.0))
-            .max(2.0);
-        let face_origin = RenderPoint::new(
-            -FACE_WIDTH_UNITS * pitch * 0.5,
-            (face_bottom + face_top - FACE_HEIGHT_UNITS * pitch) * 0.5,
-        );
-
-        Self {
-            bounds_min,
-            bounds_max,
-            pitch,
-            face_origin,
-            floor_y,
-        }
-    }
-
-    fn digit_origin(self, slot: usize) -> RenderPoint {
-        RenderPoint::new(
-            self.face_origin.x + DIGIT_ORIGINS[slot] * self.pitch,
-            self.face_origin.y,
-        )
-    }
-}
 
 pub fn render_frame(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
@@ -84,7 +40,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
 }
 
 fn render_floor(frame: &mut RenderFrame, layout: Layout) {
-    let drain_half_width = (layout.pitch * 0.85).max(10.0);
+    let drain_half_width = layout.drain_half_width();
     let left_max = RenderPoint::new(-drain_half_width, layout.floor_y);
     let right_min = RenderPoint::new(drain_half_width, layout.bounds_min.y);
     frame.push_primitive(
@@ -123,18 +79,40 @@ fn render_floor(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
+    let progress = t * t * (3.0 - 2.0 * t);
     for segment in state.segments() {
-        let origin = layout.digit_origin(usize::from(segment.id.digit_slot));
+        let anchor = layout.segment_center(segment.id);
+        let (position, angle, brightness) = match segment.representation {
+            SegmentRepresentation::Anchored => (anchor, 0.0, f32::from(segment.lit)),
+            SegmentRepresentation::Rigid { position, angle } => (position, angle, 1.0),
+            SegmentRepresentation::Reforming {
+                position,
+                angle,
+                was_lit,
+            } => (
+                position + (anchor - position) * progress,
+                angle * (1.0 - progress),
+                f32::from(was_lit) * (1.0 - progress) + f32::from(segment.lit) * progress,
+            ),
+        };
         for cell in digits::cells(segment.id.kind) {
-            render_cell(
-                frame,
-                RenderPoint::new(
-                    origin.x + f32::from(cell.x) * layout.pitch,
-                    origin.y + f32::from(cell.y) * layout.pitch,
-                ),
-                layout.pitch,
-                segment.lit,
-            );
+            let center = layout.cell_center(segment.id, *cell);
+            if segment.representation == SegmentRepresentation::Anchored {
+                render_square(frame, center, layout.pitch, 0.0, brightness);
+            } else {
+                // Keep a faint clock outline while the illuminated bars move.
+                render_square(frame, center, layout.pitch, 0.0, 0.0);
+                if brightness > 0.0 {
+                    render_square(
+                        frame,
+                        position + (center - anchor).rotate_radians(angle),
+                        layout.pitch,
+                        angle,
+                        brightness,
+                    );
+                }
+            }
         }
     }
 }
@@ -157,36 +135,93 @@ fn render_meridiem(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     let Some(meridiem) = state.display().meridiem else {
         return;
     };
-    let mut label = RenderText::new(
-        RenderPoint::new(
-            layout.face_origin.x + FACE_WIDTH_UNITS * layout.pitch,
-            layout.face_origin.y - layout.pitch * 0.20,
-        ),
-        meridiem,
-    );
-    label.color = LABEL_COLOR;
-    label.size = (layout.pitch * 0.68).clamp(10.0, 20.0);
-    label.anchor = TextAnchor::TopLeft;
-    frame.push_primitive(LABEL_LAYER, RenderPrimitive::Text(label));
+    // Use pixel glyphs so the label is identical in the vector and raster
+    // backends (the raster backend intentionally does not draw RenderText).
+    let first = if meridiem == "AM" {
+        ["010", "101", "111", "101", "101"]
+    } else {
+        ["110", "101", "110", "100", "100"]
+    };
+    let m = ["10001", "11011", "10101", "10001", "10001"];
+    let size = layout.pitch * 0.16;
+    let left = layout.face_origin.x + FACE_WIDTH_UNITS * layout.pitch - size * 9.0;
+    let top = layout.face_origin.y - layout.pitch * 0.35;
+    for (offset, glyph) in [(0.0, first), (4.0, m)] {
+        for (row, pixels) in glyph.iter().enumerate() {
+            for (column, pixel) in pixels.bytes().enumerate() {
+                if pixel == b'1' {
+                    let min = RenderPoint::new(
+                        left + (offset + column as f32) * size,
+                        top - (row + 1) as f32 * size,
+                    );
+                    frame.push_primitive(
+                        LABEL_LAYER,
+                        rectangle(
+                            min,
+                            RenderPoint::new(min.x + size * 0.9, min.y + size * 0.9),
+                            LABEL_COLOR,
+                            None,
+                        ),
+                    );
+                }
+            }
+        }
+    }
 }
 
 fn render_cell(frame: &mut RenderFrame, lower_left: RenderPoint, pitch: f32, lit: bool) {
-    let size = pitch * 0.80;
-    let inset = (pitch - size) * 0.5;
-    let min = RenderPoint::new(lower_left.x + inset, lower_left.y + inset);
-    let max = RenderPoint::new(min.x + size, min.y + size);
-    let layer = if lit {
+    render_square(
+        frame,
+        Vec2::new(lower_left.x + pitch * 0.5, lower_left.y + pitch * 0.5),
+        pitch,
+        0.0,
+        f32::from(lit),
+    );
+}
+
+fn render_square(frame: &mut RenderFrame, center: Vec2, pitch: f32, angle: f32, brightness: f32) {
+    let layer = if brightness > 0.0 {
         ACTIVE_CELL_LAYER
     } else {
         INACTIVE_CELL_LAYER
     };
-    let color = if lit {
-        ACTIVE_CELL_COLOR
+    let color = if brightness > 0.0 {
+        RenderColor {
+            a: brightness,
+            ..ACTIVE_CELL_COLOR
+        }
     } else {
         INACTIVE_CELL_COLOR
     };
-    let stroke = lit.then(|| Stroke::new(ACTIVE_CELL_EDGE_COLOR, (pitch * 0.045).max(0.8)));
-    frame.push_primitive(layer, rectangle(min, max, color, stroke));
+    let stroke = (brightness > 0.0).then(|| {
+        Stroke::new(
+            RenderColor {
+                a: brightness,
+                ..ACTIVE_CELL_EDGE_COLOR
+            },
+            (pitch * 0.045).max(0.8),
+        )
+    });
+    let half = pitch * 0.4;
+    let points = [
+        Vec2::new(-half, -half),
+        Vec2::new(half, -half),
+        Vec2::new(half, half),
+        Vec2::new(-half, half),
+    ]
+    .map(|offset| {
+        let point = center + offset.rotate_radians(angle);
+        RenderPoint::new(point.x, point.y)
+    })
+    .to_vec();
+    frame.push_primitive(
+        layer,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points,
+            fill: Some(Fill::new(color)),
+            stroke,
+        }),
+    );
 }
 
 fn rectangle(
@@ -219,6 +254,7 @@ mod tests {
             ClockConfig {
                 aspect_ratio,
                 time_format: ClockTimeFormat::TwentyFourHour,
+                ..ClockConfig::default()
             },
             7,
         );
@@ -260,5 +296,38 @@ mod tests {
             .map(|layer| layer.primitives.len())
             .sum::<usize>();
         assert_eq!(primitive_count, 103);
+    }
+
+    #[test]
+    fn twelve_hour_meridiem_is_visible_to_both_render_backends() {
+        for hour in [0, 12] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    time_format: ClockTimeFormat::TwelveHour,
+                    ..ClockConfig::default()
+                },
+                0,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(hour, 0, 0).unwrap(),
+                )],
+                std::time::Duration::ZERO,
+            );
+            let frame = ClockScenario::render_frame(&state);
+            let label = frame
+                .layers
+                .iter()
+                .find(|layer| layer.z == LABEL_LAYER)
+                .unwrap();
+            assert!(!label.primitives.is_empty());
+            assert!(
+                label
+                    .primitives
+                    .iter()
+                    .all(|primitive| matches!(primitive, RenderPrimitive::Polygon(_)))
+            );
+        }
     }
 }

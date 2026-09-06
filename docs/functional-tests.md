@@ -35,6 +35,19 @@ The initial workflows verify:
   launching and pausing the scenario, returning to the launcher, and relaunching
   a fresh Clock scenario revision.
 
+Clock event workflows additionally verify Off/Calm/Demo setting controls,
+manual and automatically scheduled falls, bounded body/collider counts,
+physics cleanup, recovery to the latest 12-hour time, and pause/resume during
+a fall. Restart and relaunch must create clean Clock instances. Busy, paused,
+stale-instance, stale-event, and inactive-Clock controls are rejected. Clock
+animation ticks must not invalidate UI revision guards.
+
+The public `clock state`, `clock trigger`, and `clock wait` API is shared by
+these tests and `spacewars-cli`; no test-only phase or time overrides are used.
+Transition deadlines allow for slower debug software rendering. Exact seeded
+timing, midnight/minute rollover during events, resizing, and repeated-cycle
+resource bounds are covered separately by `cargo test -p scenario-clock`.
+
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
 
@@ -66,7 +79,9 @@ does not require a display. Linux CI runs them explicitly under Xvfb.
 
 ## Failure artifacts
 
-Successful runs remove their temporary data. A failing workflow preserves a
+Successful runs remove their temporary data by default. Set
+`SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1` to retain successful screenshots and
+command histories for visual review. A failing workflow always preserves a
 directory under `target/functional-test-artifacts/` containing as much of the
 following as the still-running client can provide:
 

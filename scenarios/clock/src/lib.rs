@@ -1,6 +1,11 @@
 //! Deterministic low-resolution clock scenario.
 
 mod digits;
+#[cfg(test)]
+mod event_tests;
+mod events;
+mod layout;
+mod physics;
 mod render;
 
 use std::time::Duration;
@@ -11,11 +16,17 @@ pub use digits::{
 };
 
 use engine_common::{
-    Action, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
+    Action, ClockEventProfile, ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult,
+    TickModel,
 };
+use events::EventSchedule;
+pub use events::{COOLDOWN_TICKS, EventPhase, FALLING_TICKS, FIXED_HZ, REFORMING_TICKS};
+use layout::Layout;
+use physics::FallingWorld;
 
 pub const CLOCK_ACTION_VERSION: u16 = 1;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
+pub const CLOCK_ACTION_TRIGGER_FALL: u32 = 2;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
@@ -58,9 +69,17 @@ impl ClockReading {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClockAction {
     SetReading(ClockReading),
+    TriggerFall,
 }
 
 impl ClockAction {
+    pub fn trigger_fall() -> Action {
+        Action::scenario(
+            CLOCK_ACTION_TRIGGER_FALL,
+            CLOCK_ACTION_VERSION.to_le_bytes().to_vec(),
+        )
+    }
+
     pub fn set_reading(reading: ClockReading) -> Action {
         let mut payload = Vec::with_capacity(5);
         payload.extend_from_slice(&CLOCK_ACTION_VERSION.to_le_bytes());
@@ -72,14 +91,17 @@ impl ClockAction {
         let Action::Scenario { kind, payload } = action else {
             return None;
         };
-        if *kind != CLOCK_ACTION_SET_READING || payload.len() != 5 {
-            return None;
-        }
-        let version = u16::from_le_bytes(payload[0..2].try_into().ok()?);
+        let version = u16::from_le_bytes(payload.get(0..2)?.try_into().ok()?);
         if version != CLOCK_ACTION_VERSION {
             return None;
         }
-        ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
+        match (*kind, payload.len()) {
+            (CLOCK_ACTION_SET_READING, 5) => {
+                ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
+            }
+            (CLOCK_ACTION_TRIGGER_FALL, 2) => Some(Self::TriggerFall),
+            _ => None,
+        }
     }
 }
 
@@ -87,6 +109,7 @@ impl ClockAction {
 pub struct ClockConfig {
     pub aspect_ratio: f32,
     pub time_format: ClockTimeFormat,
+    pub event_profile: ClockEventProfile,
 }
 
 impl Default for ClockConfig {
@@ -94,6 +117,7 @@ impl Default for ClockConfig {
         Self {
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             time_format: ClockTimeFormat::TwentyFourHour,
+            event_profile: ClockEventProfile::default(),
         }
     }
 }
@@ -103,16 +127,18 @@ impl ClockConfig {
         Self {
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             time_format: self.time_format,
+            event_profile: self.event_profile,
         }
     }
 }
 
-#[derive(Debug)]
 pub struct ClockState {
     config: ClockConfig,
     reading: Option<ClockReading>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
+    schedule: EventSchedule,
+    falling_world: Option<FallingWorld>,
 }
 
 impl ClockState {
@@ -137,13 +163,113 @@ impl ClockState {
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
-        self.config.aspect_ratio = normalize_aspect_ratio(aspect_ratio);
+        let aspect_ratio = normalize_aspect_ratio(aspect_ratio);
+        if self.config.aspect_ratio == aspect_ratio {
+            return;
+        }
+        self.config.aspect_ratio = aspect_ratio;
+        // A resize changes both anchors and floor geometry. Recover immediately
+        // instead of leaving bodies in the old arena or teleporting colliders.
+        if matches!(self.phase(), EventPhase::Falling | EventPhase::Reforming) {
+            self.anchor_segments();
+            self.schedule.enter(EventPhase::Cooldown);
+        }
+    }
+
+    pub fn phase(&self) -> EventPhase {
+        self.schedule.phase
+    }
+    pub fn phase_tick(&self) -> u64 {
+        self.schedule.phase_tick
+    }
+    pub fn simulation_tick(&self) -> u64 {
+        self.schedule.tick
+    }
+    pub fn event_id(&self) -> u64 {
+        self.schedule.event_id
+    }
+    pub fn next_event_tick(&self) -> Option<u64> {
+        self.schedule.next_event_tick
+    }
+    pub fn event_profile(&self) -> ClockEventProfile {
+        self.config.event_profile
+    }
+    pub fn body_count(&self) -> usize {
+        self.falling_world
+            .as_ref()
+            .map_or(0, FallingWorld::body_count)
+    }
+    pub fn collider_count(&self) -> usize {
+        self.falling_world
+            .as_ref()
+            .map_or(0, FallingWorld::collider_count)
+    }
+    pub fn can_trigger_fall(&self) -> bool {
+        self.reading.is_some() && self.phase() == EventPhase::Idle
+    }
+
+    fn trigger_fall(&mut self) {
+        if self.can_trigger_fall() {
+            self.schedule.start();
+            self.start_falling();
+        }
+    }
+
+    fn start_falling(&mut self) {
+        self.falling_world = Some(FallingWorld::new(
+            Layout::new(self.aspect_ratio()),
+            &mut self.segments,
+            &mut self.schedule.rng,
+        ));
+    }
+
+    fn start_reforming(&mut self) {
+        let layout = Layout::new(self.aspect_ratio());
+        for segment in &mut self.segments {
+            let (position, angle) = match segment.representation {
+                SegmentRepresentation::Rigid { position, angle } => (position, angle),
+                _ => (layout.segment_center(segment.id), 0.0),
+            };
+            segment.representation = SegmentRepresentation::Reforming {
+                position,
+                angle,
+                was_lit: segment.lit,
+            };
+        }
+        self.falling_world = None;
+        digits::apply_snapshot(&mut self.segments, self.display);
+    }
+
+    fn anchor_segments(&mut self) {
+        self.falling_world = None;
+        for segment in &mut self.segments {
+            segment.representation = SegmentRepresentation::Anchored;
+        }
+        digits::apply_snapshot(&mut self.segments, self.display);
+    }
+
+    fn advance_tick(&mut self) {
+        if let Some(world) = &mut self.falling_world {
+            world.step(&mut self.segments);
+        }
+        let previous = self.phase();
+        self.schedule.advance(self.reading.is_some());
+        if previous != self.phase() {
+            match self.phase() {
+                EventPhase::Falling => self.start_falling(),
+                EventPhase::Reforming => self.start_reforming(),
+                EventPhase::Cooldown => self.anchor_segments(),
+                EventPhase::Idle => {}
+            }
+        }
     }
 
     fn apply_reading(&mut self, reading: ClockReading) {
         self.reading = Some(reading);
         self.display = digits::snapshot(reading, self.config.time_format);
-        digits::apply_snapshot(&mut self.segments, self.display);
+        if self.phase() != EventPhase::Falling {
+            digits::apply_snapshot(&mut self.segments, self.display);
+        }
     }
 }
 
@@ -153,20 +279,28 @@ impl Scenario for ClockScenario {
     type State = ClockState;
     type Config = ClockConfig;
 
-    fn init(config: Self::Config, _seed: u64) -> Self::State {
+    fn init(config: Self::Config, seed: u64) -> Self::State {
         ClockState {
             config: config.normalized(),
             reading: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
+            schedule: EventSchedule::new(config.event_profile, seed),
+            falling_world: None,
         }
     }
 
-    fn step(state: &mut Self::State, actions: &[Action], _dt: Duration) -> StepResult {
-        if let Some(ClockAction::SetReading(reading)) =
-            actions.iter().filter_map(ClockAction::decode).next_back()
-        {
-            state.apply_reading(reading);
+    fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        for action in actions.iter().filter_map(ClockAction::decode) {
+            match action {
+                ClockAction::SetReading(reading) => state.apply_reading(reading),
+                ClockAction::TriggerFall => state.trigger_fall(),
+            }
+        }
+        // The fixed-timestep host supplies one tick per call. Zero duration is
+        // used to synchronize inputs/control actions without advancing physics.
+        if !dt.is_zero() {
+            state.advance_tick();
         }
         StepResult::default()
     }
@@ -192,7 +326,7 @@ impl Scenario for ClockScenario {
     }
 
     fn tick_model() -> TickModel {
-        TickModel::FixedTimestep { hz: 60 }
+        TickModel::FixedTimestep { hz: FIXED_HZ }
     }
 }
 
@@ -276,6 +410,7 @@ mod tests {
             ClockConfig {
                 aspect_ratio: 16.0 / 9.0,
                 time_format: ClockTimeFormat::TwelveHour,
+                ..ClockConfig::default()
             },
             0,
         );

@@ -18,10 +18,10 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    ControlFailure, ControlFailureCode, HOST_PAUSE_COMMAND, HostPauseRequest, ProtocolError,
-    RuntimeStatus, UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND, UI_STATE_COMMAND,
-    UI_STATE_SCHEMA_VERSION, UiAction, UiActivateRequest, UiControl, UiPressRequest, UiScreen,
-    UiState, parse_runtime_status,
+    CLOCK_STATE_COMMAND, CLOCK_TRIGGER_COMMAND, ClockState, ClockTriggerRequest, ControlFailure,
+    ControlFailureCode, HOST_PAUSE_COMMAND, HostPauseRequest, ProtocolError, RuntimeStatus,
+    UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction,
+    UiActivateRequest, UiControl, UiPressRequest, UiScreen, UiState, parse_runtime_status,
 };
 
 #[cfg(unix)]
@@ -46,6 +46,8 @@ enum ControlCommand {
     UiPress(UiPressRequest),
     UiActivate(UiActivateRequest),
     HostPause(HostPauseRequest),
+    ClockState,
+    ClockTrigger(ClockTriggerRequest),
     HostBenchmark,
 }
 
@@ -308,6 +310,25 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
                 .map(ControlCommand::HostPause)
                 .map_err(|error| invalid_mutation_request(error.to_string()))
         }
+        Some(CLOCK_STATE_COMMAND) => {
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request("clock state takes no arguments"));
+            }
+            Ok(ControlCommand::ClockState)
+        }
+        Some(CLOCK_TRIGGER_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("clock trigger requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "clock trigger accepts exactly one JSON request line",
+                ));
+            }
+            ClockTriggerRequest::from_json(payload)
+                .map(ControlCommand::ClockTrigger)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some("host benchmark") => {
             if lines.next().is_some() {
                 return Err(CommandParseError::Legacy("too many command lines".into()));
@@ -338,6 +359,20 @@ fn handle_request(
     scenario_controls: &host::SharedScenarioControls,
 ) {
     match request.command {
+        ControlCommand::ClockState => handle_clock_request(
+            window,
+            None,
+            request.response,
+            ui_state_tracker,
+            scenario_controls,
+        ),
+        ControlCommand::ClockTrigger(trigger) => handle_clock_request(
+            window,
+            Some(trigger),
+            request.response,
+            ui_state_tracker,
+            scenario_controls,
+        ),
         ControlCommand::Screenshot { output } => match write_window_screenshot(window, &output) {
             Ok(()) => request
                 .response
@@ -391,6 +426,94 @@ fn handle_request(
             }
         }
     }
+}
+
+#[cfg(unix)]
+fn handle_clock_request(
+    window: &MainWindow,
+    trigger: Option<ClockTriggerRequest>,
+    response: ResponseWriter,
+    tracker: &mut UiStateTracker,
+    controls: &host::SharedScenarioControls,
+) {
+    let ui = match ui_state(window, tracker) {
+        Ok(state) => state,
+        Err(error) => {
+            response.error(error.to_string());
+            return;
+        }
+    };
+    let mut controls = controls.borrow_mut();
+    let clock = controls.clock_state();
+    if ui.active_scenario.as_deref() != Some("clock") || ui.screen.is_launcher() {
+        response.control_failure(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
+            "Clock controls require an active Clock scenario",
+            Some(ui),
+        ));
+        return;
+    }
+    let Some(clock) = clock.filter(|clock| Some(clock.scenario_revision) == ui.scenario_revision)
+    else {
+        response.control_failure(ControlFailure::new(
+            ControlFailureCode::ControlUnavailable,
+            "Clock state is not ready",
+            Some(ui),
+        ));
+        return;
+    };
+    if let Some(trigger) = trigger {
+        if let Err(failure) = validate_clock_trigger(&trigger, &ui, &clock) {
+            response.control_failure(*failure);
+            return;
+        }
+        if !controls.request_clock_fall() {
+            response.control_failure(ControlFailure::new(
+                ControlFailureCode::ActionUnavailable,
+                "Another host control is pending",
+                Some(ui),
+            ));
+            return;
+        }
+    }
+    match controls.clock_state().unwrap().to_json() {
+        Ok(json) => response.ok(json),
+        Err(error) => response.error(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn validate_clock_trigger(
+    request: &ClockTriggerRequest,
+    ui: &UiState,
+    clock: &ClockState,
+) -> Result<(), Box<ControlFailure>> {
+    let failure = if request.expected_scenario_revision != clock.scenario_revision
+        || request.expected_event_id != clock.event_id
+    {
+        Some((
+            ControlFailureCode::StaleRevision,
+            "Clock instance or event changed",
+        ))
+    } else if ui.screen != UiScreen::Gameplay || clock.paused {
+        Some((
+            ControlFailureCode::WrongScreen,
+            "Resume Clock gameplay before triggering a fall",
+        ))
+    } else if !clock.can_trigger {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            "Clock is busy; wait for idle before triggering another fall",
+        ))
+    } else {
+        None
+    };
+    if let Some((code, message)) = failure {
+        let mut failure = ControlFailure::new(code, message, Some(ui.clone()));
+        failure.current_clock_state = Some(clock.clone());
+        return Err(Box::new(failure));
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -652,6 +775,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
+            clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );
@@ -734,6 +858,8 @@ mod tests {
             | ControlCommand::UiPress(_)
             | ControlCommand::UiActivate(_)
             | ControlCommand::HostPause(_)
+            | ControlCommand::ClockState
+            | ControlCommand::ClockTrigger(_)
             | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
@@ -752,6 +878,33 @@ mod tests {
             Ok(ControlCommand::Status)
         ));
         assert!(parse_command("status\nextra\n").is_err());
+    }
+
+    #[test]
+    fn clock_commands_validate_schema_and_required_guards() {
+        assert!(matches!(
+            parse_command("clock state\n"),
+            Ok(ControlCommand::ClockState)
+        ));
+        let request = ClockTriggerRequest {
+            schema_version: 1,
+            expected_scenario_revision: 9,
+            expected_event_id: 2,
+        };
+        assert!(
+            matches!(parse_command(&format!("clock trigger\n{}\n", request.to_json().unwrap())), Ok(ControlCommand::ClockTrigger(parsed)) if parsed == request)
+        );
+        for body in [
+            "clock state\nextra\n",
+            "clock trigger\n",
+            "clock trigger\n{}\n",
+            "clock trigger\n{}\nextra\n",
+            "clock trigger\n{\"schema_version\":2,\"expected_scenario_revision\":9,\"expected_event_id\":2}\n",
+        ] {
+            assert!(
+                matches!(parse_command(body), Err(CommandParseError::Structured(failure)) if failure.code == ControlFailureCode::InvalidRequest)
+            );
+        }
     }
 
     #[test]

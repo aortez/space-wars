@@ -287,6 +287,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-pizza-desired-balls-text: "24";
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in-out property <string> launcher-clock-time-format: "24-hour";
+    in-out property <string> launcher-clock-event-profile: "Calm";
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";
@@ -1010,7 +1011,7 @@ export component MainWindow inherits Window {
                             y: 38px;
                             width: parent.width - 28px;
                             height: 22px;
-                            text: root.launcher-scenario == "spacewars" ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled + "  ·  P2 " + root.launcher-p2-controller) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : root.launcher-scenario == "clock" ? (root.launcher-clock-time-format + "  ·  local device time  ·  square-cell digits") : root.launcher-scenario == "falling" ? "256×224 native video  ·  bounded 48 kHz audio" : root.launcher-scenario == "nes" ? (root.launcher-nes-rom-name + "  ·  " + root.launcher-nes-rom-status) : "A semi-interactive mechanics scenario";
+                            text: root.launcher-scenario == "spacewars" ? (root.launcher-spacewars-preset + "  ·  health " + root.launcher-player-health-text + "%  ·  planets " + root.launcher-use-planets + "  ·  asteroids " + root.launcher-asteroids-enabled + "  ·  P2 " + root.launcher-p2-controller) : root.launcher-scenario == "pizza" ? (root.launcher-pizza-desired-balls-text + " balls  ·  spawn rate " + root.launcher-pizza-spawn-rate-text) : root.launcher-scenario == "clock" ? (root.launcher-clock-time-format + "  ·  local time  ·  " + root.launcher-clock-event-profile + " events") : root.launcher-scenario == "falling" ? "256×224 native video  ·  bounded 48 kHz audio" : root.launcher-scenario == "nes" ? (root.launcher-nes-rom-name + "  ·  " + root.launcher-nes-rom-status) : "A semi-interactive mechanics scenario";
                             color: #9fb4cc;
                             font-size: 13px;
                         }
@@ -1269,6 +1270,25 @@ export component MainWindow inherits Window {
                     }
 
                     ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: 0px;
+                        y: 156px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Event Profile";
+                        value: root.launcher-clock-event-profile;
+                        selected: root.launcher-settings-focus-index == 3;
+                        previous => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 3;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
                         visible: root.launcher-scenario == "nes";
                         x: 0px;
                         y: 0px;
@@ -1335,11 +1355,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "clock" ? 3 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -1347,7 +1367,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";

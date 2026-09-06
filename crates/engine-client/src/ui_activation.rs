@@ -102,7 +102,9 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.spacewars.preset"
         | "launcher.settings.pizza.desired-balls"
         | "launcher.settings.clock.time-format" => 2,
-        "launcher.settings.spacewars.planets" | "launcher.settings.pizza.spawn-rate" => 3,
+        "launcher.settings.spacewars.planets"
+        | "launcher.settings.pizza.spawn-rate"
+        | "launcher.settings.clock.event-profile" => 3,
         "launcher.settings.spacewars.asteroids" => 4,
         "launcher.settings.spacewars.player-health" => 5,
         "launcher.settings.spacewars.player-2" => 6,

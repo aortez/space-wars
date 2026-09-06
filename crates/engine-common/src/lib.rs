@@ -193,6 +193,16 @@ pub enum ClockTimeFormat {
 #[serde(default)]
 pub struct ClockSettings {
     pub time_format: ClockTimeFormat,
+    pub event_profile: ClockEventProfile,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockEventProfile {
+    Off,
+    #[default]
+    Calm,
+    Demo,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

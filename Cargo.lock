@@ -4580,6 +4580,9 @@ name = "scenario-clock"
 version = "0.1.0"
 dependencies = [
  "engine-common",
+ "engine-core",
+ "engine-rapier",
+ "rand",
 ]
 
 [[package]]

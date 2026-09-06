@@ -227,6 +227,11 @@ pub trait ClientScenario {
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame>;
     fn frame_layout(&self) -> FrameLayout;
 
+    fn clock_state(&self) -> Option<spacewars_control::ClockState> {
+        None
+    }
+    fn trigger_clock_fall(&mut self) {}
+
     fn native_video_frame(&self) -> Option<NativeVideoFrame<'_>> {
         None
     }
