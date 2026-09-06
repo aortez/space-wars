@@ -5,6 +5,11 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 mod client;
+mod clock;
+pub use clock::{
+    CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND, ClockState,
+    ClockStatePredicate, ClockTriggerRequest,
+};
 
 pub use client::{ControlClient, ControlClientError, UiStatePredicate};
 
@@ -317,6 +322,8 @@ pub struct ControlFailure {
     pub message: String,
     #[serde(default)]
     pub current_state: Option<UiState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_clock_state: Option<ClockState>,
 }
 
 impl ControlFailure {
@@ -330,6 +337,7 @@ impl ControlFailure {
             code,
             message: message.into(),
             current_state,
+            current_clock_state: None,
         }
     }
 

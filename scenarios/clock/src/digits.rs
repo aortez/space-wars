@@ -1,4 +1,5 @@
 use engine_common::ClockTimeFormat;
+use engine_core::Vec2;
 
 use crate::ClockReading;
 
@@ -38,12 +39,21 @@ pub struct SegmentId {
     pub kind: SegmentKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SegmentRepresentation {
     Anchored,
+    Rigid {
+        position: Vec2,
+        angle: f32,
+    },
+    Reforming {
+        position: Vec2,
+        angle: f32,
+        was_lit: bool,
+    },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SegmentState {
     pub id: SegmentId,
     pub lit: bool,

@@ -24,6 +24,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 
+#[path = "ui_control_functional/clock.rs"]
+mod clock;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
@@ -899,8 +902,8 @@ impl FunctionalHarness {
                 "name": self.test_name,
                 "duration_ms": self.elapsed_ms(),
                 "result": {
-                    "success": false,
-                    "error": self.failure.as_deref().unwrap_or("test panicked"),
+                    "success": self.failure.is_none() && !thread::panicking(),
+                    "error": self.failure,
                 },
                 "engine_log": "engine-client.log",
                 "last_state": self.last_state.as_ref().map(|_| "last-state.json"),
@@ -931,8 +934,10 @@ impl FunctionalHarness {
 
 impl Drop for FunctionalHarness {
     fn drop(&mut self) {
-        let preserve = self.failure.is_some() || thread::panicking();
-        if preserve {
+        let failed = self.failure.is_some() || thread::panicking();
+        let preserve =
+            failed || std::env::var("SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS").as_deref() == Ok("1");
+        if failed {
             self.capture_live_failure_artifacts();
         }
         self.terminate_child();

@@ -21,8 +21,10 @@ The local launcher currently hosts six playable scenarios:
   fling an existing one.
 - **Clock** — a responsive low-resolution local-time display built from stable
   seven-segment square cells. The deterministic scenario receives versioned
-  clock readings from its client adapter, leaving the face ready for later
-  falling-segment and meltdown events.
+  clock readings from its client adapter. Lit segments occasionally fall as
+  rigid bars, collide with the floor, and reform with the latest time. Choose
+  Off, Calm, or Demo in Settings; see [Clock](docs/clock.md) for timing and
+  synchronized controls.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's

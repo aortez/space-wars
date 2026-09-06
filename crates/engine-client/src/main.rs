@@ -28,7 +28,7 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
 use engine_common::{
-    ClockSettings, ClockTimeFormat, CrashBehavior, MAX_PIZZA_BALL_SPAWN_RATE,
+    ClockEventProfile, ClockSettings, ClockTimeFormat, CrashBehavior, MAX_PIZZA_BALL_SPAWN_RATE,
     MAX_PIZZA_DESIRED_BALLS, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
     MAX_SPACEWARS_PLAYER_HEALTH_PERCENT, MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
     MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_PIZZA_BALL_SPAWN_RATE,
@@ -593,6 +593,9 @@ fn show_launcher(
     window.set_launcher_clock_time_format(SharedString::from(clock_time_format_label(
         settings.clock.time_format,
     )));
+    window.set_launcher_clock_event_profile(SharedString::from(clock_event_profile_label(
+        settings.clock.event_profile,
+    )));
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -1111,7 +1114,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
-        "clock" => 4,
+        "clock" => 5,
         "falling" => 1,
         "nes" => 2,
         _ => 3,
@@ -1239,6 +1242,15 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 3 {
+        let next = cycle_label(
+            window.get_launcher_clock_event_profile().as_str(),
+            &["Off", "Calm", "Demo"],
+            delta,
+        );
+        window.set_launcher_clock_event_profile(SharedString::from(next));
+        return;
+    }
     if focus != 2 {
         return;
     }
@@ -1713,6 +1725,9 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
         time_format: clock_time_format_from_label(
             window.get_launcher_clock_time_format().as_str(),
         )?,
+        event_profile: clock_event_profile_from_label(
+            window.get_launcher_clock_event_profile().as_str(),
+        )?,
     })
 }
 
@@ -1806,6 +1821,23 @@ fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, S
         "human" => Ok(SpacewarsController::Human),
         "rule bot" => Ok(SpacewarsController::RuleBot),
         other => Err(format!("Unknown Spacewars controller {other:?}.")),
+    }
+}
+
+fn clock_event_profile_label(profile: ClockEventProfile) -> &'static str {
+    match profile {
+        ClockEventProfile::Off => "Off",
+        ClockEventProfile::Calm => "Calm",
+        ClockEventProfile::Demo => "Demo",
+    }
+}
+
+fn clock_event_profile_from_label(label: &str) -> Result<ClockEventProfile, String> {
+    match label.trim() {
+        "Off" => Ok(ClockEventProfile::Off),
+        "Calm" => Ok(ClockEventProfile::Calm),
+        "Demo" => Ok(ClockEventProfile::Demo),
+        _ => Err(format!("Unknown clock event profile: {label}")),
     }
 }
 
@@ -2474,6 +2506,7 @@ mod tests {
             nes_rom_id: Some("abc123".into()),
             clock: ClockSettings {
                 time_format: ClockTimeFormat::TwelveHour,
+                event_profile: ClockEventProfile::Demo,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

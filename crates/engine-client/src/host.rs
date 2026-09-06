@@ -71,6 +71,7 @@ pub type SharedScenarioControls = Rc<RefCell<ScenarioControls>>;
 #[derive(Debug, Default)]
 pub struct ScenarioControls {
     request: Option<ScenarioControlRequest>,
+    clock_state: Option<spacewars_control::ClockState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,6 +80,7 @@ enum ScenarioControlRequest {
     Resume,
     Restart,
     Benchmark,
+    ClockFall,
     ZoomIn { player: usize },
     ZoomOut { player: usize },
 }
@@ -88,6 +90,31 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
 }
 
 impl ScenarioControls {
+    pub fn clock_state(&self) -> Option<spacewars_control::ClockState> {
+        self.clock_state.clone().map(|mut state| {
+            state.trigger_pending = self.request == Some(ScenarioControlRequest::ClockFall);
+            state.can_trigger &= self.request.is_none();
+            state
+        })
+    }
+
+    pub fn request_clock_fall(&mut self) -> bool {
+        if !self.clock_state().is_some_and(|state| state.can_trigger) {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::ClockFall);
+        true
+    }
+
+    fn publish_clock_state(&mut self, scenario: &HostedScenario, revision: u64, paused: bool) {
+        self.clock_state = scenario.inner.clock_state().map(|mut state| {
+            state.scenario_revision = revision;
+            state.paused = paused;
+            state.can_trigger &= !paused;
+            state
+        });
+    }
+
     pub fn request_pause(&mut self) {
         self.request = Some(ScenarioControlRequest::Pause);
     }
@@ -442,6 +469,9 @@ pub fn start_scenario_loop(
     let mut paused = false;
     let mut benchmark_active = start_benchmark;
     let mut scenario_revision = next_scenario_revision();
+    controls
+        .borrow_mut()
+        .publish_clock_state(&scenario, scenario_revision, paused);
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let initial_game_over = scenario.is_game_over();
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
@@ -616,6 +646,7 @@ pub fn start_scenario_loop(
             )));
         }
 
+        controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
         scenario.record_realtime_displayed_loop_iteration();
         let updates = if let Some(telemetry) = scenario.realtime_telemetry() {
             let updates = telemetry
@@ -825,6 +856,12 @@ fn step_scenario_inner(
 
     if let Some(request) = controls.take_request() {
         match request {
+            ScenarioControlRequest::ClockFall => {
+                if !*paused {
+                    scenario.inner.trigger_clock_fall();
+                }
+                return HostStepResult::default();
+            }
             ScenarioControlRequest::Pause => {
                 if !scenario.is_game_over() {
                     *paused = true;

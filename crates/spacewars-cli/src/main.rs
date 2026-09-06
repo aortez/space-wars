@@ -1,5 +1,6 @@
 #[cfg(test)]
 use std::path::Path;
+mod clock;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
@@ -27,6 +28,11 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Inspect, trigger, or synchronize with Clock animations.
+    Clock {
+        #[command(subcommand)]
+        command: clock::ClockCommand,
+    },
     /// Print diagnostics from the running UI.
     Status,
 
@@ -239,6 +245,7 @@ fn run() -> Result<(), CliError> {
     let client = ControlClient::new(socket);
 
     match args.command {
+        Command::Clock { command } => clock::run(&client, command),
         Command::Status => request_status(&client).map_err(human_error),
         Command::Screenshot { output } => request_screenshot(&client, output).map_err(human_error),
         Command::Ui {
@@ -758,6 +765,44 @@ mod tests {
         assert_eq!(parse_timeout("750ms").unwrap(), Duration::from_millis(750));
         assert!(parse_timeout("0s").is_err());
         assert!(parse_timeout("3").is_err());
+    }
+
+    #[test]
+    fn clock_commands_parse_guards_and_require_a_known_wait_phase() {
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "state", "--json"]).is_ok());
+        assert!(
+            Args::try_parse_from([
+                "spacewars-cli",
+                "clock",
+                "trigger",
+                "--expect-scenario-revision",
+                "3",
+                "--expect-event-id",
+                "2",
+                "--timeout",
+                "2s",
+                "--json"
+            ])
+            .is_ok()
+        );
+        assert!(
+            Args::try_parse_from([
+                "spacewars-cli",
+                "clock",
+                "wait",
+                "--phase",
+                "reforming",
+                "--event-id",
+                "3",
+                "--min-phase-tick",
+                "30"
+            ])
+            .is_ok()
+        );
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "wait"]).is_err());
+        assert!(
+            Args::try_parse_from(["spacewars-cli", "clock", "wait", "--phase", "unknown"]).is_err()
+        );
     }
 
     #[test]
