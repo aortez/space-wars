@@ -251,8 +251,8 @@ mod tests {
     use std::sync::Mutex;
 
     use engine_common::{
-        AudioSettings, LaunchSettings, NesSettings, RendererSetting, SpacewarsController,
-        SpacewarsSettings, VideoSettings,
+        AudioSettings, ClockTimeFormat, LaunchSettings, NesSettings, RendererSetting,
+        SpacewarsController, SpacewarsSettings, VideoSettings,
     };
 
     use super::*;
@@ -275,6 +275,10 @@ mod tests {
         assert_eq!(loaded.settings.launch.renderer, RendererSetting::Vector);
         assert_eq!(loaded.settings.launch.raster_scale, 1.0);
         assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
+        assert_eq!(
+            loaded.settings.clock.time_format,
+            ClockTimeFormat::TwentyFourHour
+        );
         assert!(!path.exists(), "load should not create the file.");
     }
 
@@ -303,6 +307,7 @@ mod tests {
         assert!(migrated.contains("[audio]"));
         assert!(migrated.contains("[launch]"));
         assert!(migrated.contains("[spacewars]"));
+        assert!(migrated.contains("[clock]"));
         assert!(migrated.contains("[runtime]"));
     }
 
@@ -390,6 +395,10 @@ mod tests {
             80.0
         );
         assert_eq!(reloaded.settings.spacewars.player_health_percent, 250);
+        assert_eq!(
+            reloaded.settings.clock.time_format,
+            ClockTimeFormat::TwentyFourHour
+        );
         assert_eq!(
             reloaded.settings.spacewars.player_2_controller,
             SpacewarsController::RuleBot

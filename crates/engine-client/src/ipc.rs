@@ -651,6 +651,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            clock_time_format: window.get_launcher_clock_time_format().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );

@@ -30,7 +30,10 @@ The initial workflows verify:
 - starting a real deterministic Spacewars scenario, pausing through the guarded
   host API, observing the conditional Benchmark menu control, and activating it
   to start a new benchmark scenario revision; then restarting into a normal
-  round, returning to the launcher, and launching Spacewars again.
+  round, returning to the launcher, and launching Spacewars again; and
+- selecting Clock, changing its 12/24-hour setting through stable control IDs,
+  launching and pausing the scenario, returning to the launcher, and relaunching
+  a fresh Clock scenario revision.
 
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.

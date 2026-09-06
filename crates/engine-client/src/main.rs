@@ -1,7 +1,8 @@
 //! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
-//! The compile-time registry currently hosts Pizza, Rover Lab, and Spacewars
-//! from the launcher, with Null retained as a hidden test scenario.
+//! The compile-time registry hosts Clock, Falling, NES Library, Pizza, Rover
+//! Lab, and Spacewars from the launcher, with Null retained as a hidden test
+//! scenario.
 
 mod client_scenarios;
 mod gamepad;
@@ -27,9 +28,10 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Parser, ValueEnum};
 use engine_common::{
-    CrashBehavior, MAX_PIZZA_BALL_SPAWN_RATE, MAX_PIZZA_DESIRED_BALLS,
-    MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MAX_SPACEWARS_PLAYER_HEALTH_PERCENT,
-    MAX_SPACEWARS_PLAYER_VIEW_HEIGHT, MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_PIZZA_BALL_SPAWN_RATE,
+    ClockSettings, ClockTimeFormat, CrashBehavior, MAX_PIZZA_BALL_SPAWN_RATE,
+    MAX_PIZZA_DESIRED_BALLS, MAX_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC,
+    MAX_SPACEWARS_PLAYER_HEALTH_PERCENT, MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
+    MAX_SPACEWARS_UNIVERSE_RADIUS, MIN_PIZZA_BALL_SPAWN_RATE,
     MIN_SPACEWARS_ASTEROID_PROBABILITY_PER_SEC, MIN_SPACEWARS_PLAYER_HEALTH_PERCENT,
     MIN_SPACEWARS_PLAYER_VIEW_HEIGHT, MIN_SPACEWARS_UNIVERSE_RADIUS, PizzaSettings,
     RendererSetting, Settings, SpacewarsController, SpacewarsSettings,
@@ -588,6 +590,9 @@ fn show_launcher(
     window.set_launcher_pizza_spawn_rate_text(SharedString::from(format_float_setting(
         pizza.ball_spawn_rate,
     )));
+    window.set_launcher_clock_time_format(SharedString::from(clock_time_format_label(
+        settings.clock.time_format,
+    )));
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -1106,6 +1111,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
+        "clock" => 4,
         "falling" => 1,
         "nes" => 2,
         _ => 3,
@@ -1145,6 +1151,7 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => adjust_spacewars_launcher_setting(window, focus, delta),
         "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
+        "clock" => adjust_clock_launcher_setting(window, focus, delta),
         _ => {}
     }
 }
@@ -1229,6 +1236,18 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
         }
         _ => {}
     }
+}
+
+fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus != 2 {
+        return;
+    }
+    let next = cycle_label(
+        window.get_launcher_clock_time_format().as_str(),
+        &["24-hour", "12-hour"],
+        delta,
+    );
+    window.set_launcher_clock_time_format(SharedString::from(next));
 }
 
 fn cycle_label<'a>(current: &str, values: &'a [&'a str], delta: i32) -> &'a str {
@@ -1428,6 +1447,7 @@ fn hide_launcher_surfaces(window: &MainWindow) {
 struct LauncherSelections {
     launch: EffectiveLaunch,
     nes_rom_id: Option<String>,
+    clock: ClockSettings,
     spacewars: SpacewarsSettings,
     pizza: PizzaSettings,
 }
@@ -1443,6 +1463,7 @@ fn persist_launcher_settings(
     let raster_scale = normalize_raster_scale(launch.raster_scale);
     let spacewars = selections.spacewars.normalized();
     let pizza = selections.pizza.normalized();
+    let clock = selections.clock.clone();
     let nes_rom_id = selections.nes_rom_id.clone();
     let mut changed = false;
 
@@ -1468,6 +1489,10 @@ fn persist_launcher_settings(
     }
     if settings.nes.selected_rom_id != nes_rom_id {
         settings.nes.selected_rom_id = nes_rom_id;
+        changed = true;
+    }
+    if settings.clock != clock {
+        settings.clock = clock;
         changed = true;
     }
     if settings.spacewars != spacewars {
@@ -1615,16 +1640,24 @@ fn launcher_selections_from_window(
     current_settings: &Settings,
 ) -> Result<LauncherSelections, String> {
     let launch = launch_options_from_window(window)?;
-    let (spacewars, pizza) = match launch.scenario.as_str() {
+    let (clock, spacewars, pizza) = match launch.scenario.as_str() {
         "spacewars" => (
+            current_settings.clock.clone(),
             spacewars_setup_from_window(window)?,
             current_settings.pizza.clone(),
         ),
         "pizza" => (
+            current_settings.clock.clone(),
             current_settings.spacewars.clone(),
             pizza_setup_from_window(window)?,
         ),
+        "clock" => (
+            clock_setup_from_window(window)?,
+            current_settings.spacewars.clone(),
+            current_settings.pizza.clone(),
+        ),
         _ => (
+            current_settings.clock.clone(),
             current_settings.spacewars.clone(),
             current_settings.pizza.clone(),
         ),
@@ -1638,6 +1671,7 @@ fn launcher_selections_from_window(
     Ok(LauncherSelections {
         launch,
         nes_rom_id,
+        clock,
         spacewars,
         pizza,
     })
@@ -1672,6 +1706,14 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
         window.get_launcher_pizza_desired_balls_text().as_str(),
         window.get_launcher_pizza_spawn_rate_text().as_str(),
     )
+}
+
+fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String> {
+    Ok(ClockSettings {
+        time_format: clock_time_format_from_label(
+            window.get_launcher_clock_time_format().as_str(),
+        )?,
+    })
 }
 
 fn launch_options_from_values(
@@ -1764,6 +1806,21 @@ fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, S
         "human" => Ok(SpacewarsController::Human),
         "rule bot" => Ok(SpacewarsController::RuleBot),
         other => Err(format!("Unknown Spacewars controller {other:?}.")),
+    }
+}
+
+fn clock_time_format_label(format: ClockTimeFormat) -> &'static str {
+    match format {
+        ClockTimeFormat::TwelveHour => "12-hour",
+        ClockTimeFormat::TwentyFourHour => "24-hour",
+    }
+}
+
+fn clock_time_format_from_label(label: &str) -> Result<ClockTimeFormat, String> {
+    match label.trim() {
+        "12-hour" => Ok(ClockTimeFormat::TwelveHour),
+        "24-hour" => Ok(ClockTimeFormat::TwentyFourHour),
+        other => Err(format!("Unknown clock time format {other:?}.")),
     }
 }
 
@@ -2415,6 +2472,9 @@ mod tests {
                 raster_scale: 2.0,
             },
             nes_rom_id: Some("abc123".into()),
+            clock: ClockSettings {
+                time_format: ClockTimeFormat::TwelveHour,
+            },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,
                 use_planets: false,
@@ -2441,6 +2501,7 @@ mod tests {
         assert_eq!(stored.launch.raster_scale, 2.0);
         assert_eq!(stored.spacewars, selections.spacewars);
         assert_eq!(stored.pizza, selections.pizza);
+        assert_eq!(stored.clock, selections.clock);
         assert_eq!(stored.last_scenario.as_deref(), Some("spacewars"));
         assert_eq!(stored.nes.selected_rom_id.as_deref(), Some("abc123"));
         drop(stored);
@@ -2452,6 +2513,7 @@ mod tests {
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
         assert_eq!(reloaded.settings.spacewars, selections.spacewars);
         assert_eq!(reloaded.settings.pizza, selections.pizza);
+        assert_eq!(reloaded.settings.clock, selections.clock);
         assert_eq!(
             reloaded.settings.nes.selected_rom_id.as_deref(),
             Some("abc123")
@@ -2585,6 +2647,17 @@ mod tests {
         );
         assert!(pizza_setup_from_values("many", "0.42").is_err());
         assert!(pizza_setup_from_values("24", "often").is_err());
+    }
+
+    #[test]
+    fn clock_format_labels_parse_and_round_trip() {
+        for format in [ClockTimeFormat::TwelveHour, ClockTimeFormat::TwentyFourHour] {
+            assert_eq!(
+                clock_time_format_from_label(clock_time_format_label(format)).unwrap(),
+                format
+            );
+        }
+        assert!(clock_time_format_from_label("many-hours").is_err());
     }
 
     #[test]

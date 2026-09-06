@@ -115,6 +115,7 @@ IMAGE_INSTALL:append = " \
     rsync \
     screen \
     strace \
+    tzdata-core \
     tree \
     vim \
 "

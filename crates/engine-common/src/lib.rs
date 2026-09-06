@@ -123,6 +123,7 @@ pub struct Settings {
     pub audio: AudioSettings,
     pub controls: ControlBindings,
     pub launch: LaunchSettings,
+    pub clock: ClockSettings,
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
     pub pizza: PizzaSettings,
@@ -177,6 +178,21 @@ pub struct ControlBindings {
 pub struct NesSettings {
     /// SHA-256 identity of the last user cartridge selected in the launcher.
     pub selected_rom_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClockTimeFormat {
+    #[serde(rename = "12-hour")]
+    TwelveHour,
+    #[default]
+    #[serde(rename = "24-hour")]
+    TwentyFourHour,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ClockSettings {
+    pub time_format: ClockTimeFormat,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -56,6 +56,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
+    pub(crate) clock_time_format: String,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -236,6 +237,29 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
+        "clock" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.time-format",
+                &context.clock_time_format,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.clock.time-format",
+                "launcher.settings.back",
+            ]
+        }
         "falling" => &["launcher.settings.back"],
         "nes" => {
             push_choice(
@@ -356,6 +380,7 @@ mod tests {
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
+            clock_time_format: "24-hour".into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -502,6 +527,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
+            ("clock", 8, "launcher.settings.clock.time-format"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -512,6 +538,7 @@ mod tests {
             context.launcher_settings_focus_index = match scenario {
                 "spacewars" => 6,
                 "pizza" => 3,
+                "clock" => 2,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -663,7 +690,7 @@ mod tests {
 
     #[test]
     fn every_enabled_control_has_a_semantic_activation_mapping() {
-        for scenario in ["spacewars", "pizza", "rover-lab", "falling", "nes"] {
+        for scenario in ["spacewars", "pizza", "clock", "rover-lab", "falling", "nes"] {
             let context = context(scenario);
             for screen in [
                 UiScreen::LauncherMain,

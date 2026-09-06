@@ -172,6 +172,105 @@ fn launcher_navigation_uses_the_public_control_api() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn launcher_can_run_the_clock_menu_lifecycle() {
+    run_functional_test("launcher-clock-menu-lifecycle", |harness| {
+        let mut state = harness.wait_until_ready();
+        assert_launcher_main(&state);
+        state = harness.activate_until_scenario("clock", state);
+        assert_eq!(state.selected_scenario, "clock");
+
+        state = harness.activate_guarded("launcher.settings", &state);
+        assert_eq!(state.screen, UiScreen::LauncherSettings);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.time-format.next"),
+            Some("24-hour")
+        );
+        state = harness.activate_guarded("launcher.settings.clock.time-format.next", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.time-format.next"),
+            Some("12-hour")
+        );
+        state = harness.activate_guarded("launcher.settings.clock.time-format.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.time-format.next"),
+            Some("24-hour")
+        );
+        state = harness.activate_guarded("launcher.settings.back", &state);
+        harness.capture_screenshot("clock-launcher.png");
+
+        let launch_revision = state.revision;
+        harness.activate_guarded("launcher.start", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("clock".into()),
+                revision_after: Some(launch_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.active_scenario.as_deref(), Some("clock"));
+        assert!(!state.paused);
+        assert!(!state.benchmark_active);
+        let first_scenario_revision = state
+            .scenario_revision
+            .expect("Clock gameplay must report a scenario revision");
+        harness.capture_screenshot("clock-gameplay.png");
+
+        let pause_requested = harness.pause_guarded(&state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::PauseMain),
+                scenario: Some("clock".into()),
+                revision_after: Some(pause_requested.revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert!(state.paused);
+        assert_eq!(
+            control_ids(&state),
+            [
+                "pause.resume",
+                "pause.restart",
+                "pause.controls",
+                "pause.return-to-launcher",
+            ]
+        );
+
+        let return_revision = state.revision;
+        harness.activate_guarded("pause.return-to-launcher", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::LauncherMain),
+                scenario: None,
+                revision_after: Some(return_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert_eq!(state.active_scenario, None);
+        assert_eq!(selected_control(&state), "launcher.scenario");
+        assert_eq!(state.selected_scenario, "clock");
+        assert_eq!(state.scenario_revision, None);
+
+        let relaunch_revision = state.revision;
+        harness.activate_guarded("launcher.start", &state);
+        state = harness.wait_for(
+            UiStatePredicate {
+                screen: Some(UiScreen::Gameplay),
+                scenario: Some("clock".into()),
+                revision_after: Some(relaunch_revision),
+            },
+            TRANSITION_TIMEOUT,
+        );
+        assert_ne!(state.scenario_revision, Some(first_scenario_revision));
+        assert!(!state.paused);
+        assert!(!state.benchmark_active);
+        harness.capture_screenshot("clock-relaunched-gameplay.png");
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_can_run_the_spacewars_menu_lifecycle() {
     run_functional_test("launcher-spacewars-menu-lifecycle", |harness| {
         let mut state = harness.wait_until_ready();
