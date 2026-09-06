@@ -67,11 +67,15 @@ const MAX_PLANET_SPACING: f32 = 50.0;
 const PLANET_MASS_DENSITY: f32 = 750.0;
 const PLANET_ORBIT_PERIOD_SCALAR: f32 = 5.0;
 const BODY_BOUNDS_RADIUS_SCALE: f32 = 0.99;
-const SPACEPORT_ARC_LENGTH: f32 = 94.24778;
-const SPACEPORT_DEPTH_FACTOR: f32 = 0.4;
-const SPACEPORT_MAX_ARC_ANGLE: f32 = 2.7488937;
-const SPACEPORT_OUTER_POINTS: usize = 15;
-const SPACEPORT_INNER_POINTS: usize = 7;
+// Rapier reports the impulse that supports an object against gravity on every
+// solver step. Only a newly-started contact with a meaningful impact speed is
+// a crash; support impulses must not grind a resting ship's health away.
+const MIN_DAMAGING_BODY_IMPACT_SPEED: f32 = 30.0;
+const SPACEPORT_LANDING_CLEARANCE: f32 = 12.0;
+const SPACEPORT_PAD_OUTER_REACH: f32 = 24.0;
+const SPACEPORT_PAD_MIN_HALF_WIDTH: f32 = 10.0;
+const SPACEPORT_PAD_MAX_HALF_WIDTH: f32 = 24.0;
+const SPACEPORT_PAD_RADIUS_WIDTH_SCALE: f32 = 0.75;
 const SPACEPORT_APPROACH_EPSILON: f32 = 1.0e-5;
 const SPACEPORT_DAMPING: f32 = 0.94;
 const SPACEPORT_PULL_SCALE: f32 = 3.0;
@@ -89,6 +93,7 @@ const ROVER_OVERVIEW_RADIUS: f32 = 4.0;
 const ROVER_LIFE_MAX: f32 = 25.0;
 const ROVER_BUILD_SECS: f32 = 6.0;
 const ROVER_BUILD_COMPLETION_EPSILON: f32 = 1.0e-5;
+const ROVER_BREAKUP_SURFACE_MARGIN: f32 = 1.0;
 const PLANET_CAPTURE_SECS: f32 = 4.0;
 const PLANET_CAPTURE_DECAY_RATE: f32 = 0.5;
 const POD_REBUILD_SECS: f32 = 8.0;
@@ -354,6 +359,7 @@ pub struct SpacewarsState {
     pub debris_collisions: Vec<DebrisCollision>,
     pub debris_body_collisions: Vec<DebrisBodyCollision>,
     pub body_collisions: Vec<BodyCollision>,
+    pub body_impacts: Vec<BodyImpact>,
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
@@ -566,6 +572,14 @@ pub struct BodyCollision {
     pub body: BodyId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BodyImpact {
+    pub ship: usize,
+    pub body: BodyId,
+    pub speed: f32,
+    pub damage: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BodyId {
     Sun,
@@ -622,6 +636,13 @@ pub struct DebrisBodyCollision {
 pub struct SpaceportContact {
     pub ship: usize,
     pub planet: usize,
+    pub phase: SpaceportContactPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpaceportContactPhase {
+    Touchdown,
+    Landed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -1245,6 +1266,7 @@ impl Scenario for SpacewarsScenario {
             debris_collisions: Vec::new(),
             debris_body_collisions: Vec::new(),
             body_collisions: Vec::new(),
+            body_impacts: Vec::new(),
             spaceport_contacts: Vec::new(),
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
@@ -2326,13 +2348,19 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
             planet.mass,
         )
     }));
-    gravity_participants.extend(ships.iter().enumerate().map(|(index, ship)| {
-        GravityParticipant::target(
-            tagged_gravity_id(GRAVITY_SHIP_TAG, index as u64),
-            ship.position,
-            1.0,
-        )
-    }));
+    gravity_participants.extend(
+        ships
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !physics.ship_is_constrained(*index))
+            .map(|(index, ship)| {
+                GravityParticipant::target(
+                    tagged_gravity_id(GRAVITY_SHIP_TAG, index as u64),
+                    ship.position,
+                    1.0,
+                )
+            }),
+    );
     for rover in rovers {
         let Some(motions) = physics.rover_body_motions(rover) else {
             continue;
@@ -2489,12 +2517,12 @@ fn reconcile_physics(state: &mut SpacewarsState, dt_seconds: f32) -> physics::Ph
 
 fn resolve_physics_spaceport_contacts(
     state: &mut SpacewarsState,
-    intersections: &[(usize, usize)],
+    intersections: &[(usize, usize, bool)],
 ) -> BTreeSet<(usize, usize)> {
     let mut accepted = BTreeSet::new();
     state.spaceport_contacts.clear();
 
-    for &(ship_index, planet_index) in intersections {
+    for &(ship_index, planet_index, landed) in intersections {
         let Some(planet) = state.planets.get(planet_index).copied() else {
             continue;
         };
@@ -2516,6 +2544,11 @@ fn resolve_physics_spaceport_contacts(
         state.spaceport_contacts.push(SpaceportContact {
             ship: ship_index,
             planet: planet_index,
+            phase: if landed {
+                SpaceportContactPhase::Landed
+            } else {
+                SpaceportContactPhase::Touchdown
+            },
         });
     }
 
@@ -2532,6 +2565,7 @@ fn resolve_physics_collisions(
     state.rover_debris_collisions.clear();
     state.debris_collisions.clear();
     state.debris_body_collisions.clear();
+    state.body_impacts.clear();
     state.body_collisions = accepted_ports
         .iter()
         .map(|&(ship, planet)| BodyCollision {
@@ -2566,8 +2600,12 @@ fn resolve_physics_collisions(
                 let Some(ship_state) = state.ships.get(ship) else {
                     continue;
                 };
-                let damage = impact_speed(contact.impulse_magnitude, ship_state.mass(), None)
-                    * PLANET_DAMAGE_SCALAR;
+                let speed = contact.closing_speed;
+                let damage = if contact.started && speed >= MIN_DAMAGING_BODY_IMPACT_SPEED {
+                    speed * PLANET_DAMAGE_SCALAR
+                } else {
+                    0.0
+                };
                 let ship_position = ship_state.position;
                 let ship_color = ship_state.color;
                 let normal = contact.normal;
@@ -2575,21 +2613,31 @@ fn resolve_physics_collisions(
                     .point
                     .unwrap_or(body.position + normal * body.radius);
 
-                state.ships[ship].translate_life_with_impulse(-damage, normal * damage);
                 state.body_collisions.push(BodyCollision {
                     ship,
                     body: body_id,
                 });
-                spawn_impact_particles(
-                    state,
-                    -normal,
-                    ship_position,
-                    intercept,
-                    ship_color,
-                    damage,
-                    5.0,
-                    0x51B0_D000 ^ ship as u64 ^ ((body.order as u64) << 16),
-                );
+                if contact.started {
+                    state.body_impacts.push(BodyImpact {
+                        ship,
+                        body: body_id,
+                        speed,
+                        damage,
+                    });
+                }
+                if damage > 0.0 {
+                    state.ships[ship].translate_life_with_impulse(-damage, normal * damage);
+                    spawn_impact_particles(
+                        state,
+                        -normal,
+                        ship_position,
+                        intercept,
+                        ship_color,
+                        damage,
+                        5.0,
+                        0x51B0_D000 ^ ship as u64 ^ ((body.order as u64) << 16),
+                    );
+                }
             }
             (MechanicalEntity::Ship(a), MechanicalEntity::Ship(b)) => {
                 state.ship_collisions.push(ShipCollision { a, b });
@@ -2801,6 +2849,8 @@ fn strongest_entity_contacts(
                 point: contact.point,
                 normal: -contact.normal,
                 impulse_magnitude: contact.impulse_magnitude,
+                closing_speed: contact.closing_speed,
+                started: contact.started,
             }
         };
         let key = (normalized.a, normalized.b);
@@ -3260,7 +3310,25 @@ fn rover_breakup_fragments_for_state(
         .get(rover.owner_id)
         .map(|player| player.color)
         .unwrap_or(Color::DIM_GREY);
-    rover_breakup_fragments(motions, color, rover.owner_id, state.seed, state.tick, salt)
+    let mut fragments =
+        rover_breakup_fragments(motions, color, rover.owner_id, state.seed, state.tick, salt);
+    if let Some(planet) = state.planets.get(rover.planet) {
+        for fragment in &mut fragments {
+            let offset = fragment.position - planet.position;
+            let outward = if offset.length_squared() > REALLY_SMALL {
+                offset.normalized()
+            } else {
+                Vec2::X
+            };
+            let minimum_radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE
+                + fragment.radius
+                + ROVER_BREAKUP_SURFACE_MARGIN;
+            if offset.length() < minimum_radius {
+                fragment.position = planet.position + outward * minimum_radius;
+            }
+        }
+    }
+    fragments
 }
 
 fn rover_breakup_fragments(
@@ -3667,6 +3735,7 @@ fn resolve_body_collisions(state: &mut SpacewarsState) -> CollisionEvents {
             events.spaceport_contacts.push(SpaceportContact {
                 ship: contact.ship,
                 planet: spaceport.planet,
+                phase: SpaceportContactPhase::Touchdown,
             });
         } else {
             let (ship_position, ship_color, damage, intercept, flack_dir) = {
@@ -3734,7 +3803,8 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
         let ship_high = Bounds2::List(ship_high_bounds(&triangles));
 
         for body in &bodies {
-            // The port is a temporary collision-safe corridor through its planet's body.
+            // Launching ships temporarily ignore their own planet while they
+            // clear the outward pad corridor.
             if matches!(
                 body.id,
                 BodyId::Planet(planet)
@@ -3745,29 +3815,28 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
                 continue;
             }
 
-            if !ship_low.intersects(&Bounds2::Circle(body.low)) {
+            let body_intersection = ship_low.intersects(&Bounds2::Circle(body.low))
+                && ship_high.intersects(&Bounds2::Circle(body.high));
+            let spaceport = body.spaceport.filter(|spaceport| {
+                spaceport_accepts_ship(state, ship_index, spaceport.planet)
+                    && ship_high.intersects(&Bounds2::Circle(spaceport.bounds))
+            });
+            if !body_intersection && spaceport.is_none() {
                 continue;
             }
 
-            if ship_high.intersects(&Bounds2::Circle(body.high)) {
-                let spaceport = body.spaceport.filter(|spaceport| {
-                    spaceport_accepts_ship(state, ship_index, spaceport.planet)
-                        && ship_high.intersects(&Bounds2::Circle(spaceport.bounds))
-                });
-
-                contacts.push(BodyContact {
-                    ship: ship_index,
-                    body: body.id,
-                    body_order: body.order,
-                    body_position: body.position,
-                    body_radius: body.radius,
-                    ship_radius: ship_low_circle.radius,
-                    overlap: (ship_low_circle.radius + body.radius
-                        - ship_low_circle.center.distance_to(body.position))
-                    .max(0.0),
-                    spaceport,
-                });
-            }
+            contacts.push(BodyContact {
+                ship: ship_index,
+                body: body.id,
+                body_order: body.order,
+                body_position: body.position,
+                body_radius: body.radius,
+                ship_radius: ship_low_circle.radius,
+                overlap: (ship_low_circle.radius + body.radius
+                    - ship_low_circle.center.distance_to(body.position))
+                .max(0.0),
+                spaceport,
+            });
         }
     }
 
@@ -3947,11 +4016,9 @@ fn spaceport_occupancy(state: &SpacewarsState, planet_index: usize) -> Spaceport
     };
     let mut occupancy = SpaceportOccupancy::default();
 
-    for contact in state
-        .spaceport_contacts
-        .iter()
-        .filter(|contact| contact.planet == planet_index)
-    {
+    for contact in state.spaceport_contacts.iter().filter(|contact| {
+        contact.planet == planet_index && contact.phase == SpaceportContactPhase::Landed
+    }) {
         let Some(ship) = state.ships.get(contact.ship) else {
             continue;
         };
@@ -4068,8 +4135,7 @@ fn eject_ships_from_spaceport(
         };
         let ship = &mut state.ships[ship_index];
         let bounds = ship_low_bounds(&ship_triangles(ship));
-        let clearance_radius =
-            planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius + SPACEPORT_EJECT_MARGIN;
+        let clearance_radius = spaceport_launch_clearance_radius(&planet, bounds);
         let outward_distance = (bounds.center - planet.position).dot(outward);
         let distance_to_clear = (clearance_radius - outward_distance).max(0.0);
         let target_outward_speed = (distance_to_clear / SPACEPORT_EJECT_TARGET_SECS)
@@ -4104,8 +4170,7 @@ fn finish_spaceport_ejections(state: &mut SpacewarsState, dt: f32) {
         let ship = &mut state.ships[ship_index];
         ship.maintain_spaceport_ejection_velocity();
         let bounds = ship_low_bounds(&ship_triangles(ship));
-        let clearance_radius =
-            planet.radius * BODY_BOUNDS_RADIUS_SCALE + bounds.radius + SPACEPORT_EJECT_MARGIN;
+        let clearance_radius = spaceport_launch_clearance_radius(&planet, bounds);
         let cleared = bounds.center.distance_to(planet.position) >= clearance_radius;
 
         if cleared {
@@ -4130,6 +4195,13 @@ fn finish_spaceport_ejections(state: &mut SpacewarsState, dt: f32) {
 
         ship.spaceport_ejection = Some(ejection);
     }
+}
+
+fn spaceport_launch_clearance_radius(planet: &PlanetState, ship_bounds: Circle) -> f32 {
+    let physical_clearance =
+        planet.radius * BODY_BOUNDS_RADIUS_SCALE + ship_bounds.radius + SPACEPORT_EJECT_MARGIN;
+    let pad_clearance = planet.radius + SPACEPORT_PAD_OUTER_REACH + SPACEPORT_EJECT_MARGIN;
+    physical_clearance.max(pad_clearance)
 }
 
 fn refresh_player_planet_counts(state: &mut SpacewarsState) {
@@ -4423,71 +4495,26 @@ fn spaceport_points(planet: &PlanetState) -> Vec<Vec2> {
 
 #[cfg(test)]
 fn spaceport_center(planet: &PlanetState) -> Vec2 {
-    let depth = planet.radius * SPACEPORT_DEPTH_FACTOR;
-    let angle = SPACEPORT_ARC_LENGTH / planet.radius;
-    let mut sum = Vec2::ZERO;
-
-    for index in 0..SPACEPORT_OUTER_POINTS {
-        let theta = index as f32 * angle / SPACEPORT_OUTER_POINTS as f32;
-        sum += Vec2::new(theta.cos() * planet.radius, theta.sin() * planet.radius);
-    }
-
-    if angle < SPACEPORT_MAX_ARC_ANGLE {
-        for index in 0..SPACEPORT_INNER_POINTS {
-            let theta =
-                (SPACEPORT_INNER_POINTS - index - 1) as f32 * angle / SPACEPORT_INNER_POINTS as f32;
-            sum += Vec2::new(theta.cos() * depth, theta.sin() * depth);
-        }
-    } else {
-        let first = Vec2::new(planet.radius, 0.0);
-        let theta = (SPACEPORT_OUTER_POINTS - 1) as f32 * angle / SPACEPORT_OUTER_POINTS as f32;
-        let last = Vec2::new(theta.cos() * planet.radius, theta.sin() * planet.radius);
-        for index in 0..SPACEPORT_INNER_POINTS {
-            sum += (first - last) / SPACEPORT_INNER_POINTS as f32 * (index as f32 + 1.0) + last;
-        }
-    }
-
-    let count = (SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS) as f32;
-    planet.position + (sum / count).rotate_radians(planet.wrapper_angle)
+    polygon_center(&spaceport_points(planet))
 }
 
 fn spaceport_docking_anchor(planet: &PlanetState) -> Vec2 {
-    let depth = planet.radius * SPACEPORT_DEPTH_FACTOR;
-    let arc_angle = SPACEPORT_ARC_LENGTH / planet.radius
-        * (SPACEPORT_OUTER_POINTS.saturating_sub(1) as f32 / SPACEPORT_OUTER_POINTS as f32);
-    let local_anchor = Vec2::from_radians(arc_angle * 0.5) * ((planet.radius + depth) * 0.5);
-    planet.position + local_anchor.rotate_radians(planet.wrapper_angle)
+    planet.position
+        + Vec2::from_radians(planet.wrapper_angle) * (planet.radius + SPACEPORT_LANDING_CLEARANCE)
 }
 
 fn spaceport_local_points(planet_radius: f32) -> Vec<Vec2> {
-    let depth = planet_radius * SPACEPORT_DEPTH_FACTOR;
-    let angle = SPACEPORT_ARC_LENGTH / planet_radius;
-    let mut points = Vec::with_capacity(SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS);
+    let inner_radius = planet_radius * BODY_BOUNDS_RADIUS_SCALE;
+    let outer_radius = planet_radius + SPACEPORT_PAD_OUTER_REACH;
+    let half_width = (planet_radius * SPACEPORT_PAD_RADIUS_WIDTH_SCALE)
+        .clamp(SPACEPORT_PAD_MIN_HALF_WIDTH, SPACEPORT_PAD_MAX_HALF_WIDTH);
 
-    for index in 0..SPACEPORT_OUTER_POINTS {
-        let theta = index as f32 * angle / SPACEPORT_OUTER_POINTS as f32;
-        points.push(Vec2::new(
-            theta.cos() * planet_radius,
-            theta.sin() * planet_radius,
-        ));
-    }
-
-    if angle < SPACEPORT_MAX_ARC_ANGLE {
-        for index in 0..SPACEPORT_INNER_POINTS {
-            let theta =
-                (SPACEPORT_INNER_POINTS - index - 1) as f32 * angle / SPACEPORT_INNER_POINTS as f32;
-            points.push(Vec2::new(theta.cos() * depth, theta.sin() * depth));
-        }
-    } else {
-        let first = points[0];
-        let last = points[SPACEPORT_OUTER_POINTS - 1];
-        for index in 0..SPACEPORT_INNER_POINTS {
-            points
-                .push((first - last) / SPACEPORT_INNER_POINTS as f32 * (index as f32 + 1.0) + last);
-        }
-    }
-
-    points
+    vec![
+        Vec2::new(inner_radius, -half_width),
+        Vec2::new(outer_radius, -half_width),
+        Vec2::new(outer_radius, half_width),
+        Vec2::new(inner_radius, half_width),
+    ]
 }
 
 fn ship_low_bounds(triangles: &[[Vec2; 3]]) -> Circle {
@@ -6721,14 +6748,22 @@ mod tests {
     }
 
     fn land_ship_on_planet(state: &mut SpacewarsState, ship: usize, planet: usize) {
-        state.spaceport_contacts = vec![SpaceportContact { ship, planet }];
+        state.spaceport_contacts = vec![SpaceportContact {
+            ship,
+            planet,
+            phase: SpaceportContactPhase::Landed,
+        }];
     }
 
     fn land_ships_on_planet(state: &mut SpacewarsState, ships: &[usize], planet: usize) {
         state.spaceport_contacts = ships
             .iter()
             .copied()
-            .map(|ship| SpaceportContact { ship, planet })
+            .map(|ship| SpaceportContact {
+                ship,
+                planet,
+                phase: SpaceportContactPhase::Landed,
+            })
             .collect();
     }
 
@@ -7544,7 +7579,7 @@ mod tests {
     }
 
     #[test]
-    fn spaceport_geometry_uses_original_polygon_bound_and_wrapper_rotation() {
+    fn surface_spaceport_geometry_uses_pad_bound_and_wrapper_rotation() {
         let mut planet = test_planet(Vec2::new(100.0, 200.0), 50.0);
         let points = spaceport_points(&planet);
         let bounds = spaceport_physics(0, &planet).bounds;
@@ -7554,10 +7589,7 @@ mod tests {
         let rotated_bounds = spaceport_physics(0, &planet).bounds;
         let rotated_center = spaceport_center(&planet);
 
-        assert_eq!(
-            points.len(),
-            SPACEPORT_OUTER_POINTS + SPACEPORT_INNER_POINTS
-        );
+        assert_eq!(points.len(), 4);
         assert_vec_close(center, bounds.center);
         assert_vec_close(rotated_center, rotated_bounds.center);
         assert!(bounds.radius > 0.0);
@@ -7569,26 +7601,71 @@ mod tests {
     }
 
     #[test]
-    fn tiny_planet_docking_anchor_stays_away_from_the_gravity_center() {
-        let mut planet = test_planet(Vec2::new(100.0, 200.0), 15.8457);
-        let former_centroid = spaceport_center(&planet);
+    fn tiny_planet_docking_anchor_tracks_the_rotating_surface_pad() {
+        let mut planet = test_planet(Vec2::new(100.0, 200.0), MIN_PLANET_RADIUS);
         let anchor = spaceport_docking_anchor(&planet);
         let local_anchor = anchor - planet.position;
-        let expected_radius = planet.radius * (1.0 + SPACEPORT_DEPTH_FACTOR) * 0.5;
+        let expected_radius = planet.radius + SPACEPORT_LANDING_CLEARANCE;
 
         assert_close(local_anchor.length(), expected_radius);
-        assert!(
-            local_anchor.length() > (former_centroid - planet.position).length() * 2.5,
-            "docking anchor {} must stay well beyond former centroid {}",
-            local_anchor.length(),
-            (former_centroid - planet.position).length(),
-        );
 
         planet.wrapper_angle = core::f32::consts::FRAC_PI_2;
         assert_vec_close(
             spaceport_docking_anchor(&planet),
             planet.position + local_anchor.rotate_radians(planet.wrapper_angle),
         );
+    }
+
+    #[test]
+    fn spaceport_berth_is_outside_the_visible_planet_surface() {
+        for radius in [MIN_PLANET_RADIUS, MAX_PLANET_RADIUS] {
+            let planet = test_planet(Vec2::new(420.0, 450.0), radius);
+            let berth_radius = spaceport_docking_anchor(&planet).distance_to(planet.position);
+
+            assert!(
+                berth_radius > radius,
+                "radius {radius}: berth radius {berth_radius} must be outside the visible surface"
+            );
+        }
+    }
+
+    #[test]
+    fn surface_berth_keeps_the_complete_ship_hull_clear_at_release() {
+        for radius in [MIN_PLANET_RADIUS, MAX_PLANET_RADIUS] {
+            for wrapper_angle in [
+                0.0,
+                core::f32::consts::FRAC_PI_2,
+                core::f32::consts::PI,
+                core::f32::consts::PI * 1.5,
+            ] {
+                let mut planet = test_planet(Vec2::new(420.0, 450.0), radius);
+                planet.wrapper_angle = wrapper_angle;
+                let berth = spaceport_docking_anchor(&planet);
+
+                for rotation in [
+                    0.0,
+                    core::f32::consts::FRAC_PI_2,
+                    core::f32::consts::PI,
+                    core::f32::consts::PI * 1.5,
+                ] {
+                    let mut ship =
+                        ShipState::new_with_default_life(0, berth, Color::WHITE, 1.0 / 60.0);
+                    ship.rotation_radians = rotation;
+
+                    let closest_hull_point = ship_triangles(&ship)
+                        .into_iter()
+                        .flatten()
+                        .map(|point| point.distance_to(planet.position))
+                        .fold(f32::INFINITY, f32::min);
+
+                    assert!(
+                        closest_hull_point > radius * BODY_BOUNDS_RADIUS_SCALE,
+                        "radius {radius}, wrapper {wrapper_angle}, ship {rotation}: hull distance \
+                         {closest_hull_point} must clear the collision surface"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
@@ -7731,7 +7808,11 @@ mod tests {
         );
         assert_eq!(
             state.spaceport_contacts,
-            vec![SpaceportContact { ship: 0, planet: 0 }]
+            vec![SpaceportContact {
+                ship: 0,
+                planet: 0,
+                phase: SpaceportContactPhase::Touchdown,
+            }]
         );
         assert_eq!(state.ships[0].position, start_position);
         assert_vec_close(
@@ -7739,7 +7820,7 @@ mod tests {
             offset * (SPACEPORT_PULL_SCALE / SHIP_MASS),
         );
         assert_eq!(state.ships[0].life, start_life);
-        assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Active(0));
+        assert_eq!(spaceport_status(&state, 0), SpaceportStatus::Empty);
     }
 
     #[test]
@@ -7763,7 +7844,212 @@ mod tests {
     }
 
     #[test]
-    fn unowned_spaceport_does_not_hold_escape_pod() {
+    fn surface_spaceport_transitions_from_touchdown_to_landed_hold() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.ships[0].position = spaceport_docking_anchor(&state.planets[0]);
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].brake = 1.0;
+        state.ships[1].position = Vec2::new(900.0, 900.0);
+
+        step(&mut state, &[]);
+
+        assert_eq!(
+            state.spaceport_contacts,
+            vec![SpaceportContact {
+                ship: 0,
+                planet: 0,
+                phase: SpaceportContactPhase::Touchdown,
+            }]
+        );
+        assert_eq!(state.planets[0].capturing_player_id, None);
+        assert_eq!(state.planets[0].previous_docked_ship, None);
+
+        step(&mut state, &[]);
+
+        assert_eq!(
+            state.spaceport_contacts,
+            vec![SpaceportContact {
+                ship: 0,
+                planet: 0,
+                phase: SpaceportContactPhase::Landed,
+            }]
+        );
+        assert_eq!(state.planets[0].capturing_player_id, None);
+
+        step(&mut state, &[]);
+
+        assert_eq!(state.planets[0].capturing_player_id, Some(0));
+        assert_eq!(state.planets[0].previous_docked_ship, Some(0));
+
+        let anchor = spaceport_docking_anchor(&state.planets[0]);
+        let landed_life = state.ships[0].life;
+        let mut body_impact_count = 0;
+        step(&mut state, &[SpacewarsAction::set_brake(0, 0.0)]);
+        for _ in 0..300 {
+            step(&mut state, &[]);
+            body_impact_count += state
+                .body_impacts
+                .iter()
+                .filter(|impact| impact.ship == 0)
+                .count();
+        }
+
+        assert!(state.spaceport_contacts.iter().any(|contact| {
+            contact.ship == 0 && contact.phase == SpaceportContactPhase::Landed
+        }));
+        assert!(state.ships[0].position.distance_to(anchor) < 0.05);
+        assert_eq!(body_impact_count, 0);
+        assert_close(state.ships[0].life, landed_life);
+    }
+
+    #[test]
+    fn gentle_surface_contact_does_not_repeatedly_drain_ship_health() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].mass = body_mass(state.planets[0].radius);
+        // Keep the port on the opposite hemisphere so this exercises the
+        // ordinary continuous surface rather than the docking sensor.
+        state.planets[0].wrapper_angle = core::f32::consts::PI;
+        // Reconcile the replacement planet before introducing contact so its
+        // initial kinematic relocation cannot masquerade as an impact.
+        state.ships[0].position = Vec2::new(800.0, 200.0);
+        step(&mut state, &[]);
+        step(&mut state, &[]);
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = 0.0;
+        state.ships[0].direction = direction_from_rotation(0.0);
+
+        let surface_x =
+            state.planets[0].position.x + state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE;
+        let closest_hull_x = ship_triangles(&state.ships[0])
+            .into_iter()
+            .flatten()
+            .map(|point| point.x)
+            .fold(f32::INFINITY, f32::min);
+        state.ships[0].position.x += surface_x + 0.01 - closest_hull_x;
+        state.ships[0].position.y = state.planets[0].position.y;
+        let starting_life = state.ships[0].life;
+        let mut contact_ticks = 0;
+        let mut impact_count = 0;
+        let mut damaging_impact_count = 0;
+        let mut maximum_impact_speed = 0.0_f32;
+
+        for _ in 0..600 {
+            step(&mut state, &[]);
+            contact_ticks += usize::from(
+                state
+                    .body_collisions
+                    .iter()
+                    .any(|contact| contact.ship == 0),
+            );
+            for impact in state.body_impacts.iter().filter(|impact| impact.ship == 0) {
+                impact_count += 1;
+                damaging_impact_count += usize::from(impact.damage > 0.0);
+                maximum_impact_speed = maximum_impact_speed.max(impact.speed);
+            }
+        }
+
+        assert!(
+            contact_ticks > 300,
+            "ship should remain supported by the surface"
+        );
+        assert_eq!(impact_count, 1);
+        assert_eq!(damaging_impact_count, 0);
+        assert!(maximum_impact_speed < MIN_DAMAGING_BODY_IMPACT_SPEED);
+        assert_close(state.ships[0].life, starting_life);
+    }
+
+    #[test]
+    fn high_speed_surface_impact_still_damages_the_ship() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
+        state.planets[0].mass = 0.0;
+        state.planets[0].wrapper_angle = core::f32::consts::PI;
+        state.ships[0].position = Vec2::new(800.0, 450.0);
+        state.ships[1].position = Vec2::new(900.0, 900.0);
+        step(&mut state, &[]);
+        step(&mut state, &[]);
+
+        let surface_x =
+            state.planets[0].position.x + state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE;
+        let closest_hull_x = ship_triangles(&state.ships[0])
+            .into_iter()
+            .flatten()
+            .map(|point| point.x)
+            .fold(f32::INFINITY, f32::min);
+        state.ships[0].position.x += surface_x + 80.0 - closest_hull_x;
+        state.ships[0].position.y = state.planets[0].position.y;
+        state.ships[0].velocity = Vec2::new(-100.0, 0.0);
+        state.ships[0].rotation_radians = 0.0;
+        state.ships[0].direction = direction_from_rotation(0.0);
+        let starting_life = state.ships[0].life;
+        let mut impact = None;
+
+        for _ in 0..180 {
+            step(&mut state, &[]);
+            impact = state
+                .body_impacts
+                .iter()
+                .find(|impact| impact.ship == 0 && impact.body == BodyId::Planet(0))
+                .copied();
+            if impact.is_some() {
+                break;
+            }
+        }
+
+        let impact = impact.expect("ship should reach the planet surface");
+        assert!(impact.speed >= MIN_DAMAGING_BODY_IMPACT_SPEED);
+        assert!(impact.damage > 0.0);
+        assert!(state.ships[0].life < starting_life);
+    }
+
+    #[test]
+    fn thrust_releases_surface_hold_with_full_hull_clear_of_planet() {
+        let mut state = init_deathmatch_no_asteroids();
+        state.sun = None;
+        state.planets = vec![test_planet(Vec2::new(420.0, 450.0), MIN_PLANET_RADIUS)];
+        let outward = Vec2::from_radians(state.planets[0].wrapper_angle);
+        state.ships[0].position = spaceport_docking_anchor(&state.planets[0]);
+        state.ships[0].velocity = Vec2::ZERO;
+        state.ships[0].rotation_radians = rotation_for_direction(outward);
+        state.ships[0].direction = outward;
+        state.ships[0].brake = 1.0;
+        state.ships[1].position = Vec2::new(900.0, 900.0);
+
+        step(&mut state, &[]);
+        step(&mut state, &[]);
+        assert!(state.spaceport_contacts.iter().any(|contact| {
+            contact.ship == 0 && contact.phase == SpaceportContactPhase::Landed
+        }));
+        let life_before_launch = state.ships[0].life;
+
+        step(
+            &mut state,
+            &[
+                SpacewarsAction::set_brake(0, 0.0),
+                SpacewarsAction::set_thrust(0, 1.0),
+            ],
+        );
+
+        assert!(state.spaceport_contacts.iter().all(|contact| {
+            contact.ship != 0 || contact.phase == SpaceportContactPhase::Touchdown
+        }));
+        assert_close(state.ships[0].life, life_before_launch);
+        assert!(
+            ship_triangles(&state.ships[0])
+                .into_iter()
+                .flatten()
+                .all(|point| point.distance_to(state.planets[0].position)
+                    > state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE)
+        );
+    }
+
+    #[test]
+    fn unowned_surface_spaceport_does_not_accept_escape_pod() {
         let mut state = init_deathmatch_no_asteroids();
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
         let spaceport = spaceport_physics(0, &state.planets[0]);
@@ -7774,13 +8060,7 @@ mod tests {
 
         let events = resolve_body_collisions(&mut state);
 
-        assert_eq!(
-            events.body_collisions,
-            vec![BodyCollision {
-                ship: 0,
-                body: BodyId::Planet(0),
-            }]
-        );
+        assert!(events.body_collisions.is_empty());
         assert!(events.spaceport_contacts.is_empty());
         assert!(
             state.ships[0]
@@ -7805,7 +8085,11 @@ mod tests {
 
         assert_eq!(
             events.spaceport_contacts,
-            vec![SpaceportContact { ship: 0, planet: 0 }]
+            vec![SpaceportContact {
+                ship: 0,
+                planet: 0,
+                phase: SpaceportContactPhase::Touchdown,
+            }]
         );
         assert_eq!(state.ships[0].position, start_position);
     }
@@ -7875,9 +8159,7 @@ mod tests {
             let bounds = ship_low_bounds(&ship_triangles(ship));
             assert!(
                 bounds.center.distance_to(planet.position)
-                    < planet.radius * BODY_BOUNDS_RADIUS_SCALE
-                        + bounds.radius
-                        + SPACEPORT_EJECT_MARGIN
+                    < spaceport_launch_clearance_radius(&planet, bounds)
             );
             assert_eq!(ship.position, starting_positions[ship_index]);
             assert_close(ship.life, starting_life[ship_index]);
@@ -7957,9 +8239,7 @@ mod tests {
         let bounds = ship_low_bounds(&ship_triangles(pod));
         assert!(
             bounds.center.distance_to(state.planets[0].position)
-                >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
-                    + bounds.radius
-                    + SPACEPORT_EJECT_MARGIN
+                >= spaceport_launch_clearance_radius(&state.planets[0], bounds)
         );
         assert_close(
             pod.velocity
@@ -7989,9 +8269,7 @@ mod tests {
         assert_eq!(ship.spaceport_ejection, None);
         assert!(
             bounds.center.distance_to(state.planets[0].position)
-                >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
-                    + bounds.radius
-                    + SPACEPORT_EJECT_MARGIN
+                >= spaceport_launch_clearance_radius(&state.planets[0], bounds)
         );
         assert_close(
             (bounds.center - state.planets[0].position).dot(tangent),
@@ -8016,6 +8294,7 @@ mod tests {
             let side = if index == 0 { -1.0 } else { 1.0 };
             ship.position = port_center + tangent * (side * 8.0);
             ship.velocity = Vec2::ZERO;
+            ship.brake = 1.0;
         }
         land_ships_on_planet(&mut state, &[0, 1], 0);
 
@@ -8046,9 +8325,7 @@ mod tests {
             let bounds = ship_low_bounds(&ship_triangles(ship));
             assert!(
                 bounds.center.distance_to(state.planets[0].position)
-                    >= state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE
-                        + bounds.radius
-                        + SPACEPORT_EJECT_MARGIN
+                    >= spaceport_launch_clearance_radius(&state.planets[0], bounds)
             );
             assert_eq!(ship.spaceport_ejection, None);
             assert!(ship.spaceport_reentry_lockout > 0.0);
@@ -8517,7 +8794,7 @@ mod tests {
     }
 
     #[test]
-    fn step_applies_gravity_before_rapier_resolves_body_collision() {
+    fn step_applies_gravity_before_rapier_resolves_body_contact() {
         let mut state = init_deathmatch();
         let body_radius = 20.0;
         // Keep the ship crossing the surface: a collider fully contained by a
@@ -8548,7 +8825,14 @@ mod tests {
             "Rapier should resolve the gravity-driven impact outward: velocity={:?}, normal={normal:?}",
             state.ships[0].velocity
         );
-        assert!(state.ships[0].life < start_life);
+        let impact = state
+            .body_impacts
+            .iter()
+            .find(|impact| impact.ship == 0 && impact.body == BodyId::Sun)
+            .expect("initial contact should remain observable as an impact event");
+        assert!(impact.speed < MIN_DAMAGING_BODY_IMPACT_SPEED);
+        assert_eq!(impact.damage, 0.0);
+        assert_eq!(state.ships[0].life, start_life);
     }
 
     #[test]
@@ -9252,7 +9536,7 @@ mod tests {
     }
 
     #[test]
-    fn laser_fired_from_spaceport_bay_hits_the_solid_inner_wall() {
+    fn laser_fired_toward_spaceport_hits_the_continuous_planet_surface() {
         let mut state = init_deathmatch_no_asteroids();
         state.sun = None;
         state.planets = vec![test_planet(Vec2::new(420.0, 450.0), 50.0)];
@@ -9261,7 +9545,7 @@ mod tests {
         state.ships[0].velocity = Vec2::ZERO;
 
         let planet_center = state.planets[0].position;
-        let desired_head = planet_center + Vec2::X * 20.0;
+        let desired_head = planet_center + Vec2::X * 70.0;
         let head_offset = desired_head - ship_mount_center(&state.ships[0]);
         state.ships[0].position += head_offset;
         let direction = state.ships[0].direction;
@@ -9278,17 +9562,16 @@ mod tests {
         let beam = state.ships[0]
             .laser_beam
             .expect("beam should remain active");
-        let expected_inner_wall = planet_center
-            + Vec2::X
-                * (state.planets[0].radius * SPACEPORT_DEPTH_FACTOR * BODY_BOUNDS_RADIUS_SCALE);
+        let expected_surface =
+            planet_center + Vec2::X * (state.planets[0].radius * BODY_BOUNDS_RADIUS_SCALE);
         assert_vec_close(beam.head, desired_head);
         assert_eq!(state.laser_hits.len(), 1);
         assert_eq!(
             state.laser_hits[0].target,
             LaserTarget::Body(BodyId::Planet(0))
         );
-        assert!(state.laser_hits[0].point.distance_to(expected_inner_wall) < 0.02);
-        assert!(beam.tail.distance_to(expected_inner_wall) < 0.02);
+        assert!(state.laser_hits[0].point.distance_to(expected_surface) < 0.02);
+        assert!(beam.tail.distance_to(expected_surface) < 0.02);
         assert!((beam.tail - beam.head).dot(direction) > 0.0);
     }
 
@@ -10405,6 +10688,7 @@ mod tests {
             assert_eq!(first.debris_collisions, replay.debris_collisions);
             assert_eq!(first.debris_body_collisions, replay.debris_body_collisions);
             assert_eq!(first.body_collisions, replay.body_collisions);
+            assert_eq!(first.body_impacts, replay.body_impacts);
             assert_eq!(first.spaceport_contacts, replay.spaceport_contacts);
             assert_eq!(
                 first.physics.snapshot_bytes(),
@@ -10800,6 +11084,8 @@ mod tests {
                 point: Some(rover_position),
                 normal: Vec2::X,
                 impulse_magnitude: 2_000.0,
+                closing_speed: 100.0,
+                started: true,
             }],
             &BTreeSet::new(),
         );

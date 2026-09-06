@@ -2480,6 +2480,14 @@ impl RuleShipBrainV6 {
             .retain(|cooldown| tick < cooldown.until_tick);
     }
 
+    fn clear_docked_target_cooldown(&mut self, observation: &ShipObservationV1) {
+        let Some(docked_planet) = observation.own_ship.docked_planet else {
+            return;
+        };
+        self.port_target_cooldowns
+            .retain(|cooldown| cooldown.planet != docked_planet);
+    }
+
     fn sync_objective_exclusions(&mut self) {
         self.inner.objective_exclusions.clear();
         self.inner.objective_exclusions.extend(
@@ -2593,6 +2601,20 @@ impl RuleShipBrainV6 {
         observation: &ShipObservationV1,
     ) -> Option<(PortAttemptProgress, StrategyCandidate, StrategyScores)> {
         let attempt = self.port_attempt?;
+        // Contact becomes authoritative before the core brain refreshes its
+        // phase later in this tick. Never cool a target that the ship has
+        // already physically landed on.
+        if observation.own_ship.docked_planet == Some(attempt.planet) {
+            return None;
+        }
+        if observation
+            .planets
+            .iter()
+            .find(|planet| planet.id == attempt.planet)
+            .is_some_and(|planet| self.inner.port_corridor_contains_ship(observation, planet))
+        {
+            return None;
+        }
         let repeatedly_obstructed =
             attempt.obstructed_ticks >= self.config.port_attempt_obstruction_ticks;
         let stalled = observation.tick.saturating_sub(attempt.last_progress_tick)
@@ -2682,6 +2704,10 @@ impl ShipBrain for RuleShipBrainV6 {
 
     fn intent(&mut self, observation: &ShipObservationV1) -> ShipIntent {
         self.prune_port_target_cooldowns(observation.tick);
+        // A physical landing supersedes an earlier navigation timeout. Keeping
+        // that same planet cooled would contradict the contact objective the
+        // core adopts later in this tick.
+        self.clear_docked_target_cooldown(observation);
         self.sync_objective_exclusions();
         let preceding_avoided_body = self.inner.telemetry.avoided_body;
         self.sync_port_attempt(observation, preceding_avoided_body);
@@ -4115,7 +4141,11 @@ mod tests {
             legacy_maximum_surface_clearance < legacy_brain.config.body_clearance,
             "legacy maneuver unexpectedly cleared the captured trap"
         );
-        assert_eq!(legacy_state.ships[1].form, ShipForm::EscapePod);
+        // Sustained surface support no longer grinds health down through
+        // repeated solver impulses. The former controller still fails its
+        // actual objective: it remains trapped for the complete horizon.
+        assert_eq!(legacy_state.ships[1].form, ShipForm::Ship);
+        assert!(legacy_state.ships[1].life > 0.0);
 
         let mut encoder = ShipIntentEncoder::default();
         let mut maximum_surface_clearance = initial_surface_clearance;
@@ -4298,7 +4328,7 @@ mod tests {
             episode_seed: state.seed,
         });
         let mut encoder = ShipIntentEncoder::default();
-        let mut saw_approach = false;
+        let mut saw_approach_or_direct_docking = false;
         let mut saw_docked = false;
         let mut saw_rebuilt = false;
         let mut saw_depart = false;
@@ -4321,8 +4351,9 @@ mod tests {
             let intent = brain.intent(&observation);
             let telemetry = brain.telemetry();
             minimum_target_distance = minimum_target_distance.min(telemetry.target_distance);
-            saw_approach |= telemetry.port_phase == Some(PortNavigationPhase::Approach);
             let docked = observation.own_ship.docked_planet == Some(target_planet);
+            saw_approach_or_direct_docking |=
+                telemetry.port_phase == Some(PortNavigationPhase::Approach) || docked;
             if docked {
                 saw_docked = true;
                 first_docked_tick.get_or_insert(state.tick);
@@ -4361,7 +4392,14 @@ mod tests {
             SpacewarsScenario::step(&mut state, &actions, DT);
         }
 
-        assert!(saw_approach, "seed {seed} never reached port approach");
+        assert!(
+            saw_approach_or_direct_docking,
+            "seed {seed} reached neither port approach nor a direct surface landing; minimum target distance \
+             {minimum_target_distance:.3}, telemetry {:?}, position {:?}, velocity {:?}",
+            brain.telemetry(),
+            state.ships[1].position,
+            state.ships[1].velocity,
+        );
         assert!(
             saw_docked,
             "seed {seed} pod never docked; minimum target distance {minimum_target_distance:.3}, telemetry {:?}, position {:?}, velocity {:?}",
@@ -5106,7 +5144,7 @@ mod tests {
     }
 
     #[test]
-    fn v6_preserves_seed_four_slow_but_successful_port_approach() {
+    fn v6_surface_contact_supersedes_seed_four_replan_cooldown() {
         let mut config = SpacewarsConfig {
             asteroid_probability_per_sec: 0.0,
             use_starfield: false,
@@ -5163,8 +5201,13 @@ mod tests {
             maximum_avoidance_stall >= 600,
             "seed 4 did not reproduce the sustained obstruction; maximum stall {maximum_avoidance_stall}"
         );
-        assert!(saw_docked, "V6 abandoned an approach that V5 can complete");
-        assert_eq!(brain.telemetry().port_replan_count, 0);
+        assert!(saw_docked, "V6 never completed the surface landing");
+        assert_eq!(
+            brain.telemetry().port_replan_count,
+            1,
+            "the fixed seed should retain its one pre-contact replan: {:?}",
+            brain.telemetry()
+        );
         assert_eq!(brain.telemetry().cooled_port_planet, None);
     }
 

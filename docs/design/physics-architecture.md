@@ -167,7 +167,8 @@ Spacewars' implemented mapping is:
 - thrusters, braking, gravity, and ejection: forces or impulses;
 - cannon shells: dynamic bodies with selective CCD;
 - lasers: ray casts;
-- damage: a deterministic rule over normalized contact impulse events;
+- damage: a deterministic rule over normalized contact-onset events and
+  pre-solver closing speed;
 - visual particles and trails: lightweight scenario storage.
 
 Rover construction, ownership, health, patrol intent, and death are Spacewars
@@ -188,19 +189,41 @@ an arbitrary pose with no planet or gravity. These are scenario policies rather
 than solver limitations; a game mode can opt selected dynamic entities into
 hierarchical source mass without changing Rapier ownership.
 
-Planets are kinematic assemblies rather than hollow circle outlines. A solid
-inner disk and convex annular sectors leave one physical spaceport cavity. The
-port is a sensor, the inner bay wall remains solid, and an ownership-aware gate
-prevents an unauthorized escape pod from crossing the opening. This lets a
-normal ship dock through geometry while also resolving objects that spawn or
-teleport wholly inside planet material.
+Planets are kinematic assemblies with one continuous circular ship surface and
+a separate smooth traction surface for rovers. A rotating rectangular sensor
+pad begins at the surface and extends outward to a low-orbit berth. Full ships
+may touch the pad, but only a braking ship establishes the compact kinematic
+landing hold used by capture and healing. Owned escape pods establish the same
+hold automatically for rebuilding; access is a scenario rule, so an
+unauthorized pod simply meets the ordinary continuous planet surface. No ship
+needs to cross into planet material to dock.
+
+Spaceport contact has two gameplay phases. `Touchdown` is raw accepted sensor
+overlap and supplies moving-frame damping/pull without starting planet
+services. `Landed` means Rapier has established the retained hold. Thrust drops
+that hold and restores the full dynamic hull at a berth proven clear for every
+ship and planet rotation. Contested or weapon-triggered ejection applies
+outward velocity until the craft clears the complete external pad corridor.
+While the hold is active, the ship is excluded from external gravity targets;
+the moving-frame constraint is the sole authority over its motion.
+
+Body contact and body impact are separate gameplay events. A contact remains
+visible for as long as Rapier reports the pair. An impact occurs only when a
+pair starts (or has been absent long enough to rearm), and its speed is the
+pre-solver relative closing speed at the contact point, including angular
+motion. Spacewars applies planet damage only at impact onset and only above the
+30-world-unit-per-second safe-contact threshold. This prevents ordinary
+gravity support impulses from repeatedly draining a resting ship while
+preserving damage from genuine high-speed crashes.
 
 Spacewars keeps motion fields in its public scenario state as a post-step
 presentation snapshot and as an explicit command staging surface for controls,
 scripted ejection, and tests. Reconciliation only writes deliberate changes
 back to Rapier; no scenario code advances a registered body's position or
 rotation. Rapier advances every rigid body once and its normalized, stable-ID
-contact impulses drive gameplay damage.
+contact events drive gameplay damage. The client retains current landing and
+body-contact state plus the last body impact for both human and bot players so
+a paused live session exposes the event that led to its current state.
 
 ## Acceptance criteria
 
@@ -220,5 +243,7 @@ The architecture is established:
 
 The acceptance suite additionally verifies deterministic Spacewars continuation
 for identical actions, same-build physics snapshot equality, debris
-spawn/removal mapping cleanup, a solid planet interior, a real port cavity, and
-the ownership-aware pod gate.
+spawn/removal mapping cleanup, one continuous planet surface, an external
+surface berth, explicit touchdown/landed transitions, safe full-hull release,
+owner-only pod landing, non-damaging sustained surface support, and damaging
+high-speed impact onset.

@@ -15,8 +15,8 @@ use engine_common::{Action, PointerPhase, Scenario};
 use engine_core::SpacewarsConfig;
 use scenario_spacewars::{
     BodyCollision, BodyId, DebrisKind, LaserTarget, PlayerId, SPACEWARS_PLAYER_COUNT,
-    ShipCollision, ShipForm, ShipIntent, ShipIntentEncoder, ShipSensorProfile, SpacewarsScenario,
-    SpacewarsState,
+    ShipCollision, ShipForm, ShipIntent, ShipIntentEncoder, ShipSensorProfile,
+    SpaceportContactPhase, SpacewarsScenario, SpacewarsState,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -1463,13 +1463,17 @@ impl TransitionTracker {
             let rebuilt = match (self.previous_forms[player], form) {
                 (ShipForm::Ship, ShipForm::EscapePod) => {
                     self.ship_losses[player] += 1;
-                    if body_collisions.iter().any(|contact| {
-                        contact.ship == player && matches!(contact.body, BodyId::Planet(_))
+                    if state.body_impacts.iter().any(|impact| {
+                        impact.ship == player
+                            && impact.damage > 0.0
+                            && matches!(impact.body, BodyId::Planet(_))
                     }) {
                         self.planet_impact_losses[player] += 1;
                     }
-                    if body_collisions.iter().any(|contact| {
-                        contact.ship == player && matches!(contact.body, BodyId::Sun)
+                    if state.body_impacts.iter().any(|impact| {
+                        impact.ship == player
+                            && impact.damage > 0.0
+                            && matches!(impact.body, BodyId::Sun)
                     }) {
                         self.sun_impact_losses[player] += 1;
                     }
@@ -1544,7 +1548,7 @@ fn docked_planet(state: &SpacewarsState, player: usize) -> Option<usize> {
     state
         .spaceport_contacts
         .iter()
-        .find(|contact| contact.ship == player)
+        .find(|contact| contact.ship == player && contact.phase == SpaceportContactPhase::Landed)
         .map(|contact| contact.planet)
 }
 
@@ -2442,7 +2446,11 @@ mod tests {
         state.tick = 10;
         state
             .spaceport_contacts
-            .push(scenario_spacewars::SpaceportContact { ship: 1, planet: 0 });
+            .push(scenario_spacewars::SpaceportContact {
+                ship: 1,
+                planet: 0,
+                phase: SpaceportContactPhase::Landed,
+            });
         trace.observe(
             &state,
             telemetry(PortNavigationPhase::Docked),
@@ -2592,7 +2600,11 @@ mod tests {
 
         state
             .spaceport_contacts
-            .push(scenario_spacewars::SpaceportContact { ship: 1, planet: 0 });
+            .push(scenario_spacewars::SpaceportContact {
+                ship: 1,
+                planet: 0,
+                phase: SpaceportContactPhase::Landed,
+            });
         tracker.observe(&state);
 
         state.planets[0].owner_id = Some(1);
@@ -2621,18 +2633,22 @@ mod tests {
     }
 
     #[test]
-    fn loss_metrics_attribute_same_tick_planet_and_sun_impacts() {
+    fn loss_metrics_attribute_same_tick_damaging_planet_and_sun_impacts() {
         let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 27);
         let mut tracker = TransitionTracker::new(&state);
 
-        state.body_collisions = vec![
-            BodyCollision {
+        state.body_impacts = vec![
+            scenario_spacewars::BodyImpact {
                 ship: 0,
                 body: BodyId::Planet(0),
+                speed: 100.0,
+                damage: 1.0,
             },
-            BodyCollision {
+            scenario_spacewars::BodyImpact {
                 ship: 1,
                 body: BodyId::Sun,
+                speed: 100.0,
+                damage: 1.0,
             },
         ];
         state.ships[0].form = ShipForm::EscapePod;
@@ -2645,6 +2661,23 @@ mod tests {
     }
 
     #[test]
+    fn loss_metrics_do_not_misattribute_sustained_body_contact() {
+        let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 27);
+        let mut tracker = TransitionTracker::new(&state);
+
+        state.body_collisions = vec![BodyCollision {
+            ship: 0,
+            body: BodyId::Planet(0),
+        }];
+        state.ships[0].form = ShipForm::EscapePod;
+        tracker.observe(&state);
+
+        assert_eq!(tracker.ship_losses, [1, 0]);
+        assert_eq!(tracker.planet_impact_losses, [0, 0]);
+        assert_eq!(tracker.sun_impact_losses, [0, 0]);
+    }
+
+    #[test]
     fn leaving_an_already_owned_planet_is_not_a_capture_departure() {
         let mut state = SpacewarsScenario::init(SpacewarsConfig::default(), 11);
         state.planets[0].owner_id = Some(0);
@@ -2652,7 +2685,11 @@ mod tests {
 
         state
             .spaceport_contacts
-            .push(scenario_spacewars::SpaceportContact { ship: 0, planet: 0 });
+            .push(scenario_spacewars::SpaceportContact {
+                ship: 0,
+                planet: 0,
+                phase: SpaceportContactPhase::Landed,
+            });
         state.body_collisions.push(BodyCollision {
             ship: 0,
             body: BodyId::Planet(0),
@@ -2677,15 +2714,21 @@ mod tests {
         state.planets[1].position = engine_core::Vec2::X * 20.0;
         state.ships[0].position = engine_core::Vec2::ZERO;
 
-        state.spaceport_contacts =
-            vec![scenario_spacewars::SpaceportContact { ship: 0, planet: 0 }];
+        state.spaceport_contacts = vec![scenario_spacewars::SpaceportContact {
+            ship: 0,
+            planet: 0,
+            phase: SpaceportContactPhase::Landed,
+        }];
         state.planets[0].owner_id = Some(0);
         tracker.observe(&state);
 
         // Reach and capture the next nearby port before attaining the first
         // port's 90-unit safe-clearance threshold.
-        state.spaceport_contacts =
-            vec![scenario_spacewars::SpaceportContact { ship: 0, planet: 1 }];
+        state.spaceport_contacts = vec![scenario_spacewars::SpaceportContact {
+            ship: 0,
+            planet: 1,
+            phase: SpaceportContactPhase::Landed,
+        }];
         state.planets[1].owner_id = Some(0);
         tracker.observe(&state);
         assert_eq!(tracker.captures, [2, 0]);

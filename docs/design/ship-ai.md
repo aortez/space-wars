@@ -180,16 +180,18 @@ departure commits to an outward burn until the hull has safe surface
 clearance.
 
 Docking now has an explicit physical contract. The observed target is a safe
-anchor on the middle of the port's outer arc, rather than the polygon centroid
-that can fold near a tiny planet's gravity center. Contact is damped in the
-moving port frame and pulls linearly toward that anchor. An escape pod
-automatically establishes the hold required for rebuilding; a full ship must
-apply its brake, so an unbraked pass through the bay cannot become an invisible
+anchor just beyond a rotating surface pad, rather than an interior polygon
+centroid that can fold near a tiny planet's gravity center. Raw accepted sensor
+overlap is `Touchdown`: it is damped in the moving pad frame and pulled toward
+the berth, but cannot capture, heal, or rebuild. An escape pod automatically
+establishes the `Landed` hold required for rebuilding; a full ship must apply
+its brake, so an unbraked pass across the pad cannot become an invisible
 persistent latch. Once established, the full ship uses a compact kinematic
 body while its ordinary hull remains a sensor probe. It can release the brake
 and turn in place, while nonzero thrust releases the hold and restores its
-ordinary dynamic collider. Retained physical holds are included in gameplay
-docking state across brief raw-sensor gaps.
+ordinary dynamic collider outside the continuous planet surface. Retained
+physical holds are included in gameplay docking state across brief raw-sensor
+gaps.
 
 Rule policy `rule_ship_v4` adds a persistent strategic layer above those
 guidance maneuvers. Strategy evaluates at 1 Hz while collision avoidance and
@@ -360,7 +362,8 @@ multi-body escape state/age/body count/activations. Collecting it does not
 alter controller actions or the deterministic episode fingerprint, and normal
 untraced batches do not pay its extra observation cost.
 
-The first traced baseline isolated two unfinished departures. In seed 4,
+Before the surface-berth conversion, the first traced baseline isolated two
+unfinished departures. In seed 4,
 Player 2 captured planet 3 at tick 2,714 and remained docked through tick
 36,000; seed 2 left Player 1 similarly docked after its fourth capture. Both
 brains remained in `Depart`, continuously requesting a turn plus brake without
@@ -375,7 +378,9 @@ not apply the omnidirectional brake
 while aligning for launch; spaceport contact already damps and centers linear
 motion. Later physical regression work made that settling state explicit: a
 braking full ship or any accepted pod establishes a moving-frame kinematic
-hold at the safe docking anchor. A held full ship uses a body-sized circular
+hold at the safe docking anchor. The subsequent surface-berth work moved that
+anchor and its entire sensor volume outside a continuous planet collider. A
+held full ship uses a body-sized circular
 solver collider throughout capture, repair, and launch alignment, while a
 sensor copy of its normal hull preserves the established port footprint. Ship
 thrust releases the constraint and restores the full dynamic collider; turning
@@ -416,8 +421,8 @@ as both an observation-level and physical regression. Its captured state has
 32.3% life, -3.096 surface clearance, -0.195 outward speed, a -2.55-radian
 heading error, +0.441 angular velocity, and 158 stalled ticks while repairing
 at one planet and avoiding another. Replaying the former partial-brake,
-zero-thrust action from that fixture destroys the ship before it clears the
-surface; the rear-aligned reverse action must clear it without changing form.
+zero-thrust action from that fixture remains trapped for the full regression
+horizon; the rear-aligned reverse action must clear it without changing form.
 An observation-level companion regression makes that same obstacle the active
 repair target and requires the emergency state to keep aging rather than reset
 to zero. This preserves the safety hierarchy across the exact strategy switch
