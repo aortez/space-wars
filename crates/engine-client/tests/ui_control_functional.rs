@@ -27,6 +27,9 @@ const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
 
+#[path = "ui_control_functional/spaceling_lab.rs"]
+mod spaceling_lab;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {

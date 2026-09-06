@@ -1,6 +1,6 @@
 # Physics architecture
 
-Status: implemented for Pizza, Rover Lab, and Spacewars.
+Status: implemented for Pizza, Rover Lab, Spaceling Lab, and Spacewars.
 
 ## Decision
 
@@ -157,6 +157,13 @@ These scenarios share the canonical world rather than maintaining specialized
 Rapier owners. Domain builders may assemble common objects, but assembly
 construction and gameplay policy remain separate from the physics kernel.
 
+Spaceling Lab adds a single-body capsule character with bounded upright and
+support-relative movement control. Its support query traverses only contacts
+adjacent to that collider, without allocating or scanning all world bodies.
+Gravity supplies orientation and acceleration independently of terrain; limbs
+are visual geometry. This is an arcade controller, not a ragdoll or a claim
+that articulated crowds have been benchmarked.
+
 Spacewars' implemented mapping is:
 
 - planets and orbiting spaceports: fixed or kinematic bodies;
@@ -206,6 +213,14 @@ ship and planet rotation. Contested or weapon-triggered ejection applies
 outward velocity until the craft clears the complete external pad corridor.
 While the hold is active, the ship is excluded from external gravity targets;
 the moving-frame constraint is the sole authority over its motion.
+
+The external berth is an interim compatibility mechanism, not the long-term
+landing model. Ships should eventually land naturally on suitable physical
+surfaces, with support and relative motion distinct from capture, healing, and
+rebuild eligibility. Spaceling Lab will exercise a small contact-based character
+before that ship transition. See [spacelings and surface support](spacelings.md).
+Future cell-based terrain must not recreate the retired interior cavity or
+ownership gate merely to preserve docking assumptions.
 
 Body contact and body impact are separate gameplay events. A contact remains
 visible for as long as Rapier reports the pair. An impact occurs only when a

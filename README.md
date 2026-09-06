@@ -9,7 +9,7 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts six playable scenarios:
+The local launcher currently hosts seven playable scenarios:
 
 - **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
   asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
@@ -27,6 +27,9 @@ The local launcher currently hosts six playable scenarios:
   synchronized controls.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
+- **Spaceling Lab** — a single-body character walking and jumping on a rotating
+  planet, with gravity-relative upright control and visible contact diagnostics.
+  See [Spaceling Lab](docs/spaceling-lab.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
@@ -78,6 +81,7 @@ Or start a scenario directly:
 cargo run -p engine-client -- --scenario pizza
 cargo run -p engine-client -- --scenario clock
 cargo run -p engine-client -- --scenario rover-lab
+cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```
@@ -110,6 +114,10 @@ options.
 Rover Lab uses d-pad left/right to drive, `B` or d-pad down to brake, and a
 hold/release of `A` to charge and jump. Keyboard equivalents are `W` forward,
 `S` brake, `X` reverse, `Space` jump, and `R` reset.
+
+Spaceling Lab uses d-pad/left-stick left/right to walk and a press of gamepad `A`
+to jump. Keyboard equivalents are `A`/`D` or left/right arrows, `Space` to
+jump, and `R` to restart. Holding jump does not repeat it on landing.
 
 To try the first Spacewars AI opponent, open Spacewars settings in the launcher
 and change **Player 2** from **human** to **rule bot**. **Small Duel** is the

@@ -42,6 +42,18 @@ a fall. Restart and relaunch must create clean Clock instances. Busy, paused,
 stale-instance, stale-event, and inactive-Clock controls are rejected. Clock
 animation ticks must not invalidate UI revision guards.
 
+Spaceling Lab's workflow selects the scenario, renders it through both vector and
+raster paths, and verifies pause, restart, return, and relaunch with fresh
+scenario revisions. It retains gameplay screenshots when artifact retention is
+enabled. Character mechanics and deterministic movement are tested headlessly
+in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is a
+manual check.
+
+The harness uses Slint's software backend, which does not draw vector paths.
+Selecting vector verifies host lifecycle and text there, not vector geometry.
+Spaceling Lab additionally checks that the raster screenshot contains the character
+and diagnostics; desktop vector geometry needs a graphics-backend visual check.
+
 The public `clock state`, `clock trigger`, and `clock wait` API is shared by
 these tests and `spacewars-cli`; no test-only phase or time overrides are used.
 Transition deadlines allow for slower debug software rendering. Exact seeded

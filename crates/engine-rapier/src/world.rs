@@ -182,10 +182,24 @@ impl Default for BodySpec {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColliderShape {
-    Ball { radius: f32 },
-    Cuboid { half_width: f32, half_height: f32 },
-    ConvexPolygon { vertices: Vec<Vec2> },
-    Polyline { vertices: Vec<Vec2> },
+    Ball {
+        radius: f32,
+    },
+    /// Vertical capsule; half_segment excludes the rounded caps.
+    Capsule {
+        half_segment: f32,
+        radius: f32,
+    },
+    Cuboid {
+        half_width: f32,
+        half_height: f32,
+    },
+    ConvexPolygon {
+        vertices: Vec<Vec2>,
+    },
+    Polyline {
+        vertices: Vec<Vec2>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -244,6 +258,16 @@ pub struct ColliderSpec {
 }
 
 impl ColliderSpec {
+    pub fn capsule(id: ColliderId, half_segment: f32, radius: f32) -> Self {
+        Self {
+            shape: ColliderShape::Capsule {
+                half_segment,
+                radius,
+            },
+            ..Self::ball(id, radius)
+        }
+    }
+
     pub fn ball(id: ColliderId, radius: f32) -> Self {
         Self {
             id,
@@ -350,6 +374,18 @@ pub struct BodyMotionRecord {
 pub struct ContactPoint {
     pub position: Vec2,
     pub normal: Vec2,
+}
+
+/// A live solver contact on another body, viewed from the querying collider.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SurfaceContact {
+    pub collider: ColliderId,
+    pub position: Vec2,
+    /// Points out of the supporting surface toward the querying collider.
+    pub normal: Vec2,
+    pub velocity: Vec2,
+    /// Signed separation used by the latest solver; positive is speculative.
+    pub separation: f32,
 }
 
 /// One solver-backed contact pair observed during the latest step, normalized
@@ -975,6 +1011,43 @@ impl PhysicsWorld {
         points
     }
 
+    /// Allocation-free, local contact traversal; no scan of the world's bodies
+    /// or collected events. Removed colliders cannot remain supports.
+    pub fn surface_contacts(
+        &self,
+        collider: ColliderId,
+    ) -> impl Iterator<Item = SurfaceContact> + '_ {
+        self.collider_handle(collider)
+            .into_iter()
+            .flat_map(move |handle| {
+                self.raw.contact_pairs_with(handle).flat_map(move |pair| {
+                    let (other, direction) = if pair.collider1 == handle {
+                        (pair.collider2, -1.0)
+                    } else {
+                        (pair.collider1, 1.0)
+                    };
+                    let other = self.raw.colliders.get(other);
+                    pair.manifolds.iter().flat_map(move |manifold| {
+                        manifold
+                            .data
+                            .solver_contacts
+                            .iter()
+                            .filter_map(move |contact| {
+                                let other = other?;
+                                let body = self.raw.bodies.get(other.parent()?)?;
+                                Some(SurfaceContact {
+                                    collider: decode_collider(other.user_data)?,
+                                    position: from_rapier(contact.point),
+                                    normal: from_rapier(manifold.data.normal) * direction,
+                                    velocity: from_rapier(body.velocity_at_point(contact.point)),
+                                    separation: contact.dist,
+                                })
+                            })
+                    })
+                })
+            })
+    }
+
     pub fn cast_ray(
         &self,
         origin: Vec2,
@@ -1279,6 +1352,10 @@ fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider>
     }
     let builder = match &spec.shape {
         ColliderShape::Ball { radius } => ColliderBuilder::ball(*radius),
+        ColliderShape::Capsule {
+            half_segment,
+            radius,
+        } => ColliderBuilder::capsule_y(*half_segment, *radius),
         ColliderShape::Cuboid {
             half_width,
             half_height,
@@ -1375,6 +1452,12 @@ fn valid_body_spec(spec: BodySpec) -> bool {
 fn valid_collider_spec(spec: &ColliderSpec) -> bool {
     let valid_shape = match &spec.shape {
         ColliderShape::Ball { radius } => radius.is_finite() && *radius > 0.0,
+        ColliderShape::Capsule {
+            half_segment,
+            radius,
+        } => {
+            half_segment.is_finite() && *half_segment >= 0.0 && radius.is_finite() && *radius > 0.0
+        }
         ColliderShape::Cuboid {
             half_width,
             half_height,

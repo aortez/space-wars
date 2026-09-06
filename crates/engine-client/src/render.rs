@@ -240,6 +240,33 @@ pub(crate) fn frame_viewports(
     }
 }
 
+/// Text is a Slint overlay above raster geometry in ordinary scenario views.
+/// Spacewars has a native HUD and deliberately omits raster world labels; do
+/// not flatten its translucent/clipped minimap groups into this overlay.
+pub(crate) fn raster_text_overlay(
+    frames: &[RenderFrame],
+    viewport: Viewport,
+    layout: FrameLayout,
+) -> Vec<ScenePrimitive> {
+    if layout != FrameLayout::EqualHorizontal {
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    for (frame, pane) in frames
+        .iter()
+        .zip(frame_viewports(viewport, frames.len(), layout))
+    {
+        for layer in frame.ordered_layers() {
+            for primitive in &layer.primitives {
+                if let RenderPrimitive::Text(text) = primitive {
+                    output.push(text_primitive(text, frame.camera, pane));
+                }
+            }
+        }
+    }
+    output
+}
+
 pub(crate) fn frame_projections(
     frames: &[RenderFrame],
     viewport: Viewport,
@@ -696,6 +723,36 @@ mod tests {
     use engine_common::{Fill, RenderLayer};
 
     const EPS: f32 = 1.0e-4;
+
+    #[test]
+    fn raster_text_overlay_keeps_only_text_at_logical_pane_coordinates() {
+        let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 20.0));
+        frame.push_primitive(
+            0,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                1.0,
+                RenderColor::WHITE,
+            )),
+        );
+        let mut label = RenderText::new(RenderPoint::ZERO, "grounded");
+        label.size = 16.0;
+        frame.push_primitive(1, RenderPrimitive::Text(label));
+        let frames = [frame.clone(), frame];
+        let viewport = Viewport::new(1280.0, 720.0);
+        let overlay = raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+        assert_eq!(overlay.len(), 2);
+        for item in &overlay {
+            assert_eq!(item.kind, PrimitiveKind::Text);
+            assert_eq!(item.text.as_str(), "grounded");
+            assert_eq!(item.font_size, 16.0);
+            assert_eq!(item.width, 640.0);
+        }
+        assert_eq!(overlay[0].x, 0.0);
+        assert_eq!(overlay[1].x, 640.0);
+        assert_eq!(overlay[0].text_x, overlay[1].text_x);
+        assert!(raster_text_overlay(&frames, viewport, FrameLayout::SpacewarsLocalPlay).is_empty());
+    }
 
     fn assert_close(actual: f32, expected: f32) {
         assert!(

@@ -1353,7 +1353,9 @@ fn present_frames(
                 layout,
                 raster::RasterOptions::for_scale(raster_scale),
             );
-            window.set_primitives(ModelRc::new(VecModel::from(Vec::new())));
+            window.set_primitives(ModelRc::new(VecModel::from(render::raster_text_overlay(
+                &frames, viewport, layout,
+            ))));
             window.set_vector_minimaps_visible(false);
             window.set_raster_frame(image);
             window.set_raster_visible(true);
