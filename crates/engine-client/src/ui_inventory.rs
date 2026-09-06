@@ -10,6 +10,7 @@ pub(crate) struct ScreenVisibility {
     pub(crate) touch_test: bool,
     pub(crate) ingame_menu: bool,
     pub(crate) ingame_controls: bool,
+    pub(crate) ingame_clock: bool,
     pub(crate) game_over: bool,
 }
 
@@ -26,6 +27,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.ingame_clock {
+        UiScreen::PauseClock
     } else if visibility.ingame_controls {
         UiScreen::PauseControls
     } else if visibility.ingame_menu {
@@ -42,6 +45,10 @@ pub(crate) struct UiInventoryContext {
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
     pub(crate) ingame_menu_focus_index: i32,
+    pub(crate) ingame_clock_focus_index: i32,
+    pub(crate) clock_preview: String,
+    pub(crate) clock_controls_pending: bool,
+    pub(crate) clock_settings_error: Option<String>,
     pub(crate) game_over_focus_index: i32,
     pub(crate) benchmark_available: bool,
     pub(crate) launch_available: bool,
@@ -58,6 +65,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) pizza_spawn_rate: String,
     pub(crate) clock_time_format: String,
     pub(crate) clock_event_profile: String,
+    pub(crate) clock_falling_enabled: bool,
+    pub(crate) clock_color_cycle_enabled: bool,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -82,11 +91,24 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::Gameplay => UiInventory {
             selected_control: None,
-            controls: Vec::new(),
-            actions: Vec::new(),
+            controls: if context.selected_scenario == "clock" {
+                vec![UiControl::new(
+                    "gameplay.clock-controls",
+                    "Clock Controls",
+                    true,
+                )]
+            } else {
+                Vec::new()
+            },
+            actions: if context.selected_scenario == "clock" {
+                vec![UiAction::Controls]
+            } else {
+                Vec::new()
+            },
             error: context.scenario_error.clone(),
         },
         UiScreen::PauseMain => pause_main_inventory(context),
+        UiScreen::PauseClock => pause_clock_inventory(context),
         UiScreen::PauseControls => UiInventory {
             selected_control: Some("pause.controls.back".into()),
             controls: vec![
@@ -259,11 +281,25 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.event-profile",
                 &context.clock_event_profile,
             );
+            for (id, enabled) in [
+                (
+                    "launcher.settings.clock.falling",
+                    context.clock_falling_enabled,
+                ),
+                (
+                    "launcher.settings.clock.color-cycle",
+                    context.clock_color_cycle_enabled,
+                ),
+            ] {
+                push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
+            }
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.clock.time-format",
                 "launcher.settings.clock.event-profile",
+                "launcher.settings.clock.falling",
+                "launcher.settings.clock.color-cycle",
                 "launcher.settings.back",
             ]
         }
@@ -350,6 +386,11 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
         UiControl::new("pause.return-to-launcher", "Return to Launcher", true),
     ]);
 
+    if context.selected_scenario == "clock" {
+        ids.push("pause.clock");
+        controls.push(UiControl::new("pause.clock", "Clock Controls", true));
+    }
+
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
         controls,
@@ -361,6 +402,76 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
 fn push_choice(controls: &mut Vec<UiControl>, id: &str, value: &str) {
     controls.push(UiControl::new(format!("{id}.previous"), "‹", true).with_value(value));
     controls.push(UiControl::new(format!("{id}.next"), "›", true).with_value(value));
+}
+
+fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
+    let mut controls = Vec::new();
+    push_choice(
+        &mut controls,
+        "pause.clock.time-format",
+        &context.clock_time_format,
+    );
+    push_choice(
+        &mut controls,
+        "pause.clock.event-profile",
+        &context.clock_event_profile,
+    );
+    controls.push(
+        UiControl::new("pause.clock.falling", "Falling", true).with_value(
+            if context.clock_falling_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    controls.push(
+        UiControl::new("pause.clock.color-cycle", "Color Cycle", true).with_value(
+            if context.clock_color_cycle_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    push_choice(
+        &mut controls,
+        "pause.clock.preview-event",
+        &context.clock_preview,
+    );
+    controls.push(UiControl::new("pause.clock.back", "Back", true));
+    controls.push(UiControl::new(
+        "pause.clock.preview",
+        "Preview & Resume",
+        true,
+    ));
+    for control in &mut controls {
+        control.enabled = !context.clock_controls_pending;
+    }
+    UiInventory {
+        selected_control: selected_from_index(
+            &[
+                "pause.clock.time-format",
+                "pause.clock.event-profile",
+                "pause.clock.falling",
+                "pause.clock.color-cycle",
+                "pause.clock.preview-event",
+                "pause.clock.back",
+                "pause.clock.preview",
+            ],
+            context.ingame_clock_focus_index,
+        ),
+        controls,
+        actions: if context.clock_controls_pending {
+            vec![]
+        } else {
+            UiAction::ALL.to_vec()
+        },
+        error: context
+            .clock_settings_error
+            .clone()
+            .or_else(|| context.scenario_error.clone()),
+    }
 }
 
 fn selected_from_index(ids: &[&str], index: i32) -> Option<String> {
@@ -389,6 +500,8 @@ mod tests {
             pizza_spawn_rate: "0.10".into(),
             clock_time_format: "24-hour".into(),
             clock_event_profile: "Calm".into(),
+            clock_falling_enabled: true,
+            clock_color_cycle_enabled: true,
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -477,6 +590,7 @@ mod tests {
                 ingame_menu: true,
                 ingame_controls: true,
                 game_over: true,
+                ingame_clock: true,
             }),
             UiScreen::LauncherTouchTest
         );
@@ -535,7 +649,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 10, "launcher.settings.clock.event-profile"),
+            ("clock", 14, "launcher.settings.clock.color-cycle"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -546,7 +660,7 @@ mod tests {
             context.launcher_settings_focus_index = match scenario {
                 "spacewars" => 6,
                 "pizza" => 3,
-                "clock" => 3,
+                "clock" => 5,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -705,6 +819,9 @@ mod tests {
                 UiScreen::LauncherSettings,
                 UiScreen::LauncherControls,
                 UiScreen::LauncherTouchTest,
+                UiScreen::Gameplay,
+                UiScreen::PauseMain,
+                UiScreen::PauseClock,
             ] {
                 assert_inventory_is_activatable(screen, &context);
             }
@@ -722,6 +839,32 @@ mod tests {
                 assert_inventory_is_activatable(screen, &context);
             }
         }
+    }
+
+    #[test]
+    fn clock_controls_report_live_values_selection_and_pending_availability() {
+        let mut context = context("clock");
+        context.ingame_clock_focus_index = 3;
+        context.clock_preview = "Color Cycle".into();
+        let inventory = inventory_for_screen(UiScreen::PauseClock, &context);
+        assert_eq!(
+            inventory.selected_control.as_deref(),
+            Some("pause.clock.color-cycle")
+        );
+        assert_eq!(inventory.controls.len(), 10);
+        assert!(inventory.controls.iter().all(|control| control.enabled));
+        context.clock_controls_pending = true;
+        let pending = inventory_for_screen(UiScreen::PauseClock, &context);
+        assert!(pending.controls.iter().all(|control| !control.enabled));
+        assert!(pending.actions.is_empty());
+        assert_eq!(
+            classify_screen(ScreenVisibility {
+                ingame_menu: true,
+                ingame_clock: true,
+                ..Default::default()
+            }),
+            UiScreen::PauseClock
+        );
     }
 
     fn assert_inventory_is_activatable(screen: UiScreen, context: &UiInventoryContext) {

@@ -24,7 +24,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Clock follows local device time. In Settings, choose Calm for occasional falling digits, Demo for frequent falls, or Off for a static face. Bars tumble, then reform with the latest time. Pause freezes the animation. Use spacewars-cli clock to inspect or trigger a fall.",
+    controls_help: "Clock follows local device time. Start or P/Esc pauses; choose Clock Controls to change 12/24-hour format, event profile and individual events without restarting. Or tap Clock Controls on the face. Calm runs occasional events, Demo runs frequent events, Off disables automatic events. Preview & Resume replaces the current animation with your chosen event, even if disabled. Settings are saved. Pause freezes animation.",
     create,
 };
 
@@ -55,6 +55,7 @@ fn create(
             aspect_ratio: viewport.aspect_ratio(),
             time_format: settings.clock.time_format,
             event_profile: settings.clock.event_profile,
+            events: settings.clock.events,
         },
         seed,
     );
@@ -104,17 +105,36 @@ impl ClientScenario for ClockClientScenario {
             schema_version: spacewars_control::CLOCK_STATE_SCHEMA_VERSION,
             scenario_revision: 0, // Stamped by the host, not the scenario.
             paused: false,
+            settings: self.state.settings(),
             profile: match self.state.event_profile() {
                 engine_common::ClockEventProfile::Off => "off",
                 engine_common::ClockEventProfile::Calm => "calm",
                 engine_common::ClockEventProfile::Demo => "demo",
             }
             .into(),
-            phase: self.state.phase().as_str().into(),
+            lifecycle: self.state.lifecycle().as_str().into(),
+            event_kind: self.state.event_kind(),
+            phase: self.state.event_phase().map(|phase| phase.as_str().into()),
             event_id: self.state.event_id(),
             phase_tick: self.state.phase_tick(),
             simulation_tick: self.state.simulation_tick(),
             next_event_tick: self.state.next_event_tick(),
+            events: scenario_clock::EVENT_CATALOG
+                .iter()
+                .map(|event| spacewars_control::ClockEventInfo {
+                    kind: event.kind,
+                    label: event.kind.label().into(),
+                    effect: event.effect.as_str().into(),
+                    duration_ticks: event.duration_ticks,
+                    cooldown_ticks: event.cooldown_ticks,
+                    enabled: self.state.event_enabled(event.kind),
+                    automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
+                })
+                .collect(),
+            palette_rgb: {
+                let fill = self.state.palette().fill;
+                [fill.r, fill.g, fill.b].map(|channel| (channel * 255.0).round() as u8)
+            },
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
             reading: self
@@ -122,16 +142,28 @@ impl ClientScenario for ClockClientScenario {
                 .reading()
                 .map(|reading| [reading.hour(), reading.minute(), reading.second()]),
             display_digits: self.state.display().digits,
-            can_trigger: self.state.can_trigger_fall(),
+            can_trigger: self.state.can_trigger_event(),
             trigger_pending: false,
         })
     }
 
-    fn trigger_clock_fall(&mut self) {
+    fn trigger_clock_event(&mut self, event: engine_common::ClockEventKind) {
         // Synchronize wall time at the client edge, including immediately after
         // a pause, before choosing which lit bars to release.
         let mut actions = self.actions_for_reading(local_clock_reading());
-        actions.push(ClockAction::trigger_fall());
+        actions.push(ClockAction::trigger_event(event));
+        ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
+    }
+
+    fn configure_clock(&mut self, settings: engine_common::ClockSettings) {
+        let mut actions = self.actions_for_reading(local_clock_reading());
+        actions.push(ClockAction::configure(settings));
+        ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
+    }
+
+    fn preview_clock_event(&mut self, event: engine_common::ClockEventKind) {
+        let mut actions = self.actions_for_reading(local_clock_reading());
+        actions.push(ClockAction::preview_event(event));
         ClockScenario::step(&mut self.state, &actions, Duration::ZERO);
     }
 

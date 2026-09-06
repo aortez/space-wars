@@ -114,12 +114,14 @@ component PlayerStatusPanel inherits Rectangle {
 component MenuButton inherits Rectangle {
     in property <string> text;
     in property <bool> selected: false;
+    in property <bool> enabled: true;
     callback activated();
 
     background: button-touch.pressed ? #236e96 : root.selected ? #174f70 : #151a27;
     border-color: button-touch.pressed || root.selected ? #80d8ff : #596273;
     border-width: button-touch.pressed || root.selected ? 3px : 1px;
     border-radius: 6px;
+    opacity: root.enabled ? 1 : 0.5;
 
     Text {
         x: 12px;
@@ -134,6 +136,7 @@ component MenuButton inherits Rectangle {
     }
 
     button-touch := TouchArea {
+        enabled: root.enabled;
         width: parent.width;
         height: parent.height;
         mouse-cursor: pointer;
@@ -147,6 +150,7 @@ component ChoiceRow inherits Rectangle {
     in property <string> label;
     in property <string> value;
     in property <bool> selected: false;
+    in property <bool> enabled: true;
     callback previous();
     callback next();
 
@@ -167,6 +171,7 @@ component ChoiceRow inherits Rectangle {
 
     MenuButton {
         x: parent.width * 0.40;
+        enabled: root.enabled;
         y: 2px;
         width: 52px;
         height: parent.height - 4px;
@@ -191,6 +196,7 @@ component ChoiceRow inherits Rectangle {
 
     MenuButton {
         x: parent.width - 54px;
+        enabled: root.enabled;
         y: 2px;
         width: 52px;
         height: parent.height - 4px;
@@ -268,6 +274,12 @@ export component MainWindow inherits Window {
     in-out property <bool> ingame-menu-visible: false;
     in-out property <bool> ingame-controls-visible: false;
     in-out property <int> ingame-menu-focus-index: 0;
+    in-out property <bool> ingame-clock-visible: false;
+    in-out property <int> ingame-clock-focus-index: 0;
+    in-out property <int> clock-preview-index: 0;
+    in property <[string]> clock-event-labels;
+    in-out property <bool> clock-controls-pending: false;
+    in property <string> clock-settings-error: "";
     in-out property <bool> game-over-visible: false;
     in-out property <int> game-over-focus-index: 0;
     in property <[string]> launcher-scenarios;
@@ -288,6 +300,8 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in-out property <string> launcher-clock-time-format: "24-hour";
     in-out property <string> launcher-clock-event-profile: "Calm";
+    in-out property <bool> launcher-clock-falling-enabled: true;
+    in-out property <bool> launcher-clock-color-cycle-enabled: true;
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";
@@ -330,6 +344,10 @@ export component MainWindow inherits Window {
     callback launcher-nes-rom-cycle(int);
     callback launcher-quit();
     callback ingame-resume();
+    callback ingame-clock-open();
+    callback ingame-clock-adjust(int, int);
+    callback ingame-clock-preview();
+    callback clock-settings-applied();
     callback ingame-restart();
     callback ingame-return-launcher();
     callback ingame-start-benchmark();
@@ -340,13 +358,12 @@ export component MainWindow inherits Window {
     callback scenario-pointer(float, float, int);
     callback native-video-ready();
     callback ui-action(int);
+    callback keyboard-action(int, bool);
 
     forward-focus: launcher-shortcuts;
 
     changed launcher-visible => {
-        if (root.launcher-visible) {
-            launcher-shortcuts.focus();
-        }
+        launcher-shortcuts.focus();
     }
 
     changed launcher-controls-visible => {
@@ -379,12 +396,14 @@ export component MainWindow inherits Window {
     }
 
     changed ingame-menu-visible => {
+        launcher-shortcuts.focus();
         if (root.ingame-menu-visible) {
             root.ingame-menu-focus-index = 0;
         }
     }
 
     changed game-over-visible => {
+        launcher-shortcuts.focus();
         if (root.game-over-visible) {
             root.game-over-focus-index = 0;
         }
@@ -613,6 +632,16 @@ export component MainWindow inherits Window {
         }
     }
 
+    MenuButton {
+        visible: root.launcher-scenario == "clock" && !root.launcher-visible && !root.ingame-menu-visible;
+        x: parent.width - 178px;
+        y: 12px;
+        width: 166px;
+        height: 44px;
+        text: "Clock Controls";
+        activated => { root.ingame-clock-open(); }
+    }
+
     Rectangle {
         visible: root.ingame-menu-visible;
         width: parent.width;
@@ -623,7 +652,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: root.width < 632px ? root.width - 32px : 600px;
-            height: root.ingame-controls-visible ? (root.height < 456px ? root.height - 24px : 432px) : 326px;
+            height: root.ingame-controls-visible || root.ingame-clock-visible ? (root.height < 456px ? root.height - 24px : 432px) : 326px;
             background: #080a12f7;
             border-color: #596273;
             border-width: 1px;
@@ -632,14 +661,14 @@ export component MainWindow inherits Window {
             Text {
                 x: 24px;
                 y: 18px;
-                text: root.ingame-controls-visible ? "Controls" : "Paused";
+                text: root.ingame-clock-visible ? "Clock Controls" : root.ingame-controls-visible ? "Controls" : "Paused";
                 color: #ffffff;
                 font-size: 26px;
                 font-weight: 700;
             }
 
             Text {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: 24px;
                 y: 54px;
                 width: parent.width - 48px;
@@ -650,7 +679,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: 24px;
                 y: 84px;
                 width: (parent.width - 58px) / 2;
@@ -664,7 +693,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: parent.width / 2 + 5px;
                 y: 84px;
                 width: (parent.width - 58px) / 2;
@@ -678,7 +707,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: !root.ingame-controls-visible && root.scenario-benchmark-available;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible && root.scenario-benchmark-available;
                 x: 24px;
                 y: 148px;
                 width: (parent.width - 58px) / 2;
@@ -692,7 +721,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: root.scenario-benchmark-available ? parent.width / 2 + 5px : 24px;
                 y: 148px;
                 width: (parent.width - 58px) / 2;
@@ -706,7 +735,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: !root.ingame-controls-visible;
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: root.scenario-benchmark-available ? 24px : parent.width / 2 + 5px;
                 y: root.scenario-benchmark-available ? 212px : 148px;
                 width: root.scenario-benchmark-available ? parent.width - 48px : (parent.width - 58px) / 2;
@@ -757,7 +786,7 @@ export component MainWindow inherits Window {
                     y: 238px;
                     width: parent.width - 32px;
                     height: 52px;
-                    text: "Keyboard: P/Esc pause, R restart, " + (root.scenario-benchmark-available ? "B benchmark, " : "") + "Q launcher, C/F1 controls.";
+                    text: "Keyboard: arrows choose, Enter selects, Esc back. P pauses/resumes, R restarts, " + (root.scenario-benchmark-available ? "B benchmarks, " : "") + "Q opens launcher while paused, C/F1 shows help.";
                     color: #c7d0dc;
                     font-size: 12px;
                     wrap: word-wrap;
@@ -786,6 +815,110 @@ export component MainWindow inherits Window {
                 text: "Resume";
                 activated => {
                     root.ingame-resume();
+                }
+            }
+
+            MenuButton {
+                visible: !root.ingame-controls-visible && !root.ingame-clock-visible && root.launcher-scenario == "clock";
+                x: 24px;
+                y: 212px;
+                width: parent.width - 48px;
+                height: 54px;
+                text: "Clock Controls";
+                selected: root.ingame-menu-focus-index == 4;
+                activated => { root.ingame-clock-open(); }
+            }
+
+            Rectangle {
+                visible: root.ingame-clock-visible;
+                x: 24px;
+                y: 62px;
+                width: parent.width - 48px;
+                height: parent.height - 80px;
+                background: transparent;
+
+                ChoiceRow {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: 48px;
+                    label: "Time Format";
+                    value: root.launcher-clock-time-format;
+                    selected: root.ingame-clock-focus-index == 0;
+                    enabled: !root.clock-controls-pending;
+                    previous => { root.ingame-clock-adjust(0, -1); }
+                    next => { root.ingame-clock-adjust(0, 1); }
+                }
+                ChoiceRow {
+                    y: 56px;
+                    width: parent.width;
+                    height: 48px;
+                    label: "Event Profile";
+                    value: root.launcher-clock-event-profile;
+                    selected: root.ingame-clock-focus-index == 1;
+                    enabled: !root.clock-controls-pending;
+                    previous => { root.ingame-clock-adjust(1, -1); }
+                    next => { root.ingame-clock-adjust(1, 1); }
+                }
+                MenuButton {
+                    x: 0px;
+                    y: 112px;
+                    width: (parent.width - 10px) / 2;
+                    height: 48px;
+                    text: "Falling: " + (root.launcher-clock-falling-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 2;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(2, 1); }
+                }
+                MenuButton {
+                    x: (parent.width + 10px) / 2;
+                    y: 112px;
+                    width: (parent.width - 10px) / 2;
+                    height: 48px;
+                    text: "Color Cycle: " + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 3;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(3, 1); }
+                }
+                ChoiceRow {
+                    y: 168px;
+                    width: parent.width;
+                    height: 48px;
+                    label: "Preview Event";
+                    value: root.clock-event-labels[root.clock-preview-index];
+                    selected: root.ingame-clock-focus-index == 4;
+                    enabled: !root.clock-controls-pending;
+                    previous => { root.ingame-clock-adjust(4, -1); }
+                    next => { root.ingame-clock-adjust(4, 1); }
+                }
+                Text {
+                    y: 224px;
+                    width: parent.width;
+                    height: 50px;
+                    text: root.clock-controls-pending ? "Applying…" : root.clock-settings-error != "" ? root.clock-settings-error : "Changes are saved; current animation can finish. Preview replaces it, even if the event is Off.";
+                    color: root.clock-settings-error != "" ? #ffb0a0 : #80d8ff;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                MenuButton {
+                    x: 0px;
+                    y: parent.height - 54px;
+                    width: (parent.width - 10px) / 2;
+                    height: 54px;
+                    text: "Back";
+                    selected: root.ingame-clock-focus-index == 5;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-visible = false; }
+                }
+                MenuButton {
+                    x: (parent.width + 10px) / 2;
+                    y: parent.height - 54px;
+                    width: (parent.width - 10px) / 2;
+                    height: 54px;
+                    text: "Preview & Resume";
+                    selected: root.ingame-clock-focus-index == 6;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-preview(); }
                 }
             }
         }
@@ -868,48 +1001,59 @@ export component MainWindow inherits Window {
     }
 
     launcher-shortcuts := FocusScope {
-        visible: root.launcher-visible;
         width: parent.width;
         height: parent.height;
-        enabled: root.launcher-visible;
         focus-on-click: true;
         focus-on-tab-navigation: false;
 
         capture-key-pressed(event) => {
-            if (!root.launcher-visible) {
-                return reject;
-            }
-
             if (event.text == Key.Escape) {
-                root.ui-action(5);
+                root.keyboard-action(5, event.repeat);
                 return accept;
             }
             if (event.text == Key.UpArrow) {
-                root.ui-action(0);
+                if (!root.launcher-visible && !root.ingame-menu-visible && !root.game-over-visible) { return reject; }
+                root.keyboard-action(0, event.repeat);
                 return accept;
             }
             if (event.text == Key.DownArrow) {
-                root.ui-action(1);
+                if (!root.launcher-visible && !root.ingame-menu-visible && !root.game-over-visible) { return reject; }
+                root.keyboard-action(1, event.repeat);
                 return accept;
             }
             if (event.text == Key.LeftArrow) {
-                root.ui-action(2);
+                if (!root.launcher-visible && !root.ingame-menu-visible && !root.game-over-visible) { return reject; }
+                root.keyboard-action(2, event.repeat);
                 return accept;
             }
             if (event.text == Key.RightArrow) {
-                root.ui-action(3);
+                if (!root.launcher-visible && !root.ingame-menu-visible && !root.game-over-visible) { return reject; }
+                root.keyboard-action(3, event.repeat);
                 return accept;
             }
             if (event.text == Key.Return) {
-                root.ui-action(4);
+                if (!root.launcher-visible && !root.ingame-menu-visible && !root.game-over-visible) { return reject; }
+                root.keyboard-action(4, event.repeat);
                 return accept;
             }
             if (event.text == Key.F1 || event.text == "c" || event.text == "C") {
-                root.ui-action(7);
+                root.keyboard-action(7, event.repeat);
                 return accept;
             }
             if (event.text == "b" || event.text == "B") {
-                root.launcher-start-benchmark();
+                root.keyboard-action(10, event.repeat);
+                return accept;
+            }
+            if (event.text == "p" || event.text == "P") {
+                root.keyboard-action(8, event.repeat);
+                return accept;
+            }
+            if (event.text == "r" || event.text == "R") {
+                root.keyboard-action(9, event.repeat);
+                return accept;
+            }
+            if (event.text == "q" || event.text == "Q") {
+                root.keyboard-action(11, event.repeat);
                 return accept;
             }
 
@@ -918,6 +1062,7 @@ export component MainWindow inherits Window {
 
 
         Rectangle {
+            visible: root.launcher-visible;
             width: parent.width;
             height: parent.height;
             background: #050514f4;
@@ -1289,6 +1434,44 @@ export component MainWindow inherits Window {
                     }
 
                     ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: 0px;
+                        y: 208px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Falling";
+                        value: root.launcher-clock-falling-enabled ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 4;
+                        previous => {
+                            root.launcher-settings-focus-index = 4;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 4;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: parent.width / 2 + 6px;
+                        y: 208px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Color Cycle";
+                        value: root.launcher-clock-color-cycle-enabled ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 5;
+                        previous => {
+                            root.launcher-settings-focus-index = 5;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 5;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
                         visible: root.launcher-scenario == "nes";
                         x: 0px;
                         y: 0px;
@@ -1355,11 +1538,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -1367,7 +1550,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-scenario == "clock" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";

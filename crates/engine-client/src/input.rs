@@ -177,6 +177,21 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
             return EventResult::Propagate;
         };
 
+        // Host/menu shortcuts are handled by Slint's backend-neutral FocusScope.
+        // Keep physical gameplay bindings and focus-loss cleanup on Winit, but
+        // never enqueue a second copy of a shortcut before Slint receives it.
+        if matches!(
+            key,
+            GameKey::Reset
+                | GameKey::Pause
+                | GameKey::Benchmark
+                | GameKey::Back
+                | GameKey::Controls
+                | GameKey::ReturnLauncher
+        ) {
+            return EventResult::Propagate;
+        }
+
         match state {
             ElementState::Pressed => keyboard_input.borrow_mut().press(key),
             ElementState::Released => keyboard_input.borrow_mut().release(key),

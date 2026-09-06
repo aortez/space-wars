@@ -23,8 +23,12 @@ The local launcher currently hosts seven playable scenarios:
   seven-segment square cells. The deterministic scenario receives versioned
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
-  Off, Calm, or Demo in Settings; see [Clock](docs/clock.md) for timing and
-  synchronized controls.
+  Off, Calm, or Demo in Settings and enable Falling and Color Cycle individually.
+  Events share a deterministic, non-overlapping schedule; Color Cycle changes
+  the readable face palette without physics. **Pause → Clock Controls** (or the
+  on-face touch button) changes live settings and offers **Preview & Resume**.
+  See [Clock](docs/clock.md) for
+  timing, the event catalog, and synchronized preview controls.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating

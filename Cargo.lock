@@ -5090,6 +5090,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "engine-common",
+ "serde_json",
  "spacewars-control",
 ]
 
@@ -5097,6 +5098,7 @@ dependencies = [
 name = "spacewars-control"
 version = "0.1.0"
 dependencies = [
+ "engine-common",
  "serde",
  "serde_json",
 ]

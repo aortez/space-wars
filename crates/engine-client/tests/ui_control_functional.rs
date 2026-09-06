@@ -22,7 +22,6 @@ const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(250);
 const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
-const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
@@ -239,6 +238,7 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
                 "pause.restart",
                 "pause.controls",
                 "pause.return-to-launcher",
+                "pause.clock",
             ]
         );
 
@@ -783,9 +783,26 @@ impl FunctionalHarness {
         let bytes = fs::read(&path).unwrap_or_else(|error| {
             panic!("could not read screenshot {}: {error}", path.display())
         });
+        let mut reader = png::Decoder::new(bytes.as_slice())
+            .read_info()
+            .unwrap_or_else(|error| panic!("invalid PNG {}: {error}", path.display()));
+        let mut pixels = vec![0; reader.output_buffer_size()];
+        let info = reader
+            .next_frame(&mut pixels)
+            .unwrap_or_else(|error| panic!("could not decode {}: {error}", path.display()));
+        assert!(info.width > 0 && info.height > 0);
+        assert_eq!(info.color_type, png::ColorType::Rgba);
+        assert_eq!(info.bit_depth, png::BitDepth::Eight);
+        let pixels = &pixels[..info.buffer_size()];
+        let first_rgb = &pixels[..3];
         assert!(
-            bytes.starts_with(PNG_SIGNATURE),
-            "{} is not a PNG",
+            pixels.chunks_exact(4).all(|pixel| pixel[3] == 255),
+            "{} contains transparent screenshot pixels",
+            path.display()
+        );
+        assert!(
+            pixels.chunks_exact(4).any(|pixel| &pixel[..3] != first_rgb),
+            "{} is a blank, single-color screenshot",
             path.display()
         );
         path

@@ -6,6 +6,10 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
             event_profile: profile,
+            events: ClockEvents {
+                falling: true,
+                color_cycle: false,
+            },
             ..ClockConfig::default()
         },
         seed,
@@ -27,7 +31,11 @@ fn ticks(state: &mut ClockState, count: u64) {
 }
 
 fn trigger(state: &mut ClockState) {
-    ClockScenario::step(state, &[ClockAction::trigger_fall()], Duration::ZERO);
+    ClockScenario::step(
+        state,
+        &[ClockAction::trigger_event(ClockEventKind::Falling)],
+        Duration::ZERO,
+    );
 }
 
 #[test]
@@ -35,7 +43,7 @@ fn fall_uses_compound_segments_then_releases_all_physics_resources() {
     let mut state = ready(ClockEventProfile::Off, 7);
     let lit_count = state.segments().iter().filter(|s| s.lit).count();
     trigger(&mut state);
-    assert_eq!(state.phase(), EventPhase::Falling);
+    assert_eq!(state.event_phase(), Some(EventPhase::Falling));
     assert_eq!(state.body_count(), lit_count + 4);
     assert!(state.collider_count() > state.body_count() * 2);
     assert!(state.collider_count() <= 100);
@@ -56,10 +64,10 @@ fn fall_uses_compound_segments_then_releases_all_physics_resources() {
         "bars should collide with the floor, not fall through it: {on_floor}/{lit_count}"
     );
     ticks(&mut state, 1);
-    assert_eq!(state.phase(), EventPhase::Reforming);
+    assert_eq!(state.event_phase(), Some(EventPhase::Reforming));
     assert_eq!((state.body_count(), state.collider_count()), (0, 0));
     ticks(&mut state, REFORMING_TICKS);
-    assert_eq!(state.phase(), EventPhase::Cooldown);
+    assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
     assert!(
         state
             .segments()
@@ -67,7 +75,7 @@ fn fall_uses_compound_segments_then_releases_all_physics_resources() {
             .all(|s| s.representation == SegmentRepresentation::Anchored)
     );
     ticks(&mut state, COOLDOWN_TICKS);
-    assert!(state.can_trigger_fall());
+    assert!(state.can_trigger_event());
     assert_eq!(state.event_id(), 1);
 }
 
@@ -112,8 +120,8 @@ fn seeded_demo_replays_schedule_and_motion_exactly() {
         ticks(&mut a, 1);
         ticks(&mut b, 1);
         assert_eq!(
-            (a.phase(), a.event_id(), a.next_event_tick()),
-            (b.phase(), b.event_id(), b.next_event_tick())
+            (a.event_phase(), a.event_id(), a.next_event_tick()),
+            (b.event_phase(), b.event_id(), b.next_event_tick())
         );
         assert_eq!(a.segments(), b.segments());
     }
@@ -127,10 +135,10 @@ fn calm_waits_for_its_seeded_deadline_before_releasing_any_bars() {
     let deadline = state.next_event_tick().unwrap();
     assert!((45 * 60..=75 * 60).contains(&deadline));
     ticks(&mut state, deadline - 1);
-    assert_eq!(state.phase(), EventPhase::Idle);
+    assert_eq!(state.lifecycle(), EventLifecycle::Idle);
     assert_eq!((state.event_id(), state.body_count()), (0, 0));
     ticks(&mut state, 1);
-    assert_eq!(state.phase(), EventPhase::Falling);
+    assert_eq!(state.event_phase(), Some(EventPhase::Falling));
     assert_eq!(state.phase_tick(), 0);
     assert_eq!(state.event_id(), 1);
 }
@@ -146,9 +154,9 @@ fn zero_duration_busy_triggers_and_resizes_do_not_leak_or_restart_events() {
     assert_eq!(state.phase_tick(), 30);
     assert_eq!(state.segments(), poses);
     state.set_aspect_ratio(state.aspect_ratio());
-    assert_eq!(state.phase(), EventPhase::Falling);
+    assert_eq!(state.event_phase(), Some(EventPhase::Falling));
     state.set_aspect_ratio(0.75);
-    assert_eq!(state.phase(), EventPhase::Cooldown);
+    assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
     assert_eq!((state.body_count(), state.collider_count()), (0, 0));
     trigger(&mut state);
     assert_eq!(state.event_id(), 1);
@@ -177,9 +185,15 @@ fn unsynchronized_clock_and_invalid_trigger_payloads_cannot_start_a_fall() {
     ticks(&mut state, 80 * 60);
     assert_eq!(state.event_id(), 0);
     assert_eq!(state.body_count(), 0);
-    for payload in [vec![], vec![1], vec![2, 0], vec![1, 0, 0]] {
+    for payload in [
+        vec![],
+        vec![1],
+        vec![2, 0],
+        vec![1, 0, 255],
+        vec![1, 0, 0, 0],
+    ] {
         assert_eq!(
-            ClockAction::decode(&Action::scenario(CLOCK_ACTION_TRIGGER_FALL, payload)),
+            ClockAction::decode(&Action::scenario(CLOCK_ACTION_TRIGGER_EVENT, payload)),
             None
         );
     }
@@ -223,4 +237,167 @@ fn arena_side_walls_keep_falling_cell_geometry_inside_the_view() {
             }
         }
     }
+}
+
+#[test]
+fn every_event_obeys_the_same_lifecycle_and_cleanup_contract() {
+    for definition in EVENT_CATALOG {
+        let kind = definition.kind;
+        let mut state = ready(ClockEventProfile::Off, 9);
+        let trigger = ClockAction::trigger_event(kind);
+        assert_eq!(
+            ClockAction::decode(&trigger),
+            Some(ClockAction::TriggerEvent(kind))
+        );
+        ClockScenario::step(
+            &mut state,
+            &[trigger.clone(), trigger.clone()],
+            Duration::ZERO,
+        );
+        assert_eq!(state.lifecycle(), EventLifecycle::Active);
+        assert_eq!(state.event_kind(), Some(kind));
+        assert_eq!((state.event_id(), state.phase_tick()), (1, 0));
+        ticks(&mut state, 60);
+        let frozen = ClockScenario::render_frame(&state);
+        let tick = state.simulation_tick();
+        ClockScenario::step(&mut state, std::slice::from_ref(&trigger), Duration::ZERO);
+        assert_eq!(ClockScenario::render_frame(&state), frozen);
+        assert_eq!(state.simulation_tick(), tick);
+        assert_eq!(state.event_id(), 1);
+
+        // Time correction during any event must not restore stale digits/color.
+        let reading = ClockAction::set_reading(ClockReading::new(0, 1, 0).unwrap());
+        ClockScenario::step(&mut state, std::slice::from_ref(&reading), Duration::ZERO);
+        ticks(&mut state, definition.duration_ticks - 60);
+        assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
+        assert_eq!(state.event_kind(), None);
+        assert_eq!(state.event_phase(), None);
+        assert_eq!(state.palette(), DigitPalette::default());
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        let mut reference = ready(ClockEventProfile::Off, 9);
+        ClockScenario::step(&mut reference, &[reading], Duration::ZERO);
+        assert_eq!(state.segments(), reference.segments());
+        assert_eq!(
+            ClockScenario::render_frame(&state),
+            ClockScenario::render_frame(&reference)
+        );
+
+        ClockScenario::step(&mut state, std::slice::from_ref(&trigger), Duration::ZERO);
+        assert_eq!(state.event_id(), 1);
+        ticks(&mut state, COOLDOWN_TICKS);
+        assert!(state.can_trigger_event());
+        // Manual previews bypass automatic enablement and per-event cooldowns.
+        ClockScenario::step(&mut state, &[trigger], Duration::ZERO);
+        assert_eq!(state.event_id(), 2);
+        ticks(&mut state, 60);
+        state.set_aspect_ratio(state.aspect_ratio());
+        assert_eq!(state.event_kind(), Some(kind));
+        state.set_aspect_ratio(0.75);
+        assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        assert_eq!(state.palette(), DigitPalette::default());
+        assert!(
+            state
+                .segments()
+                .iter()
+                .all(|s| s.representation == SegmentRepresentation::Anchored)
+        );
+        assert_eq!(
+            state.event_ready_at_tick(kind),
+            state.simulation_tick() + definition.cooldown_ticks
+        );
+    }
+}
+
+#[test]
+fn color_cycle_changes_only_appearance_and_keeps_live_time_without_physics() {
+    let mut state = ready(ClockEventProfile::Off, 0);
+    let normal = ClockScenario::render_frame(&state);
+    ClockScenario::step(
+        &mut state,
+        &[ClockAction::trigger_event(ClockEventKind::ColorCycle)],
+        Duration::ZERO,
+    );
+    assert_eq!(ClockScenario::render_frame(&state), normal);
+    for tick in 1..COLOR_CYCLE_TICKS {
+        ticks(&mut state, 1);
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        assert!(
+            state
+                .segments()
+                .iter()
+                .all(|s| s.representation == SegmentRepresentation::Anchored)
+        );
+        let fill = state.palette().fill;
+        assert_eq!(fill.a, 1.0);
+        assert!(
+            [fill.r, fill.g, fill.b]
+                .into_iter()
+                .all(|c| c.is_finite() && (0.0..=1.0).contains(&c))
+        );
+        if tick == 90 {
+            let colored = ClockScenario::render_frame(&state);
+            assert_ne!(colored, normal);
+            for (a, b) in colored
+                .layers
+                .iter()
+                .flat_map(|l| &l.primitives)
+                .zip(normal.layers.iter().flat_map(|l| &l.primitives))
+            {
+                let (
+                    engine_common::RenderPrimitive::Polygon(a),
+                    engine_common::RenderPrimitive::Polygon(b),
+                ) = (a, b)
+                else {
+                    panic!("Clock uses polygon cells")
+                };
+                assert_eq!(a.points, b.points);
+            }
+            let reading = ClockAction::set_reading(ClockReading::new(0, 0, 0).unwrap());
+            ClockScenario::step(&mut state, &[reading], Duration::ZERO);
+            let mut expected = digits::create_segments();
+            digits::apply_snapshot(&mut expected, state.display());
+            assert_eq!(state.segments(), expected);
+        }
+    }
+    ticks(&mut state, 1);
+    assert_eq!(state.palette(), DigitPalette::default());
+}
+
+#[test]
+fn mixed_events_replay_schedule_color_and_physics_exactly() {
+    let config = ClockConfig {
+        event_profile: ClockEventProfile::Demo,
+        ..ClockConfig::default()
+    };
+    let mut a = ClockScenario::init(config, 42);
+    let mut b = ClockScenario::init(config, 42);
+    let reading = ClockAction::set_reading(ClockReading::new(23, 58, 0).unwrap());
+    ClockScenario::step(&mut a, std::slice::from_ref(&reading), Duration::ZERO);
+    ClockScenario::step(&mut b, &[reading], Duration::ZERO);
+    let mut seen = [false; 2];
+    for _ in 0..90 * 60 {
+        ticks(&mut a, 1);
+        ticks(&mut b, 1);
+        assert_eq!(
+            (
+                a.lifecycle(),
+                a.event_kind(),
+                a.phase_tick(),
+                a.next_event_tick()
+            ),
+            (
+                b.lifecycle(),
+                b.event_kind(),
+                b.phase_tick(),
+                b.next_event_tick()
+            )
+        );
+        assert_eq!(a.segments(), b.segments());
+        assert_eq!(a.palette(), b.palette());
+        if let Some(kind) = a.event_kind() {
+            seen[kind as usize] = true;
+        }
+    }
+    assert_eq!(seen, [true, true]);
 }
