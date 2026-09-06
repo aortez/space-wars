@@ -1487,6 +1487,7 @@ dependencies = [
  "scenario-null",
  "scenario-pizza",
  "scenario-rover-lab",
+ "scenario-spaceling-lab",
  "scenario-spacewars",
  "serde",
  "serde_json",
@@ -4621,6 +4622,16 @@ dependencies = [
 
 [[package]]
 name = "scenario-rover-lab"
+version = "0.1.0"
+dependencies = [
+ "engine-common",
+ "engine-core",
+ "engine-gravity",
+ "engine-rapier",
+]
+
+[[package]]
+name = "scenario-spaceling-lab"
 version = "0.1.0"
 dependencies = [
  "engine-common",

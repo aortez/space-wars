@@ -471,6 +471,16 @@ fn effective_launch_options(args: &Args, settings: &Settings) -> EffectiveLaunch
 fn normalize_launch_settings(settings: &mut Settings) -> bool {
     let mut changed = false;
 
+    // Preserve selections saved while Spaceling Lab had its working name.
+    if settings.launch.scenario == "human-lab" {
+        settings.launch.scenario = "spaceling-lab".into();
+        changed = true;
+    }
+    if settings.last_scenario.as_deref() == Some("human-lab") {
+        settings.last_scenario = Some("spaceling-lab".into());
+        changed = true;
+    }
+
     let saved_scenario_is_launchable =
         host::scenario_registration(settings.launch.scenario.as_str())
             .is_some_and(|registration| registration.launcher_visible);
@@ -2791,6 +2801,28 @@ mod tests {
             adjust_player_view_height(99999.0, 1200, false),
             player_zoom_max(1200)
         );
+    }
+
+    #[test]
+    fn launch_settings_normalization_migrates_spaceling_lab_working_name() {
+        let mut settings = Settings::default();
+        settings.launch.scenario = "human-lab".into();
+        settings.last_scenario = Some("human-lab".into());
+        settings.launch.seed = 77;
+        settings.launch.renderer = RendererSetting::Raster;
+        settings.launch.raster_scale = 2.0;
+        let mut expected = settings.clone();
+        expected.launch.scenario = "spaceling-lab".into();
+        expected.last_scenario = Some("spaceling-lab".into());
+
+        assert!(normalize_launch_settings(&mut settings));
+        assert_eq!(
+            serde_json::to_value(&settings).unwrap(),
+            serde_json::to_value(&expected).unwrap()
+        );
+        assert!(!normalize_launch_settings(&mut settings));
+        let launch = effective_launch_options(&base_args(), &settings);
+        assert_eq!(launch.scenario, "spaceling-lab");
     }
 
     #[test]

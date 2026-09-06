@@ -18,6 +18,7 @@ members = [
     "scenarios/null",
     "scenarios/pizza",
     "scenarios/rover-lab",
+    "scenarios/spaceling-lab",
     "scenarios/spacewars",
 ]
 exclude = [
@@ -73,6 +74,7 @@ scenario-nes = { path = "scenarios/nes" }
 scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
+scenario-spaceling-lab = { path = "scenarios/spaceling-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]

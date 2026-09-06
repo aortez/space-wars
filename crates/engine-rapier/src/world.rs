@@ -182,10 +182,24 @@ impl Default for BodySpec {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ColliderShape {
-    Ball { radius: f32 },
-    Cuboid { half_width: f32, half_height: f32 },
-    ConvexPolygon { vertices: Vec<Vec2> },
-    Polyline { vertices: Vec<Vec2> },
+    Ball {
+        radius: f32,
+    },
+    /// Vertical capsule; half_segment excludes the rounded caps.
+    Capsule {
+        half_segment: f32,
+        radius: f32,
+    },
+    Cuboid {
+        half_width: f32,
+        half_height: f32,
+    },
+    ConvexPolygon {
+        vertices: Vec<Vec2>,
+    },
+    Polyline {
+        vertices: Vec<Vec2>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -244,6 +258,16 @@ pub struct ColliderSpec {
 }
 
 impl ColliderSpec {
+    pub fn capsule(id: ColliderId, half_segment: f32, radius: f32) -> Self {
+        Self {
+            shape: ColliderShape::Capsule {
+                half_segment,
+                radius,
+            },
+            ..Self::ball(id, radius)
+        }
+    }
+
     pub fn ball(id: ColliderId, radius: f32) -> Self {
         Self {
             id,
@@ -350,6 +374,20 @@ pub struct BodyMotionRecord {
 pub struct ContactPoint {
     pub position: Vec2,
     pub normal: Vec2,
+}
+
+/// A live solver contact on another body, viewed from the querying collider.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SurfaceContact {
+    pub collider: ColliderId,
+    pub position: Vec2,
+    /// Points out of the supporting surface toward the querying collider.
+    pub normal: Vec2,
+    pub velocity: Vec2,
+    /// Angular velocity of the supporting body, in radians per second.
+    pub angular_velocity: f32,
+    /// Signed separation used by the latest solver; positive is speculative.
+    pub separation: f32,
 }
 
 /// One solver-backed contact pair observed during the latest step, normalized
@@ -844,6 +882,25 @@ impl PhysicsWorld {
         true
     }
 
+    /// Apply an impulse at a world-space point. Rapier derives both translation
+    /// and rotation from the body's mass, inertia, and center of mass.
+    pub fn apply_impulse_at_point(
+        &mut self,
+        id: BodyId,
+        impulse: Vec2,
+        point: Vec2,
+        wake_up: bool,
+    ) -> bool {
+        if !finite_vec2(impulse) || !finite_vec2(point) {
+            return false;
+        }
+        let Some(body) = self.body_mut(id) else {
+            return false;
+        };
+        body.apply_impulse_at_point(to_rapier(impulse), to_rapier(point), wake_up);
+        true
+    }
+
     /// Apply a mass-independent linear velocity change as a center-of-mass
     /// impulse.
     ///
@@ -973,6 +1030,44 @@ impl PhysicsWorld {
             }
         }
         points
+    }
+
+    /// Allocation-free, local contact traversal; no scan of the world's bodies
+    /// or collected events. Removed colliders cannot remain supports.
+    pub fn surface_contacts(
+        &self,
+        collider: ColliderId,
+    ) -> impl Iterator<Item = SurfaceContact> + '_ {
+        self.collider_handle(collider)
+            .into_iter()
+            .flat_map(move |handle| {
+                self.raw.contact_pairs_with(handle).flat_map(move |pair| {
+                    let (other, direction) = if pair.collider1 == handle {
+                        (pair.collider2, -1.0)
+                    } else {
+                        (pair.collider1, 1.0)
+                    };
+                    let other = self.raw.colliders.get(other);
+                    pair.manifolds.iter().flat_map(move |manifold| {
+                        manifold
+                            .data
+                            .solver_contacts
+                            .iter()
+                            .filter_map(move |contact| {
+                                let other = other?;
+                                let body = self.raw.bodies.get(other.parent()?)?;
+                                Some(SurfaceContact {
+                                    collider: decode_collider(other.user_data)?,
+                                    position: from_rapier(contact.point),
+                                    normal: from_rapier(manifold.data.normal) * direction,
+                                    velocity: from_rapier(body.velocity_at_point(contact.point)),
+                                    angular_velocity: body.angvel(),
+                                    separation: contact.dist,
+                                })
+                            })
+                    })
+                })
+            })
     }
 
     pub fn cast_ray(
@@ -1279,6 +1374,10 @@ fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider>
     }
     let builder = match &spec.shape {
         ColliderShape::Ball { radius } => ColliderBuilder::ball(*radius),
+        ColliderShape::Capsule {
+            half_segment,
+            radius,
+        } => ColliderBuilder::capsule_y(*half_segment, *radius),
         ColliderShape::Cuboid {
             half_width,
             half_height,
@@ -1375,6 +1474,12 @@ fn valid_body_spec(spec: BodySpec) -> bool {
 fn valid_collider_spec(spec: &ColliderSpec) -> bool {
     let valid_shape = match &spec.shape {
         ColliderShape::Ball { radius } => radius.is_finite() && *radius > 0.0,
+        ColliderShape::Capsule {
+            half_segment,
+            radius,
+        } => {
+            half_segment.is_finite() && *half_segment >= 0.0 && radius.is_finite() && *radius > 0.0
+        }
         ColliderShape::Cuboid {
             half_width,
             half_height,
@@ -1521,6 +1626,36 @@ mod tests {
         assert_eq!(world.motion(light_body).unwrap().linear_velocity, delta);
         assert_eq!(world.motion(heavy_body).unwrap().linear_velocity, delta);
         assert!(!world.apply_velocity_delta(light_body, Vec2::new(f32::NAN, 0.0), true));
+    }
+
+    #[test]
+    fn off_center_impulse_uses_mass_and_inertia_without_changing_pose() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let body = insert_ball(&mut world, 1, Vec2::new(2.0, 3.0));
+        let mass = world.body_mass(body).unwrap();
+        let before = world.motion(body).unwrap();
+        let impulse = Vec2::new(mass * 2.0, 0.0);
+        assert!(world.apply_impulse_at_point(body, impulse, before.position, true));
+        assert_eq!(world.motion(body).unwrap().angular_velocity, 0.0);
+        assert!(world.apply_impulse_at_point(body, impulse, before.position + Vec2::Y, true));
+        let after = world.motion(body).unwrap();
+        assert!((after.linear_velocity.x - 4.0).abs() < 1e-5);
+        assert!(after.angular_velocity < -1.0);
+        assert_eq!(after.position, before.position);
+        assert_eq!(after.angle, before.angle);
+        for (impulse, point) in [
+            (Vec2::new(f32::NAN, 0.0), before.position),
+            (Vec2::X, Vec2::new(0.0, f32::INFINITY)),
+        ] {
+            assert!(!world.apply_impulse_at_point(body, impulse, point, true));
+            assert_eq!(world.motion(body).unwrap(), after);
+        }
+        assert!(!world.apply_impulse_at_point(
+            BodyId::new(PhysicsId::new(99), BodyRole::PRIMARY),
+            impulse,
+            before.position,
+            true,
+        ));
     }
 
     #[test]

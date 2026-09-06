@@ -17,6 +17,7 @@ mod nes;
 mod null;
 mod pizza;
 mod rover_lab;
+mod spaceling_lab;
 mod spacewars;
 
 #[cfg(test)]
@@ -369,6 +370,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     nes::REGISTRATION,
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
+    spaceling_lab::REGISTRATION,
     spacewars::REGISTRATION,
 ];
 
@@ -428,7 +430,15 @@ mod tests {
             launcher_registrations()
                 .map(|registration| registration.id)
                 .collect::<Vec<_>>(),
-            vec!["clock", "falling", "nes", "pizza", "rover-lab", "spacewars"]
+            vec![
+                "clock",
+                "falling",
+                "nes",
+                "pizza",
+                "rover-lab",
+                "spaceling-lab",
+                "spacewars"
+            ]
         );
     }
 

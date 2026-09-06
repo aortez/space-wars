@@ -574,4 +574,14 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M25b: ✅ Distinguish accepted `Touchdown` overlap from a retained `Landed` hold. Only `Landed` ships and pods participate in capture, healing, rebuild, and contest logic. A full ship lands by braking; thrust releases the hold and restores its full dynamic hull.
 - M25c: ✅ Keep contested/weapon ejection force-based, but measure completion against clearance of the entire external pad. Verify tiny and large planets, arbitrary wrapper and ship rotations, safe full-hull release, moving-frame contact, pod access, deterministic replay, and rover breakup outside the continuous surface.
 - M25d: ✅ Make a retained landing constraint authoritative over gravity, and distinguish sustained body contact from a newly armed impact. Derive crash damage from pre-solver closing speed at contact onset, retain the last impact in all-player runtime diagnostics, and regress both harmless surface support and genuine high-speed damage.
+- Follow-up direction: replace the special external berth with natural physical ship landing on suitable surfaces. Keep support separate from ownership, capture, healing, and rebuilding; prove moving-surface contact in Spaceling Lab before changing ship rules again.
 - Acceptance still requiring manual validation: the external pad reads clearly in vector and raster play, human and rule-bot approaches remain practical, capture/rebuild timing feels unchanged after a true landing, and launches never pull a craft through planet material.
+
+### M26: Spaceling Lab
+
+- M26a: ✅ Add a reusable single-body, gravity-relative spaceling controller with contact-based support, bounded movement/upright control, and press-to-jump.
+- M26b: ✅ Add a rotating-planet lab with two slope obstacles, keyboard/NES-gamepad input, visual limbs, and support/motion diagnostics. Raster views retain text as a Slint overlay.
+- M26c: ✅ Verify moving/rotating support, slope and wall classification, jump/land, support removal, no-gravity behavior, deterministic replay, full laps in both directions, and ordinary launcher lifecycle. Desktop vector and software-raster screenshots are checked; hardware gamepad feel awaits manual playtesting.
+- M26d: ✅ Separate physical support from balanced/knocked-down/recovering control. Add a physical off-center lab shove, bounded supported recovery, zero-gravity momentum preservation, balance diagnostics, and deterministic impact/recovery regressions. Manual knockback/recovery playtesting passed.
+- Follow-ups: population measurements, destructible terrain support, NPC intent, and exterior-base/ship interaction. Physical limbs and Spacewars integration are not part of the first slice.
+- Design: [spacelings and natural surface support](spacelings.md).
