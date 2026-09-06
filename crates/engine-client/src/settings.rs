@@ -273,12 +273,20 @@ mod tests {
             loaded.settings.clock.time_format,
             ClockTimeFormat::TwelveHour
         );
+        assert_eq!(
+            loaded.settings.clock.events,
+            engine_common::ClockEvents::default()
+        );
         for profile in [
             engine_common::ClockEventProfile::Off,
             engine_common::ClockEventProfile::Calm,
             engine_common::ClockEventProfile::Demo,
         ] {
             loaded.settings.clock.event_profile = profile;
+            loaded.settings.clock.events = engine_common::ClockEvents {
+                falling: false,
+                color_cycle: true,
+            };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
                 load_settings(&path).unwrap().settings.clock,

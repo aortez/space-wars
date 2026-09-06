@@ -3,7 +3,7 @@ use engine_common::{
 };
 
 use crate::{
-    ClockState, REFORMING_TICKS, SegmentRepresentation, digits,
+    ClockState, DigitPalette, REFORMING_TICKS, SegmentRepresentation, digits,
     layout::{CAMERA_HEIGHT, FACE_WIDTH_UNITS, Layout},
 };
 use engine_core::Vec2;
@@ -18,8 +18,6 @@ const BACKGROUND_COLOR: RenderColor = RenderColor::rgb(0.018, 0.025, 0.055);
 const FLOOR_COLOR: RenderColor = RenderColor::rgb(0.075, 0.105, 0.145);
 const FLOOR_EDGE_COLOR: RenderColor = RenderColor::rgb(0.19, 0.40, 0.52);
 const INACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.045, 0.105, 0.135);
-const ACTIVE_CELL_COLOR: RenderColor = RenderColor::rgb(0.33, 0.94, 0.91);
-const ACTIVE_CELL_EDGE_COLOR: RenderColor = RenderColor::rgb(0.72, 1.0, 0.96);
 const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 
 const COLON_X_UNITS: f32 = 14.5;
@@ -79,6 +77,7 @@ fn render_floor(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
     for segment in state.segments() {
@@ -99,10 +98,10 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         for cell in digits::cells(segment.id.kind) {
             let center = layout.cell_center(segment.id, *cell);
             if segment.representation == SegmentRepresentation::Anchored {
-                render_square(frame, center, layout.pitch, 0.0, brightness);
+                render_square(frame, center, layout.pitch, 0.0, brightness, palette);
             } else {
                 // Keep a faint clock outline while the illuminated bars move.
-                render_square(frame, center, layout.pitch, 0.0, 0.0);
+                render_square(frame, center, layout.pitch, 0.0, 0.0, palette);
                 if brightness > 0.0 {
                     render_square(
                         frame,
@@ -110,6 +109,7 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                         layout.pitch,
                         angle,
                         brightness,
+                        palette,
                     );
                 }
             }
@@ -127,6 +127,7 @@ fn render_colon(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
             ),
             layout.pitch,
             state.display().colon_lit,
+            state.palette(),
         );
     }
 }
@@ -169,17 +170,31 @@ fn render_meridiem(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
     }
 }
 
-fn render_cell(frame: &mut RenderFrame, lower_left: RenderPoint, pitch: f32, lit: bool) {
+fn render_cell(
+    frame: &mut RenderFrame,
+    lower_left: RenderPoint,
+    pitch: f32,
+    lit: bool,
+    palette: DigitPalette,
+) {
     render_square(
         frame,
         Vec2::new(lower_left.x + pitch * 0.5, lower_left.y + pitch * 0.5),
         pitch,
         0.0,
         f32::from(lit),
+        palette,
     );
 }
 
-fn render_square(frame: &mut RenderFrame, center: Vec2, pitch: f32, angle: f32, brightness: f32) {
+fn render_square(
+    frame: &mut RenderFrame,
+    center: Vec2,
+    pitch: f32,
+    angle: f32,
+    brightness: f32,
+    palette: DigitPalette,
+) {
     let layer = if brightness > 0.0 {
         ACTIVE_CELL_LAYER
     } else {
@@ -188,7 +203,7 @@ fn render_square(frame: &mut RenderFrame, center: Vec2, pitch: f32, angle: f32, 
     let color = if brightness > 0.0 {
         RenderColor {
             a: brightness,
-            ..ACTIVE_CELL_COLOR
+            ..palette.fill
         }
     } else {
         INACTIVE_CELL_COLOR
@@ -197,7 +212,7 @@ fn render_square(frame: &mut RenderFrame, center: Vec2, pitch: f32, angle: f32, 
         Stroke::new(
             RenderColor {
                 a: brightness,
-                ..ACTIVE_CELL_EDGE_COLOR
+                ..palette.edge
             },
             (pitch * 0.045).max(0.8),
         )

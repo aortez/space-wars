@@ -230,7 +230,11 @@ pub trait ClientScenario {
     fn clock_state(&self) -> Option<spacewars_control::ClockState> {
         None
     }
-    fn trigger_clock_fall(&mut self) {}
+    fn trigger_clock_event(&mut self, _event: engine_common::ClockEventKind) {}
+
+    fn configure_clock(&mut self, _settings: engine_common::ClockSettings) {}
+
+    fn preview_clock_event(&mut self, _event: engine_common::ClockEventKind) {}
 
     fn native_video_frame(&self) -> Option<NativeVideoFrame<'_>> {
         None

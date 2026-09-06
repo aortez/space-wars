@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 mod client;
 mod clock;
 pub use clock::{
-    CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND, ClockState,
-    ClockStatePredicate, ClockTriggerRequest,
+    CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND, ClockEventInfo,
+    ClockEventKind, ClockState, ClockStatePredicate, ClockTriggerRequest,
 };
 
 pub use client::{ControlClient, ControlClientError, UiStatePredicate};
@@ -36,6 +36,8 @@ pub enum UiScreen {
     PauseMain,
     #[serde(rename = "pause.controls")]
     PauseControls,
+    #[serde(rename = "pause.clock")]
+    PauseClock,
     #[serde(rename = "game-over")]
     GameOver,
 }
@@ -50,6 +52,7 @@ impl UiScreen {
             Self::Gameplay => "gameplay",
             Self::PauseMain => "pause.main",
             Self::PauseControls => "pause.controls",
+            Self::PauseClock => "pause.clock",
             Self::GameOver => "game-over",
         }
     }
@@ -542,6 +545,7 @@ mod tests {
             (UiScreen::Gameplay, "gameplay"),
             (UiScreen::PauseMain, "pause.main"),
             (UiScreen::PauseControls, "pause.controls"),
+            (UiScreen::PauseClock, "pause.clock"),
             (UiScreen::GameOver, "game-over"),
         ];
 

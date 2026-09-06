@@ -80,7 +80,9 @@ enum ScenarioControlRequest {
     Resume,
     Restart,
     Benchmark,
-    ClockFall,
+    ClockEvent(engine_common::ClockEventKind),
+    ClockSettings(engine_common::ClockSettings),
+    ClockPreview(engine_common::ClockEventKind),
     ZoomIn { player: usize },
     ZoomOut { player: usize },
 }
@@ -92,17 +94,52 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
 impl ScenarioControls {
     pub fn clock_state(&self) -> Option<spacewars_control::ClockState> {
         self.clock_state.clone().map(|mut state| {
-            state.trigger_pending = self.request == Some(ScenarioControlRequest::ClockFall);
+            state.trigger_pending = matches!(
+                self.request,
+                Some(
+                    ScenarioControlRequest::ClockEvent(_) | ScenarioControlRequest::ClockPreview(_)
+                )
+            );
             state.can_trigger &= self.request.is_none();
             state
         })
     }
 
-    pub fn request_clock_fall(&mut self) -> bool {
+    pub fn request_clock_event(&mut self, event: engine_common::ClockEventKind) -> bool {
         if !self.clock_state().is_some_and(|state| state.can_trigger) {
             return false;
         }
-        self.request = Some(ScenarioControlRequest::ClockFall);
+        self.request = Some(ScenarioControlRequest::ClockEvent(event));
+        true
+    }
+
+    pub fn clock_controls_pending(&self) -> bool {
+        matches!(
+            self.request,
+            Some(
+                ScenarioControlRequest::ClockSettings(_) | ScenarioControlRequest::ClockPreview(_)
+            )
+        )
+    }
+
+    pub fn request_clock_settings(&mut self, settings: engine_common::ClockSettings) -> bool {
+        if self.request.is_some() || !self.clock_state.as_ref().is_some_and(|state| state.paused) {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::ClockSettings(settings));
+        true
+    }
+
+    pub fn request_clock_preview(&mut self, event: engine_common::ClockEventKind) -> bool {
+        if self.request.is_some()
+            || !self
+                .clock_state
+                .as_ref()
+                .is_some_and(|state| state.paused && state.reading.is_some())
+        {
+            return false;
+        }
+        self.request = Some(ScenarioControlRequest::ClockPreview(event));
         true
     }
 
@@ -433,7 +470,7 @@ pub fn start_scenario_loop(
         raster_scale,
         controls,
         input,
-        settings,
+        mut settings,
         asset,
     } = options;
     let scenario_name = scenario.to_string();
@@ -472,6 +509,10 @@ pub fn start_scenario_loop(
     controls
         .borrow_mut()
         .publish_clock_state(&scenario, scenario_revision, paused);
+    if scenario_name == "clock" {
+        crate::clock_controls::publish_settings(window, settings.clock);
+    }
+    window.set_clock_controls_pending(false);
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let initial_game_over = scenario.is_game_over();
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
@@ -604,6 +645,9 @@ pub fn start_scenario_loop(
             &input_projections,
         );
         if step_result.return_to_launcher {
+            // The launcher callback clears shared input; release the loop's
+            // borrow before re-entering UI code (e.g. the keyboard Q shortcut).
+            drop(input);
             window.invoke_ingame_return_launcher();
             return;
         }
@@ -647,6 +691,15 @@ pub fn start_scenario_loop(
         }
 
         controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
+        let clock_settings = controls.borrow().clock_state.as_ref().map(|clock| clock.settings);
+        if let Some(clock_settings) = clock_settings
+            && settings.clock != clock_settings
+        {
+            settings.clock = clock_settings;
+            crate::clock_controls::publish_settings(&window, clock_settings);
+            window.invoke_clock_settings_applied();
+        }
+        window.set_clock_controls_pending(controls.borrow().clock_controls_pending());
         scenario.record_realtime_displayed_loop_iteration();
         let updates = if let Some(telemetry) = scenario.realtime_telemetry() {
             let updates = telemetry
@@ -856,9 +909,24 @@ fn step_scenario_inner(
 
     if let Some(request) = controls.take_request() {
         match request {
-            ScenarioControlRequest::ClockFall => {
+            ScenarioControlRequest::ClockSettings(settings) => {
+                if *paused {
+                    scenario.inner.configure_clock(settings);
+                }
+                return HostStepResult::default();
+            }
+            ScenarioControlRequest::ClockPreview(event) => {
+                if *paused {
+                    scenario.inner.preview_clock_event(event);
+                    *paused = false;
+                    *accumulator = Duration::ZERO;
+                    input.clear();
+                }
+                return HostStepResult::default();
+            }
+            ScenarioControlRequest::ClockEvent(event) => {
                 if !*paused {
-                    scenario.inner.trigger_clock_fall();
+                    scenario.inner.trigger_clock_event(event);
                 }
                 return HostStepResult::default();
             }
@@ -1191,6 +1259,7 @@ fn set_ingame_menu(window: &MainWindow, paused: bool) {
     window.set_ingame_menu_visible(visible);
     if !visible {
         window.set_ingame_controls_visible(false);
+        window.set_ingame_clock_visible(false);
     }
 }
 

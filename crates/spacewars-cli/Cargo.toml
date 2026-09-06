@@ -11,6 +11,7 @@ name = "spacewars-cli"
 path = "src/main.rs"
 
 [dependencies]
+serde_json = { workspace = true }
 clap = { workspace = true }
 engine-common = { workspace = true }
 spacewars-control = { workspace = true }

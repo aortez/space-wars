@@ -27,6 +27,7 @@ pub(crate) fn moved_launcher_controls_selection(current: i32, action: UiAction) 
     }
 }
 
+/// Two columns and an optional full-width third row (Benchmark or Clock menu).
 pub(crate) fn moved_ingame_selection(
     current: i32,
     benchmark_available: bool,
@@ -47,6 +48,16 @@ pub(crate) fn moved_ingame_selection(
             UiAction::Left | UiAction::Right => [1, 0, 3, 2][current as usize],
             _ => current,
         }
+    }
+}
+
+pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
+    let current = current.clamp(0, 6) as usize;
+    match action {
+        UiAction::Up => [5, 0, 1, 1, 2, 4, 4][current],
+        UiAction::Down => [1, 2, 4, 4, 5, 0, 0][current],
+        UiAction::Left | UiAction::Right => [0, 1, 3, 2, 4, 6, 5][current],
+        _ => current as i32,
     }
 }
 

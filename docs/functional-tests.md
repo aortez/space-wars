@@ -35,21 +35,44 @@ The initial workflows verify:
   launching and pausing the scenario, returning to the launcher, and relaunching
   a fresh Clock scenario revision.
 
-Clock event workflows additionally verify Off/Calm/Demo setting controls,
-manual and automatically scheduled falls, bounded body/collider counts,
-physics cleanup, recovery to the latest 12-hour time, and pause/resume during
-a fall. Restart and relaunch must create clean Clock instances. Busy, paused,
-stale-instance, stale-event, and inactive-Clock controls are rejected. Clock
-animation ticks must not invalidate UI revision guards.
+Clock event workflows additionally verify Off/Calm/Demo controls, individual
+Falling/Color Cycle switches, the public event catalog, named manual previews
+(including disabled events), and automatic mixed-event selection. They check
+bounded body/collider counts, physics cleanup, recovery to the latest 12-hour
+time, and pause/resume during both event kinds. Color Cycle must preserve live
+digits, create no physics objects, change the visible palette, and restore cyan.
+Restart and relaunch must create clean instances and retain event settings.
+Busy, paused, stale-instance, stale-event, and inactive-Clock controls are
+rejected. Animation ticks must not invalidate UI revision guards.
+
+The live Clock-controls workflow enters `pause.clock` through the on-face
+control, changes and persists all four settings without replacing the paused
+event, replaces Falling with a Color Cycle preview and vice versa, navigates
+the controller-style menu grid, rejects stale UI guards, and checks both
+restart/relaunch and the saved settings file. Captures include the live settings
+page and the resumed preview. A display-free unit test separately dispatches
+real Slint key events through a non-Winit window: launcher and pause navigation,
+Clock settings, host shortcuts, suppression of repeated toggle keys, and
+pointer hits on the 800×480 controls. Another non-Winit test runs the real host
+timer through keyboard pause and Q-to-launcher, verifying input is released
+before the launcher callback re-borrows it.
 
 The public `clock state`, `clock trigger`, and `clock wait` API is shared by
 these tests and `spacewars-cli`; no test-only phase or time overrides are used.
 Transition deadlines allow for slower debug software rendering. Exact seeded
 timing, midnight/minute rollover during events, resizing, and repeated-cycle
-resource bounds are covered separately by `cargo test -p scenario-clock`.
+resource bounds are covered separately by `cargo test -p scenario-clock`, along
+with shared lifecycle contracts, per-event cooldowns, empty enabled sets,
+non-overlap, eligible-repeat avoidance, and deterministic mixed-event replay.
 
 These are semantic UI tests. They do not validate physical touchscreen hit
 testing, LinuxKMS coordinate transforms, or panel rotation.
+
+Each successful screenshot is decoded as an eight-bit RGBA PNG and checked for
+nonzero dimensions, fully opaque pixels, and more than one RGB color. Checking
+only the PNG signature can miss transparent or blank captures. The display-free
+`rotated_snapshot` integration test additionally checks opacity, RGB content,
+logical dimensions, and restoration of all four software output rotations.
 
 ## Run locally
 
