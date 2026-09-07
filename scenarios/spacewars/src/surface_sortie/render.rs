@@ -10,20 +10,26 @@ fn camera(state: &SurfaceSortieState) -> Camera2 {
     let snapshot = state.spaceling_snapshot();
     let ship = &state.world.ships[state.pilot.vehicle.0];
     let parked = state.vehicle_settled();
-    let center = snapshot.map_or_else(
-        || {
-            if parked {
-                (ship.position + state.access_position()) * 0.5 + Vec2::new(0.0, 2.0)
-            } else {
-                ship.position
-            }
-        },
-        |s| s.motion.position + Vec2::new(0.0, 7.0),
-    );
-    let height = if snapshot.is_some() || parked {
-        44.0
+    let (center, height) = if let Some(snapshot) = snapshot {
+        let pilot = snapshot.motion.position;
+        let ship_center = ship.position + SHIP_PIVOT;
+        if parked && pilot.distance_to(ship_center) < 32.0 {
+            // North-up framing must work on the sides/underside too. Keep the
+            // nearby ship and pilot in the central band between the HUD strips;
+            // walk farther away and the camera follows only the active pilot.
+            let separation = ship_center - pilot;
+            let height = 44.0_f32.max((separation.y.abs() + 12.0) / 0.48);
+            ((pilot + ship_center) * 0.5, height)
+        } else {
+            (pilot + snapshot.up * 7.0, 44.0)
+        }
+    } else if parked {
+        (
+            (ship.position + state.access_position()) * 0.5 + state.access_up() * 2.0,
+            44.0,
+        )
     } else {
-        100.0
+        (ship.position, 100.0)
     };
     Camera2::new(render_point(center), height)
 }
@@ -46,26 +52,28 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
             RenderColor::rgb(1.0, 0.85, 0.25),
         );
     }
-    let planet = &state.world.planets[0];
-    let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
-    circle(
-        &mut frame,
-        -20,
-        planet.position,
-        radius,
-        RenderColor::rgb(0.09, 0.16, 0.23),
-    );
-    for index in 0..72 {
-        let up =
-            Vec2::from_radians(planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0);
-        line(
+    for planet in &state.world.planets {
+        let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
+        circle(
             &mut frame,
-            -18,
-            planet.position + up * (radius - 1.0),
-            planet.position + up * (radius - 0.08),
-            RenderColor::rgb(0.28, 0.51, 0.6),
-            1.0,
+            -20,
+            planet.position,
+            radius,
+            RenderColor::rgb(0.09, 0.16, 0.23),
         );
+        for index in 0..72 {
+            let up = Vec2::from_radians(
+                planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0,
+            );
+            line(
+                &mut frame,
+                -18,
+                planet.position + up * (radius - 1.0),
+                planet.position + up * (radius - 0.08),
+                RenderColor::rgb(0.28, 0.51, 0.6),
+                1.0,
+            );
+        }
     }
     draw_outpost(&mut frame, state, &observation.outpost);
     let access = observation.access_position;
@@ -136,7 +144,18 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(center.x, title_y),
-        format!("SURFACE SORTIE  /  {}", state.motion_preset.label()),
+        state.generated_case.map_or_else(
+            || format!("SURFACE SORTIE  /  {}", state.motion_preset.label()),
+            |case| {
+                format!(
+                    "{}  |  seed {} planet {} bearing {}",
+                    case.profile.label(),
+                    case.seed,
+                    case.planet,
+                    case.bearing
+                )
+            },
+        ),
         LIGHT,
         18.0,
     );
@@ -275,7 +294,7 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             -18,
             RenderPrimitive::Circle(RenderCircle {
                 center: render_point(sun.position),
-                radius: state.world.planets[0].orbit_radius,
+                radius: state.world.planets[state.pilot.planet].orbit_radius,
                 fill: None,
                 stroke: Some(Stroke::new(RenderColor::rgba(0.55, 0.6, 0.7, 0.45), 1.0)),
             }),

@@ -11,7 +11,8 @@ pub(super) fn walk_to(
             idle(state, 12);
             return;
         }
-        let up = (snapshot.motion.position - state.world.planets[0].position).normalized();
+        let up = (snapshot.motion.position - state.world.planets[state.pilot.planet].position)
+            .normalized();
         tick(
             state,
             SurfaceSortieAction {
@@ -105,7 +106,11 @@ fn outpost_round_trip_captures_repairs_and_departs_using_only_player_controls() 
 }
 
 fn round_trip(preset: SurfaceMotionPreset) {
-    let mut state = SurfaceSortieScenario::init(preset, 7);
+    round_trip_state(SurfaceSortieScenario::init(preset, 7));
+}
+
+pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
+    let preset = state.motion_preset();
     idle(&mut state, 120);
     assert!(
         state.vehicle_settled(),
@@ -129,7 +134,7 @@ fn round_trip(preset: SurfaceMotionPreset) {
     assert!(state.vehicle_settled());
     assert_eq!(state.observation().outpost.captures, 1);
     assert_eq!(
-        state.world.planets[0].owner_id, None,
+        state.world.planets[state.pilot.planet].owner_id, None,
         "outpost ownership is not planet ownership"
     );
     assert!(state.world.spaceport_contacts.is_empty());

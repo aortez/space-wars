@@ -30,6 +30,26 @@ fn surface_sortie_orbit_launch_pause_restart_and_both_renderers() {
     );
 }
 
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn surface_sortie_generated_launch_pause_restart_and_both_renderers() {
+    lab_lifecycle(
+        "surface-sortie-generated",
+        "surface-sortie-generated-lifecycle",
+        assert_raster_sortie_visible,
+    );
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn surface_sortie_world_launch_pause_restart_and_both_renderers() {
+    lab_lifecycle(
+        "surface-sortie-world",
+        "surface-sortie-world-lifecycle",
+        assert_raster_sortie_visible,
+    );
+}
+
 fn lab_lifecycle(scenario: &str, test_name: &'static str, assert_visible: fn(&Path)) {
     run_functional_test(test_name, |harness| {
         let ready = harness.wait_until_ready();

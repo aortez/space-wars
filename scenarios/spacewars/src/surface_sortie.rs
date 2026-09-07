@@ -8,13 +8,16 @@ use engine_rapier::{
     world::PhysicsId,
 };
 
+pub mod compatibility;
 mod landing;
 mod motion;
 mod outpost;
+mod profiles;
 mod render;
 pub use landing::{LandingPhase, LandingTelemetry};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
+pub use profiles::GeneratedSurfaceProfile;
 #[cfg(test)]
 mod tests;
 
@@ -113,6 +116,7 @@ impl SurfaceSortieAction {
 pub struct SurfaceSortieState {
     world: SpacewarsState,
     motion_preset: SurfaceMotionPreset,
+    generated_case: Option<compatibility::GeneratedSurfaceCase>,
     motion_metrics: SurfaceMotionMetrics,
     idle_anchor: Option<(bool, Vec2)>,
     pilot: SurfacePilot,
@@ -129,6 +133,8 @@ pub(super) struct SurfacePilot {
     id: SpacelingId,
     owner: PlayerId,
     vehicle: VehicleId,
+    /// Selected support body in this single-pilot fixture, not always planet 0.
+    planet: usize,
     body: Option<SpacelingAssembly>,
     control: SpacelingControl,
     gravity: Vec2,
@@ -164,6 +170,7 @@ impl SurfacePilot {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SurfaceSortieObservation {
     pub version: u32,
+    pub generated_case: Option<compatibility::GeneratedSurfaceCase>,
     pub tick: u64,
     pub spaceling: SpacelingId,
     pub owner: PlayerId,
@@ -206,7 +213,8 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilot.vehicle.0];
         let snapshot = self.spaceling_snapshot();
         SurfaceSortieObservation {
-            version: 4,
+            version: 6,
+            generated_case: self.generated_case,
             tick: self.world.tick,
             spaceling: self.pilot.id,
             owner: self.pilot.owner,
@@ -245,11 +253,11 @@ impl SurfaceSortieState {
         // or fixed planet marker; the physical landing gate is checked first.
         let hatch =
             ship.position + SHIP_PIVOT + Vec2::new(8.0, -5.0).rotate_radians(ship.rotation_radians);
-        (hatch - self.world.planets[0].position).normalized()
+        (hatch - self.world.planets[self.pilot.planet].position).normalized()
     }
 
     fn access_position(&self) -> Vec2 {
-        let planet = &self.world.planets[0];
+        let planet = &self.world.planets[self.pilot.planet];
         planet.position + self.access_up() * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
     }
 
@@ -334,6 +342,19 @@ impl Scenario for SurfaceSortieScenario {
     type Config = SurfaceMotionPreset;
 
     fn init(motion_preset: SurfaceMotionPreset, seed: u64) -> SurfaceSortieState {
+        if matches!(
+            motion_preset,
+            SurfaceMotionPreset::Generated | SurfaceMotionPreset::GeneratedSurfaceV1
+        ) {
+            return compatibility::GeneratedSurfaceCase::new(seed, 0, 0)
+                .with_profile(if motion_preset == SurfaceMotionPreset::Generated {
+                    GeneratedSurfaceProfile::Raw
+                } else {
+                    GeneratedSurfaceProfile::SurfaceV1
+                })
+                .init()
+                .expect("default generated world has a planet");
+        }
         let mut world = SpacewarsScenario::init(
             SpacewarsConfig {
                 universe_radius: 500,
@@ -364,56 +385,9 @@ impl Scenario for SurfaceSortieScenario {
             wrapper_omega: 0.015,
         };
         world.sun = motion_preset.configure(&mut planet);
-        // Begin just above the ground on the rear feet; Rapier settles the
-        // vehicle during the first few ticks, just as after a flown landing.
-        let center = planet.position + Vec2::Y * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + 5.5);
-        world.ships[0].position = center - SHIP_PIVOT;
-        world.ships[0].rotation_radians = 0.0;
-        world.ships[0].direction = Vec2::Y;
-        world.ships[0].velocity = motion_preset.initial_velocity(&planet)
-            + Vec2::new(-(center - planet.position).y, (center - planet.position).x)
-                * planet.wrapper_omega;
-        world.ships[0].life = world.ships[0].life_max * 0.75;
-        // The legacy world stores two ship slots. Surface physics disables the
-        // unused slot instead of letting an invisible craft orbit into the lab.
         world.planets = vec![planet];
         world.rover_builds = vec![RoverBuildState::default()];
-        world.physics =
-            physics::SpacewarsPhysics::new(500.0, &world.ships, world.sun, &world.planets);
-        // Position-based kinematic terrain derives its velocity on the first
-        // physics step. Do not try to set its COM velocity with set_velocity.
-        world.physics.enable_surface_sortie(0, &world.ships[0]);
-        world.spaceport_contacts.clear();
-        let outpost = outpost::SurfaceOutpost::new(OutpostId(1), 0, -0.34);
-        assert!(world.physics.insert_surface_terminal(
-            outpost.planet,
-            planet.radius,
-            outpost.local_angle
-        ));
-        SurfaceSortieState {
-            world,
-            motion_preset,
-            motion_metrics: SurfaceMotionMetrics::default(),
-            idle_anchor: None,
-            pilot: SurfacePilot {
-                id: SpacelingId(1),
-                owner: PlayerId::PLAYER_1,
-                vehicle: VehicleId(0),
-                body: None,
-                control: SpacelingControl::default(),
-                gravity: Vec2::ZERO,
-                facing: 1.0,
-                gait_phase: 0.0,
-                ship_gravity_delta: Vec2::ZERO,
-            },
-            input: SurfaceSortieAction::default(),
-            interact_was_held: false,
-            controls_armed: false,
-            transfers: 0,
-            last_transfer: TransferResult::Ready,
-            landing: LandingTelemetry::default(),
-            outpost,
-        }
+        Self::on_surface(world, motion_preset, 0, Vec2::Y, -0.34)
     }
 
     fn step(state: &mut SurfaceSortieState, actions: &[Action], dt: Duration) -> StepResult {
@@ -477,9 +451,9 @@ impl Scenario for SurfaceSortieScenario {
         // Schedule terrain exactly once. Actors are never transported with it;
         // controls, gravity, and Rapier contacts own their dynamic motion.
         let dt = dt.as_secs_f32();
-        state
-            .motion_preset
-            .advance(&mut state.world.planets[0], state.world.sun, dt);
+        for planet in &mut state.world.planets {
+            state.motion_preset.advance(planet, state.world.sun, dt);
+        }
         let result = SpacewarsScenario::step_with_surface_pilot(
             &mut state.world,
             &[],
@@ -489,7 +463,8 @@ impl Scenario for SurfaceSortieScenario {
         state.landing.update(
             &state.world.physics,
             state.pilot.vehicle.0,
-            &state.world.planets[0],
+            state.pilot.planet,
+            &state.world.planets[state.pilot.planet],
             &state.world.ships[state.pilot.vehicle.0],
             dt,
         );
@@ -520,6 +495,66 @@ impl Scenario for SurfaceSortieScenario {
 }
 
 impl SurfaceSortieScenario {
+    fn on_surface(
+        mut world: SpacewarsState,
+        motion_preset: SurfaceMotionPreset,
+        planet_index: usize,
+        up: Vec2,
+        terminal_angle: f32,
+    ) -> SurfaceSortieState {
+        let planet = world.planets[planet_index];
+        // Begin just above the rear feet. Only initial placement is prescribed;
+        // all subsequent motion is dynamic, including the unoccupied ship.
+        let center = planet.position + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + 5.5);
+        world.ships[0].position = center - SHIP_PIVOT;
+        world.ships[0].rotation_radians = rotation_for_direction(up);
+        world.ships[0].direction = up;
+        world.ships[0].velocity = motion_preset.initial_velocity(&planet)
+            + Vec2::new(-(center - planet.position).y, (center - planet.position).x)
+                * planet.wrapper_omega;
+        world.ships[0].life = world.ships[0].life_max * 0.75;
+        world.physics = physics::SpacewarsPhysics::new(
+            world.config.universe_radius as f32,
+            &world.ships,
+            world.sun,
+            &world.planets,
+        );
+        world.physics.enable_surface_sortie(0, &world.ships[0]);
+        world.spaceport_contacts.clear();
+        let outpost = outpost::SurfaceOutpost::new(OutpostId(1), planet_index, terminal_angle);
+        assert!(
+            world
+                .physics
+                .insert_surface_terminal(planet_index, planet.radius, terminal_angle)
+        );
+        SurfaceSortieState {
+            world,
+            motion_preset,
+            generated_case: None,
+            motion_metrics: SurfaceMotionMetrics::default(),
+            idle_anchor: None,
+            pilot: SurfacePilot {
+                id: SpacelingId(1),
+                owner: PlayerId::PLAYER_1,
+                vehicle: VehicleId(0),
+                planet: planet_index,
+                body: None,
+                control: SpacelingControl::default(),
+                gravity: Vec2::ZERO,
+                facing: 1.0,
+                gait_phase: 0.0,
+                ship_gravity_delta: Vec2::ZERO,
+            },
+            input: SurfaceSortieAction::default(),
+            interact_was_held: false,
+            controls_armed: false,
+            transfers: 0,
+            last_transfer: TransferResult::Ready,
+            landing: LandingTelemetry::default(),
+            outpost,
+        }
+    }
+
     /// Fixed-scale north-up world context; the client overlays this second frame.
     pub fn minimap_frame(state: &SurfaceSortieState, viewport_aspect: f32) -> RenderFrame {
         render::minimap(state, viewport_aspect)

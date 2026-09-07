@@ -40,6 +40,11 @@ The local launcher currently hosts seven playable scenarios:
   ownership flag, and landing/capture diagnostics. Choose **surface-sortie-orbit**
   for the same loop on a moving, spinning planet, with drift/support-loss telemetry.
   See [Surface Sortie](docs/surface-sortie.md) for controls and scope.
+  The untuned **surface-sortie-generated** preset and
+  [headless compatibility matrix](docs/surface-compatibility.md) measure the
+  gravity/motion gaps before ordinary-game integration. **surface-sortie-world**
+  tries an explicit Surface V1 gravity/spin/orbit profile on those generated
+  layouts. Ordinary Spacewars and the shared controllers remain unchanged.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

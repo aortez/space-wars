@@ -39,6 +39,20 @@ pub(super) const ORBIT_REGISTRATION: ScenarioRegistration = ScenarioRegistration
     ..REGISTRATION
 };
 
+pub(super) const GENERATED_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "surface-sortie-generated",
+    controls_help: "Compatibility diagnostic, not yet a playable surface preset. Uses ordinary generated gravity and motion with the unchanged lab controls: takeoff and on-foot support can fail. Planet 0, initially away from the sun; use the launch seed to reproduce. A / Space thrusts or jumps; left/right turns or walks; B / X exits or boards a landed ship. Start / Esc pauses; R restarts. Use surface-sortie or surface-sortie-orbit for the tuned gameplay loop.",
+    create: create_generated,
+    ..REGISTRATION
+};
+
+pub(super) const WORLD_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "surface-sortie-world",
+    controls_help: "Experimental Surface V1 world: generated planet sizes/layout with gentler gravity, bounded spin, sun-matched orbits and extra flight clearance. Same natural landing, capture and repair controls as Surface Sortie; no change to ordinary Spacewars. Planet 0, initially away from the sun; the launch seed reproduces it. A / Space thrusts or jumps; left/right turns or walks; Down / S brakes; B / X exits or boards beside a landed ship's cyan hatch. Stand by the amber terminal to capture and repair. Start / Esc pauses; R restarts. Passive landings and long-idle support still have known limits; see docs/surface-compatibility.md.",
+    create: create_world,
+    ..REGISTRATION
+};
+
 struct SurfaceSortieClientScenario {
     state: SurfaceSortieState,
 }
@@ -67,10 +81,36 @@ fn create_orbit(
     }))
 }
 
+fn create_generated(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SurfaceSortieClientScenario {
+        state: SurfaceSortieScenario::init(SurfaceMotionPreset::Generated, seed),
+    }))
+}
+
+fn create_world(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SurfaceSortieClientScenario {
+        state: SurfaceSortieScenario::init(SurfaceMotionPreset::GeneratedSurfaceV1, seed),
+    }))
+}
+
 impl ClientScenario for SurfaceSortieClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
         match self.state.motion_preset() {
             SurfaceMotionPreset::Orbit => &ORBIT_REGISTRATION,
+            SurfaceMotionPreset::Generated => &GENERATED_REGISTRATION,
+            SurfaceMotionPreset::GeneratedSurfaceV1 => &WORLD_REGISTRATION,
             _ => &REGISTRATION,
         }
     }
@@ -118,6 +158,75 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     #[test]
+    fn generated_diagnostic_is_selectable_reproducible_and_renders_the_whole_world() {
+        use scenario_spacewars::surface_sortie::compatibility::GeneratedSurfaceCase;
+        for seed in [0, 2] {
+            let mut scenario = GENERATED_REGISTRATION
+                .create(
+                    seed,
+                    &Settings::default(),
+                    Viewport::new(1280.0, 720.0),
+                    ScenarioStartMode::Normal,
+                )
+                .unwrap();
+            assert_eq!(scenario.registration().id, "surface-sortie-generated");
+            for _ in 0..60 {
+                scenario.step(
+                    &[SurfaceSortieAction::default().encode()],
+                    Duration::from_secs_f64(1.0 / 60.0),
+                );
+            }
+            let scenario = scenario
+                .as_any()
+                .downcast_ref::<SurfaceSortieClientScenario>()
+                .unwrap();
+            assert_eq!(
+                scenario.state.observation().generated_case,
+                Some(GeneratedSurfaceCase::new(seed, 0, 0))
+            );
+            let mut replay = SurfaceSortieClientScenario {
+                state: GeneratedSurfaceCase::new(seed, 0, 0).init().unwrap(),
+            };
+            for _ in 0..60 {
+                replay.step(
+                    &[SurfaceSortieAction::default().encode()],
+                    Duration::from_secs_f64(1.0 / 60.0),
+                );
+            }
+            assert_eq!(scenario.state.observation(), replay.state.observation());
+            for viewport in [Viewport::new(1280.0, 720.0), Viewport::new(1280.0, 1400.0)] {
+                let frames = scenario.render_frames(RenderBackend::Vector, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Raster, viewport)
+                );
+                let overlay =
+                    crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+                assert!(
+                    overlay
+                        .iter()
+                        .any(|primitive| primitive.text.starts_with("GENERATED / UNTUNED"))
+                );
+                let planets = frames[1]
+                    .ordered_layers()
+                    .iter()
+                    .filter(|layer| layer.z == -10)
+                    .map(|layer| layer.primitives.len())
+                    .sum::<usize>();
+                assert_eq!(planets, GeneratedSurfaceCase::planet_count(seed));
+                check_render(
+                    scenario,
+                    viewport,
+                    &format!(
+                        "generated-seed{seed}-{}x{}",
+                        viewport.width, viewport.height
+                    ),
+                );
+            }
+        }
+    }
+
+    #[test]
     fn keyboard_and_nes_pad_produce_the_same_context_neutral_intent() {
         let scenario = SurfaceSortieClientScenario {
             state: SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 0),
@@ -157,7 +266,11 @@ mod tests {
 
     #[test]
     fn outpost_capture_progress_and_owner_flag_render_in_both_backends() {
-        for preset in [SurfaceMotionPreset::Stationary, SurfaceMotionPreset::Orbit] {
+        for preset in [
+            SurfaceMotionPreset::Stationary,
+            SurfaceMotionPreset::Orbit,
+            SurfaceMotionPreset::GeneratedSurfaceV1,
+        ] {
             let mut scenario = SurfaceSortieClientScenario {
                 state: SurfaceSortieScenario::init(preset, 0),
             };
@@ -256,7 +369,7 @@ mod tests {
 
     #[test]
     fn registered_fixture_renders_and_restarts_in_both_backends() {
-        for registration in [&REGISTRATION, &ORBIT_REGISTRATION] {
+        for registration in [&REGISTRATION, &ORBIT_REGISTRATION, &WORLD_REGISTRATION] {
             let viewport = Viewport::new(1280.0, 720.0);
             let mut scenario = registration
                 .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)
@@ -333,6 +446,30 @@ mod tests {
             RasterOptions::default(),
         );
         let pixels = image.to_rgb8().unwrap();
+        // Preserve failing frames too: visibility assertions should be inspectable.
+        if let Some(directory) = std::env::var_os("SPACEWARS_SORTIE_ARTIFACTS") {
+            let directory = std::path::PathBuf::from(directory);
+            let directory = if directory.is_absolute() {
+                directory
+            } else {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../..")
+                    .join(directory)
+            };
+            std::fs::create_dir_all(&directory).unwrap();
+            let file = std::fs::File::create(
+                directory.join(format!("{name}-{}.png", scenario.registration().id)),
+            )
+            .unwrap();
+            let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+            encoder.set_color(png::ColorType::Rgb);
+            encoder.set_depth(png::BitDepth::Eight);
+            encoder
+                .write_header()
+                .unwrap()
+                .write_image_data(pixels.as_bytes())
+                .unwrap();
+        }
         let ship_pixels = pixels
             .as_slice()
             .iter()
@@ -369,29 +506,6 @@ mod tests {
                 })
                 .count();
             assert!(suit_pixels > 20, "missing on-foot actor: {suit_pixels}");
-        }
-        if let Some(directory) = std::env::var_os("SPACEWARS_SORTIE_ARTIFACTS") {
-            let directory = std::path::PathBuf::from(directory);
-            let directory = if directory.is_absolute() {
-                directory
-            } else {
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../..")
-                    .join(directory)
-            };
-            std::fs::create_dir_all(&directory).unwrap();
-            let file = std::fs::File::create(
-                directory.join(format!("{name}-{}.png", scenario.registration().id)),
-            )
-            .unwrap();
-            let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
-            encoder.set_color(png::ColorType::Rgb);
-            encoder.set_depth(png::BitDepth::Eight);
-            encoder
-                .write_header()
-                .unwrap()
-                .write_image_data(pixels.as_bytes())
-                .unwrap();
         }
     }
 }

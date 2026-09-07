@@ -11,6 +11,9 @@ pub enum SurfaceMotionPreset {
     /// A short headless diagnostic; a straight path eventually leaves the map.
     Translating,
     Orbit,
+    /// Untuned ordinary generated world; intentionally a compatibility diagnostic.
+    Generated,
+    GeneratedSurfaceV1,
 }
 
 impl SurfaceMotionPreset {
@@ -19,6 +22,8 @@ impl SurfaceMotionPreset {
             Self::Stationary => "STATIONARY CENTER",
             Self::Translating => "TRANSLATING",
             Self::Orbit => "ORBIT + SPIN",
+            Self::Generated => "GENERATED / UNTUNED",
+            Self::GeneratedSurfaceV1 => "GENERATED / SURFACE V1",
         }
     }
 
@@ -46,12 +51,17 @@ impl SurfaceMotionPreset {
     pub(super) fn initial_velocity(self, planet: &PlanetState) -> Vec2 {
         match self {
             Self::Translating => Vec2::new(3.0, 0.0),
-            Self::Stationary | Self::Orbit => planet_surface_velocity(planet, planet.position),
+            Self::Stationary | Self::Orbit | Self::Generated | Self::GeneratedSurfaceV1 => {
+                planet_surface_velocity(planet, planet.position)
+            }
         }
     }
 
     pub(super) fn advance(self, planet: &mut PlanetState, sun: Option<SunState>, dt: f32) {
-        if self == Self::Orbit {
+        if matches!(
+            self,
+            Self::Orbit | Self::Generated | Self::GeneratedSurfaceV1
+        ) {
             planet.update_orbit(
                 sun.expect("orbital fixture has its central source")
                     .position,
@@ -84,8 +94,8 @@ pub(super) struct SurfaceFrame {
 }
 
 impl SurfaceFrame {
-    pub(super) fn read(physics: &physics::SpacewarsPhysics) -> Self {
-        let body = physics.planet_body(0);
+    pub(super) fn read(physics: &physics::SpacewarsPhysics, planet: usize) -> Self {
+        let body = physics.planet_body(planet);
         let motion = physics
             .world
             .motion(body)
@@ -104,7 +114,7 @@ impl SurfaceFrame {
 
 impl SurfaceSortieState {
     pub(super) fn planet_motion(&self) -> SurfaceFrame {
-        SurfaceFrame::read(&self.world.physics)
+        SurfaceFrame::read(&self.world.physics, self.pilot.planet)
     }
 
     pub fn motion_preset(&self) -> SurfaceMotionPreset {
@@ -183,8 +193,8 @@ impl SurfaceSortieState {
             .motion(body)
             .expect("active sortie body");
         let surface_velocity = point_velocity(frame, actor.position);
-        let planet = &self.world.planets[0];
-        let (scripted_acceleration, external_gravity_at_center) =
+        let planet = &self.world.planets[self.pilot.planet];
+        let (scripted_acceleration, mut external_gravity_at_center) =
             self.world.sun.map_or((Vec2::ZERO, Vec2::ZERO), |sun| {
                 let inward = sun.position - frame.position;
                 let gravity = if inward.length_squared() > 1.0e-6 {
@@ -192,13 +202,25 @@ impl SurfaceSortieState {
                 } else {
                     Vec2::ZERO
                 };
-                let scripted = if self.motion_preset == SurfaceMotionPreset::Orbit {
+                let scripted = if matches!(
+                    self.motion_preset,
+                    SurfaceMotionPreset::Orbit
+                        | SurfaceMotionPreset::Generated
+                        | SurfaceMotionPreset::GeneratedSurfaceV1
+                ) {
                     inward * planet.orbit_omega.powi(2)
                 } else {
                     Vec2::ZERO
                 };
                 (scripted, gravity)
             });
+        for (index, planet) in self.world.planets.iter().enumerate() {
+            if index != self.pilot.planet {
+                let origin = SurfaceFrame::read(&self.world.physics, index).position;
+                external_gravity_at_center +=
+                    compatibility::source_acceleration(origin, planet.mass, frame.position);
+            }
+        }
         let support = snapshot.and_then(|snapshot| snapshot.support);
         SurfaceMotionObservation {
             preset: self.motion_preset,

@@ -12,7 +12,7 @@ const SETTLE_SECONDS: f32 = 0.25;
 const DESCENT_SPEED: f32 = 2.0;
 const MAX_DESCENT_ACCELERATION: f32 = 30.0;
 const MAX_LATERAL_ACCELERATION: f32 = 12.0;
-const THRUST_ACCELERATION: f32 = 45.0;
+pub(super) const THRUST_ACCELERATION: f32 = 45.0;
 const BRAKE_ACCELERATION: f32 = 40.0;
 const TURN_SPEED: f32 = 1.8;
 const TURN_ACCELERATION: f32 = 6.0;
@@ -56,12 +56,13 @@ impl LandingTelemetry {
     pub(super) fn measure(
         physics: &physics::SpacewarsPhysics,
         index: usize,
+        planet_index: usize,
         planet: &PlanetState,
     ) -> Self {
         let Some(motion) = physics.world.motion(physics.ship_body(index)) else {
             return Self::default();
         };
-        let surface = motion::SurfaceFrame::read(physics);
+        let surface = motion::SurfaceFrame::read(physics, planet_index);
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let relative = physics
@@ -95,7 +96,7 @@ impl LandingTelemetry {
             descent_speed: -relative.dot(up),
             lateral_speed: relative.dot(right),
             relative_spin: motion.angular_velocity - surface.angular_velocity,
-            supported_feet: physics.landing_feet_supported(index, 0, up),
+            supported_feet: physics.landing_feet_supported(index, planet_index, up),
             assist_strength: smooth(near) * smooth(aligned),
             ..Self::default()
         }
@@ -105,11 +106,12 @@ impl LandingTelemetry {
         &mut self,
         physics: &physics::SpacewarsPhysics,
         index: usize,
+        planet_index: usize,
         planet: &PlanetState,
         ship: &ShipState,
         dt: f32,
     ) {
-        let mut next = Self::measure(physics, index, planet);
+        let mut next = Self::measure(physics, index, planet_index, planet);
         let settled = ship.form == ShipForm::Ship
             && !ship.dead
             && ship.thrust == 0.0
@@ -141,6 +143,10 @@ impl SurfacePilot {
         self.vehicle.0
     }
 
+    pub(crate) fn planet_index(&self) -> usize {
+        self.planet
+    }
+
     pub(crate) fn control_vehicle(
         &self,
         physics: &mut physics::SpacewarsPhysics,
@@ -155,8 +161,8 @@ impl SurfacePilot {
         let Some(motion) = physics.world.motion(body) else {
             return;
         };
-        let surface = motion::SurfaceFrame::read(physics);
-        let landing = LandingTelemetry::measure(physics, self.vehicle.0, planet);
+        let surface = motion::SurfaceFrame::read(physics, self.planet);
+        let landing = LandingTelemetry::measure(physics, self.vehicle.0, self.planet, planet);
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let mut acceleration =

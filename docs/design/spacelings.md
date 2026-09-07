@@ -210,6 +210,39 @@ loss/rescue, contested infrastructure, terrain, and bot intent remain separate
 slices; this controlled preset's acceptance does not cover arbitrary generated
 orbits or combat.
 
+## Sixth slice: generated-world compatibility evidence
+
+Implemented on `surface-generated-compatibility`. The generated diagnostic keeps
+all ordinary planet/sun masses and prescribed paths, uses an explicit selected
+planet index, and runs independent landing, idle, walking, jump and takeoff
+probes. Prerequisite failures remain visible instead of masquerading as passes.
+An untuned launcher preset provides visual reproduction at planet 0 / bearing 0.
+
+The first 72 generated cases confirm a major force/motion mismatch, not merely
+a radius or landing-assist problem. Controlled radius changes from 15 to 150
+pass at lab gravity; generated surface gravity is roughly 650–712 versus 18
+in the lab. High gravity overwhelms takeoff/jumps and disrupts balanced support;
+rapid spin and unmatched external acceleration add independent constraints.
+See [the compatibility report](../surface-compatibility.md) for reproducible
+commands, criteria, results and limits. Ordinary game tuning and bot baselines
+remain unchanged.
+
+The same slice now includes the explicit **Surface V1** experiment, alongside
+the raw baseline: lab-scale planet gravity, a gentler sun, spin bounded by local
+gravity, central-field-matched circular orbits, and exterior flight clearance.
+All generated sources remain active and the ship/spaceling controllers are
+unchanged. This remains a cheap kinematic world, not full N-body motion or
+actor-relative gravity compensation. `surface-sortie-world` is the selectable
+visual preset; `--profile both` runs paired headless cases.
+
+The initial 72 cases pass all five probes; the wider 620-case matrix passes
+3,093/3,100 probes, with seven passive approach failures retained as evidence.
+Four sampled planets pass the full outpost round trip. Extended idle tests
+expose brief support gaps and slow drift without damage/knockdown, so this is
+not a universal contact-stability claim. Playtest the profile and decide its
+acceptance envelope before multi-pilot, loss/rescue, contested services and bot
+surface-intent integration. Ordinary Spacewars defaults have not changed.
+
 ## Planet and ship direction
 
 The continuous surface and external berth from PR #40 fix the interior-bay

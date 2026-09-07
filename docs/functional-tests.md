@@ -64,13 +64,15 @@ enabled. Character mechanics and deterministic movement are tested headlessly
 in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is a
 manual check.
 
-Both Surface Sortie presets (stationary center and orbital) use the same
+All four Surface Sortie presets (stationary center, orbital, untuned generated
+world, and experimental Surface V1 generated world) use the same
 launcher/pause/restart workflow with both renderers;
 their raster checks require the ship, amber outpost, capture/landing HUD,
 and minimap planet. The client unit tests also render the disembarked spaceling,
 capture progress, and owner-colored flag in landscape/portrait, while
 `scenario-spacewars` exercises the physical exit/walk/capture/repair/return/board/
-departure loop and input gating on stationary and orbital terrain. See
+departure loop and input gating on stationary, orbital, and sampled Surface V1
+generated terrain. See
 [Surface Sortie](surface-sortie.md) for the manual controls and retained images.
 
 The harness uses Slint's software backend, which does not draw vector paths.
