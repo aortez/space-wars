@@ -1,7 +1,7 @@
 //! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
 //! The compile-time registry hosts Clock, Falling, NES Library, Pizza, Rover
-//! Lab, and Spacewars from the launcher, with Null retained as a hidden test
+//! Lab, Spaceling Lab, Terrain Lab, and Spacewars, with Null retained as a hidden test
 //! scenario.
 
 mod client_scenarios;

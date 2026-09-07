@@ -5,7 +5,7 @@
 //! motion or normalized contact data after each step.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -751,6 +751,61 @@ impl PhysicsWorld {
         true
     }
 
+    /// Atomically validate and replace one collider role on an existing body.
+    /// Call at the lifecycle boundary, outside contact iteration. Motion, joints,
+    /// sensors in other roles, and unrelated bodies retain their identities.
+    /// Step the world before querying the new geometry through the broad phase.
+    pub fn replace_colliders(
+        &mut self,
+        parent: BodyId,
+        role: ColliderRole,
+        specs: &[ColliderSpec],
+    ) -> bool {
+        let Some(parent_handle) = self.body_handle(parent) else {
+            return false;
+        };
+        let mut ids = BTreeSet::new();
+        let mut builders = Vec::with_capacity(specs.len());
+        for spec in specs {
+            if spec.id.entity != parent.entity || spec.id.role != role || !ids.insert(spec.id) {
+                return false;
+            }
+            let Some(collider) = build_collider(spec, self.collect_events) else {
+                return false;
+            };
+            builders.push((spec.id, collider));
+        }
+        let old: Vec<_> = self
+            .colliders
+            .iter()
+            .filter(|entry| entry.id.entity == parent.entity && entry.id.role == role)
+            .copied()
+            .collect();
+        if old.iter().any(|entry| entry.parent != parent) {
+            return false;
+        }
+        builders.sort_by_key(|(id, _)| *id);
+        let removed: BTreeSet<_> = old.iter().map(|entry| entry.id).collect();
+        for entry in old {
+            self.raw.remove_collider(entry.handle);
+            self.remove_collider_mapping(entry.id);
+        }
+        if let Some(entity) = self.entities.get_mut(&parent.entity) {
+            entity.colliders.retain(|id| !removed.contains(id));
+        }
+        self.contact_events.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        self.sensor_intersections.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        for (id, collider) in builders {
+            let handle = self.raw.insert_collider(collider, Some(parent_handle));
+            self.register_collider(id, parent, handle);
+        }
+        true
+    }
+
     pub fn remove_entity(&mut self, entity: PhysicsId) -> bool {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
@@ -787,6 +842,29 @@ impl PhysicsWorld {
     pub fn body_mass(&self, id: BodyId) -> Option<f32> {
         let handle = self.body_handle(id)?;
         self.raw.bodies.get(handle).map(RigidBody::mass)
+    }
+
+    pub fn center_of_mass(&self, id: BodyId) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(from_rapier(body.center_of_mass()))
+    }
+
+    pub fn velocity_at_point(&self, id: BodyId, point: Vec2) -> Option<Vec2> {
+        if !finite_vec2(point) {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(from_rapier(body.velocity_at_point(to_rapier(point))))
+    }
+
+    /// Make edited collider mass, inertia, and center of mass available before
+    /// the next step. The caller chooses how velocity should change after a cut.
+    pub fn refresh_mass_properties(&mut self, id: BodyId) -> bool {
+        let Some(handle) = self.body_handle(id) else {
+            return false;
+        };
+        self.raw.bodies[handle].recompute_mass_properties_from_colliders(&self.raw.colliders);
+        true
     }
 
     pub fn set_body_kind(&mut self, id: BodyId, kind: BodyKind, wake_up: bool) -> bool {
@@ -1112,6 +1190,78 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    pub fn collider_body(&self, id: ColliderId) -> Option<BodyId> {
+        self.colliders
+            .get(*self.collider_indices.get(&id)?)
+            .map(|entry| entry.parent)
+    }
+
+    /// Sweep an existing collider along a world direction, excluding its entity
+    /// and sensors. Returns available travel, or None for invalid input. As with
+    /// ray queries, call against the last completed physics step.
+    pub fn collider_translation_clearance(
+        &self,
+        id: ColliderId,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        if !finite_vec2(direction)
+            || direction.length_squared() <= f32::EPSILON
+            || !distance.is_finite()
+            || distance < 0.0
+        {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        let hit = self.raw.cast_shape(
+            collider.position(),
+            to_rapier(direction.normalized()),
+            collider.shape(),
+            rapier2d::parry::query::ShapeCastOptions {
+                max_time_of_impact: distance,
+                stop_at_penetration: false,
+                ..Default::default()
+            },
+            QueryFilter {
+                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                groups: Some(collider.collision_groups()),
+                predicate: Some(&predicate),
+                ..Default::default()
+            },
+        );
+        Some(hit.map_or(distance, |(_, hit)| hit.time_of_impact))
+    }
+
+    /// Check the complete collider shape at a proposed world pose without moving
+    /// it. The query ignores its own entity and sensors, and respects its groups.
+    pub fn collider_fits_at(&self, id: ColliderId, position: Vec2, angle: f32) -> Option<bool> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        Some(
+            self.raw
+                .intersect_shape(
+                    Pose::new(to_rapier(position), angle),
+                    collider.shape(),
+                    QueryFilter {
+                        flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                        groups: Some(collider.collision_groups()),
+                        predicate: Some(&predicate),
+                        ..Default::default()
+                    },
+                )
+                .next()
+                .is_none(),
+        )
     }
 
     /// Serialize authoritative Rapier state and all stable handle mappings.

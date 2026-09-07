@@ -6,4 +6,5 @@
 
 pub mod rover;
 pub mod spaceling;
+pub mod terrain;
 pub mod world;

@@ -29,6 +29,9 @@ mod clock;
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 
+#[path = "ui_control_functional/terrain_lab.rs"]
+mod terrain_lab;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
@@ -433,7 +436,15 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
 }
 
 fn run_functional_test(name: &'static str, workflow: impl FnOnce(&mut FunctionalHarness)) {
-    let mut harness = FunctionalHarness::spawn(name)
+    run_functional_test_with_backend(name, "winit-software", workflow);
+}
+
+fn run_functional_test_with_backend(
+    name: &'static str,
+    backend: &'static str,
+    workflow: impl FnOnce(&mut FunctionalHarness),
+) {
+    let mut harness = FunctionalHarness::spawn(name, backend)
         .unwrap_or_else(|error| panic!("could not start {name}: {error}"));
     let result = catch_unwind(AssertUnwindSafe(|| workflow(&mut harness)));
     if let Err(payload) = result {
@@ -456,7 +467,7 @@ struct FunctionalHarness {
 }
 
 impl FunctionalHarness {
-    fn spawn(test_name: &'static str) -> Result<Self, String> {
+    fn spawn(test_name: &'static str, backend: &'static str) -> Result<Self, String> {
         let artifact_root = workspace_root().join("target/functional-test-artifacts");
         fs::create_dir_all(&artifact_root).map_err(|error| {
             format!(
@@ -502,7 +513,7 @@ impl FunctionalHarness {
             .args(&arguments)
             .current_dir(workspace_root())
             .env("RUST_LOG", "info")
-            .env("SLINT_BACKEND", "winit-software")
+            .env("SLINT_BACKEND", backend)
             .env("SPACEWARS_CONTROL_SOCKET", &socket_path)
             .env_remove("WAYLAND_DISPLAY")
             .stdin(Stdio::null())

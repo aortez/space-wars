@@ -1,6 +1,6 @@
 # Physics architecture
 
-Status: implemented for Pizza, Rover Lab, Spaceling Lab, and Spacewars.
+Status: implemented for Pizza, Rover Lab, Spaceling Lab, Terrain Lab, and Spacewars.
 
 ## Decision
 
@@ -100,6 +100,21 @@ large populations use the hierarchy. The opening angle θ controls the
 speed/accuracy tradeoff.
 
 ## Physical entity tiers
+
+Terrain Lab adds scenario-owned material fields from `engine-terrain`. Each
+field's greedy chunk rectangle cover is bound to one body through
+`engine-rapier::terrain::TerrainAssembly`. At the lifecycle boundary,
+`PhysicsWorld::replace_colliders` validates a complete replacement role before
+removing its old shapes. Other chunk roles, sensor roles, body motion, and joints
+remain intact. Empty chunks remove their shapes and mappings. Material edits and
+the visual cover commit together before the next physics step; ray queries then
+use that same revision. Edge connectivity keeps the largest component on its
+existing body and transfers disconnected components to cropped fields with new
+dynamic bodies. The retained planet stays kinematic. Uniform-density collider
+mass and inertia update before gravity; each surviving point inherits its
+pre-cut velocity, including when the center of mass moves. Fragments remain
+mineable and collide with the planet, character, and one another. See
+[Terrain Lab](../terrain-lab.md).
 
 Not every visible object belongs in Rapier:
 

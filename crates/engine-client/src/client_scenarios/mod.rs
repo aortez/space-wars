@@ -19,6 +19,7 @@ mod pizza;
 mod rover_lab;
 mod spaceling_lab;
 mod spacewars;
+mod terrain_lab;
 
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
@@ -371,6 +372,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
     spaceling_lab::REGISTRATION,
+    terrain_lab::REGISTRATION,
     spacewars::REGISTRATION,
 ];
 
@@ -437,6 +439,7 @@ mod tests {
                 "pizza",
                 "rover-lab",
                 "spaceling-lab",
+                "terrain-lab",
                 "spacewars"
             ]
         );

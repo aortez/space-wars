@@ -6,6 +6,7 @@ members = [
     "crates/engine-gravity",
     "crates/engine-nes",
     "crates/engine-rapier",
+    "crates/engine-terrain",
     "crates/spacewars-ai",
     "crates/engine-client",
     "crates/spacewars-control",
@@ -19,6 +20,7 @@ members = [
     "scenarios/pizza",
     "scenarios/rover-lab",
     "scenarios/spaceling-lab",
+    "scenarios/terrain-lab",
     "scenarios/spacewars",
 ]
 exclude = [
@@ -66,6 +68,7 @@ engine-core = { path = "crates/engine-core" }
 engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
+engine-terrain = { path = "crates/engine-terrain" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
 scenario-clock = { path = "scenarios/clock" }
@@ -75,6 +78,7 @@ scenario-null = { path = "scenarios/null" }
 scenario-pizza = { path = "scenarios/pizza" }
 scenario-rover-lab = { path = "scenarios/rover-lab" }
 scenario-spaceling-lab = { path = "scenarios/spaceling-lab" }
+scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]

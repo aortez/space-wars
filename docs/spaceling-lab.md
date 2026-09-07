@@ -20,9 +20,9 @@ backend. Text diagnostics are a Slint overlay in either mode.
 ## Controls
 
 - D-pad or left stick left/right: walk relative to local gravity.
-- Gamepad A: jump on press; release before jumping again.
+- Gamepad bottom face (Xbox A / Switch B): jump or get up on press; release before repeating.
 - Gamepad B: apply a repeatable off-center test shove; release before repeating.
-- Keyboard A/D or left/right arrows: walk; Space: jump.
+- Keyboard A/D or left/right arrows: walk; Space: jump or get up when prone.
 - Keyboard X: the same test shove. It pushes outward and in the facing direction.
 - Start or Esc: pause. R or the pause menu: restart.
 
@@ -85,24 +85,44 @@ or a reconstruction of collision energy. Solver impacts are detected on the
 next controller tick; a shove applied before controls is detected immediately.
 Ordinary walking and jump/land cycles are regression-tested not to knock down.
 
-While knocked down, walking, jumping, air control, and upright correction are
-disabled. The same capsule gains ordinary contact friction (0.6, combined using
+While knocked down, walking, ordinary jumping, air control, and automatic upright
+correction are disabled. Jump instead requests an explicit get-up attempt. The
+same capsule gains ordinary contact friction (0.6, combined using
 the minimum material friction) so it can physically settle. In free space,
 there is no artificial angular damping or timed auto-recovery.
 
 Recovery starts after 0.25 seconds of continuous suitable support, with
 support-relative contact-point speed at most 2 units/s and relative angular
-speed at most 2 rad/s. It ramps bounded upright control and ground braking over
+speed at most 2 rad/s. It ramps bounded upright control and ground traction over
 at least 0.8 seconds. Completion also requires upright alignment within 0.15
-radians and relative angular speed below 0.8 rad/s. Player/bot walking and jump
-intent remain disabled until completion; holding jump during recovery cannot
-produce a buffered jump afterward.
+radians and relative angular speed below 0.8 rad/s. Supported movement during
+recovery crawls at 25% of walking speed, allowing escape from a low roof or ledge.
+Ordinary jumps remain disabled until completion; holding jump during recovery
+cannot produce a buffered jump afterward.
 
 A 0.1-second contact grace period tolerates tiny gaps while physically standing
-up; progress does not advance during a gap. Longer gaps, a different support,
-removed support, loss of gravity, or another severe disturbance interrupt
-recovery. Removed support and loss of gravity cancel immediately. No pose is
-snapped, no new limbs/colliders appear, and no landing zone is involved.
+up; progress does not advance during a gap. A valid contact handoff preserves
+progress, including when mining replaces collision rectangles on the same body.
+Longer gaps, removed support, loss of gravity, or another severe disturbance
+interrupt automatic recovery. Removed support and loss of gravity cancel
+immediately.
+
+A fresh jump press while prone or unbalanced requests a physical get-up. It
+requires gravity and real support, no severe impact, contact-relative speed at
+most 4 units/s, and relative spin at most 2 rad/s. A shape sweep checks upward
+clearance and a full-capsule overlap query checks the proposed upright space.
+Sensors and the character's own entity are excluded; collision groups apply.
+With room, a bounded lift follows the supporting body's translation and rotation
+for at most 0.8 seconds while full upright correction turns the capsule. The
+lift briefly counters gravity and permits the contact gap needed to stand;
+upright alignment and low spin end it early. Gravity loss, support removal, or
+a severe new impact cancels it. Holding the button cannot repeat it, and a
+press in free flight cannot provide an extra jump. Rapier owns the entire motion
+and collision response: no pose is snapped and no new collider appears.
+
+The snapshot reports get-up attempts and the latest result (started, succeeded,
+blocked, unsupported, unsettled, or no gravity). Terrain Lab displays these in
+its debug HUD and shows a normal-play hint when getting up is needed.
 
 Balanced airborne self-righting uses 15% of normal angular acceleration. The
 knockdown/recovery thresholds live in `SpacelingBalanceSpec`; Rapier still owns
@@ -147,8 +167,12 @@ and complete laps over the lab obstacles. Balance tests include mild/severe
 shoves, real high-speed landings, physical tumbling and recovery, moving support,
 interrupted recovery, support removal/gaps, zero-gravity momentum, and held-input
 gating. The rotating-planet lab regresses shoves in both directions at multiple
-locations. Version-1 walking/jumping actions remain readable; version 2 adds
-held shove input and balance diagnostics in observations.
+locations. Get-up regressions cover both prone directions and all balance states,
+strong gravity on translating/rotating support, collider replacement, low-roof
+collision and crawling, held input, unsupported/zero-gravity requests, and
+interruption of an active lift. Version-1 walking/jumping actions remain readable;
+version-2 actions add held shove input. Observation version 3 includes explicit
+get-up diagnostics alongside balance and lab-shove state.
 
 The real-client functional workflow covers launcher selection, both renderers,
 pause, restart, return, and relaunch. It captures screenshots; use an existing

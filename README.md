@@ -9,7 +9,7 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts seven playable scenarios:
+The local launcher currently hosts eight playable scenarios:
 
 - **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
   asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
@@ -34,6 +34,12 @@ The local launcher currently hosts seven playable scenarios:
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating
   planet, with gravity-relative upright control and visible contact diagnostics.
   See [Spaceling Lab](docs/spaceling-lab.md).
+- **Terrain Lab** — an editable material planet with a walking spaceling. Switch
+  between a precision laser, drill, and excavator to collect rock and ore, preview
+  each cut, and zoom in to mine individual cells. Cut pieces free to make moving,
+  collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
+  craters and tunnels, inspect chunk colliders, and watch ray queries and physical
+  support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
@@ -86,6 +92,7 @@ cargo run -p engine-client -- --scenario pizza
 cargo run -p engine-client -- --scenario clock
 cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
+cargo run -p engine-client -- --scenario terrain-lab
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```
