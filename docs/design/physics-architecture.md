@@ -171,6 +171,21 @@ world's Rapier mass/inertia binding. Recovery does not introduce another body,
 pose snapping, free-space damping, or a terrain scan. See the
 [lab's balance model](../spaceling-lab.md#balance-and-recovery).
 
+Surface Sortie's stationary and orbital presets use that same controller and
+canonical world alongside a dynamic ship with physical landing feet. Terrain
+targets are scheduled once; pre-step gravity/controllers read the completed
+physics frame, and post-step landing/services consume completed contacts.
+`BodyMotion.position` is the body origin but `linear_velocity` is the center-of-mass
+velocity. Use the allocation-free `PhysicsWorld::velocity_at_point` when comparing
+motion at a hatch, foot, or frame origin; an asymmetric collider set can offset
+the center of mass. Never substitute the next kinematic target or an analytic
+endpoint derivative for the contacts' completed motion.
+
+The orbital sortie matches its sun's gravity to the prescribed planet path at
+the center; it adds no actor transport or compensating field. This controlled
+fixture does not establish support on every ordinary scripted orbit, whose
+rate and mass may be inconsistent. See the [motion boundary](../surface-sortie.md#moving-planet-evidence).
+
 Spacewars' implemented mapping is:
 
 - planets and orbiting spaceports: fixed or kinematic bodies;

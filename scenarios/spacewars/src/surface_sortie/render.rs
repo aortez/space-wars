@@ -37,6 +37,15 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     let center = Vec2::new(camera.center.x, camera.center.y);
     let height = camera.height;
     let mut frame = RenderFrame::new(camera);
+    if let Some(sun) = state.world.sun {
+        circle(
+            &mut frame,
+            -21,
+            sun.position,
+            sun.radius,
+            RenderColor::rgb(1.0, 0.85, 0.25),
+        );
+    }
     let planet = &state.world.planets[0];
     let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
     circle(
@@ -127,7 +136,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(center.x, title_y),
-        "SURFACE SORTIE  /  capture an outpost, repair, depart",
+        format!("SURFACE SORTIE  /  {}", state.motion_preset.label()),
         LIGHT,
         18.0,
     );
@@ -145,7 +154,11 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         center + Vec2::new(0.0, height * 0.31),
-        "Stand beside the amber terminal for 3s to capture.  Start / Esc: pause   R: restart",
+        format!(
+            "Planet {:.1}u/s / spin {:+.3}  |  Stand at terminal: capture  |  Start / Esc: pause",
+            observation.motion.planet_velocity.length(),
+            observation.motion.planet_spin
+        ),
         LIGHT,
         13.0,
     );
@@ -158,7 +171,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     };
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.29),
+        center - Vec2::new(0.0, height * 0.278),
         message,
         CYAN,
         16.0,
@@ -170,7 +183,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     );
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.348),
+        center - Vec2::new(0.0, height * 0.323),
         format!(
             "OUTPOST {ownership}  |  {:.0}%  |  {}  |  {:.1}u",
             post.capture_progress * 100.0,
@@ -186,7 +199,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     );
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.405),
+        center - Vec2::new(0.0, height * 0.369),
         format!(
             "{}  |  angle {:.0}°  |  descent {:+.1}  |  sideways {:+.1}  |  feet {}/2",
             observation.landing.phase.label(),
@@ -206,7 +219,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     );
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.463),
+        center - Vec2::new(0.0, height * 0.415),
         format!(
             "Ship {:.0}%  |  {}  |  hatch {:.1}u  |  bodies {}",
             ship.life / ship.life_max.max(1.0) * 100.0,
@@ -216,6 +229,21 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
         ),
         ORANGE,
         15.0,
+    );
+    let metrics = observation.motion_metrics;
+    text(
+        &mut frame,
+        center - Vec2::new(0.0, height * 0.465),
+        format!(
+            "Rel {:.1}u/s  |  lost support: pilot {} ship {}  |  idle drift {:.2}u  |  damage {:.1}",
+            observation.motion.relative_velocity.length(),
+            metrics.pilot_support_losses,
+            metrics.ship_support_losses,
+            metrics.idle_drift,
+            metrics.ship_damage
+        ),
+        LIGHT,
+        12.0,
     );
     frame
 }
@@ -235,6 +263,24 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             stroke: Some(Stroke::new(RenderColor::rgb(0.36, 0.43, 0.52), 1.0)),
         }),
     );
+    if let Some(sun) = state.world.sun {
+        circle(
+            &mut map,
+            -19,
+            sun.position,
+            sun.radius,
+            RenderColor::rgb(1.0, 0.85, 0.25),
+        );
+        map.push_primitive(
+            -18,
+            RenderPrimitive::Circle(RenderCircle {
+                center: render_point(sun.position),
+                radius: state.world.planets[0].orbit_radius,
+                fill: None,
+                stroke: Some(Stroke::new(RenderColor::rgba(0.55, 0.6, 0.7, 0.45), 1.0)),
+            }),
+        );
+    }
     for planet in &state.world.planets {
         circle(
             &mut map,

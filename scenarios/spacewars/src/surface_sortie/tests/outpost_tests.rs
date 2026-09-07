@@ -1,6 +1,9 @@
 use super::*;
 
-fn walk_to(state: &mut SurfaceSortieState, target: impl Fn(&SurfaceSortieState) -> Vec2) {
+pub(super) fn walk_to(
+    state: &mut SurfaceSortieState,
+    target: impl Fn(&SurfaceSortieState) -> Vec2,
+) {
     for _ in 0..600 {
         let snapshot = state.spaceling_snapshot().unwrap();
         let delta = target(state) - snapshot.motion.position;
@@ -20,7 +23,7 @@ fn walk_to(state: &mut SurfaceSortieState, target: impl Fn(&SurfaceSortieState) 
     panic!("could not walk to target: {:?}", state.observation());
 }
 
-fn terminal_approach(state: &SurfaceSortieState) -> Vec2 {
+pub(super) fn terminal_approach(state: &SurfaceSortieState) -> Vec2 {
     let planet = &state.world.planets[state.outpost.planet];
     let up = state
         .outpost
@@ -55,8 +58,8 @@ fn capture(state: &mut SurfaceSortieState) {
 
 #[test]
 fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_steps() {
-    let mut a = SurfaceSortieScenario::init((), 7);
-    let mut b = SurfaceSortieScenario::init((), 7);
+    let mut a = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7);
+    let mut b = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7);
     for frame in 0..650 {
         let observation = a.observation();
         let input = SurfaceSortieAction {
@@ -87,7 +90,7 @@ fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_step
         SurfaceSortieScenario::step(&mut a, &[], Duration::ZERO);
     }
     assert_eq!(a.observation(), before);
-    let fresh = SurfaceSortieScenario::init((), 7).observation();
+    let fresh = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7).observation();
     assert_eq!(fresh.outpost.owner, None);
     assert_eq!(fresh.outpost.capture_progress, 0.0);
     assert_eq!(fresh.outpost.repaired_health, 0.0);
@@ -96,7 +99,19 @@ fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_step
 
 #[test]
 fn outpost_round_trip_captures_repairs_and_departs_using_only_player_controls() {
-    let mut state = parked();
+    for preset in [SurfaceMotionPreset::Stationary, SurfaceMotionPreset::Orbit] {
+        round_trip(preset);
+    }
+}
+
+fn round_trip(preset: SurfaceMotionPreset) {
+    let mut state = SurfaceSortieScenario::init(preset, 7);
+    idle(&mut state, 120);
+    assert!(
+        state.vehicle_settled(),
+        "{preset:?}: {:?}",
+        state.observation()
+    );
     let initial = state.observation();
     assert_eq!(initial.ship_health, state.world.ships[0].life_max * 0.75);
     idle(&mut state, 360);

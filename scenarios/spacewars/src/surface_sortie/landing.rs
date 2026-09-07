@@ -61,9 +61,14 @@ impl LandingTelemetry {
         let Some(motion) = physics.world.motion(physics.ship_body(index)) else {
             return Self::default();
         };
-        let up = (motion.position - planet.position).normalized();
+        let surface = motion::SurfaceFrame::read(physics);
+        let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
-        let relative = motion.linear_velocity - planet_surface_velocity(planet, motion.position);
+        let relative = physics
+            .world
+            .velocity_at_point(physics.ship_body(index), motion.position)
+            .unwrap()
+            - motion::point_velocity(surface, motion.position);
         let angle_degrees = Vec2::Y
             .rotate_radians(motion.angle)
             .dot(up)
@@ -73,7 +78,7 @@ impl LandingTelemetry {
         let altitude = physics::LANDING_FEET
             .into_iter()
             .map(|foot| {
-                (motion.position + foot.rotate_radians(motion.angle)).distance_to(planet.position)
+                (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
                     - planet.radius * BODY_BOUNDS_RADIUS_SCALE
                     - physics::LANDING_FOOT_RADIUS
             })
@@ -89,7 +94,7 @@ impl LandingTelemetry {
             angle_degrees,
             descent_speed: -relative.dot(up),
             lateral_speed: relative.dot(right),
-            relative_spin: motion.angular_velocity - planet.wrapper_omega,
+            relative_spin: motion.angular_velocity - surface.angular_velocity,
             supported_feet: physics.landing_feet_supported(index, 0, up),
             assist_strength: smooth(near) * smooth(aligned),
             ..Self::default()
@@ -150,14 +155,18 @@ impl SurfacePilot {
         let Some(motion) = physics.world.motion(body) else {
             return;
         };
+        let surface = motion::SurfaceFrame::read(physics);
         let landing = LandingTelemetry::measure(physics, self.vehicle.0, planet);
-        let up = (motion.position - planet.position).normalized();
+        let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let mut acceleration =
             Vec2::Y.rotate_radians(motion.angle) * (ship.thrust * THRUST_ACCELERATION);
         if ship.brake > 0.0 {
-            let relative =
-                motion.linear_velocity - planet_surface_velocity(planet, motion.position);
+            let relative = physics
+                .world
+                .velocity_at_point(body, motion.position)
+                .unwrap()
+                - motion::point_velocity(surface, motion.position);
             let braking = relative * -4.0;
             acceleration += braking.normalized() * braking.length().min(BRAKE_ACCELERATION);
         } else if ship.thrust == 0.0 {
@@ -182,7 +191,7 @@ impl SurfacePilot {
         // nose outward. Stronger damping near touchdown removes unwanted spin.
         let desired_spin = -ship.turn * TURN_SPEED
             + if landing.assist_strength > 0.0 {
-                planet.wrapper_omega
+                surface.angular_velocity
             } else {
                 0.0
             };

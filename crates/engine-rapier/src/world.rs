@@ -358,8 +358,10 @@ impl Default for PhysicsWorldConfig {
 /// Authoritative motion read directly from one Rapier rigid body.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BodyMotion {
+    /// Body-frame origin in world coordinates; not necessarily the center of mass.
     pub position: Vec2,
     pub angle: f32,
+    /// Center-of-mass velocity. Use `PhysicsWorld::velocity_at_point` elsewhere.
     pub linear_velocity: Vec2,
     pub angular_velocity: f32,
 }
@@ -775,6 +777,17 @@ impl PhysicsWorld {
     pub fn motion(&self, id: BodyId) -> Option<BodyMotion> {
         let handle = self.body_handle(id)?;
         self.raw.bodies.get(handle).map(body_motion)
+    }
+
+    /// Velocity at a world-space point, accounting for an off-center mass.
+    /// `BodyMotion::position` is the body origin, whereas its linear velocity
+    /// is Rapier's center-of-mass velocity. They need not coincide.
+    pub fn velocity_at_point(&self, id: BodyId, point: Vec2) -> Option<Vec2> {
+        if !finite_vec2(point) {
+            return None;
+        }
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(from_rapier(body.velocity_at_point(to_rapier(point))))
     }
 
     pub fn motions(&self) -> impl ExactSizeIterator<Item = BodyMotionRecord> + '_ {
@@ -1692,6 +1705,46 @@ mod tests {
             before.position,
             true,
         ));
+    }
+
+    #[test]
+    fn point_velocity_accounts_for_offset_mass_and_rejects_invalid_queries() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (entity, body, collider_id) = ball_ids(1);
+        let mut collider = ColliderSpec::ball(collider_id, 1.0);
+        collider.local_position = Vec2::new(2.0, 0.0);
+        let origin = Vec2::new(10.0, 20.0);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                position: origin,
+                ..BodySpec::default()
+            },
+            &[collider]
+        ));
+        // Populate mass properties through the normal lifecycle, with no motion.
+        world.step(1.0 / 60.0);
+        assert!(world.set_velocity(body, Vec2::new(3.0, 4.0), 2.0, true));
+        let before = world.motion(body).unwrap();
+        assert_eq!(
+            world.velocity_at_point(body, origin),
+            Some(Vec2::new(3.0, 0.0))
+        );
+        assert_eq!(
+            world.velocity_at_point(body, origin + Vec2::X * 2.0),
+            Some(Vec2::new(3.0, 4.0))
+        );
+        assert_eq!(
+            world.velocity_at_point(body, Vec2::new(f32::NAN, 0.0)),
+            None
+        );
+        assert_eq!(
+            world.motion(body),
+            Some(before),
+            "queries never change state"
+        );
+        world.remove_entity(entity);
+        assert_eq!(world.velocity_at_point(body, origin), None);
     }
 
     #[test]

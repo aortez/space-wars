@@ -113,11 +113,11 @@ There is no kinematic hold, radial snapping, or hidden takeoff impulse. The hatc
 follows the landed ship, not the old pad marker; clearance uses actual colliders.
 A translucent north-up minimap preserves world context when flying away.
 
-The fixture starts parked on a slowly rotating planet with a stationary center.
+The original fixture starts parked on a slowly rotating planet with a stationary center.
 The spaceling inherits the local surface velocity at spawn; after that only
 gravity and Rapier contacts move it. Do not copy the rover's scripted-orbit
-transport into this controller. Accelerating orbital supports need their own
-regressions before enabling this in ordinary generated Spacewars worlds.
+transport into this controller. The fifth slice below adds controlled orbital
+evidence; arbitrary generated Spacewars orbits still need an explicit policy.
 
 The initial slice disabled capture/services, weapons, and asteroid spawning in
 the fixture. It leaves the ordinary Spacewars game and bot observations unchanged.
@@ -170,14 +170,45 @@ This is deliberately one operator and one outpost, not a general contested-base
 system. The terminal is intact and non-destructible; terrain removal and service
 invalidation need explicit later policy. There are no new weapons, resources,
 pod rebuilding, pilot death rules, or changes to ordinary Spacewars/bots.
-Moving/accelerating-planet evidence and independent pilot/vehicle loss rules
-still precede ordinary-game integration.
+Orbital compatibility and independent pilot/vehicle loss rules still precede
+ordinary-game integration.
 
 Acceptance: an action-driven capture/repair/departure round trip; interrupted
 capture and wrong-support rejection; solid rotating terminal/body-count bounds;
 friendly, live, in-range, landed repair with rate/clamp checks; deterministic
 replay and restart; capture/ownership rendering in both paths and window
 orientations; unchanged landing, normal-game, and pinned bot regressions.
+
+## Fifth slice: orbital surface motion
+
+Implemented on `surface-sortie-motion`. Keep the stationary-center scenario and
+register `surface-sortie-orbit` as another preset of the same scenario, controls,
+landing, and outpost loop. A headless translating preset isolates linear motion.
+The orbital fixture adds one sun and a prescribed circular path whose center
+acceleration matches that sun's gravity. Nearby actors receive the unmodified
+shared gravity field once; no actor attachment, frame transport, or common-field
+subtraction is added. The unused second ship slot is not simulated.
+
+Landing, boarding, and gravity sample the completed terrain pose before the
+next kinematic step. Contact-point velocity accounts for Rapier's potentially
+offset center of mass. The fixture schedules orbit/spin only once per tick.
+Bounded landing and spaceling controllers retain their existing force limits.
+
+Versioned observations expose the completed frame, relative motion, scripted
+acceleration versus external gravity, support losses, knockdowns, damage, and
+planet-local idle drift. The HUD shows a compact subset. Deterministic tests
+cover the full orbital round trip, extended idle support, faster/reverse motion,
+multi-bearing landings, independent jumps/takeoff, and separation when motion
+exceeds the support budget. Desktop lifecycle/render tests cover both presets.
+The user reported successful playtesting of the deployed orbital preset on the
+Pi/controller on 2026-09-06.
+
+This is evidence for a controlled acceleration envelope, not a general solution
+for ordinary planets whose prescribed orbit and gravity masses are chosen
+independently. Decide that policy before enabling natural landing there. Pilot
+loss/rescue, contested infrastructure, terrain, and bot intent remain separate
+slices; this controlled preset's acceptance does not cover arbitrary generated
+orbits or combat.
 
 ## Planet and ship direction
 

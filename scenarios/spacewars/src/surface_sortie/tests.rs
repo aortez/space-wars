@@ -3,6 +3,7 @@ use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
 
+mod motion_tests;
 mod outpost_tests;
 
 fn tick(state: &mut SurfaceSortieState, input: SurfaceSortieAction) {
@@ -20,7 +21,7 @@ fn idle(state: &mut SurfaceSortieState, ticks: usize) {
 }
 
 fn parked() -> SurfaceSortieState {
-    let mut state = SurfaceSortieScenario::init((), 7);
+    let mut state = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7);
     idle(&mut state, 120);
     assert!(state.vehicle_settled(), "{:?}", state.observation());
     state
@@ -33,7 +34,25 @@ fn approach(
     descent: f32,
     sideways: f32,
 ) -> SurfaceSortieState {
-    let mut state = SurfaceSortieScenario::init((), 7);
+    approach_in(
+        SurfaceMotionPreset::Stationary,
+        up_angle,
+        height,
+        tilt,
+        descent,
+        sideways,
+    )
+}
+
+fn approach_in(
+    preset: SurfaceMotionPreset,
+    up_angle: f32,
+    height: f32,
+    tilt: f32,
+    descent: f32,
+    sideways: f32,
+) -> SurfaceSortieState {
+    let mut state = SurfaceSortieScenario::init(preset, 7);
     state.controls_armed = true;
     let planet = state.world.planets[0];
     let up = Vec2::from_radians(up_angle);
@@ -325,9 +344,12 @@ fn spawn_inherits_rotating_surface_velocity_without_transporting_airborne_body()
     let snapshot = state.spaceling_snapshot().unwrap();
     assert_eq!(
         snapshot.motion.linear_velocity,
-        planet_surface_velocity(&planet, snapshot.motion.position)
+        motion::point_velocity(state.planet_motion(), snapshot.motion.position)
     );
-    assert_eq!(snapshot.motion.angular_velocity, planet.wrapper_omega);
+    assert_eq!(
+        snapshot.motion.angular_velocity,
+        state.planet_motion().angular_velocity
+    );
     assert_eq!(snapshot.contacts, 0);
     // In flight, changing the terrain angle must not teleport the actor.
     let body = state.pilot.body.as_ref().unwrap().body();
@@ -464,8 +486,8 @@ fn unsafe_exit_blocked_capsule_remote_or_airborne_boarding_and_lost_vehicle_are_
 
 #[test]
 fn restart_actions_and_observations_are_reproducible_and_malformed_actions_are_rejected() {
-    let mut a = SurfaceSortieScenario::init((), 3);
-    let mut b = SurfaceSortieScenario::init((), 3);
+    let mut a = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 3);
+    let mut b = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 3);
     for frame in 0..800 {
         let input = SurfaceSortieAction {
             interact_held: frame == 120 || frame == 600,
@@ -498,7 +520,15 @@ fn restart_actions_and_observations_are_reproducible_and_malformed_actions_are_r
         .is_none()
     );
     assert_eq!(
-        SurfaceSortieScenario::observe(&SurfaceSortieScenario::init((), 3)).payload,
-        SurfaceSortieScenario::observe(&SurfaceSortieScenario::init((), 3)).payload
+        SurfaceSortieScenario::observe(&SurfaceSortieScenario::init(
+            SurfaceMotionPreset::default(),
+            3
+        ))
+        .payload,
+        SurfaceSortieScenario::observe(&SurfaceSortieScenario::init(
+            SurfaceMotionPreset::default(),
+            3
+        ))
+        .payload
     );
 }

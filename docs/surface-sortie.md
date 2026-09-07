@@ -7,6 +7,17 @@ in the launcher, or run:
 cargo run -p engine-client -- --scenario surface-sortie
 ```
 
+For the same loop on a moving planet, choose **surface-sortie-orbit** in the
+launcher (including gamepad navigation), or run:
+
+```sh
+cargo run -p engine-client -- --scenario surface-sortie-orbit
+```
+
+These are presets of the same scenario, not separate gameplay implementations.
+Restart repeats the selected preset; returning to the launcher preserves its
+selection. Controls and the capture/repair rules are identical.
+
 The fixture starts with your ship at **75% health**, settling rear-first onto a
 slowly rotating planet. Press **B** on a gamepad or **X** on the keyboard to
 disembark. Release the controls, walk right to the amber terminal, and stand
@@ -131,13 +142,15 @@ Boarding requires that same available ship, proximity to its access point,
 physical support, balance, and low support-relative speed. This is a short hatch
 transition, not remote boarding or a physical door/ladder simulation.
 
-At exit the capsule inherits the rotating surface's point velocity and spin.
+At exit the capsule inherits the moving surface's point velocity and spin.
 Afterward Rapier and gravity own its motion; no radial snapping or per-tick
-orbital transport is added. The center is stationary on purpose. Accelerating
-scripted orbits need separate regression evidence before ordinary-world use.
+orbital transport is added. The original preset retains its stationary center;
+the orbital preset and its compatibility boundary are described below.
 
 This is a noncombat fixture: no weapons, asteroids, pod rebuilding, rover
 construction, resources, or win condition. Ordinary Spacewars and its bots are unchanged.
+Only the pilot's ship is simulated; the legacy world's unused second ship slot
+has no physics body, controls, or gravity target to interfere with the experiment.
 If you lose the ship while experimenting with flight, restart; damage, rescue,
 pod, and elimination policy for an independent pilot are not settled here.
 The intact outpost gives walking a useful capture-and-repair loop without
@@ -155,7 +168,7 @@ Headless regressions cover exit/walk/jump/return/reboard without pose shortcuts,
 ship health and creature identity preservation, one-body lifecycle, velocity
 inheritance, no airborne transport, blocked exits, unsafe/remote boarding,
 held-input gating in both directions, and reproducible actions/restarts. Typed
-`SurfaceSortieState::observation()` and version-3 JSON scenario observations
+`SurfaceSortieState::observation()` and version-4 JSON scenario observations
 include landing phase, clearance, angle, relative speeds/spin, foot count,
 assist strength, and settling duration for future runners. Outpost observations
 add identity, position/normal, owner, active claimant, capture eligibility and
@@ -184,7 +197,7 @@ SPACEWARS_SORTIE_ARTIFACTS=target/surface-sortie-poses cargo test -p engine-clie
   outpost_capture_progress_and_owner_flag_render_in_both_backends
 ```
 
-The real-window functional test covers launcher selection, both renderers,
+The real-window functional tests cover both presets' launcher selection, both renderers,
 pause, restart, return, and relaunch, with raster ship/outpost/HUD/minimap visibility checks:
 
 ```sh
@@ -198,3 +211,84 @@ initial sortie and refined assisted landing have both passed manual playtesting.
 The outpost loop also passed user-reported controller playtesting on the
 Raspberry Pi on 2026-09-06: gameplay worked well and the direction was accepted.
 This validates the experimental loop, not a final planet-claiming mechanic.
+
+## Moving-planet evidence
+
+The orbital preset uses a radius-60 planet on a radius-220 circular path at
+0.065 radians/s (14.3 units/s, about 97 seconds per orbit), with the same
+0.015 radians/s surface spin as the original fixture. The yellow central source
+and orbital guide appear on the minimap. A `Translating` Rust configuration
+provides a short, straight-line diagnostic at 3 units/s; it is not another
+launcher entry because an indefinite straight path eventually leaves the map.
+
+Terrain remains position-driven kinematic geometry in the canonical world.
+The fixture schedules its path once per step. Before physics, gravity and
+controls read the completed terrain pose, not its next target; after physics,
+landing and services consume the new completed contacts. Point velocities use
+Rapier's center-of-mass-aware query. A body's origin and center of mass need
+not coincide, so adding angular velocity around the origin to its raw linear
+velocity is not generally correct.
+
+For this controlled orbit, the sun's mass is selected so its gravity at the
+planet center matches the scripted centripetal acceleration. Ships and the
+spaceling receive the ordinary shared field, including its spatial variation,
+once per tick. There is **no** rover-style frame transport, common-gravity
+subtraction, invisible attachment, or extra gravity solve. Jumping and thrusting
+inherit surface momentum and then leave support normally.
+
+This does not establish compatibility with every generated Spacewars planet.
+The ordinary game's scripted orbital rates and gravity masses are selected
+independently; its planets need not follow the acceleration experienced by
+nearby actors. That mismatch and the supported spin/acceleration envelope need
+an explicit policy before replacing ordinary-game docking. This fixture does
+not retune those orbits, gravity, rovers, ships, or bots.
+
+### Motion diagnostics
+
+Version-4 typed/JSON observations add `motion` and `motion_metrics`:
+
+- completed planet position, origin velocity, angle/spin, active-body
+  surface-relative velocity, and actual support-point velocity/relative speed;
+- scripted orbital acceleration and external gravity at the planet center,
+  making their mismatch visible rather than silently compensating for it;
+- on-foot/supported/landed tick counts, unexpected pilot/ship support losses,
+  jumps, knockdowns, landings, deliberate departures, and cumulative ship damage;
+- current and maximum planet-local idle drift of the active actor. Movement,
+  flight, loss of balance, and controller-context changes reset the current
+  interval; the lifetime maximum remains.
+
+Counters advance only in simulation steps. Boarding and commanded jumps are
+not unexpected support losses; service healing does not erase recorded damage.
+The HUD shows the preset, speed/spin, relative speed, support losses, current
+idle drift, and damage. These are scenario observations and HUD diagnostics,
+not a new live IPC gameplay-state API.
+
+### Reproduce the motion tests
+
+```sh
+cargo test -p scenario-spacewars surface_sortie::tests::motion_tests -- --nocapture
+cargo test -p scenario-spacewars outpost_round_trip -- --nocapture
+
+# Isolated headless timing, including assertions/diagnostic reads, not rendered FPS:
+cargo test --release -p scenario-spacewars \
+  orbiting_and_translating_sorties_stay_supported -- --nocapture --test-threads=1
+```
+
+Coverage includes a 200-second orbital idle period, faster/opposite orbit and
+spin, both actors' independent flight, eight-bearing orbital approaches, the full capture/repair/reboard/
+departure loop, deliberately excessive support acceleration, stable body/collider
+counts, and deterministic actions/observations/restarts. Timing is printed for
+comparison but never used as a flaky pass/fail threshold.
+
+One local x86_64 Rust 1.89 release run on 2026-09-06 completed the 12,000-tick
+orbital idle window with pilot support and ship landing on every tick, zero
+support losses/knockdowns/damage, five bodies while on foot, and maximum recorded
+idle drift of 0.128 units. It ran at about 98,000 headless ticks/s including
+assertions and diagnostic reads. This is a tiny-fixture measurement, not rendered
+FPS, Pi performance, or evidence about crowded worlds.
+
+The orbital preset was deployed to `spacewars.local` on 2026-09-06. Runtime
+checks reported about 60 FPS / 60 UPS with the Switch Pro controller connected;
+the user subsequently reported that playtesting seemed good. This adds orbital
+Pi/controller acceptance alongside the previously accepted stationary outpost
+loop, without extending the claim to arbitrary generated planets or combat.

@@ -374,6 +374,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     spaceling_lab::REGISTRATION,
     spacewars::REGISTRATION,
     surface_sortie::REGISTRATION,
+    surface_sortie::ORBIT_REGISTRATION,
 ];
 
 pub fn registrations() -> &'static [ScenarioRegistration] {
@@ -440,7 +441,8 @@ mod tests {
                 "rover-lab",
                 "spaceling-lab",
                 "spacewars",
-                "surface-sortie"
+                "surface-sortie",
+                "surface-sortie-orbit"
             ]
         );
     }
