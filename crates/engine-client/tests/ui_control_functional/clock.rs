@@ -170,23 +170,7 @@ fn falling_digits_recover_and_survive_pause_restart_and_relaunch() {
         assert!(paused.paused);
         assert_eq!(paused.phase.as_deref(), Some("falling"));
         harness.clock_trigger_failure(&paused, ControlFailureCode::WrongScreen);
-        let predicate = ClockStatePredicate {
-            scenario_revision: paused.scenario_revision,
-            lifecycle: Some("active".into()),
-            event_kind: paused.event_kind,
-            phase: paused.phase.clone(),
-            event_id: Some(paused.event_id),
-            min_phase_tick: paused.phase_tick + 1,
-        };
-        let error = harness
-            .client
-            .wait_for_clock_state(&predicate, Duration::from_millis(250))
-            .unwrap_err();
-        harness.record_error("clock wait (paused animation must not advance)", &error);
-        let failure = error.failure().unwrap();
-        assert_eq!(failure.code, ControlFailureCode::Timeout);
-        assert_eq!(failure.current_clock_state.as_ref(), Some(&paused));
-        assert_eq!(harness.clock_state(), paused);
+        harness.assert_clock_stays_paused(&paused);
         harness.capture_screenshot("clock-paused.png");
 
         harness.activate_guarded("pause.resume", &paused_ui);
@@ -371,23 +355,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         let pause_ui = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         let paused = harness.clock_state();
         harness.clock_trigger_failure(&paused, ControlFailureCode::WrongScreen);
-        let error = harness
-            .client
-            .wait_for_clock_state(
-                &ClockStatePredicate {
-                    scenario_revision: paused.scenario_revision,
-                    lifecycle: Some("active".into()),
-                    event_kind: Some(ClockEventKind::ColorCycle),
-                    phase: Some("cycling".into()),
-                    event_id: Some(1),
-                    min_phase_tick: paused.phase_tick + 1,
-                },
-                Duration::from_millis(250),
-            )
-            .unwrap_err();
-        harness.record_error("color wait (paused animation must not advance)", &error);
-        assert_eq!(error.failure().unwrap().code, ControlFailureCode::Timeout);
-        assert_eq!(harness.clock_state(), paused);
+        harness.assert_clock_stays_paused(&paused);
         harness.activate_guarded("pause.resume", &pause_ui);
         let recovered = harness.clock_wait(&initial, "idle", 1, 0);
         assert_eq!(recovered.palette_rgb, initial.palette_rgb);
@@ -439,6 +407,39 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
 }
 
 impl FunctionalHarness {
+    fn assert_clock_stays_paused(&mut self, paused: &ClockState) {
+        assert!(paused.paused);
+        assert_eq!(paused.lifecycle, "active");
+        let predicate = ClockStatePredicate {
+            scenario_revision: paused.scenario_revision,
+            lifecycle: Some("active".into()),
+            event_kind: paused.event_kind,
+            phase: paused.phase.clone(),
+            event_id: Some(paused.event_id),
+            min_phase_tick: paused.phase_tick + 1,
+        };
+        // This is an observation window, not a response-latency requirement.
+        // A loaded runner may receive no replies before this short wait expires.
+        let error = self
+            .client
+            .wait_for_clock_state(&predicate, Duration::from_millis(250))
+            .unwrap_err();
+        self.record_error("clock wait (paused animation must not advance)", &error);
+        let failure = error.failure().unwrap();
+        assert_eq!(failure.code, ControlFailureCode::Timeout);
+        if let Some(observed) = &failure.current_clock_state {
+            assert_eq!(observed, paused);
+        }
+        // Always obtain a fresh successful snapshot with the normal transition
+        // budget. Allowing an absent timeout snapshot must not skip the actual
+        // assertion that the complete paused state is still unchanged.
+        let result = self
+            .client
+            .clock_state_before(Instant::now() + TRANSITION_TIMEOUT);
+        let observed = self.require_clock("clock state (verify paused state after wait)", result);
+        assert_eq!(&observed, paused);
+    }
+
     fn clock_state(&mut self) -> ClockState {
         let result = self.client.clock_state_before(request_deadline());
         self.require_clock("clock state", result)

@@ -45,6 +45,15 @@ Restart and relaunch must create clean instances and retain event settings.
 Busy, paused, stale-instance, stale-event, and inactive-Clock controls are
 rejected. Animation ticks must not invalidate UI revision guards.
 
+Short negative Clock waits check that a paused event does not advance; they
+are not response-latency requirements. A timeout may have no snapshot if no
+reply arrived before its deadline. The UI workflows compare any returned
+snapshot and always require a fresh successful state query afterward, using
+the normal transition budget, to verify the complete paused state is unchanged.
+Display-free `spacewars-control` tests exercise the same polling loop with
+scripted replies and virtual time: no-reply and last-reply timeouts, shared
+deadlines and bounded retry sleeps, successful matches, and error propagation.
+
 The live Clock-controls workflow enters `pause.clock` through the on-face
 control, changes and persists all four settings without replacing the paused
 event, replaces Falling with a Color Cycle preview and vice versa, navigates
