@@ -32,6 +32,8 @@ pub(crate) const MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER: f32 = 2.0;
 pub enum FrameLayout {
     EqualHorizontal,
     SpacewarsLocalPlay,
+    /// One full-window camera with a translucent overview below the top HUD.
+    SinglePlayerWithMinimap,
 }
 
 pub struct VectorPresentation {
@@ -147,14 +149,17 @@ pub fn scene_presentation_from_frames_with_layout(
         main_primitives: Vec::new(),
         minimaps: Vec::new(),
     };
-    let uses_minimap_groups = layout == FrameLayout::SpacewarsLocalPlay && frames.len() >= 4;
-
     for (index, (frame, frame_viewport)) in frames
         .iter()
         .zip(frame_viewports(viewport, frames.len(), layout))
         .enumerate()
     {
-        if uses_minimap_groups && (2..4).contains(&index) {
+        let is_minimap = match layout {
+            FrameLayout::SpacewarsLocalPlay => frames.len() >= 4 && (2..4).contains(&index),
+            FrameLayout::SinglePlayerWithMinimap => frames.len() == 2 && index == 1,
+            FrameLayout::EqualHorizontal => false,
+        };
+        if is_minimap {
             let minimum_object_diameter = (layout == FrameLayout::SpacewarsLocalPlay
                 && (2..4).contains(&index))
             .then_some(MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER);
@@ -184,6 +189,22 @@ pub(crate) fn frame_viewports(
 ) -> Vec<Viewport> {
     match layout {
         FrameLayout::EqualHorizontal => viewport.split_horizontally(count),
+        FrameLayout::SinglePlayerWithMinimap => {
+            if count != 2 {
+                return viewport.split_horizontally(count);
+            }
+            let size = viewport.height.min(viewport.width) * 0.25;
+            let margin = (viewport.height * 0.02).clamp(4.0, 16.0).min(size * 0.2);
+            vec![
+                viewport,
+                Viewport::with_origin(
+                    viewport.x + viewport.width - size - margin,
+                    viewport.y + viewport.height * 0.25,
+                    size,
+                    size,
+                ),
+            ]
+        }
         FrameLayout::SpacewarsLocalPlay => {
             if count < 4 {
                 return viewport.split_horizontally(count);
@@ -248,13 +269,20 @@ pub(crate) fn raster_text_overlay(
     viewport: Viewport,
     layout: FrameLayout,
 ) -> Vec<ScenePrimitive> {
-    if layout != FrameLayout::EqualHorizontal {
+    if layout == FrameLayout::SpacewarsLocalPlay {
         return Vec::new();
     }
     let mut output = Vec::new();
     for (frame, pane) in frames
         .iter()
         .zip(frame_viewports(viewport, frames.len(), layout))
+        .take(
+            if layout == FrameLayout::SinglePlayerWithMinimap && frames.len() == 2 {
+                1
+            } else {
+                frames.len()
+            },
+        )
     {
         for layer in frame.ordered_layers() {
             for primitive in &layer.primitives {
@@ -867,6 +895,38 @@ mod tests {
         assert_close(primitives[1].y, 0.0);
         assert_close(primitives[1].width, 100.0);
         assert_close(primitives[1].height, 100.0);
+    }
+
+    #[test]
+    fn single_player_overview_keeps_the_main_camera_full_size_and_groups_only_the_map() {
+        let frames = [
+            frame_with_triangle(RenderColor::RED),
+            frame_with_triangle(RenderColor::BLUE),
+        ];
+        for viewport in [
+            Viewport::new(1280.0, 720.0),
+            Viewport::with_origin(12.0, 20.0, 720.0, 1280.0),
+        ] {
+            let layout = FrameLayout::SinglePlayerWithMinimap;
+            let panes = frame_viewports(viewport, 2, layout);
+            assert_eq!(panes[0], viewport);
+            let presentation =
+                scene_presentation_from_frames_with_layout(&frames, viewport, layout);
+            assert_eq!(presentation.main_primitives.len(), 1);
+            assert_eq!(presentation.minimaps.len(), 1);
+            let minimap = &presentation.minimaps[0];
+            assert_eq!(minimap.viewport, panes[1]);
+            assert_eq!(minimap.viewport.width, minimap.viewport.height);
+            assert!(minimap.viewport.x >= viewport.x);
+            assert!(minimap.viewport.x + minimap.viewport.width <= viewport.x + viewport.width);
+            assert!(minimap.viewport.y > viewport.y + viewport.height * 0.23);
+            assert!(
+                minimap.viewport.y + minimap.viewport.height < viewport.y + viewport.height * 0.72
+            );
+            assert_eq!(minimap.primitives[0].x, 0.0);
+            assert_eq!(minimap.primitives[0].y, 0.0);
+            assert_eq!(minimap.primitives[0].width, panes[1].width);
+        }
     }
 
     #[test]

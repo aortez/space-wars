@@ -34,6 +34,10 @@ const SPACEPORT_SENSOR_ROLE: ColliderRole = ColliderRole::new(3);
 const SHIP_HULL_ROLE: ColliderRole = ColliderRole::new(5);
 const DEBRIS_ROLE: ColliderRole = ColliderRole::new(6);
 const ROVER_SURFACE_ROLE: ColliderRole = ColliderRole::new(7);
+const LANDING_FOOT_ROLE: ColliderRole = ColliderRole::new(8);
+
+pub(super) const LANDING_FOOT_RADIUS: f32 = 0.45;
+pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0, -5.0)];
 
 const GROUP_SHIP_0: u32 = 1 << 0;
 const GROUP_SHIP_1: u32 = 1 << 1;
@@ -45,9 +49,17 @@ const GROUP_WORLD: u32 = 1 << 6;
 const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
 const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
+const GROUP_SPACELING: u32 = 1 << 11;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
 const GROUP_ALL_SOLIDS: u32 =
-    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER;
+    GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER | GROUP_SPACELING;
+
+pub(super) fn spaceling_collision_groups() -> CollisionGroups {
+    CollisionGroups::new(
+        GROUP_SPACELING,
+        GROUP_ROVER_SURFACE | GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_WORLD,
+    )
+}
 
 const WORLD_SURFACE_SEGMENTS: usize = 192;
 // The full ship silhouette is intentionally broad. Use a body-sized,
@@ -149,10 +161,12 @@ struct RoverPhysicsEntry {
 
 #[derive(Debug, Clone)]
 pub(super) struct SpacewarsPhysics {
-    world: PhysicsWorld,
+    pub(super) world: PhysicsWorld,
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
     docked_planets: [Option<usize>; 2],
+    // Opt-in physical landing assembly; ordinary Spacewars retains its berths.
+    surface_ship: Option<usize>,
     tick: u64,
     contact_last_seen: BTreeMap<(MechanicalEntity, MechanicalEntity), u64>,
     pre_step_motions: BTreeMap<MechanicalEntity, BodyMotion>,
@@ -192,6 +206,7 @@ impl SpacewarsPhysics {
             sun_radius: None,
             ship_keys: [None, None],
             docked_planets: [None, None],
+            surface_ship: None,
             tick: 0,
             contact_last_seen: BTreeMap::new(),
             pre_step_motions: BTreeMap::new(),
@@ -272,6 +287,24 @@ impl SpacewarsPhysics {
         }
 
         for (index, ship) in ships.iter_mut().enumerate() {
+            if self.surface_ship == Some(index) {
+                self.docked_planets[index] = None;
+                let key = ShipColliderKey {
+                    form: ship.form,
+                    wing_theta: ship.wing_theta.to_bits(),
+                    docked: false,
+                    compact: false,
+                    constrained: false,
+                };
+                if self.ship_keys[index] != Some(key) {
+                    lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
+                    lifecycle.added +=
+                        usize::from(self.insert_ship(index, ship, false, false, false));
+                } else {
+                    synchronize_ship_to_physics(&mut self.world, index, ship);
+                }
+                continue;
+            }
             // A pod is captured automatically so it can rebuild. A full ship
             // establishes the stronger docking hold with its brake; otherwise
             // a ship that merely coasts across the pad would be latched there
@@ -361,6 +394,45 @@ impl SpacewarsPhysics {
             .get(index)
             .and_then(|key| *key)
             .is_some_and(|key| key.constrained)
+    }
+
+    pub(super) fn enable_surface_landing(&mut self, index: usize, ship: &ShipState) {
+        self.surface_ship = Some(index);
+        self.docked_planets[index] = None;
+        self.world.remove_entity(ship_entity(index));
+        assert!(self.insert_ship(index, ship, false, false, false));
+    }
+
+    pub(super) fn ship_body(&self, index: usize) -> PhysicsBodyId {
+        primary_body(ship_entity(index))
+    }
+
+    /// Solver-backed rear-foot support within contact slop, not hull or port overlap.
+    pub(super) fn landing_feet_supported(&self, index: usize, planet: usize, up: Vec2) -> usize {
+        let body = self.ship_body(index);
+        let Some(motion) = self.world.motion(body) else {
+            return 0;
+        };
+        (0..LANDING_FEET.len())
+            .filter(|&part| {
+                self.world
+                    .surface_contacts(collider_id(
+                        ship_entity(index),
+                        LANDING_FOOT_ROLE,
+                        part as u16,
+                    ))
+                    .any(|contact| {
+                        let offset = contact.position - motion.position;
+                        let velocity = motion.linear_velocity
+                            + Vec2::new(-offset.y, offset.x) * motion.angular_velocity;
+                        contact.collider.entity == planet_entity(planet)
+                            && contact.collider.role == ROVER_SURFACE_ROLE
+                            && contact.separation <= 0.04
+                            && contact.normal.dot(up) >= 0.7
+                            && (velocity - contact.velocity).dot(contact.normal) <= 1.0
+                    })
+            })
+            .count()
     }
 
     fn capture_pre_step_motions(&mut self) {
@@ -752,8 +824,10 @@ impl SpacewarsPhysics {
         );
         collider.restitution = DEFAULT_ELASTICITY;
         collider.friction = 0.0;
-        collider.collision_groups =
-            CollisionGroups::new(GROUP_WORLD, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER);
+        collider.collision_groups = CollisionGroups::new(
+            GROUP_WORLD,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER | GROUP_SPACELING,
+        );
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -796,8 +870,8 @@ impl SpacewarsPhysics {
         let entity = planet_entity(index);
         let body_groups = CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
         let mut colliders = planet_solid_colliders(entity, planet.radius, body_groups);
-        // Ships use one continuous frictionless, elastic surface. Rovers get a
-        // separate traction surface on the same kinematic body.
+        // Ordinary ships use the elastic surface. Surface vehicles and
+        // spacelings opt into traction instead; never both coincident surfaces.
         let mut rover_surface = ColliderSpec::ball(
             collider_id(entity, ROVER_SURFACE_ROLE, 0),
             planet.radius * BODY_BOUNDS_RADIUS_SCALE,
@@ -805,7 +879,10 @@ impl SpacewarsPhysics {
         rover_surface.density = 0.0;
         rover_surface.friction = 1.25;
         rover_surface.restitution = 0.0;
-        rover_surface.collision_groups = CollisionGroups::new(GROUP_ROVER_SURFACE, GROUP_ROVER);
+        rover_surface.collision_groups = CollisionGroups::new(
+            GROUP_ROVER_SURFACE,
+            GROUP_ROVER | GROUP_SPACELING | GROUP_ALL_SHIPS,
+        );
         rover_surface.solver_groups = rover_surface.collision_groups;
         colliders.push(rover_surface);
 
@@ -847,7 +924,11 @@ impl SpacewarsPhysics {
         constrained: bool,
     ) -> bool {
         let entity = ship_entity(index);
-        let colliders = ship_colliders(entity, ship, docked, compact);
+        let colliders = if self.surface_ship == Some(index) {
+            surface_ship_colliders(entity, ship)
+        } else {
+            ship_colliders(entity, ship, docked, compact)
+        };
         let inserted = self.world.insert_body(
             primary_body(entity),
             BodySpec {
@@ -1008,7 +1089,7 @@ fn ship_collision_groups(ship: &ShipState, docked: bool) -> CollisionGroups {
         ShipForm::EscapePod if ship.owner_id == 0 => GROUP_POD_0,
         ShipForm::EscapePod => GROUP_POD_1,
     };
-    let mut filter = GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR;
+    let mut filter = GROUP_WORLD | GROUP_DEBRIS | GROUP_SPACEPORT_SENSOR | GROUP_SPACELING;
     if !docked {
         filter |= GROUP_BODY | GROUP_ALL_SHIPS;
     }
@@ -1097,6 +1178,35 @@ fn ship_colliders(
         colliders.push(probe);
     }
 
+    colliders
+}
+
+fn surface_ship_colliders(entity: PhysicsId, ship: &ShipState) -> Vec<ColliderSpec> {
+    let mut colliders = ship_colliders(entity, ship, false, false);
+    let hull = &mut colliders[0];
+    hull.friction = 0.8;
+    hull.restitution = 0.0;
+    hull.collision_groups.filter = (hull.collision_groups.filter
+        & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
+        | GROUP_ROVER_SURFACE;
+    hull.solver_groups = hull.collision_groups;
+    let groups = hull.collision_groups;
+    if ship.form == ShipForm::Ship {
+        for (part, position) in LANDING_FEET.into_iter().enumerate() {
+            let mut foot = ColliderSpec::ball(
+                collider_id(entity, LANDING_FOOT_ROLE, part as u16),
+                LANDING_FOOT_RADIUS,
+            );
+            foot.local_position = position;
+            // Small feet extend behind the hull; no overlapping hull pieces,
+            // extra bodies/joints, or changes to the ship's inertial mass.
+            foot.density = 0.0;
+            foot.friction = 1.0;
+            foot.collision_groups = groups;
+            foot.solver_groups = groups;
+            colliders.push(foot);
+        }
+    }
     colliders
 }
 

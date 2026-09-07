@@ -296,6 +296,16 @@ impl ClientInput {
         (walk, gamepad.south, gamepad.east)
     }
 
+    pub(crate) fn surface_sortie_brake_held(&self) -> bool {
+        self.is_pressed(GameKey::P1Brake)
+            || self.is_pressed(GameKey::NesDown)
+            || self
+                .gamepads
+                .borrow()
+                .seat(0)
+                .is_some_and(|pad| pad.connected && pad.dpad_down)
+    }
+
     pub(crate) fn nes_controller_buttons(&self, player: usize) -> ControllerButtons {
         let mut buttons = ControllerButtons::NONE;
         let pressed = self.pressed.borrow();

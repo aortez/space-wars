@@ -1468,23 +1468,23 @@ fn set_vector_presentation(window: &MainWindow, presentation: render::VectorPres
     window.set_minimap_opacity(render::SPACEWARS_MINIMAP_OPACITY);
 
     let mut minimaps = presentation.minimaps.into_iter();
+    // Clear the unused group when switching from two player maps to one (or none).
+    window.set_p2_minimap_size(0.0);
+    window.set_p2_minimap_primitives(ModelRc::default());
     let Some(player_1) = minimaps.next() else {
         window.set_vector_minimaps_visible(false);
         return;
     };
-    let Some(player_2) = minimaps.next() else {
-        window.set_vector_minimaps_visible(false);
-        return;
-    };
-
     window.set_p1_minimap_x(player_1.viewport.x);
     window.set_p1_minimap_y(player_1.viewport.y);
     window.set_p1_minimap_size(player_1.viewport.width);
     window.set_p1_minimap_primitives(ModelRc::new(VecModel::from(player_1.primitives)));
-    window.set_p2_minimap_x(player_2.viewport.x);
-    window.set_p2_minimap_y(player_2.viewport.y);
-    window.set_p2_minimap_size(player_2.viewport.width);
-    window.set_p2_minimap_primitives(ModelRc::new(VecModel::from(player_2.primitives)));
+    if let Some(player_2) = minimaps.next() {
+        window.set_p2_minimap_x(player_2.viewport.x);
+        window.set_p2_minimap_y(player_2.viewport.y);
+        window.set_p2_minimap_size(player_2.viewport.width);
+        window.set_p2_minimap_primitives(ModelRc::new(VecModel::from(player_2.primitives)));
+    }
     window.set_vector_minimaps_visible(true);
 }
 
@@ -2219,6 +2219,46 @@ mod tests {
     use crate::input::ScreenPointerEvent;
 
     const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
+
+    #[test]
+    fn vector_minimap_groups_switch_between_two_one_and_none_without_stale_maps() {
+        use slint::Model;
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+        struct TestPlatform;
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+            }
+        }
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        for count in [2, 1, 0, 2] {
+            let presentation = render::VectorPresentation {
+                main_primitives: Vec::new(),
+                minimaps: (0..count)
+                    .map(|index| render::VectorMinimap {
+                        viewport: Viewport::with_origin(index as f32 * 100.0, 10.0, 80.0, 80.0),
+                        primitives: vec![crate::ScenePrimitive::default()],
+                    })
+                    .collect(),
+            };
+            set_vector_presentation(&window, presentation);
+            assert_eq!(window.get_vector_minimaps_visible(), count > 0);
+            if count > 0 {
+                assert_eq!(window.get_p1_minimap_size(), 80.0);
+                assert_eq!(window.get_p1_minimap_primitives().row_count(), 1);
+            }
+            assert_eq!(
+                window.get_p2_minimap_size(),
+                if count == 2 { 80.0 } else { 0.0 }
+            );
+            assert_eq!(
+                window.get_p2_minimap_primitives().row_count(),
+                usize::from(count == 2)
+            );
+        }
+    }
 
     fn hosted_scenario(name: &str, seed: u64) -> Result<HostedScenario, HostError> {
         HostedScenario::new(

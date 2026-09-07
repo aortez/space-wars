@@ -4651,6 +4651,7 @@ dependencies = [
  "engine-rapier",
  "image",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -34,6 +34,10 @@ The local launcher currently hosts seven playable scenarios:
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating
   planet, with gravity-relative upright control and visible contact diagnostics.
   See [Spaceling Lab](docs/spaceling-lab.md).
+- **Surface Sortie** — an opt-in Spacewars pilot/vehicle experiment: land
+  rear-first with flight assistance, walk/jump on the planet, and reboard the
+  same physical ship. Includes a translucent minimap and landing diagnostics.
+  See [Surface Sortie](docs/surface-sortie.md) for controls and scope.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
@@ -86,6 +90,7 @@ cargo run -p engine-client -- --scenario pizza
 cargo run -p engine-client -- --scenario clock
 cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
+cargo run -p engine-client -- --scenario surface-sortie
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```
