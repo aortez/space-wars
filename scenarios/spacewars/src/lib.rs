@@ -5,6 +5,7 @@
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
 mod physics;
+pub mod surface_sortie;
 
 use std::{
     collections::{BTreeMap, BTreeSet, BinaryHeap},
@@ -178,6 +179,7 @@ const GRAVITY_DEBRIS_TAG: u64 = 3;
 const GRAVITY_PARTICLE_TAG: u64 = 4;
 const GRAVITY_ROVER_TAG: u64 = 5;
 const GRAVITY_ROVER_FRAME_TAG: u64 = 6;
+const GRAVITY_SURFACE_PILOT_TAG: u64 = 7;
 const ROVER_BODY_COUNT: u64 = 3;
 
 pub const SPACEWARS_PLAYER_COUNT: usize = 2;
@@ -1277,6 +1279,34 @@ impl Scenario for SpacewarsScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
+        Self::step_with_surface_pilot(state, actions, dt, None)
+    }
+
+    fn observe(_state: &Self::State) -> Observation {
+        Observation {
+            payload: Vec::new(),
+        }
+    }
+
+    fn render_frame(state: &Self::State) -> RenderFrame {
+        render_state(state)
+    }
+
+    fn tick_model() -> TickModel {
+        TickModel::FixedTimestep { hz: 60 }
+    }
+}
+
+impl SpacewarsScenario {
+    // The opt-in fixture shares this exact physics step. Ordinary Spacewars
+    // passes no pilot and retains its existing services and observation model.
+    fn step_with_surface_pilot(
+        state: &mut SpacewarsState,
+        actions: &[Action],
+        dt: Duration,
+        mut surface_pilot: Option<&mut surface_sortie::SurfacePilot>,
+    ) -> StepResult {
+        let experimental = surface_pilot.is_some();
         state.last_step_metrics = SpacewarsStepMetrics::default();
         if state.winner.is_some() {
             return StepResult::default();
@@ -1293,13 +1323,31 @@ impl Scenario for SpacewarsScenario {
                 planet.update_orbit(sun.position, dt);
             }
         }
-        update_spaceports(state, dt);
-        reconcile_rover_deployments(state, dt);
+        if !experimental {
+            update_spaceports(state, dt);
+            reconcile_rover_deployments(state, dt);
+        }
         update_rover_patrol(state);
 
         let universe_radius = state.config.universe_radius as f32;
-        for ship in &mut state.ships {
-            ship.update(dt, state.seed, state.tick);
+        for (index, ship) in state.ships.iter_mut().enumerate() {
+            if surface_pilot
+                .as_ref()
+                .is_some_and(|pilot| pilot.vehicle_index() == index)
+            {
+                // The fixture's bounded flight controller owns control impulses;
+                // retain visual exhaust without the legacy brake/turn velocity edits.
+                ship.update_exhaust_trails(dt);
+                if ship.thrust > 0.0 {
+                    ship.fire_exhaust(
+                        ship.direction,
+                        &mut exhaust_rng_for_tick(state.seed, state.tick, index),
+                        state.tick,
+                    );
+                }
+            } else {
+                ship.update(dt, state.seed, state.tick);
+            }
             recover_ship_outside_universe(ship, universe_radius);
         }
         finish_spaceport_ejections(state, dt);
@@ -1312,8 +1360,21 @@ impl Scenario for SpacewarsScenario {
         let lifecycle_time = lifecycle_started.elapsed();
 
         let gravity_started = Instant::now();
-        let gravity = apply_world_gravity(state);
+        let gravity = if let Some(pilot) = surface_pilot.as_deref_mut() {
+            apply_world_gravity_with_pilot(state, Some(pilot), dt)
+        } else {
+            apply_world_gravity(state)
+        };
         let gravity_time = gravity_started.elapsed();
+
+        if let Some(pilot) = surface_pilot {
+            pilot.control_vehicle(
+                &mut state.physics,
+                &state.ships[pilot.vehicle_index()],
+                &state.planets[0],
+                dt,
+            );
+        }
 
         let rapier = state.physics.step(dt);
         state
@@ -1327,7 +1388,11 @@ impl Scenario for SpacewarsScenario {
 
         let contacts = state.physics.contacts();
         let port_intersections = state.physics.spaceport_contacts();
-        let accepted_ports = resolve_physics_spaceport_contacts(state, &port_intersections);
+        let accepted_ports = if experimental {
+            BTreeSet::new()
+        } else {
+            resolve_physics_spaceport_contacts(state, &port_intersections)
+        };
         resolve_physics_collisions(state, &contacts, &accepted_ports);
         handle_ship_deaths(state);
         handle_rover_deaths(state);
@@ -1337,7 +1402,9 @@ impl Scenario for SpacewarsScenario {
         remove_finished_debris(state);
         update_particles(state, dt);
         spawn_random_asteroid(state, dt);
-        update_game_over(state);
+        if !experimental {
+            update_game_over(state);
+        }
 
         state.tick += 1;
         let accounted = lifecycle_time + gravity_time + collision_time + rapier.wall_time;
@@ -1353,20 +1420,6 @@ impl Scenario for SpacewarsScenario {
             rapier,
         };
         StepResult::default()
-    }
-
-    fn observe(_state: &Self::State) -> Observation {
-        Observation {
-            payload: Vec::new(),
-        }
-    }
-
-    fn render_frame(state: &Self::State) -> RenderFrame {
-        render_state(state)
-    }
-
-    fn tick_model() -> TickModel {
-        TickModel::FixedTimestep { hz: 60 }
     }
 }
 
@@ -2319,6 +2372,14 @@ fn body_mass(radius: f32) -> f32 {
 }
 
 fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
+    apply_world_gravity_with_pilot(state, None, state.config.delta_time())
+}
+
+fn apply_world_gravity_with_pilot(
+    state: &mut SpacewarsState,
+    mut pilot: Option<&mut surface_sortie::SurfacePilot>,
+    dt: f32,
+) -> GravityStepMetrics {
     let SpacewarsState {
         tick,
         ships,
@@ -2333,6 +2394,9 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
         ..
     } = state;
     gravity_participants.clear();
+    if let Some(pilot) = pilot.as_deref_mut() {
+        pilot.ship_gravity_delta = Vec2::ZERO;
+    }
 
     if let Some(sun) = *sun {
         gravity_participants.push(GravityParticipant::direct_source(
@@ -2348,6 +2412,13 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
             planet.mass,
         )
     }));
+    if let Some(snapshot) = pilot.as_deref().and_then(|pilot| pilot.snapshot(physics)) {
+        gravity_participants.push(GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_SURFACE_PILOT_TAG, 0),
+            snapshot.motion.position,
+            1.0,
+        ));
+    }
     gravity_participants.extend(
         ships
             .iter()
@@ -2428,12 +2499,29 @@ fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
         .collect::<BTreeMap<_, _>>();
     for output in outputs {
         let (tag, payload) = split_gravity_id(output.id);
-        if output.velocity_delta == Vec2::ZERO && tag != GRAVITY_ROVER_TAG {
+        if output.velocity_delta == Vec2::ZERO
+            && tag != GRAVITY_ROVER_TAG
+            && tag != GRAVITY_SURFACE_PILOT_TAG
+        {
             continue;
         }
         match tag {
+            GRAVITY_SURFACE_PILOT_TAG => {
+                if let Some(pilot) = pilot.as_deref_mut() {
+                    // Spacewars' historical gravity scale is a per-fixed-tick
+                    // velocity delta. Convert it to acceleration for the
+                    // controller's disturbance reference, then apply it once.
+                    pilot.apply_gravity_and_control(physics, output.velocity_delta, dt);
+                }
+            }
             GRAVITY_SHIP_TAG => {
                 let index = usize::try_from(payload).expect("ship gravity id fits usize");
+                if let Some(pilot) = pilot
+                    .as_deref_mut()
+                    .filter(|pilot| pilot.vehicle_index() == index)
+                {
+                    pilot.ship_gravity_delta = output.velocity_delta;
+                }
                 assert!(physics.apply_velocity_delta(
                     MechanicalEntity::Ship(index),
                     output.velocity_delta,

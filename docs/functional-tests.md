@@ -64,6 +64,12 @@ enabled. Character mechanics and deterministic movement are tested headlessly
 in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is a
 manual check.
 
+Surface Sortie uses the same launcher/pause/restart workflow with both renderers;
+its raster check requires the landed ship, diagnostics, and minimap planet. The client unit
+tests also render the disembarked spaceling, while `scenario-spacewars` exercises
+the complete physical exit/walk/jump/return/board loop and input gating. See
+[Surface Sortie](surface-sortie.md) for the manual controls and retained images.
+
 The harness uses Slint's software backend, which does not draw vector paths.
 Selecting vector verifies host lifecycle and text there, not vector geometry.
 Spaceling Lab additionally checks that the raster screenshot contains the character

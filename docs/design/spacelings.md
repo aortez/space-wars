@@ -88,6 +88,52 @@ vehicle entry/exit, and useful surface interactions. Population measurements
 remain necessary before expanding to crowds; articulated ragdolls are optional
 follow-up work.
 
+## Third slice: opt-in surface sortie
+
+Implemented on `spaceling-surface-sortie`; the first-pass round trip and assisted
+physical landing/minimap refinements passed manual playtesting.
+The [fixture guide](../surface-sortie.md) documents its boundaries.
+
+Start with `surface-sortie`, a single-player fixture inside the Spacewars scenario
+crate. It uses the existing Spacewars world, ship assemblies, gravity pass, and
+physics step, not a second lab physics pipeline. A pilot has a stable identity
+and owner independent of the ship, and is either aboard that ship or represented
+by one physical spaceling outside it. Boarding removes only the external body;
+it does not recreate or heal the ship. An unoccupied ship remains in the world.
+
+Use a fresh interaction press to disembark from a physically landed ship, and to reboard
+near its surface access point while supported and settled. Reject unsafe exits,
+blocked placement, remote boarding, and unavailable vehicles with visible
+feedback. Require controls to return to neutral after a successful transfer.
+The fixture no longer uses the old elevated berth. Two rear feet on the dynamic
+ship body establish landing through actual contacts, alignment, low relative
+speed/spin, and a short settling interval. Nearby nose-outward flight assistance
+damps sideways motion/spin and bounds descent without auto-pointing or hovering.
+There is no kinematic hold, radial snapping, or hidden takeoff impulse. The hatch
+follows the landed ship, not the old pad marker; clearance uses actual colliders.
+A translucent north-up minimap preserves world context when flying away.
+
+The fixture starts parked on a slowly rotating planet with a stationary center.
+The spaceling inherits the local surface velocity at spawn; after that only
+gravity and Rapier contacts move it. Do not copy the rover's scripted-orbit
+transport into this controller. Accelerating orbital supports need their own
+regressions before enabling this in ordinary generated Spacewars worlds.
+
+This slice disables capture/services, weapons, and asteroid spawning in the
+fixture. It leaves the ordinary Spacewars game and bot observations unchanged.
+Pilot damage, ship destruction while unoccupied, rescue/pods/elimination, NPC
+policy, and the contested outpost reward loop require explicit later policy;
+the fixture reports a lost vehicle and offers restart rather than inventing
+those rules. The next gameplay slice can make walking useful through an intact
+outpost capture and repair/rebuild service.
+
+Acceptance: rear-first landing at multiple bearings, physical takeoff/return,
+bounded assist, rejected hover/nose contact, parked exit/walk/jump/reboard,
+moving-surface velocity inheritance,
+actual collider clearance, fresh-input gating, preserved ship state, rejected
+unsafe transitions, deterministic restart/observations, both renderers and the
+standard launcher/pause flow, plus unchanged ordinary-game regressions.
+
 ## Planet and ship direction
 
 The continuous surface and external berth from PR #40 fix the interior-bay
@@ -98,8 +144,9 @@ landing, independently of ownership or services.
 
 Capture, healing, and pod rebuilding remain explicit scenario policies.
 Natural contact anywhere must not automatically provide those services.
-Replace the ship berth in a later slice, with launch/landing, damage, bot, and
-moving-planet regressions; Spaceling Lab does not change those rules.
+Surface Sortie now exercises natural rear-first landing in isolation. Replace
+the ordinary game's berth in a later slice, with launch/landing, damage, bot,
+and moving-planet regressions; neither lab changes those ordinary-game rules.
 
 [Cell-based terrain (#16)](https://github.com/aortez/space-wars/issues/16)
 should start from the continuous exterior, not recreate a cavity or ownership

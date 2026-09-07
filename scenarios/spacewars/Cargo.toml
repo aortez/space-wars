@@ -12,6 +12,7 @@ engine-core = { workspace = true }
 engine-gravity = { workspace = true }
 engine-rapier = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 bincode = { workspace = true }

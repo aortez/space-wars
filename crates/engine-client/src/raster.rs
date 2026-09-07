@@ -216,6 +216,19 @@ impl RasterRenderer {
                     starfield_cache,
                     &mut timings,
                 );
+            } else if layout == FrameLayout::SinglePlayerWithMinimap && frames.len() == 2 {
+                let viewports =
+                    render::frame_viewports(Viewport::new(width as f32, height as f32), 2, layout);
+                let started = Instant::now();
+                canvas.draw_frame(&frames[0], viewports[0]);
+                timings.other_frames += started.elapsed();
+                draw_uncached_overview(
+                    &mut canvas,
+                    &frames[1],
+                    viewports[1],
+                    overview_buffers,
+                    &mut timings,
+                );
             } else if !frames.is_empty() {
                 let viewports = render::frame_viewports(
                     Viewport::new(width as f32, height as f32),
@@ -405,6 +418,39 @@ fn draw_cached_overview(
         overlay.pixels.as_slice(),
         overlay.width,
         overlay.height,
+        viewport.x.round() as i32,
+        viewport.y.round() as i32,
+        render::SPACEWARS_MINIMAP_OPACITY,
+    );
+    timings.overview_blit += started.elapsed();
+}
+
+/// Small scenario-defined overviews have no Spacewars layer/cache conventions.
+/// Composite the complete opaque backing and scene once, just like vector groups.
+fn draw_uncached_overview(
+    canvas: &mut Canvas<'_>,
+    frame: &RenderFrame,
+    viewport: Viewport,
+    buffers: &mut OverviewBuffers,
+    timings: &mut RasterTimings,
+) {
+    let width = viewport.width.ceil().max(1.0) as u32;
+    let height = viewport.height.ceil().max(1.0) as u32;
+    let overlay = buffers.composite[0].get_or_insert_with(|| CachedRaster::new(width, height));
+    if overlay.width != width || overlay.height != height {
+        *overlay = CachedRaster::new(width, height);
+    }
+    let started = Instant::now();
+    let pixels = overlay.pixels.make_mut_slice();
+    clear_pixels(pixels);
+    Canvas::new(width, height, pixels)
+        .draw_frame(frame, Viewport::new(width as f32, height as f32));
+    timings.overview_live += started.elapsed();
+    let started = Instant::now();
+    canvas.blit_circle_with_opacity(
+        overlay.pixels.as_slice(),
+        width,
+        height,
         viewport.x.round() as i32,
         viewport.y.round() as i32,
         render::SPACEWARS_MINIMAP_OPACITY,
@@ -1983,6 +2029,58 @@ mod tests {
 
         assert_eq!(left_overview_center, BACKGROUND);
         assert!(right_overview_center.b > BACKGROUND.b);
+    }
+
+    #[test]
+    fn single_player_minimap_has_one_translucent_backing_and_keeps_its_corners_clear() {
+        let camera = Camera2::new(RenderPoint::ZERO, 100.0);
+        let mut player = RenderFrame::new(camera);
+        player.push_primitive(
+            0,
+            RenderPrimitive::Circle(RenderCircle::filled(
+                RenderPoint::ZERO,
+                100.0,
+                RenderColor::RED,
+            )),
+        );
+        let mut minimap = RenderFrame::new(camera);
+        let frames = [player.clone(), minimap.clone()];
+        let viewport = Viewport::new(100.0, 100.0);
+        let layout = FrameLayout::SinglePlayerWithMinimap;
+        let pane = render::frame_viewports(viewport, 2, layout)[1];
+        let x = (pane.x + pane.width * 0.5).round() as usize;
+        let y = (pane.y + pane.height * 0.5).round() as usize;
+        let mut renderer = RasterRenderer::new();
+        let empty = renderer
+            .image_from_frames_with_layout(&frames, viewport, layout, RasterOptions::default())
+            .to_rgb8()
+            .unwrap();
+        let backing = empty.as_slice()[y * 100 + x];
+        assert!(backing.r > BACKGROUND.r && backing.r < 255);
+        assert_eq!(
+            empty.as_slice()[pane.y as usize * 100 + pane.x as usize].r,
+            255
+        );
+        // Opaque overlapping items are composited within the map, not individually
+        // faded over the player. The top item completely hides the lower one.
+        for color in [RenderColor::GREEN, RenderColor::BLUE] {
+            minimap.push_primitive(
+                0,
+                RenderPrimitive::Circle(RenderCircle::filled(RenderPoint::ZERO, 15.0, color)),
+            );
+        }
+        let layered = renderer
+            .image_from_frames_with_layout(
+                &[player, minimap],
+                viewport,
+                layout,
+                RasterOptions::default(),
+            )
+            .to_rgb8()
+            .unwrap();
+        let center = layered.as_slice()[y * 100 + x];
+        assert!(center.r > 0 && center.b > 150);
+        assert_eq!(center.g, 0);
     }
 
     #[test]

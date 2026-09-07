@@ -1070,6 +1070,42 @@ impl PhysicsWorld {
             })
     }
 
+    /// Test placement against solid colliders in the last completed physics
+    /// step's spatial index. Call before mutating scene poses for the next step.
+    /// Malformed capsules fail closed. Intended for infrequent spawn/entry
+    /// checks, not a replacement for the narrow-phase support iterator.
+    pub fn capsule_is_clear(
+        &self,
+        position: Vec2,
+        angle: f32,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+    ) -> bool {
+        if !finite_vec2(position)
+            || !angle.is_finite()
+            || !half_segment.is_finite()
+            || half_segment < 0.0
+            || !radius.is_finite()
+            || radius <= 0.0
+        {
+            return false;
+        }
+        let capsule = ColliderBuilder::capsule_y(half_segment, radius).build();
+        self.raw
+            .intersect_shape(
+                Pose::new(to_rapier(position), angle),
+                capsule.shape(),
+                QueryFilter {
+                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                    groups: Some(groups.to_rapier()),
+                    ..QueryFilter::default()
+                },
+            )
+            .next()
+            .is_none()
+    }
+
     pub fn cast_ray(
         &self,
         origin: Vec2,
@@ -1756,6 +1792,48 @@ mod tests {
         let intersection = world.sensor_intersections()[0];
         assert!(intersection.collider_a < intersection.collider_b);
         assert!([intersection.collider_a, intersection.collider_b].contains(&sensor_id));
+    }
+
+    #[test]
+    fn capsule_clearance_respects_solids_groups_rotation_and_invalid_input() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (_, body, collider) = ball_ids(10);
+        let mut shape = ColliderSpec::ball(collider, 1.0);
+        shape.collision_groups = CollisionGroups::new(1, 2);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..BodySpec::default()
+            },
+            &[shape]
+        ));
+        world.step(1.0 / 60.0);
+        let groups = CollisionGroups::new(2, 1);
+        assert!(!world.capsule_is_clear(Vec2::new(0.0, 1.5), 0.0, 0.6, 0.3, groups));
+        assert!(world.capsule_is_clear(
+            Vec2::new(0.0, 1.5),
+            std::f32::consts::FRAC_PI_2,
+            0.6,
+            0.3,
+            groups
+        ));
+        assert!(world.capsule_is_clear(Vec2::ZERO, 0.0, 0.6, 0.3, CollisionGroups::NONE));
+        assert!(!world.capsule_is_clear(Vec2::ZERO, f32::NAN, 0.6, 0.3, groups));
+        assert!(!world.capsule_is_clear(Vec2::ZERO, 0.0, 0.6, -0.3, groups));
+        world.remove_entity(body.entity);
+        let mut sensor = ColliderSpec::ball(collider, 4.0);
+        sensor.sensor = true;
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..BodySpec::default()
+            },
+            &[sensor]
+        ));
+        world.step(1.0 / 60.0);
+        assert!(world.capsule_is_clear(Vec2::ZERO, 0.0, 0.6, 0.3, CollisionGroups::ALL));
     }
 
     #[test]

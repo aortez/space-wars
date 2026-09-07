@@ -3,12 +3,13 @@
 use engine_core::Vec2;
 
 use crate::world::{
-    BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
-    PhysicsWorld, SurfaceContact,
+    BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
+    CollisionGroups, PhysicsId, PhysicsWorld, SurfaceContact,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpacelingSpec {
+    pub collision_groups: CollisionGroups,
     pub radius: f32,
     pub half_segment: f32,
     pub walk_speed: f32,
@@ -68,6 +69,7 @@ pub struct SpacelingDisturbance {
 impl Default for SpacelingSpec {
     fn default() -> Self {
         Self {
+            collision_groups: CollisionGroups::ALL,
             radius: 0.3,
             half_segment: 0.6,
             walk_speed: 5.0,
@@ -177,6 +179,8 @@ impl SpacelingAssembly {
         let body = BodyId::new(entity, BodyRole::PRIMARY);
         let collider = ColliderId::new(entity, ColliderRole::PRIMARY, 0);
         let mut shape = ColliderSpec::capsule(collider, spec.half_segment, spec.radius);
+        shape.collision_groups = spec.collision_groups;
+        shape.solver_groups = spec.collision_groups;
         // Traction is the bounded controller, not a large passive friction torque.
         shape.friction = 0.0;
         if !physics.insert_body(

@@ -585,3 +585,12 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M26d: ✅ Separate physical support from balanced/knocked-down/recovering control. Add a physical off-center lab shove, bounded supported recovery, zero-gravity momentum preservation, balance diagnostics, and deterministic impact/recovery regressions. Manual knockback/recovery playtesting passed.
 - Follow-ups: population measurements, destructible terrain support, NPC intent, and exterior-base/ship interaction. Physical limbs and Spacewars integration are not part of the first slice.
 - Design: [spacelings and natural surface support](spacelings.md).
+
+### M27: Shared-world surface sortie
+
+- M27a: ✅ Add opt-in `surface-sortie` using Spacewars' existing world, gravity solve, and physics step. Keep pilot identity and vehicle occupancy separate, with one external capsule only while on foot.
+- M27b: ✅ Add collider-checked exit, surface-relative velocity inheritance, nearby supported boarding, control-context neutral gating, and visible feedback. The initial elevated-berth round trip passed manual playtesting.
+- M27c: ✅ Replace that temporary berth in the fixture with physical rear landing feet, nose-outward bounded flight assistance, contact-based settling, and physical takeoff. Add a translucent north-up minimap and landing diagnostics. Refined landing feel passed manual playtesting.
+- M27d: ✅ Add deterministic round-trip, eight-bearing flown landing, takeoff/return, blocked/unsafe transition, repeated body lifecycle, gravity, renderer/compositing, keyboard/gamepad mapping, and launcher workflow regressions.
+- Follow-ups: an intact surface-outpost capture/reward loop; explicit damage/rescue/pod rules; accelerating orbital supports; ordinary Spacewars integration and bot intent. Normal capture gameplay is unchanged by this fixture.
+- Guide: [Surface Sortie](../surface-sortie.md).

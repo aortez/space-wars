@@ -442,7 +442,7 @@ export component MainWindow inherits Window {
     }
 
     MinimapPanel {
-        visible: root.vector-minimaps-visible;
+        visible: root.vector-minimaps-visible && root.p1-minimap-size > 0px;
         x: root.p1-minimap-x;
         y: root.p1-minimap-y;
         width: root.p1-minimap-size;
@@ -453,7 +453,7 @@ export component MainWindow inherits Window {
     }
 
     MinimapPanel {
-        visible: root.vector-minimaps-visible;
+        visible: root.vector-minimaps-visible && root.p2-minimap-size > 0px;
         x: root.p2-minimap-x;
         y: root.p2-minimap-y;
         width: root.p2-minimap-size;
