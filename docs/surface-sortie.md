@@ -7,10 +7,13 @@ in the launcher, or run:
 cargo run -p engine-client -- --scenario surface-sortie
 ```
 
-The fixture starts with your ship settling rear-first onto a slowly rotating planet. Press
-**B** on a gamepad or **X** on the keyboard to disembark. Release the controls,
-walk around, and return to the cyan access marker. Once standing and settled,
-press B/X again to reboard the same ship. Boarding does not heal or replace it.
+The fixture starts with your ship at **75% health**, settling rear-first onto a
+slowly rotating planet. Press **B** on a gamepad or **X** on the keyboard to
+disembark. Release the controls, walk right to the amber terminal, and stand
+beside it for three seconds to capture the outpost. It repairs your nearby
+landed ship. Return to the cyan access marker and, once standing and settled,
+press B/X again to reboard and depart. Boarding itself does not heal or replace
+the ship.
 
 | Control | Aboard | On foot |
 | --- | --- | --- |
@@ -25,6 +28,37 @@ After each successful transfer, all controls must return to neutral before the
 new context accepts them. Holding A while exiting cannot become an unintended
 jump, and holding it while boarding cannot immediately launch the ship. An
 unsuccessful interaction does not repeat until B/X is released and pressed again.
+
+## Capturing and repairing
+
+Capture is automatic while standing within **3 world units** of the terminal's
+base, balanced and supported by that planet's surface or terminal. Your
+support-point-relative speed must be at most **1 unit/s**. Jumping, getting
+knocked down, walking out of range, or moving too quickly resets partial
+progress. Landing the ship cannot capture; neither can hovering nearby or
+standing on an unrelated vehicle/platform. No additional interaction button is
+needed.
+
+After **3 continuous seconds**, the outpost raises your owner-colored flag and
+its square minimap marker changes from amber to your color. The HUD shows
+progress and why capture is waiting. Ownership persists when you leave; it
+belongs to the outpost, **not the entire planet**.
+
+Capturing a neutral outpost is one testbed interaction, not the universal rule
+for claiming or developing a planet. Future scenarios must allow other paths
+without requiring a pre-existing neutral terminal. Planet claims, infrastructure
+ownership, and operational services remain separate concepts; this fixture
+implements only outpost ownership and its simple repair service.
+
+A friendly outpost restores **5% of maximum ship health per second**, capped at
+full health, while the same live ship is physically landed and its center is
+within **24 world units** of the terminal's base. The faint service-range circle
+is a visual guide, not a landing constraint. Repairs work while you are outside
+the ship too; the starting landing spot is already in range. Taking off or
+leaving service range stops repair immediately. An enemy ship, destroyed ship,
+or pod cannot use this repair service; this is not a rebuild or resurrection
+mechanic. After landing elsewhere, you can still capture on foot, but must move
+the ship into range to repair it.
 
 ## Flying and landing
 
@@ -51,7 +85,9 @@ to the existing hull body, not extra bodies, joints, or mass.
 
 The camera follows the active ship or spaceling. A translucent, fixed-scale,
 north-up minimap stays visible at the right below the top HUD: cyan planet, red
-ship with heading, orange spaceling, and a white camera footprint. Its footprint
+ship with heading, orange spaceling, square outpost marker, and a white camera
+footprint. A short leader connects the outpost marker to its surface location.
+Its footprint
 uses the actual window aspect ratio, including portrait layouts. The main view
 keeps the whole window; both vector and raster backends composite the circular
 backing and map as one faded layer.
@@ -59,7 +95,8 @@ backing and map as one faded layer.
 Orange is balanced, red is
 knocked down, yellow is recovering; cyan identifies physical support and surface
 access. The HUD shows landing phase, angle, descent and sideways speed, foot
-contacts, transfer feedback, ship health, body count, and access distance.
+contacts, transfer feedback, ship health, body count, access distance, outpost
+capture progress, and repair eligibility.
 Use raster rendering on software-only backends (including the kiosk).
 
 ## Model and boundaries
@@ -78,6 +115,13 @@ hitting the coincident ship-only surface. Spawn clearance is an infrequent
 capsule query against the world's spatial index; ordinary support queries stay
 local to the character's contacts.
 
+The intact terminal adds one solid collider to the existing rotating planet
+body, not another simulated body. Capture and repair are small scenario-owned
+policies consuming completed support/landing state; they do not manipulate
+physics, transfer ownership of terrain, or reuse the ordinary game's port
+capture/heal rules. This single-operator fixture does not define contested
+capture, destructible infrastructure, or multiple-outpost service arbitration.
+
 The former elevated berth/access connection is removed in this fixture. Its
 ship opts out of the port sensor, compact dock collider, and kinematic hold,
 and collides only with the planet's rough surface, not both coincident surfaces.
@@ -92,12 +136,12 @@ Afterward Rapier and gravity own its motion; no radial snapping or per-tick
 orbital transport is added. The center is stationary on purpose. Accelerating
 scripted orbits need separate regression evidence before ordinary-world use.
 
-This is a noncombat fixture: no weapons, asteroids, capture, healing, rover
-construction, or win condition. Ordinary Spacewars and its bots are unchanged.
+This is a noncombat fixture: no weapons, asteroids, pod rebuilding, rover
+construction, resources, or win condition. Ordinary Spacewars and its bots are unchanged.
 If you lose the ship while experimenting with flight, restart; damage, rescue,
 pod, and elimination policy for an independent pilot are not settled here.
-The next gameplay slice can add an intact surface outpost to capture and a
-repair/rebuild reward. This is not yet that outpost game mode.
+The intact outpost gives walking a useful capture-and-repair loop without
+settling those larger game-mode policies.
 
 ## Verification
 
@@ -111,25 +155,37 @@ Headless regressions cover exit/walk/jump/return/reboard without pose shortcuts,
 ship health and creature identity preservation, one-body lifecycle, velocity
 inheritance, no airborne transport, blocked exits, unsafe/remote boarding,
 held-input gating in both directions, and reproducible actions/restarts. Typed
-`SurfaceSortieState::observation()` and version-2 JSON scenario observations
+`SurfaceSortieState::observation()` and version-3 JSON scenario observations
 include landing phase, clearance, angle, relative speeds/spin, foot count,
-assist strength, and settling duration for future runners; this does not add
-a live IPC telemetry API.
+assist strength, and settling duration for future runners. Outpost observations
+add identity, position/normal, owner, active claimant, capture eligibility and
+progress, capture count, repair eligibility/range, and cumulative health
+restored. This does not add a live IPC telemetry API.
 
 Landing regressions fly gentle approaches at eight bearings, verify physical
 takeoff/return, contact-only boarding, the settling interval, sideways damping,
 no automatic pointing, and damage on fast approaches. Ordinary Spacewars' port
 regressions and pinned AI suites remain the compatibility guard.
 
-The client test checks both render paths and on-foot geometry. To retain images:
+Outpost regressions complete exit/walk/capture/repair/return/reboard/takeoff
+using only player controls. They also cover interrupted capture, wrong support
+identity, solid rotating terminal geometry without another body, ownership
+separate from the planet, repair eligibility/rate/clamping, fresh capture time
+for a changed claimant, deterministic replay, restart, and no progress without
+simulation steps.
+
+Client tests check both render paths, on-foot geometry, capture feedback, and
+the actual owner-colored flag in landscape and portrait layouts. To retain images:
 
 ```sh
 SPACEWARS_SORTIE_ARTIFACTS=target/surface-sortie-poses cargo test -p engine-client \
   registered_fixture_renders_and_restarts_in_both_backends
+SPACEWARS_SORTIE_ARTIFACTS=target/surface-sortie-poses cargo test -p engine-client \
+  outpost_capture_progress_and_owner_flag_render_in_both_backends
 ```
 
 The real-window functional test covers launcher selection, both renderers,
-pause, restart, return, and relaunch, with raster ship/HUD/minimap visibility checks:
+pause, restart, return, and relaunch, with raster ship/outpost/HUD/minimap visibility checks:
 
 ```sh
 SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 cargo test -p engine-client \
@@ -139,3 +195,6 @@ SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 cargo test -p engine-client \
 Use an existing display or the [Xvfb workflow](functional-tests.md). Physical
 gamepad feel and the complete round trip remain manual acceptance checks; the
 initial sortie and refined assisted landing have both passed manual playtesting.
+The outpost loop also passed user-reported controller playtesting on the
+Raspberry Pi on 2026-09-06: gameplay worked well and the direction was accepted.
+This validates the experimental loop, not a final planet-claiming mechanic.

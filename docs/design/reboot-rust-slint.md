@@ -592,5 +592,15 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M27b: ✅ Add collider-checked exit, surface-relative velocity inheritance, nearby supported boarding, control-context neutral gating, and visible feedback. The initial elevated-berth round trip passed manual playtesting.
 - M27c: ✅ Replace that temporary berth in the fixture with physical rear landing feet, nose-outward bounded flight assistance, contact-based settling, and physical takeoff. Add a translucent north-up minimap and landing diagnostics. Refined landing feel passed manual playtesting.
 - M27d: ✅ Add deterministic round-trip, eight-bearing flown landing, takeoff/return, blocked/unsafe transition, repeated body lifecycle, gravity, renderer/compositing, keyboard/gamepad mapping, and launcher workflow regressions.
-- Follow-ups: an intact surface-outpost capture/reward loop; explicit damage/rescue/pod rules; accelerating orbital supports; ordinary Spacewars integration and bot intent. Normal capture gameplay is unchanged by this fixture.
+- Follow-ups: M28 adds an intact surface-outpost capture/reward loop. Explicit damage/rescue/pod rules, accelerating orbital supports, ordinary Spacewars integration, and bot intent remain later work. Normal capture gameplay is unchanged by this fixture.
 - Guide: [Surface Sortie](../surface-sortie.md).
+
+### M28: Intact outpost capture and repair
+
+- M28a: ✅ Add one solid terminal on Surface Sortie's existing rotating planet body, with scenario-owned capture state separate from terrain ownership and physical landing. Start the ship at 75% health; require three continuous supported, balanced, settled seconds near the terminal.
+- M28b: ✅ Add gradual friendly-ship repair requiring a live, physically landed ship within service range. Do not heal on boarding, repair airborne ships, or rebuild pods.
+- M28c: ✅ Show capture progress and service eligibility, raise an owner-colored flag, and add a square ownership marker to the minimap. Extend typed/versioned observations with outpost and repair statistics.
+- M28d: ✅ Cover the control-driven round trip, capture interruptions/support identity, rotating solid geometry, repair eligibility/rate/clamping, deterministic replay/restart, and owner rendering in landscape/portrait through both paths.
+- Manual playtesting: the user reported the deployed outpost gameplay loop worked well with a controller on the Raspberry Pi (2026-09-06).
+- Design direction: neutral-outpost capture is one experimental path, not the only future way to claim or develop a planet. Keep planet claims, infrastructure ownership, and operational services distinct; do not require a pre-existing neutral outpost on every claimable planet.
+- Boundaries: no contested-capture policy, destructible infrastructure, resource economy, rebuilding, pilot/vehicle loss policy, or ordinary Spacewars/bot rule changes.

@@ -3,6 +3,8 @@ use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
 
+mod outpost_tests;
+
 fn tick(state: &mut SurfaceSortieState, input: SurfaceSortieAction) {
     SurfaceSortieScenario::step(
         state,

@@ -35,9 +35,16 @@ const SHIP_HULL_ROLE: ColliderRole = ColliderRole::new(5);
 const DEBRIS_ROLE: ColliderRole = ColliderRole::new(6);
 const ROVER_SURFACE_ROLE: ColliderRole = ColliderRole::new(7);
 const LANDING_FOOT_ROLE: ColliderRole = ColliderRole::new(8);
+const OUTPOST_TERMINAL_ROLE: ColliderRole = ColliderRole::new(9);
 
 pub(super) const LANDING_FOOT_RADIUS: f32 = 0.45;
 pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0, -5.0)];
+pub(super) const OUTPOST_TERMINAL_HALF_SIZE: Vec2 = Vec2::new(0.7, 1.1);
+
+pub(super) fn is_planet_surface_support(collider: ColliderId, planet: usize) -> bool {
+    collider.entity == planet_entity(planet)
+        && (collider.role == ROVER_SURFACE_ROLE || collider.role == OUTPOST_TERMINAL_ROLE)
+}
 
 const GROUP_SHIP_0: u32 = 1 << 0;
 const GROUP_SHIP_1: u32 = 1 << 1;
@@ -401,6 +408,33 @@ impl SpacewarsPhysics {
         self.docked_planets[index] = None;
         self.world.remove_entity(ship_entity(index));
         assert!(self.insert_ship(index, ship, false, false, false));
+    }
+
+    /// An intact terminal attached to existing terrain: one collider, no new body.
+    /// This fixture has fixed planet geometry; regeneration/destruction is a later policy.
+    pub(super) fn insert_surface_terminal(
+        &mut self,
+        planet: usize,
+        radius: f32,
+        local_angle: f32,
+    ) -> bool {
+        let entity = planet_entity(planet);
+        let mut terminal = ColliderSpec::cuboid(
+            collider_id(entity, OUTPOST_TERMINAL_ROLE, 0),
+            OUTPOST_TERMINAL_HALF_SIZE.x,
+            OUTPOST_TERMINAL_HALF_SIZE.y,
+        );
+        terminal.local_position = Vec2::from_radians(local_angle)
+            * (radius * BODY_BOUNDS_RADIUS_SCALE + OUTPOST_TERMINAL_HALF_SIZE.y - 0.02);
+        terminal.local_angle = local_angle - core::f32::consts::FRAC_PI_2;
+        terminal.density = 0.0;
+        terminal.friction = 0.8;
+        terminal.collision_groups = CollisionGroups::new(
+            GROUP_BODY | GROUP_ROVER_SURFACE,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER | GROUP_SPACELING,
+        );
+        terminal.solver_groups = terminal.collision_groups;
+        self.world.insert_collider(primary_body(entity), &terminal)
     }
 
     pub(super) fn ship_body(&self, index: usize) -> PhysicsBodyId {

@@ -35,8 +35,9 @@ The local launcher currently hosts seven playable scenarios:
   planet, with gravity-relative upright control and visible contact diagnostics.
   See [Spaceling Lab](docs/spaceling-lab.md).
 - **Surface Sortie** — an opt-in Spacewars pilot/vehicle experiment: land
-  rear-first with flight assistance, walk/jump on the planet, and reboard the
-  same physical ship. Includes a translucent minimap and landing diagnostics.
+  rear-first with flight assistance, walk to capture an outpost, repair your
+  nearby landed ship, and reboard to depart. Includes a translucent minimap,
+  ownership flag, and landing/capture diagnostics.
   See [Surface Sortie](docs/surface-sortie.md) for controls and scope.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
