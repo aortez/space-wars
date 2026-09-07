@@ -26,7 +26,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Surface Sortie (experimental): left/right or A/D turns aboard, walks on foot. A / Space thrusts aboard and jumps on foot. Down / S brakes. Point the nose away from the planet for landing assist; settle on both rear feet. B / X exits a landed ship or boards at its cyan hatch. Release controls after transferring. Start / Esc pauses; R restarts. North-up minimap: red ship, orange spaceling, cyan planet. No weapons or capture.",
+    controls_help: "Surface Sortie: left/right or A/D turns aboard, walks on foot. A / Space thrusts aboard and jumps on foot. Down / S brakes. Face away from the planet for landing assist; settle on both rear feet. B / X exits or boards at the cyan hatch. Release controls after transferring. Stand beside the amber terminal for 3 seconds to capture; leaving, jumping, or knockdown resets progress. A friendly outpost repairs a nearby landed ship at 5%/s. The ship starts at 75% health. Minimap: red ship, orange spaceling, cyan planet, square outpost (owner color). Start / Esc pauses; R restarts. No weapons or rebuilding.",
     create,
 };
 
@@ -129,6 +129,103 @@ mod tests {
             scenario.map_input(&mut input, false),
             vec![SurfaceSortieAction::default().encode()]
         );
+    }
+
+    #[test]
+    fn outpost_capture_progress_and_owner_flag_render_in_both_backends() {
+        let mut scenario = SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init((), 0),
+        };
+        let dt = Duration::from_secs_f64(1.0 / 60.0);
+        for frame in 0..120 {
+            scenario.step(
+                &[SurfaceSortieAction {
+                    interact_held: frame == 60,
+                    ..SurfaceSortieAction::default()
+                }
+                .encode()],
+                dt,
+            );
+        }
+        for _ in 0..600 {
+            let observation = scenario.state.observation();
+            if observation
+                .position
+                .distance_to(observation.outpost.position)
+                < 2.35
+            {
+                break;
+            }
+            scenario.step(
+                &[SurfaceSortieAction {
+                    horizontal: 1.0,
+                    ..SurfaceSortieAction::default()
+                }
+                .encode()],
+                dt,
+            );
+        }
+        for _ in 0..60 {
+            scenario.step(&[SurfaceSortieAction::default().encode()], dt);
+        }
+        let partial = scenario.state.observation().outpost;
+        assert!(partial.capture_progress > 0.0 && partial.capture_progress < 1.0);
+        let viewport = Viewport::new(1280.0, 720.0);
+        check_render(&scenario, viewport, "on-foot-capturing");
+        for _ in 0..180 {
+            scenario.step(&[SurfaceSortieAction::default().encode()], dt);
+        }
+        let observation = scenario.state.observation();
+        assert_eq!(observation.outpost.owner, Some(observation.owner));
+        assert!(observation.outpost.repaired_health > 0.0);
+        for viewport in [viewport, Viewport::new(1280.0, 1400.0)] {
+            let frames = scenario.render_frames(RenderBackend::Vector, viewport);
+            assert_eq!(
+                frames,
+                scenario.render_frames(RenderBackend::Raster, viewport)
+            );
+            let overlay =
+                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+            assert!(
+                overlay
+                    .iter()
+                    .any(|primitive| primitive.text.starts_with("OUTPOST P1"))
+            );
+            assert!(
+                overlay
+                    .iter()
+                    .any(|primitive| primitive.text == "P1 OUTPOST")
+            );
+            let name = if viewport.height > viewport.width {
+                "on-foot-secured-portrait"
+            } else {
+                "on-foot-secured"
+            };
+            check_render(&scenario, viewport, name);
+            // Check the actual owner-colored flag, not just a text/model entry.
+            let up = observation.outpost.surface_normal;
+            let flag = observation.outpost.position
+                + up * 3.15
+                + engine_core::Vec2::new(up.y, -up.x) * 1.3;
+            let projected = frames[0].camera.world_to_viewport(
+                engine_common::RenderPoint::new(flag.x, flag.y),
+                viewport.aspect_ratio(),
+            );
+            let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
+                &frames,
+                viewport,
+                scenario.frame_layout(),
+                crate::raster::RasterOptions::default(),
+            );
+            let pixels = image.to_rgb8().unwrap();
+            let x = (projected.x * pixels.width() as f32) as usize;
+            let y = (projected.y * pixels.height() as f32) as usize;
+            let pixel = pixels.as_slice()[y * pixels.width() as usize + x];
+            assert!(
+                pixel.r > 200 && pixel.g < 80 && pixel.b < 80,
+                "missing owner flag: {pixel:?}"
+            );
+        }
     }
 
     #[test]

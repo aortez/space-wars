@@ -119,13 +119,13 @@ gravity and Rapier contacts move it. Do not copy the rover's scripted-orbit
 transport into this controller. Accelerating orbital supports need their own
 regressions before enabling this in ordinary generated Spacewars worlds.
 
-This slice disables capture/services, weapons, and asteroid spawning in the
-fixture. It leaves the ordinary Spacewars game and bot observations unchanged.
+The initial slice disabled capture/services, weapons, and asteroid spawning in
+the fixture. It leaves the ordinary Spacewars game and bot observations unchanged.
 Pilot damage, ship destruction while unoccupied, rescue/pods/elimination, NPC
 policy, and the contested outpost reward loop require explicit later policy;
 the fixture reports a lost vehicle and offers restart rather than inventing
-those rules. The next gameplay slice can make walking useful through an intact
-outpost capture and repair/rebuild service.
+those rules. The next slice below makes walking useful through an intact
+outpost capture and repair service, without adding rebuilding.
 
 Acceptance: rear-first landing at multiple bearings, physical takeoff/return,
 bounded assist, rejected hover/nose contact, parked exit/walk/jump/reboard,
@@ -133,6 +133,51 @@ moving-surface velocity inheritance,
 actual collider clearance, fresh-input gating, preserved ship state, rejected
 unsafe transitions, deterministic restart/observations, both renderers and the
 standard launcher/pause flow, plus unchanged ordinary-game regressions.
+
+## Fourth slice: surface-outpost capture and repair
+
+Implemented on `surface-outpost-loop`; the deployed loop passed user-reported
+controller playtesting on the Raspberry Pi on 2026-09-06. Extend
+Surface Sortie with one intact terminal attached to the rotating planet body
+as a solid collider. The ship starts at 75% health so the reward is visible.
+Disembark, walk to the terminal, remain supported/balanced/settled for three
+seconds, capture, repair the nearby landed ship, return, and depart.
+
+Keep three separate contracts: physics establishes support and landing;
+scenario policy establishes outpost ownership; service policy checks ownership,
+ship availability, landed state, and range before gradually restoring health.
+The outpost owns no terrain, creates no landing hold, and grants no remote or
+airborne repair. Reboarding still preserves the same ship without itself
+changing health. The reusable spaceling controller needs no capture code.
+
+Neutral-outpost capture is only one path toward establishing a presence, not
+the sole future way to claim a planet or get it running. Keep planet claims,
+infrastructure ownership, and operational services distinct. For example,
+building a new base or restoring abandoned infrastructure could provide other
+paths; their specific rules are not decided or implemented by this slice.
+Do not require every claimable planet to spawn with a neutral outpost, or
+equate ownership of one installation with control of all terrain. The current
+capture-enables-repair rule is fixture policy, not an engine invariant.
+
+Capture requires support from this planet or its terminal, not merely any
+grounded contact nearby. Leaving, jumping, losing balance, or excessive
+support-relative speed resets partial progress. Ownership remains secured on
+departure. The owner-colored physical flag and square minimap marker expose
+that state; the HUD shows capture progress and service eligibility. Structured
+observations include owner/claimant, progress, captures, and health restored.
+
+This is deliberately one operator and one outpost, not a general contested-base
+system. The terminal is intact and non-destructible; terrain removal and service
+invalidation need explicit later policy. There are no new weapons, resources,
+pod rebuilding, pilot death rules, or changes to ordinary Spacewars/bots.
+Moving/accelerating-planet evidence and independent pilot/vehicle loss rules
+still precede ordinary-game integration.
+
+Acceptance: an action-driven capture/repair/departure round trip; interrupted
+capture and wrong-support rejection; solid rotating terminal/body-count bounds;
+friendly, live, in-range, landed repair with rate/clamp checks; deterministic
+replay and restart; capture/ownership rendering in both paths and window
+orientations; unchanged landing, normal-game, and pinned bot regressions.
 
 ## Planet and ship direction
 

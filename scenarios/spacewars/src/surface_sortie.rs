@@ -9,8 +9,10 @@ use engine_rapier::{
 };
 
 mod landing;
+mod outpost;
 mod render;
 pub use landing::{LandingPhase, LandingTelemetry};
+pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 #[cfg(test)]
 mod tests;
 
@@ -115,6 +117,7 @@ pub struct SurfaceSortieState {
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
+    outpost: outpost::SurfaceOutpost,
 }
 
 pub(super) struct SurfacePilot {
@@ -176,6 +179,7 @@ pub struct SurfaceSortieObservation {
     pub controls_armed: bool,
     pub physical_bodies: usize,
     pub landing: LandingTelemetry,
+    pub outpost: OutpostObservation,
 }
 
 impl SurfaceSortieState {
@@ -195,7 +199,7 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilot.vehicle.0];
         let snapshot = self.spaceling_snapshot();
         SurfaceSortieObservation {
-            version: 2,
+            version: 3,
             tick: self.world.tick,
             spaceling: self.pilot.id,
             owner: self.pilot.owner,
@@ -220,6 +224,9 @@ impl SurfaceSortieState {
             controls_armed: self.controls_armed,
             physical_bodies: self.world.physics.world.body_count(),
             landing: self.landing,
+            outpost: self
+                .outpost
+                .observation(&self.world.planets[self.outpost.planet]),
         }
     }
 
@@ -353,6 +360,7 @@ impl Scenario for SurfaceSortieScenario {
         world.ships[0].rotation_radians = 0.0;
         world.ships[0].direction = Vec2::Y;
         world.ships[0].velocity = planet_surface_velocity(&planet, center);
+        world.ships[0].life = world.ships[0].life_max * 0.75;
         // Keep the second vehicle far from the single-player fixture. Its
         // existence does not imply that this pilot may occupy another owner's ship.
         world.ships[1].position = Vec2::new(850.0, 850.0);
@@ -362,6 +370,12 @@ impl Scenario for SurfaceSortieScenario {
         world.physics = physics::SpacewarsPhysics::new(500.0, &world.ships, None, &world.planets);
         world.physics.enable_surface_landing(0, &world.ships[0]);
         world.spaceport_contacts.clear();
+        let outpost = outpost::SurfaceOutpost::new(OutpostId(1), 0, -0.34);
+        assert!(world.physics.insert_surface_terminal(
+            outpost.planet,
+            planet.radius,
+            outpost.local_angle
+        ));
         SurfaceSortieState {
             world,
             pilot: SurfacePilot {
@@ -381,6 +395,7 @@ impl Scenario for SurfaceSortieScenario {
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
+            outpost,
         }
     }
 
@@ -465,6 +480,8 @@ impl Scenario for SurfaceSortieScenario {
                 + snapshot.relative_speed.abs() * dt * 5.0)
                 .rem_euclid(std::f32::consts::TAU);
         }
+        // Services consume completed physical support/landing, never create it.
+        state.update_outpost(Duration::from_secs_f32(dt));
         result
     }
 

@@ -65,9 +65,11 @@ in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is
 manual check.
 
 Surface Sortie uses the same launcher/pause/restart workflow with both renderers;
-its raster check requires the landed ship, diagnostics, and minimap planet. The client unit
-tests also render the disembarked spaceling, while `scenario-spacewars` exercises
-the complete physical exit/walk/jump/return/board loop and input gating. See
+its raster check requires the ship, amber outpost, capture/landing HUD,
+and minimap planet. The client unit tests also render the disembarked spaceling,
+capture progress, and owner-colored flag in landscape/portrait, while
+`scenario-spacewars` exercises the physical exit/walk/capture/repair/return/board/
+departure loop and input gating. See
 [Surface Sortie](surface-sortie.md) for the manual controls and retained images.
 
 The harness uses Slint's software backend, which does not draw vector paths.

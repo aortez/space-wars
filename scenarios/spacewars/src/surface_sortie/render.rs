@@ -4,6 +4,7 @@ use engine_common::RenderLine;
 const LIGHT: RenderColor = RenderColor::rgb(0.86, 0.93, 0.97);
 const CYAN: RenderColor = RenderColor::rgb(0.25, 0.93, 0.8);
 const ORANGE: RenderColor = RenderColor::rgb(1.0, 0.58, 0.23);
+const AMBER: RenderColor = RenderColor::rgb(1.0, 0.82, 0.25);
 
 fn camera(state: &SurfaceSortieState) -> Camera2 {
     let snapshot = state.spaceling_snapshot();
@@ -57,6 +58,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
             1.0,
         );
     }
+    draw_outpost(&mut frame, state, &observation.outpost);
     let access = observation.access_position;
     if parked {
         circle(
@@ -109,7 +111,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     }
     // Keep diagnostics legible when the parked ship crosses the HUD as the
     // planet rotates. The scene remains visible through the shallow strips.
-    for (bottom, top) in [(0.27, 0.48), (-0.48, -0.28)] {
+    for (bottom, top) in [(0.27, 0.48), (-0.49, -0.255)] {
         frame.push_primitive(
             15,
             RenderPrimitive::Polygon(RenderPolygon {
@@ -125,7 +127,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(center.x, title_y),
-        "SURFACE SORTIE  /  shared-world pilot experiment",
+        "SURFACE SORTIE  /  capture an outpost, repair, depart",
         LIGHT,
         18.0,
     );
@@ -143,7 +145,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         center + Vec2::new(0.0, height * 0.31),
-        "Start / Esc: pause   R: restart   No weapons or capture in this fixture",
+        "Stand beside the amber terminal for 3s to capture.  Start / Esc: pause   R: restart",
         LIGHT,
         13.0,
     );
@@ -156,14 +158,35 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     };
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.32),
+        center - Vec2::new(0.0, height * 0.29),
         message,
         CYAN,
         16.0,
     );
+    let post = &observation.outpost;
+    let ownership = post.owner.map_or_else(
+        || "NEUTRAL".to_owned(),
+        |owner| format!("P{}", owner.index() + 1),
+    );
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.38),
+        center - Vec2::new(0.0, height * 0.348),
+        format!(
+            "OUTPOST {ownership}  |  {:.0}%  |  {}  |  {:.1}u",
+            post.capture_progress * 100.0,
+            post.capture_status.label(),
+            observation.position.distance_to(post.position)
+        ),
+        if post.owner == Some(observation.owner) {
+            CYAN
+        } else {
+            AMBER
+        },
+        14.0,
+    );
+    text(
+        &mut frame,
+        center - Vec2::new(0.0, height * 0.405),
         format!(
             "{}  |  angle {:.0}°  |  descent {:+.1}  |  sideways {:+.1}  |  feet {}/2",
             observation.landing.phase.label(),
@@ -183,14 +206,13 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     );
     text(
         &mut frame,
-        center - Vec2::new(0.0, height * 0.44),
+        center - Vec2::new(0.0, height * 0.463),
         format!(
-            "{}  |  ship {:.0}%  |  transfers {}  |  bodies {}  |  access {:.1}u",
-            observation.balance,
+            "Ship {:.0}%  |  {}  |  hatch {:.1}u  |  bodies {}",
             ship.life / ship.life_max.max(1.0) * 100.0,
-            observation.transfers,
-            observation.physical_bodies,
+            post.repair_status.label(),
             observation.position.distance_to(access),
+            observation.physical_bodies,
         ),
         ORANGE,
         15.0,
@@ -222,6 +244,29 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             CYAN,
         );
     }
+    let outpost = &state.outpost;
+    let planet = &state.world.planets[outpost.planet];
+    let site = outpost.position(planet);
+    // Lift the symbol off the planet rim, with a leader to its exact location;
+    // the tiny ship/creature icons must remain distinguishable nearby.
+    let marker = site + outpost.up(planet) * 35.0;
+    let owner_color = outpost_color(state);
+    line(&mut map, 1, site, marker, owner_color, 1.0);
+    map.push_primitive(
+        1,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: [
+                Vec2::new(-12.0, -12.0),
+                Vec2::new(12.0, -12.0),
+                Vec2::new(12.0, 12.0),
+                Vec2::new(-12.0, 12.0),
+            ]
+            .map(|point| render_point(marker + point))
+            .to_vec(),
+            fill: Some(Fill::new(owner_color)),
+            stroke: Some(Stroke::new(LIGHT, 1.0)),
+        }),
+    );
     // The footprint follows the actual full-window camera, including resizes.
     let camera = camera(state);
     let aspect = if viewport_aspect.is_finite() && viewport_aspect > 0.0 {
@@ -284,6 +329,123 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
         );
     }
     map
+}
+
+fn outpost_color(state: &SurfaceSortieState) -> RenderColor {
+    state.outpost.owner.map_or(AMBER, |owner| {
+        render_color(state.world.players[owner.index()].color)
+    })
+}
+
+fn draw_outpost(
+    frame: &mut RenderFrame,
+    state: &SurfaceSortieState,
+    observation: &OutpostObservation,
+) {
+    let planet = &state.world.planets[state.outpost.planet];
+    let up = state.outpost.up(planet);
+    let right = Vec2::new(up.y, -up.x);
+    let base = observation.position;
+    let local = |x, y| base + right * x + up * y;
+    let owner_color = outpost_color(state);
+    // Service radius is an eligibility hint, not a docking region or force.
+    // Its underground half is occluded by the planet fill.
+    let range_color = if observation.owner.is_some() {
+        RenderColor::rgba(0.3, 0.9, 0.7, 0.35)
+    } else {
+        RenderColor::rgba(1.0, 0.82, 0.25, 0.2)
+    };
+    for segment in (0..64).step_by(2) {
+        let a = segment as f32 * std::f32::consts::TAU / 64.0;
+        let b = (segment + 1) as f32 * std::f32::consts::TAU / 64.0;
+        line(
+            frame,
+            -21,
+            base + Vec2::from_radians(a) * observation.repair_range,
+            base + Vec2::from_radians(b) * observation.repair_range,
+            range_color,
+            1.0,
+        );
+    }
+    for segment in 0..12 {
+        let a = (segment as f32 / 12.0 * 2.0 - 1.0) * observation.capture_range
+            / (planet.radius * BODY_BOUNDS_RADIUS_SCALE);
+        let b = ((segment + 1) as f32 / 12.0 * 2.0 - 1.0) * observation.capture_range
+            / (planet.radius * BODY_BOUNDS_RADIUS_SCALE);
+        let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE + 0.08;
+        line(
+            frame,
+            -5,
+            planet.position + up.rotate_radians(a) * radius,
+            planet.position + up.rotate_radians(b) * radius,
+            owner_color,
+            2.0,
+        );
+    }
+    let quad = |left, bottom, right, top, fill| {
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: [(left, bottom), (right, bottom), (right, top), (left, top)]
+                .map(|(x, y)| render_point(local(x, y)))
+                .to_vec(),
+            fill: Some(Fill::new(fill)),
+            stroke: Some(Stroke::new(LIGHT, 1.0)),
+        })
+    };
+    let half = physics::OUTPOST_TERMINAL_HALF_SIZE;
+    frame.push_primitive(
+        -4,
+        quad(
+            -half.x,
+            -0.02,
+            half.x,
+            half.y * 2.0 - 0.02,
+            RenderColor::rgb(0.2, 0.27, 0.35),
+        ),
+    );
+    frame.push_primitive(
+        -3,
+        quad(
+            -0.48,
+            0.9,
+            0.48,
+            1.8,
+            if observation.owner.is_some() {
+                CYAN
+            } else {
+                AMBER
+            },
+        ),
+    );
+    line(frame, -3, local(0.6, 1.8), local(0.6, 3.6), LIGHT, 1.5);
+    if observation.owner.is_some() {
+        frame.push_primitive(-2, quad(0.6, 2.75, 2.1, 3.6, owner_color));
+    }
+    frame.push_primitive(
+        -2,
+        quad(-1.2, 2.6, 0.25, 2.8, RenderColor::rgb(0.08, 0.1, 0.16)),
+    );
+    if observation.capture_progress > 0.0 {
+        frame.push_primitive(
+            -1,
+            quad(
+                -1.2,
+                2.6,
+                -1.2 + 1.45 * observation.capture_progress,
+                2.8,
+                owner_color,
+            ),
+        );
+    }
+    text(
+        frame,
+        local(0.0, 4.4),
+        observation.owner.map_or_else(
+            || "NEUTRAL OUTPOST".to_owned(),
+            |owner| format!("P{} OUTPOST", owner.index() + 1),
+        ),
+        owner_color,
+        12.0,
+    );
 }
 
 fn draw_spaceling(frame: &mut RenderFrame, snapshot: SpacelingSnapshot, facing: f32, phase: f32) {

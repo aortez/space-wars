@@ -111,6 +111,8 @@ fn assert_raster_sortie_visible(path: &Path) {
     let mut ship_pixels = 0;
     let mut diagnostics_pixels = 0;
     let mut minimap_planet_pixels = 0;
+    let mut outpost_pixels = 0;
+    let mut outpost_hud_pixels = 0;
     for (index, pixel) in buffer[..frame.buffer_size()]
         .chunks_exact(channels)
         .enumerate()
@@ -121,8 +123,18 @@ fn assert_raster_sortie_visible(path: &Path) {
         {
             ship_pixels += 1;
         }
-        if y > height * 4 / 5 && pixel[0] < 150 && pixel[1] > 175 && pixel[2] > 140 {
+        // The cyan transfer row is in the bottom quarter. Landing diagnostics
+        // below it change from orange to cyan as the initial ship settles.
+        if y > height * 3 / 4 && pixel[0] < 150 && pixel[1] > 175 && pixel[2] > 140 {
             diagnostics_pixels += 1;
+        }
+        if pixel[0] > 200 && pixel[1] > 160 && pixel[1] < 230 && pixel[2] < 100 {
+            if y > height / 3 && y < height * 3 / 4 {
+                outpost_pixels += 1;
+            }
+            if y > height * 4 / 5 {
+                outpost_hud_pixels += 1;
+            }
         }
         // The overview sits below the top HUD at the right. Its planet stays
         // cyan even though the main scene uses a dark-blue surface.
@@ -136,7 +148,15 @@ fn assert_raster_sortie_visible(path: &Path) {
             minimap_planet_pixels += 1;
         }
     }
-    assert!(ship_pixels > 100, "missing parked ship: {ship_pixels}");
+    assert!(ship_pixels > 100, "missing initial ship: {ship_pixels}");
+    assert!(
+        outpost_pixels > 40,
+        "missing amber outpost: {outpost_pixels}"
+    );
+    assert!(
+        outpost_hud_pixels > 40,
+        "missing outpost capture HUD: {outpost_hud_pixels}"
+    );
     assert!(
         minimap_planet_pixels > 40,
         "missing minimap planet: {minimap_planet_pixels}"
