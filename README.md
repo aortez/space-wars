@@ -37,7 +37,8 @@ The local launcher currently hosts seven playable scenarios:
 - **Surface Sortie** — an opt-in Spacewars pilot/vehicle experiment: land
   rear-first with flight assistance, walk to capture an outpost, repair your
   nearby landed ship, and reboard to depart. Includes a translucent minimap,
-  ownership flag, and landing/capture diagnostics.
+  ownership flag, and landing/capture diagnostics. Choose **surface-sortie-orbit**
+  for the same loop on a moving, spinning planet, with drift/support-loss telemetry.
   See [Surface Sortie](docs/surface-sortie.md) for controls and scope.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
@@ -92,6 +93,7 @@ cargo run -p engine-client -- --scenario clock
 cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario surface-sortie
+cargo run -p engine-client -- --scenario surface-sortie-orbit
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```

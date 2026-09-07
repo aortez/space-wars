@@ -1318,12 +1318,12 @@ impl SpacewarsScenario {
         }
 
         let dt = dt.as_secs_f32();
-        if let Some(sun) = state.sun {
-            for planet in &mut state.planets {
-                planet.update_orbit(sun.position, dt);
-            }
-        }
         if !experimental {
+            if let Some(sun) = state.sun {
+                for planet in &mut state.planets {
+                    planet.update_orbit(sun.position, dt);
+                }
+            }
             update_spaceports(state, dt);
             reconcile_rover_deployments(state, dt);
         }
@@ -1331,6 +1331,12 @@ impl SpacewarsScenario {
 
         let universe_radius = state.config.universe_radius as f32;
         for (index, ship) in state.ships.iter_mut().enumerate() {
+            if surface_pilot
+                .as_ref()
+                .is_some_and(|pilot| pilot.vehicle_index() != index)
+            {
+                continue;
+            }
             if surface_pilot
                 .as_ref()
                 .is_some_and(|pilot| pilot.vehicle_index() == index)
@@ -2406,9 +2412,22 @@ fn apply_world_gravity_with_pilot(
         ));
     }
     gravity_participants.extend(planets.iter().enumerate().map(|(index, planet)| {
+        // The sortie has scheduled the next kinematic terrain pose, but its
+        // actors and contacts still describe the completed step. Sample the
+        // same current frame for gravity and controls. Legacy gameplay retains
+        // its established integration order and deterministic baselines.
+        let position = if pilot.is_some() {
+            physics
+                .world
+                .motion(physics.planet_body(index))
+                .unwrap()
+                .position
+        } else {
+            planet.position
+        };
         GravityParticipant::direct_source(
             tagged_gravity_id(GRAVITY_BODY_TAG, index as u64 + 1),
-            planet.position,
+            position,
             planet.mass,
         )
     }));
@@ -2423,7 +2442,12 @@ fn apply_world_gravity_with_pilot(
         ships
             .iter()
             .enumerate()
-            .filter(|(index, _)| !physics.ship_is_constrained(*index))
+            .filter(|(index, _)| {
+                !physics.ship_is_constrained(*index)
+                    && pilot
+                        .as_ref()
+                        .is_none_or(|pilot| pilot.vehicle_index() == *index)
+            })
             .map(|(index, ship)| {
                 GravityParticipant::target(
                     tagged_gravity_id(GRAVITY_SHIP_TAG, index as u64),

@@ -9,9 +9,11 @@ use engine_rapier::{
 };
 
 mod landing;
+mod motion;
 mod outpost;
 mod render;
 pub use landing::{LandingPhase, LandingTelemetry};
+pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 #[cfg(test)]
 mod tests;
@@ -110,6 +112,9 @@ impl SurfaceSortieAction {
 
 pub struct SurfaceSortieState {
     world: SpacewarsState,
+    motion_preset: SurfaceMotionPreset,
+    motion_metrics: SurfaceMotionMetrics,
+    idle_anchor: Option<(bool, Vec2)>,
     pilot: SurfacePilot,
     input: SurfaceSortieAction,
     interact_was_held: bool,
@@ -180,6 +185,8 @@ pub struct SurfaceSortieObservation {
     pub physical_bodies: usize,
     pub landing: LandingTelemetry,
     pub outpost: OutpostObservation,
+    pub motion: SurfaceMotionObservation,
+    pub motion_metrics: SurfaceMotionMetrics,
 }
 
 impl SurfaceSortieState {
@@ -199,7 +206,7 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilot.vehicle.0];
         let snapshot = self.spaceling_snapshot();
         SurfaceSortieObservation {
-            version: 3,
+            version: 4,
             tick: self.world.tick,
             spaceling: self.pilot.id,
             owner: self.pilot.owner,
@@ -227,6 +234,8 @@ impl SurfaceSortieState {
             outpost: self
                 .outpost
                 .observation(&self.world.planets[self.outpost.planet]),
+            motion: self.motion_observation(),
+            motion_metrics: self.motion_metrics,
         }
     }
 
@@ -272,7 +281,7 @@ impl SurfaceSortieState {
                 return TransferResult::TooFar;
             }
             let relative = snapshot.motion.linear_velocity
-                - planet_surface_velocity(&self.world.planets[0], snapshot.motion.position);
+                - motion::point_velocity(self.planet_motion(), snapshot.motion.position);
             if !snapshot.grounded()
                 || snapshot.balance != SpacelingBalance::Balanced
                 || relative.length() > SETTLED_SPEED
@@ -307,10 +316,11 @@ impl SurfaceSortieState {
             ) else {
                 return TransferResult::ExitBlocked;
             };
+            let surface = self.planet_motion();
             self.world.physics.world.set_velocity(
                 body.body(),
-                planet_surface_velocity(&self.world.planets[0], position),
-                self.world.planets[0].wrapper_omega,
+                motion::point_velocity(surface, position),
+                surface.angular_velocity,
                 true,
             );
             self.pilot.body = Some(body);
@@ -321,9 +331,9 @@ impl SurfaceSortieState {
 
 impl Scenario for SurfaceSortieScenario {
     type State = SurfaceSortieState;
-    type Config = ();
+    type Config = SurfaceMotionPreset;
 
-    fn init(_config: (), seed: u64) -> SurfaceSortieState {
+    fn init(motion_preset: SurfaceMotionPreset, seed: u64) -> SurfaceSortieState {
         let mut world = SpacewarsScenario::init(
             SpacewarsConfig {
                 universe_radius: 500,
@@ -334,7 +344,7 @@ impl Scenario for SurfaceSortieScenario {
             },
             seed,
         );
-        let planet = PlanetState {
+        let mut planet = PlanetState {
             position: Vec2::splat(500.0),
             radius: SURFACE_RADIUS,
             // Match 18 units/s² at the feet using the existing fixed-tick
@@ -353,22 +363,26 @@ impl Scenario for SurfaceSortieScenario {
             wrapper_angle: std::f32::consts::FRAC_PI_2,
             wrapper_omega: 0.015,
         };
+        world.sun = motion_preset.configure(&mut planet);
         // Begin just above the ground on the rear feet; Rapier settles the
         // vehicle during the first few ticks, just as after a flown landing.
         let center = planet.position + Vec2::Y * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + 5.5);
         world.ships[0].position = center - SHIP_PIVOT;
         world.ships[0].rotation_radians = 0.0;
         world.ships[0].direction = Vec2::Y;
-        world.ships[0].velocity = planet_surface_velocity(&planet, center);
+        world.ships[0].velocity = motion_preset.initial_velocity(&planet)
+            + Vec2::new(-(center - planet.position).y, (center - planet.position).x)
+                * planet.wrapper_omega;
         world.ships[0].life = world.ships[0].life_max * 0.75;
-        // Keep the second vehicle far from the single-player fixture. Its
-        // existence does not imply that this pilot may occupy another owner's ship.
-        world.ships[1].position = Vec2::new(850.0, 850.0);
-        world.ships[1].velocity = Vec2::new(-6.0, 6.0);
+        // The legacy world stores two ship slots. Surface physics disables the
+        // unused slot instead of letting an invisible craft orbit into the lab.
         world.planets = vec![planet];
         world.rover_builds = vec![RoverBuildState::default()];
-        world.physics = physics::SpacewarsPhysics::new(500.0, &world.ships, None, &world.planets);
-        world.physics.enable_surface_landing(0, &world.ships[0]);
+        world.physics =
+            physics::SpacewarsPhysics::new(500.0, &world.ships, world.sun, &world.planets);
+        // Position-based kinematic terrain derives its velocity on the first
+        // physics step. Do not try to set its COM velocity with set_velocity.
+        world.physics.enable_surface_sortie(0, &world.ships[0]);
         world.spaceport_contacts.clear();
         let outpost = outpost::SurfaceOutpost::new(OutpostId(1), 0, -0.34);
         assert!(world.physics.insert_surface_terminal(
@@ -378,6 +392,9 @@ impl Scenario for SurfaceSortieScenario {
         ));
         SurfaceSortieState {
             world,
+            motion_preset,
+            motion_metrics: SurfaceMotionMetrics::default(),
+            idle_anchor: None,
             pilot: SurfacePilot {
                 id: SpacelingId(1),
                 owner: PlayerId::PLAYER_1,
@@ -412,6 +429,7 @@ impl Scenario for SurfaceSortieScenario {
             state.input = input;
         }
         let input = state.input;
+        let before = motion::StepSample::read(state);
         let mut effective = SurfaceSortieAction::default();
         if !state.controls_armed {
             state.controls_armed = input == SurfaceSortieAction::default();
@@ -456,12 +474,12 @@ impl Scenario for SurfaceSortieScenario {
         });
         ship.set_laser(false);
         ship.set_cannon(false);
-        // Rotation is kinematic terrain motion. No spaceling pose/velocity
-        // transport is performed here or in the controller.
+        // Schedule terrain exactly once. Actors are never transported with it;
+        // controls, gravity, and Rapier contacts own their dynamic motion.
         let dt = dt.as_secs_f32();
-        state.world.planets[0].wrapper_angle = (state.world.planets[0].wrapper_angle
-            + state.world.planets[0].wrapper_omega * dt)
-            .rem_euclid(std::f32::consts::TAU);
+        state
+            .motion_preset
+            .advance(&mut state.world.planets[0], state.world.sun, dt);
         let result = SpacewarsScenario::step_with_surface_pilot(
             &mut state.world,
             &[],
@@ -480,6 +498,7 @@ impl Scenario for SurfaceSortieScenario {
                 + snapshot.relative_speed.abs() * dt * 5.0)
                 .rem_euclid(std::f32::consts::TAU);
         }
+        state.record_motion_step(before, effective);
         // Services consume completed physical support/landing, never create it.
         state.update_outpost(Duration::from_secs_f32(dt));
         result

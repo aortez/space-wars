@@ -294,6 +294,11 @@ impl SpacewarsPhysics {
         }
 
         for (index, ship) in ships.iter_mut().enumerate() {
+            if self.surface_ship.is_some_and(|active| index != active) {
+                // The single-pilot fixture retains the legacy two-slot data
+                // layout, but does not simulate an invisible second craft.
+                continue;
+            }
             if self.surface_ship == Some(index) {
                 self.docked_planets[index] = None;
                 let key = ShipColliderKey {
@@ -403,8 +408,16 @@ impl SpacewarsPhysics {
             .is_some_and(|key| key.constrained)
     }
 
-    pub(super) fn enable_surface_landing(&mut self, index: usize, ship: &ShipState) {
+    /// Configure the single-vehicle fixture, including physical landing feet.
+    pub(super) fn enable_surface_sortie(&mut self, index: usize, ship: &ShipState) {
         self.surface_ship = Some(index);
+        for other in 0..self.ship_keys.len() {
+            if other != index {
+                self.world.remove_entity(ship_entity(other));
+                self.ship_keys[other] = None;
+                self.docked_planets[other] = None;
+            }
+        }
         self.docked_planets[index] = None;
         self.world.remove_entity(ship_entity(index));
         assert!(self.insert_ship(index, ship, false, false, false));
@@ -441,12 +454,13 @@ impl SpacewarsPhysics {
         primary_body(ship_entity(index))
     }
 
+    pub(super) fn planet_body(&self, index: usize) -> PhysicsBodyId {
+        primary_body(planet_entity(index))
+    }
+
     /// Solver-backed rear-foot support within contact slop, not hull or port overlap.
     pub(super) fn landing_feet_supported(&self, index: usize, planet: usize, up: Vec2) -> usize {
         let body = self.ship_body(index);
-        let Some(motion) = self.world.motion(body) else {
-            return 0;
-        };
         (0..LANDING_FEET.len())
             .filter(|&part| {
                 self.world
@@ -456,9 +470,10 @@ impl SpacewarsPhysics {
                         part as u16,
                     ))
                     .any(|contact| {
-                        let offset = contact.position - motion.position;
-                        let velocity = motion.linear_velocity
-                            + Vec2::new(-offset.y, offset.x) * motion.angular_velocity;
+                        let velocity = self
+                            .world
+                            .velocity_at_point(body, contact.position)
+                            .unwrap();
                         contact.collider.entity == planet_entity(planet)
                             && contact.collider.role == ROVER_SURFACE_ROLE
                             && contact.separation <= 0.04

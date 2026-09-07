@@ -592,7 +592,7 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M27b: ✅ Add collider-checked exit, surface-relative velocity inheritance, nearby supported boarding, control-context neutral gating, and visible feedback. The initial elevated-berth round trip passed manual playtesting.
 - M27c: ✅ Replace that temporary berth in the fixture with physical rear landing feet, nose-outward bounded flight assistance, contact-based settling, and physical takeoff. Add a translucent north-up minimap and landing diagnostics. Refined landing feel passed manual playtesting.
 - M27d: ✅ Add deterministic round-trip, eight-bearing flown landing, takeoff/return, blocked/unsafe transition, repeated body lifecycle, gravity, renderer/compositing, keyboard/gamepad mapping, and launcher workflow regressions.
-- Follow-ups: M28 adds an intact surface-outpost capture/reward loop. Explicit damage/rescue/pod rules, accelerating orbital supports, ordinary Spacewars integration, and bot intent remain later work. Normal capture gameplay is unchanged by this fixture.
+- Follow-ups: M28 adds an intact surface-outpost capture/reward loop; M29 exercises controlled accelerating supports. Explicit damage/rescue/pod rules, general orbital compatibility, ordinary Spacewars integration, and bot intent remain later work. Normal capture gameplay is unchanged by this fixture.
 - Guide: [Surface Sortie](../surface-sortie.md).
 
 ### M28: Intact outpost capture and repair
@@ -604,3 +604,12 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - Manual playtesting: the user reported the deployed outpost gameplay loop worked well with a controller on the Raspberry Pi (2026-09-06).
 - Design direction: neutral-outpost capture is one experimental path, not the only future way to claim or develop a planet. Keep planet claims, infrastructure ownership, and operational services distinct; do not require a pre-existing neutral outpost on every claimable planet.
 - Boundaries: no contested-capture policy, destructible infrastructure, resource economy, rebuilding, pilot/vehicle loss policy, or ordinary Spacewars/bot rule changes.
+
+### M29: Orbital Surface Sortie evidence
+
+- M29a: ✅ Keep the original preset and register `surface-sortie-orbit` with the same scenario/controllers. Add a headless translating diagnostic and a sun whose gravity matches the prescribed circular path at the planet center.
+- M29b: ✅ Sample completed terrain motion consistently for gravity, landing, and boarding; use center-of-mass-aware point velocity, schedule terrain once, and stop simulating the unused second ship. No actor transport or controller-force retuning.
+- M29c: ✅ Add deterministic motion/support/drift/damage counters, frame diagnostics, preset HUD, and sun/orbit minimap context.
+- M29d: ✅ Regress the full orbital round trip, extended support, opposite/faster rates, multi-bearing landings, independent jump/takeoff, excessive-acceleration separation, and bounded body lifecycle. Exercise both presets through renderer and launcher workflows.
+- Manual playtesting: deployed `surface-sortie-orbit` on the Pi, verified about 60 FPS / 60 UPS and a connected Switch Pro controller; the user reported that playtesting seemed good (2026-09-06).
+- Boundary: ordinary generated orbits need an explicit acceleration/gravity policy before integration; pilot/vehicle loss rules and bots remain separate work. See [Surface Sortie](../surface-sortie.md#moving-planet-evidence).

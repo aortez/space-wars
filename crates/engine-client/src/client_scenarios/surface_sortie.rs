@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickModel};
 use scenario_spacewars::surface_sortie::{
-    SurfaceSortieAction, SurfaceSortieScenario, SurfaceSortieState,
+    SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario, SurfaceSortieState,
 };
 
 use super::{
@@ -30,6 +30,15 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     create,
 };
 
+/// Another selectable preset of the same scenario, input mapping and renderer.
+/// Keeping a distinct registry ID makes the choice persist and remain reachable
+/// through ordinary keyboard/gamepad launcher navigation without new buttons.
+pub(super) const ORBIT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "surface-sortie-orbit",
+    create: create_orbit,
+    ..REGISTRATION
+};
+
 struct SurfaceSortieClientScenario {
     state: SurfaceSortieState,
 }
@@ -42,13 +51,28 @@ fn create(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init((), seed),
+        state: SurfaceSortieScenario::init(SurfaceMotionPreset::default(), seed),
+    }))
+}
+
+fn create_orbit(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SurfaceSortieClientScenario {
+        state: SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, seed),
     }))
 }
 
 impl ClientScenario for SurfaceSortieClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
-        &REGISTRATION
+        match self.state.motion_preset() {
+            SurfaceMotionPreset::Orbit => &ORBIT_REGISTRATION,
+            _ => &REGISTRATION,
+        }
     }
     fn tick_model(&self) -> TickModel {
         SurfaceSortieScenario::tick_model()
@@ -96,7 +120,7 @@ mod tests {
     #[test]
     fn keyboard_and_nes_pad_produce_the_same_context_neutral_intent() {
         let scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init((), 0),
+            state: SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 0),
         };
         let mut keyboard = ClientInput::default();
         for key in [
@@ -133,150 +157,154 @@ mod tests {
 
     #[test]
     fn outpost_capture_progress_and_owner_flag_render_in_both_backends() {
-        let mut scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init((), 0),
-        };
-        let dt = Duration::from_secs_f64(1.0 / 60.0);
-        for frame in 0..120 {
-            scenario.step(
-                &[SurfaceSortieAction {
-                    interact_held: frame == 60,
-                    ..SurfaceSortieAction::default()
-                }
-                .encode()],
-                dt,
-            );
-        }
-        for _ in 0..600 {
-            let observation = scenario.state.observation();
-            if observation
-                .position
-                .distance_to(observation.outpost.position)
-                < 2.35
-            {
-                break;
-            }
-            scenario.step(
-                &[SurfaceSortieAction {
-                    horizontal: 1.0,
-                    ..SurfaceSortieAction::default()
-                }
-                .encode()],
-                dt,
-            );
-        }
-        for _ in 0..60 {
-            scenario.step(&[SurfaceSortieAction::default().encode()], dt);
-        }
-        let partial = scenario.state.observation().outpost;
-        assert!(partial.capture_progress > 0.0 && partial.capture_progress < 1.0);
-        let viewport = Viewport::new(1280.0, 720.0);
-        check_render(&scenario, viewport, "on-foot-capturing");
-        for _ in 0..180 {
-            scenario.step(&[SurfaceSortieAction::default().encode()], dt);
-        }
-        let observation = scenario.state.observation();
-        assert_eq!(observation.outpost.owner, Some(observation.owner));
-        assert!(observation.outpost.repaired_health > 0.0);
-        for viewport in [viewport, Viewport::new(1280.0, 1400.0)] {
-            let frames = scenario.render_frames(RenderBackend::Vector, viewport);
-            assert_eq!(
-                frames,
-                scenario.render_frames(RenderBackend::Raster, viewport)
-            );
-            let overlay =
-                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
-            assert!(
-                overlay
-                    .iter()
-                    .any(|primitive| primitive.text.starts_with("OUTPOST P1"))
-            );
-            assert!(
-                overlay
-                    .iter()
-                    .any(|primitive| primitive.text == "P1 OUTPOST")
-            );
-            let name = if viewport.height > viewport.width {
-                "on-foot-secured-portrait"
-            } else {
-                "on-foot-secured"
+        for preset in [SurfaceMotionPreset::Stationary, SurfaceMotionPreset::Orbit] {
+            let mut scenario = SurfaceSortieClientScenario {
+                state: SurfaceSortieScenario::init(preset, 0),
             };
-            check_render(&scenario, viewport, name);
-            // Check the actual owner-colored flag, not just a text/model entry.
-            let up = observation.outpost.surface_normal;
-            let flag = observation.outpost.position
-                + up * 3.15
-                + engine_core::Vec2::new(up.y, -up.x) * 1.3;
-            let projected = frames[0].camera.world_to_viewport(
-                engine_common::RenderPoint::new(flag.x, flag.y),
-                viewport.aspect_ratio(),
-            );
-            let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
-                &frames,
-                viewport,
-                scenario.frame_layout(),
-                crate::raster::RasterOptions::default(),
-            );
-            let pixels = image.to_rgb8().unwrap();
-            let x = (projected.x * pixels.width() as f32) as usize;
-            let y = (projected.y * pixels.height() as f32) as usize;
-            let pixel = pixels.as_slice()[y * pixels.width() as usize + x];
-            assert!(
-                pixel.r > 200 && pixel.g < 80 && pixel.b < 80,
-                "missing owner flag: {pixel:?}"
-            );
+            let dt = Duration::from_secs_f64(1.0 / 60.0);
+            for frame in 0..120 {
+                scenario.step(
+                    &[SurfaceSortieAction {
+                        interact_held: frame == 60,
+                        ..SurfaceSortieAction::default()
+                    }
+                    .encode()],
+                    dt,
+                );
+            }
+            for _ in 0..600 {
+                let observation = scenario.state.observation();
+                if observation
+                    .position
+                    .distance_to(observation.outpost.position)
+                    < 2.35
+                {
+                    break;
+                }
+                scenario.step(
+                    &[SurfaceSortieAction {
+                        horizontal: 1.0,
+                        ..SurfaceSortieAction::default()
+                    }
+                    .encode()],
+                    dt,
+                );
+            }
+            for _ in 0..60 {
+                scenario.step(&[SurfaceSortieAction::default().encode()], dt);
+            }
+            let partial = scenario.state.observation().outpost;
+            assert!(partial.capture_progress > 0.0 && partial.capture_progress < 1.0);
+            let viewport = Viewport::new(1280.0, 720.0);
+            check_render(&scenario, viewport, "on-foot-capturing");
+            for _ in 0..180 {
+                scenario.step(&[SurfaceSortieAction::default().encode()], dt);
+            }
+            let observation = scenario.state.observation();
+            assert_eq!(observation.outpost.owner, Some(observation.owner));
+            assert!(observation.outpost.repaired_health > 0.0);
+            for viewport in [viewport, Viewport::new(1280.0, 1400.0)] {
+                let frames = scenario.render_frames(RenderBackend::Vector, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Raster, viewport)
+                );
+                let overlay =
+                    crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+                assert!(
+                    overlay
+                        .iter()
+                        .any(|primitive| primitive.text.starts_with("OUTPOST P1"))
+                );
+                assert!(
+                    overlay
+                        .iter()
+                        .any(|primitive| primitive.text == "P1 OUTPOST")
+                );
+                let name = if viewport.height > viewport.width {
+                    "on-foot-secured-portrait"
+                } else {
+                    "on-foot-secured"
+                };
+                check_render(&scenario, viewport, name);
+                // Check the actual owner-colored flag, not just a text/model entry.
+                let up = observation.outpost.surface_normal;
+                let flag = observation.outpost.position
+                    + up * 3.15
+                    + engine_core::Vec2::new(up.y, -up.x) * 1.3;
+                let projected = frames[0].camera.world_to_viewport(
+                    engine_common::RenderPoint::new(flag.x, flag.y),
+                    viewport.aspect_ratio(),
+                );
+                let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                    crate::raster::RasterOptions::default(),
+                );
+                let pixels = image.to_rgb8().unwrap();
+                let x = (projected.x * pixels.width() as f32) as usize;
+                let y = (projected.y * pixels.height() as f32) as usize;
+                let pixel = pixels.as_slice()[y * pixels.width() as usize + x];
+                assert!(
+                    pixel.r > 200 && pixel.g < 80 && pixel.b < 80,
+                    "missing owner flag: {pixel:?}"
+                );
+            }
         }
     }
 
     #[test]
     fn registered_fixture_renders_and_restarts_in_both_backends() {
-        let viewport = Viewport::new(1280.0, 720.0);
-        let mut scenario = REGISTRATION
-            .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)
-            .unwrap();
-        let initial = scenario.render_frames(RenderBackend::Vector, viewport);
-        for tick in 0..90 {
-            scenario.step(
-                &[SurfaceSortieAction {
-                    interact_held: tick == 60,
-                    ..SurfaceSortieAction::default()
+        for registration in [&REGISTRATION, &ORBIT_REGISTRATION] {
+            let viewport = Viewport::new(1280.0, 720.0);
+            let mut scenario = registration
+                .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)
+                .unwrap();
+            let initial = scenario.render_frames(RenderBackend::Vector, viewport);
+            for tick in 0..90 {
+                scenario.step(
+                    &[SurfaceSortieAction {
+                        interact_held: tick == 60,
+                        ..SurfaceSortieAction::default()
+                    }
+                    .encode()],
+                    Duration::from_secs_f64(1.0 / 60.0),
+                );
+                if tick == 59 {
+                    check_render(&*scenario, viewport, "aboard");
+                    check_render(&*scenario, Viewport::new(1280.0, 1400.0), "aboard-portrait");
                 }
-                .encode()],
-                Duration::from_secs_f64(1.0 / 60.0),
-            );
-            if tick == 59 {
-                check_render(&*scenario, viewport, "aboard");
-                check_render(&*scenario, Viewport::new(1280.0, 1400.0), "aboard-portrait");
             }
+            let frames = scenario.render_frames(RenderBackend::Vector, viewport);
+            assert_eq!(
+                frames,
+                scenario.render_frames(RenderBackend::Raster, viewport)
+            );
+            assert_ne!(frames, initial);
+            check_render(&*scenario, viewport, "on-foot");
+            check_render(
+                &*scenario,
+                Viewport::new(1280.0, 1400.0),
+                "on-foot-portrait",
+            );
+            assert!(matches!(
+                scenario
+                    .as_any()
+                    .downcast_ref::<SurfaceSortieClientScenario>()
+                    .unwrap()
+                    .state
+                    .location(),
+                scenario_spacewars::surface_sortie::PilotLocation::OnFoot
+            ));
+            let fresh = registration
+                .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)
+                .unwrap();
+            assert_eq!(
+                initial,
+                fresh.render_frames(RenderBackend::Vector, viewport)
+            );
         }
-        let frames = scenario.render_frames(RenderBackend::Vector, viewport);
-        assert_eq!(
-            frames,
-            scenario.render_frames(RenderBackend::Raster, viewport)
-        );
-        assert_ne!(frames, initial);
-        check_render(&*scenario, viewport, "on-foot");
-        check_render(
-            &*scenario,
-            Viewport::new(1280.0, 1400.0),
-            "on-foot-portrait",
-        );
-        assert!(matches!(
-            scenario
-                .as_any()
-                .downcast_ref::<SurfaceSortieClientScenario>()
-                .unwrap()
-                .state
-                .location(),
-            scenario_spacewars::surface_sortie::PilotLocation::OnFoot
-        ));
-        let fresh = REGISTRATION
-            .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)
-            .unwrap();
-        assert_eq!(
-            initial,
-            fresh.render_frames(RenderBackend::Vector, viewport)
-        );
     }
 
     fn check_render(scenario: &dyn ClientScenario, viewport: Viewport, name: &str) {
@@ -352,7 +380,10 @@ mod tests {
                     .join(directory)
             };
             std::fs::create_dir_all(&directory).unwrap();
-            let file = std::fs::File::create(directory.join(format!("{name}.png"))).unwrap();
+            let file = std::fs::File::create(
+                directory.join(format!("{name}-{}.png", scenario.registration().id)),
+            )
+            .unwrap();
             let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
             encoder.set_color(png::ColorType::Rgb);
             encoder.set_depth(png::BitDepth::Eight);
