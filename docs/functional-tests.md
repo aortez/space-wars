@@ -76,14 +76,26 @@ manual check.
 All four Surface Sortie presets (stationary center, orbital, untuned generated
 world, and experimental Surface V1 generated world), plus **surface-expedition**, use the same
 launcher/pause/restart workflow with both renderers;
-their raster checks require the ship, amber outpost, capture/landing HUD,
-and minimap planet. The client unit tests also render the disembarked spaceling,
-capture progress, and owner-colored flag in landscape/portrait, and check that
-capturing an Expedition site does not recolor the other minimap sites, while
+their raster checks require the ship, capture/landing HUD, and minimap planet.
+Only the pinned Sortie fixtures require an amber outpost; Expedition explicitly
+has none. Client unit tests render the disembarked spaceling, capture progress
+and flag in landscape/portrait and Pi-sized frames, and verify that raising
+an Expedition flag only recolors its planet after completion, while
 `scenario-spacewars` exercises the physical exit/walk/capture/repair/return/board/
 departure loop and input gating on stationary, orbital, and sampled Surface V1
-generated terrain. See
+generated terrain. The newer planet-claim regressions separately cover
+proximity-only flag lowering, a fresh replacement timer, contests, actual
+support, interrupted stages and an action-only two-planet claiming journey. See
 [Surface Sortie](surface-sortie.md) for the manual controls and retained images.
+
+Surface Expedition also has a two-player workflow. It changes **Settings →
+Players** from 1 to 2 through the public control inventory, verifies the
+persisted choice across launch/return, exercises both renderers and
+pause/restart, and checks that the raster screenshot contains both
+player-colored ships and both minimaps. Adapter tests cover independently
+addressed keyboard/gamepad input, disconnect, camera footprints, both HUDs and
+landscape/portrait images. Actual simultaneous two-controller gameplay still
+requires a manual check; this workflow does not inject a physical controller.
 
 The harness uses Slint's software backend, which does not draw vector paths.
 Selecting vector verifies host lifecycle and text there, not vector geometry.

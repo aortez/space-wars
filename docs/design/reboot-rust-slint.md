@@ -629,3 +629,13 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M31c: ✅ Exercise action-only A-to-B capture/repair journeys on stationary/translating spinning planets, generated arrivals, wrong-planet services/support, stable lifecycle and deterministic replay. Preserve pinned compatibility probes and ordinary-game behavior.
 - M31d: ✅ Deploy to the Pi, verify launcher/pause/restart and sampled 60 FPS / 60 UPS, and receive positive initial user playtesting feedback on 2026-09-07.
 - Boundary: single pilot/vehicle, one intact site per planet, no combat/rescue/rebuilding. Broader controller, generated-route and long-duration checks remain open; multi-pilot and bot integration follow. See [Surface Expedition](../surface-expedition.md).
+
+### M32: Two-player Surface Expedition
+
+- M32a: ✅ Evolve the existing Expedition entry with a persisted 1/2-player setting, defaulting to one. Preserve the single-pilot pinned Sortie and compatibility presets.
+- M32b: ✅ Give each pilot independent assigned-ship, control, transfer, landing and diagnostic state. Share one Rapier world, gravity solve and physics step; bound capsule lifecycle to one external body per pilot and reject occupied hatch exits.
+- M32c: ✅ Add per-seat split-screen cameras, HUDs and translucent minimaps. Address Surface control actions by player and expose per-player observations (initially version 8, now 9 with planet claims and optional focused outpost).
+- M32d: ✅ Resolve physically eligible opposing claimants together, pause contested progress, prevent borrowed partial claims, and repair only friendly landed vehicles. Regress independent controls, same-planet transfer cycles, capture/repair, replay, migration and real client lifecycle. Preserve ordinary navigation/strategy baselines.
+- M32e: ✅ Following positive multiplayer Pi playtesting, simplify Expedition to planet claims without infrastructure: stand on the surface for three seconds to raise a flag; approach an enemy flag to lower it for three seconds before a fresh raise. Preserve local contests, interrupted-stage rules, real contact attachment, both minimaps and the pinned outpost reference tests. No flag bodies/colliders; no Expedition repair service.
+- Manual playtesting: the simplified flag-loop build was deployed to the Pi, verified at about 60 FPS / 60 UPS, and received positive user feedback on 2026-09-07.
+- Boundary: no weapons, ship swapping, rescue/rebuilding, bots, terrain changes or ordinary Spacewars docking changes. See [Surface Expedition](../surface-expedition.md).

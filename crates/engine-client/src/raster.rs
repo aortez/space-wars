@@ -216,19 +216,29 @@ impl RasterRenderer {
                     starfield_cache,
                     &mut timings,
                 );
-            } else if layout == FrameLayout::SinglePlayerWithMinimap && frames.len() == 2 {
-                let viewports =
-                    render::frame_viewports(Viewport::new(width as f32, height as f32), 2, layout);
-                let started = Instant::now();
-                canvas.draw_frame(&frames[0], viewports[0]);
-                timings.other_frames += started.elapsed();
-                draw_uncached_overview(
-                    &mut canvas,
-                    &frames[1],
-                    viewports[1],
-                    overview_buffers,
-                    &mut timings,
+            } else if layout == FrameLayout::PlayerViewsWithMinimaps
+                && matches!(frames.len(), 2 | 4)
+            {
+                let viewports = render::frame_viewports(
+                    Viewport::new(width as f32, height as f32),
+                    frames.len(),
+                    layout,
                 );
+                let players = frames.len() / 2;
+                let started = Instant::now();
+                for player in 0..players {
+                    canvas.draw_frame(&frames[player], viewports[player]);
+                }
+                timings.other_frames += started.elapsed();
+                for player in 0..players {
+                    draw_uncached_overview(
+                        &mut canvas,
+                        &frames[players + player],
+                        viewports[players + player],
+                        overview_buffers,
+                        &mut timings,
+                    );
+                }
             } else if !frames.is_empty() {
                 let viewports = render::frame_viewports(
                     Viewport::new(width as f32, height as f32),
@@ -2046,7 +2056,7 @@ mod tests {
         let mut minimap = RenderFrame::new(camera);
         let frames = [player.clone(), minimap.clone()];
         let viewport = Viewport::new(100.0, 100.0);
-        let layout = FrameLayout::SinglePlayerWithMinimap;
+        let layout = FrameLayout::PlayerViewsWithMinimaps;
         let pane = render::frame_viewports(viewport, 2, layout)[1];
         let x = (pane.x + pane.width * 0.5).round() as usize;
         let y = (pane.y + pane.height * 0.5).round() as usize;

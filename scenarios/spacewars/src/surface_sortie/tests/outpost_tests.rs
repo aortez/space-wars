@@ -5,13 +5,13 @@ pub(super) fn walk_to(
     target: impl Fn(&SurfaceSortieState) -> Vec2,
 ) {
     for _ in 0..600 {
-        let snapshot = state.spaceling_snapshot().unwrap();
+        let snapshot = state.spaceling_snapshot(0).unwrap();
         let delta = target(state) - snapshot.motion.position;
         if delta.length() < 0.3 {
             idle(state, 12);
             return;
         }
-        let up = (snapshot.motion.position - state.world.planets[state.pilot.planet].position)
+        let up = (snapshot.motion.position - state.world.planets[state.pilots[0].planet].position)
             .normalized();
         tick(
             state,
@@ -21,7 +21,7 @@ pub(super) fn walk_to(
             },
         );
     }
-    panic!("could not walk to target: {:?}", state.observation());
+    panic!("could not walk to target: {:?}", state.observation(0));
 }
 
 pub(super) fn terminal_approach(state: &SurfaceSortieState) -> Vec2 {
@@ -38,10 +38,15 @@ fn at_terminal() -> SurfaceSortieState {
     disembark(&mut state);
     walk_to(&mut state, terminal_approach);
     assert_eq!(
-        state.observation().outpost.capture_status,
+        state
+            .observation(0)
+            .outpost
+            .as_ref()
+            .unwrap()
+            .capture_status,
         CaptureStatus::Capturing,
         "{:?}",
-        state.observation()
+        state.observation(0)
     );
     state
 }
@@ -49,11 +54,11 @@ fn at_terminal() -> SurfaceSortieState {
 fn capture(state: &mut SurfaceSortieState) {
     for _ in 0..200 {
         idle(state, 1);
-        if state.outposts[0].owner == Some(state.pilot.owner) {
+        if state.outposts[0].owner == Some(state.pilots[0].owner) {
             return;
         }
     }
-    panic!("capture did not complete: {:?}", state.observation());
+    panic!("capture did not complete: {:?}", state.observation(0));
 }
 
 #[test]
@@ -61,13 +66,13 @@ fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_step
     let mut a = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7);
     let mut b = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7);
     for frame in 0..650 {
-        let observation = a.observation();
+        let observation = a.observation(0);
         let input = SurfaceSortieAction {
             interact_held: frame == 60,
             horizontal: if frame > 120
                 && observation
                     .position
-                    .distance_to(observation.outpost.position)
+                    .distance_to(observation.outpost.as_ref().unwrap().position)
                     > 2.35
             {
                 1.0
@@ -78,22 +83,22 @@ fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_step
         };
         tick(&mut a, input);
         tick(&mut b, input);
-        assert_eq!(a.observation(), b.observation(), "tick {frame}");
+        assert_eq!(a.observation(0), b.observation(0), "tick {frame}");
     }
-    assert_eq!(a.outposts[0].owner, Some(a.pilot.owner));
-    assert!(a.observation().outpost.repaired_health > 0.0);
-    let before = a.observation();
+    assert_eq!(a.outposts[0].owner, Some(a.pilots[0].owner));
+    assert!(a.observation(0).outpost.as_ref().unwrap().repaired_health > 0.0);
+    let before = a.observation(0);
     for _ in 0..10 {
         let _ = SurfaceSortieScenario::render_frame(&a);
-        let _ = SurfaceSortieScenario::minimap_frame(&a, 16.0 / 9.0);
+        let _ = SurfaceSortieScenario::minimap_frame(&a, 0, 16.0 / 9.0);
         let _ = SurfaceSortieScenario::observe(&a);
         SurfaceSortieScenario::step(&mut a, &[], Duration::ZERO);
     }
-    assert_eq!(a.observation(), before);
-    let fresh = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7).observation();
-    assert_eq!(fresh.outpost.owner, None);
-    assert_eq!(fresh.outpost.capture_progress, 0.0);
-    assert_eq!(fresh.outpost.repaired_health, 0.0);
+    assert_eq!(a.observation(0), before);
+    let fresh = SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 7).observation(0);
+    assert_eq!(fresh.outpost.as_ref().unwrap().owner, None);
+    assert_eq!(fresh.outpost.as_ref().unwrap().capture_progress, 0.0);
+    assert_eq!(fresh.outpost.as_ref().unwrap().repaired_health, 0.0);
     assert_eq!(fresh.ship_health, 75.0);
 }
 
@@ -112,11 +117,11 @@ pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
     let preset = state.motion_preset();
     idle(&mut state, 120);
     assert!(
-        state.vehicle_settled(),
+        state.vehicle_settled(0),
         "{preset:?}: {:?}",
-        state.observation()
+        state.observation(0)
     );
-    let initial = state.observation();
+    let initial = state.observation(0);
     assert_eq!(initial.ship_health, state.world.ships[0].life_max * 0.75);
     idle(&mut state, 360);
     assert_eq!(
@@ -131,20 +136,20 @@ pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
     );
     walk_to(&mut state, terminal_approach);
     idle(&mut state, 60);
-    let partial = state.observation().outpost;
+    let partial = state.observation(0).outpost.unwrap();
     assert!(partial.capture_progress > 0.2 && partial.capture_progress < 1.0);
     assert_eq!(partial.owner, None);
     assert_eq!(partial.repair_status, RepairStatus::NeedsCapture);
     capture(&mut state);
-    assert!(state.vehicle_settled());
-    assert_eq!(state.observation().outpost.captures, 1);
+    assert!(state.vehicle_settled(0));
+    assert_eq!(state.observation(0).outpost.as_ref().unwrap().captures, 1);
     assert_eq!(
-        state.world.planets[state.pilot.planet].owner_id, None,
+        state.world.planets[state.pilots[0].planet].owner_id, None,
         "outpost ownership is not planet ownership"
     );
     assert!(state.world.spaceport_contacts.is_empty());
     assert_eq!(
-        state.observation().physical_bodies,
+        state.observation(0).physical_bodies,
         initial.physical_bodies + 1
     );
     for _ in 0..360 {
@@ -157,24 +162,37 @@ pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
     }
     assert_eq!(state.world.ships[0].life, state.world.ships[0].life_max);
     let initial_damage = state.world.ships[0].life_max - initial.ship_health;
-    assert!((state.observation().outpost.repaired_health - initial_damage).abs() < 1e-3);
+    assert!(
+        (state
+            .observation(0)
+            .outpost
+            .as_ref()
+            .unwrap()
+            .repaired_health
+            - initial_damage)
+            .abs()
+            < 1e-3
+    );
     assert_eq!(
-        state.observation().outpost.repair_status,
+        state.observation(0).outpost.as_ref().unwrap().repair_status,
         RepairStatus::Ready
     );
     walk_to(&mut state, |s| {
-        s.access_position() + s.access_up() * SurfaceSortieState::spec().half_height()
+        s.access_position(0) + s.access_up(0) * SurfaceSortieState::spec().half_height()
     });
     interact(&mut state);
     assert_eq!(
-        state.last_transfer,
+        state.pilots[0].last_transfer,
         TransferResult::Boarded,
         "{:?}",
-        state.observation()
+        state.observation(0)
     );
-    assert_eq!(state.observation().physical_bodies, initial.physical_bodies);
-    assert_eq!(state.observation().spaceling, initial.spaceling);
-    assert_eq!(state.observation().vehicle, initial.vehicle);
+    assert_eq!(
+        state.observation(0).physical_bodies,
+        initial.physical_bodies
+    );
+    assert_eq!(state.observation(0).spaceling, initial.spaceling);
+    assert_eq!(state.observation(0).vehicle, initial.vehicle);
     idle(&mut state, 1); // Neutral transfer handoff.
     state.world.ships[0].life = 60.0;
     for _ in 0..30 {
@@ -187,12 +205,15 @@ pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
         );
         assert_eq!(state.world.ships[0].life, 60.0, "no repair once taking off");
         assert_eq!(
-            state.observation().outpost.repair_status,
+            state.observation(0).outpost.as_ref().unwrap().repair_status,
             RepairStatus::NeedLanding
         );
     }
-    assert!(state.landing.altitude > 1.0);
-    assert_eq!(state.observation().outpost.owner, Some(initial.owner));
+    assert!(state.pilots[0].landing.altitude > 1.0);
+    assert_eq!(
+        state.observation(0).outpost.as_ref().unwrap().owner,
+        Some(initial.owner)
+    );
 }
 
 #[test]
@@ -200,7 +221,15 @@ fn interrupted_outpost_capture_resets_when_walking_away_jumping_or_knocked_down(
     for interruption in 0..3 {
         let mut state = at_terminal();
         idle(&mut state, 60);
-        assert!(state.observation().outpost.capture_progress > 0.2);
+        assert!(
+            state
+                .observation(0)
+                .outpost
+                .as_ref()
+                .unwrap()
+                .capture_progress
+                > 0.2
+        );
         match interruption {
             0 => {
                 for _ in 0..40 {
@@ -213,7 +242,12 @@ fn interrupted_outpost_capture_resets_when_walking_away_jumping_or_knocked_down(
                     );
                 }
                 assert_eq!(
-                    state.observation().outpost.capture_status,
+                    state
+                        .observation(0)
+                        .outpost
+                        .as_ref()
+                        .unwrap()
+                        .capture_status,
                     CaptureStatus::TooFar
                 );
             }
@@ -225,11 +259,11 @@ fn interrupted_outpost_capture_resets_when_walking_away_jumping_or_knocked_down(
                         ..SurfaceSortieAction::default()
                     },
                 );
-                assert!(!state.spaceling_snapshot().unwrap().grounded());
+                assert!(!state.spaceling_snapshot(0).unwrap().grounded());
             }
             _ => {
-                let snapshot = state.spaceling_snapshot().unwrap();
-                let body = state.pilot.body.as_ref().unwrap().body();
+                let snapshot = state.spaceling_snapshot(0).unwrap();
+                let body = state.pilots[0].body.as_ref().unwrap().body();
                 state.world.physics.world.set_velocity(
                     body,
                     snapshot.motion.linear_velocity,
@@ -238,12 +272,12 @@ fn interrupted_outpost_capture_resets_when_walking_away_jumping_or_knocked_down(
                 );
                 idle(&mut state, 1);
                 assert_eq!(
-                    state.spaceling_snapshot().unwrap().balance,
+                    state.spaceling_snapshot(0).unwrap().balance,
                     SpacelingBalance::KnockedDown
                 );
             }
         }
-        let outpost = state.observation().outpost;
+        let outpost = state.observation(0).outpost.unwrap();
         assert_eq!(outpost.capture_progress, 0.0);
         assert_eq!(outpost.capturing_player, None);
         assert_eq!(outpost.owner, None);
@@ -278,28 +312,33 @@ fn unrelated_physical_support_near_the_terminal_does_not_capture() {
     // Construct a supported actor on an unrelated platform inside the capture
     // radius. This isolates the surface-identity gate from the walk-up test.
     let spec = SurfaceSortieState::spec();
-    state.pilot.body = SpacelingAssembly::insert(
+    state.pilots[0].body = SpacelingAssembly::insert(
         &mut state.world.physics.world,
-        PILOT_PHYSICS_ID,
+        pilot_physics_id(PlayerId::PLAYER_1),
         position + up * 0.75,
         rotation_for_direction(up),
         spec,
     );
-    assert!(state.pilot.body.is_some());
+    assert!(state.pilots[0].body.is_some());
     idle(&mut state, 240);
-    assert!(state.spaceling_snapshot().unwrap().grounded());
+    assert!(state.spaceling_snapshot(0).unwrap().grounded());
     assert_eq!(
-        state.observation().outpost.capture_status,
+        state
+            .observation(0)
+            .outpost
+            .as_ref()
+            .unwrap()
+            .capture_status,
         CaptureStatus::NeedSupport,
         "{:?}",
-        state.observation()
+        state.observation(0)
     );
     assert_eq!(state.outposts[0].owner, None);
     state.world.physics.world.remove_entity(platform);
     idle(&mut state, 300);
     assert_eq!(
         state.outposts[0].owner,
-        Some(state.pilot.owner),
+        Some(state.pilots[0].owner),
         "actual planet support permits capture"
     );
 }
@@ -351,14 +390,14 @@ fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
     let mut ship = initial.clone();
     post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(1));
     assert_eq!(
-        post.observation(&state.world.planets[0]).repair_status,
+        post.observation(&state.world.planets[0], 0).repair_status,
         RepairStatus::NeedsCapture
     );
     assert_eq!(ship.life, initial.life);
     post.owner = Some(PlayerId::PLAYER_2);
     post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(1));
     assert_eq!(
-        post.observation(&state.world.planets[0]).repair_status,
+        post.observation(&state.world.planets[0], 0).repair_status,
         RepairStatus::NotFriendly
     );
     post.owner = Some(PlayerId::PLAYER_1);
@@ -368,7 +407,7 @@ fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
     ] {
         post.repair_ship(&mut ship, landed, distance, Duration::from_secs(1));
         assert_eq!(
-            post.observation(&state.world.planets[0]).repair_status,
+            post.observation(&state.world.planets[0], 0).repair_status,
             expected
         );
         assert_eq!(ship.life, initial.life);
@@ -383,7 +422,7 @@ fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
         let before = ship.life;
         post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(1));
         assert_eq!(
-            post.observation(&state.world.planets[0]).repair_status,
+            post.observation(&state.world.planets[0], 0).repair_status,
             RepairStatus::VehicleUnavailable
         );
         assert_eq!(ship.life, before);
@@ -393,14 +432,14 @@ fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
     ship.life = ship.life_max - 0.02;
     post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(1));
     assert_eq!(ship.life, ship.life_max);
-    let repaired = post.observation(&state.world.planets[0]).repaired_health;
+    let repaired = post.observation(&state.world.planets[0], 0).repaired_health;
     post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(10));
     assert_eq!(
-        post.observation(&state.world.planets[0]).repaired_health,
+        post.observation(&state.world.planets[0], 0).repaired_health,
         repaired
     );
     assert_eq!(
-        post.observation(&state.world.planets[0]).repair_status,
+        post.observation(&state.world.planets[0], 0).repair_status,
         RepairStatus::Ready
     );
 }
@@ -410,34 +449,29 @@ fn outpost_capture_uses_elapsed_time_and_never_shares_partial_progress_between_p
     let mut state = parked();
     let post = &mut state.outposts[0];
     post.update_capture(
-        PlayerId::PLAYER_1,
-        CaptureStatus::Capturing,
+        &[(PlayerId::PLAYER_1, CaptureStatus::Capturing)],
         Duration::from_secs(2),
     );
     assert_eq!(post.owner, None);
     post.update_capture(
-        PlayerId::PLAYER_2,
-        CaptureStatus::Capturing,
+        &[(PlayerId::PLAYER_2, CaptureStatus::Capturing)],
         Duration::from_secs(2),
     );
     assert_eq!(post.owner, None);
     post.update_capture(
-        PlayerId::PLAYER_2,
-        CaptureStatus::Capturing,
+        &[(PlayerId::PLAYER_2, CaptureStatus::Capturing)],
         Duration::from_secs(1),
     );
     assert_eq!(post.owner, Some(PlayerId::PLAYER_2));
     post.update_capture(
-        PlayerId::PLAYER_2,
-        CaptureStatus::Capturing,
+        &[(PlayerId::PLAYER_2, CaptureStatus::Capturing)],
         Duration::from_secs(10),
     );
-    assert_eq!(post.observation(&state.world.planets[0]).captures, 1);
+    assert_eq!(post.observation(&state.world.planets[0], 0).captures, 1);
     post.update_capture(
-        PlayerId::PLAYER_1,
-        CaptureStatus::Capturing,
+        &[(PlayerId::PLAYER_1, CaptureStatus::Capturing)],
         Duration::from_secs(3),
     );
     assert_eq!(post.owner, Some(PlayerId::PLAYER_1));
-    assert_eq!(post.observation(&state.world.planets[0]).captures, 2);
+    assert_eq!(post.observation(&state.world.planets[0], 0).captures, 2);
 }

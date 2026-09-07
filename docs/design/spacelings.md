@@ -266,6 +266,42 @@ new boundaries. The initial Pi deployment and user playtest on 2026-09-07 were
 positive. This does not yet prove all generated routes, multiplayer, combat or
 rescue rules. See [Surface Expedition](../surface-expedition.md).
 
+## Eighth slice: two-player surface expedition
+
+Implemented on `surface-expedition-multiplayer`. The existing Expedition
+entry gains a persisted 1/2-player setting, defaulting to one; the pinned
+Sortie and compatibility presets remain single-pilot configurations. Each
+seat has stable pilot/vehicle identities, controls, transfer and landing
+state, telemetry, camera and minimap. Boarding is limited to the assigned
+ship. One pilot's transfer/release gate cannot consume the other's input.
+
+All active ships and spacelings inhabit one Rapier world with one shared
+gravity solve and physics step. After successful initial multiplayer Pi
+playtesting, Expedition's objective was simplified: land, disembark and stand
+still for three seconds to claim the planet. An enemy flag requires proximity
+and three seconds of lowering, then a fresh three seconds to raise a replacement.
+Ownership remains with the defender while lowering, then neutral while raising.
+Opposing eligible pilots near a flag pause progress; interrupted stages reset
+without undoing a completed neutralization or sharing time between claimants.
+
+Flags attach at the actual contact point/normal in the planet's local frame,
+without nominal-radius projection or extra physics bodies/colliders. Expedition
+starts ships at full health and creates no outposts or repair services. The
+outpost model and its multi-pilot contest/repair tests remain as future
+infrastructure references, independent of planet ownership. Observation version
+9 provides a `players` array, focused/full planet claims and an optional focused
+outpost. Ordinary Spacewars protocols are unchanged.
+
+Regressions cover repeated same-planet transfers with stationary and moving
+centers, blocked exits, independent control gates, no foreign-ship boarding,
+contested capture and owner-specific repair, deterministic action ordering,
+settings migration, and split-screen rendering/lifecycle. The frozen ordinary
+navigation and strategy suites still match. The preceding outpost-based
+multiplayer and simplified flag-loop builds both received positive Pi
+playtesting. Weapons, pilot/vehicle loss, rescue, rebuilding, bot surface intents
+and terrain integration are not part of this slice. See
+[Surface Expedition](../surface-expedition.md#two-player-expedition).
+
 ## Planet and ship direction
 
 The continuous surface and external berth from PR #40 fix the interior-bay

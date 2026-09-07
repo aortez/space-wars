@@ -113,8 +113,8 @@ impl SurfaceFrame {
 }
 
 impl SurfaceSortieState {
-    pub(super) fn planet_motion(&self) -> SurfaceFrame {
-        SurfaceFrame::read(&self.world.physics, self.motion_planet_index())
+    pub(super) fn planet_motion(&self, player: usize) -> SurfaceFrame {
+        SurfaceFrame::read(&self.world.physics, self.motion_planet_index(player))
     }
 
     pub fn motion_preset(&self) -> SurfaceMotionPreset {
@@ -170,23 +170,23 @@ pub(super) struct StepSample {
 }
 
 impl StepSample {
-    pub(super) fn read(state: &SurfaceSortieState) -> Self {
+    pub(super) fn read(state: &SurfaceSortieState, player: usize) -> Self {
         Self {
-            planet: state.motion_planet_index(),
-            snapshot: state.spaceling_snapshot(),
-            landing: state.landing,
-            ship_health: state.world.ships[state.pilot.vehicle.0].life,
-            ship_available: state.vehicle_available(),
+            planet: state.motion_planet_index(player),
+            snapshot: state.spaceling_snapshot(player),
+            landing: state.pilots[player].landing,
+            ship_health: state.world.ships[state.pilots[player].vehicle.0].life,
+            ship_available: state.vehicle_available(player),
         }
     }
 }
 
 impl SurfaceSortieState {
-    pub(super) fn motion_observation(&self) -> SurfaceMotionObservation {
-        let frame = self.planet_motion();
-        let snapshot = self.spaceling_snapshot();
-        let body = self.pilot.body.as_ref().map_or_else(
-            || self.world.physics.ship_body(self.pilot.vehicle.0),
+    pub(super) fn motion_observation(&self, player: usize) -> SurfaceMotionObservation {
+        let frame = self.planet_motion(player);
+        let snapshot = self.spaceling_snapshot(player);
+        let body = self.pilots[player].body.as_ref().map_or_else(
+            || self.world.physics.ship_body(self.pilots[player].vehicle.0),
             |pilot| pilot.body(),
         );
         let actor = self
@@ -196,7 +196,7 @@ impl SurfaceSortieState {
             .motion(body)
             .expect("active sortie body");
         let surface_velocity = point_velocity(frame, actor.position);
-        let planet_index = self.motion_planet_index();
+        let planet_index = self.motion_planet_index(player);
         let planet = &self.world.planets[planet_index];
         let (scripted_acceleration, mut external_gravity_at_center) =
             self.world.sun.map_or((Vec2::ZERO, Vec2::ZERO), |sun| {
@@ -257,18 +257,24 @@ impl SurfaceSortieState {
         }
     }
 
-    pub(super) fn record_motion_step(&mut self, before: StepSample, input: SurfaceSortieAction) {
-        if before.planet != self.motion_planet_index() {
-            self.idle_anchor = None;
+    pub(super) fn record_motion_step(
+        &mut self,
+        player: usize,
+        before: StepSample,
+        input: SurfaceSortieAction,
+    ) {
+        if before.planet != self.motion_planet_index(player) {
+            self.pilots[player].idle_anchor = None;
         }
-        let after = self.spaceling_snapshot();
-        let available = self.vehicle_available();
-        let ship = &self.world.ships[self.pilot.vehicle.0];
-        let frame = self.planet_motion();
-        let metrics = &mut self.motion_metrics;
+        let after = self.spaceling_snapshot(player);
+        let available = self.vehicle_available(player);
+        let ship = &self.world.ships[self.pilots[player].vehicle.0];
+        let frame = self.planet_motion(player);
+        let pilot = &mut self.pilots[player];
+        let metrics = &mut pilot.motion_metrics;
         metrics.on_foot_ticks += u64::from(after.is_some());
         metrics.supported_ticks += u64::from(after.is_some_and(SpacelingSnapshot::grounded));
-        metrics.ship_landed_ticks += u64::from(self.landing.phase == LandingPhase::Landed);
+        metrics.ship_landed_ticks += u64::from(pilot.landing.phase == LandingPhase::Landed);
         if let (Some(before), Some(after)) = (before.snapshot, after) {
             let jumps = after.jumps.saturating_sub(before.jumps);
             metrics.jumps += jumps;
@@ -278,16 +284,16 @@ impl SurfaceSortieState {
         }
         metrics.ship_support_losses += u64::from(
             before.landing.supported_feet > 0
-                && self.landing.supported_feet == 0
+                && pilot.landing.supported_feet == 0
                 && ship.thrust == 0.0,
         );
         metrics.landings += u64::from(
             before.landing.phase != LandingPhase::Landed
-                && self.landing.phase == LandingPhase::Landed,
+                && pilot.landing.phase == LandingPhase::Landed,
         );
         metrics.departures += u64::from(
             before.landing.phase == LandingPhase::Landed
-                && self.landing.phase != LandingPhase::Landed
+                && pilot.landing.phase != LandingPhase::Landed
                 && ship.thrust > 0.0,
         );
         // Called before service healing. A destroyed/transformed ship loses
@@ -299,7 +305,7 @@ impl SurfaceSortieState {
         let idle = if let Some(snapshot) = after {
             snapshot.grounded() && snapshot.balance == SpacelingBalance::Balanced
         } else {
-            self.landing.phase == LandingPhase::Landed
+            pilot.landing.phase == LandingPhase::Landed
         } && input.horizontal == 0.0
             && !input.primary_held
             && !input.interact_held
@@ -310,15 +316,15 @@ impl SurfaceSortieState {
             });
             let local = (position - frame.position).rotate_radians(-frame.angle);
             let on_foot = after.is_some();
-            let anchor = self
+            let anchor = pilot
                 .idle_anchor
                 .filter(|(foot, _)| *foot == on_foot)
                 .map_or(local, |(_, anchor)| anchor);
-            self.idle_anchor = Some((on_foot, anchor));
+            pilot.idle_anchor = Some((on_foot, anchor));
             metrics.idle_drift = local.distance_to(anchor);
             metrics.max_idle_drift = metrics.max_idle_drift.max(metrics.idle_drift);
         } else {
-            self.idle_anchor = None;
+            pilot.idle_anchor = None;
             metrics.idle_drift = 0.0;
         }
     }

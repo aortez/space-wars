@@ -8,6 +8,7 @@ use engine_rapier::{
     world::PhysicsId,
 };
 
+mod claim;
 pub mod compatibility;
 mod landing;
 mod motion;
@@ -15,6 +16,9 @@ mod outpost;
 mod profiles;
 mod render;
 mod travel;
+pub use claim::{
+    PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,
+};
 pub use landing::{LandingPhase, LandingTelemetry};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
@@ -22,8 +26,10 @@ pub use profiles::GeneratedSurfaceProfile;
 #[cfg(test)]
 mod tests;
 
-const CONTROL_V1: u32 = 0x5355_0001;
-const PILOT_PHYSICS_ID: PhysicsId = PhysicsId::new(40_000);
+const CONTROL_V2: u32 = 0x5355_0002;
+fn pilot_physics_id(player: PlayerId) -> PhysicsId {
+    PhysicsId::new(40_000 + player.index() as u64)
+}
 const SURFACE_RADIUS: f32 = 60.0;
 const BOARDING_RANGE: f32 = 3.0;
 const SETTLED_SPEED: f32 = 2.0;
@@ -83,34 +89,39 @@ pub struct SurfaceSortieAction {
 }
 
 impl SurfaceSortieAction {
-    pub fn encode(self) -> Action {
+    pub fn encode(self, player: PlayerId) -> Action {
         let mut payload = self.horizontal.to_le_bytes().to_vec();
         payload.extend([
             self.primary_held as u8,
             self.interact_held as u8,
             self.brake_held as u8,
         ]);
-        Action::scenario(CONTROL_V1, payload)
+        payload.push(player.index() as u8);
+        Action::scenario(CONTROL_V2, payload)
     }
 
-    pub fn decode(action: &Action) -> Option<Self> {
+    pub fn decode(action: &Action) -> Option<(PlayerId, Self)> {
         let Action::Scenario {
-            kind: CONTROL_V1,
+            kind: CONTROL_V2,
             payload,
         } = action
         else {
             return None;
         };
-        if payload.len() != 7 || payload[4..].iter().any(|&value| value > 1) {
+        if payload.len() != 8 || payload[4..7].iter().any(|&value| value > 1) {
             return None;
         }
         let horizontal = f32::from_le_bytes(payload[..4].try_into().ok()?);
-        horizontal.is_finite().then_some(Self {
-            horizontal: horizontal.clamp(-1.0, 1.0),
-            primary_held: payload[4] != 0,
-            interact_held: payload[5] != 0,
-            brake_held: payload[6] != 0,
-        })
+        let player = PlayerId::from_index(payload[7] as usize)?;
+        horizontal.is_finite().then_some((
+            player,
+            Self {
+                horizontal: horizontal.clamp(-1.0, 1.0),
+                primary_held: payload[4] != 0,
+                interact_held: payload[5] != 0,
+                brake_held: payload[6] != 0,
+            },
+        ))
     }
 }
 
@@ -118,21 +129,22 @@ pub struct SurfaceSortieState {
     world: SpacewarsState,
     motion_preset: SurfaceMotionPreset,
     generated_case: Option<compatibility::GeneratedSurfaceCase>,
+    pilots: Vec<SurfacePilot>,
+    outposts: Vec<outpost::SurfaceOutpost>,
+    claims: Vec<claim::SurfacePlanetClaim>,
+}
+
+pub(super) struct SurfacePilot {
     motion_metrics: SurfaceMotionMetrics,
     idle_anchor: Option<(bool, Vec2)>,
-    pilot: SurfacePilot,
     input: SurfaceSortieAction,
     interact_was_held: bool,
     controls_armed: bool,
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
-    outposts: Vec<outpost::SurfaceOutpost>,
-}
-
-pub(super) struct SurfacePilot {
     id: SpacelingId,
-    owner: PlayerId,
+    pub(super) owner: PlayerId,
     vehicle: VehicleId,
     /// Approach frame, not proof of contact or permission to board/repair.
     planet: usize,
@@ -146,6 +158,30 @@ pub(super) struct SurfacePilot {
 }
 
 impl SurfacePilot {
+    fn new(owner: PlayerId, planet: usize, travel_enabled: bool) -> Self {
+        Self {
+            id: SpacelingId(owner.index() as u64 + 1),
+            owner,
+            vehicle: VehicleId(owner.index()),
+            planet,
+            travel_enabled,
+            body: None,
+            control: SpacelingControl::default(),
+            gravity: Vec2::ZERO,
+            facing: 1.0,
+            gait_phase: 0.0,
+            ship_gravity_delta: Vec2::ZERO,
+            motion_metrics: SurfaceMotionMetrics::default(),
+            idle_anchor: None,
+            input: SurfaceSortieAction::default(),
+            interact_was_held: false,
+            controls_armed: false,
+            transfers: 0,
+            last_transfer: TransferResult::Ready,
+            landing: LandingTelemetry::default(),
+        }
+    }
+
     pub(super) fn snapshot(
         &self,
         physics: &physics::SpacewarsPhysics,
@@ -167,6 +203,12 @@ impl SurfacePilot {
                 .apply_velocity_delta(body.body(), velocity_delta, true);
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SurfaceSessionObservation {
+    pub version: u32,
+    pub players: Vec<SurfaceSortieObservation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -196,39 +238,45 @@ pub struct SurfaceSortieObservation {
     pub controls_armed: bool,
     pub physical_bodies: usize,
     pub landing: LandingTelemetry,
-    pub outpost: OutpostObservation,
+    pub outpost: Option<OutpostObservation>,
     pub outposts: Vec<OutpostObservation>,
+    pub planet_claim: Option<PlanetClaimObservation>,
+    pub planet_claims: Vec<PlanetClaimObservation>,
     pub motion: SurfaceMotionObservation,
     pub motion_metrics: SurfaceMotionMetrics,
 }
 
 impl SurfaceSortieState {
-    pub fn spaceling_snapshot(&self) -> Option<SpacelingSnapshot> {
-        self.pilot.snapshot(&self.world.physics)
+    pub fn player_count(&self) -> usize {
+        self.pilots.len()
     }
 
-    pub fn location(&self) -> PilotLocation {
-        if self.pilot.body.is_some() {
+    pub fn spaceling_snapshot(&self, player: usize) -> Option<SpacelingSnapshot> {
+        self.pilots[player].snapshot(&self.world.physics)
+    }
+
+    pub fn location(&self, player: usize) -> PilotLocation {
+        if self.pilots[player].body.is_some() {
             PilotLocation::OnFoot
         } else {
-            PilotLocation::Aboard(self.pilot.vehicle)
+            PilotLocation::Aboard(self.pilots[player].vehicle)
         }
     }
 
-    pub fn observation(&self) -> SurfaceSortieObservation {
-        let ship = &self.world.ships[self.pilot.vehicle.0];
-        let snapshot = self.spaceling_snapshot();
+    pub fn observation(&self, player: usize) -> SurfaceSortieObservation {
+        let ship = &self.world.ships[self.pilots[player].vehicle.0];
+        let snapshot = self.spaceling_snapshot(player);
         SurfaceSortieObservation {
-            version: 7,
+            version: 9,
             generated_case: self.generated_case,
             travel_enabled: self.travel_enabled(),
-            ship_support_planet: self.ship_support_planet(),
-            pilot_support_planet: self.pilot_support_planet(),
+            ship_support_planet: self.ship_support_planet(player),
+            pilot_support_planet: self.pilot_support_planet(player),
             tick: self.world.tick,
-            spaceling: self.pilot.id,
-            owner: self.pilot.owner,
-            vehicle: self.pilot.vehicle,
-            location: self.location(),
+            spaceling: self.pilots[player].id,
+            owner: self.pilots[player].owner,
+            vehicle: self.pilots[player].vehicle,
+            location: self.location(player),
             position: snapshot.map_or(ship.position, |s| s.motion.position),
             velocity: snapshot.map_or(ship.velocity, |s| s.motion.linear_velocity),
             angle: snapshot.map_or(ship.rotation_radians, |s| s.motion.angle),
@@ -241,38 +289,42 @@ impl SurfaceSortieState {
             jumps: snapshot.map_or(0, |s| s.jumps),
             ship_position: ship.position,
             ship_health: ship.life,
-            ship_available: self.vehicle_available(),
-            access_position: self.access_position(),
-            transfers: self.transfers,
-            last_transfer: self.last_transfer,
-            controls_armed: self.controls_armed,
+            ship_available: self.vehicle_available(player),
+            access_position: self.access_position(player),
+            transfers: self.pilots[player].transfers,
+            last_transfer: self.pilots[player].last_transfer,
+            controls_armed: self.pilots[player].controls_armed,
             physical_bodies: self.world.physics.world.body_count(),
-            landing: self.landing,
+            landing: self.pilots[player].landing,
             outpost: self
-                .focused_outpost()
-                .observation(&self.world.planets[self.focused_outpost().planet]),
+                .focused_outpost(player)
+                .map(|post| post.observation(&self.world.planets[post.planet], player)),
             outposts: self
                 .outposts
                 .iter()
-                .map(|post| post.observation(&self.world.planets[post.planet]))
+                .map(|post| post.observation(&self.world.planets[post.planet], player))
                 .collect(),
-            motion: self.motion_observation(),
-            motion_metrics: self.motion_metrics,
+            planet_claim: self.claim_observation(self.motion_planet_index(player), player),
+            planet_claims: (0..self.claims.len())
+                .filter_map(|planet| self.claim_observation(planet, player))
+                .collect(),
+            motion: self.motion_observation(player),
+            motion_metrics: self.pilots[player].motion_metrics,
         }
     }
 
-    fn access_up(&self) -> Vec2 {
-        let ship = &self.world.ships[self.pilot.vehicle.0];
+    fn access_up(&self, player: usize) -> Vec2 {
+        let ship = &self.world.ships[self.pilots[player].vehicle.0];
         // A surface access point beside the *actual* ship. No elevated berth
         // or fixed planet marker; the physical landing gate is checked first.
         let hatch =
             ship.position + SHIP_PIVOT + Vec2::new(8.0, -5.0).rotate_radians(ship.rotation_radians);
-        (hatch - self.world.planets[self.pilot.planet].position).normalized()
+        (hatch - self.world.planets[self.pilots[player].planet].position).normalized()
     }
 
-    fn access_position(&self) -> Vec2 {
-        let planet = &self.world.planets[self.pilot.planet];
-        planet.position + self.access_up() * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
+    fn access_position(&self, player: usize) -> Vec2 {
+        let planet = &self.world.planets[self.pilots[player].planet];
+        planet.position + self.access_up(player) * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
     }
 
     fn spec() -> SpacelingSpec {
@@ -282,31 +334,38 @@ impl SurfaceSortieState {
         }
     }
 
-    fn vehicle_available(&self) -> bool {
-        let ship = &self.world.ships[self.pilot.vehicle.0];
-        !ship.dead && ship.form == ShipForm::Ship && ship.owner_id == self.pilot.owner.index()
+    fn vehicle_available(&self, player: usize) -> bool {
+        let ship = &self.world.ships[self.pilots[player].vehicle.0];
+        !ship.dead
+            && ship.form == ShipForm::Ship
+            && ship.owner_id == self.pilots[player].owner.index()
     }
 
-    fn vehicle_settled(&self) -> bool {
-        self.landing.phase == LandingPhase::Landed
+    fn vehicle_settled(&self, player: usize) -> bool {
+        self.pilots[player].landing.phase == LandingPhase::Landed
     }
 
-    fn try_transfer(&mut self) -> TransferResult {
-        if !self.vehicle_available() {
+    fn try_transfer(&mut self, player: usize) -> TransferResult {
+        if !self.vehicle_available(player) {
             return TransferResult::VehicleUnavailable;
         }
-        if !self.vehicle_settled() {
+        if !self.vehicle_settled(player) {
             return TransferResult::ShipNotSettled;
         }
-        if let Some(snapshot) = self.spaceling_snapshot() {
-            if snapshot.motion.position.distance_to(self.access_position()) > BOARDING_RANGE {
+        if let Some(snapshot) = self.spaceling_snapshot(player) {
+            if snapshot
+                .motion
+                .position
+                .distance_to(self.access_position(player))
+                > BOARDING_RANGE
+            {
                 return TransferResult::TooFar;
             }
             let relative = snapshot.motion.linear_velocity
-                - motion::point_velocity(self.planet_motion(), snapshot.motion.position);
+                - motion::point_velocity(self.planet_motion(player), snapshot.motion.position);
             if !snapshot.grounded()
                 || !snapshot.support.is_some_and(|support| {
-                    physics::is_planet_surface_support(support.collider, self.pilot.planet)
+                    physics::is_planet_surface_support(support.collider, self.pilots[player].planet)
                 })
                 || snapshot.balance != SpacelingBalance::Balanced
                 || relative.length() > SETTLED_SPEED
@@ -315,14 +374,28 @@ impl SurfaceSortieState {
             }
             // The creature remains alive/owned; only its external physical
             // representation disappears while it occupies the existing ship.
-            self.world.physics.world.remove_entity(PILOT_PHYSICS_ID);
-            self.pilot.body = None;
+            self.world
+                .physics
+                .world
+                .remove_entity(pilot_physics_id(self.pilots[player].owner));
+            self.pilots[player].body = None;
             TransferResult::Boarded
         } else {
             let spec = Self::spec();
-            let up = self.access_up();
-            let position = self.access_position() + up * (spec.half_height() + 0.12);
+            let up = self.access_up(player);
+            let position = self.access_position(player) + up * (spec.half_height() + 0.12);
             let angle = rotation_for_direction(up);
+            // Rapier's broad-phase queries describe the completed step. A capsule
+            // inserted by another seat's transfer this tick is not indexed yet.
+            // Reserve a conservative capsule-sized clearance using the bounded
+            // pilot list and authoritative body poses, without another physics step.
+            if self.pilots.iter().any(|pilot| {
+                pilot.snapshot(&self.world.physics).is_some_and(|snapshot| {
+                    snapshot.motion.position.distance_to(position) < spec.half_height() * 2.0 + 0.04
+                })
+            }) {
+                return TransferResult::ExitBlocked;
+            }
             if !self.world.physics.world.capsule_is_clear(
                 position,
                 angle,
@@ -334,21 +407,21 @@ impl SurfaceSortieState {
             }
             let Some(body) = SpacelingAssembly::insert(
                 &mut self.world.physics.world,
-                PILOT_PHYSICS_ID,
+                pilot_physics_id(self.pilots[player].owner),
                 position,
                 angle,
                 spec,
             ) else {
                 return TransferResult::ExitBlocked;
             };
-            let surface = self.planet_motion();
+            let surface = self.planet_motion(player);
             self.world.physics.world.set_velocity(
                 body.body(),
                 motion::point_velocity(surface, position),
                 surface.angular_velocity,
                 true,
             );
-            self.pilot.body = Some(body);
+            self.pilots[player].body = Some(body);
             TransferResult::Exited
         }
     }
@@ -404,7 +477,7 @@ impl Scenario for SurfaceSortieScenario {
         world.sun = motion_preset.configure(&mut planet);
         world.planets = vec![planet];
         world.rover_builds = vec![RoverBuildState::default()];
-        Self::on_surface(world, motion_preset, 0, Vec2::Y, -0.34)
+        Self::on_surface(world, motion_preset, 0, Vec2::Y, Some(-0.34))
     }
 
     fn step(state: &mut SurfaceSortieState, actions: &[Action], dt: Duration) -> StepResult {
@@ -412,101 +485,114 @@ impl Scenario for SurfaceSortieScenario {
         if dt.is_zero() {
             return StepResult::default();
         }
-        if let Some(input) = actions
-            .iter()
-            .filter_map(SurfaceSortieAction::decode)
-            .next_back()
-        {
-            state.input = input;
+        for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
+            if let Some(pilot) = state.pilots.get_mut(player.index()) {
+                pilot.input = input;
+            }
         }
-        let input = state.input;
-        let before = motion::StepSample::read(state);
-        let mut effective = SurfaceSortieAction::default();
-        if !state.controls_armed {
-            state.controls_armed = input == SurfaceSortieAction::default();
-        } else {
-            effective = input;
-            if input.interact_held && !state.interact_was_held {
-                state.last_transfer = state.try_transfer();
-                if matches!(
-                    state.last_transfer,
-                    TransferResult::Exited | TransferResult::Boarded
-                ) {
-                    state.transfers += 1;
-                    state.controls_armed = false;
-                    effective = SurfaceSortieAction::default();
+        // Bounded seat-local samples; no per-tick actor collection allocation.
+        let samples: [_; SPACEWARS_PLAYER_COUNT] = std::array::from_fn(|player| {
+            (player < state.player_count()).then(|| motion::StepSample::read(state, player))
+        });
+        let mut effective_inputs = [SurfaceSortieAction::default(); SPACEWARS_PLAYER_COUNT];
+        for (player, effective) in effective_inputs
+            .iter_mut()
+            .enumerate()
+            .take(state.player_count())
+        {
+            let input = state.pilots[player].input;
+            if !state.pilots[player].controls_armed {
+                state.pilots[player].controls_armed = input == SurfaceSortieAction::default();
+            } else {
+                *effective = input;
+                if input.interact_held && !state.pilots[player].interact_was_held {
+                    let result = state.try_transfer(player);
+                    state.pilots[player].last_transfer = result;
+                    if matches!(result, TransferResult::Exited | TransferResult::Boarded) {
+                        state.pilots[player].transfers += 1;
+                        state.pilots[player].controls_armed = false;
+                        *effective = SurfaceSortieAction::default();
+                    }
                 }
             }
-        }
-        state.interact_was_held = input.interact_held;
-        let on_foot = state.pilot.body.is_some();
-        state.pilot.control = if on_foot {
-            SpacelingControl {
-                walk: effective.horizontal,
-                jump_held: effective.primary_held,
+            let pilot = &mut state.pilots[player];
+            pilot.interact_was_held = input.interact_held;
+            let on_foot = pilot.body.is_some();
+            pilot.control = if on_foot {
+                SpacelingControl {
+                    walk: effective.horizontal,
+                    jump_held: effective.primary_held,
+                }
+            } else {
+                SpacelingControl::default()
+            };
+            if effective.horizontal.abs() > 0.01 {
+                pilot.facing = effective.horizontal.signum();
             }
-        } else {
-            SpacelingControl::default()
-        };
-        if effective.horizontal.abs() > 0.01 {
-            state.pilot.facing = effective.horizontal.signum();
+            let ship = &mut state.world.ships[pilot.vehicle.0];
+            ship.set_thrust(if !on_foot && effective.primary_held {
+                1.0
+            } else {
+                0.0
+            });
+            ship.set_turn(if on_foot { 0.0 } else { effective.horizontal });
+            ship.set_brake(if !on_foot && effective.brake_held {
+                1.0
+            } else {
+                0.0
+            });
+            ship.set_laser(false);
+            ship.set_cannon(false);
         }
-        let ship = &mut state.world.ships[state.pilot.vehicle.0];
-        ship.set_thrust(if !on_foot && effective.primary_held {
-            1.0
-        } else {
-            0.0
-        });
-        ship.set_turn(if on_foot { 0.0 } else { effective.horizontal });
-        ship.set_brake(if !on_foot && effective.brake_held {
-            1.0
-        } else {
-            0.0
-        });
-        ship.set_laser(false);
-        ship.set_cannon(false);
-        // Schedule terrain exactly once. Actors are never transported with it;
-        // controls, gravity, and Rapier contacts own their dynamic motion.
+        // Schedule terrain, solve gravity, and step Rapier exactly once for all seats.
         let dt = dt.as_secs_f32();
         for planet in &mut state.world.planets {
             state.motion_preset.advance(planet, state.world.sun, dt);
         }
-        let result = SpacewarsScenario::step_with_surface_pilot(
+        let result = SpacewarsScenario::step_with_surface_pilots(
             &mut state.world,
             &[],
             Duration::from_secs_f32(dt),
-            Some(&mut state.pilot),
+            &mut state.pilots,
         );
-        state
-            .pilot
-            .select_approach_planet(&state.world.physics, &state.world.planets);
-        state.landing.update(
-            &state.world.physics,
-            state.pilot.vehicle.0,
-            state.pilot.planet,
-            &state.world.planets[state.pilot.planet],
-            &state.world.ships[state.pilot.vehicle.0],
-            dt,
-        );
-        if let Some(snapshot) = state.spaceling_snapshot() {
-            state.pilot.gait_phase = (state.pilot.gait_phase
-                + snapshot.relative_speed.abs() * dt * 5.0)
-                .rem_euclid(std::f32::consts::TAU);
+        for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
+            let Some(before) = before else { continue };
+            let pilot = &mut state.pilots[player];
+            pilot.select_approach_planet(&state.world.physics, &state.world.planets);
+            pilot.landing.update(
+                &state.world.physics,
+                pilot.vehicle.0,
+                pilot.planet,
+                &state.world.planets[pilot.planet],
+                &state.world.ships[pilot.vehicle.0],
+                dt,
+            );
+            if let Some(snapshot) = pilot.snapshot(&state.world.physics) {
+                pilot.gait_phase = (pilot.gait_phase + snapshot.relative_speed.abs() * dt * 5.0)
+                    .rem_euclid(std::f32::consts::TAU);
+            }
+            state.record_motion_step(player, before, effective);
         }
-        state.record_motion_step(before, effective);
-        // Services consume completed physical support/landing, never create it.
+        // Resolve all claimants together, then service each eligible vehicle once.
         state.update_outpost(Duration::from_secs_f32(dt));
+        state.update_planet_claims(Duration::from_secs_f32(dt));
         result
     }
 
     fn observe(state: &SurfaceSortieState) -> Observation {
         Observation {
-            payload: serde_json::to_vec(&state.observation()).expect("finite sortie observation"),
+            payload: serde_json::to_vec(&SurfaceSessionObservation {
+                version: 9,
+                players: (0..state.player_count())
+                    .map(|player| state.observation(player))
+                    .collect(),
+            })
+            .expect("finite sortie observation"),
         }
     }
 
     fn render_frame(state: &SurfaceSortieState) -> RenderFrame {
-        render::frame(state)
+        render::frame(state, 0)
     }
 
     fn tick_model() -> TickModel {
@@ -520,7 +606,7 @@ impl SurfaceSortieScenario {
         motion_preset: SurfaceMotionPreset,
         planet_index: usize,
         up: Vec2,
-        terminal_angle: f32,
+        terminal_angle: Option<f32>,
     ) -> SurfaceSortieState {
         let planet = world.planets[planet_index];
         // Begin just above the rear feet. Only initial placement is prescribed;
@@ -539,49 +625,43 @@ impl SurfaceSortieScenario {
             world.sun,
             &world.planets,
         );
-        world.physics.enable_surface_sortie(0, &world.ships[0]);
+        world.physics.enable_surface_sortie(&[0], &world.ships);
         world.spaceport_contacts.clear();
-        let outpost = outpost::SurfaceOutpost::new(
-            OutpostId(planet_index as u64 + 1),
-            planet_index,
-            terminal_angle,
-        );
-        assert!(
-            world
-                .physics
-                .insert_surface_terminal(planet_index, planet.radius, terminal_angle)
-        );
+        let outposts = terminal_angle
+            .into_iter()
+            .map(|angle| {
+                assert!(
+                    world
+                        .physics
+                        .insert_surface_terminal(planet_index, planet.radius, angle)
+                );
+                outpost::SurfaceOutpost::new(
+                    OutpostId(planet_index as u64 + 1),
+                    planet_index,
+                    angle,
+                )
+            })
+            .collect();
         SurfaceSortieState {
             world,
             motion_preset,
             generated_case: None,
-            motion_metrics: SurfaceMotionMetrics::default(),
-            idle_anchor: None,
-            pilot: SurfacePilot {
-                id: SpacelingId(1),
-                owner: PlayerId::PLAYER_1,
-                vehicle: VehicleId(0),
-                planet: planet_index,
-                travel_enabled: false,
-                body: None,
-                control: SpacelingControl::default(),
-                gravity: Vec2::ZERO,
-                facing: 1.0,
-                gait_phase: 0.0,
-                ship_gravity_delta: Vec2::ZERO,
-            },
-            input: SurfaceSortieAction::default(),
-            interact_was_held: false,
-            controls_armed: false,
-            transfers: 0,
-            last_transfer: TransferResult::Ready,
-            landing: LandingTelemetry::default(),
-            outposts: vec![outpost],
+            pilots: vec![SurfacePilot::new(PlayerId::PLAYER_1, planet_index, false)],
+            outposts,
+            claims: Vec::new(),
         }
     }
 
+    pub fn player_frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
+        render::frame(state, player)
+    }
+
     /// Fixed-scale north-up world context; the client overlays this second frame.
-    pub fn minimap_frame(state: &SurfaceSortieState, viewport_aspect: f32) -> RenderFrame {
-        render::minimap(state, viewport_aspect)
+    pub fn minimap_frame(
+        state: &SurfaceSortieState,
+        player: usize,
+        viewport_aspect: f32,
+    ) -> RenderFrame {
+        render::minimap(state, player, viewport_aspect)
     }
 }

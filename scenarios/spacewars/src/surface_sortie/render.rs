@@ -6,10 +6,10 @@ const CYAN: RenderColor = RenderColor::rgb(0.25, 0.93, 0.8);
 const ORANGE: RenderColor = RenderColor::rgb(1.0, 0.58, 0.23);
 const AMBER: RenderColor = RenderColor::rgb(1.0, 0.82, 0.25);
 
-fn camera(state: &SurfaceSortieState) -> Camera2 {
-    let snapshot = state.spaceling_snapshot();
-    let ship = &state.world.ships[state.pilot.vehicle.0];
-    let parked = state.vehicle_settled();
+fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
+    let snapshot = state.spaceling_snapshot(player);
+    let ship = &state.world.ships[state.pilots[player].vehicle.0];
+    let parked = state.vehicle_settled(player);
     let (center, height) = if let Some(snapshot) = snapshot {
         let pilot = snapshot.motion.position;
         let ship_center = ship.position + SHIP_PIVOT;
@@ -25,7 +25,7 @@ fn camera(state: &SurfaceSortieState) -> Camera2 {
         }
     } else if parked {
         (
-            (ship.position + state.access_position()) * 0.5 + state.access_up() * 2.0,
+            (ship.position + state.access_position(player)) * 0.5 + state.access_up(player) * 2.0,
             44.0,
         )
     } else {
@@ -34,12 +34,12 @@ fn camera(state: &SurfaceSortieState) -> Camera2 {
     Camera2::new(render_point(center), height)
 }
 
-pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
-    let observation = state.observation();
-    let snapshot = state.spaceling_snapshot();
-    let ship = &state.world.ships[state.pilot.vehicle.0];
-    let parked = state.vehicle_settled();
-    let camera = camera(state);
+pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
+    let observation = state.observation(player);
+    let snapshot = state.spaceling_snapshot(player);
+    let ship = &state.world.ships[state.pilots[player].vehicle.0];
+    let parked = state.vehicle_settled(player);
+    let camera = camera(state, player);
     let center = Vec2::new(camera.center.x, camera.center.y);
     let height = camera.height;
     let mut frame = RenderFrame::new(camera);
@@ -61,6 +61,20 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
             radius,
             RenderColor::rgb(0.09, 0.16, 0.23),
         );
+        if let Some(owner) = planet.owner_id {
+            frame.push_primitive(
+                -17,
+                RenderPrimitive::Circle(RenderCircle {
+                    center: render_point(planet.position),
+                    radius,
+                    fill: None,
+                    stroke: Some(Stroke::new(
+                        render_color(state.world.players[owner].color),
+                        1.5,
+                    )),
+                }),
+            );
+        }
         for index in 0..72 {
             let up = Vec2::from_radians(
                 planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0,
@@ -78,56 +92,21 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     for post in &observation.outposts {
         draw_outpost(&mut frame, state, post);
     }
+    for flag in observation
+        .planet_claims
+        .iter()
+        .filter_map(|claim| claim.flag.as_ref())
+    {
+        draw_planet_flag(&mut frame, state, flag);
+    }
+    for player in 0..state.player_count() {
+        draw_actor(&mut frame, state, player);
+    }
+    if state.player_count() > 1 || observation.planet_claim.is_some() {
+        draw_player_hud(&mut frame, state, player, center, height);
+        return frame;
+    }
     let access = observation.access_position;
-    if parked {
-        circle(
-            &mut frame,
-            -1,
-            access + state.access_up() * 0.12,
-            0.38,
-            CYAN,
-        );
-    }
-    render_ship(&mut frame, ship);
-    if ship.form == ShipForm::Ship {
-        for foot in physics::LANDING_FEET {
-            let position = ship.position + SHIP_PIVOT + foot.rotate_radians(ship.rotation_radians);
-            line(
-                &mut frame,
-                1,
-                position,
-                position + Vec2::Y.rotate_radians(ship.rotation_radians) * 1.3,
-                LIGHT,
-                2.0,
-            );
-            circle(
-                &mut frame,
-                1,
-                position,
-                physics::LANDING_FOOT_RADIUS,
-                if parked { CYAN } else { LIGHT },
-            );
-        }
-    }
-    render_exhaust(&mut frame, ship);
-    if let Some(snapshot) = snapshot {
-        draw_spaceling(
-            &mut frame,
-            snapshot,
-            state.pilot.facing,
-            state.pilot.gait_phase,
-        );
-        if let Some(support) = snapshot.support {
-            line(
-                &mut frame,
-                6,
-                support.position,
-                support.position + support.normal,
-                CYAN,
-                2.0,
-            );
-        }
-    }
     // Keep diagnostics legible when the parked ship crosses the HUD as the
     // planet rotates. The scene remains visible through the shallow strips.
     for (bottom, top) in [(0.27, 0.48), (-0.49, -0.255)] {
@@ -152,7 +131,7 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
                 if state.travel_enabled() {
                     return format!(
                         "SURFACE EXPEDITION / V1  |  seed {}  |  approach planet {}",
-                        case.seed, state.pilot.planet
+                        case.seed, state.pilots[player].planet
                     );
                 }
                 format!(
@@ -189,12 +168,12 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
         LIGHT,
         13.0,
     );
-    let message = if !state.vehicle_available() {
+    let message = if !state.vehicle_available(player) {
         TransferResult::VehicleUnavailable.label()
-    } else if !state.controls_armed {
+    } else if !state.pilots[player].controls_armed {
         "Release all controls to activate the new control context"
     } else {
-        state.last_transfer.label()
+        state.pilots[player].last_transfer.label()
     };
     text(
         &mut frame,
@@ -203,7 +182,10 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
         CYAN,
         16.0,
     );
-    let post = &observation.outpost;
+    let post = observation
+        .outpost
+        .as_ref()
+        .expect("pinned outpost fixture");
     let ownership = post.owner.map_or_else(
         || "NEUTRAL".to_owned(),
         |owner| format!("P{}", owner.index() + 1),
@@ -280,7 +262,11 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     frame
 }
 
-pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> RenderFrame {
+pub(super) fn minimap(
+    state: &SurfaceSortieState,
+    player: usize,
+    viewport_aspect: f32,
+) -> RenderFrame {
     let radius = state.world.config.universe_radius as f32;
     let mut map = RenderFrame::new(Camera2::new(
         render_point(Vec2::splat(radius)),
@@ -307,7 +293,7 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             -18,
             RenderPrimitive::Circle(RenderCircle {
                 center: render_point(sun.position),
-                radius: state.world.planets[state.pilot.planet].orbit_radius,
+                radius: state.world.planets[state.pilots[player].planet].orbit_radius,
                 fill: None,
                 stroke: Some(Stroke::new(RenderColor::rgba(0.55, 0.6, 0.7, 0.45), 1.0)),
             }),
@@ -319,7 +305,35 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             -10,
             planet.position,
             planet.radius * BODY_BOUNDS_RADIUS_SCALE,
-            CYAN,
+            planet
+                .owner_id
+                .map_or(CYAN, |owner| render_color(state.world.players[owner].color)),
+        );
+    }
+    for claim in &state.claims {
+        let observation = state
+            .claim_observation(claim.planet, player)
+            .expect("indexed claim");
+        let Some(flag) = observation.flag else {
+            continue;
+        };
+        let half = (radius * 0.025).max(12.0);
+        let marker = flag.position + flag.normal * (half * 2.0).max(35.0);
+        let color = render_color(state.world.players[flag.player.index()].color);
+        line(&mut map, 1, flag.position, marker, color, 1.0);
+        map.push_primitive(
+            2,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: [
+                    Vec2::new(-half, -half),
+                    Vec2::new(-half, half),
+                    Vec2::new(half, 0.0),
+                ]
+                .map(|point| render_point(marker + point))
+                .to_vec(),
+                fill: Some(Fill::new(color)),
+                stroke: Some(Stroke::new(LIGHT, 1.0)),
+            }),
         );
     }
     for outpost in &state.outposts {
@@ -354,7 +368,7 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
         );
     }
     // The footprint follows the actual full-window camera, including resizes.
-    let camera = camera(state);
+    let camera = camera(state, player);
     let aspect = if viewport_aspect.is_finite() && viewport_aspect > 0.0 {
         viewport_aspect
     } else {
@@ -377,42 +391,44 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             stroke: Some(Stroke::new(LIGHT, 1.0)),
         }),
     );
-    let ship = &state.world.ships[state.pilot.vehicle.0];
-    map.push_primitive(
-        2,
-        RenderPrimitive::Polygon(RenderPolygon {
-            points: [
-                Vec2::new(0.0, 20.0),
-                Vec2::new(-12.0, -12.0),
-                Vec2::new(0.0, -5.0),
-                Vec2::new(12.0, -12.0),
-            ]
-            .map(|offset| {
-                render_point(
-                    ship.position + SHIP_PIVOT + offset.rotate_radians(ship.rotation_radians),
-                )
-            })
-            .to_vec(),
-            fill: Some(Fill::new(RenderColor::rgb(1.0, 0.22, 0.22))),
-            stroke: Some(Stroke::new(LIGHT, 1.0)),
-        }),
-    );
-    if let Some(snapshot) = state.spaceling_snapshot() {
+    for player in 0..state.player_count() {
+        let ship = &state.world.ships[state.pilots[player].vehicle.0];
         map.push_primitive(
-            3,
+            2,
             RenderPrimitive::Polygon(RenderPolygon {
                 points: [
-                    Vec2::new(0.0, 12.0),
-                    Vec2::new(-10.0, 0.0),
-                    Vec2::new(0.0, -12.0),
-                    Vec2::new(10.0, 0.0),
+                    Vec2::new(0.0, 20.0),
+                    Vec2::new(-12.0, -12.0),
+                    Vec2::new(0.0, -5.0),
+                    Vec2::new(12.0, -12.0),
                 ]
-                .map(|offset| render_point(snapshot.motion.position + offset))
+                .map(|offset| {
+                    render_point(
+                        ship.position + SHIP_PIVOT + offset.rotate_radians(ship.rotation_radians),
+                    )
+                })
                 .to_vec(),
-                fill: Some(Fill::new(ORANGE)),
+                fill: Some(Fill::new(render_color(state.world.players[player].color))),
                 stroke: Some(Stroke::new(LIGHT, 1.0)),
             }),
         );
+        if let Some(snapshot) = state.spaceling_snapshot(player) {
+            map.push_primitive(
+                3,
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points: [
+                        Vec2::new(0.0, 12.0),
+                        Vec2::new(-10.0, 0.0),
+                        Vec2::new(0.0, -12.0),
+                        Vec2::new(10.0, 0.0),
+                    ]
+                    .map(|offset| render_point(snapshot.motion.position + offset))
+                    .to_vec(),
+                    fill: Some(Fill::new(pilot_color(state, player))),
+                    stroke: Some(Stroke::new(LIGHT, 1.0)),
+                }),
+            );
+        }
     }
     map
 }
@@ -421,6 +437,30 @@ fn outpost_color(state: &SurfaceSortieState, owner: Option<PlayerId>) -> RenderC
     owner.map_or(AMBER, |owner| {
         render_color(state.world.players[owner.index()].color)
     })
+}
+
+fn draw_planet_flag(
+    frame: &mut RenderFrame,
+    state: &SurfaceSortieState,
+    flag: &PlanetFlagObservation,
+) {
+    let up = flag.normal;
+    let right = Vec2::new(up.y, -up.x);
+    let local = |x, y| flag.position + right * x + up * y;
+    line(frame, 0, local(0.0, 0.0), local(0.0, 3.6), LIGHT, 1.5);
+    let top = 0.9 + flag.raised_fraction * 2.7;
+    frame.push_primitive(
+        1,
+        RenderPrimitive::Polygon(RenderPolygon {
+            points: [(0.0, top), (1.8, top - 0.45), (0.0, top - 0.9)]
+                .map(|(x, y)| render_point(local(x, y)))
+                .to_vec(),
+            fill: Some(Fill::new(render_color(
+                state.world.players[flag.player.index()].color,
+            ))),
+            stroke: Some(Stroke::new(LIGHT, 1.0)),
+        }),
+    );
 }
 
 fn draw_outpost(
@@ -534,11 +574,17 @@ fn draw_outpost(
     );
 }
 
-fn draw_spaceling(frame: &mut RenderFrame, snapshot: SpacelingSnapshot, facing: f32, phase: f32) {
+fn draw_spaceling(
+    frame: &mut RenderFrame,
+    snapshot: SpacelingSnapshot,
+    facing: f32,
+    phase: f32,
+    color: RenderColor,
+) {
     let center = snapshot.motion.position;
     let local = |x, y| center + Vec2::new(x, y).rotate_radians(snapshot.motion.angle);
     let suit = match snapshot.balance {
-        SpacelingBalance::Balanced => ORANGE,
+        SpacelingBalance::Balanced => color,
         SpacelingBalance::KnockedDown => RenderColor::rgb(1.0, 0.25, 0.25),
         SpacelingBalance::Recovering => RenderColor::rgb(1.0, 0.85, 0.3),
     };
@@ -638,4 +684,207 @@ fn text(
     text.color = color;
     text.size = size;
     frame.push_primitive(20, RenderPrimitive::Text(text));
+}
+
+fn pilot_color(state: &SurfaceSortieState, player: usize) -> RenderColor {
+    if state.player_count() == 1 {
+        ORANGE
+    } else {
+        render_color(state.world.players[player].color)
+    }
+}
+
+fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize) {
+    let access = state.access_position(player);
+    let ship = &state.world.ships[state.pilots[player].vehicle.0];
+    let snapshot = state.spaceling_snapshot(player);
+    let parked = state.vehicle_settled(player);
+    if parked {
+        circle(
+            frame,
+            -1,
+            access + state.access_up(player) * 0.12,
+            0.38,
+            CYAN,
+        );
+    }
+    render_ship(frame, ship);
+    if ship.form == ShipForm::Ship {
+        for foot in physics::LANDING_FEET {
+            let position = ship.position + SHIP_PIVOT + foot.rotate_radians(ship.rotation_radians);
+            line(
+                frame,
+                1,
+                position,
+                position + Vec2::Y.rotate_radians(ship.rotation_radians) * 1.3,
+                LIGHT,
+                2.0,
+            );
+            circle(
+                frame,
+                1,
+                position,
+                physics::LANDING_FOOT_RADIUS,
+                if parked { CYAN } else { LIGHT },
+            );
+        }
+    }
+    render_exhaust(frame, ship);
+    if let Some(snapshot) = snapshot {
+        draw_spaceling(
+            frame,
+            snapshot,
+            state.pilots[player].facing,
+            state.pilots[player].gait_phase,
+            pilot_color(state, player),
+        );
+        if let Some(support) = snapshot.support {
+            line(
+                frame,
+                6,
+                support.position,
+                support.position + support.normal,
+                CYAN,
+                2.0,
+            );
+        }
+    }
+}
+
+fn draw_player_hud(
+    frame: &mut RenderFrame,
+    state: &SurfaceSortieState,
+    player: usize,
+    center: Vec2,
+    height: f32,
+) {
+    let observation = state.observation(player);
+    let ship = &state.world.ships[state.pilots[player].vehicle.0];
+    let color = pilot_color(state, player);
+    for (bottom, top) in [(0.29, 0.49), (-0.49, -0.25)] {
+        frame.push_primitive(
+            15,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: [(-4.0, bottom), (4.0, bottom), (4.0, top), (-4.0, top)]
+                    .map(|(x, y)| render_point(center + Vec2::new(x, y) * height))
+                    .to_vec(),
+                fill: Some(Fill::new(RenderColor::rgba(0.025, 0.03, 0.055, 0.85))),
+                stroke: None,
+            }),
+        );
+    }
+    let mode = if observation.location == PilotLocation::OnFoot {
+        "ON FOOT"
+    } else {
+        "ABOARD"
+    };
+    let (objective, progress, detail) = if let Some(claim) = &observation.planet_claim {
+        let owner = claim.owner.map_or("Neutral".to_owned(), |owner| {
+            format!("P{}", owner.index() + 1)
+        });
+        let phase = match claim.phase {
+            PlanetClaimPhase::Idle => String::new(),
+            PlanetClaimPhase::Lowering => format!(" / lowering {:.0}%", claim.progress * 100.0),
+            PlanetClaimPhase::Raising => format!(" / raising {:.0}%", claim.progress * 100.0),
+        };
+        (
+            format!("Planet {}: {owner}{phase}", claim.planet),
+            claim.status.label().to_owned(),
+            claim.flag.map_or_else(
+                || {
+                    format!(
+                        "Stand still 3s / feet {}/2",
+                        observation.landing.supported_feet
+                    )
+                },
+                |flag| {
+                    format!(
+                        "Flag {:.1}u / feet {}/2",
+                        observation.position.distance_to(flag.position),
+                        observation.landing.supported_feet
+                    )
+                },
+            ),
+        )
+    } else {
+        let post = observation.outpost.as_ref().expect("outpost fixture");
+        (
+            format!(
+                "Site {}: {} / {:.0}%",
+                post.id.0,
+                post.owner.map_or("Neutral".to_owned(), |owner| format!(
+                    "P{}",
+                    owner.index() + 1
+                )),
+                post.capture_progress * 100.0
+            ),
+            post.capture_status.label().to_owned(),
+            format!(
+                "{} / feet {}/2",
+                post.repair_status.label(),
+                observation.landing.supported_feet
+            ),
+        )
+    };
+    let lines = [
+        (
+            0.445,
+            format!(
+                "P{}  {mode}  /  planet {}",
+                player + 1,
+                observation.motion.planet
+            ),
+            color,
+        ),
+        (
+            0.385,
+            format!(
+                "Ship {:.0}%  /  {}",
+                ship.life / ship.life_max * 100.0,
+                observation.landing.phase.label()
+            ),
+            LIGHT,
+        ),
+        (0.325, "A: thrust/jump  B: board/exit".to_owned(), LIGHT),
+        (
+            -0.29,
+            if !observation.ship_available {
+                "Vehicle lost; restart".to_owned()
+            } else if !observation.controls_armed {
+                "Release controls after transfer".to_owned()
+            } else {
+                match observation.last_transfer {
+                    TransferResult::ExitBlocked => "No clear space beside the hatch",
+                    TransferResult::TooFar => "Return to your own ship's hatch",
+                    TransferResult::MustBeSupported => "Stand still on the ship's planet",
+                    TransferResult::ShipNotSettled => "Land and settle before transfer",
+                    _ if observation.location == PilotLocation::OnFoot => {
+                        if observation.planet_claim.is_some() {
+                            "Claim on foot; B at your hatch"
+                        } else {
+                            "Walk to terminal; B at hatch"
+                        }
+                    }
+                    _ if observation.landing.phase == LandingPhase::Landed => {
+                        "B: exit your landed ship"
+                    }
+                    _ => "Land rear-first; settle to exit",
+                }
+                .to_owned()
+            },
+            CYAN,
+        ),
+        (-0.345, objective, LIGHT),
+        (-0.405, progress, AMBER),
+        (-0.46, detail, color),
+    ];
+    for (y, label, color) in lines {
+        text(
+            frame,
+            center + Vec2::new(0.0, y * height),
+            label,
+            color,
+            13.0,
+        );
+    }
 }

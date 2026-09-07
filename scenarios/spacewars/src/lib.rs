@@ -1279,7 +1279,7 @@ impl Scenario for SpacewarsScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
-        Self::step_with_surface_pilot(state, actions, dt, None)
+        Self::step_with_surface_pilots(state, actions, dt, &mut [])
     }
 
     fn observe(_state: &Self::State) -> Observation {
@@ -1300,13 +1300,13 @@ impl Scenario for SpacewarsScenario {
 impl SpacewarsScenario {
     // The opt-in fixture shares this exact physics step. Ordinary Spacewars
     // passes no pilot and retains its existing services and observation model.
-    fn step_with_surface_pilot(
+    fn step_with_surface_pilots(
         state: &mut SpacewarsState,
         actions: &[Action],
         dt: Duration,
-        mut surface_pilot: Option<&mut surface_sortie::SurfacePilot>,
+        surface_pilots: &mut [surface_sortie::SurfacePilot],
     ) -> StepResult {
-        let experimental = surface_pilot.is_some();
+        let experimental = !surface_pilots.is_empty();
         state.last_step_metrics = SpacewarsStepMetrics::default();
         if state.winner.is_some() {
             return StepResult::default();
@@ -1331,16 +1331,14 @@ impl SpacewarsScenario {
 
         let universe_radius = state.config.universe_radius as f32;
         for (index, ship) in state.ships.iter_mut().enumerate() {
-            if surface_pilot
-                .as_ref()
-                .is_some_and(|pilot| pilot.vehicle_index() != index)
+            if experimental
+                && !surface_pilots
+                    .iter()
+                    .any(|pilot| pilot.vehicle_index() == index)
             {
                 continue;
             }
-            if surface_pilot
-                .as_ref()
-                .is_some_and(|pilot| pilot.vehicle_index() == index)
-            {
+            if experimental {
                 // The fixture's bounded flight controller owns control impulses;
                 // retain visual exhaust without the legacy brake/turn velocity edits.
                 ship.update_exhaust_trails(dt);
@@ -1366,14 +1364,14 @@ impl SpacewarsScenario {
         let lifecycle_time = lifecycle_started.elapsed();
 
         let gravity_started = Instant::now();
-        let gravity = if let Some(pilot) = surface_pilot.as_deref_mut() {
-            apply_world_gravity_with_pilot(state, Some(pilot), dt)
+        let gravity = if experimental {
+            apply_world_gravity_with_pilots(state, surface_pilots, dt)
         } else {
             apply_world_gravity(state)
         };
         let gravity_time = gravity_started.elapsed();
 
-        if let Some(pilot) = surface_pilot {
+        for pilot in surface_pilots {
             pilot.control_vehicle(
                 &mut state.physics,
                 &state.ships[pilot.vehicle_index()],
@@ -2378,12 +2376,12 @@ fn body_mass(radius: f32) -> f32 {
 }
 
 fn apply_world_gravity(state: &mut SpacewarsState) -> GravityStepMetrics {
-    apply_world_gravity_with_pilot(state, None, state.config.delta_time())
+    apply_world_gravity_with_pilots(state, &mut [], state.config.delta_time())
 }
 
-fn apply_world_gravity_with_pilot(
+fn apply_world_gravity_with_pilots(
     state: &mut SpacewarsState,
-    mut pilot: Option<&mut surface_sortie::SurfacePilot>,
+    pilots: &mut [surface_sortie::SurfacePilot],
     dt: f32,
 ) -> GravityStepMetrics {
     let SpacewarsState {
@@ -2400,7 +2398,7 @@ fn apply_world_gravity_with_pilot(
         ..
     } = state;
     gravity_participants.clear();
-    if let Some(pilot) = pilot.as_deref_mut() {
+    for pilot in pilots.iter_mut() {
         pilot.ship_gravity_delta = Vec2::ZERO;
     }
 
@@ -2416,7 +2414,7 @@ fn apply_world_gravity_with_pilot(
         // actors and contacts still describe the completed step. Sample the
         // same current frame for gravity and controls. Legacy gameplay retains
         // its established integration order and deterministic baselines.
-        let position = if pilot.is_some() {
+        let position = if !pilots.is_empty() {
             physics
                 .world
                 .motion(physics.planet_body(index))
@@ -2431,12 +2429,14 @@ fn apply_world_gravity_with_pilot(
             planet.mass,
         )
     }));
-    if let Some(snapshot) = pilot.as_deref().and_then(|pilot| pilot.snapshot(physics)) {
-        gravity_participants.push(GravityParticipant::target(
-            tagged_gravity_id(GRAVITY_SURFACE_PILOT_TAG, 0),
-            snapshot.motion.position,
-            1.0,
-        ));
+    for pilot in pilots.iter() {
+        if let Some(snapshot) = pilot.snapshot(physics) {
+            gravity_participants.push(GravityParticipant::target(
+                tagged_gravity_id(GRAVITY_SURFACE_PILOT_TAG, pilot.owner.index() as u64),
+                snapshot.motion.position,
+                1.0,
+            ));
+        }
     }
     gravity_participants.extend(
         ships
@@ -2444,9 +2444,8 @@ fn apply_world_gravity_with_pilot(
             .enumerate()
             .filter(|(index, _)| {
                 !physics.ship_is_constrained(*index)
-                    && pilot
-                        .as_ref()
-                        .is_none_or(|pilot| pilot.vehicle_index() == *index)
+                    && (pilots.is_empty()
+                        || pilots.iter().any(|pilot| pilot.vehicle_index() == *index))
             })
             .map(|(index, ship)| {
                 GravityParticipant::target(
@@ -2531,7 +2530,10 @@ fn apply_world_gravity_with_pilot(
         }
         match tag {
             GRAVITY_SURFACE_PILOT_TAG => {
-                if let Some(pilot) = pilot.as_deref_mut() {
+                if let Some(pilot) = pilots
+                    .iter_mut()
+                    .find(|pilot| pilot.owner.index() as u64 == payload)
+                {
                     // Spacewars' historical gravity scale is a per-fixed-tick
                     // velocity delta. Convert it to acceleration for the
                     // controller's disturbance reference, then apply it once.
@@ -2540,9 +2542,9 @@ fn apply_world_gravity_with_pilot(
             }
             GRAVITY_SHIP_TAG => {
                 let index = usize::try_from(payload).expect("ship gravity id fits usize");
-                if let Some(pilot) = pilot
-                    .as_deref_mut()
-                    .filter(|pilot| pilot.vehicle_index() == index)
+                if let Some(pilot) = pilots
+                    .iter_mut()
+                    .find(|pilot| pilot.vehicle_index() == index)
                 {
                     pilot.ship_gravity_delta = output.velocity_delta;
                 }

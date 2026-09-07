@@ -126,9 +126,34 @@ pub struct Settings {
     pub clock: ClockSettings,
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
+    pub surface_expedition: SurfaceExpeditionSettings,
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SurfaceExpeditionSettings {
+    pub players: SurfaceExpeditionPlayers,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SurfaceExpeditionPlayers {
+    #[default]
+    #[serde(rename = "one")]
+    One,
+    #[serde(rename = "two")]
+    Two,
+}
+
+impl SurfaceExpeditionPlayers {
+    pub fn count(self) -> usize {
+        match self {
+            Self::One => 1,
+            Self::Two => 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

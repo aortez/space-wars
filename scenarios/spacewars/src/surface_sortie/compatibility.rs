@@ -46,6 +46,13 @@ impl GeneratedSurfaceCase {
     }
 
     pub fn init(self) -> Result<SurfaceSortieState, &'static str> {
+        self.init_with_outpost(true)
+    }
+
+    pub(super) fn init_with_outpost(
+        self,
+        outpost: bool,
+    ) -> Result<SurfaceSortieState, &'static str> {
         if self.bearing > 3 {
             return Err("bearing must be 0, 1, 2, or 3");
         }
@@ -67,7 +74,7 @@ impl GeneratedSurfaceCase {
             self.profile.preset(),
             self.planet,
             up,
-            terminal_angle,
+            outpost.then_some(terminal_angle),
         );
         state.generated_case = Some(self);
         Ok(state)
@@ -131,7 +138,7 @@ pub struct SurfaceEnvironment {
 
 impl SurfaceEnvironment {
     pub(super) fn read(state: &SurfaceSortieState) -> Self {
-        let planet = &state.world.planets[state.pilot.planet];
+        let planet = &state.world.planets[state.pilots[0].planet];
         let center = state.world.ships[0].position + SHIP_PIVOT;
         let gravity_point = state.world.ships[0].position;
         let up = (center - planet.position).normalized();
@@ -142,7 +149,7 @@ impl SurfaceEnvironment {
             gravity += source_acceleration(sun.position, sun.mass, gravity_point);
         }
         for (index, source) in state.world.planets.iter().enumerate() {
-            if index != state.pilot.planet {
+            if index != state.pilots[0].planet {
                 external += source_acceleration(source.position, source.mass, planet.position);
             }
             gravity += source_acceleration(source.position, source.mass, gravity_point);
@@ -235,13 +242,13 @@ pub struct PilotProbeObservation {
 
 impl PilotProbeObservation {
     fn read(state: &SurfaceSortieState) -> Option<Self> {
-        state.spaceling_snapshot().map(|snapshot| Self {
+        state.spaceling_snapshot(0).map(|snapshot| Self {
             grounded: snapshot.grounded(),
             balanced: snapshot.balance == SpacelingBalance::Balanced,
             relative_speed: snapshot.relative_speed,
             knockdowns: snapshot.knockdowns,
             last_disturbance_velocity: snapshot.last_knockdown.map(|event| event.velocity_change),
-            gravity_acceleration: state.pilot.gravity,
+            gravity_acceleration: state.pilots[0].gravity,
         })
     }
 }
@@ -257,7 +264,7 @@ pub struct CompatibilityReport {
 fn step(state: &mut SurfaceSortieState, action: SurfaceSortieAction) {
     SurfaceSortieScenario::step(
         state,
-        &[action.encode()],
+        &[action.encode(PlayerId::PLAYER_1)],
         Duration::from_secs_f64(1.0 / 60.0),
     );
 }
@@ -265,10 +272,10 @@ fn step(state: &mut SurfaceSortieState, action: SurfaceSortieAction) {
 fn settle(state: &mut SurfaceSortieState) -> bool {
     for _ in 0..600 {
         step(state, SurfaceSortieAction::default());
-        if state.vehicle_settled() {
+        if state.vehicle_settled(0) {
             return true;
         }
-        if !state.vehicle_available() {
+        if !state.vehicle_available(0) {
             return false;
         }
     }
@@ -276,19 +283,19 @@ fn settle(state: &mut SurfaceSortieState) -> bool {
 }
 
 fn local_pilot_angle(state: &SurfaceSortieState) -> f32 {
-    let frame = state.planet_motion();
-    let offset = state.spaceling_snapshot().unwrap().motion.position - frame.position;
+    let frame = state.planet_motion(0);
+    let offset = state.spaceling_snapshot(0).unwrap().motion.position - frame.position;
     offset.y.atan2(offset.x) - frame.angle
 }
 
 fn pilot_altitude(state: &SurfaceSortieState) -> f32 {
     state
-        .spaceling_snapshot()
+        .spaceling_snapshot(0)
         .unwrap()
         .motion
         .position
-        .distance_to(state.planet_motion().position)
-        - state.world.planets[state.pilot.planet].radius * BODY_BOUNDS_RADIUS_SCALE
+        .distance_to(state.planet_motion(0).position)
+        - state.world.planets[state.pilots[0].planet].radius * BODY_BOUNDS_RADIUS_SCALE
 }
 
 pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> ProbeResult {
@@ -304,7 +311,7 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
         final_pilot: None,
     };
     if kind == ProbeKind::Landing {
-        let planet = state.world.planets[state.pilot.planet];
+        let planet = state.world.planets[state.pilots[0].planet];
         let ship = &mut state.world.ships[0];
         let up = (ship.position + SHIP_PIVOT - planet.position).normalized();
         let center = ship.position + SHIP_PIVOT + up * 18.0;
@@ -316,8 +323,8 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
         ship.omega = planet.wrapper_omega;
     } else {
         let landed = settle(&mut state);
-        result.setup_metrics = state.motion_metrics;
-        result.final_landing = state.landing;
+        result.setup_metrics = state.pilots[0].motion_metrics;
+        result.final_landing = state.pilots[0].landing;
         if !landed {
             return result;
         }
@@ -329,33 +336,33 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
                     ..SurfaceSortieAction::default()
                 },
             );
-            result.final_landing = state.landing;
-            result.setup_metrics = state.motion_metrics;
-            if state.location() != PilotLocation::OnFoot {
+            result.final_landing = state.pilots[0].landing;
+            result.setup_metrics = state.pilots[0].motion_metrics;
+            if state.location(0) != PilotLocation::OnFoot {
                 result.reason = "transfer_prerequisite";
                 return result;
             }
             for _ in 0..120 {
                 step(&mut state, SurfaceSortieAction::default());
             }
-            result.setup_metrics = state.motion_metrics;
-            result.final_landing = state.landing;
+            result.setup_metrics = state.pilots[0].motion_metrics;
+            result.final_landing = state.pilots[0].landing;
             result.final_pilot = PilotProbeObservation::read(&state);
-            let snapshot = state.spaceling_snapshot().unwrap();
+            let snapshot = state.spaceling_snapshot(0).unwrap();
             if !snapshot.grounded() || snapshot.balance != SpacelingBalance::Balanced {
                 result.reason = "balanced_support_prerequisite";
                 return result;
             }
         }
     }
-    state.motion_metrics = SurfaceMotionMetrics::default();
-    state.idle_anchor = None;
+    state.pilots[0].motion_metrics = SurfaceMotionMetrics::default();
+    state.pilots[0].idle_anchor = None;
     let initial_angle = state
-        .spaceling_snapshot()
+        .spaceling_snapshot(0)
         .map(|_| local_pilot_angle(&state));
-    let initial_height = state.spaceling_snapshot().map(|_| pilot_altitude(&state));
+    let initial_height = state.spaceling_snapshot(0).map(|_| pilot_altitude(&state));
     let initial_jumps = state
-        .spaceling_snapshot()
+        .spaceling_snapshot(0)
         .map_or(0, |snapshot| snapshot.jumps);
     let mut arc = 0.0;
     let mut previous_angle = initial_angle;
@@ -382,7 +389,7 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
                     .rem_euclid(std::f32::consts::TAU)
                     - std::f32::consts::PI;
                 arc -= delta
-                    * state.world.planets[state.pilot.planet].radius
+                    * state.world.planets[state.pilots[0].planet].radius
                     * BODY_BOUNDS_RADIUS_SCALE;
                 previous_angle = Some(angle);
                 distance = arc;
@@ -390,23 +397,23 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
             ProbeKind::Jump => {
                 distance = distance.max(pilot_altitude(&state) - initial_height.unwrap())
             }
-            ProbeKind::Takeoff => distance = distance.max(state.landing.altitude),
+            ProbeKind::Takeoff => distance = distance.max(state.pilots[0].landing.altitude),
             _ => {}
         }
-        if kind == ProbeKind::Landing && state.vehicle_settled() {
+        if kind == ProbeKind::Landing && state.vehicle_settled(0) {
             break;
         }
-        if matches!(kind, ProbeKind::Landing | ProbeKind::Takeoff) && !state.vehicle_available() {
+        if matches!(kind, ProbeKind::Landing | ProbeKind::Takeoff) && !state.vehicle_available(0) {
             break;
         }
     }
-    result.metrics = state.motion_metrics;
-    result.final_landing = state.landing;
+    result.metrics = state.pilots[0].motion_metrics;
+    result.final_landing = state.pilots[0].landing;
     result.final_pilot = PilotProbeObservation::read(&state);
     result.distance =
         matches!(kind, ProbeKind::Walk | ProbeKind::Jump | ProbeKind::Takeoff).then_some(distance);
     let passed = match kind {
-        ProbeKind::Landing => state.vehicle_settled() && result.metrics.ship_damage == 0.0,
+        ProbeKind::Landing => state.vehicle_settled(0) && result.metrics.ship_damage == 0.0,
         ProbeKind::Idle => {
             result.metrics.supported_ticks == result.ticks
                 && result.metrics.knockdowns == 0
@@ -419,12 +426,12 @@ pub(super) fn run_probe(mut state: SurfaceSortieState, kind: ProbeKind) -> Probe
         }
         ProbeKind::Jump => {
             distance > 0.5
-                && state.spaceling_snapshot().unwrap().jumps == initial_jumps + 1
-                && state.spaceling_snapshot().unwrap().grounded()
+                && state.spaceling_snapshot(0).unwrap().jumps == initial_jumps + 1
+                && state.spaceling_snapshot(0).unwrap().grounded()
                 && result.metrics.knockdowns == 0
         }
         ProbeKind::Takeoff => {
-            distance > 10.0 && state.vehicle_available() && state.landing.altitude > 10.0
+            distance > 10.0 && state.vehicle_available(0) && state.pilots[0].landing.altitude > 10.0
         }
     };
     result.outcome = if passed {

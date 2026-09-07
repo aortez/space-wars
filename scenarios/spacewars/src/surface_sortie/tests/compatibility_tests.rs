@@ -86,17 +86,17 @@ fn surface_v1_extended_idle_support() {
             .with_profile(GeneratedSurfaceProfile::SurfaceV1);
         let mut state = case.init().unwrap();
         idle(&mut state, 120);
-        assert!(state.vehicle_settled(), "{case:?}");
+        assert!(state.vehicle_settled(0), "{case:?}");
         disembark(&mut state);
         let bodies = state.world.physics.world.body_count();
-        state.motion_metrics = SurfaceMotionMetrics::default();
-        state.idle_anchor = None;
+        state.pilots[0].motion_metrics = SurfaceMotionMetrics::default();
+        state.pilots[0].idle_anchor = None;
         let mut unsupported_streak = 0;
         let mut longest_gap = 0;
         let mut max_hatch_distance = 0.0_f32;
         for _ in 0..12000 {
             idle(&mut state, 1);
-            let snapshot = state.spaceling_snapshot().unwrap();
+            let snapshot = state.spaceling_snapshot(0).unwrap();
             unsupported_streak = if snapshot.grounded() {
                 0
             } else {
@@ -107,18 +107,18 @@ fn surface_v1_extended_idle_support() {
                 snapshot
                     .motion
                     .position
-                    .distance_to(state.access_position()),
+                    .distance_to(state.access_position(0)),
             );
         }
-        let metrics = state.motion_metrics;
+        let metrics = state.pilots[0].motion_metrics;
         eprintln!(
             "extended {case:?}: {metrics:?}, longest_gap={longest_gap}, max_hatch={max_hatch_distance}, hatch={}",
             state
-                .spaceling_snapshot()
+                .spaceling_snapshot(0)
                 .unwrap()
                 .motion
                 .position
-                .distance_to(state.access_position())
+                .distance_to(state.access_position(0))
         );
         assert_eq!(state.world.physics.world.body_count(), bodies);
         assert_eq!(metrics.knockdowns, 0);
@@ -210,7 +210,7 @@ fn controlled(radius: f32, gravity: f32, spin: f32) -> SurfaceSortieState {
         SurfaceMotionPreset::Stationary,
         0,
         Vec2::Y,
-        -20.4 / radius,
+        Some(-20.4 / radius),
     )
 }
 
@@ -289,9 +289,9 @@ fn generated_fixture_preserves_all_world_sources_and_the_selected_planet_identit
     assert_eq!(state.world.planets, planets);
     assert_eq!(state.world.sun, sun);
     assert_eq!(GeneratedSurfaceCase::planet_count(case.seed), planets.len());
-    assert_eq!(state.pilot.planet, case.planet);
+    assert_eq!(state.pilots[0].planet, case.planet);
     assert_eq!(state.outposts[0].planet, case.planet);
-    assert_eq!(state.observation().generated_case, Some(case));
+    assert_eq!(state.observation(0).generated_case, Some(case));
     assert_eq!(state.world.physics.world.body_count(), planets.len() + 3);
     let bodies = state.world.physics.world.body_count();
     idle(&mut state, 1);
@@ -311,7 +311,7 @@ fn generated_fixture_preserves_all_world_sources_and_the_selected_planet_identit
     }
     assert_eq!(state.world.physics.world.body_count(), bodies);
     assert_eq!(
-        state.planet_motion().position,
+        state.planet_motion(0).position,
         state.world.planets[case.planet].position
     );
     assert!(!state.world.physics.ship_is_constrained(0));
@@ -374,15 +374,16 @@ fn generated_field_report_matches_the_shared_solver_and_support_is_planet_specif
     let environment = compatibility::SurfaceEnvironment::read(&state);
     idle(&mut state, 1);
     assert!(
-        (state.pilot.ship_gravity_delta * 60.0 - environment.gravity_at_ship_spawn).length() < 0.01
+        (state.pilots[0].ship_gravity_delta * 60.0 - environment.gravity_at_ship_spawn).length()
+            < 0.01
     );
     for _ in 0..600 {
-        if state.vehicle_settled() {
+        if state.vehicle_settled(0) {
             break;
         }
         idle(&mut state, 1);
     }
-    assert!(state.vehicle_settled());
+    assert!(state.vehicle_settled(0));
     let planet = state.world.planets[2];
     let up = (state.world.ships[0].position + SHIP_PIVOT - planet.position).normalized();
     assert_eq!(state.world.physics.landing_feet_supported(0, 2, up), 2);

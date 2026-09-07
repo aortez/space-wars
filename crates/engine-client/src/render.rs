@@ -32,8 +32,8 @@ pub(crate) const MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER: f32 = 2.0;
 pub enum FrameLayout {
     EqualHorizontal,
     SpacewarsLocalPlay,
-    /// One full-window camera with a translucent overview below the top HUD.
-    SinglePlayerWithMinimap,
+    /// One or two player cameras, followed by their translucent overview frames.
+    PlayerViewsWithMinimaps,
 }
 
 pub struct VectorPresentation {
@@ -156,7 +156,9 @@ pub fn scene_presentation_from_frames_with_layout(
     {
         let is_minimap = match layout {
             FrameLayout::SpacewarsLocalPlay => frames.len() >= 4 && (2..4).contains(&index),
-            FrameLayout::SinglePlayerWithMinimap => frames.len() == 2 && index == 1,
+            FrameLayout::PlayerViewsWithMinimaps => {
+                matches!(frames.len(), 2 | 4) && index >= frames.len() / 2
+            }
             FrameLayout::EqualHorizontal => false,
         };
         if is_minimap {
@@ -189,21 +191,28 @@ pub(crate) fn frame_viewports(
 ) -> Vec<Viewport> {
     match layout {
         FrameLayout::EqualHorizontal => viewport.split_horizontally(count),
-        FrameLayout::SinglePlayerWithMinimap => {
-            if count != 2 {
+        FrameLayout::PlayerViewsWithMinimaps => {
+            if !matches!(count, 2 | 4) {
                 return viewport.split_horizontally(count);
             }
-            let size = viewport.height.min(viewport.width) * 0.25;
-            let margin = (viewport.height * 0.02).clamp(4.0, 16.0).min(size * 0.2);
-            vec![
-                viewport,
-                Viewport::with_origin(
-                    viewport.x + viewport.width - size - margin,
-                    viewport.y + viewport.height * 0.25,
+            let players = count / 2;
+            let panes = viewport.split_horizontally(players);
+            let mut result = panes.clone();
+            for pane in panes {
+                let size = if players == 1 {
+                    pane.height.min(pane.width) * 0.25
+                } else {
+                    (pane.height * 0.25).min(pane.width * 0.4)
+                };
+                let margin = (pane.height * 0.02).clamp(4.0, 16.0).min(size * 0.2);
+                result.push(Viewport::with_origin(
+                    pane.x + pane.width - size - margin,
+                    pane.y + pane.height * 0.25,
                     size,
                     size,
-                ),
-            ]
+                ));
+            }
+            result
         }
         FrameLayout::SpacewarsLocalPlay => {
             if count < 4 {
@@ -277,8 +286,8 @@ pub(crate) fn raster_text_overlay(
         .iter()
         .zip(frame_viewports(viewport, frames.len(), layout))
         .take(
-            if layout == FrameLayout::SinglePlayerWithMinimap && frames.len() == 2 {
-                1
+            if layout == FrameLayout::PlayerViewsWithMinimaps && matches!(frames.len(), 2 | 4) {
+                frames.len() / 2
             } else {
                 frames.len()
             },
@@ -907,7 +916,7 @@ mod tests {
             Viewport::new(1280.0, 720.0),
             Viewport::with_origin(12.0, 20.0, 720.0, 1280.0),
         ] {
-            let layout = FrameLayout::SinglePlayerWithMinimap;
+            let layout = FrameLayout::PlayerViewsWithMinimaps;
             let panes = frame_viewports(viewport, 2, layout);
             assert_eq!(panes[0], viewport);
             let presentation =

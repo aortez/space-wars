@@ -72,7 +72,7 @@ const GROUP_ALL_SOLIDS: u32 =
 pub(super) fn spaceling_collision_groups() -> CollisionGroups {
     CollisionGroups::new(
         GROUP_SPACELING,
-        GROUP_ROVER_SURFACE | GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_WORLD,
+        GROUP_ROVER_SURFACE | GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_WORLD | GROUP_SPACELING,
     )
 }
 
@@ -181,7 +181,7 @@ pub(super) struct SpacewarsPhysics {
     ship_keys: [Option<ShipColliderKey>; 2],
     docked_planets: [Option<usize>; 2],
     // Opt-in physical landing assembly; ordinary Spacewars retains its berths.
-    surface_ship: Option<usize>,
+    surface_ships: Option<Vec<usize>>,
     tick: u64,
     contact_last_seen: BTreeMap<(MechanicalEntity, MechanicalEntity), u64>,
     pre_step_motions: BTreeMap<MechanicalEntity, BodyMotion>,
@@ -221,7 +221,7 @@ impl SpacewarsPhysics {
             sun_radius: None,
             ship_keys: [None, None],
             docked_planets: [None, None],
-            surface_ship: None,
+            surface_ships: None,
             tick: 0,
             contact_last_seen: BTreeMap::new(),
             pre_step_motions: BTreeMap::new(),
@@ -302,12 +302,20 @@ impl SpacewarsPhysics {
         }
 
         for (index, ship) in ships.iter_mut().enumerate() {
-            if self.surface_ship.is_some_and(|active| index != active) {
+            if self
+                .surface_ships
+                .as_ref()
+                .is_some_and(|active| !active.contains(&index))
+            {
                 // The single-pilot fixture retains the legacy two-slot data
                 // layout, but does not simulate an invisible second craft.
                 continue;
             }
-            if self.surface_ship == Some(index) {
+            if self
+                .surface_ships
+                .as_ref()
+                .is_some_and(|active| active.contains(&index))
+            {
                 self.docked_planets[index] = None;
                 let key = ShipColliderKey {
                     form: ship.form,
@@ -416,19 +424,18 @@ impl SpacewarsPhysics {
             .is_some_and(|key| key.constrained)
     }
 
-    /// Configure the single-vehicle fixture, including physical landing feet.
-    pub(super) fn enable_surface_sortie(&mut self, index: usize, ship: &ShipState) {
-        self.surface_ship = Some(index);
-        for other in 0..self.ship_keys.len() {
-            if other != index {
-                self.world.remove_entity(ship_entity(other));
-                self.ship_keys[other] = None;
-                self.docked_planets[other] = None;
+    /// Configure the fixture's active vehicles, with real landing feet and no ports.
+    /// Called only during setup, before any actors occupy or leave these ships.
+    pub(super) fn enable_surface_sortie(&mut self, indices: &[usize], ships: &[ShipState]) {
+        self.surface_ships = Some(indices.to_vec());
+        for (index, ship) in ships.iter().enumerate().take(self.ship_keys.len()) {
+            self.world.remove_entity(ship_entity(index));
+            self.ship_keys[index] = None;
+            self.docked_planets[index] = None;
+            if indices.contains(&index) {
+                assert!(self.insert_ship(index, ship, false, false, false));
             }
         }
-        self.docked_planets[index] = None;
-        self.world.remove_entity(ship_entity(index));
-        assert!(self.insert_ship(index, ship, false, false, false));
     }
 
     /// An intact terminal attached to existing terrain: one collider, no new body.
@@ -981,7 +988,11 @@ impl SpacewarsPhysics {
         constrained: bool,
     ) -> bool {
         let entity = ship_entity(index);
-        let colliders = if self.surface_ship == Some(index) {
+        let colliders = if self
+            .surface_ships
+            .as_ref()
+            .is_some_and(|active| active.contains(&index))
+        {
             surface_ship_colliders(entity, ship)
         } else {
             ship_colliders(entity, ship, docked, compact)
