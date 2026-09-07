@@ -202,22 +202,23 @@ impl SurfaceOutpost {
 }
 
 impl SurfaceSortieState {
-    fn capture_status(&self) -> CaptureStatus {
+    fn capture_status(&self, outpost: &SurfaceOutpost) -> CaptureStatus {
         let Some(snapshot) = self.spaceling_snapshot() else {
             return CaptureStatus::Aboard;
         };
-        let planet = &self.world.planets[self.outpost.planet];
+        let planet = &self.world.planets[outpost.planet];
         if snapshot
             .motion
             .position
-            .distance_to(self.outpost.position(planet))
+            .distance_to(outpost.position(planet))
             > CAPTURE_RANGE
         {
             return CaptureStatus::TooFar;
         }
-        let Some(support) = snapshot.support.filter(|support| {
-            physics::is_planet_surface_support(support.collider, self.outpost.planet)
-        }) else {
+        let Some(support) = snapshot
+            .support
+            .filter(|support| physics::is_planet_surface_support(support.collider, outpost.planet))
+        else {
             return CaptureStatus::NeedSupport;
         };
         if snapshot.balance != SpacelingBalance::Balanced {
@@ -234,18 +235,20 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn update_outpost(&mut self, dt: Duration) {
-        let status = self.capture_status();
-        self.outpost.update_capture(self.pilot.owner, status, dt);
-        let position = self
-            .outpost
-            .position(&self.world.planets[self.outpost.planet]);
-        let landed = self.vehicle_settled();
-        let ship = &mut self.world.ships[self.pilot.vehicle.0];
-        self.outpost.repair_ship(
-            ship,
-            landed,
-            (ship.position + SHIP_PIVOT).distance_to(position),
-            dt,
-        );
+        for index in 0..self.outposts.len() {
+            let status = self.capture_status(&self.outposts[index]);
+            let landed =
+                self.vehicle_settled() && self.landing.planet == Some(self.outposts[index].planet);
+            let post = &mut self.outposts[index];
+            post.update_capture(self.pilot.owner, status, dt);
+            let position = post.position(&self.world.planets[post.planet]);
+            let ship = &mut self.world.ships[self.pilot.vehicle.0];
+            post.repair_ship(
+                ship,
+                landed,
+                (ship.position + SHIP_PIVOT).distance_to(position),
+                dt,
+            );
+        }
     }
 }

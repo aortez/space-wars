@@ -613,3 +613,19 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M29d: ✅ Regress the full orbital round trip, extended support, opposite/faster rates, multi-bearing landings, independent jump/takeoff, excessive-acceleration separation, and bounded body lifecycle. Exercise both presets through renderer and launcher workflows.
 - Manual playtesting: deployed `surface-sortie-orbit` on the Pi, verified about 60 FPS / 60 UPS and a connected Switch Pro controller; the user reported that playtesting seemed good (2026-09-06).
 - Boundary: ordinary generated orbits need an explicit acceleration/gravity policy before integration; pilot/vehicle loss rules and bots remain separate work. See [Surface Sortie](../surface-sortie.md#moving-planet-evidence).
+
+### M30: Generated-surface compatibility evidence
+
+- M30a: ✅ Retain the generated world and shared step while selecting a specific support planet. Add an untuned visual launcher preset; keep ordinary gameplay and bot baselines unchanged.
+- M30b: ✅ Add a deterministic headless matrix with source/force/frame diagnostics, independent approach/idle/walk/jump/takeoff probes, explicit blocked prerequisites and separate setup metrics. Add controlled radius/gravity/spin probes and positive-control coverage.
+- M30c: ✅ Add a fixture-only `surface-v1` gravity/spin/orbit/flight-clearance profile, paired raw/profile reports, and the selectable `surface-sortie-world` preset. Preserve shared controllers and all real gravity sources; no actor attachment, compensation, or ordinary-world retuning.
+- M30d: ✅ Gate the initial 72-case matrix, generated outpost round trips, independent free flight, reproducibility and profile scope. Run a broader 620-case diagnostic and 200-second idle samples; retain passive-approach failures and brief support gaps as visible limits, not discarded cases. Frame the nearby ship/pilot on arbitrary surface bearings and exercise all four launcher presets.
+- Boundary: Surface V1 remains experimental, not a universal landing guarantee or an ordinary-game default. Initial Pi playtesting through M31 was positive; broader contact/approach acceptance remains open before ordinary-game integration. See [Generated-surface compatibility](../surface-compatibility.md).
+
+### M31: Single-pilot planet-to-planet expedition
+
+- M31a: ✅ Add opt-in `surface-expedition` using the existing Surface V1 world and controllers. Separate approach selection from actual foot support; reset settling on planet changes and validate the planet for boarding and repairs.
+- M31b: ✅ Store independent outposts with stable IDs, per-site ownership/capture/repair, full-world/minimap rendering and focused HUD diagnostics. Add explicit support/frame IDs and site inventory to observation version 7.
+- M31c: ✅ Exercise action-only A-to-B capture/repair journeys on stationary/translating spinning planets, generated arrivals, wrong-planet services/support, stable lifecycle and deterministic replay. Preserve pinned compatibility probes and ordinary-game behavior.
+- M31d: ✅ Deploy to the Pi, verify launcher/pause/restart and sampled 60 FPS / 60 UPS, and receive positive initial user playtesting feedback on 2026-09-07.
+- Boundary: single pilot/vehicle, one intact site per planet, no combat/rescue/rebuilding. Broader controller, generated-route and long-duration checks remain open; multi-pilot and bot integration follow. See [Surface Expedition](../surface-expedition.md).

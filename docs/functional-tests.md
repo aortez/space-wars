@@ -45,6 +45,15 @@ Restart and relaunch must create clean instances and retain event settings.
 Busy, paused, stale-instance, stale-event, and inactive-Clock controls are
 rejected. Animation ticks must not invalidate UI revision guards.
 
+Short negative Clock waits check that a paused event does not advance; they
+are not response-latency requirements. A timeout may have no snapshot if no
+reply arrived before its deadline. The UI workflows compare any returned
+snapshot and always require a fresh successful state query afterward, using
+the normal transition budget, to verify the complete paused state is unchanged.
+Display-free `spacewars-control` tests exercise the same polling loop with
+scripted replies and virtual time: no-reply and last-reply timeouts, shared
+deadlines and bounded retry sleeps, successful matches, and error propagation.
+
 The live Clock-controls workflow enters `pause.clock` through the on-face
 control, changes and persists all four settings without replacing the paused
 event, replaces Falling with a Color Cycle preview and vice versa, navigates
@@ -64,13 +73,16 @@ enabled. Character mechanics and deterministic movement are tested headlessly
 in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is a
 manual check.
 
-Both Surface Sortie presets (stationary center and orbital) use the same
+All four Surface Sortie presets (stationary center, orbital, untuned generated
+world, and experimental Surface V1 generated world), plus **surface-expedition**, use the same
 launcher/pause/restart workflow with both renderers;
 their raster checks require the ship, amber outpost, capture/landing HUD,
 and minimap planet. The client unit tests also render the disembarked spaceling,
-capture progress, and owner-colored flag in landscape/portrait, while
+capture progress, and owner-colored flag in landscape/portrait, and check that
+capturing an Expedition site does not recolor the other minimap sites, while
 `scenario-spacewars` exercises the physical exit/walk/capture/repair/return/board/
-departure loop and input gating on stationary and orbital terrain. See
+departure loop and input gating on stationary, orbital, and sampled Surface V1
+generated terrain. See
 [Surface Sortie](surface-sortie.md) for the manual controls and retained images.
 
 The harness uses Slint's software backend, which does not draw vector paths.

@@ -42,8 +42,16 @@ pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0
 pub(super) const OUTPOST_TERMINAL_HALF_SIZE: Vec2 = Vec2::new(0.7, 1.1);
 
 pub(super) fn is_planet_surface_support(collider: ColliderId, planet: usize) -> bool {
-    collider.entity == planet_entity(planet)
-        && (collider.role == ROVER_SURFACE_ROLE || collider.role == OUTPOST_TERMINAL_ROLE)
+    planet_surface_support_index(collider) == Some(planet)
+}
+
+/// Decode contact identity directly; support lookup must not scan the world.
+pub(super) fn planet_surface_support_index(collider: ColliderId) -> Option<usize> {
+    if collider.role == ROVER_SURFACE_ROLE || collider.role == OUTPOST_TERMINAL_ROLE {
+        planet_index(collider.entity)
+    } else {
+        None
+    }
 }
 
 const GROUP_SHIP_0: u32 = 1 << 0;

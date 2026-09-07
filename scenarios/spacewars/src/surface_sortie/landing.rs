@@ -12,7 +12,7 @@ const SETTLE_SECONDS: f32 = 0.25;
 const DESCENT_SPEED: f32 = 2.0;
 const MAX_DESCENT_ACCELERATION: f32 = 30.0;
 const MAX_LATERAL_ACCELERATION: f32 = 12.0;
-const THRUST_ACCELERATION: f32 = 45.0;
+pub(super) const THRUST_ACCELERATION: f32 = 45.0;
 const BRAKE_ACCELERATION: f32 = 40.0;
 const TURN_SPEED: f32 = 1.8;
 const TURN_ACCELERATION: f32 = 6.0;
@@ -40,6 +40,8 @@ impl LandingPhase {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub struct LandingTelemetry {
+    /// Approach/contact frame. Only supported feet and the settled gate prove landing.
+    pub planet: Option<usize>,
     pub phase: LandingPhase,
     pub altitude: f32,
     pub angle_degrees: f32,
@@ -56,12 +58,13 @@ impl LandingTelemetry {
     pub(super) fn measure(
         physics: &physics::SpacewarsPhysics,
         index: usize,
+        planet_index: usize,
         planet: &PlanetState,
     ) -> Self {
         let Some(motion) = physics.world.motion(physics.ship_body(index)) else {
             return Self::default();
         };
-        let surface = motion::SurfaceFrame::read(physics);
+        let surface = motion::SurfaceFrame::read(physics, planet_index);
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let relative = physics
@@ -90,12 +93,13 @@ impl LandingTelemetry {
         // Smooth both transitions so crossing the cone/height boundary is not a switch.
         let smooth = |x: f32| x * x * (3.0 - 2.0 * x);
         Self {
+            planet: Some(planet_index),
             altitude,
             angle_degrees,
             descent_speed: -relative.dot(up),
             lateral_speed: relative.dot(right),
             relative_spin: motion.angular_velocity - surface.angular_velocity,
-            supported_feet: physics.landing_feet_supported(index, 0, up),
+            supported_feet: physics.landing_feet_supported(index, planet_index, up),
             assist_strength: smooth(near) * smooth(aligned),
             ..Self::default()
         }
@@ -105,11 +109,12 @@ impl LandingTelemetry {
         &mut self,
         physics: &physics::SpacewarsPhysics,
         index: usize,
+        planet_index: usize,
         planet: &PlanetState,
         ship: &ShipState,
         dt: f32,
     ) {
-        let mut next = Self::measure(physics, index, planet);
+        let mut next = Self::measure(physics, index, planet_index, planet);
         let settled = ship.form == ShipForm::Ship
             && !ship.dead
             && ship.thrust == 0.0
@@ -119,7 +124,12 @@ impl LandingTelemetry {
             && next.lateral_speed.abs() < SETTLED_SPEED
             && next.relative_spin.abs() < 0.2;
         next.settled_seconds = if settled {
-            (self.settled_seconds + dt).min(SETTLE_SECONDS)
+            let previous = if self.planet == next.planet {
+                self.settled_seconds
+            } else {
+                0.0
+            };
+            (previous + dt).min(SETTLE_SECONDS)
         } else {
             0.0
         };
@@ -142,21 +152,23 @@ impl SurfacePilot {
     }
 
     pub(crate) fn control_vehicle(
-        &self,
+        &mut self,
         physics: &mut physics::SpacewarsPhysics,
         ship: &ShipState,
-        planet: &PlanetState,
+        planets: &[PlanetState],
         dt: f32,
     ) {
         if ship.form != ShipForm::Ship || ship.dead {
             return;
         }
+        self.select_approach_planet(physics, planets);
+        let planet = &planets[self.planet];
         let body = physics.ship_body(self.vehicle.0);
         let Some(motion) = physics.world.motion(body) else {
             return;
         };
-        let surface = motion::SurfaceFrame::read(physics);
-        let landing = LandingTelemetry::measure(physics, self.vehicle.0, planet);
+        let surface = motion::SurfaceFrame::read(physics, self.planet);
+        let landing = LandingTelemetry::measure(physics, self.vehicle.0, self.planet, planet);
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         let mut acceleration =

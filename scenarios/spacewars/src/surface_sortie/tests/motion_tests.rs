@@ -93,7 +93,7 @@ fn motion_metrics_preserve_damage_through_repair_and_reset_only_current_idle_dri
     state.world.ships[0].life -= 10.0;
     state.record_motion_step(before, SurfaceSortieAction::default());
     assert_eq!(state.motion_metrics.ship_damage, 10.0);
-    state.outpost.owner = Some(state.pilot.owner);
+    state.outposts[0].owner = Some(state.pilot.owner);
     let health = state.world.ships[0].life;
     idle(&mut state, 120);
     assert!(state.world.ships[0].life > health);
@@ -156,7 +156,11 @@ fn orbital_approaches_land_from_eight_bearings_without_damage() {
 
 #[test]
 fn orbiting_jump_and_ship_takeoff_inherit_motion_then_fly_independently() {
-    let mut state = SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, 7);
+    free_flight_without_transport(|| SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, 7));
+}
+
+pub(super) fn free_flight_without_transport(init: impl Fn() -> SurfaceSortieState) {
+    let mut state = init();
     idle(&mut state, 120);
     disembark(&mut state);
     let snapshot = state.spaceling_snapshot().unwrap();
@@ -198,7 +202,7 @@ fn orbiting_jump_and_ship_takeoff_inherit_motion_then_fly_independently() {
     assert!(state.spaceling_snapshot().unwrap().grounded());
 
     // A fresh, reproducible fixture exercises takeoff through player controls.
-    let mut state = SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, 7);
+    let mut state = init();
     idle(&mut state, 120);
     let before = state.world.ships[0].velocity;
     tick(
@@ -243,8 +247,7 @@ fn excessive_support_acceleration_causes_separation_and_stops_capture_and_repair
     super::outpost_tests::walk_to(&mut state, super::outpost_tests::terminal_approach);
     idle(&mut state, 40);
     assert!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .capture_progress
             > 0.0
@@ -256,29 +259,25 @@ fn excessive_support_acceleration_causes_separation_and_stops_capture_and_repair
     assert!(!state.spaceling_snapshot().unwrap().grounded());
     assert!(!state.vehicle_settled());
     assert_eq!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .capture_progress,
         0.0
     );
     assert!(state.motion_metrics.pilot_support_losses > 0);
-    state.outpost.owner = Some(state.pilot.owner);
-    let healed = state
-        .outpost
+    state.outposts[0].owner = Some(state.pilot.owner);
+    let healed = state.outposts[0]
         .observation(&state.world.planets[0])
         .repaired_health;
     idle(&mut state, 30);
     assert_ne!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .repair_status,
         RepairStatus::Repairing
     );
     assert_eq!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .repaired_health,
         healed
@@ -321,7 +320,7 @@ fn orbital_motion_metrics_and_rendering_replay_and_restart_deterministically() {
             SurfaceSortieScenario::observe(&SurfaceSortieScenario::init(preset, 123)).payload,
             initial
         );
-        assert_eq!(a.observation().version, 4);
+        assert_eq!(a.observation().version, 7);
         assert!(a.motion_metrics.on_foot_ticks > 0);
         assert_eq!(a.motion_metrics.jumps, 1);
         assert_eq!(a.motion_metrics.ship_damage, 0.0);
@@ -354,13 +353,13 @@ fn orbital_frame_has_matched_external_gravity_without_a_follow_force() {
 fn landing_uses_completed_terrain_pose_while_the_next_pose_is_scheduled() {
     let state = parked();
     let planet = state.world.planets[0];
-    let before = LandingTelemetry::measure(&state.world.physics, 0, &planet);
+    let before = LandingTelemetry::measure(&state.world.physics, 0, 0, &planet);
     let mut next = planet;
     next.position += Vec2::new(20.0, -10.0);
     next.wrapper_angle += 0.2;
     // In the canonical step, scenario terrain already describes the next
     // kinematic target when control reads the previous completed contacts.
-    let scheduled = LandingTelemetry::measure(&state.world.physics, 0, &next);
+    let scheduled = LandingTelemetry::measure(&state.world.physics, 0, 0, &next);
     assert_eq!(before, scheduled);
 }
 
@@ -462,7 +461,7 @@ fn frame_velocity_matches_motion_of_the_surface_not_its_offset_center_of_mass() 
     for point in [
         planet.position,
         state.access_position(),
-        state.outpost.position(&planet),
+        state.outposts[0].position(&planet),
     ] {
         let actual = state
             .world

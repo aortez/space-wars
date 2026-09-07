@@ -10,20 +10,26 @@ fn camera(state: &SurfaceSortieState) -> Camera2 {
     let snapshot = state.spaceling_snapshot();
     let ship = &state.world.ships[state.pilot.vehicle.0];
     let parked = state.vehicle_settled();
-    let center = snapshot.map_or_else(
-        || {
-            if parked {
-                (ship.position + state.access_position()) * 0.5 + Vec2::new(0.0, 2.0)
-            } else {
-                ship.position
-            }
-        },
-        |s| s.motion.position + Vec2::new(0.0, 7.0),
-    );
-    let height = if snapshot.is_some() || parked {
-        44.0
+    let (center, height) = if let Some(snapshot) = snapshot {
+        let pilot = snapshot.motion.position;
+        let ship_center = ship.position + SHIP_PIVOT;
+        if parked && pilot.distance_to(ship_center) < 32.0 {
+            // North-up framing must work on the sides/underside too. Keep the
+            // nearby ship and pilot in the central band between the HUD strips;
+            // walk farther away and the camera follows only the active pilot.
+            let separation = ship_center - pilot;
+            let height = 44.0_f32.max((separation.y.abs() + 12.0) / 0.48);
+            ((pilot + ship_center) * 0.5, height)
+        } else {
+            (pilot + snapshot.up * 7.0, 44.0)
+        }
+    } else if parked {
+        (
+            (ship.position + state.access_position()) * 0.5 + state.access_up() * 2.0,
+            44.0,
+        )
     } else {
-        100.0
+        (ship.position, 100.0)
     };
     Camera2::new(render_point(center), height)
 }
@@ -46,28 +52,32 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
             RenderColor::rgb(1.0, 0.85, 0.25),
         );
     }
-    let planet = &state.world.planets[0];
-    let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
-    circle(
-        &mut frame,
-        -20,
-        planet.position,
-        radius,
-        RenderColor::rgb(0.09, 0.16, 0.23),
-    );
-    for index in 0..72 {
-        let up =
-            Vec2::from_radians(planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0);
-        line(
+    for planet in &state.world.planets {
+        let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
+        circle(
             &mut frame,
-            -18,
-            planet.position + up * (radius - 1.0),
-            planet.position + up * (radius - 0.08),
-            RenderColor::rgb(0.28, 0.51, 0.6),
-            1.0,
+            -20,
+            planet.position,
+            radius,
+            RenderColor::rgb(0.09, 0.16, 0.23),
         );
+        for index in 0..72 {
+            let up = Vec2::from_radians(
+                planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0,
+            );
+            line(
+                &mut frame,
+                -18,
+                planet.position + up * (radius - 1.0),
+                planet.position + up * (radius - 0.08),
+                RenderColor::rgb(0.28, 0.51, 0.6),
+                1.0,
+            );
+        }
     }
-    draw_outpost(&mut frame, state, &observation.outpost);
+    for post in &observation.outposts {
+        draw_outpost(&mut frame, state, post);
+    }
     let access = observation.access_position;
     if parked {
         circle(
@@ -136,7 +146,24 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
     text(
         &mut frame,
         Vec2::new(center.x, title_y),
-        format!("SURFACE SORTIE  /  {}", state.motion_preset.label()),
+        state.generated_case.map_or_else(
+            || format!("SURFACE SORTIE  /  {}", state.motion_preset.label()),
+            |case| {
+                if state.travel_enabled() {
+                    return format!(
+                        "SURFACE EXPEDITION / V1  |  seed {}  |  approach planet {}",
+                        case.seed, state.pilot.planet
+                    );
+                }
+                format!(
+                    "{}  |  seed {} planet {} bearing {}",
+                    case.profile.label(),
+                    case.seed,
+                    case.planet,
+                    case.bearing
+                )
+            },
+        ),
         LIGHT,
         18.0,
     );
@@ -185,10 +212,15 @@ pub(super) fn frame(state: &SurfaceSortieState) -> RenderFrame {
         &mut frame,
         center - Vec2::new(0.0, height * 0.323),
         format!(
-            "OUTPOST {ownership}  |  {:.0}%  |  {}  |  {:.1}u",
+            "OUTPOST {ownership}  |  {:.0}%  |  {}  |  {:.1}u{}",
             post.capture_progress * 100.0,
             post.capture_status.label(),
-            observation.position.distance_to(post.position)
+            observation.position.distance_to(post.position),
+            if state.travel_enabled() {
+                format!("  |  site {} / planet {}", post.id.0, post.planet)
+            } else {
+                String::new()
+            }
         ),
         if post.owner == Some(observation.owner) {
             CYAN
@@ -275,7 +307,7 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             -18,
             RenderPrimitive::Circle(RenderCircle {
                 center: render_point(sun.position),
-                radius: state.world.planets[0].orbit_radius,
+                radius: state.world.planets[state.pilot.planet].orbit_radius,
                 fill: None,
                 stroke: Some(Stroke::new(RenderColor::rgba(0.55, 0.6, 0.7, 0.45), 1.0)),
             }),
@@ -290,29 +322,37 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
             CYAN,
         );
     }
-    let outpost = &state.outpost;
-    let planet = &state.world.planets[outpost.planet];
-    let site = outpost.position(planet);
-    // Lift the symbol off the planet rim, with a leader to its exact location;
-    // the tiny ship/creature icons must remain distinguishable nearby.
-    let marker = site + outpost.up(planet) * 35.0;
-    let owner_color = outpost_color(state);
-    line(&mut map, 1, site, marker, owner_color, 1.0);
-    map.push_primitive(
-        1,
-        RenderPrimitive::Polygon(RenderPolygon {
-            points: [
-                Vec2::new(-12.0, -12.0),
-                Vec2::new(12.0, -12.0),
-                Vec2::new(12.0, 12.0),
-                Vec2::new(-12.0, 12.0),
-            ]
-            .map(|point| render_point(marker + point))
-            .to_vec(),
-            fill: Some(Fill::new(owner_color)),
-            stroke: Some(Stroke::new(LIGHT, 1.0)),
-        }),
-    );
+    for outpost in &state.outposts {
+        let planet = &state.world.planets[outpost.planet];
+        let site = outpost.position(planet);
+        // Lift the symbol off the planet rim, with a leader to its exact location;
+        // the tiny ship/creature icons must remain distinguishable nearby.
+        // Generated worlds are much wider than the small lab. Keep ownership
+        // squares large enough to show their fill inside the one-pixel outline.
+        let half_size = if state.travel_enabled() {
+            (radius * 0.025).max(12.0)
+        } else {
+            12.0
+        };
+        let marker = site + outpost.up(planet) * (half_size * 2.0).max(35.0);
+        let owner_color = outpost_color(state, outpost.owner);
+        line(&mut map, 1, site, marker, owner_color, 1.0);
+        map.push_primitive(
+            1,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: [
+                    Vec2::new(-half_size, -half_size),
+                    Vec2::new(half_size, -half_size),
+                    Vec2::new(half_size, half_size),
+                    Vec2::new(-half_size, half_size),
+                ]
+                .map(|point| render_point(marker + point))
+                .to_vec(),
+                fill: Some(Fill::new(owner_color)),
+                stroke: Some(Stroke::new(LIGHT, 1.0)),
+            }),
+        );
+    }
     // The footprint follows the actual full-window camera, including resizes.
     let camera = camera(state);
     let aspect = if viewport_aspect.is_finite() && viewport_aspect > 0.0 {
@@ -377,8 +417,8 @@ pub(super) fn minimap(state: &SurfaceSortieState, viewport_aspect: f32) -> Rende
     map
 }
 
-fn outpost_color(state: &SurfaceSortieState) -> RenderColor {
-    state.outpost.owner.map_or(AMBER, |owner| {
+fn outpost_color(state: &SurfaceSortieState, owner: Option<PlayerId>) -> RenderColor {
+    owner.map_or(AMBER, |owner| {
         render_color(state.world.players[owner.index()].color)
     })
 }
@@ -388,12 +428,12 @@ fn draw_outpost(
     state: &SurfaceSortieState,
     observation: &OutpostObservation,
 ) {
-    let planet = &state.world.planets[state.outpost.planet];
-    let up = state.outpost.up(planet);
+    let planet = &state.world.planets[observation.planet];
+    let up = observation.surface_normal;
     let right = Vec2::new(up.y, -up.x);
     let base = observation.position;
     let local = |x, y| base + right * x + up * y;
-    let owner_color = outpost_color(state);
+    let owner_color = outpost_color(state, observation.owner);
     // Service radius is an eligibility hint, not a docking region or force.
     // Its underground half is occluded by the planet fill.
     let range_color = if observation.owner.is_some() {

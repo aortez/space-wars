@@ -18,6 +18,28 @@ These are presets of the same scenario, not separate gameplay implementations.
 Restart repeats the selected preset; returning to the launcher preserves its
 selection. Controls and the capture/repair rules are identical.
 
+The additional **surface-sortie-generated** preset is an explicitly untuned
+[compatibility diagnostic](surface-compatibility.md), not another accepted
+gameplay preset. It tests ordinary generated masses/motion with these controls.
+
+Choose **surface-sortie-world** for the experimental **Surface V1** profile on
+generated planets. It retains their sizes and relative layout, with gentler
+gravity, bounded spin, sun-matched orbits, and more room before the world wall:
+
+```sh
+cargo run -p engine-client -- --scenario surface-sortie-world --seed 0
+```
+
+The controllers and outpost loop are unchanged. This is fixture-only tuning,
+not a new ordinary-game default. Both generated presets start on planet 0,
+initially away from the sun. See the [profile comparison](surface-compatibility.md#surface-v1-experiment)
+for parameters, results, and remaining approach/long-idle limits.
+
+For travel between those planets and separate outposts, choose
+**surface-expedition**. It adds dynamic approach/support selection to the same
+scenario; the four original presets remain pinned compatibility fixtures.
+See [Surface Expedition](surface-expedition.md) for that opt-in loop and scope.
+
 The fixture starts with your ship at **75% health**, settling rear-first onto a
 slowly rotating planet. Press **B** on a gamepad or **X** on the keyboard to
 disembark. Release the controls, walk right to the amber terminal, and stand
@@ -94,7 +116,9 @@ to ordinary Spacewars flight. The fixture uses bounded thrust, braking, and turn
 rate control in the canonical Rapier world. The landing feet add two colliders
 to the existing hull body, not extra bodies, joints, or mass.
 
-The camera follows the active ship or spaceling. A translucent, fixed-scale,
+The camera follows the active ship or spaceling, framing the nearby landed ship
+and pilot between the HUD strips even on the sides or underside of the planet.
+Farther from the ship it follows the pilot alone. A translucent, fixed-scale,
 north-up minimap stays visible at the right below the top HUD: cyan planet, red
 ship with heading, orange spaceling, square outpost marker, and a white camera
 footprint. A short leader connects the outpost marker to its surface location.
@@ -245,7 +269,10 @@ not retune those orbits, gravity, rovers, ships, or bots.
 
 ### Motion diagnostics
 
-Version-4 typed/JSON observations add `motion` and `motion_metrics`:
+Typed/JSON observations include `motion` and `motion_metrics` (introduced in
+version 4; version 5 adds the optional `generated_case` identifier; version 6
+adds its explicit gravity/motion `profile`; version 7 adds travel, explicit
+support/frame planet IDs and the complete outpost inventory):
 
 - completed planet position, origin velocity, angle/spin, active-body
   surface-relative velocity, and actual support-point velocity/relative speed;

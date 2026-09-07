@@ -11,7 +11,8 @@ pub(super) fn walk_to(
             idle(state, 12);
             return;
         }
-        let up = (snapshot.motion.position - state.world.planets[0].position).normalized();
+        let up = (snapshot.motion.position - state.world.planets[state.pilot.planet].position)
+            .normalized();
         tick(
             state,
             SurfaceSortieAction {
@@ -24,9 +25,8 @@ pub(super) fn walk_to(
 }
 
 pub(super) fn terminal_approach(state: &SurfaceSortieState) -> Vec2 {
-    let planet = &state.world.planets[state.outpost.planet];
-    let up = state
-        .outpost
+    let planet = &state.world.planets[state.outposts[0].planet];
+    let up = state.outposts[0]
         .up(planet)
         .rotate_radians(2.0 / (planet.radius * BODY_BOUNDS_RADIUS_SCALE));
     planet.position
@@ -49,7 +49,7 @@ fn at_terminal() -> SurfaceSortieState {
 fn capture(state: &mut SurfaceSortieState) {
     for _ in 0..200 {
         idle(state, 1);
-        if state.outpost.owner == Some(state.pilot.owner) {
+        if state.outposts[0].owner == Some(state.pilot.owner) {
             return;
         }
     }
@@ -80,7 +80,7 @@ fn outpost_capture_and_repair_replay_identically_and_do_not_advance_without_step
         tick(&mut b, input);
         assert_eq!(a.observation(), b.observation(), "tick {frame}");
     }
-    assert_eq!(a.outpost.owner, Some(a.pilot.owner));
+    assert_eq!(a.outposts[0].owner, Some(a.pilot.owner));
     assert!(a.observation().outpost.repaired_health > 0.0);
     let before = a.observation();
     for _ in 0..10 {
@@ -105,7 +105,11 @@ fn outpost_round_trip_captures_repairs_and_departs_using_only_player_controls() 
 }
 
 fn round_trip(preset: SurfaceMotionPreset) {
-    let mut state = SurfaceSortieScenario::init(preset, 7);
+    round_trip_state(SurfaceSortieScenario::init(preset, 7));
+}
+
+pub(super) fn round_trip_state(mut state: SurfaceSortieState) {
+    let preset = state.motion_preset();
     idle(&mut state, 120);
     assert!(
         state.vehicle_settled(),
@@ -115,10 +119,16 @@ fn round_trip(preset: SurfaceMotionPreset) {
     let initial = state.observation();
     assert_eq!(initial.ship_health, state.world.ships[0].life_max * 0.75);
     idle(&mut state, 360);
-    assert_eq!(state.outpost.owner, None, "landing alone cannot capture");
+    assert_eq!(
+        state.outposts[0].owner, None,
+        "landing alone cannot capture"
+    );
     assert_eq!(state.world.ships[0].life, initial.ship_health);
     disembark(&mut state);
-    assert_eq!(state.outpost.owner, None, "must walk away from the hatch");
+    assert_eq!(
+        state.outposts[0].owner, None,
+        "must walk away from the hatch"
+    );
     walk_to(&mut state, terminal_approach);
     idle(&mut state, 60);
     let partial = state.observation().outpost;
@@ -129,7 +139,7 @@ fn round_trip(preset: SurfaceMotionPreset) {
     assert!(state.vehicle_settled());
     assert_eq!(state.observation().outpost.captures, 1);
     assert_eq!(
-        state.world.planets[0].owner_id, None,
+        state.world.planets[state.pilot.planet].owner_id, None,
         "outpost ownership is not planet ownership"
     );
     assert!(state.world.spaceport_contacts.is_empty());
@@ -284,11 +294,11 @@ fn unrelated_physical_support_near_the_terminal_does_not_capture() {
         "{:?}",
         state.observation()
     );
-    assert_eq!(state.outpost.owner, None);
+    assert_eq!(state.outposts[0].owner, None);
     state.world.physics.world.remove_entity(platform);
     idle(&mut state, 300);
     assert_eq!(
-        state.outpost.owner,
+        state.outposts[0].owner,
         Some(state.pilot.owner),
         "actual planet support permits capture"
     );
@@ -301,7 +311,8 @@ fn outpost_terminal_is_solid_and_rotates_with_its_planet_without_an_extra_body()
     let colliders = state.world.physics.world.collider_count();
     let terminal_center = |s: &SurfaceSortieState| {
         let planet = &s.world.planets[0];
-        s.outpost.position(planet) + s.outpost.up(planet) * physics::OUTPOST_TERMINAL_HALF_SIZE.y
+        s.outposts[0].position(planet)
+            + s.outposts[0].up(planet) * physics::OUTPOST_TERMINAL_HALF_SIZE.y
     };
     let original = terminal_center(&state);
     let groups = SurfaceSortieState::spec().collision_groups;
@@ -336,7 +347,7 @@ fn outpost_terminal_is_solid_and_rotates_with_its_planet_without_an_extra_body()
 fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
     let mut state = parked();
     let initial = state.world.ships[0].clone();
-    let post = &mut state.outpost;
+    let post = &mut state.outposts[0];
     let mut ship = initial.clone();
     post.repair_ship(&mut ship, true, 0.0, Duration::from_secs(1));
     assert_eq!(
@@ -397,7 +408,7 @@ fn outpost_repair_policy_requires_friendly_landed_in_range_and_live_ship() {
 #[test]
 fn outpost_capture_uses_elapsed_time_and_never_shares_partial_progress_between_players() {
     let mut state = parked();
-    let post = &mut state.outpost;
+    let post = &mut state.outposts[0];
     post.update_capture(
         PlayerId::PLAYER_1,
         CaptureStatus::Capturing,

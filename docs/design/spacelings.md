@@ -210,6 +210,62 @@ loss/rescue, contested infrastructure, terrain, and bot intent remain separate
 slices; this controlled preset's acceptance does not cover arbitrary generated
 orbits or combat.
 
+## Sixth slice: generated-world compatibility evidence
+
+Implemented on `surface-generated-compatibility`. The generated diagnostic keeps
+all ordinary planet/sun masses and prescribed paths, uses an explicit selected
+planet index, and runs independent landing, idle, walking, jump and takeoff
+probes. Prerequisite failures remain visible instead of masquerading as passes.
+An untuned launcher preset provides visual reproduction at planet 0 / bearing 0.
+
+The first 72 generated cases confirm a major force/motion mismatch, not merely
+a radius or landing-assist problem. Controlled radius changes from 15 to 150
+pass at lab gravity; generated surface gravity is roughly 650–712 versus 18
+in the lab. High gravity overwhelms takeoff/jumps and disrupts balanced support;
+rapid spin and unmatched external acceleration add independent constraints.
+See [the compatibility report](../surface-compatibility.md) for reproducible
+commands, criteria, results and limits. Ordinary game tuning and bot baselines
+remain unchanged.
+
+The same slice now includes the explicit **Surface V1** experiment, alongside
+the raw baseline: lab-scale planet gravity, a gentler sun, spin bounded by local
+gravity, central-field-matched circular orbits, and exterior flight clearance.
+All generated sources remain active and the ship/spaceling controllers are
+unchanged. This remains a cheap kinematic world, not full N-body motion or
+actor-relative gravity compensation. `surface-sortie-world` is the selectable
+visual preset; `--profile both` runs paired headless cases.
+
+The initial 72 cases pass all five probes; the wider 620-case matrix passes
+3,093/3,100 probes, with seven passive approach failures retained as evidence.
+Four sampled planets pass the full outpost round trip. Extended idle tests
+expose brief support gaps and slow drift without damage/knockdown, so this is
+not a universal contact-stability claim. Playtest the profile and decide its
+acceptance envelope before multi-pilot, loss/rescue, contested services and bot
+surface-intent integration. Ordinary Spacewars defaults have not changed.
+
+## Seventh slice: single-pilot planet-to-planet expedition
+
+Implemented on `surface-planet-travel`, following the compatibility work in
+PR #47. The opt-in `surface-expedition` preset shares Surface Sortie's physics,
+gravity and controllers, but follows the destination rather than a permanently
+pinned planet. Approach selection prefers actual foot contacts, then nearest
+surface with hysteresis; landing requires fresh settling on that same body.
+Hatch transfers and repair validate physical planet identity independently of
+proximity. Spaceling diagnostics/site focus are independent of the parked ship.
+
+Sites are a collection with stable IDs and independent ownership/capture/repair
+state, one per generated planet in this fixture. The minimap and world show all
+sites, while the HUD focuses the active planet's site. No new terrain bodies or
+gravity solves are introduced. Existing raw/profile probes remain pinned and
+ordinary Spacewars is unchanged.
+
+Two controlled action-only journeys cover rotating planets with stationary and
+translating centers. Generated arrivals, stale-frame reset, foreign services,
+unrelated boarding support, resource bounds and deterministic replay cover the
+new boundaries. The initial Pi deployment and user playtest on 2026-09-07 were
+positive. This does not yet prove all generated routes, multiplayer, combat or
+rescue rules. See [Surface Expedition](../surface-expedition.md).
+
 ## Planet and ship direction
 
 The continuous surface and external berth from PR #40 fix the interior-bay
