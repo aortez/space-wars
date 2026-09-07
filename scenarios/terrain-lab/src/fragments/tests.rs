@@ -214,6 +214,9 @@ fn last_connection_creates_a_body_with_the_same_world_cells_and_point_velocities
 #[test]
 fn detached_piece_falls_collides_with_the_planet_and_resumes_from_a_checkpoint() {
     let mut first = fixture(8.0);
+    // Keep the floor intact while testing rigid support and checkpoint motion.
+    // Impact damage and collapsing floors have separate end-to-end regressions.
+    first.config.impacts.enabled = false;
     release(&mut first);
     let body = first.fragments[0].assembly.body();
     let before = first.physics.motion(body).unwrap().position;
@@ -283,7 +286,7 @@ fn a_moving_fragment_splits_again_without_losing_material_or_resetting_motion() 
     let before_com = state.physics.center_of_mass(body).unwrap();
     state.pending_edits.push(PendingEdit {
         body: body.entity,
-        recover: false,
+        cause: EditCause::Debug,
         edit: TerrainEdit {
             brush: Brush::Capsule {
                 start: CellCoord::new(2, 0),

@@ -21,11 +21,13 @@ use engine_terrain::{
 };
 
 mod fragments;
+mod impacts;
 mod mining;
 mod render;
 mod tools;
 mod view;
 pub use fragments::TerrainFragment;
+pub use impacts::{TerrainImpactConfig, TerrainImpactStats};
 pub use mining::{
     DRILL_DAMAGE, DRILL_INTERVAL_TICKS, DRILL_RADIUS, DRILL_RANGE, MiningControls, MiningInventory,
     MiningSnapshot, MiningTarget,
@@ -49,6 +51,7 @@ pub struct TerrainLabConfig {
     pub gravity_acceleration: f32,
     /// Profiles indexed by `MiningTool`, independent of terrain resolution.
     pub mining_tools: [MiningToolProfile; 3],
+    pub impacts: TerrainImpactConfig,
 }
 
 impl Default for TerrainLabConfig {
@@ -60,6 +63,7 @@ impl Default for TerrainLabConfig {
             orbit_radius: 4.0,
             gravity_acceleration: 18.0,
             mining_tools: MiningToolProfile::DEFAULTS,
+            impacts: TerrainImpactConfig::default(),
         }
     }
 }
@@ -234,13 +238,22 @@ pub struct TerrainLabState {
     previous_tool_controls: ToolControls,
     mining: mining::MiningState,
     pending_edits: Vec<PendingEdit>,
+    impact: impacts::ImpactState,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum EditCause {
+    Debug,
+    Mining,
+    Impact,
 }
 
 #[derive(Clone, Copy)]
 struct PendingEdit {
     body: PhysicsId,
     edit: TerrainEdit,
-    recover: bool,
+    cause: EditCause,
 }
 
 impl From<TerrainEdit> for PendingEdit {
@@ -248,7 +261,7 @@ impl From<TerrainEdit> for PendingEdit {
         Self {
             body: PLANET_ID,
             edit,
-            recover: false,
+            cause: EditCause::Debug,
         }
     }
 }
@@ -400,6 +413,7 @@ impl Scenario for TerrainLabScenario {
         for (profile, default) in config.mining_tools.iter_mut().zip(defaults.mining_tools) {
             *profile = profile.normalized(default);
         }
+        config.impacts = config.impacts.normalized();
         let terrain = generate_planet(config, seed).expect("normalized lab field");
         let geometry = TerrainGeometry::new(&terrain);
         let terrain_hash = terrain.hash();
@@ -460,6 +474,7 @@ impl Scenario for TerrainLabScenario {
             previous_tool_controls: ToolControls::default(),
             mining: mining::MiningState::default(),
             pending_edits: Vec::new(),
+            impact: impacts::ImpactState::default(),
         }
     }
 
@@ -545,6 +560,15 @@ impl Scenario for TerrainLabScenario {
             elapsed * state.config.angular_velocity,
         );
         state.physics.clear_forces();
+        let mut impact_motions = state.capture_impact_motions();
+        if let Some(planet) = impact_motions.get_mut(&PLANET_ID) {
+            planet.set_kinematic_target(
+                center,
+                elapsed * state.config.angular_velocity,
+                state.config.angular_velocity,
+                dt,
+            );
+        }
         let delta = state.apply_fragment_gravity(dt);
         state.spaceling.apply_control(
             &mut state.physics,
@@ -559,12 +583,13 @@ impl Scenario for TerrainLabScenario {
             .physics
             .apply_velocity_delta(state.spaceling.body(), delta, true);
         state.physics.step(dt);
+        state.queue_impact_damage(&impact_motions);
         state.tick += 1;
         StepResult::default()
     }
 
     fn observe(state: &Self::State) -> Observation {
-        let mut payload = vec![5, state.selected_tool() as u8, state.view as u8];
+        let mut payload = vec![6, state.selected_tool() as u8, state.view as u8];
         for value in [
             state.tick,
             state.terrain.revision(),
@@ -629,6 +654,35 @@ impl Scenario for TerrainLabScenario {
                 motion.angular_velocity,
             ] {
                 payload.extend(value.to_le_bytes());
+            }
+        }
+        let impacts = state.impact_stats();
+        for value in [
+            impacts.hits,
+            impacts.damaged_cells,
+            impacts.destroyed_cells,
+            impacts.budget_dropped,
+            impacts.last_hits as u64,
+        ] {
+            payload.extend(value.to_le_bytes());
+        }
+        payload.extend(impacts.last_speed.to_le_bytes());
+        payload.extend(impacts.last_energy.to_le_bytes());
+        payload.push(impacts.last_damage);
+        payload.extend((state.impact.contacts.len() as u32).to_le_bytes());
+        for (&(a, b), &tick) in &state.impact.contacts {
+            for value in [a.value(), b.value(), tick] {
+                payload.extend(value.to_le_bytes());
+            }
+        }
+        payload.extend((state.pending_edits.len() as u32).to_le_bytes());
+        for pending in &state.pending_edits {
+            payload.extend(pending.body.value().to_le_bytes());
+            payload.push(pending.cause as u8);
+            if let Action::Scenario { payload: edit, .. } =
+                TerrainLabAction::Edit(pending.edit).encode()
+            {
+                payload.extend(edit);
             }
         }
         Observation { payload }

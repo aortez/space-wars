@@ -1,4 +1,4 @@
-//! Full separation, fragment collisions, and rendering workload, without a display.
+//! Repeated terrain impacts, bounded damage, and cascading fragment workload.
 use std::{
     hint::black_box,
     time::{Duration, Instant},
@@ -13,9 +13,8 @@ use scenario_terrain_lab::{
 fn occupied(state: &TerrainLabState) -> usize {
     std::iter::once(state.terrain())
         .chain(state.fragments().iter().map(|f| f.terrain()))
-        .map(|terrain| {
-            terrain
-                .cells()
+        .map(|t| {
+            t.cells()
                 .iter()
                 .filter(|c| c.material != MaterialId::VOID)
                 .count()
@@ -30,21 +29,23 @@ fn percentile(values: &mut [f64], fraction: f64) -> f64 {
 
 fn main() {
     println!(
-        "case,radius,fragments,cut_step_ms,connectivity_ms,step_p95_ms,step_max_ms,frame_p95_ms,frame_max_ms,colliders,cell_kib,hash"
+        "case,radius,impacts_enabled,cut_ms,step_p95_ms,step_max_ms,frame_p95_ms,frame_max_ms,peak_fragments,final_fragments,impacts,destroyed_cells,budget_skips,peak_colliders,hash"
     );
     let dt = Duration::from_secs_f64(1.0 / f64::from(FIXED_HZ));
-    for (case, radius) in [("equator", 20.0), ("blocks", 20.0), ("equator", 150.0)] {
-        let mut state = TerrainLabScenario::init(
-            TerrainLabConfig {
-                radius,
-                ..Default::default()
-            },
-            42,
-        );
-        // Preserve the separation-only baseline; impact_benchmark measures wear
-        // and subsequent chain reactions with the same starting cuts.
-        state.config.impacts.enabled = false;
-        let initial_cells = occupied(&state);
+    for (case, radius, enabled) in [
+        ("equator", 20.0, false),
+        ("equator", 20.0, true),
+        ("blocks", 20.0, true),
+        ("blocks", 40.0, true),
+        ("equator", 150.0, true),
+    ] {
+        let mut config = TerrainLabConfig {
+            radius,
+            ..Default::default()
+        };
+        config.impacts.enabled = enabled;
+        let mut state = TerrainLabScenario::init(config, 42);
+        let initial = occupied(&state);
         for _ in 0..120 {
             TerrainLabScenario::step(&mut state, &[], dt);
         }
@@ -73,33 +74,38 @@ fn main() {
         }
         let started = Instant::now();
         TerrainLabScenario::step(&mut state, &edits, dt);
-        let cut_step = started.elapsed().as_secs_f64() * 1000.0;
-        let connectivity = state.last_edit.connectivity_time.as_secs_f64() * 1000.0;
-        assert!(!state.fragments().is_empty());
-        assert_eq!(
-            initial_cells,
-            occupied(&state) + state.removed_cells as usize
-        );
-        assert_eq!(state.recovered.rock_cells + state.recovered.ore_cells, 0);
+        let cut_ms = started.elapsed().as_secs_f64() * 1000.0;
         let mut steps = Vec::new();
         let mut frames = Vec::new();
-        for _ in 0..600 {
+        let mut peak_fragments = state.fragments().len();
+        let mut peak_colliders = state.collider_count();
+        for _ in 0..1200 {
             let started = Instant::now();
             TerrainLabScenario::step(&mut state, &[], dt);
             steps.push(started.elapsed().as_secs_f64() * 1000.0);
             let started = Instant::now();
             black_box(TerrainLabScenario::render_frame(&state));
             frames.push(started.elapsed().as_secs_f64() * 1000.0);
+            peak_fragments = peak_fragments.max(state.fragments().len());
+            peak_colliders = peak_colliders.max(state.collider_count());
+            assert!(state.impact_stats().last_hits <= config.impacts.max_hits_per_tick);
         }
+        assert_eq!(initial, occupied(&state) + state.removed_cells as usize);
+        assert_eq!(state.recovered.rock_cells + state.recovered.ore_cells, 0);
+        if !enabled {
+            assert_eq!(state.impact_stats().hits, 0);
+        }
+        let impacts = state.impact_stats();
         println!(
-            "{case},{radius},{},{cut_step:.3},{connectivity:.3},{:.3},{:.3},{:.3},{:.3},{},{:.1},{:016x}",
-            state.fragments().len(),
+            "{case},{radius},{enabled},{cut_ms:.3},{:.3},{:.3},{:.3},{:.3},{peak_fragments},{},{},{},{},{peak_colliders},{:016x}",
             percentile(&mut steps, 0.95),
             percentile(&mut steps, 1.0),
             percentile(&mut frames, 0.95),
             percentile(&mut frames, 1.0),
-            state.collider_count(),
-            state.terrain_cell_bytes() as f64 / 1024.0,
+            state.fragments().len(),
+            impacts.hits,
+            impacts.destroyed_cells,
+            impacts.budget_dropped,
             state.terrain_hash()
         );
     }

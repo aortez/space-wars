@@ -212,11 +212,27 @@ pub(super) fn frame(state: &TerrainLabState) -> RenderFrame {
     if mining.target.is_some() {
         circle(&mut frame, mining.end, 0.18, drill_color);
     }
+    for flash in &state.impact.flashes {
+        let age = state.tick.saturating_sub(flash.tick) as f32 / 18.0;
+        let color = RenderColor::rgba(1.0, 0.76, 0.35, (1.0 - age).max(0.0));
+        let radius = flash.radius.max(0.25) + age * 0.6;
+        for spoke in 0..8 {
+            let direction = Vec2::from_radians(spoke as f32 * std::f32::consts::FRAC_PI_4);
+            line(
+                &mut frame,
+                8,
+                flash.point + direction * radius * 0.5,
+                flash.point + direction * radius,
+                color,
+                2.0,
+            );
+        }
+    }
     // Keep text readable over rock and ore in the close views. The renderer
     // clips these wide camera-relative panels to the viewport.
     for (bottom, top) in [
         (0.295, 0.5),
-        (-0.5, if state.overlay { -0.18 } else { -0.365 }),
+        (-0.5, if state.overlay { -0.135 } else { -0.365 }),
     ] {
         let half_width = camera.height * 4.0;
         frame.push_primitive(
@@ -328,6 +344,17 @@ pub(super) fn frame(state: &TerrainLabState) -> RenderFrame {
         CYAN,
     );
     if state.overlay {
+        let impacts = state.impact_stats();
+        text(
+            &mut frame,
+            hud(-0.18),
+            format!(
+                "Impacts: {}   Destroyed: {} cells   Last: {:.1} u/s   Budget skips: {}",
+                impacts.hits, impacts.destroyed_cells, impacts.last_speed, impacts.budget_dropped,
+            ),
+            13.0,
+            ORANGE,
+        );
         text(
             &mut frame,
             hud(-0.225),

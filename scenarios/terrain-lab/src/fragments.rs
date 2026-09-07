@@ -11,7 +11,7 @@ use engine_rapier::{
 };
 use engine_terrain::{ChunkId, MaterialId, Terrain, TerrainError, TerrainGeometry};
 
-use crate::{ORE, PLANET_ID, ROCK, TerrainLabMetrics, TerrainLabState};
+use crate::{EditCause, ORE, PLANET_ID, ROCK, TerrainLabMetrics, TerrainLabState};
 
 /// A separately simulated, still-mineable terrain field. IDs survive further
 /// cuts and are never reused during a run.
@@ -118,7 +118,11 @@ impl TerrainLabState {
                     if result.changed_cells > 0 {
                         *changed.entry(pending.body).or_default() |= removed > 0;
                     }
-                    if pending.recover {
+                    if pending.cause == EditCause::Impact {
+                        self.impact.stats.damaged_cells += u64::from(result.changed_cells);
+                        self.impact.stats.destroyed_cells += u64::from(removed);
+                    }
+                    if pending.cause == EditCause::Mining {
                         for removed in result.removed {
                             match removed.material {
                                 ROCK => self.recovered.rock_cells += u64::from(removed.cells),
@@ -175,6 +179,7 @@ impl TerrainLabState {
                     self.fragments.remove(index);
                 }
             }
+            let parent_id = id;
             for detached in detached {
                 let terrain = detached.terrain;
                 metrics.detached_cells += terrain
@@ -208,6 +213,7 @@ impl TerrainLabState {
                     + Vec2::new(-offset.y, offset.x) * motion.angular_velocity;
                 self.physics
                     .set_velocity(assembly.body(), velocity, motion.angular_velocity, true);
+                self.impact.inherit_contacts(parent_id, id);
                 metrics.rebuilt_chunks += terrain.chunk_count();
                 metrics.spawned_fragments += 1;
                 self.fragments.push(TerrainFragment {

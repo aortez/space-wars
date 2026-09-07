@@ -397,6 +397,10 @@ pub struct ContactEvent {
     pub collider_a: ColliderId,
     pub collider_b: ColliderId,
     pub point: Option<Vec2>,
+    /// Surface point and outward normal in each parent body's local frame.
+    /// These remain attached to the hit surfaces after motion or CCD substeps.
+    pub local_contact_a: Option<ContactPoint>,
+    pub local_contact_b: Option<ContactPoint>,
     /// Normal and impulse point from `collider_a` toward `collider_b`.
     pub normal: Vec2,
     pub impulse: Vec2,
@@ -1567,8 +1571,48 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
     let (magnitude, strongest_normal) = pair.max_impulse();
     let mut normal = from_rapier(strongest_normal);
     let mut impulse = from_rapier(pair.total_impulse());
+    let local_contacts = pair
+        .manifolds
+        .iter()
+        .filter(|manifold| !manifold.data.solver_contacts.is_empty())
+        .max_by(|a, b| {
+            let a = a.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            let b = b.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            a.total_cmp(&b)
+        })
+        .and_then(|manifold| {
+            let contact = manifold
+                .data
+                .solver_contacts
+                .iter()
+                .filter_map(|solver| manifold.points.get(solver.contact_id[0] as usize))
+                .max_by(|a, b| a.data.impulse.total_cmp(&b.data.impulse))?;
+            let pose_a = collider_a
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos1.unwrap_or_default();
+            let pose_b = collider_b
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos2.unwrap_or_default();
+            Some((
+                ContactPoint {
+                    position: from_rapier(pose_a * contact.local_p1),
+                    normal: from_rapier(pose_a.rotation * manifold.local_n1),
+                },
+                ContactPoint {
+                    position: from_rapier(pose_b * contact.local_p2),
+                    normal: from_rapier(pose_b.rotation * manifold.local_n2),
+                },
+            ))
+        });
+    let (mut local_contact_a, mut local_contact_b) =
+        local_contacts.map_or((None, None), |(a, b)| (Some(a), Some(b)));
     if id_b < id_a {
         std::mem::swap(&mut id_a, &mut id_b);
+        std::mem::swap(&mut local_contact_a, &mut local_contact_b);
         normal = -normal;
         impulse = -impulse;
     }
@@ -1587,6 +1631,8 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
         collider_a: id_a,
         collider_b: id_b,
         point,
+        local_contact_a,
+        local_contact_b,
         normal,
         impulse,
         impulse_magnitude: magnitude,

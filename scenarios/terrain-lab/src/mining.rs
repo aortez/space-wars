@@ -2,7 +2,9 @@ use engine_core::Vec2;
 use engine_rapier::world::{PhysicsId, RayCastOptions};
 use engine_terrain::{Brush, CellCoord, EditMode, MaterialId, TerrainEdit};
 
-use crate::{FIXED_HZ, MiningTool, ORE, PendingEdit, ROCK, SPACELING_ID, TerrainLabState};
+use crate::{
+    EditCause, FIXED_HZ, MiningTool, ORE, PendingEdit, ROCK, SPACELING_ID, TerrainLabState,
+};
 
 pub const DRILL_RANGE: f32 = 4.0;
 pub const DRILL_RADIUS: f32 = 1.0;
@@ -175,7 +177,7 @@ impl TerrainLabState {
                     brush,
                     mode: EditMode::Damage(profile.damage),
                 },
-                recover: true,
+                cause: EditCause::Mining,
             });
             self.mining.cooldown = profile.interval_ticks;
         }
