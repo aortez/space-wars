@@ -290,7 +290,7 @@ fn generated_fixture_preserves_all_world_sources_and_the_selected_planet_identit
     assert_eq!(state.world.sun, sun);
     assert_eq!(GeneratedSurfaceCase::planet_count(case.seed), planets.len());
     assert_eq!(state.pilot.planet, case.planet);
-    assert_eq!(state.outpost.planet, case.planet);
+    assert_eq!(state.outposts[0].planet, case.planet);
     assert_eq!(state.observation().generated_case, Some(case));
     assert_eq!(state.world.physics.world.body_count(), planets.len() + 3);
     let bodies = state.world.physics.world.body_count();

@@ -40,6 +40,8 @@ impl LandingPhase {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub struct LandingTelemetry {
+    /// Approach/contact frame. Only supported feet and the settled gate prove landing.
+    pub planet: Option<usize>,
     pub phase: LandingPhase,
     pub altitude: f32,
     pub angle_degrees: f32,
@@ -91,6 +93,7 @@ impl LandingTelemetry {
         // Smooth both transitions so crossing the cone/height boundary is not a switch.
         let smooth = |x: f32| x * x * (3.0 - 2.0 * x);
         Self {
+            planet: Some(planet_index),
             altitude,
             angle_degrees,
             descent_speed: -relative.dot(up),
@@ -121,7 +124,12 @@ impl LandingTelemetry {
             && next.lateral_speed.abs() < SETTLED_SPEED
             && next.relative_spin.abs() < 0.2;
         next.settled_seconds = if settled {
-            (self.settled_seconds + dt).min(SETTLE_SECONDS)
+            let previous = if self.planet == next.planet {
+                self.settled_seconds
+            } else {
+                0.0
+            };
+            (previous + dt).min(SETTLE_SECONDS)
         } else {
             0.0
         };
@@ -143,20 +151,18 @@ impl SurfacePilot {
         self.vehicle.0
     }
 
-    pub(crate) fn planet_index(&self) -> usize {
-        self.planet
-    }
-
     pub(crate) fn control_vehicle(
-        &self,
+        &mut self,
         physics: &mut physics::SpacewarsPhysics,
         ship: &ShipState,
-        planet: &PlanetState,
+        planets: &[PlanetState],
         dt: f32,
     ) {
         if ship.form != ShipForm::Ship || ship.dead {
             return;
         }
+        self.select_approach_planet(physics, planets);
+        let planet = &planets[self.planet];
         let body = physics.ship_body(self.vehicle.0);
         let Some(motion) = physics.world.motion(body) else {
             return;

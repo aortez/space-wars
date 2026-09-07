@@ -65,11 +65,12 @@ in `engine-rapier` and `scenario-spaceling-lab`; physical controller hardware is
 manual check.
 
 All four Surface Sortie presets (stationary center, orbital, untuned generated
-world, and experimental Surface V1 generated world) use the same
+world, and experimental Surface V1 generated world), plus **surface-expedition**, use the same
 launcher/pause/restart workflow with both renderers;
 their raster checks require the ship, amber outpost, capture/landing HUD,
 and minimap planet. The client unit tests also render the disembarked spaceling,
-capture progress, and owner-colored flag in landscape/portrait, while
+capture progress, and owner-colored flag in landscape/portrait, and check that
+capturing an Expedition site does not recolor the other minimap sites, while
 `scenario-spacewars` exercises the physical exit/walk/capture/repair/return/board/
 departure loop and input gating on stationary, orbital, and sampled Surface V1
 generated terrain. See

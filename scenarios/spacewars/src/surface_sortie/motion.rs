@@ -114,7 +114,7 @@ impl SurfaceFrame {
 
 impl SurfaceSortieState {
     pub(super) fn planet_motion(&self) -> SurfaceFrame {
-        SurfaceFrame::read(&self.world.physics, self.pilot.planet)
+        SurfaceFrame::read(&self.world.physics, self.motion_planet_index())
     }
 
     pub fn motion_preset(&self) -> SurfaceMotionPreset {
@@ -126,6 +126,7 @@ impl SurfaceSortieState {
 /// origin, using the same surface frame as landing/boarding (not screen motion).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct SurfaceMotionObservation {
+    pub planet: usize,
     pub preset: SurfaceMotionPreset,
     pub planet_position: Vec2,
     pub planet_velocity: Vec2,
@@ -161,6 +162,7 @@ pub struct SurfaceMotionMetrics {
 }
 
 pub(super) struct StepSample {
+    planet: usize,
     snapshot: Option<SpacelingSnapshot>,
     landing: LandingTelemetry,
     ship_health: f32,
@@ -170,6 +172,7 @@ pub(super) struct StepSample {
 impl StepSample {
     pub(super) fn read(state: &SurfaceSortieState) -> Self {
         Self {
+            planet: state.motion_planet_index(),
             snapshot: state.spaceling_snapshot(),
             landing: state.landing,
             ship_health: state.world.ships[state.pilot.vehicle.0].life,
@@ -193,7 +196,8 @@ impl SurfaceSortieState {
             .motion(body)
             .expect("active sortie body");
         let surface_velocity = point_velocity(frame, actor.position);
-        let planet = &self.world.planets[self.pilot.planet];
+        let planet_index = self.motion_planet_index();
+        let planet = &self.world.planets[planet_index];
         let (scripted_acceleration, mut external_gravity_at_center) =
             self.world.sun.map_or((Vec2::ZERO, Vec2::ZERO), |sun| {
                 let inward = sun.position - frame.position;
@@ -215,7 +219,7 @@ impl SurfaceSortieState {
                 (scripted, gravity)
             });
         for (index, planet) in self.world.planets.iter().enumerate() {
-            if index != self.pilot.planet {
+            if index != planet_index {
                 let origin = SurfaceFrame::read(&self.world.physics, index).position;
                 external_gravity_at_center +=
                     compatibility::source_acceleration(origin, planet.mass, frame.position);
@@ -223,6 +227,7 @@ impl SurfaceSortieState {
         }
         let support = snapshot.and_then(|snapshot| snapshot.support);
         SurfaceMotionObservation {
+            planet: planet_index,
             preset: self.motion_preset,
             planet_position: frame.position,
             planet_velocity: frame.linear_velocity,
@@ -253,6 +258,9 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn record_motion_step(&mut self, before: StepSample, input: SurfaceSortieAction) {
+        if before.planet != self.motion_planet_index() {
+            self.idle_anchor = None;
+        }
         let after = self.spaceling_snapshot();
         let available = self.vehicle_available();
         let ship = &self.world.ships[self.pilot.vehicle.0];

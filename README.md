@@ -45,6 +45,8 @@ The local launcher currently hosts seven playable scenarios:
   gravity/motion gaps before ordinary-game integration. **surface-sortie-world**
   tries an explicit Surface V1 gravity/spin/orbit profile on those generated
   layouts. Ordinary Spacewars and the shared controllers remain unchanged.
+  **surface-expedition** enables planet-to-planet travel and independent
+  outposts on that experimental world. See [Surface Expedition](docs/surface-expedition.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
