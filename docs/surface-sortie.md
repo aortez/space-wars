@@ -35,6 +35,11 @@ not a new ordinary-game default. Both generated presets start on planet 0,
 initially away from the sun. See the [profile comparison](surface-compatibility.md#surface-v1-experiment)
 for parameters, results, and remaining approach/long-idle limits.
 
+For travel between those planets and separate outposts, choose
+**surface-expedition**. It adds dynamic approach/support selection to the same
+scenario; the four original presets remain pinned compatibility fixtures.
+See [Surface Expedition](surface-expedition.md) for that opt-in loop and scope.
+
 The fixture starts with your ship at **75% health**, settling rear-first onto a
 slowly rotating planet. Press **B** on a gamepad or **X** on the keyboard to
 disembark. Release the controls, walk right to the amber terminal, and stand
@@ -266,7 +271,8 @@ not retune those orbits, gravity, rovers, ships, or bots.
 
 Typed/JSON observations include `motion` and `motion_metrics` (introduced in
 version 4; version 5 adds the optional `generated_case` identifier; version 6
-adds its explicit gravity/motion `profile`):
+adds its explicit gravity/motion `profile`; version 7 adds travel, explicit
+support/frame planet IDs and the complete outpost inventory):
 
 - completed planet position, origin velocity, angle/spin, active-body
   surface-relative velocity, and actual support-point velocity/relative speed;

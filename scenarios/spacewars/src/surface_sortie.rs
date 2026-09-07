@@ -14,6 +14,7 @@ mod motion;
 mod outpost;
 mod profiles;
 mod render;
+mod travel;
 pub use landing::{LandingPhase, LandingTelemetry};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
@@ -126,15 +127,16 @@ pub struct SurfaceSortieState {
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
-    outpost: outpost::SurfaceOutpost,
+    outposts: Vec<outpost::SurfaceOutpost>,
 }
 
 pub(super) struct SurfacePilot {
     id: SpacelingId,
     owner: PlayerId,
     vehicle: VehicleId,
-    /// Selected support body in this single-pilot fixture, not always planet 0.
+    /// Approach frame, not proof of contact or permission to board/repair.
     planet: usize,
+    travel_enabled: bool,
     body: Option<SpacelingAssembly>,
     control: SpacelingControl,
     gravity: Vec2,
@@ -171,6 +173,9 @@ impl SurfacePilot {
 pub struct SurfaceSortieObservation {
     pub version: u32,
     pub generated_case: Option<compatibility::GeneratedSurfaceCase>,
+    pub travel_enabled: bool,
+    pub ship_support_planet: Option<usize>,
+    pub pilot_support_planet: Option<usize>,
     pub tick: u64,
     pub spaceling: SpacelingId,
     pub owner: PlayerId,
@@ -192,6 +197,7 @@ pub struct SurfaceSortieObservation {
     pub physical_bodies: usize,
     pub landing: LandingTelemetry,
     pub outpost: OutpostObservation,
+    pub outposts: Vec<OutpostObservation>,
     pub motion: SurfaceMotionObservation,
     pub motion_metrics: SurfaceMotionMetrics,
 }
@@ -213,8 +219,11 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilot.vehicle.0];
         let snapshot = self.spaceling_snapshot();
         SurfaceSortieObservation {
-            version: 6,
+            version: 7,
             generated_case: self.generated_case,
+            travel_enabled: self.travel_enabled(),
+            ship_support_planet: self.ship_support_planet(),
+            pilot_support_planet: self.pilot_support_planet(),
             tick: self.world.tick,
             spaceling: self.pilot.id,
             owner: self.pilot.owner,
@@ -240,8 +249,13 @@ impl SurfaceSortieState {
             physical_bodies: self.world.physics.world.body_count(),
             landing: self.landing,
             outpost: self
-                .outpost
-                .observation(&self.world.planets[self.outpost.planet]),
+                .focused_outpost()
+                .observation(&self.world.planets[self.focused_outpost().planet]),
+            outposts: self
+                .outposts
+                .iter()
+                .map(|post| post.observation(&self.world.planets[post.planet]))
+                .collect(),
             motion: self.motion_observation(),
             motion_metrics: self.motion_metrics,
         }
@@ -291,6 +305,9 @@ impl SurfaceSortieState {
             let relative = snapshot.motion.linear_velocity
                 - motion::point_velocity(self.planet_motion(), snapshot.motion.position);
             if !snapshot.grounded()
+                || !snapshot.support.is_some_and(|support| {
+                    physics::is_planet_surface_support(support.collider, self.pilot.planet)
+                })
                 || snapshot.balance != SpacelingBalance::Balanced
                 || relative.length() > SETTLED_SPEED
             {
@@ -460,6 +477,9 @@ impl Scenario for SurfaceSortieScenario {
             Duration::from_secs_f32(dt),
             Some(&mut state.pilot),
         );
+        state
+            .pilot
+            .select_approach_planet(&state.world.physics, &state.world.planets);
         state.landing.update(
             &state.world.physics,
             state.pilot.vehicle.0,
@@ -521,7 +541,11 @@ impl SurfaceSortieScenario {
         );
         world.physics.enable_surface_sortie(0, &world.ships[0]);
         world.spaceport_contacts.clear();
-        let outpost = outpost::SurfaceOutpost::new(OutpostId(1), planet_index, terminal_angle);
+        let outpost = outpost::SurfaceOutpost::new(
+            OutpostId(planet_index as u64 + 1),
+            planet_index,
+            terminal_angle,
+        );
         assert!(
             world
                 .physics
@@ -538,6 +562,7 @@ impl SurfaceSortieScenario {
                 owner: PlayerId::PLAYER_1,
                 vehicle: VehicleId(0),
                 planet: planet_index,
+                travel_enabled: false,
                 body: None,
                 control: SpacelingControl::default(),
                 gravity: Vec2::ZERO,
@@ -551,7 +576,7 @@ impl SurfaceSortieScenario {
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
-            outpost,
+            outposts: vec![outpost],
         }
     }
 

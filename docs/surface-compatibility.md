@@ -100,8 +100,10 @@ prescribed center acceleration, and effective inward/lateral acceleration at
 ship spawn. Units are world units/s² and rad/s, not pixels or per-tick deltas.
 The ship's legacy gravity query point is offset from its Rapier origin; both
 points are reported, and the diagnostic field is checked against the real
-shared solver. Scenario observations are now version 6, with
-`generated_case.profile`; compatibility reports have their own version 2 schema.
+shared solver. Scenario observations are now version 7 (profile identity was
+added in version 6; version 7 adds travel/support and outpost inventory);
+compatibility reports retain their version 2 schema with an additive
+`final_landing.planet` frame identifier.
 Old case identifiers without `profile` deserialize as raw, not Surface V1.
 
 ## Initial evidence (2026-09-06, Rust 1.89, x86_64)
@@ -203,14 +205,20 @@ cargo test --locked --release -p scenario-spacewars surface_v1 -- --nocapture
 
 This is ready for **experimental playtesting**, not ordinary-game rollout.
 Residual mutual-field mismatch, arbitrary approaches, long-idle drift, and
-longer planetary trajectories need continued evaluation. No Pi deployment or
-physical-controller acceptance has been performed for Surface V1 yet.
+longer planetary trajectories need continued evaluation. Surface V1 received
+an initial Pi playtest through [Surface Expedition](surface-expedition.md#initial-pi-playtest-2026-09-07)
+on 2026-09-07; the user reported it working. This is not exhaustive acceptance
+of the standalone preset, all generated routes, or long-duration stability.
 
 ## Remaining path
 
 Playtest this named profile and agree acceptable contact/approach limits before
 adopting a world policy in ordinary Spacewars. Keep the raw comparison and
 uncompensated free-flight behavior available during that decision.
+
+The opt-in [Surface Expedition](surface-expedition.md) now exercises travel
+between planets with one pilot and independent outposts; it does not change
+these pinned comparison cases or adopt the profile in ordinary Spacewars.
 
 After agreeing that policy: generalize to multiple pilots/vehicles, decide loss
 and rescue/rebuild rules, connect contested services, and add versioned bot

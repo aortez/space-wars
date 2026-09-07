@@ -1377,7 +1377,7 @@ impl SpacewarsScenario {
             pilot.control_vehicle(
                 &mut state.physics,
                 &state.ships[pilot.vehicle_index()],
-                &state.planets[pilot.planet_index()],
+                &state.planets,
                 dt,
             );
         }

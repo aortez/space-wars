@@ -377,6 +377,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     surface_sortie::ORBIT_REGISTRATION,
     surface_sortie::GENERATED_REGISTRATION,
     surface_sortie::WORLD_REGISTRATION,
+    surface_sortie::EXPEDITION_REGISTRATION,
 ];
 
 pub fn registrations() -> &'static [ScenarioRegistration] {
@@ -446,7 +447,8 @@ mod tests {
                 "surface-sortie",
                 "surface-sortie-orbit",
                 "surface-sortie-generated",
-                "surface-sortie-world"
+                "surface-sortie-world",
+                "surface-expedition"
             ]
         );
     }

@@ -53,8 +53,27 @@ pub(super) const WORLD_REGISTRATION: ScenarioRegistration = ScenarioRegistration
     ..REGISTRATION
 };
 
+pub(super) const EXPEDITION_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "surface-expedition",
+    controls_help: "Surface Expedition: fly between generated Surface V1 planets. Approach assistance follows the nearest surface; landing requires actual rear-foot support. Each planet has its own neutral outpost. Land, B / X to exit, walk to the amber terminal and stand still to capture. A friendly site repairs a nearby ship landed on that same planet. Return to the cyan hatch and B / X to board. A / Space thrusts or jumps; left/right turns or walks; Down / S brakes. Start / Esc pauses; R restarts. Minimap squares show each site's ownership. Single pilot, no combat, rescue or rebuilding; ordinary Spacewars is unchanged.",
+    create: create_expedition,
+    ..REGISTRATION
+};
+
 struct SurfaceSortieClientScenario {
     state: SurfaceSortieState,
+}
+
+fn create_expedition(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SurfaceSortieClientScenario {
+        state: SurfaceSortieScenario::init_expedition(seed),
+    }))
 }
 
 fn create(
@@ -107,6 +126,9 @@ fn create_world(
 
 impl ClientScenario for SurfaceSortieClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
+        if self.state.travel_enabled() {
+            return &EXPEDITION_REGISTRATION;
+        }
         match self.state.motion_preset() {
             SurfaceMotionPreset::Orbit => &ORBIT_REGISTRATION,
             SurfaceMotionPreset::Generated => &GENERATED_REGISTRATION,
@@ -266,14 +288,16 @@ mod tests {
 
     #[test]
     fn outpost_capture_progress_and_owner_flag_render_in_both_backends() {
-        for preset in [
+        for state in [
             SurfaceMotionPreset::Stationary,
             SurfaceMotionPreset::Orbit,
             SurfaceMotionPreset::GeneratedSurfaceV1,
-        ] {
-            let mut scenario = SurfaceSortieClientScenario {
-                state: SurfaceSortieScenario::init(preset, 0),
-            };
+        ]
+        .map(|preset| SurfaceSortieScenario::init(preset, 0))
+        .into_iter()
+        .chain([SurfaceSortieScenario::init_expedition(0)])
+        {
+            let mut scenario = SurfaceSortieClientScenario { state };
             let dt = Duration::from_secs_f64(1.0 / 60.0);
             for frame in 0..120 {
                 scenario.step(
@@ -316,6 +340,36 @@ mod tests {
             let observation = scenario.state.observation();
             assert_eq!(observation.outpost.owner, Some(observation.owner));
             assert!(observation.outpost.repaired_health > 0.0);
+            if scenario.state.travel_enabled() {
+                assert!(
+                    observation.outposts[1..]
+                        .iter()
+                        .all(|post| post.owner.is_none())
+                );
+                let map = SurfaceSortieScenario::minimap_frame(&scenario.state, 16.0 / 9.0);
+                let sites = map
+                    .ordered_layers()
+                    .into_iter()
+                    .find(|layer| layer.z == 1)
+                    .unwrap();
+                let fills = sites
+                    .primitives
+                    .iter()
+                    .filter_map(|primitive| {
+                        if let engine_common::RenderPrimitive::Polygon(polygon) = primitive {
+                            polygon.fill.map(|fill| fill.color)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(fills.len(), observation.outposts.len());
+                assert_ne!(
+                    fills[0], fills[1],
+                    "capturing one site must not recolor every site"
+                );
+                assert!(fills[1..].iter().all(|fill| *fill == fills[1]));
+            }
             for viewport in [viewport, Viewport::new(1280.0, 1400.0)] {
                 let frames = scenario.render_frames(RenderBackend::Vector, viewport);
                 assert_eq!(
@@ -369,7 +423,12 @@ mod tests {
 
     #[test]
     fn registered_fixture_renders_and_restarts_in_both_backends() {
-        for registration in [&REGISTRATION, &ORBIT_REGISTRATION, &WORLD_REGISTRATION] {
+        for registration in [
+            &REGISTRATION,
+            &ORBIT_REGISTRATION,
+            &WORLD_REGISTRATION,
+            &EXPEDITION_REGISTRATION,
+        ] {
             let viewport = Viewport::new(1280.0, 720.0);
             let mut scenario = registration
                 .create(0, &Settings::default(), viewport, ScenarioStartMode::Normal)

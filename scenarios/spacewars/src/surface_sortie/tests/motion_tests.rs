@@ -93,7 +93,7 @@ fn motion_metrics_preserve_damage_through_repair_and_reset_only_current_idle_dri
     state.world.ships[0].life -= 10.0;
     state.record_motion_step(before, SurfaceSortieAction::default());
     assert_eq!(state.motion_metrics.ship_damage, 10.0);
-    state.outpost.owner = Some(state.pilot.owner);
+    state.outposts[0].owner = Some(state.pilot.owner);
     let health = state.world.ships[0].life;
     idle(&mut state, 120);
     assert!(state.world.ships[0].life > health);
@@ -247,8 +247,7 @@ fn excessive_support_acceleration_causes_separation_and_stops_capture_and_repair
     super::outpost_tests::walk_to(&mut state, super::outpost_tests::terminal_approach);
     idle(&mut state, 40);
     assert!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .capture_progress
             > 0.0
@@ -260,29 +259,25 @@ fn excessive_support_acceleration_causes_separation_and_stops_capture_and_repair
     assert!(!state.spaceling_snapshot().unwrap().grounded());
     assert!(!state.vehicle_settled());
     assert_eq!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .capture_progress,
         0.0
     );
     assert!(state.motion_metrics.pilot_support_losses > 0);
-    state.outpost.owner = Some(state.pilot.owner);
-    let healed = state
-        .outpost
+    state.outposts[0].owner = Some(state.pilot.owner);
+    let healed = state.outposts[0]
         .observation(&state.world.planets[0])
         .repaired_health;
     idle(&mut state, 30);
     assert_ne!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .repair_status,
         RepairStatus::Repairing
     );
     assert_eq!(
-        state
-            .outpost
+        state.outposts[0]
             .observation(&state.world.planets[0])
             .repaired_health,
         healed
@@ -325,7 +320,7 @@ fn orbital_motion_metrics_and_rendering_replay_and_restart_deterministically() {
             SurfaceSortieScenario::observe(&SurfaceSortieScenario::init(preset, 123)).payload,
             initial
         );
-        assert_eq!(a.observation().version, 6);
+        assert_eq!(a.observation().version, 7);
         assert!(a.motion_metrics.on_foot_ticks > 0);
         assert_eq!(a.motion_metrics.jumps, 1);
         assert_eq!(a.motion_metrics.ship_damage, 0.0);
@@ -466,7 +461,7 @@ fn frame_velocity_matches_motion_of_the_surface_not_its_offset_center_of_mass() 
     for point in [
         planet.position,
         state.access_position(),
-        state.outpost.position(&planet),
+        state.outposts[0].position(&planet),
     ] {
         let actual = state
             .world

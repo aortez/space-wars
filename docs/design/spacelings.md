@@ -243,6 +243,29 @@ not a universal contact-stability claim. Playtest the profile and decide its
 acceptance envelope before multi-pilot, loss/rescue, contested services and bot
 surface-intent integration. Ordinary Spacewars defaults have not changed.
 
+## Seventh slice: single-pilot planet-to-planet expedition
+
+Implemented on `surface-planet-travel`, following the compatibility work in
+PR #47. The opt-in `surface-expedition` preset shares Surface Sortie's physics,
+gravity and controllers, but follows the destination rather than a permanently
+pinned planet. Approach selection prefers actual foot contacts, then nearest
+surface with hysteresis; landing requires fresh settling on that same body.
+Hatch transfers and repair validate physical planet identity independently of
+proximity. Spaceling diagnostics/site focus are independent of the parked ship.
+
+Sites are a collection with stable IDs and independent ownership/capture/repair
+state, one per generated planet in this fixture. The minimap and world show all
+sites, while the HUD focuses the active planet's site. No new terrain bodies or
+gravity solves are introduced. Existing raw/profile probes remain pinned and
+ordinary Spacewars is unchanged.
+
+Two controlled action-only journeys cover rotating planets with stationary and
+translating centers. Generated arrivals, stale-frame reset, foreign services,
+unrelated boarding support, resource bounds and deterministic replay cover the
+new boundaries. The initial Pi deployment and user playtest on 2026-09-07 were
+positive. This does not yet prove all generated routes, multiplayer, combat or
+rescue rules. See [Surface Expedition](../surface-expedition.md).
+
 ## Planet and ship direction
 
 The continuous surface and external berth from PR #40 fix the interior-bay
