@@ -117,3 +117,32 @@ cover 72 simulated minutes and 4,320 passing per-second audits.
 
 Validation artifacts are stored in
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/material-combat-v4-20260908/`.
+
+## Pi deployment and live check
+
+Gameplay checkpoint `6da67e0cf33a009cc5b8cc839fdda893d8c199fe` was built
+with the accepted Yocto layer pins and deployed through the A/B updater.
+All 6,608 build tasks succeeded (21 rerun). The Pi boots slot A (`/dev/sda2`).
+The installed client SHA-256 matches the binary extracted from the archived
+image: `8fc3285a90f108b3b499a36d9ef47973efdf32633ce1b9c9e6015026402557db`.
+The compressed image SHA-256 is
+`9466ccf6d6e479184537ae7e4b342c058beb2298fe9eb8f271a557c1e8c22b19`.
+
+An additional headless Pi run with its formerly saved seed 0 reached a blocked
+replacement hatch after landing, claiming and rebuilding. That failure is
+retained in `pi-live-seed0.json`; it is additional to the matrix above. The Pi's
+playtest seed is now 42. The seed affects collision cascades and this is not a
+claim that recovery succeeds from every fight or landing position.
+
+The live 800×480 raster kiosk on seed 42 completed a weapon-loss recovery:
+P1 landed its pod, captured the planet, rebuilt, boarded and resumed firing.
+The 60-second capture shows rebuilding at 60%; the 90-second capture shows
+P1 firing again with its surface flag and ownership retained. These are saved
+as `pi-p1-rebuilding-60s.png` and `pi-p1-firing-again-90s.png`. The live run held
+about 60 FPS with no kiosk restarts. Its collision sequence differs from the
+headless compiler build, while exercising the same gameplay milestones.
+
+The final playtest setup is a fresh, paused `spacewars-terrain-combat` session:
+P1 human, P2 AI, seed 42. Resume with Start. Select `spacewars-terrain-duel` to
+watch both bots. The guarded UI state, settings backup, screenshots and device
+hash verification are retained with the report. The branch remains unmerged.
