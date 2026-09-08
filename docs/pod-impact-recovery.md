@@ -140,3 +140,26 @@ logs are archived in:
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/impact-recovery-20260908/`.
 Only `desktop/` and `pi/` are the final matrix; `preliminary/` is exploratory
 fixture development and is excluded from these totals.
+
+## Pi deployment
+
+Gameplay checkpoint `20368039193ad81c3ce67159417cf94b09d04b09` was built with
+the accepted Yocto layer pins and installed through the A/B updater on
+2026-09-08 UTC. All 6,608 tasks succeeded (21 rerun), with the existing host
+distribution warning. The Pi booted slot A (`/dev/sda2`). The installed client
+matches the binary extracted from the archived image:
+`3df791f244b1f8d9948fc7b2cf27b814b9e1b5328813ef9b9eb1f271bb88ccd6`.
+The compressed image SHA-256 is
+`95531623b0a4c01cb5a5bc48794cd888c2923b3ec4e0222c898a4e3ee4bfcd88`.
+
+The live 800×480 recovery demo completed the circuit, capture, physical ship
+loss, pod landing, rebuild, boarding and departure. The 87-second capture
+shows pod stabilization; at 130 seconds it is departing in the replacement
+ship; the final 178-second capture reads `AI: recovered / flying again` with
+P2 still owning the planet. The kiosk stayed around 60 FPS with zero restarts.
+Screenshots, actual capture timestamps and status logs are in the archive.
+
+The playtest setup is a fresh, paused `spacewars-terrain-combat` session:
+P1 human, P2 Capture, combat-break interval 8 seconds and duration 4 seconds.
+Resume with B or Start. The source remains on the integration branch; merging
+is still deferred.
