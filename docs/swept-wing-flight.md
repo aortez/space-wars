@@ -108,3 +108,25 @@ outside the new flight code.
 
 Raw reports, runners, logs and deployment artifacts:
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/swept-wing-flight-20260908/`.
+
+## Deployed Pi checkpoint
+
+Gameplay source `d647b51ad08a5e2915dfbb056925cc4796b1ba9f` was built with the
+accepted Yocto layer pins and installed through the normal A/B updater on
+2026-09-08 UTC. The Pi booted slot A (`/dev/sda2`). The installed client hash
+matches the binary extracted from the archived image:
+`82a7c74d26b9d8719e55648c97c5d9d0c7b753f0247a1b5e8e1c7a89bd2943b2`.
+The compressed image SHA-256 is
+`62bbebf1940d3ea2464392611cd4824957a07925ddd7a4cdfe1a19c47bc15a1d`.
+
+The live kiosk completed the V2 circuit, reopened/braked, returned, claimed for
+P2, boarded and departed into its holding phase. Screenshots show swept flight at 94 units/s, the return
+and completed state at 800×480; status sampled 59.7–60.0 FPS/UPS with zero
+service restarts. The final focused UI rerun passed after the new cruise hint,
+and both renderers were visually checked. Deployment leaves the two-human
+`spacewars-terrain` scene paused at a fresh start, so both connected pads can
+exercise flight; the bot demonstration remains in `spacewars-terrain-ai`.
+
+Human feedback on wing feel and braking distance is the next acceptance check.
+The next integration slice can then exercise damage and recovery deliberately,
+before weapons/dogfighting and random asteroid hazards.
