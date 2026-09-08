@@ -77,9 +77,10 @@ estimate of general player success.
 | 15s | 22s | 0/4 |
 | 30s | 21s | 0/4 |
 
-At 8s, seed 7 mirrored lands/exits at approximately 42.8s and completes its
-capture. Seed 42 unmirrored lands/exits at 50.9s, but a cannon round destroys
-its empty ship at 56.1s. The landing script cannot recover from that loss.
+At 8s, seed 7 mirrored lands/exits at approximately 42.8s and completes capture, reboarding and departure. Seed 42 unmirrored lands/exits at
+50.9s, claims at 54.4s and reboards at 54.5s. P2 then correctly reacquires the
+occupied ship and fires two more rounds; a cannon hit destroys it during
+departure at 56.1s. The landing script cannot recover from that loss.
 The remaining two attempts lose their ships at 50.9s and 91.9s. Neither 15s nor
 30s creates a break before the first loss in three of four landing attempts.
 
@@ -137,3 +138,20 @@ strategy (twelve episodes) retain their exact frozen baselines.
 
 Artifacts and comparison scripts:
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/combat-breaks-20260908/`.
+
+## Deployment and live check
+
+Gameplay checkpoint `c2d1ac46e7bec7afe81331e4b9e3b314dfcf9a4d` was built with
+the accepted Yocto layer pins. All 6,608 tasks succeeded (21 rerun). The A/B
+updater verified slot A (`/dev/sda2`), an active kiosk and zero restarts.
+The installed client hash matches the archived image's extracted client:
+`78ed511f85da11688a6deb0e34b8e88e358d02e7aa3cb6fa43f6fc164e5b5af9`.
+The compressed image hash is
+`42b35d24971009a01d6b7cf094aab1ca6d8901e589e422f4e9d7b7ef50fa3027`.
+
+Live 800×480 raster captures show the flyby HUD and readable Settings controls.
+Active duel samples report 60.0–60.1 FPS with zero kiosk restarts. The paused
+ready-screen sample is excluded from that range. The saved setup is a fresh,
+paused `spacewars-terrain-combat` round, seed 42, P1 human versus P2 bot, with
+**8s interval / 4s duration**. Press Start to resume; return to Launcher → Settings
+to compare Off, 8s, 15s or 30s and change the duration.
