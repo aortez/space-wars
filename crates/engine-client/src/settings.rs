@@ -395,6 +395,29 @@ mod tests {
     }
 
     #[test]
+    fn combat_breaks_default_in_old_settings_and_roundtrip_off_and_custom_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[launch]\nseed = 42\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(
+            loaded.settings.combat_breaks,
+            engine_common::CombatBreakSettings::default()
+        );
+        for interval in [0, 8, 30] {
+            loaded.settings.combat_breaks = engine_common::CombatBreakSettings {
+                interval_seconds: interval,
+                duration_seconds: 6,
+            };
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.combat_breaks,
+                loaded.settings.combat_breaks
+            );
+        }
+    }
+
+    #[test]
     fn save_then_load_roundtrips() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested/settings.toml");

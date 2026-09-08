@@ -147,7 +147,7 @@ fn create_pilot(
 
 pub(super) const COMBAT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-combat",
-    controls_help: "Material combat: P1 human versus P2 combat bot. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
+    controls_help: "Material combat: P1 human versus P2 combat bot. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. Launcher Settings adjust Bot combat breaks (Off, 8s, 15s or 30s of combat on average) and break duration. During a flyby the bot keeps moving with weapons off and remains vulnerable. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
     create: create_combat_pilot,
     ..TERRAIN_REGISTRATION
 };
@@ -158,7 +158,7 @@ struct MaterialCombatClientScenario {
 }
 fn create_combat_pilot(
     seed: u64,
-    _settings: &Settings,
+    settings: &Settings,
     _viewport: Viewport,
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
@@ -167,23 +167,26 @@ fn create_combat_pilot(
         sortie: SurfaceSortieClientScenario {
             state: SurfaceSortieScenario::init_material_combat(seed),
         },
-        brain: RulePilotV4::new(BrainReset {
-            actor: PlayerId::PLAYER_2,
-            episode_seed: seed,
-        }),
+        brain: RulePilotV4::with_combat_breaks(
+            BrainReset {
+                actor: PlayerId::PLAYER_2,
+                episode_seed: seed,
+            },
+            settings.combat_breaks,
+        ),
         p1_brain: None,
     }))
 }
 
 pub(super) const DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-duel",
-    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
+    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Launcher Settings adjust combat breaks and their duration for both bots. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
     create: create_combat_duel,
     ..COMBAT_REGISTRATION
 };
 fn create_combat_duel(
     seed: u64,
-    _settings: &Settings,
+    settings: &Settings,
     _viewport: Viewport,
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
@@ -192,14 +195,20 @@ fn create_combat_duel(
         sortie: SurfaceSortieClientScenario {
             state: SurfaceSortieScenario::init_material_combat(seed),
         },
-        brain: RulePilotV4::new(BrainReset {
-            actor: PlayerId::PLAYER_2,
-            episode_seed: seed,
-        }),
-        p1_brain: Some(RulePilotV4::new(BrainReset {
-            actor: PlayerId::PLAYER_1,
-            episode_seed: seed,
-        })),
+        brain: RulePilotV4::with_combat_breaks(
+            BrainReset {
+                actor: PlayerId::PLAYER_2,
+                episode_seed: seed,
+            },
+            settings.combat_breaks,
+        ),
+        p1_brain: Some(RulePilotV4::with_combat_breaks(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: seed,
+            },
+            settings.combat_breaks,
+        )),
     }))
 }
 
@@ -597,6 +606,37 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn combat_and_duel_hosts_apply_break_settings_to_every_bot() {
+        for registration in [&COMBAT_REGISTRATION, &DUEL_REGISTRATION] {
+            for interval in [0, 8, 15, 30] {
+                let settings = Settings {
+                    combat_breaks: engine_common::CombatBreakSettings {
+                        interval_seconds: interval,
+                        duration_seconds: 6,
+                    },
+                    ..Default::default()
+                };
+                let mut host = registration
+                    .create(
+                        42,
+                        &settings,
+                        Viewport::new(800.0, 480.0),
+                        ScenarioStartMode::Normal,
+                    )
+                    .unwrap();
+                let host = host
+                    .as_any_mut()
+                    .downcast_mut::<MaterialCombatClientScenario>()
+                    .unwrap();
+                assert_eq!(host.brain.telemetry().breaks.config, settings.combat_breaks);
+                if let Some(p1) = &host.p1_brain {
+                    assert_eq!(p1.telemetry().breaks.config, settings.combat_breaks);
+                }
+            }
+        }
+    }
 
     #[test]
     fn combat_host_maps_weapons_owns_p2_and_pauses_without_advancing_policy() {

@@ -127,9 +127,37 @@ pub struct Settings {
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
     pub surface_expedition: SurfaceExpeditionSettings,
+    pub combat_breaks: CombatBreakSettings,
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+/// Optional pacing experiment for the material combat pilots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CombatBreakSettings {
+    /// Mean engaged flight time between breaks; zero disables breaks.
+    pub interval_seconds: u32,
+    pub duration_seconds: u32,
+}
+
+impl Default for CombatBreakSettings {
+    fn default() -> Self {
+        Self {
+            interval_seconds: 15,
+            duration_seconds: 4,
+        }
+    }
+}
+
+impl CombatBreakSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            interval_seconds: self.interval_seconds.min(120),
+            duration_seconds: self.duration_seconds.clamp(1, 15),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

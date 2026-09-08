@@ -53,6 +53,9 @@ below the existing 500-unit/s audit threshold. This correction is opt-in with
 combat. The earlier controlled asteroid/recovery fixtures retain their ejection
 behavior pending a coordinated landing-policy migration.
 
+The subsequent [combat breaks experiment](combat-breaks.md) adds configurable
+weapons-off flybys and compares their pacing with this unchanged Off policy.
+
 ## Test bed and results, 2026-09-08
 
 ```sh

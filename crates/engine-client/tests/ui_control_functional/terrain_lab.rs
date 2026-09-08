@@ -14,6 +14,33 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
         let mut state = harness.activate_until_scenario(scenario, ready);
         for renderer in ["vector", "raster"] {
             state = harness.activate_guarded("launcher.settings", &state);
+            if matches!(
+                scenario,
+                "spacewars-terrain-combat" | "spacewars-terrain-duel"
+            ) {
+                let interval = "launcher.settings.combat.break-interval.next";
+                let duration = "launcher.settings.combat.break-duration.next";
+                if renderer == "vector" {
+                    assert_eq!(control_value(&state, interval), Some("15"));
+                    assert_eq!(control_value(&state, duration), Some("4"));
+                    for expected in ["30", "Off", "8"] {
+                        state = harness.activate_guarded(interval, &state);
+                        assert_eq!(control_value(&state, interval), Some(expected));
+                    }
+                    state = harness.activate_guarded(duration, &state);
+                    assert_eq!(control_value(&state, duration), Some("6"));
+                } else {
+                    // Returning through launch/restart reloads the persisted choices.
+                    assert_eq!(control_value(&state, interval), Some("8"));
+                    assert_eq!(control_value(&state, duration), Some("6"));
+                    state = harness.activate_guarded(
+                        "launcher.settings.combat.break-interval.previous",
+                        &state,
+                    );
+                    assert_eq!(control_value(&state, interval), Some("Off"));
+                }
+                harness.capture_screenshot(&format!("{scenario}-{renderer}-break-settings.png"));
+            }
             if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
                 state = harness.activate_guarded("launcher.settings.renderer.next", &state);
             }

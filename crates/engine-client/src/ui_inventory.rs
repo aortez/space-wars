@@ -56,6 +56,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) scenario_error: Option<String>,
     pub(crate) renderer: String,
     pub(crate) raster_scale: String,
+    pub(crate) combat_break_interval: String,
+    pub(crate) combat_break_duration: String,
     pub(crate) expedition_players: String,
     pub(crate) spacewars_preset: String,
     pub(crate) spacewars_planets: String,
@@ -229,6 +231,35 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.spacewars.asteroids",
                 "launcher.settings.spacewars.player-health",
                 "launcher.settings.spacewars.player-2",
+                "launcher.settings.back",
+            ]
+        }
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.break-interval",
+                &context.combat_break_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.break-duration",
+                &context.combat_break_duration,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.combat.break-interval",
+                "launcher.settings.combat.break-duration",
                 "launcher.settings.back",
             ]
         }
@@ -515,6 +546,8 @@ mod tests {
             launch_available: true,
             renderer: "raster".into(),
             raster_scale: "2.0".into(),
+            combat_break_interval: "15".into(),
+            combat_break_duration: "4".into(),
             spacewars_preset: "Small Duel".into(),
             spacewars_planets: "on".into(),
             spacewars_asteroids: "off".into(),

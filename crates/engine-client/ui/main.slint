@@ -293,6 +293,9 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-asteroids-enabled: "on";
     in-out property <string> launcher-asteroid-probability-text: "20.0";
     in-out property <string> launcher-player-health-text: "100";
+    in-out property <string> launcher-combat-break-interval: "15";
+    in-out property <string> launcher-combat-break-duration: "4";
+    property <bool> launcher-material-combat: root.launcher-scenario == "spacewars-terrain-combat" || root.launcher-scenario == "spacewars-terrain-duel";
     in-out property <string> launcher-expedition-players: "1";
     in-out property <string> launcher-p2-controller: "human";
     in-out property <string> launcher-p1-zoom-text: "320";
@@ -1283,6 +1286,32 @@ export component MainWindow inherits Window {
                     }
 
                     ChoiceRow {
+                        visible: root.launcher-material-combat;
+                        x: 0px;
+                        y: 104px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Bot combat breaks";
+                        value: root.launcher-combat-break-interval == "Off" ? "Off" : "Every ~" + root.launcher-combat-break-interval + "s";
+                        selected: root.launcher-settings-focus-index == 2;
+                        previous => { root.launcher-settings-focus-index = 2; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 2; root.ui-action(3); }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-material-combat;
+                        x: 0px;
+                        y: 156px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Break duration";
+                        value: root.launcher-combat-break-duration + "s";
+                        selected: root.launcher-settings-focus-index == 3;
+                        previous => { root.launcher-settings-focus-index = 3; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
+                    }
+
+                    ChoiceRow {
                         visible: root.launcher-scenario == "spacewars";
                         x: 0px;
                         y: 52px;
@@ -1558,11 +1587,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-material-combat ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-scenario == "pizza" || root.launcher-material-combat ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -1570,7 +1599,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" || root.launcher-material-combat ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";

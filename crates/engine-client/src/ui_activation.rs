@@ -119,10 +119,12 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.renderer" | "launcher.settings.nes.cartridge" => 0,
         "launcher.settings.raster-scale" => 1,
         "launcher.settings.spacewars.preset"
+        | "launcher.settings.combat.break-interval"
         | "launcher.settings.expedition.players"
         | "launcher.settings.pizza.desired-balls"
         | "launcher.settings.clock.time-format" => 2,
         "launcher.settings.spacewars.planets"
+        | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.event-profile" => 3,
         "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.falling" => 4,
