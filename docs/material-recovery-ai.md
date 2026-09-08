@@ -115,3 +115,30 @@ All 19 real-window UI workflows passed. Both frozen ordinary-game suites
 (`navigation-v1`, six episodes; `strategy-v1`, twelve episodes) match exactly.
 Rust 1.89 desktop and Rust 1.94.1 ARM builds pass; workspace Clippy completes
 with pre-existing warnings, and the new AI code is clean. Formatting passes.
+
+Pi core step P95 was 0.1439–0.1623 ms and sensor/policy P95 was
+0.0099–0.0140 ms; the worst measured step across its eleven runs was 0.6142 ms.
+
+## Deployed checkpoint
+
+Gameplay source `7d9f0289426832dce44778baa3c145dfc9d7cf7e` was built with the
+accepted Yocto layer pins and installed on 2026-09-08 UTC through the A/B
+updater. All 6,608 build tasks succeeded (21 rerun). The Pi booted slot B
+(`/dev/sda3`), and its installed client hash matches the archived image:
+`e594101bc4f87792c55dd5cdcd8190beaaa1e20c0c4897fa4fe99fb489cfc043`.
+The compressed image SHA-256 is
+`d4d31c53e83fef0c8ab3bc81d99f212ef48ab10b87f2a44c0b69c4f118d2ab7a`.
+
+The live 800×480 kiosk completed the journey: circuit and claim, asteroid
+ship loss, pod stabilization and landing, exit, rebuilding, boarding and
+continued flight. Captures at 87, 100, 116 and 145 seconds show those phases;
+the last reads `Planet 0: P2` and `AI: recovered / flying again`. Ownership was
+won before the strike and retained because the flag survived. The live run
+held about 60 FPS with zero kiosk restarts.
+
+Screenshots, guarded UI history, installed-image verification and the complete
+headless reports are in the artifact directory above. The final playtest setup
+is a fresh, paused two-human `spacewars-terrain` session. Select
+`spacewars-terrain-recovery` to repeat the bot demonstration. Merging remains
+deferred; crater escape/mining routes and combat are still future integration
+work.
