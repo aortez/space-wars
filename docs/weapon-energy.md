@@ -73,14 +73,17 @@ close-up draw lists can be exported as JSON. A failed audit saves the partial
 report and a final draw list, reports `completed_seconds` and `failure`, and
 returns a nonzero exit status; an aborted run is not a completed three-minute run.
 
-The initial workspace all-target run passed 1,005 tests. Focused coverage includes
+The final workspace all-target run passed 1,006 tests. Focused coverage includes
 time-based drain, serialized paid reloads, both rails at multiple headings and
 wing sweeps, zero-energy launches, depletion/recharge, seat isolation, pause and
 clone/replay, actual shared laser/projectile hits, and three minutes of held fire
-bounded by the battery budget. A subsequent regression checks that combat pods
+bounded by the battery budget. A regression checks that combat pods
 retain the resolved impact velocity and discard the destroyed weapon supply.
 Both ordinary AI baselines match (six navigation
 episodes and twelve strategy episodes).
+Both combat UI lifecycle workflows pass with raster and vector rendering.
+Formatting and Clippy complete; existing workspace warnings remain, with no
+warnings in the new weapon module or modified endurance runner.
 
 All eight desktop duels (seeds 7/42, mirrored seats, separations 0.5/0.8) completed
 180 seconds with passing material, finite-motion and energy audits. Seven
@@ -95,5 +98,36 @@ All four landing-pressure runs (seeds 7/42 and both seat arrangements) now finis
 at approximately 18.4–31.5 seconds, after beginning its landing attempt at 12s.
 The opponents remain active; no safe-landing or survival result is implied.
 Weapon pacing alone does not establish that landing under fire is balanced.
+
+The same eight duels were also run on the Pi 5. All finish 180 seconds with
+passing audits; four complete recovery and return to firing. Two other runs
+cannot stabilize their pods and two exceed the recovery time budget. Later
+losses encounter enemy-owned ground. This is lower recovery coverage than on
+desktop, and is recorded separately from the successful physics/energy audits.
+
+| Platform | Step P95 range | Worst step | Sensors + policies P95 range |
+| --- | --- | --- | --- |
+| Desktop | 0.0713–0.1046 ms | 0.2675 ms | 0.0058–0.0503 ms |
+| Pi 5, kiosk running | 0.1843–0.2795 ms | 0.7234 ms | 0.0225–0.1682 ms |
+
+The sixteen duels and four desktop landing-pressure runs cover 60 simulated
+minutes and 3,600 passing per-second audits. Failed runs from the investigation
+are retained under `before-pod-fix-*`; they are not included in those totals.
+
+## Pi deployment and live check
+
+Gameplay checkpoint `2f4cd11ee99e02715c96158915e1156670670fae` was built
+with the accepted Yocto layer pins. All 6,608 tasks succeeded (21 rerun), and
+the A/B updater verified slot B (`/dev/sda3`). The installed client SHA-256
+matches the client extracted from the archived image:
+`de0614b792860c0d752f8273396efde41907e42b0a86ffc07cefa222c8e512b3`.
+The compressed image SHA-256 is
+`f6c5f623a43ab7419a333c124bdc3a35249c4480908e30e2d6c779e9a370ebde`.
+
+Live 800×480 raster captures show the mounted rounds and energy HUD. Active
+duel samples report 59.8–60.1 FPS with zero kiosk restarts. The paused ready
+screen is excluded from that FPS range. The final setup is a fresh, paused
+`spacewars-terrain-combat` session: P1 human, P2 bot, seed 42. Press Start to
+resume; RT/LB fires the laser and X/west launches missiles.
 
 Artifacts: `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/weapon-energy-20260908/`.
