@@ -8,6 +8,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod flight_pilot;
 pub mod pilot;
 
 use core::f32::consts::PI;

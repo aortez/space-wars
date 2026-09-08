@@ -902,6 +902,19 @@ fn draw_player_hud(
             observation.landing.phase.label()
         )
     };
+    let vehicle_status = if state.has_material_ground() && ship.form == ShipForm::Ship && !ship.dead
+    {
+        let flight = state.flight_observation(player);
+        format!(
+            "{:.0}% {} {:.0}u/s / {}",
+            ship.life / ship.life_max * 100.0,
+            flight.label(),
+            flight.relative_speed,
+            observation.landing.phase.label()
+        )
+    } else {
+        vehicle_status
+    };
     let recovery_message = recovery
         .filter(|r| r.scuttle_progress > 0.0 || !observation.ship_available)
         .map(|r| {
@@ -943,7 +956,16 @@ fn draw_player_hud(
             color,
         ),
         (0.385, vehicle_status, LIGHT),
-        (0.325, "A: thrust/jump  B: board/exit".to_owned(), LIGHT),
+        (
+            0.325,
+            if state.has_material_ground() && mode == "ABOARD" {
+                "A: thrust  RB: cruise  B: exit"
+            } else {
+                "A: thrust/jump  B: board/exit"
+            }
+            .to_owned(),
+            LIGHT,
+        ),
         (
             -0.29,
             if !observation.controls_armed {

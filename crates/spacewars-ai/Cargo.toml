@@ -7,10 +7,10 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+engine-common = { workspace = true }
 engine-core = { workspace = true }
 scenario-spacewars = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-engine-common = { workspace = true }
 serde_json = { workspace = true }

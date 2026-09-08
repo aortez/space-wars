@@ -1,6 +1,9 @@
 # Material pilot AI, first capture sortie
 
-`spacewars-terrain-ai` runs a human in P1 and `rule_pilot_v1` in P2 on the
+The current interactive scene uses [swept-wing flight V2](swept-wing-flight.md).
+This document retains the V1 landing policy contract and its accepted evidence.
+
+The first `spacewars-terrain-ai` release ran a human in P1 and `rule_pilot_v1` in P2 on the
 controlled material planet. The bot starts in flight, selects a landing site,
 settles on its rear feet, exits, claims a neutral planet, boards and departs.
 After one successful sortie it holds above the planet. The P2 HUD shows its

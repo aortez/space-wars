@@ -107,3 +107,11 @@ starts to generated worlds. Measure AI cost separately from the full simulation
 step on desktop and Pi. Actual match results and controller playtesting complete
 the evidence; the existing human acceptance runs and unchanged legacy AI
 baselines alone do not validate the new policy.
+
+## Swept-wing flight checkpoint
+
+The next controlled slice is implemented by `rule_pilot_v2`: grounded takeoff,
+a measured fast circuit, opening/braking, then the V1 landing/capture/departure
+sequence. Both human material seats share the same wing controls and physics.
+See [flight tuning and evidence](../swept-wing-flight.md). Combat, asteroid
+hazards, recovery policy and multiple-planet planning remain later slices.

@@ -113,6 +113,7 @@ impl SurfaceSortieScenario {
                     .push(SurfacePilot::new(PlayerId::PLAYER_2, 0, true));
             }
             state.world.ships[player].life = state.world.ships[player].life_max;
+            state.pilots[player].flight_enabled = true;
         }
         state
             .world

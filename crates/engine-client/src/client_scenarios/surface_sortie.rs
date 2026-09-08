@@ -4,12 +4,9 @@ use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickMod
 use scenario_spacewars::PlayerId;
 use scenario_spacewars::surface_sortie::{
     SurfaceMiningAction, SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario,
-    SurfaceSortieState,
+    SurfaceSortieState, SurfaceWingAction,
 };
-use spacewars_ai::{
-    BrainReset,
-    pilot::{PilotBrain, RulePilotV1},
-};
+use spacewars_ai::{BrainReset, flight_pilot::RulePilotV2};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
@@ -76,14 +73,14 @@ struct SurfaceSortieClientScenario {
 
 pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain",
-    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
+    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Hold RB/J to sweep wings and cruise; release to open, then brake for landing. Open wings turn faster; sweeping adds speed. P2 uses PageDown for wings aboard. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
     create: create_material,
     ..EXPEDITION_REGISTRATION
 };
 
 pub(super) const PILOT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-ai",
-    controls_help: "Material pilot AI playtest: P1 is human; P2 flies, lands, exits, claims a neutral planet, boards and departs using the same controls and physics. Watch its goal in the P2 view. After one sortie it holds above the planet. Enemy flag navigation, mining and vehicle recovery are future AI slices; a blocked goal is shown explicitly. P1 controls match Destructible Expedition: A/Space thrusts or jumps; B/X transfers; left/right turns or walks; Down/S brakes; right stick aims, RT/LB mines, Y changes size. Start/Esc pauses; R restarts both pilots. Select spacewars-terrain for one or two human pilots.",
+    controls_help: "Material pilot AI playtest: P1 is human; P2 takes off, flies a fast swept-wing circuit, opens and brakes, returns, lands, exits, claims a neutral planet, boards and departs using the same controls and physics. Watch its goal in the P2 view. After one sortie it holds above the planet. Enemy flag navigation, mining and vehicle recovery are future AI slices; a blocked goal is shown explicitly. P1 controls match Destructible Expedition: A/Space thrusts or jumps; B/X transfers; left/right turns or walks; Down/S brakes; hold RB/J for swept-wing cruise, release to open; right stick aims, RT/LB mines, Y changes size. Start/Esc pauses; R restarts both pilots. Select spacewars-terrain for one or two human pilots.",
     create: create_pilot,
     ..TERRAIN_REGISTRATION
 };
@@ -91,7 +88,7 @@ pub(super) const PILOT_REGISTRATION: ScenarioRegistration = ScenarioRegistration
 /// Host-owned policy. The scenario still consumes only ordinary encoded actions.
 struct MaterialPilotClientScenario {
     sortie: SurfaceSortieClientScenario,
-    brain: RulePilotV1,
+    brain: RulePilotV2,
 }
 
 fn create_pilot(
@@ -101,25 +98,11 @@ fn create_pilot(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    use scenario_spacewars::surface_sortie::pilot::MaterialFlightStart;
     Ok(Box::new(MaterialPilotClientScenario {
         sortie: SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material_flight(
-                seed,
-                2,
-                &[(
-                    PlayerId::PLAYER_2,
-                    MaterialFlightStart {
-                        bearing: std::f32::consts::PI,
-                        altitude: 45.0,
-                        radial_speed: -5.0,
-                        lateral_speed: 3.0,
-                        heading_offset: -0.45,
-                    },
-                )],
-            ),
+            state: SurfaceSortieScenario::init_material(seed, 2),
         },
-        brain: RulePilotV1::new(BrainReset {
+        brain: RulePilotV2::new(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: seed,
         }),
@@ -132,6 +115,8 @@ fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
         .filter(|action| {
             SurfaceSortieAction::decode(action)
                 .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
+                || SurfaceWingAction::decode(action)
+                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
                 || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| seat == 0)
         })
         .cloned()
@@ -152,9 +137,9 @@ impl ClientScenario for MaterialPilotClientScenario {
         let observation = self
             .sortie
             .state
-            .pilot_observation(1, self.brain.site_request());
+            .flight_pilot_observation(1, self.brain.site_request());
         let mut actions = human_pilot_actions(actions);
-        actions.push(self.brain.intent(&observation).encode(PlayerId::PLAYER_2));
+        actions.extend(self.brain.intent(&observation).encode(PlayerId::PLAYER_2));
         self.sortie.step(&actions, dt)
     }
     fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
@@ -168,13 +153,9 @@ impl ClientScenario for MaterialPilotClientScenario {
         for layer in &mut frames[1].layers {
             for primitive in &mut layer.primitives {
                 if let RenderPrimitive::Text(text) = primitive
-                    && text.text == "A: thrust/jump  B: board/exit"
+                    && text.text.starts_with("A: thrust")
                 {
-                    let status = self.brain.telemetry();
-                    text.text = format!(
-                        "AI: {}",
-                        status.blocked_reason.unwrap_or(status.goal.label())
-                    );
+                    text.text = format!("AI: {}", self.brain.label());
                     text.color = RenderColor::rgb(1.0, 0.82, 0.25);
                 }
             }
@@ -308,6 +289,12 @@ impl ClientScenario for SurfaceSortieClientScenario {
             .collect();
         if self.state.has_material_ground() {
             for player in 0..self.state.player_count() {
+                actions.push(
+                    SurfaceWingAction {
+                        closed: input.surface_wings_held(player),
+                    }
+                    .encode(PlayerId::from_index(player).expect("bounded seat")),
+                );
                 let (aim, held, cycle) = input.surface_mining_input(player);
                 actions.push(
                     SurfaceMiningAction { aim, held, cycle }
@@ -395,6 +382,7 @@ mod tests {
         let mut reference = host.sortie.state.clone();
         let mut brain = host.brain.clone();
         let interfering = [
+            SurfaceWingAction { closed: true }.encode(PlayerId::PLAYER_2),
             SurfaceSortieAction {
                 horizontal: 1.0,
                 primary_held: true,
@@ -413,12 +401,12 @@ mod tests {
         host.step(&interfering, Duration::ZERO);
         assert_eq!(host.brain.telemetry(), &before);
         assert_eq!(host.sortie.state.observation(1).tick, 0);
-        for _ in 0..120 * 60 {
-            let o = reference.pilot_observation(1, brain.site_request());
+        for _ in 0..180 * 60 {
+            let o = reference.flight_pilot_observation(1, brain.site_request());
             let action = brain.intent(&o);
             SurfaceSortieScenario::step(
                 &mut reference,
-                &[action.encode(PlayerId::PLAYER_2)],
+                &action.encode(PlayerId::PLAYER_2),
                 Duration::from_nanos(16_666_667),
             );
             host.step(&interfering, Duration::from_nanos(16_666_667));
@@ -466,6 +454,7 @@ mod tests {
                 connected: true,
                 right_stick_y: -1.0,
                 right_trigger: 1.0,
+                right_bumper: true,
                 north: true,
                 ..Default::default()
             },
@@ -475,6 +464,17 @@ mod tests {
             .iter()
             .filter_map(SurfaceMiningAction::decode)
             .collect();
+        let wings: Vec<_> = actions
+            .iter()
+            .filter_map(SurfaceWingAction::decode)
+            .collect();
+        assert_eq!(
+            wings,
+            vec![
+                (PlayerId::PLAYER_1, SurfaceWingAction::default()),
+                (PlayerId::PLAYER_2, SurfaceWingAction { closed: true })
+            ]
+        );
         assert_eq!(mining[0], (0, SurfaceMiningAction::default()));
         assert_eq!(
             mining[1],
@@ -502,6 +502,12 @@ mod tests {
         );
         pads.borrow_mut().disconnect_seat(1);
         let released = scenario.map_input(&mut input, false);
+        assert!(
+            released
+                .iter()
+                .filter_map(SurfaceWingAction::decode)
+                .all(|(_, a)| !a.closed)
+        );
         assert!(
             released
                 .iter()

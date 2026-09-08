@@ -530,6 +530,34 @@ impl SpacewarsPhysics {
             constrained: false,
         });
         self.docked_planets[index] = None;
+        if let (Some(previous), Some(next_key)) = (self.ship_keys[index], next)
+            && previous.form == ShipForm::Ship
+            && next_key.form == ShipForm::Ship
+            && previous.wing_theta != next_key.wing_theta
+        {
+            // Folding changes only the hull. Keep the body and rear feet, and
+            // preserve origin velocity when the new silhouette moves the COM.
+            synchronize_ship_to_physics(&mut self.world, index, ship);
+            let body = self.ship_body(index);
+            let motion = self.world.motion(body).expect("existing surface ship");
+            let origin_velocity = self.world.velocity_at_point(body, motion.position).unwrap();
+            let colliders = surface_ship_colliders(ship_entity(index), ship, self.surface_recovery);
+            assert!(
+                self.world
+                    .replace_colliders(body, SHIP_HULL_ROLE, &colliders[..1])
+            );
+            assert!(self.world.refresh_mass_properties(body));
+            let offset = self.world.center_of_mass(body).unwrap() - motion.position;
+            self.world.set_velocity(
+                body,
+                origin_velocity + Vec2::new(-offset.y, offset.x) * motion.angular_velocity,
+                motion.angular_velocity,
+                true,
+            );
+            self.ship_keys[index] = next;
+            self.material_queries_dirty = true;
+            return lifecycle;
+        }
         if self.ship_keys[index] != next {
             lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
             self.ship_keys[index] = None;

@@ -10,6 +10,7 @@ use engine_rapier::{
 
 mod claim;
 pub mod compatibility;
+pub mod flight;
 mod landing;
 mod material;
 mod motion;
@@ -22,6 +23,7 @@ mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,
 };
+pub use flight::SurfaceWingAction;
 pub use landing::{LandingPhase, LandingTelemetry};
 pub use material::{SurfaceMiningAction, SurfaceMiningObservation};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
@@ -148,6 +150,8 @@ pub(super) struct SurfacePilot {
     input: SurfaceSortieAction,
     interact_was_held: bool,
     controls_armed: bool,
+    wing_input: bool,
+    flight_enabled: bool,
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
@@ -185,6 +189,8 @@ impl SurfacePilot {
             input: SurfaceSortieAction::default(),
             interact_was_held: false,
             controls_armed: false,
+            wing_input: false,
+            flight_enabled: false,
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
@@ -578,6 +584,7 @@ impl Scenario for SurfaceSortieScenario {
         let prepared = SpacewarsScenario::prepare_terrain(&mut state.world, &[]);
         state.reconcile_material_support(footings);
         state.read_mining_actions(actions);
+        state.read_wing_actions(actions);
         for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
             if let Some(pilot) = state.pilots.get_mut(player.index()) {
                 pilot.input = input;
@@ -595,7 +602,8 @@ impl Scenario for SurfaceSortieScenario {
         {
             let input = state.pilots[player].input;
             if !state.pilots[player].controls_armed {
-                state.pilots[player].controls_armed = input == SurfaceSortieAction::default();
+                state.pilots[player].controls_armed =
+                    input == SurfaceSortieAction::default() && !state.pilots[player].wing_input;
             } else {
                 *effective = input;
                 if state.update_scuttle_input(player, input, dt) {
@@ -645,6 +653,7 @@ impl Scenario for SurfaceSortieScenario {
         }
         // Schedule terrain, solve gravity, and step Rapier exactly once for all seats.
         let dt = dt.as_secs_f32();
+        state.update_surface_wings(dt);
         for planet in &mut state.world.planets {
             state.motion_preset.advance(planet, state.world.sun, dt);
         }

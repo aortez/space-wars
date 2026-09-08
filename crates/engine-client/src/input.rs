@@ -323,6 +323,18 @@ impl ClientInput {
             .is_some_and(|pad| pad.connected && pad.dpad_down)
     }
 
+    pub(crate) fn surface_wings_held(&self, player: usize) -> bool {
+        self.is_pressed(if player == 0 {
+            GameKey::P1Wing
+        } else {
+            GameKey::P2Wing
+        }) || self
+            .gamepads
+            .borrow()
+            .seat(player)
+            .is_some_and(|pad| pad.connected && pad.right_bumper)
+    }
+
     pub(crate) fn spacewars_terrain_gamepad_tools(&self) -> (bool, bool) {
         self.gamepads
             .borrow()
