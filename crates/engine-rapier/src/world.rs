@@ -508,7 +508,8 @@ pub struct PhysicsStepMetrics {
     pub island_time: Duration,
     pub island_constraints_time: Duration,
     pub solver_time: Duration,
-    pub ccd_time: Duration,
+    /// None when the physics backend does not provide complete CCD timing.
+    pub ccd_time: Option<Duration>,
     pub active_bodies: usize,
     pub sleeping_bodies: usize,
     pub candidate_pairs: usize,
@@ -689,6 +690,11 @@ impl PhysicsWorld {
 
     pub fn collider_count(&self) -> usize {
         self.colliders.len()
+    }
+
+    /// Stable identities for inspecting derived geometry without exposing Rapier.
+    pub fn collider_ids(&self) -> impl ExactSizeIterator<Item = ColliderId> + '_ {
+        self.colliders.iter().map(|entry| entry.id)
     }
 
     pub fn contains_entity(&self, id: PhysicsId) -> bool {
@@ -1073,7 +1079,9 @@ impl PhysicsWorld {
             island_time: counters.stages.island_construction_time.time(),
             island_constraints_time: counters.stages.island_constraints_collection_time.time(),
             solver_time: counters.stages.solver_time.time(),
-            ccd_time: counters.stages.ccd_time.time(),
+            // Rapier 0.34 does not time all CCD paths; its aggregate counter
+            // remains zero. A partial TOI timer is not a total CCD measurement.
+            ccd_time: None,
             active_bodies: self.raw.islands.active_bodies().count(),
             sleeping_bodies: self
                 .bodies

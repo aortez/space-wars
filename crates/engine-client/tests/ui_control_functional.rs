@@ -32,6 +32,9 @@ mod spaceling_lab;
 #[path = "ui_control_functional/terrain_lab.rs"]
 mod terrain_lab;
 
+#[path = "ui_control_functional/spacewars_terrain.rs"]
+mod spacewars_terrain;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {

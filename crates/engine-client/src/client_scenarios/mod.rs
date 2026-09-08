@@ -111,7 +111,6 @@ pub struct BenchmarkStepMetrics {
     pub rapier_island_time: Duration,
     pub rapier_island_constraints_time: Duration,
     pub rapier_solver_time: Duration,
-    pub rapier_ccd_time: Duration,
     pub added: usize,
     pub removed: usize,
 }
@@ -139,7 +138,6 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
         self.rapier_island_time += rhs.rapier_island_time;
         self.rapier_island_constraints_time += rhs.rapier_island_constraints_time;
         self.rapier_solver_time += rhs.rapier_solver_time;
-        self.rapier_ccd_time += rhs.rapier_ccd_time;
         self.added += rhs.added;
         self.removed += rhs.removed;
     }
@@ -374,6 +372,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     spaceling_lab::REGISTRATION,
     terrain_lab::REGISTRATION,
     spacewars::REGISTRATION,
+    spacewars::TERRAIN_REGISTRATION,
 ];
 
 pub fn registrations() -> &'static [ScenarioRegistration] {
@@ -440,7 +439,8 @@ mod tests {
                 "rover-lab",
                 "spaceling-lab",
                 "terrain-lab",
-                "spacewars"
+                "spacewars",
+                "spacewars-terrain"
             ]
         );
     }

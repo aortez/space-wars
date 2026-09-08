@@ -1708,7 +1708,7 @@ struct BenchmarkRow {
     avg_rapier_island_ms: f64,
     avg_rapier_island_constraints_ms: f64,
     avg_rapier_solver_ms: f64,
-    avg_rapier_ccd_ms: f64,
+    avg_rapier_ccd_ms: Option<f64>,
     avg_render_ms: f64,
     avg_present_ms: f64,
     avg_raster_clear_ms: f64,
@@ -1839,7 +1839,9 @@ impl BenchmarkRow {
                 frames,
             ),
             avg_rapier_solver_ms: avg_ms(sample.scenario_metrics.rapier_solver_time, frames),
-            avg_rapier_ccd_ms: avg_ms(sample.scenario_metrics.rapier_ccd_time, frames),
+            // Rapier 0.34 exposes no complete CCD timer. Preserve the column
+            // as unavailable instead of reporting a misleading zero.
+            avg_rapier_ccd_ms: None,
             avg_render_ms: avg_ms(sample.render_time, frames),
             avg_present_ms: avg_ms(sample.present_time, frames),
             avg_raster_clear_ms: avg_ms(sample.raster_timings.clear, frames),
@@ -1939,7 +1941,8 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_rapier_island_ms),
         format!("{:.3}", row.avg_rapier_island_constraints_ms),
         format!("{:.3}", row.avg_rapier_solver_ms),
-        format!("{:.3}", row.avg_rapier_ccd_ms),
+        row.avg_rapier_ccd_ms
+            .map_or_else(String::new, |ms| format!("{ms:.3}")),
         format!("{:.3}", row.avg_render_ms),
         format!("{:.3}", row.avg_present_ms),
         format!("{:.3}", row.avg_raster_clear_ms),

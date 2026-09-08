@@ -11,7 +11,7 @@ use super::{
     RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
     ScenarioStartMode,
 };
-use crate::input::ClientInput;
+use crate::input::{ClientInput, GameKey};
 use crate::render::{self, FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -29,6 +29,31 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick or d-pad left/right turns, RT or d-pad up thrusts, LT or d-pad down brakes, B reverses, RB closes wings, A fires laser, X fires cannon, Start pauses, Select shows controls. Zoom is available in the pause menu.",
     create,
 };
+
+pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain",
+    launcher_visible: true,
+    capabilities: ScenarioCapabilities {
+        benchmark: false,
+        game_over: false,
+        ..REGISTRATION.capabilities
+    },
+    controls_help: "Spacewars Terrain uses the real ship, cannon, laser, rover and base services. Cannon hits chip rock and ore; tunnels and falling fragments are physical. Removing the base footing disables capture, repair and rebuilding. Switch Pro: stick turns, ZR thrusts, ZL brakes, A reverses, R closes wings, B fires laser, Y fires cannon. X opens a test tunnel through the planet along the ship's aim; L changes overview/follow view. Keyboard: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, T test tunnel, V view. + or Esc opens pause/restart.",
+    create: create_terrain,
+};
+
+fn create_terrain(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SpacewarsClientScenario {
+        state: Box::new(SpacewarsScenario::init_terrain_fixture(seed)),
+        player_2_rule_bot: false,
+    }))
+}
 
 pub(crate) struct SpacewarsClientScenario {
     pub(crate) state: Box<SpacewarsState>,
@@ -58,7 +83,11 @@ fn create(
 
 impl ClientScenario for SpacewarsClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
-        &REGISTRATION
+        if self.state.is_terrain_fixture() {
+            &TERRAIN_REGISTRATION
+        } else {
+            &REGISTRATION
+        }
     }
 
     fn tick_model(&self) -> TickModel {
@@ -70,14 +99,25 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
-        input.actions_for_spacewars(
+        let mut actions = input.actions_for_spacewars(
             &self.state,
             benchmark_active,
             [false, self.player_2_rule_bot],
-        )
+        );
+        if self.state.is_terrain_fixture() {
+            let (tunnel, view) = input.spacewars_terrain_gamepad_tools();
+            actions.push(scenario_spacewars::terrain_fixture_controls(
+                tunnel || input.is_pressed(GameKey::TerrainTool),
+                view || input.is_pressed(GameKey::TerrainView),
+            ));
+        }
+        actions
     }
 
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        if self.state.is_terrain_fixture() {
+            return vec![SpacewarsScenario::render_terrain_fixture(&self.state)];
+        }
         let player_view_aspect_ratio =
             render::frame_viewports(viewport, 4, FrameLayout::SpacewarsLocalPlay)[0].aspect_ratio();
         if renderer == RenderBackend::Raster {
@@ -91,7 +131,11 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn frame_layout(&self) -> FrameLayout {
-        FrameLayout::SpacewarsLocalPlay
+        if self.state.is_terrain_fixture() {
+            FrameLayout::EqualHorizontal
+        } else {
+            FrameLayout::SpacewarsLocalPlay
+        }
     }
 
     fn center_panel_state(
@@ -100,6 +144,9 @@ impl ClientScenario for SpacewarsClientScenario {
         benchmark_active: bool,
         performance_text: &str,
     ) -> Option<CenterPanelState> {
+        if self.state.is_terrain_fixture() {
+            return None;
+        }
         Some(center_panel_state(
             &self.state,
             paused,
@@ -178,7 +225,6 @@ impl ClientScenario for SpacewarsClientScenario {
             rapier_island_time: metrics.rapier.island_time,
             rapier_island_constraints_time: metrics.rapier.island_constraints_time,
             rapier_solver_time: metrics.rapier.solver_time,
-            rapier_ccd_time: metrics.rapier.ccd_time,
             added: metrics.added,
             removed: metrics.removed,
             ..BenchmarkStepMetrics::default()
@@ -305,6 +351,79 @@ fn player_panel_state(state: &SpacewarsState, player_index: usize) -> PlayerPane
 mod tests {
     use super::*;
     use crate::client_scenarios::BenchmarkConfiguration;
+
+    #[test]
+    fn terrain_fixture_maps_cannon_tunnel_and_view_with_release_on_disconnect() {
+        use crate::input::{GamepadInput, GamepadSeatInput};
+        use std::{cell::RefCell, rc::Rc};
+        let pads = Rc::new(RefCell::new(GamepadInput::default()));
+        let mut input = ClientInput::new(Rc::clone(&pads));
+        let mut scenario = create_terrain(
+            42,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        pads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                north: true,
+                west: true,
+                left_bumper: true,
+                ..Default::default()
+            },
+        );
+        let actions = scenario.map_input(&mut input, false);
+        assert!(
+            actions
+                .iter()
+                .filter_map(scenario_spacewars::SpacewarsAction::decode)
+                .any(|a| matches!(
+                    a,
+                    scenario_spacewars::SpacewarsAction::SetCannon {
+                        player: 0,
+                        on: true
+                    }
+                ))
+        );
+        assert!(actions.iter().any(
+            |a| matches!(a, Action::Scenario { kind: 100, payload } if payload == &[1, 1, 1])
+        ));
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+        let state = &scenario
+            .as_any()
+            .downcast_ref::<SpacewarsClientScenario>()
+            .unwrap()
+            .state;
+        assert!(state.terrain_removed_cells() > 0);
+        assert!(!scenario.registration().capabilities.game_over);
+        assert_eq!(
+            scenario
+                .render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0))
+                .len(),
+            1
+        );
+        pads.borrow_mut().disconnect_seat(0);
+        let actions = scenario.map_input(&mut input, false);
+        assert!(actions.iter().any(
+            |a| matches!(a, Action::Scenario { kind: 100, payload } if payload == &[1, 0, 0])
+        ));
+        assert!(
+            actions
+                .iter()
+                .filter_map(scenario_spacewars::SpacewarsAction::decode)
+                .any(|a| matches!(
+                    a,
+                    scenario_spacewars::SpacewarsAction::SetCannon {
+                        player: 0,
+                        on: false
+                    }
+                ))
+        );
+    }
 
     #[test]
     fn normal_launch_installs_and_labels_the_opt_in_rule_bot() {

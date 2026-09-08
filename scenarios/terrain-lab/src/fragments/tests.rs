@@ -453,3 +453,4 @@ fn durability_only_edits_do_not_scan_connectivity_and_empty_planet_keeps_its_sou
     }
     assert_eq!(state.recovered, MiningInventory::default());
 }
+use engine_rapier::{terrain::TerrainAssembly, world::BodySpec};

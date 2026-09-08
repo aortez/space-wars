@@ -365,6 +365,7 @@ fn apply_rover_gravity(state: &mut RoverLabState, dt_seconds: f32) -> GravitySte
         source_mass: source.gravitational_parameter,
         response_scale: 0.0,
         source_policy: source.policy,
+        source_shape: engine_gravity::GravitySourceShape::Point,
     }));
 
     let bodies = rover.bodies();

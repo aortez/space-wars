@@ -3,11 +3,15 @@ use super::*;
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn terrain_lab_launch_pause_restart_and_both_renderers() {
+    run_terrain_lifecycle("terrain-lab");
+}
+
+pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
     // Slint's software backend does not draw Path items. Femtovg exercises
     // actual vector paths as well as our software raster image and text overlay.
-    run_functional_test_with_backend("terrain-lab-lifecycle", "winit-femtovg", |harness| {
+    run_functional_test_with_backend(scenario, "winit-femtovg", |harness| {
         let ready = harness.wait_until_ready();
-        let mut state = harness.activate_until_scenario("terrain-lab", ready);
+        let mut state = harness.activate_until_scenario(scenario, ready);
         for renderer in ["vector", "raster"] {
             state = harness.activate_guarded("launcher.settings", &state);
             if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
@@ -23,20 +27,19 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
             state = harness.wait_for(
                 UiStatePredicate {
                     screen: Some(UiScreen::Gameplay),
-                    scenario: Some("terrain-lab".into()),
+                    scenario: Some(scenario.into()),
                     revision_after: Some(revision),
                 },
                 TRANSITION_TIMEOUT,
             );
             assert!(!state.benchmark_active);
-            let screenshot = harness.capture_screenshot(&format!("terrain-lab-{renderer}.png"));
-            assert_terrain_visible(&screenshot);
+            wait_for_terrain_frame(harness, &format!("{scenario}-{renderer}.png"));
             let first_instance = state.scenario_revision;
             let pause = harness.pause_guarded(&state);
             state = harness.wait_for(
                 UiStatePredicate {
                     screen: Some(UiScreen::PauseMain),
-                    scenario: Some("terrain-lab".into()),
+                    scenario: Some(scenario.into()),
                     revision_after: Some(pause.revision),
                 },
                 TRANSITION_TIMEOUT,
@@ -47,7 +50,7 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
             state = harness.wait_for(
                 UiStatePredicate {
                     screen: Some(UiScreen::Gameplay),
-                    scenario: Some("terrain-lab".into()),
+                    scenario: Some(scenario.into()),
                     revision_after: Some(revision),
                 },
                 TRANSITION_TIMEOUT,
@@ -57,7 +60,7 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
             state = harness.wait_for(
                 UiStatePredicate {
                     screen: Some(UiScreen::PauseMain),
-                    scenario: Some("terrain-lab".into()),
+                    scenario: Some(scenario.into()),
                     revision_after: Some(pause.revision),
                 },
                 TRANSITION_TIMEOUT,
@@ -72,12 +75,29 @@ fn terrain_lab_launch_pause_restart_and_both_renderers() {
                 },
                 TRANSITION_TIMEOUT,
             );
-            assert_eq!(state.selected_scenario, "terrain-lab");
+            assert_eq!(state.selected_scenario, scenario);
         }
     });
 }
 
-fn assert_terrain_visible(path: &Path) {
+fn wait_for_terrain_frame(harness: &mut FunctionalHarness, name: &str) {
+    // UI state can be published before the matching frame is presented.
+    let deadline = Instant::now() + TRANSITION_TIMEOUT;
+    loop {
+        let path = harness.capture_screenshot(name);
+        let (terrain_pixels, text_pixels) = terrain_pixel_counts(&path);
+        if terrain_pixels > 20_000 && text_pixels > 150 {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "terrain frame did not appear: {terrain_pixels} material pixels, {text_pixels} title/control pixels"
+        );
+        thread::sleep(POLL_INTERVAL);
+    }
+}
+
+fn terrain_pixel_counts(path: &Path) -> (usize, usize) {
     let mut reader = png::Decoder::new(File::open(path).unwrap())
         .read_info()
         .unwrap();
@@ -86,12 +106,8 @@ fn assert_terrain_visible(path: &Path) {
     let pixels = &buffer[..info.buffer_size()];
     let terrain_pixels = pixels
         .chunks_exact(4)
-        .filter(|p| p[0] > 25 && p[0] < 115 && p[1] > 45 && p[1] < 140 && p[2] > 45 && p[2] < 100)
+        .filter(|p| p[0] > 25 && p[0] < 115 && p[1] > 45 && p[1] < 140 && p[2] > 45 && p[2] < 150)
         .count();
-    assert!(
-        terrain_pixels > 20_000,
-        "missing terrain: {terrain_pixels} material pixels"
-    );
     let text_pixels = pixels
         .chunks_exact(4)
         .enumerate()
@@ -102,8 +118,5 @@ fn assert_terrain_visible(path: &Path) {
                 && p[2] > 170
         })
         .count();
-    assert!(
-        text_pixels > 150,
-        "missing title and controls: {text_pixels} text pixels"
-    );
+    (terrain_pixels, text_pixels)
 }

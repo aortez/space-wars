@@ -40,6 +40,11 @@ The local launcher currently hosts eight playable scenarios:
   collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
   craters and tunnels, inspect chunk colliders, and watch ray queries and physical
   support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
+- **Spacewars Terrain** — Spacewars ships, cannon, lasers, and a rover interacting
+  with a material planet. Blast craters, fly through test tunnels, and disable a
+  base by removing its footing. See [Spacewars Terrain](docs/spacewars-terrain.md).
+  The [terrain endurance test bed](docs/terrain-endurance.md) runs seeded workloads
+  up to three minutes each and produces an offline report with world snapshots.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

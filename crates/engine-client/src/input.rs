@@ -311,6 +311,14 @@ impl ClientInput {
         (walk, gamepad.south, gamepad.east)
     }
 
+    pub(crate) fn spacewars_terrain_gamepad_tools(&self) -> (bool, bool) {
+        self.gamepads
+            .borrow()
+            .seat(0)
+            .filter(|pad| pad.connected)
+            .map_or((false, false), |pad| (pad.north, pad.left_bumper))
+    }
+
     pub(crate) fn terrain_gamepad_tools(&self) -> TerrainGamepadTools {
         let gamepads = self.gamepads.borrow();
         gamepads.seat(0).filter(|pad| pad.connected).map_or_else(

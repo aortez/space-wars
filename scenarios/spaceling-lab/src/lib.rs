@@ -236,6 +236,7 @@ impl Scenario for SpacelingLabScenario {
                     * reference_radius,
                 response_scale: 0.0,
                 source_policy: GravitySourcePolicy::Direct,
+                source_shape: engine_gravity::GravitySourceShape::Point,
             },
             GravityParticipant::target(GravityId::new(2), position, 1.0),
         ];

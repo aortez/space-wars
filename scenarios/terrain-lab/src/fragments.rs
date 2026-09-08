@@ -6,33 +6,14 @@ use engine_gravity::{
 };
 use engine_rapier::{
     spaceling::SpacelingSpec,
-    terrain::{TerrainAssembly, TerrainSpec},
-    world::{BodyId, BodyMotion, BodyRole, BodySpec, PhysicsId},
+    terrain::TerrainSpec,
+    world::{BodyId, BodyMotion, BodyRole, PhysicsId},
 };
 use engine_terrain::{ChunkId, MaterialId, Terrain, TerrainError, TerrainGeometry};
 
+pub use engine_rapier::terrain::TerrainFragment;
+
 use crate::{EditCause, ORE, PLANET_ID, ROCK, TerrainLabMetrics, TerrainLabState};
-
-/// A separately simulated, still-mineable terrain field. IDs survive further
-/// cuts and are never reused during a run.
-#[derive(Clone)]
-pub struct TerrainFragment {
-    pub(super) id: PhysicsId,
-    pub(super) terrain: Terrain,
-    pub(super) geometry: TerrainGeometry,
-    pub(super) assembly: TerrainAssembly,
-    pub(super) hash: u64,
-    pub(super) edited_chunks: Vec<ChunkId>,
-}
-
-impl TerrainFragment {
-    pub fn id(&self) -> PhysicsId {
-        self.id
-    }
-    pub fn terrain(&self) -> &Terrain {
-        &self.terrain
-    }
-}
 
 impl TerrainLabState {
     pub fn fragments(&self) -> &[TerrainFragment] {
@@ -181,49 +162,30 @@ impl TerrainLabState {
             }
             let parent_id = id;
             for detached in detached {
-                let terrain = detached.terrain;
-                metrics.detached_cells += terrain
+                metrics.detached_cells += detached
+                    .terrain
                     .cells()
                     .iter()
                     .filter(|c| c.material != MaterialId::VOID)
                     .count() as u32;
-                let geometry = TerrainGeometry::new(&terrain);
                 let id = PhysicsId::new(self.next_fragment_id);
                 self.next_fragment_id = self
                     .next_fragment_id
                     .checked_add(1)
                     .expect("fragment ID exhausted");
-                let assembly = TerrainAssembly::insert(
+                let fragment = TerrainFragment::insert(
                     &mut self.physics,
                     id,
-                    BodySpec {
-                        position: motion.position
-                            + detached.parent_offset.rotate_radians(motion.angle),
-                        angle: motion.angle,
-                        ccd_enabled: true,
-                        ..BodySpec::default()
-                    },
-                    &terrain,
-                    &geometry,
+                    detached,
+                    motion,
+                    old_center,
                     TerrainSpec::default(),
                 )
                 .expect("valid detached terrain");
-                let offset = self.physics.center_of_mass(assembly.body()).unwrap() - old_center;
-                let velocity = motion.linear_velocity
-                    + Vec2::new(-offset.y, offset.x) * motion.angular_velocity;
-                self.physics
-                    .set_velocity(assembly.body(), velocity, motion.angular_velocity, true);
                 self.impact.inherit_contacts(parent_id, id);
-                metrics.rebuilt_chunks += terrain.chunk_count();
+                metrics.rebuilt_chunks += fragment.terrain.chunk_count();
                 metrics.spawned_fragments += 1;
-                self.fragments.push(TerrainFragment {
-                    id,
-                    hash: terrain.hash(),
-                    terrain,
-                    geometry,
-                    assembly,
-                    edited_chunks: Vec::new(),
-                });
+                self.fragments.push(fragment);
             }
             metrics.rebuild_time += started.elapsed();
         }
@@ -242,6 +204,7 @@ impl TerrainLabState {
                 source_mass: self.config.gravity_acceleration * reference * reference,
                 response_scale: 0.0,
                 source_policy: GravitySourcePolicy::Direct,
+                source_shape: engine_gravity::GravitySourceShape::Point,
             },
             GravityParticipant::target(
                 GravityId::new(2),

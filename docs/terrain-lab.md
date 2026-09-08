@@ -12,6 +12,10 @@ Start it from the launcher or directly:
 cargo run -p engine-client -- --scenario terrain-lab --seed 42
 ```
 
+[Spacewars Terrain](spacewars-terrain.md) is the subsequent integration fixture:
+real Spacewars ships and weapons use material terrain and the shared fragment
+creation path, including explicit base support and service invalidation.
+
 | Action | Keyboard / pointer | Xbox layout | Switch Pro |
 | --- | --- | --- | --- |
 | Walk | A/D or left/right arrows | Left stick or d-pad left/right | Same |

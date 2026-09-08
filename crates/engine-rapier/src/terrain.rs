@@ -1,11 +1,12 @@
 //! Chunk geometry binding. Terrain remains scenario-owned; this adapter only
 //! replaces derived shapes in the canonical mechanics world.
 
-use engine_terrain::{Terrain, TerrainGeometry};
+use engine_core::Vec2;
+use engine_terrain::{ChunkId, DetachedTerrain, Terrain, TerrainGeometry};
 
 use crate::world::{
-    BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, CollisionGroups, PhysicsId,
-    PhysicsWorld,
+    BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
+    CollisionGroups, PhysicsId, PhysicsWorld,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -13,6 +14,7 @@ pub struct TerrainSpec {
     /// Reserve one consecutive role per chunk; other roles may hold sensors.
     pub first_chunk_role: u32,
     pub friction: f32,
+    pub restitution: f32,
     pub collision_groups: CollisionGroups,
 }
 
@@ -21,6 +23,7 @@ impl Default for TerrainSpec {
         Self {
             first_chunk_role: 1000,
             friction: 0.9,
+            restitution: 0.0,
             collision_groups: CollisionGroups::ALL,
         }
     }
@@ -44,7 +47,11 @@ impl TerrainAssembly {
     ) -> Option<Self> {
         spec.first_chunk_role
             .checked_add(terrain.chunk_count() as u32)?;
-        if !spec.friction.is_finite() || spec.friction < 0.0 {
+        if !spec.friction.is_finite()
+            || spec.friction < 0.0
+            || !spec.restitution.is_finite()
+            || !(0.0..=1.0).contains(&spec.restitution)
+        {
             return None;
         }
         let body = BodyId::new(id, BodyRole::PRIMARY);
@@ -115,7 +122,7 @@ impl TerrainAssembly {
                     );
                     collider.local_position = rect.local_center(terrain);
                     collider.friction = self.spec.friction;
-                    collider.restitution = 0.0;
+                    collider.restitution = self.spec.restitution;
                     collider.collision_groups = self.spec.collision_groups;
                     collider.solver_groups = self.spec.collision_groups;
                     collider
@@ -137,6 +144,65 @@ impl TerrainAssembly {
             world.set_velocity(self.body, velocity, motion.angular_velocity, true);
         }
         Some(rebuilt)
+    }
+}
+
+/// Scenario-owned detached material and its derived caches. Both labs and game
+/// scenarios use this path so a split preserves the same point velocities, mass,
+/// cropped coordinates, and CCD behavior.
+#[derive(Debug, Clone)]
+pub struct TerrainFragment {
+    pub id: PhysicsId,
+    pub terrain: Terrain,
+    pub geometry: TerrainGeometry,
+    pub assembly: TerrainAssembly,
+    pub hash: u64,
+    pub edited_chunks: Vec<ChunkId>,
+}
+
+impl TerrainFragment {
+    pub fn id(&self) -> PhysicsId {
+        self.id
+    }
+    pub fn terrain(&self) -> &Terrain {
+        &self.terrain
+    }
+
+    pub fn insert(
+        world: &mut PhysicsWorld,
+        id: PhysicsId,
+        detached: DetachedTerrain,
+        parent: BodyMotion,
+        parent_center: Vec2,
+        spec: TerrainSpec,
+    ) -> Option<Self> {
+        let terrain = detached.terrain;
+        let geometry = TerrainGeometry::new(&terrain);
+        let assembly = TerrainAssembly::insert(
+            world,
+            id,
+            BodySpec {
+                position: parent.position + detached.parent_offset.rotate_radians(parent.angle),
+                angle: parent.angle,
+                ccd_enabled: true,
+                ..BodySpec::default()
+            },
+            &terrain,
+            &geometry,
+            spec,
+        )?;
+        let offset = world.center_of_mass(assembly.body())? - parent_center;
+        let velocity =
+            parent.linear_velocity + Vec2::new(-offset.y, offset.x) * parent.angular_velocity;
+        world.set_velocity(assembly.body(), velocity, parent.angular_velocity, true);
+        Some(Self {
+            id,
+            hash: terrain.hash(),
+            terrain,
+            geometry,
+            assembly,
+            edited_chunks: Vec::new(),
+        })
     }
 }
 

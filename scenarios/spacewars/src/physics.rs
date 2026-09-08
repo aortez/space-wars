@@ -46,6 +46,8 @@ const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
 const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
+// GROUP_BODY also includes dynamic terrain fragments. Celestial and boundary
+// filters must accept that group as well as ordinary ships, debris, and rovers.
 const GROUP_ALL_SOLIDS: u32 =
     GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER;
 
@@ -55,6 +57,15 @@ const WORLD_SURFACE_SEGMENTS: usize = 192;
 // surface berth cannot introduce a new planet overlap.
 const DOCKED_SHIP_COLLIDER_RADIUS: f32 = 2.5;
 const CONTACT_REARM_TICKS: u64 = 6;
+
+pub(super) fn terrain_spec() -> engine_rapier::terrain::TerrainSpec {
+    engine_rapier::terrain::TerrainSpec {
+        friction: 0.9,
+        restitution: 0.1,
+        collision_groups: CollisionGroups::new(GROUP_BODY, GROUP_ALL_SOLIDS),
+        ..Default::default()
+    }
+}
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
     RoverSpec {
@@ -87,6 +98,7 @@ pub(super) fn spacewars_rover_spawn_pose(planet: &PlanetState) -> RoverSpawnPose
 pub(super) enum MechanicalEntity {
     World,
     Body(BodyId),
+    TerrainFragment(u64),
     Ship(usize),
     Rover(u64),
     Debris(u64),
@@ -149,7 +161,9 @@ struct RoverPhysicsEntry {
 
 #[derive(Debug, Clone)]
 pub(super) struct SpacewarsPhysics {
-    world: PhysicsWorld,
+    pub(super) world: PhysicsWorld,
+    pub(super) terrain_fragments: BTreeSet<u64>,
+    disabled_spaceports: BTreeSet<usize>,
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
     docked_planets: [Option<usize>; 2],
@@ -189,6 +203,8 @@ impl SpacewarsPhysics {
                 max_ccd_substeps: 4,
                 collect_events: true,
             }),
+            terrain_fragments: BTreeSet::new(),
+            disabled_spaceports: BTreeSet::new(),
             sun_radius: None,
             ship_keys: [None, None],
             docked_planets: [None, None],
@@ -393,6 +409,12 @@ impl SpacewarsPhysics {
                 );
             }
         }
+        for id in &self.terrain_fragments {
+            capture(
+                MechanicalEntity::TerrainFragment(*id),
+                primary_body(PhysicsId::new(*id)),
+            );
+        }
         for id in self.debris_keys.keys().copied() {
             capture(
                 MechanicalEntity::Debris(id),
@@ -429,7 +451,9 @@ impl SpacewarsPhysics {
     pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
         let entity = match entity {
             MechanicalEntity::Ship(index) => ship_entity(index),
-            MechanicalEntity::Debris(id) => PhysicsId::new(id),
+            MechanicalEntity::Debris(id) | MechanicalEntity::TerrainFragment(id) => {
+                PhysicsId::new(id)
+            }
             MechanicalEntity::World | MechanicalEntity::Body(_) | MechanicalEntity::Rover(_) => {
                 return false;
             }
@@ -666,7 +690,9 @@ impl SpacewarsPhysics {
             let Some(planet) = planet_index(port.entity) else {
                 continue;
             };
-            contacts.entry((ship, planet)).or_insert(false);
+            if !self.disabled_spaceports.contains(&planet) {
+                contacts.entry((ship, planet)).or_insert(false);
+            }
         }
         for (ship, planet) in self.docked_planets.iter().copied().enumerate() {
             if let Some(planet) = planet {
@@ -752,8 +778,10 @@ impl SpacewarsPhysics {
         );
         collider.restitution = DEFAULT_ELASTICITY;
         collider.friction = 0.0;
-        collider.collision_groups =
-            CollisionGroups::new(GROUP_WORLD, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER);
+        collider.collision_groups = CollisionGroups::new(
+            GROUP_WORLD,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER | GROUP_BODY,
+        );
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -776,7 +804,7 @@ impl SpacewarsPhysics {
         collider.friction = 0.0;
         collider.restitution = PLANET_ELASTICITY;
         collider.collision_groups =
-            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
+            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY);
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -792,9 +820,43 @@ impl SpacewarsPhysics {
         inserted
     }
 
+    pub fn add_spaceport_sensor(&mut self, index: usize, planet: &PlanetState) {
+        let entity = planet_entity(index);
+        let mut sensor = ColliderSpec::convex_polygon(
+            spaceport_sensor_id(index),
+            spaceport_local_points(planet.radius),
+        );
+        sensor.density = 0.0;
+        sensor.sensor = true;
+        sensor.collision_groups = CollisionGroups::new(GROUP_SPACEPORT_SENSOR, GROUP_ALL_SHIPS);
+        sensor.solver_groups = CollisionGroups::NONE;
+        assert!(self.world.replace_colliders(
+            primary_body(entity),
+            SPACEPORT_SENSOR_ROLE,
+            &[sensor]
+        ));
+    }
+
+    pub fn disable_spaceport(&mut self, index: usize) {
+        if !self.disabled_spaceports.insert(index) {
+            return;
+        }
+        assert!(self.world.replace_colliders(
+            primary_body(planet_entity(index)),
+            SPACEPORT_SENSOR_ROLE,
+            &[]
+        ));
+        for held in &mut self.docked_planets {
+            if *held == Some(index) {
+                *held = None;
+            }
+        }
+    }
+
     fn insert_planet(&mut self, index: usize, planet: &PlanetState) -> bool {
         let entity = planet_entity(index);
-        let body_groups = CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
+        let body_groups =
+            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY);
         let mut colliders = planet_solid_colliders(entity, planet.radius, body_groups);
         // Ships use one continuous frictionless, elastic surface. Rovers get a
         // separate traction surface on the same kinematic body.
@@ -1230,12 +1292,16 @@ fn debris_signature(debris: &DebrisState) -> u64 {
     hash
 }
 
-fn primary_body(entity: PhysicsId) -> PhysicsBodyId {
+pub(super) fn primary_body(entity: PhysicsId) -> PhysicsBodyId {
     PhysicsBodyId::new(entity, BodyRole::PRIMARY)
 }
 
 fn collider_id(entity: PhysicsId, role: ColliderRole, part: u16) -> ColliderId {
     ColliderId::new(entity, role, part)
+}
+
+pub(super) fn spaceport_sensor_id(index: usize) -> ColliderId {
+    collider_id(planet_entity(index), SPACEPORT_SENSOR_ROLE, 0)
 }
 
 fn world_entity() -> PhysicsId {
@@ -1246,7 +1312,7 @@ fn sun_entity() -> PhysicsId {
     PhysicsId::new(SUN_ENTITY_VALUE)
 }
 
-fn planet_entity(index: usize) -> PhysicsId {
+pub(super) fn planet_entity(index: usize) -> PhysicsId {
     PhysicsId::new(PLANET_ENTITY_BASE + index as u64)
 }
 
@@ -1259,7 +1325,7 @@ fn rover_entity(id: u64) -> PhysicsId {
     PhysicsId::new(ROVER_ENTITY_BASE + id)
 }
 
-fn planet_index(entity: PhysicsId) -> Option<usize> {
+pub(super) fn planet_index(entity: PhysicsId) -> Option<usize> {
     let value = entity.value();
     (PLANET_ENTITY_BASE..SHIP_ENTITY_BASE)
         .contains(&value)
@@ -1292,6 +1358,9 @@ fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
         }
         value if (ROVER_ENTITY_BASE..DEBRIS_ENTITY_BASE).contains(&value) => {
             Some(MechanicalEntity::Rover(value - ROVER_ENTITY_BASE))
+        }
+        value if value >= super::terrain::FRAGMENT_ID_BASE => {
+            Some(MechanicalEntity::TerrainFragment(value))
         }
         value if value >= DEBRIS_ENTITY_BASE => Some(MechanicalEntity::Debris(value)),
         _ => None,
