@@ -629,3 +629,22 @@ Physics fidelity should follow the 2008 behavior, even though the reboot should 
 - M31c: ✅ Exercise action-only A-to-B capture/repair journeys on stationary/translating spinning planets, generated arrivals, wrong-planet services/support, stable lifecycle and deterministic replay. Preserve pinned compatibility probes and ordinary-game behavior.
 - M31d: ✅ Deploy to the Pi, verify launcher/pause/restart and sampled 60 FPS / 60 UPS, and receive positive initial user playtesting feedback on 2026-09-07.
 - Boundary: single pilot/vehicle, one intact site per planet, no combat/rescue/rebuilding. Broader controller, generated-route and long-duration checks remain open; multi-pilot and bot integration follow. See [Surface Expedition](../surface-expedition.md).
+
+### M32: Two-player Surface Expedition
+
+- M32a: ✅ Evolve the existing Expedition entry with a persisted 1/2-player setting, defaulting to one. Preserve the single-pilot pinned Sortie and compatibility presets.
+- M32b: ✅ Give each pilot independent assigned-ship, control, transfer, landing and diagnostic state. Share one Rapier world, gravity solve and physics step; bound capsule lifecycle to one external body per pilot and reject occupied hatch exits.
+- M32c: ✅ Add per-seat split-screen cameras, HUDs and translucent minimaps. Address Surface control actions by player and expose per-player observations (initially version 8, now 9 with planet claims and optional focused outpost).
+- M32d: ✅ Resolve physically eligible opposing claimants together, pause contested progress, prevent borrowed partial claims, and repair only friendly landed vehicles. Regress independent controls, same-planet transfer cycles, capture/repair, replay, migration and real client lifecycle. Preserve ordinary navigation/strategy baselines.
+- M32e: ✅ Following positive multiplayer Pi playtesting, simplify Expedition to planet claims without infrastructure: stand on the surface for three seconds to raise a flag; approach an enemy flag to lower it for three seconds before a fresh raise. Preserve local contests, interrupted-stage rules, real contact attachment, both minimaps and the pinned outpost reference tests. No flag bodies/colliders; no Expedition repair service.
+- Manual playtesting: the simplified flag-loop build was deployed to the Pi, verified at about 60 FPS / 60 UPS, and received positive user feedback on 2026-09-07.
+- Boundary: no weapons, ship swapping, rescue/rebuilding, bots, terrain changes or ordinary Spacewars docking changes. See [Surface Expedition](../surface-expedition.md).
+
+### M33: Expedition vehicle recovery
+
+- M33a: ✅ Separate occupied/empty ship loss: retain the same pilot in a flyable pod or on foot, without phantom pods. Opt in only for Expedition; retain ordinary Spacewars behavior.
+- M33b: ✅ Add pod rear feet and natural landing/transfer gates, plus an eight-second owned-surface rebuild policy independent of outposts and flags. Use bounded local clearance queries, surface-frame velocity and normal boarding after a replacement settles.
+- M33c: ✅ Add the hold A+B+Down loss drill, neutral-input gates, per-seat lifecycle/progress counters and pod/rebuild HUDs in observation version 10. Regress the action-only recovery journey, moving planets, repeated two-seat loss/rebuild, blocked placement and replay.
+- Deployment: recovery is installed in Pi slot B, preserving the accepted flag build in slot A. The installed binary checksum and unchanged settings were verified; two-player Expedition and an actual screenshot were checked at about 60 FPS / 60 UPS with zero service restarts.
+- Manual acceptance: the user reported the basic recovery loop working full circle on the Pi, including occupied scuttling while flying and landed, pod landing, disembarking, claiming and returning to a full ship. Existing rebuild progress/instructions are retained. Empty-ship scuttling and broader multiplayer failure cases were not explicitly reported as manually tested.
+- Boundary: no pilot damage/elimination, weapons, ship swapping, remote rescue, bots, terrain changes or ordinary-game docking changes. Pods/spacelings remain invulnerable. See [Expedition recovery](../surface-expedition.md#ship-loss-and-recovery).

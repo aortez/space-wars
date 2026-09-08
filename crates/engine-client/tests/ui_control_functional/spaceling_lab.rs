@@ -56,16 +56,49 @@ fn surface_expedition_launch_pause_restart_and_both_renderers() {
     lab_lifecycle(
         "surface-expedition",
         "surface-expedition-lifecycle",
-        assert_raster_sortie_visible,
+        assert_raster_expedition_visible,
+    );
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn surface_expedition_two_players_settings_and_lifecycle() {
+    lab_lifecycle_with_players(
+        "surface-expedition",
+        "surface-expedition-two-players",
+        assert_raster_pair_visible,
+        2,
     );
 }
 
 fn lab_lifecycle(scenario: &str, test_name: &'static str, assert_visible: fn(&Path)) {
+    lab_lifecycle_with_players(scenario, test_name, assert_visible, 1);
+}
+
+fn lab_lifecycle_with_players(
+    scenario: &str,
+    test_name: &'static str,
+    assert_visible: fn(&Path),
+    players: usize,
+) {
     run_functional_test(test_name, |harness| {
         let ready = harness.wait_until_ready();
         let mut state = harness.activate_until_scenario(scenario, ready);
         for renderer in ["vector", "raster"] {
             state = harness.activate_guarded("launcher.settings", &state);
+            if scenario == "surface-expedition" {
+                let expected = players.to_string();
+                if control_value(&state, "launcher.settings.expedition.players.next")
+                    != Some(expected.as_str())
+                {
+                    state = harness
+                        .activate_guarded("launcher.settings.expedition.players.next", &state);
+                }
+                assert_eq!(
+                    control_value(&state, "launcher.settings.expedition.players.next"),
+                    Some(expected.as_str())
+                );
+            }
             if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
                 state = harness.activate_guarded("launcher.settings.renderer.next", &state);
             }
@@ -131,11 +164,74 @@ fn lab_lifecycle(scenario: &str, test_name: &'static str, assert_visible: fn(&Pa
                 TRANSITION_TIMEOUT,
             );
             assert_eq!(state.selected_scenario, scenario);
+            if scenario == "surface-expedition" {
+                state = harness.activate_guarded("launcher.settings", &state);
+                assert_eq!(
+                    control_value(&state, "launcher.settings.expedition.players.next"),
+                    Some(players.to_string().as_str())
+                );
+                state = harness.activate_guarded("launcher.settings.back", &state);
+            }
         }
     });
 }
 
+fn assert_raster_pair_visible(path: &Path) {
+    let mut decoder = png::Decoder::new(File::open(path).unwrap());
+    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = decoder.read_info().unwrap();
+    let mut buffer = vec![0; reader.output_buffer_size()];
+    let frame = reader.next_frame(&mut buffer).unwrap();
+    let channels = match frame.color_type {
+        png::ColorType::Rgb => 3,
+        png::ColorType::Rgba => 4,
+        other => panic!("unexpected {other:?}"),
+    };
+    let mut ships = [0; 2];
+    let mut maps = [0; 2];
+    for (index, pixel) in buffer[..frame.buffer_size()]
+        .chunks_exact(channels)
+        .enumerate()
+    {
+        let x = index % frame.width as usize;
+        let y = index / frame.width as usize;
+        let player = usize::from(x >= frame.width as usize / 2);
+        if y > frame.height as usize / 3 && y < frame.height as usize * 3 / 4 {
+            let own_color = if player == 0 {
+                pixel[0] > 200 && pixel[1] < 80
+            } else {
+                pixel[1] > 200 && pixel[0] < 80
+            };
+            if own_color && pixel[2] < 80 {
+                ships[player] += 1;
+            }
+        }
+        let local_x = x - player * (frame.width as usize / 2);
+        if local_x > frame.width as usize * 3 / 10
+            && y >= frame.height as usize / 4
+            && y < frame.height as usize / 2
+            && pixel[0] < 100
+            && pixel[1] > 130
+            && pixel[2] > 100
+        {
+            maps[player] += 1;
+        }
+    }
+    for player in 0..2 {
+        assert!(ships[player] > 100, "P{player} ship missing: {ships:?}");
+        assert!(maps[player] > 20, "P{player} minimap missing: {maps:?}");
+    }
+}
+
 fn assert_raster_sortie_visible(path: &Path) {
+    assert_raster_surface_visible(path, true);
+}
+
+fn assert_raster_expedition_visible(path: &Path) {
+    assert_raster_surface_visible(path, false);
+}
+
+fn assert_raster_surface_visible(path: &Path, has_outpost: bool) {
     let mut decoder = png::Decoder::new(File::open(path).unwrap());
     decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
     let mut reader = decoder.read_info().unwrap();
@@ -152,7 +248,7 @@ fn assert_raster_sortie_visible(path: &Path) {
     let mut diagnostics_pixels = 0;
     let mut minimap_planet_pixels = 0;
     let mut outpost_pixels = 0;
-    let mut outpost_hud_pixels = 0;
+    let mut mission_hud_pixels = 0;
     for (index, pixel) in buffer[..frame.buffer_size()]
         .chunks_exact(channels)
         .enumerate()
@@ -173,7 +269,7 @@ fn assert_raster_sortie_visible(path: &Path) {
                 outpost_pixels += 1;
             }
             if y > height * 4 / 5 {
-                outpost_hud_pixels += 1;
+                mission_hud_pixels += 1;
             }
         }
         // The overview sits below the top HUD at the right. Its planet stays
@@ -189,13 +285,17 @@ fn assert_raster_sortie_visible(path: &Path) {
         }
     }
     assert!(ship_pixels > 100, "missing initial ship: {ship_pixels}");
+    if has_outpost {
+        assert!(
+            outpost_pixels > 40,
+            "missing amber outpost: {outpost_pixels}"
+        );
+    } else {
+        assert_eq!(outpost_pixels, 0, "Expedition must not spawn a terminal");
+    }
     assert!(
-        outpost_pixels > 40,
-        "missing amber outpost: {outpost_pixels}"
-    );
-    assert!(
-        outpost_hud_pixels > 40,
-        "missing outpost capture HUD: {outpost_hud_pixels}"
+        mission_hud_pixels > 40,
+        "missing capture/claim HUD: {mission_hud_pixels}"
     );
     assert!(
         minimap_planet_pixels > 40,

@@ -282,9 +282,9 @@ impl ClientInput {
         (throttle, brake, gamepad.south)
     }
 
-    pub(crate) fn spaceling_gamepad_input(&self) -> (f32, bool, bool) {
+    pub(crate) fn spaceling_gamepad_input(&self, player: usize) -> (f32, bool, bool) {
         let gamepads = self.gamepads.borrow();
-        let Some(gamepad) = gamepads.seat(0).filter(|gamepad| gamepad.connected) else {
+        let Some(gamepad) = gamepads.seat(player).filter(|gamepad| gamepad.connected) else {
             return (0.0, false, false);
         };
         let walk = match (gamepad.dpad_left, gamepad.dpad_right) {
@@ -296,14 +296,16 @@ impl ClientInput {
         (walk, gamepad.south, gamepad.east)
     }
 
-    pub(crate) fn surface_sortie_brake_held(&self) -> bool {
-        self.is_pressed(GameKey::P1Brake)
-            || self.is_pressed(GameKey::NesDown)
-            || self
-                .gamepads
-                .borrow()
-                .seat(0)
-                .is_some_and(|pad| pad.connected && pad.dpad_down)
+    pub(crate) fn surface_sortie_brake_held(&self, player: usize) -> bool {
+        (if player == 0 {
+            self.is_pressed(GameKey::P1Brake) || self.is_pressed(GameKey::NesDown)
+        } else {
+            self.is_pressed(GameKey::P2Brake)
+        }) || self
+            .gamepads
+            .borrow()
+            .seat(player)
+            .is_some_and(|pad| pad.connected && pad.dpad_down)
     }
 
     pub(crate) fn nes_controller_buttons(&self, player: usize) -> ControllerButtons {

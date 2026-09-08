@@ -82,7 +82,7 @@ impl ClientScenario for SpacelingLabClientScenario {
 }
 
 pub(super) fn spaceling_controls(input: &ClientInput) -> (f32, bool, bool) {
-    let (gamepad_walk, gamepad_jump, gamepad_shove) = input.spaceling_gamepad_input();
+    let (gamepad_walk, gamepad_jump, gamepad_shove) = input.spaceling_gamepad_input(0);
     let left = input.is_pressed(GameKey::P1TurnLeft) || input.is_pressed(GameKey::NesLeft);
     let right = input.is_pressed(GameKey::P1TurnRight) || input.is_pressed(GameKey::NesRight);
     let walk = match (left, right) {

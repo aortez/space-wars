@@ -20,6 +20,7 @@ pub enum CaptureStatus {
     NeedBalance,
     NeedSettle,
     Capturing,
+    Contested,
     Secured,
 }
 
@@ -32,6 +33,7 @@ impl CaptureStatus {
             Self::NeedBalance => "recover your balance",
             Self::NeedSettle => "stand still to capture",
             Self::Capturing => "capturing; stay beside the terminal",
+            Self::Contested => "contested; capture paused",
             Self::Secured => "secured",
         }
     }
@@ -70,9 +72,9 @@ pub(super) struct SurfaceOutpost {
     pub owner: Option<PlayerId>,
     capture_elapsed: Duration,
     capturing_player: Option<PlayerId>,
-    capture_status: CaptureStatus,
+    capture_status: [CaptureStatus; SPACEWARS_PLAYER_COUNT],
     captures: u64,
-    repair_status: RepairStatus,
+    repair_status: [RepairStatus; SPACEWARS_PLAYER_COUNT],
     repaired_health: f32,
 }
 
@@ -103,9 +105,9 @@ impl SurfaceOutpost {
             owner: None,
             capture_elapsed: Duration::ZERO,
             capturing_player: None,
-            capture_status: CaptureStatus::Aboard,
+            capture_status: [CaptureStatus::Aboard; SPACEWARS_PLAYER_COUNT],
             captures: 0,
-            repair_status: RepairStatus::NeedsCapture,
+            repair_status: [RepairStatus::NeedsCapture; SPACEWARS_PLAYER_COUNT],
             repaired_health: 0.0,
         }
     }
@@ -118,7 +120,7 @@ impl SurfaceOutpost {
         planet.position + self.up(planet) * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
     }
 
-    pub(super) fn observation(&self, planet: &PlanetState) -> OutpostObservation {
+    pub(super) fn observation(&self, planet: &PlanetState, player: usize) -> OutpostObservation {
         OutpostObservation {
             id: self.id,
             planet: self.planet,
@@ -126,33 +128,55 @@ impl SurfaceOutpost {
             surface_normal: self.up(planet),
             owner: self.owner,
             capturing_player: self.capturing_player,
-            capture_status: self.capture_status,
+            capture_status: self.capture_status[player],
             capture_progress: self.capture_elapsed.as_secs_f32() / CAPTURE_TIME.as_secs_f32(),
             capture_required_seconds: CAPTURE_TIME.as_secs_f32(),
             capture_range: CAPTURE_RANGE,
             captures: self.captures,
-            repair_status: self.repair_status,
+            repair_status: self.repair_status[player],
             repair_range: REPAIR_RANGE,
             repaired_health: self.repaired_health,
         }
     }
 
-    pub(super) fn update_capture(
-        &mut self,
-        claimant: PlayerId,
-        status: CaptureStatus,
-        dt: Duration,
-    ) {
-        if self.owner == Some(claimant) {
-            self.capture_status = CaptureStatus::Secured;
-            self.capturing_player = None;
-            self.capture_elapsed = CAPTURE_TIME;
+    /// Evaluate the complete set before changing ownership; iteration order cannot win a race.
+    pub(super) fn update_capture(&mut self, statuses: &[(PlayerId, CaptureStatus)], dt: Duration) {
+        let mut eligible = [None; SPACEWARS_PLAYER_COUNT];
+        let mut count = 0;
+        for &(player, status) in statuses {
+            self.capture_status[player.index()] = if self.owner == Some(player) {
+                CaptureStatus::Secured
+            } else {
+                status
+            };
+            if status == CaptureStatus::Capturing {
+                eligible[count] = Some(player);
+                count += 1;
+            }
+        }
+        if count > 1 {
+            for player in eligible.into_iter().flatten() {
+                self.capture_status[player.index()] = CaptureStatus::Contested;
+            }
+            // Preserve an active claim only while that claimant still qualifies.
+            if !eligible.contains(&self.capturing_player) {
+                self.capturing_player = None;
+                self.capture_elapsed = Duration::ZERO;
+            }
             return;
         }
-        self.capture_status = status;
-        if status != CaptureStatus::Capturing {
-            self.capture_elapsed = Duration::ZERO;
+        let Some(claimant) = eligible[0] else {
             self.capturing_player = None;
+            self.capture_elapsed = if self.owner.is_some() {
+                CAPTURE_TIME
+            } else {
+                Duration::ZERO
+            };
+            return;
+        };
+        if self.owner == Some(claimant) {
+            self.capturing_player = None;
+            self.capture_elapsed = CAPTURE_TIME;
             return;
         }
         if self.capturing_player != Some(claimant) {
@@ -163,7 +187,15 @@ impl SurfaceOutpost {
         if self.capture_elapsed == CAPTURE_TIME {
             self.owner = Some(claimant);
             self.capturing_player = None;
-            self.capture_status = CaptureStatus::Secured;
+            // Refresh both views immediately: the previous owner must not
+            // report "secured" for one extra tick after ownership changes.
+            for &(player, status) in statuses {
+                self.capture_status[player.index()] = if player == claimant {
+                    CaptureStatus::Secured
+                } else {
+                    status
+                };
+            }
             self.captures += 1;
         }
     }
@@ -175,7 +207,7 @@ impl SurfaceOutpost {
         distance: f32,
         dt: Duration,
     ) {
-        self.repair_status = if self.owner.is_none() {
+        self.repair_status[ship.owner_id] = if self.owner.is_none() {
             RepairStatus::NeedsCapture
         } else if ship.dead || ship.life <= 0.0 || ship.form != ShipForm::Ship {
             RepairStatus::VehicleUnavailable
@@ -202,8 +234,8 @@ impl SurfaceOutpost {
 }
 
 impl SurfaceSortieState {
-    fn capture_status(&self, outpost: &SurfaceOutpost) -> CaptureStatus {
-        let Some(snapshot) = self.spaceling_snapshot() else {
+    fn capture_status(&self, player: usize, outpost: &SurfaceOutpost) -> CaptureStatus {
+        let Some(snapshot) = self.spaceling_snapshot(player) else {
             return CaptureStatus::Aboard;
         };
         let planet = &self.world.planets[outpost.planet];
@@ -235,20 +267,33 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn update_outpost(&mut self, dt: Duration) {
+        let player_count = self.player_count();
         for index in 0..self.outposts.len() {
-            let status = self.capture_status(&self.outposts[index]);
-            let landed =
-                self.vehicle_settled() && self.landing.planet == Some(self.outposts[index].planet);
-            let post = &mut self.outposts[index];
-            post.update_capture(self.pilot.owner, status, dt);
-            let position = post.position(&self.world.planets[post.planet]);
-            let ship = &mut self.world.ships[self.pilot.vehicle.0];
-            post.repair_ship(
-                ship,
-                landed,
-                (ship.position + SHIP_PIVOT).distance_to(position),
-                dt,
-            );
+            let statuses: [_; SPACEWARS_PLAYER_COUNT] = std::array::from_fn(|player| {
+                let owner = PlayerId::from_index(player).expect("bounded player index");
+                (
+                    owner,
+                    if player < self.player_count() {
+                        self.capture_status(player, &self.outposts[index])
+                    } else {
+                        CaptureStatus::Aboard
+                    },
+                )
+            });
+            self.outposts[index].update_capture(&statuses[..player_count], dt);
+            for player in 0..self.player_count() {
+                let landed = self.vehicle_settled(player)
+                    && self.pilots[player].landing.planet == Some(self.outposts[index].planet);
+                let post = &mut self.outposts[index];
+                let position = post.position(&self.world.planets[post.planet]);
+                let ship = &mut self.world.ships[self.pilots[player].vehicle.0];
+                post.repair_ship(
+                    ship,
+                    landed,
+                    (ship.position + SHIP_PIVOT).distance_to(position),
+                    dt,
+                );
+            }
         }
     }
 }

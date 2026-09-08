@@ -782,6 +782,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
+            expedition_players: window.get_launcher_expedition_players().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
             clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
             clock_falling_enabled: window.get_launcher_clock_falling_enabled(),

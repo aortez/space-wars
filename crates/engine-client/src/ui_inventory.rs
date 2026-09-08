@@ -56,6 +56,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) scenario_error: Option<String>,
     pub(crate) renderer: String,
     pub(crate) raster_scale: String,
+    pub(crate) expedition_players: String,
     pub(crate) spacewars_preset: String,
     pub(crate) spacewars_planets: String,
     pub(crate) spacewars_asteroids: String,
@@ -300,6 +301,29 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.event-profile",
                 "launcher.settings.clock.falling",
                 "launcher.settings.clock.color-cycle",
+                "launcher.settings.back",
+            ]
+        }
+        "surface-expedition" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.expedition.players",
+                &context.expedition_players,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.expedition.players",
                 "launcher.settings.back",
             ]
         }
@@ -653,11 +677,17 @@ mod tests {
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
+            (
+                "surface-expedition",
+                8,
+                "launcher.settings.expedition.players",
+            ),
         ];
 
         for (scenario, control_count, selected) in cases {
             let mut context = context(scenario);
             context.launcher_settings_focus_index = match scenario {
+                "surface-expedition" => 2,
                 "spacewars" => 6,
                 "pizza" => 3,
                 "clock" => 5,

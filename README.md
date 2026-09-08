@@ -9,7 +9,7 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently hosts seven playable scenarios:
+The local launcher currently has twelve entries across eight scenario families:
 
 - **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
   asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
@@ -45,8 +45,14 @@ The local launcher currently hosts seven playable scenarios:
   gravity/motion gaps before ordinary-game integration. **surface-sortie-world**
   tries an explicit Surface V1 gravity/spin/orbit profile on those generated
   layouts. Ordinary Spacewars and the shared controllers remain unchanged.
-  **surface-expedition** enables planet-to-planet travel and independent
-  outposts on that experimental world. See [Surface Expedition](docs/surface-expedition.md).
+  **surface-expedition** enables planet-to-planet travel and flag-based planet
+  claiming: land, disembark and wait 3 seconds; enemy flags must first be lowered
+  up close. After ship loss, land and exit the escape pod (or continue with the
+  existing on-foot pilot), then stand on owned terrain for 8 seconds to rebuild.
+  Hold A+B+Down for 3 seconds for a deliberate loss drill.
+  Outposts/repair remain in the older lab fixtures. Choose **Settings →
+  Players: 1 or 2** for solo or split-screen play using the same scenario. See
+  [Surface Expedition](docs/surface-expedition.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

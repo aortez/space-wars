@@ -592,6 +592,9 @@ fn show_launcher(
     window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
         launch.raster_scale,
     )));
+    window.set_launcher_expedition_players(SharedString::from(
+        settings.surface_expedition.players.count().to_string(),
+    ));
     let setup = settings.spacewars.normalized();
     window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
     window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
@@ -1191,6 +1194,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "clock" => 7,
         "falling" => 1,
         "nes" => 2,
+        "surface-expedition" => 4,
         _ => 3,
     }
 }
@@ -1226,6 +1230,14 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
     }
 
     match window.get_launcher_scenario().as_str() {
+        "surface-expedition" if focus == 2 => {
+            let next = cycle_label(
+                window.get_launcher_expedition_players().as_str(),
+                &["1", "2"],
+                delta,
+            );
+            window.set_launcher_expedition_players(SharedString::from(next));
+        }
         "spacewars" => adjust_spacewars_launcher_setting(window, focus, delta),
         "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
         "clock" => adjust_clock_launcher_setting(window, focus, delta),
@@ -1547,6 +1559,7 @@ struct LauncherSelections {
     clock: ClockSettings,
     spacewars: SpacewarsSettings,
     pizza: PizzaSettings,
+    surface_expedition: engine_common::SurfaceExpeditionSettings,
 }
 
 fn persist_launcher_settings(
@@ -1594,6 +1607,10 @@ fn persist_launcher_settings(
     }
     if settings.spacewars != spacewars {
         settings.spacewars = spacewars;
+        changed = true;
+    }
+    if settings.surface_expedition != selections.surface_expedition {
+        settings.surface_expedition = selections.surface_expedition;
         changed = true;
     }
     if settings.pizza != pizza {
@@ -1765,7 +1782,19 @@ fn launcher_selections_from_window(
     } else {
         current_settings.nes.selected_rom_id.clone()
     };
+    let surface_expedition = if launch.scenario == "surface-expedition" {
+        engine_common::SurfaceExpeditionSettings {
+            players: match window.get_launcher_expedition_players().as_str() {
+                "1" => engine_common::SurfaceExpeditionPlayers::One,
+                "2" => engine_common::SurfaceExpeditionPlayers::Two,
+                _ => return Err("Expedition needs one or two players.".to_owned()),
+            },
+        }
+    } else {
+        current_settings.surface_expedition
+    };
     Ok(LauncherSelections {
+        surface_expedition,
         launch,
         nes_rom_id,
         clock,
@@ -2586,6 +2615,9 @@ mod tests {
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
         let selections = LauncherSelections {
+            surface_expedition: engine_common::SurfaceExpeditionSettings {
+                players: engine_common::SurfaceExpeditionPlayers::Two,
+            },
             launch: EffectiveLaunch {
                 scenario: "spacewars".into(),
                 seed: 123,
@@ -2638,6 +2670,10 @@ mod tests {
         assert_eq!(reloaded.settings.launch.renderer, RendererSetting::Raster);
         assert_eq!(reloaded.settings.launch.raster_scale, 2.0);
         assert_eq!(reloaded.settings.spacewars, selections.spacewars);
+        assert_eq!(
+            reloaded.settings.surface_expedition,
+            selections.surface_expedition
+        );
         assert_eq!(reloaded.settings.pizza, selections.pizza);
         assert_eq!(reloaded.settings.clock, selections.clock);
         assert_eq!(

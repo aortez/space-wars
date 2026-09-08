@@ -78,12 +78,13 @@ impl LandingTelemetry {
             .clamp(-1.0, 1.0)
             .acos()
             .to_degrees();
-        let altitude = physics::LANDING_FEET
+        let (feet, foot_radius) = physics.landing_geometry(index);
+        let altitude = feet
             .into_iter()
             .map(|foot| {
                 (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
                     - planet.radius * BODY_BOUNDS_RADIUS_SCALE
-                    - physics::LANDING_FOOT_RADIUS
+                    - foot_radius
             })
             .fold(f32::INFINITY, f32::min);
         let near =
@@ -115,8 +116,7 @@ impl LandingTelemetry {
         dt: f32,
     ) {
         let mut next = Self::measure(physics, index, planet_index, planet);
-        let settled = ship.form == ShipForm::Ship
-            && !ship.dead
+        let settled = !ship.dead
             && ship.thrust == 0.0
             && next.supported_feet == 2
             && next.angle_degrees < LANDED_ANGLE
@@ -158,7 +158,7 @@ impl SurfacePilot {
         planets: &[PlanetState],
         dt: f32,
     ) {
-        if ship.form != ShipForm::Ship || ship.dead {
+        if ship.dead || (ship.form == ShipForm::EscapePod && self.recovery.is_none()) {
             return;
         }
         self.select_approach_planet(physics, planets);

@@ -100,8 +100,12 @@ prescribed center acceleration, and effective inward/lateral acceleration at
 ship spawn. Units are world units/s² and rad/s, not pixels or per-tick deltas.
 The ship's legacy gravity query point is offset from its Rapier origin; both
 points are reported, and the diagnostic field is checked against the real
-shared solver. Scenario observations are now version 7 (profile identity was
-added in version 6; version 7 adds travel/support and outpost inventory);
+shared solver. Scenario observations are now version 10 (profile identity was
+added in version 6; version 7 adds travel/support and outpost inventory;
+version 8 wraps per-player views in a `players` array; version 9 adds Expedition
+planet claims and makes the focused outpost optional; version 10 adds vehicle
+form and optional Expedition recovery telemetry). These compatibility
+fixtures remain single-pilot configurations;
 compatibility reports retain their version 2 schema with an additive
 `final_landing.planet` frame identifier.
 Old case identifiers without `profile` deserialize as raw, not Surface V1.
@@ -217,9 +221,9 @@ adopting a world policy in ordinary Spacewars. Keep the raw comparison and
 uncompensated free-flight behavior available during that decision.
 
 The opt-in [Surface Expedition](surface-expedition.md) now exercises travel
-between planets with one pilot and independent outposts; it does not change
+between planets with one or two pilots and flag-based planet claiming; it does not change
 these pinned comparison cases or adopt the profile in ordinary Spacewars.
 
-After agreeing that policy: generalize to multiple pilots/vehicles, decide loss
-and rescue/rebuild rules, connect contested services, and add versioned bot
+After agreeing that policy: decide loss and rescue/rebuild rules, connect
+future services independently of planet ownership, and add versioned bot
 surface intents. Economy and deformable terrain remain separate work.

@@ -35,7 +35,7 @@ not a new ordinary-game default. Both generated presets start on planet 0,
 initially away from the sun. See the [profile comparison](surface-compatibility.md#surface-v1-experiment)
 for parameters, results, and remaining approach/long-idle limits.
 
-For travel between those planets and separate outposts, choose
+For travel between those planets and flag-based planet claiming, choose
 **surface-expedition**. It adds dynamic approach/support selection to the same
 scenario; the four original presets remain pinned compatibility fixtures.
 See [Surface Expedition](surface-expedition.md) for that opt-in loop and scope.
@@ -192,12 +192,18 @@ Headless regressions cover exit/walk/jump/return/reboard without pose shortcuts,
 ship health and creature identity preservation, one-body lifecycle, velocity
 inheritance, no airborne transport, blocked exits, unsafe/remote boarding,
 held-input gating in both directions, and reproducible actions/restarts. Typed
-`SurfaceSortieState::observation()` and version-4 JSON scenario observations
+`SurfaceSortieState::observation(player)` and JSON scenario observations
 include landing phase, clearance, angle, relative speeds/spin, foot count,
 assist strength, and settling duration for future runners. Outpost observations
 add identity, position/normal, owner, active claimant, capture eligibility and
 progress, capture count, repair eligibility/range, and cumulative health
-restored. This does not add a live IPC telemetry API.
+restored. The current JSON envelope is version 10 with a `players` array;
+these pinned presets contain only seat 0. Version 9 makes `outpost` optional
+and adds `planet_claim`/`planet_claims` for Expedition; pinned outpost fixtures
+retain their existing behavior. Version 10 adds `vehicle_form` and optional
+Expedition recovery telemetry (`recovery` is null in these pinned fixtures).
+This does not add a live IPC
+telemetry API.
 
 Landing regressions fly gentle approaches at eight bearings, verify physical
 takeoff/return, contact-only boarding, the settling interval, sideways damping,
@@ -272,7 +278,9 @@ not retune those orbits, gravity, rovers, ships, or bots.
 Typed/JSON observations include `motion` and `motion_metrics` (introduced in
 version 4; version 5 adds the optional `generated_case` identifier; version 6
 adds its explicit gravity/motion `profile`; version 7 adds travel, explicit
-support/frame planet IDs and the complete outpost inventory):
+support/frame planet IDs and the complete outpost inventory; version 8 wraps
+independent seat views in a `players` array; version 9 adds planet claims and
+an optional focused outpost; version 10 adds vehicle form and optional recovery):
 
 - completed planet position, origin velocity, angle/spin, active-body
   surface-relative velocity, and actual support-point velocity/relative speed;

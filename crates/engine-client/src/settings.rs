@@ -260,6 +260,30 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn previous_settings_default_to_one_expedition_player_and_both_counts_round_trip() {
+        use engine_common::SurfaceExpeditionPlayers;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[launch]\nscenario = \"surface-expedition\"\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.status, LoadStatus::Migrated);
+        assert_eq!(loaded.settings.launch.scenario, "surface-expedition");
+        assert_eq!(
+            loaded.settings.surface_expedition.players,
+            SurfaceExpeditionPlayers::One
+        );
+        for players in [SurfaceExpeditionPlayers::Two, SurfaceExpeditionPlayers::One] {
+            loaded.settings.surface_expedition.players = players;
+            save_settings(&loaded.settings, &path).unwrap();
+            let reloaded = load_settings(&path).unwrap();
+            assert_eq!(reloaded.status, LoadStatus::Existing);
+            assert_eq!(reloaded.settings.surface_expedition.players, players);
+            assert_eq!(reloaded.settings.launch.scenario, "surface-expedition");
+        }
+    }
+
+    #[test]
     fn previous_clock_settings_default_to_calm_and_profiles_round_trip() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
