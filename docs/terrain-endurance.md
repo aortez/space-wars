@@ -285,6 +285,11 @@ landed on material ground without a pad; the existing two-player setting was
 preserved. This is a startup/idle rendering check, not a fragmented-world GPU
 benchmark or a substitute for controller playtesting.
 
+Subsequent Pi controller playtesting confirmed takeoff and landing again,
+disembarking, walking, and claiming the planet. Mining the flag's footing removed
+the flag and began a fresh claim at the stationary spaceling. The user accepted
+this behavior and the first combined terrain/Expedition slice.
+
 Reports and validation records are in the local
 `surface-terrain-integration-20260908` artifact directory. `desktop` and `pi`
 contain the final three runs per platform; earlier diagnostic attempts are
