@@ -13,6 +13,7 @@ pub mod flight_pilot;
 pub mod pilot;
 pub mod recovery_pilot;
 pub mod recovery_task;
+pub mod tactical_sortie;
 
 use core::f32::consts::PI;
 

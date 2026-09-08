@@ -74,7 +74,41 @@ pub struct CombatObservationV2 {
     pub weapons: CombatTelemetry,
 }
 
+/// Cover is measured against surviving planet material, never inferred from
+/// the old circular outline or a detached fragment. One requested site keeps
+/// steady flight queries bounded; a survey samples at most 64 sites.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct LandingCover {
+    pub site: LandingSiteId,
+    pub grounded: bool,
+    pub approach: bool,
+    pub departure: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TacticalSortieObservationV1 {
+    pub version: u32,
+    pub combat: CombatObservationV2,
+    pub cover: Vec<LandingCover>,
+}
+
 impl SurfaceSortieScenario {
+    /// Fixed initial conditions for paired landing trials. Health is set only
+    /// during construction; subsequent damage and recovery remain physical.
+    pub fn init_material_combat_trial(
+        seed: u64,
+        starts: &[(PlayerId, MaterialFlightStart)],
+        health_percent: [f32; 2],
+    ) -> SurfaceSortieState {
+        let mut state = Self::init_material_combat_flight(seed, starts);
+        for (seat, health) in health_percent.into_iter().enumerate() {
+            assert!(health.is_finite() && (1.0..=100.0).contains(&health));
+            let ship = &mut state.world.ships[state.pilots[seat].vehicle.0];
+            ship.life = ship.life_max * health / 100.0;
+        }
+        state
+    }
+
     pub fn init_material_combat(seed: u64) -> SurfaceSortieState {
         Self::init_material_combat_flight(
             seed,
@@ -116,6 +150,54 @@ impl SurfaceSortieScenario {
     }
 }
 impl SurfaceSortieState {
+    pub fn tactical_sortie_observation(
+        &self,
+        player: usize,
+        site: Option<LandingSiteId>,
+    ) -> TacticalSortieObservationV1 {
+        let combat = self.combat_observation(player, site);
+        let cover = combat
+            .recovery
+            .flight
+            .pilot
+            .sites
+            .iter()
+            .map(|site| {
+                let occluded = |height| {
+                    let Some(enemy) = combat.target else {
+                        return true;
+                    };
+                    let target = site.vehicle_position + site.normal * height;
+                    let delta = target - enemy.motion.position;
+                    let vehicle = self.pilots[enemy.owner.index()].vehicle.0;
+                    self.world
+                        .physics
+                        .cast_laser(
+                            vehicle,
+                            enemy.motion.position,
+                            delta.normalized(),
+                            delta.length(),
+                        )
+                        .is_some_and(|hit| {
+                            hit.target
+                                == Some(MechanicalEntity::Body(BodyId::Planet(site.id.planet)))
+                        })
+                };
+                LandingCover {
+                    site: site.id,
+                    grounded: occluded(7.0),
+                    approach: occluded(30.0),
+                    departure: occluded(60.0),
+                }
+            })
+            .collect();
+        TacticalSortieObservationV1 {
+            version: 1,
+            combat,
+            cover,
+        }
+    }
+
     pub fn combat_enabled(&self) -> bool {
         self.pilots.first().is_some_and(|p| p.combat.is_some())
     }
@@ -259,6 +341,85 @@ fn record_taken(pilots: &mut [SurfacePilot], target: usize, tick: u64, source: &
 mod tests {
     use super::*;
     const DT: Duration = Duration::from_nanos(16_666_667);
+    #[test]
+    fn tactical_cover_is_bounded_read_only_and_uses_current_material() {
+        use engine_terrain::{Brush, EditMode, TerrainEdit};
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        assert!(state.tactical_sortie_observation(0, None).cover.is_empty());
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let before = SurfaceSortieScenario::observe(&state);
+        let survey = state.tactical_sortie_observation(0, None);
+        assert!(!survey.cover.is_empty() && survey.cover.len() <= 64);
+        assert!(
+            survey
+                .cover
+                .iter()
+                .any(|c| c.grounded && c.approach && c.departure)
+        );
+        assert!(survey.cover.iter().any(|c| !c.grounded));
+        assert_eq!(survey, state.tactical_sortie_observation(0, None));
+        assert_eq!(
+            before.payload,
+            SurfaceSortieScenario::observe(&state).payload
+        );
+        let site = survey.combat.recovery.flight.pilot.sites[0];
+        let requested = state.tactical_sortie_observation(0, Some(site.id));
+        assert_eq!(requested.cover.len(), 1);
+        assert_eq!(requested.cover[0].site, site.id);
+
+        // Removing the surveyed footing invalidates the query until the shared
+        // step rebuilds colliders. Neither sensor can make the old site usable.
+        let cell = state.world.terrain.planets[&0]
+            .field
+            .local_to_cell(site.local_position - site.local_position.normalized() * 0.1)
+            .unwrap();
+        state
+            .world
+            .queue_planet_edit(
+                0,
+                TerrainEdit {
+                    brush: Brush::Circle {
+                        center: cell,
+                        radius: 10,
+                    },
+                    mode: EditMode::Remove,
+                },
+            )
+            .unwrap();
+        SpacewarsScenario::prepare_terrain(&mut state.world, &[]);
+        let dirty = state.tactical_sortie_observation(0, Some(site.id));
+        assert!(!dirty.combat.recovery.flight.pilot.queries_ready);
+        assert!(dirty.cover.is_empty());
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let changed = state.tactical_sortie_observation(0, Some(site.id));
+        let pilot = &changed.combat.recovery.flight.pilot;
+        assert!(pilot.queries_ready && pilot.planet.revision > site.revision);
+        assert!(
+            pilot.sites.is_empty()
+                || pilot.sites[0]
+                    .local_position
+                    .distance_to(site.local_position)
+                    > 2.0
+        );
+        assert_eq!(changed.cover.len(), pilot.sites.len());
+    }
+
+    #[test]
+    fn trial_health_is_initial_only_and_full_health_preserves_existing_fixture() {
+        let ordinary = SurfaceSortieScenario::init_material_combat_flight(42, &[]);
+        let full = SurfaceSortieScenario::init_material_combat_trial(42, &[], [100.0; 2]);
+        assert_eq!(
+            SurfaceSortieScenario::observe(&ordinary).payload,
+            SurfaceSortieScenario::observe(&full).payload
+        );
+        let half = SurfaceSortieScenario::init_material_combat_trial(42, &[], [100.0, 50.0]);
+        for seat in 0..2 {
+            let a = full.pilot_observation(seat, None);
+            let b = half.pilot_observation(seat, None);
+            assert_eq!(a.ship, b.ship);
+            assert_eq!(b.ship_health, if seat == 0 { 100.0 } else { 50.0 });
+        }
+    }
     #[test]
     fn surface_pod_keeps_resolved_motion_without_legacy_damage_kick() {
         let mut state = SurfaceSortieScenario::init_material_combat(42);

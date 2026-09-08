@@ -22,7 +22,9 @@ and the evidence needed before expanding it into the normal game.
 
 The controlled combat slice now adds the shared laser/cannon pipeline,
 `rule_pilot_v4` pursuit and firing, and recovery followed by renewed combat.
-See [Material combat V4](../material-combat-ai.md). Random asteroid pressure,
+See [Material combat V4](../material-combat-ai.md) and the opt-in
+[cover-aware capture sortie](../tactical-surface-sorties.md), which coordinates
+landing and departure around the existing surface and recovery tasks. Random asteroid pressure,
 enemy flag routes and generated multi-planet match integration remain ahead.
 
 ## Player outcome

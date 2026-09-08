@@ -595,6 +595,12 @@ fn show_launcher(
     window.set_launcher_expedition_players(SharedString::from(
         settings.surface_expedition.players.count().to_string(),
     ));
+    window.set_launcher_combat_mission(SharedString::from(
+        match settings.material_combat.mission {
+            engine_common::MaterialCombatMission::Dogfight => "Dogfight",
+            engine_common::MaterialCombatMission::Capture => "Capture",
+        },
+    ));
     let breaks = settings.combat_breaks.normalized();
     window.set_launcher_combat_break_interval(SharedString::from(
         if breaks.interval_seconds == 0 {
@@ -1201,7 +1207,8 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
-        "pizza" | "spacewars-terrain-combat" | "spacewars-terrain-duel" => 5,
+        "pizza" => 5,
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 6,
         "clock" => 7,
         "falling" => 1,
         "nes" => 2,
@@ -1258,6 +1265,11 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
             3 => window.set_launcher_combat_break_duration(SharedString::from(cycle_label(
                 window.get_launcher_combat_break_duration().as_str(),
                 &["2", "4", "6", "8"],
+                delta,
+            ))),
+            4 => window.set_launcher_combat_mission(SharedString::from(cycle_label(
+                window.get_launcher_combat_mission().as_str(),
+                &["Dogfight", "Capture"],
                 delta,
             ))),
             _ => {}
@@ -1585,6 +1597,7 @@ struct LauncherSelections {
     pizza: PizzaSettings,
     surface_expedition: engine_common::SurfaceExpeditionSettings,
     combat_breaks: engine_common::CombatBreakSettings,
+    material_combat: engine_common::MaterialCombatSettings,
 }
 
 fn persist_launcher_settings(
@@ -1636,6 +1649,10 @@ fn persist_launcher_settings(
     }
     if settings.surface_expedition != selections.surface_expedition {
         settings.surface_expedition = selections.surface_expedition;
+        changed = true;
+    }
+    if settings.material_combat != selections.material_combat {
+        settings.material_combat = selections.material_combat;
         changed = true;
     }
     if settings.combat_breaks != selections.combat_breaks.normalized() {
@@ -1845,7 +1862,22 @@ fn launcher_selections_from_window(
     } else {
         current_settings.combat_breaks
     };
+    let material_combat = if matches!(
+        launch.scenario.as_str(),
+        "spacewars-terrain-combat" | "spacewars-terrain-duel"
+    ) {
+        engine_common::MaterialCombatSettings {
+            mission: match window.get_launcher_combat_mission().as_str() {
+                "Dogfight" => engine_common::MaterialCombatMission::Dogfight,
+                "Capture" => engine_common::MaterialCombatMission::Capture,
+                _ => return Err("Unknown combat mission.".to_owned()),
+            },
+        }
+    } else {
+        current_settings.material_combat
+    };
     Ok(LauncherSelections {
+        material_combat,
         combat_breaks,
         surface_expedition,
         launch,
@@ -2668,6 +2700,9 @@ mod tests {
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
         let selections = LauncherSelections {
+            material_combat: engine_common::MaterialCombatSettings {
+                mission: engine_common::MaterialCombatMission::Capture,
+            },
             combat_breaks: engine_common::CombatBreakSettings {
                 interval_seconds: 8,
                 duration_seconds: 6,
@@ -2732,6 +2767,10 @@ mod tests {
             selections.surface_expedition
         );
         assert_eq!(reloaded.settings.combat_breaks, selections.combat_breaks);
+        assert_eq!(
+            reloaded.settings.material_combat,
+            selections.material_combat
+        );
         assert_eq!(reloaded.settings.pizza, selections.pizza);
         assert_eq!(reloaded.settings.clock, selections.clock);
         assert_eq!(

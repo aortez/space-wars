@@ -10,6 +10,7 @@ use scenario_spacewars::surface_sortie::{
 };
 use spacewars_ai::{
     BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3,
+    tactical_sortie::TacticalSortiePilot,
 };
 
 use super::{
@@ -147,7 +148,7 @@ fn create_pilot(
 
 pub(super) const COMBAT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-combat",
-    controls_help: "Material combat: P1 human versus P2 combat bot. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. Launcher Settings adjust Bot combat breaks (Off, 8s, 15s or 30s of combat on average) and break duration. During a flyby the bot keeps moving with weapons off and remains vulnerable. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
+    controls_help: "Material combat: P1 human versus P2 combat bot. Set Bot mission to Capture in launcher Settings to intercept P2 as it seeks shelter, lands, captures, boards and departs. After its attempt it fights or recovers. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. Launcher Settings adjust Bot combat breaks (Off, 8s, 15s or 30s of combat on average) and break duration. During a flyby the bot keeps moving with weapons off and remains vulnerable. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
     create: create_combat_pilot,
     ..TERRAIN_REGISTRATION
 };
@@ -155,6 +156,7 @@ struct MaterialCombatClientScenario {
     sortie: SurfaceSortieClientScenario,
     brain: RulePilotV4,
     p1_brain: Option<RulePilotV4>,
+    tactical: Option<TacticalSortiePilot>,
 }
 fn create_combat_pilot(
     seed: u64,
@@ -175,12 +177,13 @@ fn create_combat_pilot(
             settings.combat_breaks,
         ),
         p1_brain: None,
+        tactical: capture_pilot(seed, PlayerId::PLAYER_2, settings),
     }))
 }
 
 pub(super) const DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-duel",
-    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Launcher Settings adjust combat breaks and their duration for both bots. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
+    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Set Bot mission to Capture in launcher Settings for P1 to attempt a sheltered landing, capture and departure while P2 intercepts. After its attempt P1 fights or recovers. Launcher Settings adjust combat breaks and their duration for both bots. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
     create: create_combat_duel,
     ..COMBAT_REGISTRATION
 };
@@ -209,7 +212,20 @@ fn create_combat_duel(
             },
             settings.combat_breaks,
         )),
+        tactical: capture_pilot(seed, PlayerId::PLAYER_1, settings),
     }))
+}
+
+fn capture_pilot(seed: u64, actor: PlayerId, settings: &Settings) -> Option<TacticalSortiePilot> {
+    (settings.material_combat.mission == engine_common::MaterialCombatMission::Capture).then(|| {
+        TacticalSortiePilot::new(
+            BrainReset {
+                actor,
+                episode_seed: seed,
+            },
+            settings.combat_breaks,
+        )
+    })
 }
 
 fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
@@ -285,6 +301,31 @@ impl ClientScenario for MaterialCombatClientScenario {
         if dt.is_zero() {
             return self.sortie.step(&[], dt);
         }
+        if let Some(tactical) = &mut self.tactical {
+            let (seat, owner) = if self.p1_brain.is_some() {
+                (0, PlayerId::PLAYER_1)
+            } else {
+                (1, PlayerId::PLAYER_2)
+            };
+            let observation = self
+                .sortie
+                .state
+                .tactical_sortie_observation(seat, tactical.site_request());
+            let mut actions = if seat == 1 {
+                human_pilot_actions(actions)
+            } else {
+                Vec::new()
+            };
+            actions.extend(tactical.intent(&observation).encode(owner));
+            if seat == 0 {
+                let opponent = self
+                    .sortie
+                    .state
+                    .combat_observation(1, self.brain.site_request());
+                actions.extend(self.brain.intent(&opponent).encode(PlayerId::PLAYER_2));
+            }
+            return self.sortie.step(&actions, dt);
+        }
         let observation = self
             .sortie
             .state
@@ -309,9 +350,17 @@ impl ClientScenario for MaterialCombatClientScenario {
     }
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
         let mut frames = self.sortie.render_frames(renderer, viewport);
-        pilot_hud(&mut frames, self.brain.label());
-        if let Some(brain) = &self.p1_brain {
-            pilot_hud_for(&mut frames, 0, brain.label());
+        if let Some(tactical) = &self.tactical {
+            let seat = if self.p1_brain.is_some() { 0 } else { 1 };
+            pilot_hud_for(&mut frames, seat, tactical.label());
+            if seat == 0 {
+                pilot_hud(&mut frames, self.brain.label());
+            }
+        } else {
+            pilot_hud(&mut frames, self.brain.label());
+            if let Some(brain) = &self.p1_brain {
+                pilot_hud_for(&mut frames, 0, brain.label());
+            }
         }
         frames
     }
@@ -606,6 +655,70 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn capture_mission_owns_the_expected_seat_and_pause_restart_preserve_boundaries() {
+        for registration in [&COMBAT_REGISTRATION, &DUEL_REGISTRATION] {
+            let make = || {
+                registration
+                    .create(
+                        42,
+                        &Settings {
+                            material_combat: engine_common::MaterialCombatSettings {
+                                mission: engine_common::MaterialCombatMission::Capture,
+                            },
+                            ..Default::default()
+                        },
+                        Viewport::new(800.0, 480.0),
+                        ScenarioStartMode::Normal,
+                    )
+                    .unwrap()
+            };
+            let mut host = make();
+            let host = host
+                .as_any_mut()
+                .downcast_mut::<MaterialCombatClientScenario>()
+                .unwrap();
+            let seat = if registration.id == DUEL_REGISTRATION.id {
+                0
+            } else {
+                1
+            };
+            let initial = host.tactical.as_ref().unwrap().telemetry().clone();
+            let input = [SurfaceWeaponAction {
+                laser: true,
+                cannon: true,
+            }
+            .encode(PlayerId::from_index(seat).unwrap())];
+            host.step(&input, Duration::ZERO);
+            assert_eq!(host.tactical.as_ref().unwrap().telemetry(), &initial);
+            assert_eq!(host.sortie.state.observation(0).tick, 0);
+            for _ in 0..120 {
+                host.step(&input, Duration::from_nanos(16_666_667));
+            }
+            assert!(
+                host.tactical
+                    .as_ref()
+                    .unwrap()
+                    .telemetry()
+                    .started_tick
+                    .is_some()
+            );
+            assert_eq!(host.sortie.state.combat_telemetry(seat).shells_fired, 0);
+            assert_eq!(host.sortie.state.combat_telemetry(seat).laser_hit_ticks, 0);
+            let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
+            let expected = format!("AI: {}", host.tactical.as_ref().unwrap().label());
+            assert!(frames[seat].layers.iter().flat_map(|l| &l.primitives).any(
+                |p| matches!(p, engine_common::RenderPrimitive::Text(t) if t.text == expected)
+            ));
+            let reset = make();
+            let reset = reset
+                .as_any()
+                .downcast_ref::<MaterialCombatClientScenario>()
+                .unwrap();
+            assert_eq!(reset.tactical.as_ref().unwrap().telemetry(), &initial);
+        }
+    }
 
     #[test]
     fn combat_and_duel_hosts_apply_break_settings_to_every_bot() {

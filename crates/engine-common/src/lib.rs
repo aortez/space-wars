@@ -128,9 +128,24 @@ pub struct Settings {
     pub spacewars: SpacewarsSettings,
     pub surface_expedition: SurfaceExpeditionSettings,
     pub combat_breaks: CombatBreakSettings,
+    pub material_combat: MaterialCombatSettings,
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MaterialCombatSettings {
+    pub mission: MaterialCombatMission,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaterialCombatMission {
+    #[default]
+    Dogfight,
+    Capture,
 }
 
 /// Optional pacing experiment for the material combat pilots.

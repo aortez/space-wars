@@ -89,6 +89,14 @@ pub struct RulePilotV1 {
 }
 
 impl RulePilotV1 {
+    /// A mission may choose the destination; the normal policy still checks
+    /// its material revision and performs every landing/transfer physically.
+    pub fn with_site(context: BrainReset, site: PilotLandingSite) -> Self {
+        let mut pilot = Self::new(context);
+        pilot.site = Some(site);
+        pilot
+    }
+
     pub fn new(context: BrainReset) -> Self {
         Self {
             context,

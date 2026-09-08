@@ -777,6 +777,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             raster_scale: window.get_launcher_raster_scale_text().to_string(),
             combat_break_interval: window.get_launcher_combat_break_interval().to_string(),
             combat_break_duration: window.get_launcher_combat_break_duration().to_string(),
+            combat_mission: window.get_launcher_combat_mission().to_string(),
             spacewars_preset: window.get_launcher_spacewars_preset().to_string(),
             spacewars_planets: window.get_launcher_use_planets().to_string(),
             spacewars_asteroids: window.get_launcher_asteroids_enabled().to_string(),

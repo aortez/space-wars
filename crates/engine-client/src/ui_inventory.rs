@@ -58,6 +58,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) raster_scale: String,
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
+    pub(crate) combat_mission: String,
     pub(crate) expedition_players: String,
     pub(crate) spacewars_preset: String,
     pub(crate) spacewars_planets: String,
@@ -255,11 +256,17 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.break-duration",
                 &context.combat_break_duration,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.mission",
+                &context.combat_mission,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.combat.break-interval",
                 "launcher.settings.combat.break-duration",
+                "launcher.settings.combat.mission",
                 "launcher.settings.back",
             ]
         }
@@ -548,6 +555,7 @@ mod tests {
             raster_scale: "2.0".into(),
             combat_break_interval: "15".into(),
             combat_break_duration: "4".into(),
+            combat_mission: "Dogfight".into(),
             spacewars_preset: "Small Duel".into(),
             spacewars_planets: "on".into(),
             spacewars_asteroids: "off".into(),

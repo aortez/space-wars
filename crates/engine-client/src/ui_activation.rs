@@ -127,7 +127,9 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.event-profile" => 3,
-        "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.falling" => 4,
+        "launcher.settings.spacewars.asteroids"
+        | "launcher.settings.clock.falling"
+        | "launcher.settings.combat.mission" => 4,
         "launcher.settings.spacewars.player-health" | "launcher.settings.clock.color-cycle" => 5,
         "launcher.settings.spacewars.player-2" => 6,
         _ => return None,

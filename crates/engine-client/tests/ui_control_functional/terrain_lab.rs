@@ -20,7 +20,11 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
             ) {
                 let interval = "launcher.settings.combat.break-interval.next";
                 let duration = "launcher.settings.combat.break-duration.next";
+                let mission = "launcher.settings.combat.mission.next";
                 if renderer == "vector" {
+                    assert_eq!(control_value(&state, mission), Some("Dogfight"));
+                    state = harness.activate_guarded(mission, &state);
+                    assert_eq!(control_value(&state, mission), Some("Capture"));
                     assert_eq!(control_value(&state, interval), Some("15"));
                     assert_eq!(control_value(&state, duration), Some("4"));
                     for expected in ["30", "Off", "8"] {
@@ -31,6 +35,9 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                     assert_eq!(control_value(&state, duration), Some("6"));
                 } else {
                     // Returning through launch/restart reloads the persisted choices.
+                    assert_eq!(control_value(&state, mission), Some("Capture"));
+                    state = harness.activate_guarded(mission, &state);
+                    assert_eq!(control_value(&state, mission), Some("Dogfight"));
                     assert_eq!(control_value(&state, interval), Some("8"));
                     assert_eq!(control_value(&state, duration), Some("6"));
                     state = harness.activate_guarded(
