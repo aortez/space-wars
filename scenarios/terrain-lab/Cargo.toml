@@ -1,0 +1,17 @@
+[package]
+name = "scenario-terrain-lab"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+engine-common = { workspace = true }
+engine-core = { workspace = true }
+engine-gravity = { workspace = true }
+engine-rapier = { workspace = true }
+engine-terrain = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }

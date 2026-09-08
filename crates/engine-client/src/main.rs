@@ -1,7 +1,7 @@
 //! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
 //! The compile-time registry hosts Clock, Falling, NES Library, Pizza, Rover
-//! Lab, and Spacewars from the launcher, with Null retained as a hidden test
+//! Lab, Spaceling Lab, Terrain Lab, and Spacewars, with Null retained as a hidden test
 //! scenario.
 
 mod client_scenarios;
@@ -1194,7 +1194,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "clock" => 7,
         "falling" => 1,
         "nes" => 2,
-        "surface-expedition" => 4,
+        "surface-expedition" | "spacewars-terrain" => 4,
         _ => 3,
     }
 }
@@ -1230,7 +1230,7 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
     }
 
     match window.get_launcher_scenario().as_str() {
-        "surface-expedition" if focus == 2 => {
+        "surface-expedition" | "spacewars-terrain" if focus == 2 => {
             let next = cycle_label(
                 window.get_launcher_expedition_players().as_str(),
                 &["1", "2"],
@@ -1782,7 +1782,10 @@ fn launcher_selections_from_window(
     } else {
         current_settings.nes.selected_rom_id.clone()
     };
-    let surface_expedition = if launch.scenario == "surface-expedition" {
+    let surface_expedition = if matches!(
+        launch.scenario.as_str(),
+        "surface-expedition" | "spacewars-terrain"
+    ) {
         engine_common::SurfaceExpeditionSettings {
             players: match window.get_launcher_expedition_players().as_str() {
                 "1" => engine_common::SurfaceExpeditionPlayers::One,

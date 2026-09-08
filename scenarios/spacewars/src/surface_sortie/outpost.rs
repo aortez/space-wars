@@ -65,6 +65,7 @@ impl RepairStatus {
     }
 }
 
+#[derive(Clone)]
 pub(super) struct SurfaceOutpost {
     pub id: OutpostId,
     pub planet: usize,

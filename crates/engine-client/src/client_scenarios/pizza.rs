@@ -133,7 +133,6 @@ impl ClientScenario for PizzaClientScenario {
             rapier_island_time: metrics.rapier.island_time,
             rapier_island_constraints_time: metrics.rapier.island_constraints_time,
             rapier_solver_time: metrics.rapier.solver_time,
-            rapier_ccd_time: metrics.rapier.ccd_time,
             added: metrics.added,
             removed: metrics.removed,
         })

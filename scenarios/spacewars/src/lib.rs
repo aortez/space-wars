@@ -6,6 +6,11 @@
 
 mod physics;
 pub mod surface_sortie;
+mod terrain;
+pub use terrain::{
+    TerrainDiagnostics, TerrainMotionAnomaly, TerrainMotionBody, TerrainMotionFrame,
+    TerrainMotionPeaks, TerrainMotionStage, fixture_controls as terrain_fixture_controls,
+};
 
 use std::{
     collections::{BTreeMap, BTreeSet, BinaryHeap},
@@ -180,6 +185,7 @@ const GRAVITY_PARTICLE_TAG: u64 = 4;
 const GRAVITY_ROVER_TAG: u64 = 5;
 const GRAVITY_ROVER_FRAME_TAG: u64 = 6;
 const GRAVITY_SURFACE_PILOT_TAG: u64 = 7;
+const GRAVITY_TERRAIN_FRAGMENT_TAG: u64 = 8;
 const ROVER_BODY_COUNT: u64 = 3;
 
 pub const SPACEWARS_PLAYER_COUNT: usize = 2;
@@ -365,6 +371,7 @@ pub struct SpacewarsState {
     pub spaceport_contacts: Vec<SpaceportContact>,
     pub player_view_heights: [f32; 2],
     pub last_step_metrics: SpacewarsStepMetrics,
+    terrain: terrain::TerrainState,
     physics: physics::SpacewarsPhysics,
     gravity_solver: GravitySolver,
     gravity_participants: Vec<GravityParticipant>,
@@ -385,6 +392,8 @@ pub struct SpacewarsBenchmarkCounts {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct SpacewarsStepMetrics {
+    /// Optional motion-history capture, excluded from mechanics timing.
+    pub motion_diagnostics_time: Duration,
     pub workload_time: Duration,
     pub lifecycle_time: Duration,
     pub gravity_time: Duration,
@@ -608,6 +617,7 @@ pub enum LaserTarget {
     Rover(u64),
     Debris(usize),
     Body(BodyId),
+    TerrainFragment(u64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1273,19 +1283,18 @@ impl Scenario for SpacewarsScenario {
             player_view_heights,
             last_step_metrics: SpacewarsStepMetrics::default(),
             physics,
+            terrain: terrain::TerrainState::default(),
             gravity_solver: GravitySolver::new(),
             gravity_participants: Vec::new(),
         }
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
-        Self::step_with_surface_pilots(state, actions, dt, &mut [])
+        Self::step_with_surface_pilots(state, actions, dt, &mut [], None)
     }
 
-    fn observe(_state: &Self::State) -> Observation {
-        Observation {
-            payload: Vec::new(),
-        }
+    fn observe(state: &Self::State) -> Observation {
+        terrain::observation(state)
     }
 
     fn render_frame(state: &Self::State) -> RenderFrame {
@@ -1298,6 +1307,16 @@ impl Scenario for SpacewarsScenario {
 }
 
 impl SpacewarsScenario {
+    fn prepare_terrain(state: &mut SpacewarsState, actions: &[Action]) -> (Duration, Duration) {
+        terrain::apply_fixture_controls(state, actions);
+        let mut diagnostics = terrain::capture_motion(state, TerrainMotionStage::BeforeEdits);
+        let started = Instant::now();
+        terrain::commit(state);
+        let elapsed = started.elapsed();
+        diagnostics += terrain::capture_motion(state, TerrainMotionStage::AfterEdits);
+        (elapsed, diagnostics)
+    }
+
     // The opt-in fixture shares this exact physics step. Ordinary Spacewars
     // passes no pilot and retains its existing services and observation model.
     fn step_with_surface_pilots(
@@ -1305,13 +1324,19 @@ impl SpacewarsScenario {
         actions: &[Action],
         dt: Duration,
         surface_pilots: &mut [surface_sortie::SurfacePilot],
+        prepared_terrain: Option<(Duration, Duration)>,
     ) -> StepResult {
         let experimental = !surface_pilots.is_empty();
         state.last_step_metrics = SpacewarsStepMetrics::default();
         if state.winner.is_some() {
             return StepResult::default();
         }
+        if dt.is_zero() {
+            return StepResult::default();
+        }
         let step_started = Instant::now();
+        let (terrain_time, mut motion_diagnostics_time) =
+            prepared_terrain.unwrap_or_else(|| Self::prepare_terrain(state, actions));
 
         for action in actions.iter().filter_map(SpacewarsAction::decode) {
             state.apply_action(action);
@@ -1326,6 +1351,11 @@ impl SpacewarsScenario {
             }
             update_spaceports(state, dt);
             reconcile_rover_deployments(state, dt);
+        }
+        if !experimental && state.sun.is_none() && state.terrain.fixture {
+            for planet in &mut state.planets {
+                planet.wrapper_angle += planet.wrapper_omega * dt;
+            }
         }
         update_rover_patrol(state);
 
@@ -1364,8 +1394,10 @@ impl SpacewarsScenario {
 
         let lifecycle_started = Instant::now();
         let lifecycle = reconcile_physics(state, dt);
-        let lifecycle_time = lifecycle_started.elapsed();
+        let lifecycle_time = lifecycle_started.elapsed() + terrain_time;
 
+        motion_diagnostics_time +=
+            terrain::capture_motion(state, TerrainMotionStage::BeforeGravity);
         let gravity_started = Instant::now();
         let gravity = if experimental {
             apply_world_gravity_with_pilots(state, surface_pilots, dt)
@@ -1373,6 +1405,7 @@ impl SpacewarsScenario {
             apply_world_gravity(state)
         };
         let gravity_time = gravity_started.elapsed();
+        motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterGravity);
 
         for pilot in surface_pilots.iter_mut() {
             pilot.control_vehicle(
@@ -1384,6 +1417,7 @@ impl SpacewarsScenario {
         }
 
         let rapier = state.physics.step(dt);
+        motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterPhysics);
         state
             .physics
             .synchronize_motion(&mut state.ships, &mut state.debris);
@@ -1393,6 +1427,7 @@ impl SpacewarsScenario {
         state.laser_hits = resolve_laser_hits(state);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
+        terrain::queue_cannon_hits(state);
         let contacts = state.physics.contacts();
         let port_intersections = state.physics.spaceport_contacts();
         let accepted_ports = if experimental {
@@ -1409,13 +1444,20 @@ impl SpacewarsScenario {
         remove_finished_debris(state);
         update_particles(state, dt);
         spawn_random_asteroid(state, dt);
-        if !experimental {
+        if !experimental && !state.terrain.fixture {
             update_game_over(state);
         }
 
+        motion_diagnostics_time +=
+            terrain::capture_motion(state, TerrainMotionStage::AfterCollisions);
         state.tick += 1;
-        let accounted = lifecycle_time + gravity_time + collision_time + rapier.wall_time;
+        let accounted = lifecycle_time
+            + gravity_time
+            + collision_time
+            + rapier.wall_time
+            + motion_diagnostics_time;
         state.last_step_metrics = SpacewarsStepMetrics {
+            motion_diagnostics_time,
             workload_time: step_started.elapsed().saturating_sub(accounted),
             lifecycle_time,
             gravity_time,
@@ -2057,6 +2099,7 @@ fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
         }
         let target = match trace.target {
             Some(MechanicalEntity::Body(body)) => LaserTarget::Body(body),
+            Some(MechanicalEntity::TerrainFragment(id)) => LaserTarget::TerrainFragment(id),
             Some(MechanicalEntity::Ship(ship)) => LaserTarget::Ship(ship),
             Some(MechanicalEntity::Rover(id)) => {
                 if !state.rovers.iter().any(|rover| rover.id == id) {
@@ -2109,7 +2152,7 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
             let impact_direction = hit.point - state.debris[debris].position;
             damage_debris(state, debris, hit.damage, impact_direction, 0x1A5E_0000);
         }
-        LaserTarget::Body(_) => {}
+        LaserTarget::Body(_) | LaserTarget::TerrainFragment(_) => {}
     }
 }
 
@@ -2131,6 +2174,13 @@ fn spawn_laser_hit_particles(state: &mut SpacewarsState, direction: Vec2, hit: L
 
 fn impact_target_data(state: &SpacewarsState, target: LaserTarget) -> Option<(Vec2, Color, f32)> {
     match target {
+        LaserTarget::TerrainFragment(id) => state
+            .physics
+            .world
+            .motion(physics::primary_body(engine_rapier::world::PhysicsId::new(
+                id,
+            )))
+            .map(|m| (m.position, Color::rgb(0.3, 0.4, 0.45), 1.0)),
         LaserTarget::Ship(ship) => state
             .ships
             .get(ship)
@@ -2166,6 +2216,7 @@ fn laser_target_salt(target: LaserTarget) -> u64 {
         LaserTarget::Ship(ship) => 0x5100_0000 ^ ship as u64,
         LaserTarget::Rover(id) => 0x707E_0000 ^ id,
         LaserTarget::Debris(debris) => 0xDEB0_0000 ^ debris as u64,
+        LaserTarget::TerrainFragment(id) => 0x7E00_0000 ^ id,
         LaserTarget::Body(BodyId::Sun) => 0x5A00_0000,
         LaserTarget::Body(BodyId::Planet(index)) => 0xB0D0_0000 ^ index as u64,
     }
@@ -2398,6 +2449,7 @@ fn apply_world_gravity_with_pilots(
         physics,
         gravity_solver,
         gravity_participants,
+        terrain,
         ..
     } = state;
     gravity_participants.clear();
@@ -2426,11 +2478,12 @@ fn apply_world_gravity_with_pilots(
         } else {
             planet.position
         };
-        GravityParticipant::direct_source(
-            tagged_gravity_id(GRAVITY_BODY_TAG, index as u64 + 1),
-            position,
-            planet.mass,
-        )
+        let id = tagged_gravity_id(GRAVITY_BODY_TAG, index as u64 + 1);
+        if terrain.planets.contains_key(&index) {
+            GravityParticipant::spherical_source(id, position, planet.mass, planet.radius)
+        } else {
+            GravityParticipant::direct_source(id, position, planet.mass)
+        }
     }));
     for pilot in pilots.iter() {
         if let Some(snapshot) = pilot.snapshot(physics) {
@@ -2484,6 +2537,16 @@ fn apply_world_gravity_with_pilots(
         ));
     }
 
+    for (&id, fragment) in &terrain.fragments {
+        gravity_participants.push(GravityParticipant::target(
+            tagged_gravity_id(GRAVITY_TERRAIN_FRAGMENT_TAG, id),
+            physics
+                .world
+                .center_of_mass(fragment.assembly.body())
+                .expect("fragment mass"),
+            1.0,
+        ));
+    }
     let debris_responds = tick.is_multiple_of(ASTEROID_GRAVITY_FRAME_MODULUS);
     gravity_participants.extend(debris.iter().filter(|debris| !debris.dead).map(|debris| {
         GravityParticipant::target(
@@ -2577,6 +2640,12 @@ fn apply_world_gravity_with_pilots(
                     rover_id,
                     body_index,
                     output.velocity_delta - frame_delta,
+                ));
+            }
+            GRAVITY_TERRAIN_FRAGMENT_TAG => {
+                assert!(physics.apply_velocity_delta(
+                    MechanicalEntity::TerrainFragment(payload),
+                    output.velocity_delta
                 ));
             }
             GRAVITY_BODY_TAG | GRAVITY_ROVER_FRAME_TAG => {}
@@ -2755,6 +2824,12 @@ fn resolve_physics_collisions(
                         5.0,
                         0x51B0_D000 ^ ship as u64 ^ ((body.order as u64) << 16),
                     );
+                }
+            }
+            (MechanicalEntity::TerrainFragment(_), MechanicalEntity::Ship(ship)) => {
+                if contact.started && contact.closing_speed >= MIN_DAMAGING_BODY_IMPACT_SPEED {
+                    let damage = contact.closing_speed * PLANET_DAMAGE_SCALAR;
+                    state.ships[ship].translate_life_with_impulse(-damage, contact.normal * damage);
                 }
             }
             (MechanicalEntity::Ship(a), MechanicalEntity::Ship(b)) => {
@@ -3981,6 +4056,9 @@ fn detect_body_contacts(state: &SpacewarsState) -> Vec<BodyContact> {
 }
 
 fn spaceport_accepts_ship(state: &SpacewarsState, ship_index: usize, planet_index: usize) -> bool {
+    if !state.terrain.supported(planet_index) {
+        return false;
+    }
     let ship = &state.ships[ship_index];
     if ship.spaceport_reentry_lockout > 0.0 {
         return false;
@@ -4407,7 +4485,9 @@ fn reconcile_rover_deployments(state: &mut SpacewarsState, dt: f32) {
     for planet_index in 0..state.planets.len() {
         let planet = state.planets[planet_index];
         let eligible_owner = planet.owner_id.filter(|owner| {
-            *owner < state.players.len() && planet.radius >= ROVER_MIN_PLANET_RADIUS
+            *owner < state.players.len()
+                && planet.radius >= ROVER_MIN_PLANET_RADIUS
+                && state.terrain.supported(planet_index)
         });
         let build = &mut state.rover_builds[planet_index];
         if build.owner_id != eligible_owner {
@@ -5743,20 +5823,48 @@ fn render_state_with_camera(
     }
 
     for (planet_index, planet) in state.planets.iter().enumerate() {
-        render_body(
-            &mut frame,
-            PLANET_LAYER,
-            planet.position,
-            planet.radius,
-            with_alpha(render_color(planet.color), 1.0),
-            RenderColor::rgba(0.72, 0.78, 0.84, 1.0),
-        );
+        if let Some(terrain) = state.terrain.planets.get(&planet_index) {
+            terrain::render_body(
+                &mut frame,
+                &terrain.field,
+                &terrain.geometry,
+                planet.position,
+                planet.wrapper_angle,
+            );
+        } else {
+            render_body(
+                &mut frame,
+                PLANET_LAYER,
+                planet.position,
+                planet.radius,
+                with_alpha(render_color(planet.color), 1.0),
+                RenderColor::rgba(0.72, 0.78, 0.84, 1.0),
+            );
+        }
         if options.show_planet_ownership_halo {
             render_planet_ownership_halo(&mut frame, state, planet);
         }
         render_spaceport(&mut frame, state, planet_index, planet);
-        render_planet_flags(&mut frame, state, planet);
+        if state.terrain.planets.contains_key(&planet_index) {
+            if !options.show_planet_ownership_halo {
+                render_planet_ownership_halo(&mut frame, state, planet);
+            }
+        } else {
+            render_planet_flags(&mut frame, state, planet);
+        }
         render_rover_build_marker(&mut frame, state, planet_index, planet, options.rover_style);
+    }
+
+    for fragment in state.terrain.fragments.values() {
+        if let Some(motion) = state.physics.world.motion(fragment.assembly.body()) {
+            terrain::render_body(
+                &mut frame,
+                &fragment.terrain,
+                &fragment.geometry,
+                motion.position,
+                motion.angle,
+            );
+        }
     }
 
     for rover in &state.rovers {
@@ -6250,6 +6358,9 @@ fn render_spaceport(
     planet_index: usize,
     planet: &PlanetState,
 ) {
+    if !state.terrain.supported(planet_index) {
+        return;
+    }
     let points = spaceport_points(planet)
         .into_iter()
         .map(render_point)

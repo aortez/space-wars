@@ -17,6 +17,9 @@ const MIN_ROOT_HALF_EXTENT: f64 = 1.0;
 const ROOT_PADDING: f64 = 1.0e-9;
 const NO_NODE: u32 = u32::MAX;
 
+#[cfg(test)]
+mod spherical_tests;
+
 /// Stable identity used to exclude a body from its own gravity.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GravityId(u64);
@@ -44,7 +47,21 @@ pub enum GravitySourcePolicy {
     Direct,
 }
 
-/// One point-mass gravity source and/or target.
+/// Radial source field, evaluated at each target's position.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum GravitySourceShape {
+    #[default]
+    Point,
+    /// Inverse-square outside the radius, linear inward pull inside, and zero
+    /// at the center. Radius must be finite and positive. With softening, the
+    /// interior still meets the softened exterior field at the surface.
+    ///
+    /// Spherical sources are always evaluated directly, including when their
+    /// source policy requests a tree: a point aggregate would lose this field.
+    UniformSphere { radius: f32 },
+}
+
+/// A gravity source and/or point target. Extended target volumes are not integrated.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GravityParticipant {
     pub id: GravityId,
@@ -56,6 +73,7 @@ pub struct GravityParticipant {
     /// acceleration.
     pub response_scale: f32,
     pub source_policy: GravitySourcePolicy,
+    pub source_shape: GravitySourceShape,
 }
 
 impl GravityParticipant {
@@ -67,6 +85,7 @@ impl GravityParticipant {
             source_mass: mass,
             response_scale: 1.0,
             source_policy: GravitySourcePolicy::Hierarchical,
+            source_shape: GravitySourceShape::Point,
         }
     }
 
@@ -78,6 +97,15 @@ impl GravityParticipant {
             source_mass: mass,
             response_scale: 0.0,
             source_policy: GravitySourcePolicy::Direct,
+            source_shape: GravitySourceShape::Point,
+        }
+    }
+
+    /// A scripted spherical source with a bounded, continuous interior field.
+    pub const fn spherical_source(id: GravityId, position: Vec2, mass: f32, radius: f32) -> Self {
+        Self {
+            source_shape: GravitySourceShape::UniformSphere { radius },
+            ..Self::direct_source(id, position, mass)
         }
     }
 
@@ -89,6 +117,7 @@ impl GravityParticipant {
             source_mass: 0.0,
             response_scale,
             source_policy: GravitySourcePolicy::Hierarchical,
+            source_shape: GravitySourceShape::Point,
         }
     }
 }
@@ -96,7 +125,9 @@ impl GravityParticipant {
 /// Gravity algorithm selected for one fixed-timestep solve.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GravityBackend {
-    /// Symmetric all-pairs evaluation. This is the correctness oracle.
+    /// Exact all-pairs evaluation. This is the correctness oracle. Momentum
+    /// symmetry applies to point masses; overlapping extended sources are
+    /// sampled at target points rather than integrated over target volumes.
     Exact,
     /// Barnes-Hut monopole approximation with an opening angle.
     BarnesHut { theta: f32 },
@@ -161,6 +192,7 @@ pub enum GravityError {
     DuplicateId(GravityId),
     InvalidPosition(GravityId),
     InvalidSourceMass(GravityId),
+    InvalidSourceRadius(GravityId),
     InvalidResponseScale(GravityId),
     InvalidSoftening,
     InvalidInteractionScale,
@@ -182,6 +214,11 @@ impl fmt::Display for GravityError {
             Self::InvalidSourceMass(id) => write!(
                 formatter,
                 "gravity participant {} has an invalid source mass",
+                id.value()
+            ),
+            Self::InvalidSourceRadius(id) => write!(
+                formatter,
+                "gravity participant {} has an invalid spherical source radius",
                 id.value()
             ),
             Self::InvalidResponseScale(id) => write!(
@@ -392,15 +429,20 @@ impl GravitySolver {
             if !participant.source_mass.is_finite() || participant.source_mass < 0.0 {
                 return Err(GravityError::InvalidSourceMass(participant.id));
             }
+            if let GravitySourceShape::UniformSphere { radius } = participant.source_shape
+                && (!radius.is_finite() || radius <= 0.0)
+            {
+                return Err(GravityError::InvalidSourceRadius(participant.id));
+            }
             if !participant.response_scale.is_finite() || participant.response_scale < 0.0 {
                 return Err(GravityError::InvalidResponseScale(participant.id));
             }
             if participant.source_mass > 0.0 {
-                match participant.source_policy {
-                    GravitySourcePolicy::Hierarchical => {
+                match (participant.source_policy, participant.source_shape) {
+                    (GravitySourcePolicy::Hierarchical, GravitySourceShape::Point) => {
                         self.hierarchical_sources.push(index);
                     }
-                    GravitySourcePolicy::Direct => self.direct_sources.push(index),
+                    _ => self.direct_sources.push(index),
                 }
             }
         }
@@ -429,6 +471,13 @@ impl GravitySolver {
                 let mut applied = false;
 
                 if left.response_scale > 0.0 && right.source_mass > 0.0 {
+                    let base_scale = source_base_scale(
+                        right.source_shape,
+                        distance_without_softening,
+                        softening_squared,
+                        interaction_scale,
+                        base_scale,
+                    );
                     let scale =
                         base_scale * f64::from(right.source_mass) * f64::from(left.response_scale);
                     self.accumulators[left_index].add_scaled(dx, dy, scale);
@@ -436,6 +485,13 @@ impl GravitySolver {
                     applied = true;
                 }
                 if right.response_scale > 0.0 && left.source_mass > 0.0 {
+                    let base_scale = source_base_scale(
+                        left.source_shape,
+                        distance_without_softening,
+                        softening_squared,
+                        interaction_scale,
+                        base_scale,
+                    );
                     let scale =
                         base_scale * f64::from(left.source_mass) * f64::from(right.response_scale);
                     self.accumulators[right_index].add_scaled(-dx, -dy, scale);
@@ -846,7 +902,8 @@ fn add_source_acceleration(
     if distance_without_softening == 0.0 {
         return false;
     }
-    let distance_squared = distance_without_softening + softening_squared;
+    let distance_squared = source_distance_squared(source.source_shape, distance_without_softening)
+        + softening_squared;
     let inverse_distance = distance_squared.sqrt().recip();
     let scale = interaction_scale
         * f64::from(source.source_mass)
@@ -855,6 +912,30 @@ fn add_source_acceleration(
         / distance_squared;
     acceleration.add_scaled(dx, dy, scale);
     true
+}
+
+fn source_distance_squared(shape: GravitySourceShape, distance_squared: f64) -> f64 {
+    match shape {
+        GravitySourceShape::Point => distance_squared,
+        GravitySourceShape::UniformSphere { radius } => {
+            distance_squared.max(f64::from(radius).powi(2))
+        }
+    }
+}
+
+fn source_base_scale(
+    shape: GravitySourceShape,
+    distance_squared: f64,
+    softening_squared: f64,
+    interaction_scale: f64,
+    point_scale: f64,
+) -> f64 {
+    let effective = source_distance_squared(shape, distance_squared);
+    if effective == distance_squared {
+        return point_scale;
+    }
+    let softened = effective + softening_squared;
+    interaction_scale * softened.sqrt().recip() / softened
 }
 
 #[cfg(test)]
@@ -1163,6 +1244,7 @@ mod tests {
                 source_mass: 0.0,
                 response_scale: 1.0,
                 source_policy: GravitySourcePolicy::Hierarchical,
+                source_shape: GravitySourceShape::Point,
             },
             GravityParticipant::dynamic(GravityId::new(3), Vec2::new(4.0, 0.0), 2.0),
         ];

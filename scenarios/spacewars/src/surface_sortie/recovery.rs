@@ -55,7 +55,7 @@ pub struct SurfaceRecoveryObservation {
     pub blocked_attempts: u64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub(super) struct SurfaceRecovery {
     status: SurfaceRecoveryStatus,
     planet: Option<usize>,

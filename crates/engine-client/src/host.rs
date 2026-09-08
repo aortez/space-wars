@@ -1708,7 +1708,7 @@ struct BenchmarkRow {
     avg_rapier_island_ms: f64,
     avg_rapier_island_constraints_ms: f64,
     avg_rapier_solver_ms: f64,
-    avg_rapier_ccd_ms: f64,
+    avg_rapier_ccd_ms: Option<f64>,
     avg_render_ms: f64,
     avg_present_ms: f64,
     avg_raster_clear_ms: f64,
@@ -1839,7 +1839,9 @@ impl BenchmarkRow {
                 frames,
             ),
             avg_rapier_solver_ms: avg_ms(sample.scenario_metrics.rapier_solver_time, frames),
-            avg_rapier_ccd_ms: avg_ms(sample.scenario_metrics.rapier_ccd_time, frames),
+            // Rapier 0.34 exposes no complete CCD timer. Preserve the column
+            // as unavailable instead of reporting a misleading zero.
+            avg_rapier_ccd_ms: None,
             avg_render_ms: avg_ms(sample.render_time, frames),
             avg_present_ms: avg_ms(sample.present_time, frames),
             avg_raster_clear_ms: avg_ms(sample.raster_timings.clear, frames),
@@ -1939,7 +1941,8 @@ fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result
         format!("{:.3}", row.avg_rapier_island_ms),
         format!("{:.3}", row.avg_rapier_island_constraints_ms),
         format!("{:.3}", row.avg_rapier_solver_ms),
-        format!("{:.3}", row.avg_rapier_ccd_ms),
+        row.avg_rapier_ccd_ms
+            .map_or_else(String::new, |ms| format!("{ms:.3}")),
         format!("{:.3}", row.avg_render_ms),
         format!("{:.3}", row.avg_present_ms),
         format!("{:.3}", row.avg_raster_clear_ms),
@@ -2726,6 +2729,79 @@ mod tests {
             .expect("scenario should host Pizza");
         assert_eq!(pizza.state.balls.len(), 1);
         assert!(pizza.state.held_ball_id.is_some());
+    }
+
+    #[test]
+    fn pausing_terrain_lab_cancels_held_pointer_mining_before_resume() {
+        let settings = Settings::default();
+        let mut scenario = HostedScenario::new(
+            "terrain-lab",
+            42,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        let projections =
+            render::frame_projections(&frames, TEST_VIEWPORT, scenario.frame_layout());
+        let mut input = ClientInput::default();
+        input.push_pointer_event(ScreenPointerEvent {
+            position: RenderPoint::new(TEST_VIEWPORT.width * 0.5, TEST_VIEWPORT.height * 0.5),
+            phase: engine_common::PointerPhase::Press,
+        });
+        let actions = scenario.actions(&mut input, false, &projections);
+        let dt = Duration::from_secs_f64(1.0 / 60.0);
+        scenario.step(&actions, dt);
+        let drill_label = |scenario: &HostedScenario| {
+            scenario
+                .render_frames(RenderBackend::Vector, TEST_VIEWPORT)
+                .into_iter()
+                .flat_map(|frame| frame.layers)
+                .flat_map(|layer| layer.primitives)
+                .find_map(|primitive| match primitive {
+                    engine_common::RenderPrimitive::Text(text)
+                        if text.text.starts_with("DRILLING")
+                            || text.text.starts_with("DRILL READY") =>
+                    {
+                        Some(text.text)
+                    }
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert!(drill_label(&scenario).starts_with("DRILLING"));
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = false;
+        let mut benchmark_active = false;
+        for expected_paused in [true, false] {
+            input.press(input::GameKey::Pause);
+            step_scenario(
+                &mut scenario,
+                "terrain-lab",
+                42,
+                TickModel::FixedTimestep { hz: 60 },
+                Some(dt),
+                Duration::ZERO,
+                &mut accumulator,
+                &mut input,
+                &mut controls,
+                &mut paused,
+                &mut benchmark_active,
+                false,
+                &settings,
+                TEST_VIEWPORT,
+                &projections,
+            );
+            assert_eq!(paused, expected_paused);
+            assert!(drill_label(&scenario).starts_with("DRILL READY"));
+        }
+        for _ in 0..30 {
+            let actions = scenario.actions(&mut input, false, &projections);
+            scenario.step(&actions, dt);
+        }
+        assert!(drill_label(&scenario).starts_with("DRILL READY"));
     }
 
     #[test]

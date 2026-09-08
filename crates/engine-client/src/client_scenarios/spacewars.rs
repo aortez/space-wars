@@ -11,7 +11,7 @@ use super::{
     RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError, ScenarioRegistration,
     ScenarioStartMode,
 };
-use crate::input::ClientInput;
+use crate::input::{ClientInput, GameKey};
 use crate::render::{self, FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -29,6 +29,9 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     controls_help: "Player 1: W thrust, S brake, X reverse, A/D turn, J wings, Space laser, K cannon, U/I zoom.\nPlayer 2: Numpad 8 thrust, Numpad 5 brake, Numpad 2 reverse, Numpad 4/6 turn, PageDown wings, Delete laser, End cannon, Insert/Home zoom.\nPad: left stick or d-pad left/right turns, RT or d-pad up thrusts, LT or d-pad down brakes, B reverses, RB closes wings, A fires laser, X fires cannon, Start pauses, Select shows controls. Zoom is available in the pause menu.",
     create,
 };
+
+pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration =
+    super::surface_sortie::TERRAIN_REGISTRATION;
 
 pub(crate) struct SpacewarsClientScenario {
     pub(crate) state: Box<SpacewarsState>,
@@ -58,7 +61,11 @@ fn create(
 
 impl ClientScenario for SpacewarsClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
-        &REGISTRATION
+        if self.state.is_terrain_fixture() {
+            &TERRAIN_REGISTRATION
+        } else {
+            &REGISTRATION
+        }
     }
 
     fn tick_model(&self) -> TickModel {
@@ -70,14 +77,25 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action> {
-        input.actions_for_spacewars(
+        let mut actions = input.actions_for_spacewars(
             &self.state,
             benchmark_active,
             [false, self.player_2_rule_bot],
-        )
+        );
+        if self.state.is_terrain_fixture() {
+            let (tunnel, view) = input.spacewars_terrain_gamepad_tools();
+            actions.push(scenario_spacewars::terrain_fixture_controls(
+                tunnel || input.is_pressed(GameKey::TerrainTool),
+                view || input.is_pressed(GameKey::TerrainView),
+            ));
+        }
+        actions
     }
 
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        if self.state.is_terrain_fixture() {
+            return vec![SpacewarsScenario::render_terrain_fixture(&self.state)];
+        }
         let player_view_aspect_ratio =
             render::frame_viewports(viewport, 4, FrameLayout::SpacewarsLocalPlay)[0].aspect_ratio();
         if renderer == RenderBackend::Raster {
@@ -91,7 +109,11 @@ impl ClientScenario for SpacewarsClientScenario {
     }
 
     fn frame_layout(&self) -> FrameLayout {
-        FrameLayout::SpacewarsLocalPlay
+        if self.state.is_terrain_fixture() {
+            FrameLayout::EqualHorizontal
+        } else {
+            FrameLayout::SpacewarsLocalPlay
+        }
     }
 
     fn center_panel_state(
@@ -100,6 +122,9 @@ impl ClientScenario for SpacewarsClientScenario {
         benchmark_active: bool,
         performance_text: &str,
     ) -> Option<CenterPanelState> {
+        if self.state.is_terrain_fixture() {
+            return None;
+        }
         Some(center_panel_state(
             &self.state,
             paused,
@@ -178,7 +203,6 @@ impl ClientScenario for SpacewarsClientScenario {
             rapier_island_time: metrics.rapier.island_time,
             rapier_island_constraints_time: metrics.rapier.island_constraints_time,
             rapier_solver_time: metrics.rapier.solver_time,
-            rapier_ccd_time: metrics.rapier.ccd_time,
             added: metrics.added,
             removed: metrics.removed,
             ..BenchmarkStepMetrics::default()

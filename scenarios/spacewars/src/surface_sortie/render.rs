@@ -52,15 +52,26 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
             RenderColor::rgb(1.0, 0.85, 0.25),
         );
     }
-    for planet in &state.world.planets {
+    for (planet_index, planet) in state.world.planets.iter().enumerate() {
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
-        circle(
-            &mut frame,
-            -20,
-            planet.position,
-            radius,
-            RenderColor::rgb(0.09, 0.16, 0.23),
-        );
+        if let Some(material) = state.world.terrain.planets.get(&planet_index) {
+            let motion = motion::SurfaceFrame::read(&state.world.physics, planet_index);
+            terrain::render_body(
+                &mut frame,
+                &material.field,
+                &material.geometry,
+                motion.position,
+                motion.angle,
+            );
+        } else {
+            circle(
+                &mut frame,
+                -20,
+                planet.position,
+                radius,
+                RenderColor::rgb(0.09, 0.16, 0.23),
+            );
+        }
         if let Some(owner) = planet.owner_id {
             frame.push_primitive(
                 -17,
@@ -75,7 +86,7 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
                 }),
             );
         }
-        for index in 0..72 {
+        for index in 0..if state.has_material_ground() { 0 } else { 72 } {
             let up = Vec2::from_radians(
                 planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0,
             );
@@ -86,6 +97,29 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
                 planet.position + up * (radius - 0.08),
                 RenderColor::rgb(0.28, 0.51, 0.6),
                 1.0,
+            );
+        }
+    }
+    for fragment in state.world.terrain.fragments.values() {
+        if let Some(body) = state.world.physics.world.motion(fragment.assembly.body()) {
+            terrain::render_body(
+                &mut frame,
+                &fragment.terrain,
+                &fragment.geometry,
+                body.position,
+                body.angle,
+            );
+        }
+    }
+    if let Some(mining) = &observation.mining {
+        if let Some((start, end)) = mining.beam {
+            line(
+                &mut frame,
+                8,
+                start,
+                end,
+                if mining.held { AMBER } else { CYAN },
+                if mining.held { 2.0 } else { 0.7 },
             );
         }
     }
@@ -942,7 +976,21 @@ fn draw_player_hud(
         ),
         (-0.345, objective, LIGHT),
         (-0.405, progress, AMBER),
-        (-0.46, detail, color),
+        (
+            -0.46,
+            observation.mining.as_ref().map_or(detail, |mining| {
+                format!(
+                    "Cut {} / removed {} / RT: mine Y: size",
+                    if mining.radius == 0 {
+                        "1 cell".to_owned()
+                    } else {
+                        format!("r{}", mining.radius)
+                    },
+                    mining.removed_cells
+                )
+            }),
+            color,
+        ),
     ];
     for (y, label, color) in lines {
         text(

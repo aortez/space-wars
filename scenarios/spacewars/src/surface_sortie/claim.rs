@@ -55,6 +55,7 @@ impl PlanetClaimStatus {
 struct FlagAnchor {
     position: Vec2,
     normal: Vec2,
+    footing: Option<engine_terrain::CellCoord>,
 }
 
 impl FlagAnchor {
@@ -84,6 +85,7 @@ struct Claimant {
     anchor: Option<FlagAnchor>,
 }
 
+#[derive(Clone)]
 pub(super) struct SurfacePlanetClaim {
     pub planet: usize,
     flag: Option<PlanetFlag>,
@@ -297,6 +299,31 @@ impl SurfacePlanetClaim {
 }
 
 impl SurfaceSortieState {
+    pub(super) fn invalidate_flag_footings(&mut self) {
+        for claim in &mut self.claims {
+            let Some(terrain) = self.world.terrain.planets.get(&claim.planet) else {
+                continue;
+            };
+            let lost = claim.flag.is_some_and(|flag| {
+                !flag.anchor.footing.is_some_and(|cell| {
+                    terrain
+                        .field
+                        .cell(cell)
+                        .is_some_and(|cell| cell.material != engine_terrain::MaterialId::VOID)
+                })
+            });
+            if lost {
+                // Flags are currently the only owned planetary object. Destroying
+                // their material footing neutralizes, never transfers ownership.
+                claim.neutralizations +=
+                    u64::from(self.world.planets[claim.planet].owner_id.take().is_some());
+                claim.flag = None;
+                claim.progress = None;
+                claim.statuses = [PlanetClaimStatus::NeedSupport; SPACEWARS_PLAYER_COUNT];
+            }
+        }
+    }
+
     fn claim_candidate(&self, player: usize) -> Claimant {
         let mut candidate = Claimant {
             player: self.pilots[player].owner,
@@ -329,9 +356,26 @@ impl SurfaceSortieState {
             return candidate;
         }
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+        let position = (support.position - frame.position).rotate_radians(-frame.angle);
+        let normal = support.normal.rotate_radians(-frame.angle);
+        let footing = self.world.terrain.planets.get(&planet).and_then(|terrain| {
+            terrain
+                .field
+                .local_to_cell(position - normal * 0.08)
+                .filter(|cell| {
+                    terrain
+                        .field
+                        .cell(*cell)
+                        .is_some_and(|cell| cell.material != engine_terrain::MaterialId::VOID)
+                })
+        });
+        if self.world.terrain.planets.contains_key(&planet) && footing.is_none() {
+            return candidate;
+        }
         candidate.anchor = Some(FlagAnchor {
-            position: (support.position - frame.position).rotate_radians(-frame.angle),
-            normal: support.normal.rotate_radians(-frame.angle),
+            position,
+            normal,
+            footing,
         });
         candidate.status = PlanetClaimStatus::Ready;
         candidate

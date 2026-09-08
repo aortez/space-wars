@@ -3,7 +3,8 @@ use std::time::Duration;
 use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickModel};
 use scenario_spacewars::PlayerId;
 use scenario_spacewars::surface_sortie::{
-    SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario, SurfaceSortieState,
+    SurfaceMiningAction, SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario,
+    SurfaceSortieState,
 };
 
 use super::{
@@ -67,6 +68,28 @@ pub(super) const EXPEDITION_REGISTRATION: ScenarioRegistration = ScenarioRegistr
 
 struct SurfaceSortieClientScenario {
     state: SurfaceSortieState,
+}
+
+pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain",
+    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
+    create: create_material,
+    ..EXPEDITION_REGISTRATION
+};
+
+fn create_material(
+    seed: u64,
+    settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(SurfaceSortieClientScenario {
+        state: SurfaceSortieScenario::init_material(
+            seed,
+            settings.surface_expedition.players.count(),
+        ),
+    }))
 }
 
 fn create_expedition(
@@ -134,6 +157,9 @@ fn create_world(
 
 impl ClientScenario for SurfaceSortieClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
+        if self.state.has_material_ground() {
+            return &TERRAIN_REGISTRATION;
+        }
         if self.state.travel_enabled() {
             return &EXPEDITION_REGISTRATION;
         }
@@ -151,7 +177,7 @@ impl ClientScenario for SurfaceSortieClientScenario {
         SurfaceSortieScenario::step(&mut self.state, actions, dt)
     }
     fn map_input(&self, input: &mut ClientInput, _benchmark: bool) -> Vec<Action> {
-        (0..self.state.player_count())
+        let mut actions: Vec<_> = (0..self.state.player_count())
             .map(|player| {
                 let (horizontal, primary_held, interact_held) = surface_controls(input, player);
                 SurfaceSortieAction {
@@ -162,7 +188,17 @@ impl ClientScenario for SurfaceSortieClientScenario {
                 }
                 .encode(PlayerId::from_index(player).expect("bounded player seat"))
             })
-            .collect()
+            .collect();
+        if self.state.has_material_ground() {
+            for player in 0..self.state.player_count() {
+                let (aim, held, cycle) = input.surface_mining_input(player);
+                actions.push(
+                    SurfaceMiningAction { aim, held, cycle }
+                        .encode(PlayerId::from_index(player).expect("bounded seat")),
+                );
+            }
+        }
+        actions
     }
     fn render_frames(&self, _renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
         let count = self.state.player_count();
@@ -221,6 +257,123 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn material_seats_map_mining_without_ship_weapons_and_release_on_disconnect() {
+        let pads = Rc::new(RefCell::new(GamepadInput::default()));
+        let mut input = ClientInput::new(Rc::clone(&pads));
+        let mut settings = Settings::default();
+        settings.surface_expedition.players = engine_common::SurfaceExpeditionPlayers::Two;
+        let mut scenario = TERRAIN_REGISTRATION
+            .create(
+                42,
+                &settings,
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+        pads.borrow_mut().set_seat(
+            1,
+            GamepadSeatInput {
+                connected: true,
+                right_stick_y: -1.0,
+                right_trigger: 1.0,
+                north: true,
+                ..Default::default()
+            },
+        );
+        let actions = scenario.map_input(&mut input, false);
+        let mining: Vec<_> = actions
+            .iter()
+            .filter_map(SurfaceMiningAction::decode)
+            .collect();
+        assert_eq!(mining[0], (0, SurfaceMiningAction::default()));
+        assert_eq!(
+            mining[1],
+            (
+                1,
+                SurfaceMiningAction {
+                    aim: -engine_core::Vec2::Y,
+                    held: true,
+                    cycle: true
+                }
+            )
+        );
+        assert!(
+            actions
+                .iter()
+                .all(|a| scenario_spacewars::SpacewarsAction::decode(a).is_none())
+        );
+        scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+        assert_eq!(scenario.registration().id, "spacewars-terrain");
+        assert_eq!(
+            scenario
+                .render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0))
+                .len(),
+            4
+        );
+        pads.borrow_mut().disconnect_seat(1);
+        let released = scenario.map_input(&mut input, false);
+        assert!(
+            released
+                .iter()
+                .filter_map(SurfaceMiningAction::decode)
+                .all(|(_, action)| action == SurfaceMiningAction::default())
+        );
+    }
+
+    #[test]
+    fn material_claim_and_excavation_render_with_the_shared_pilot_hud() {
+        let mut scenario = SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material(42, 1),
+        };
+        let dt = Duration::from_nanos(16_666_667);
+        for _ in 0..90 {
+            scenario.step(&[], dt);
+        }
+        scenario.step(
+            &[SurfaceSortieAction {
+                interact_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1)],
+            dt,
+        );
+        for _ in 0..220 {
+            scenario.step(
+                &[SurfaceSortieAction::default().encode(PlayerId::PLAYER_1)],
+                dt,
+            );
+        }
+        let observation = scenario.state.observation(0);
+        assert_eq!(
+            observation.planet_claim.as_ref().unwrap().owner,
+            Some(PlayerId::PLAYER_1)
+        );
+        check_render(
+            &scenario,
+            Viewport::new(800.0, 480.0),
+            "on-foot-material-claimed",
+        );
+        let flag = observation.planet_claim.unwrap().flag.unwrap();
+        for tick in 0..25 {
+            scenario.step(
+                &[SurfaceMiningAction {
+                    aim: flag.position - scenario.state.observation(0).position,
+                    held: tick > 1,
+                    cycle: tick == 0,
+                }
+                .encode(PlayerId::PLAYER_1)],
+                dt,
+            );
+        }
+        assert!(scenario.state.terrain_diagnostics().removed_cells > 0);
+        check_render(
+            &scenario,
+            Viewport::new(800.0, 480.0),
+            "on-foot-material-excavated",
+        );
+    }
 
     #[test]
     fn expedition_seats_have_independent_keyboard_pad_and_disconnect_controls() {
@@ -994,6 +1147,7 @@ mod tests {
             &ORBIT_REGISTRATION,
             &WORLD_REGISTRATION,
             &EXPEDITION_REGISTRATION,
+            &TERRAIN_REGISTRATION,
         ] {
             let viewport = Viewport::new(1280.0, 720.0);
             let mut scenario = registration
@@ -1063,7 +1217,10 @@ mod tests {
         } else {
             "ABOARD"
         };
-        let label = if scenario.registration().id == "surface-expedition" {
+        let label = if matches!(
+            scenario.registration().id,
+            "surface-expedition" | "spacewars-terrain"
+        ) {
             format!("P1  {label}")
         } else {
             label.to_owned()

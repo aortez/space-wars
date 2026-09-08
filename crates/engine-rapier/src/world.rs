@@ -5,7 +5,7 @@
 //! motion or normalized contact data after each step.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -399,6 +399,10 @@ pub struct ContactEvent {
     pub collider_a: ColliderId,
     pub collider_b: ColliderId,
     pub point: Option<Vec2>,
+    /// Surface point and outward normal in each parent body's local frame.
+    /// These remain attached to the hit surfaces after motion or CCD substeps.
+    pub local_contact_a: Option<ContactPoint>,
+    pub local_contact_b: Option<ContactPoint>,
     /// Normal and impulse point from `collider_a` toward `collider_b`.
     pub normal: Vec2,
     pub impulse: Vec2,
@@ -506,7 +510,8 @@ pub struct PhysicsStepMetrics {
     pub island_time: Duration,
     pub island_constraints_time: Duration,
     pub solver_time: Duration,
-    pub ccd_time: Duration,
+    /// None when the physics backend does not provide complete CCD timing.
+    pub ccd_time: Option<Duration>,
     pub active_bodies: usize,
     pub sleeping_bodies: usize,
     pub candidate_pairs: usize,
@@ -689,6 +694,11 @@ impl PhysicsWorld {
         self.colliders.len()
     }
 
+    /// Stable identities for inspecting derived geometry without exposing Rapier.
+    pub fn collider_ids(&self) -> impl ExactSizeIterator<Item = ColliderId> + '_ {
+        self.colliders.iter().map(|entry| entry.id)
+    }
+
     pub fn contains_entity(&self, id: PhysicsId) -> bool {
         self.entities.contains_key(&id)
     }
@@ -753,6 +763,61 @@ impl PhysicsWorld {
         true
     }
 
+    /// Atomically validate and replace one collider role on an existing body.
+    /// Call at the lifecycle boundary, outside contact iteration. Motion, joints,
+    /// sensors in other roles, and unrelated bodies retain their identities.
+    /// Step the world before querying the new geometry through the broad phase.
+    pub fn replace_colliders(
+        &mut self,
+        parent: BodyId,
+        role: ColliderRole,
+        specs: &[ColliderSpec],
+    ) -> bool {
+        let Some(parent_handle) = self.body_handle(parent) else {
+            return false;
+        };
+        let mut ids = BTreeSet::new();
+        let mut builders = Vec::with_capacity(specs.len());
+        for spec in specs {
+            if spec.id.entity != parent.entity || spec.id.role != role || !ids.insert(spec.id) {
+                return false;
+            }
+            let Some(collider) = build_collider(spec, self.collect_events) else {
+                return false;
+            };
+            builders.push((spec.id, collider));
+        }
+        let old: Vec<_> = self
+            .colliders
+            .iter()
+            .filter(|entry| entry.id.entity == parent.entity && entry.id.role == role)
+            .copied()
+            .collect();
+        if old.iter().any(|entry| entry.parent != parent) {
+            return false;
+        }
+        builders.sort_by_key(|(id, _)| *id);
+        let removed: BTreeSet<_> = old.iter().map(|entry| entry.id).collect();
+        for entry in old {
+            self.raw.remove_collider(entry.handle);
+            self.remove_collider_mapping(entry.id);
+        }
+        if let Some(entity) = self.entities.get_mut(&parent.entity) {
+            entity.colliders.retain(|id| !removed.contains(id));
+        }
+        self.contact_events.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        self.sensor_intersections.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        for (id, collider) in builders {
+            let handle = self.raw.insert_collider(collider, Some(parent_handle));
+            self.register_collider(id, parent, handle);
+        }
+        true
+    }
+
     pub fn remove_entity(&mut self, entity: PhysicsId) -> bool {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
@@ -800,6 +865,21 @@ impl PhysicsWorld {
     pub fn body_mass(&self, id: BodyId) -> Option<f32> {
         let handle = self.body_handle(id)?;
         self.raw.bodies.get(handle).map(RigidBody::mass)
+    }
+
+    pub fn center_of_mass(&self, id: BodyId) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(from_rapier(body.center_of_mass()))
+    }
+
+    /// Make edited collider mass, inertia, and center of mass available before
+    /// the next step. The caller chooses how velocity should change after a cut.
+    pub fn refresh_mass_properties(&mut self, id: BodyId) -> bool {
+        let Some(handle) = self.body_handle(id) else {
+            return false;
+        };
+        self.raw.bodies[handle].recompute_mass_properties_from_colliders(&self.raw.colliders);
+        true
     }
 
     pub fn set_body_kind(&mut self, id: BodyId, kind: BodyKind, wake_up: bool) -> bool {
@@ -1004,7 +1084,9 @@ impl PhysicsWorld {
             island_time: counters.stages.island_construction_time.time(),
             island_constraints_time: counters.stages.island_constraints_collection_time.time(),
             solver_time: counters.stages.solver_time.time(),
-            ccd_time: counters.stages.ccd_time.time(),
+            // Rapier 0.34 does not time all CCD paths; its aggregate counter
+            // remains zero. A partial TOI timer is not a total CCD measurement.
+            ccd_time: None,
             active_bodies: self.raw.islands.active_bodies().count(),
             sleeping_bodies: self
                 .bodies
@@ -1161,6 +1243,78 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    pub fn collider_body(&self, id: ColliderId) -> Option<BodyId> {
+        self.colliders
+            .get(*self.collider_indices.get(&id)?)
+            .map(|entry| entry.parent)
+    }
+
+    /// Sweep an existing collider along a world direction, excluding its entity
+    /// and sensors. Returns available travel, or None for invalid input. As with
+    /// ray queries, call against the last completed physics step.
+    pub fn collider_translation_clearance(
+        &self,
+        id: ColliderId,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        if !finite_vec2(direction)
+            || direction.length_squared() <= f32::EPSILON
+            || !distance.is_finite()
+            || distance < 0.0
+        {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        let hit = self.raw.cast_shape(
+            collider.position(),
+            to_rapier(direction.normalized()),
+            collider.shape(),
+            rapier2d::parry::query::ShapeCastOptions {
+                max_time_of_impact: distance,
+                stop_at_penetration: false,
+                ..Default::default()
+            },
+            QueryFilter {
+                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                groups: Some(collider.collision_groups()),
+                predicate: Some(&predicate),
+                ..Default::default()
+            },
+        );
+        Some(hit.map_or(distance, |(_, hit)| hit.time_of_impact))
+    }
+
+    /// Check the complete collider shape at a proposed world pose without moving
+    /// it. The query ignores its own entity and sensors, and respects its groups.
+    pub fn collider_fits_at(&self, id: ColliderId, position: Vec2, angle: f32) -> Option<bool> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        Some(
+            self.raw
+                .intersect_shape(
+                    Pose::new(to_rapier(position), angle),
+                    collider.shape(),
+                    QueryFilter {
+                        flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                        groups: Some(collider.collision_groups()),
+                        predicate: Some(&predicate),
+                        ..Default::default()
+                    },
+                )
+                .next()
+                .is_none(),
+        )
     }
 
     /// Serialize authoritative Rapier state and all stable handle mappings.
@@ -1466,8 +1620,48 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
     let (magnitude, strongest_normal) = pair.max_impulse();
     let mut normal = from_rapier(strongest_normal);
     let mut impulse = from_rapier(pair.total_impulse());
+    let local_contacts = pair
+        .manifolds
+        .iter()
+        .filter(|manifold| !manifold.data.solver_contacts.is_empty())
+        .max_by(|a, b| {
+            let a = a.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            let b = b.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            a.total_cmp(&b)
+        })
+        .and_then(|manifold| {
+            let contact = manifold
+                .data
+                .solver_contacts
+                .iter()
+                .filter_map(|solver| manifold.points.get(solver.contact_id[0] as usize))
+                .max_by(|a, b| a.data.impulse.total_cmp(&b.data.impulse))?;
+            let pose_a = collider_a
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos1.unwrap_or_default();
+            let pose_b = collider_b
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos2.unwrap_or_default();
+            Some((
+                ContactPoint {
+                    position: from_rapier(pose_a * contact.local_p1),
+                    normal: from_rapier(pose_a.rotation * manifold.local_n1),
+                },
+                ContactPoint {
+                    position: from_rapier(pose_b * contact.local_p2),
+                    normal: from_rapier(pose_b.rotation * manifold.local_n2),
+                },
+            ))
+        });
+    let (mut local_contact_a, mut local_contact_b) =
+        local_contacts.map_or((None, None), |(a, b)| (Some(a), Some(b)));
     if id_b < id_a {
         std::mem::swap(&mut id_a, &mut id_b);
+        std::mem::swap(&mut local_contact_a, &mut local_contact_b);
         normal = -normal;
         impulse = -impulse;
     }
@@ -1486,6 +1680,8 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
         collider_a: id_a,
         collider_b: id_b,
         point,
+        local_contact_a,
+        local_contact_b,
         normal,
         impulse,
         impulse_magnitude: magnitude,

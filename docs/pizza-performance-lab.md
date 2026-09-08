@@ -59,7 +59,9 @@ gravity, physics, snapshot, and presentation costs. Gravity reports validation,
 tree construction, mass aggregation, and traversal time plus source, target,
 node, exact-interaction, approximation, and applied-source counts. Rapier runs
 additionally report its broad phase, narrow phase, island construction, solver,
-and CCD timers. Population, awake/sleeping body, candidate-pair,
+and CCD timing availability. Rapier 0.34 does not populate its aggregate CCD
+timer, so `avg_rapier_ccd_ms` is an empty CSV field rather than a measured zero.
+`PhysicsStepMetrics::ccd_time` returns `None`. Population, awake/sleeping body, candidate-pair,
 active-contact, solver-contact, added, and removed counts accompany every
 one-second sample.
 

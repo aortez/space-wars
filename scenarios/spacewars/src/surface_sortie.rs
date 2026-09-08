@@ -11,6 +11,7 @@ use engine_rapier::{
 mod claim;
 pub mod compatibility;
 mod landing;
+mod material;
 mod motion;
 mod outpost;
 mod profiles;
@@ -21,6 +22,7 @@ pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,
 };
 pub use landing::{LandingPhase, LandingTelemetry};
+pub use material::{SurfaceMiningAction, SurfaceMiningObservation};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 pub use profiles::GeneratedSurfaceProfile;
@@ -127,6 +129,7 @@ impl SurfaceSortieAction {
     }
 }
 
+#[derive(Clone)]
 pub struct SurfaceSortieState {
     world: SpacewarsState,
     motion_preset: SurfaceMotionPreset,
@@ -134,8 +137,10 @@ pub struct SurfaceSortieState {
     pilots: Vec<SurfacePilot>,
     outposts: Vec<outpost::SurfaceOutpost>,
     claims: Vec<claim::SurfacePlanetClaim>,
+    mining: Option<material::SurfaceMining>,
 }
 
+#[derive(Clone)]
 pub(super) struct SurfacePilot {
     motion_metrics: SurfaceMotionMetrics,
     idle_anchor: Option<(bool, Vec2)>,
@@ -201,7 +206,13 @@ impl SurfacePilot {
     ) {
         if let Some(body) = self.body.as_mut() {
             self.gravity = velocity_delta / dt;
-            body.apply_control(&mut physics.world, self.control, self.gravity, dt);
+            body.apply_control_with_queries(
+                &mut physics.world,
+                self.control,
+                self.gravity,
+                dt,
+                !physics.material_queries_dirty,
+            );
             physics
                 .world
                 .apply_velocity_delta(body.body(), velocity_delta, true);
@@ -213,6 +224,8 @@ impl SurfacePilot {
 pub struct SurfaceSessionObservation {
     pub version: u32,
     pub players: Vec<SurfaceSortieObservation>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub terrain: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -243,6 +256,8 @@ pub struct SurfaceSortieObservation {
     pub last_transfer: TransferResult,
     pub controls_armed: bool,
     pub physical_bodies: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mining: Option<SurfaceMiningObservation>,
     pub landing: LandingTelemetry,
     pub outpost: Option<OutpostObservation>,
     pub outposts: Vec<OutpostObservation>,
@@ -273,7 +288,7 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         let snapshot = self.spaceling_snapshot(player);
         SurfaceSortieObservation {
-            version: 10,
+            version: if self.has_material_ground() { 11 } else { 10 },
             generated_case: self.generated_case,
             travel_enabled: self.travel_enabled(),
             ship_support_planet: self.ship_support_planet(player),
@@ -306,6 +321,7 @@ impl SurfaceSortieState {
             last_transfer: self.pilots[player].last_transfer,
             controls_armed: self.pilots[player].controls_armed,
             physical_bodies: self.world.physics.world.body_count(),
+            mining: self.mining_observation(player),
             landing: self.pilots[player].landing,
             outpost: self
                 .focused_outpost(player)
@@ -325,6 +341,16 @@ impl SurfaceSortieState {
     }
 
     fn access_up(&self, player: usize) -> Vec2 {
+        if self
+            .world
+            .terrain
+            .planets
+            .contains_key(&self.pilots[player].planet)
+        {
+            if let Some(hit) = self.material_access(player) {
+                return hit.normal;
+            }
+        }
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         // A surface access point beside the *actual* ship. No elevated berth
         // or fixed planet marker; the physical landing gate is checked first.
@@ -340,6 +366,17 @@ impl SurfaceSortieState {
     }
 
     fn access_position(&self, player: usize) -> Vec2 {
+        if self
+            .world
+            .terrain
+            .planets
+            .contains_key(&self.pilots[player].planet)
+        {
+            return self.material_access(player).map_or_else(
+                || self.world.ships[self.pilots[player].vehicle.0].position,
+                |hit| hit.point,
+            );
+        }
         let planet = &self.world.planets[self.pilots[player].planet];
         planet.position + self.access_up(player) * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
     }
@@ -376,6 +413,15 @@ impl SurfaceSortieState {
         }
         if !self.vehicle_settled(player) {
             return TransferResult::ShipNotSettled;
+        }
+        if self
+            .world
+            .terrain
+            .planets
+            .contains_key(&self.pilots[player].planet)
+            && self.material_access(player).is_none()
+        {
+            return TransferResult::ExitBlocked;
         }
         if let Some(snapshot) = self.spaceling_snapshot(player) {
             if snapshot
@@ -510,6 +556,11 @@ impl Scenario for SurfaceSortieScenario {
         if dt.is_zero() {
             return StepResult::default();
         }
+        // Invalidate edited support before either seat can transfer or use it.
+        let footings = state.material_footings();
+        let prepared = SpacewarsScenario::prepare_terrain(&mut state.world, &[]);
+        state.reconcile_material_support(footings);
+        state.read_mining_actions(actions);
         for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
             if let Some(pilot) = state.pilots.get_mut(player.index()) {
                 pilot.input = input;
@@ -585,6 +636,7 @@ impl Scenario for SurfaceSortieScenario {
             &[],
             Duration::from_secs_f32(dt),
             &mut state.pilots,
+            Some(prepared),
         );
         state.reconcile_recovery_vehicles();
         for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
@@ -609,16 +661,18 @@ impl Scenario for SurfaceSortieScenario {
         state.update_outpost(Duration::from_secs_f32(dt));
         state.update_planet_claims(Duration::from_secs_f32(dt));
         state.update_recovery(Duration::from_secs_f32(dt));
+        state.update_mining();
         result
     }
 
     fn observe(state: &SurfaceSortieState) -> Observation {
         Observation {
             payload: serde_json::to_vec(&SurfaceSessionObservation {
-                version: 10,
+                version: if state.has_material_ground() { 11 } else { 10 },
                 players: (0..state.player_count())
                     .map(|player| state.observation(player))
                     .collect(),
+                terrain: terrain::observation(&state.world).payload,
             })
             .expect("finite sortie observation"),
         }
@@ -682,6 +736,7 @@ impl SurfaceSortieScenario {
             pilots: vec![SurfacePilot::new(PlayerId::PLAYER_1, planet_index, false)],
             outposts,
             claims: Vec::new(),
+            mining: None,
         }
     }
 

@@ -304,7 +304,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
-        "surface-expedition" => {
+        "surface-expedition" | "spacewars-terrain" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -687,7 +687,7 @@ mod tests {
         for (scenario, control_count, selected) in cases {
             let mut context = context(scenario);
             context.launcher_settings_focus_index = match scenario {
-                "surface-expedition" => 2,
+                "surface-expedition" | "spacewars-terrain" => 2,
                 "spacewars" => 6,
                 "pizza" => 3,
                 "clock" => 5,

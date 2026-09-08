@@ -9,7 +9,7 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently has twelve entries across eight scenario families:
+The local launcher includes the following scenarios and presets:
 
 - **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
   asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
@@ -53,6 +53,17 @@ The local launcher currently has twelve entries across eight scenario families:
   Outposts/repair remain in the older lab fixtures. Choose **Settings →
   Players: 1 or 2** for solo or split-screen play using the same scenario. See
   [Surface Expedition](docs/surface-expedition.md).
+- **Terrain Lab** — an editable material planet with a walking spaceling. Switch
+  between a precision laser, drill, and excavator to collect rock and ore, preview
+  each cut, and zoom in to mine individual cells. Cut pieces free to make moving,
+  collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
+  craters and tunnels, inspect chunk colliders, and watch ray queries and physical
+  support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
+- **Spacewars Terrain** — the Expedition loop on destructible ground: land, exit,
+  claim with a surface flag, mine material, and rebuild after ship loss. Destroyed
+  flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).
+  The [terrain endurance test bed](docs/terrain-endurance.md) runs seeded workloads
+  up to three minutes each and produces an offline report with world snapshots.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
@@ -107,6 +118,7 @@ cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario surface-sortie
 cargo run -p engine-client -- --scenario surface-sortie-orbit
+cargo run -p engine-client -- --scenario terrain-lab
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```

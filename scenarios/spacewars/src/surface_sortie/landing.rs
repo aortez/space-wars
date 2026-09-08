@@ -82,6 +82,17 @@ impl LandingTelemetry {
         let altitude = feet
             .into_iter()
             .map(|foot| {
+                if physics.material_planets.contains(&planet_index) {
+                    let point = motion.position + foot.rotate_radians(motion.angle);
+                    return physics
+                        .material_ground_ray(
+                            planet_index,
+                            point + up * 0.1,
+                            -up,
+                            ASSIST_HEIGHT + 1.0,
+                        )
+                        .map_or(ASSIST_HEIGHT + 1.0, |hit| hit.distance - 0.1 - foot_radius);
+                }
                 (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
                     - planet.radius * BODY_BOUNDS_RADIUS_SCALE
                     - foot_radius

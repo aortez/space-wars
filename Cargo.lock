@@ -1489,6 +1489,7 @@ dependencies = [
  "scenario-rover-lab",
  "scenario-spaceling-lab",
  "scenario-spacewars",
+ "scenario-terrain-lab",
  "serde",
  "serde_json",
  "sha2",
@@ -1547,7 +1548,17 @@ version = "0.1.0"
 dependencies = [
  "bincode 1.3.3",
  "engine-core",
+ "engine-terrain",
  "rapier2d",
+ "serde",
+]
+
+[[package]]
+name = "engine-terrain"
+version = "0.1.0"
+dependencies = [
+ "bincode 1.3.3",
+ "engine-core",
  "serde",
 ]
 
@@ -4645,13 +4656,28 @@ name = "scenario-spacewars"
 version = "0.1.0"
 dependencies = [
  "bincode 1.3.3",
+ "clap",
  "engine-common",
  "engine-core",
  "engine-gravity",
  "engine-rapier",
+ "engine-terrain",
  "image",
  "serde",
  "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "scenario-terrain-lab"
+version = "0.1.0"
+dependencies = [
+ "bincode 1.3.3",
+ "engine-common",
+ "engine-core",
+ "engine-gravity",
+ "engine-rapier",
+ "engine-terrain",
 ]
 
 [[package]]
