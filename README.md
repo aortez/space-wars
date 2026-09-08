@@ -64,6 +64,9 @@ The local launcher includes the following scenarios and presets:
   flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).
   The [terrain endurance test bed](docs/terrain-endurance.md) runs seeded workloads
   up to three minutes each and produces an offline report with world snapshots.
+  **spacewars-terrain-combat** adds a human-versus-bot dogfight with the shared
+  laser/cannon and physical ship recovery. **spacewars-terrain-duel** lets both
+  bots run the same loop. See [Material combat](docs/material-combat-ai.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

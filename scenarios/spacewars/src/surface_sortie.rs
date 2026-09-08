@@ -9,6 +9,7 @@ use engine_rapier::{
 };
 
 mod claim;
+pub mod combat;
 pub mod compatibility;
 pub mod flight;
 pub mod impact;
@@ -155,6 +156,7 @@ pub(super) struct SurfacePilot {
     controls_armed: bool,
     wing_input: bool,
     flight_enabled: bool,
+    pub(super) combat: Option<combat::CombatSeat>,
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
@@ -194,6 +196,7 @@ impl SurfacePilot {
             controls_armed: false,
             wing_input: false,
             flight_enabled: false,
+            combat: None,
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
@@ -589,6 +592,7 @@ impl Scenario for SurfaceSortieScenario {
         state.read_mining_actions(actions);
         state.read_wing_actions(actions);
         state.read_impact_actions(actions);
+        state.read_weapon_actions(actions);
         for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
             if let Some(pilot) = state.pilots.get_mut(player.index()) {
                 pilot.input = input;
@@ -608,7 +612,11 @@ impl Scenario for SurfaceSortieScenario {
             if !state.pilots[player].controls_armed {
                 state.pilots[player].controls_armed = input == SurfaceSortieAction::default()
                     && !state.pilots[player].wing_input
-                    && !state.damage.held[player];
+                    && !state.damage.held[player]
+                    && state.pilots[player]
+                        .combat
+                        .as_ref()
+                        .is_none_or(|c| c.input == combat::SurfaceWeaponAction::default());
             } else {
                 *effective = input;
                 if state.update_scuttle_input(player, input, dt) {
@@ -653,8 +661,14 @@ impl Scenario for SurfaceSortieScenario {
             } else {
                 0.0
             });
-            ship.set_laser(false);
-            ship.set_cannon(false);
+            let weapons = pilot
+                .combat
+                .as_ref()
+                .map_or(combat::SurfaceWeaponAction::default(), |c| c.input);
+            let armed =
+                pilot.controls_armed && !on_foot && !ship.dead && ship.form == ShipForm::Ship;
+            ship.set_laser(armed && weapons.laser);
+            ship.set_cannon(armed && weapons.cannon);
         }
         // Schedule terrain, solve gravity, and step Rapier exactly once for all seats.
         let dt = dt.as_secs_f32();

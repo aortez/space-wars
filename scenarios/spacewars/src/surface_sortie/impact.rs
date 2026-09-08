@@ -132,7 +132,7 @@ impl SurfaceSortieState {
         self.damage.seats[player]
     }
     pub(super) fn read_impact_actions(&mut self, actions: &[Action]) {
-        if !self.has_material_ground() {
+        if !self.has_material_ground() || self.combat_enabled() {
             return;
         }
         for (owner, action) in actions.iter().filter_map(SurfaceImpactAction::decode) {
@@ -236,7 +236,14 @@ impl SurfaceSortieState {
             d.last_damage_tick = Some(self.world.tick);
             d.last_damage_percent = damage / max_life.max(f32::EPSILON) * 100.0;
             d.last_ship_lost = lost;
-            d.last_source = Some(if asteroid {
+            let weapon = pilot
+                .combat
+                .as_ref()
+                .filter(|c| c.telemetry.last_hit_taken_tick == Some(self.world.tick))
+                .and_then(|c| c.telemetry.last_hit_source);
+            d.last_source = Some(if let Some(weapon) = weapon {
+                weapon
+            } else if asteroid {
                 "asteroid"
             } else if surface {
                 "ground"

@@ -5,9 +5,12 @@ use scenario_spacewars::PlayerId;
 use scenario_spacewars::surface_sortie::{
     SurfaceMiningAction, SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario,
     SurfaceSortieState, SurfaceWingAction,
+    combat::SurfaceWeaponAction,
     impact::{ImpactKind, SurfaceImpactAction},
 };
-use spacewars_ai::{BrainReset, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3};
+use spacewars_ai::{
+    BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3,
+};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
@@ -142,12 +145,72 @@ fn create_pilot(
     }))
 }
 
+pub(super) const COMBAT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-combat",
+    controls_help: "Material combat: P1 human versus P2 combat bot. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) fires the cannon. Keyboard E laser, K cannon. Cannon recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
+    create: create_combat_pilot,
+    ..TERRAIN_REGISTRATION
+};
+struct MaterialCombatClientScenario {
+    sortie: SurfaceSortieClientScenario,
+    brain: RulePilotV4,
+    p1_brain: Option<RulePilotV4>,
+}
+fn create_combat_pilot(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(MaterialCombatClientScenario {
+        sortie: SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material_combat(seed),
+        },
+        brain: RulePilotV4::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: seed,
+        }),
+        p1_brain: None,
+    }))
+}
+
+pub(super) const DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-duel",
+    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
+    create: create_combat_duel,
+    ..COMBAT_REGISTRATION
+};
+fn create_combat_duel(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(MaterialCombatClientScenario {
+        sortie: SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material_combat(seed),
+        },
+        brain: RulePilotV4::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: seed,
+        }),
+        p1_brain: Some(RulePilotV4::new(BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: seed,
+        })),
+    }))
+}
+
 fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
     actions
         .iter()
         .filter(|action| {
-            SurfaceSortieAction::decode(action)
+            SurfaceWeaponAction::decode(action)
                 .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
+                || SurfaceSortieAction::decode(action)
+                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
                 || SurfaceWingAction::decode(action)
                     .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
                 || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| seat == 0)
@@ -198,10 +261,71 @@ impl ClientScenario for MaterialPilotClientScenario {
     }
 }
 
+impl ClientScenario for MaterialCombatClientScenario {
+    fn registration(&self) -> &'static ScenarioRegistration {
+        if self.p1_brain.is_some() {
+            &DUEL_REGISTRATION
+        } else {
+            &COMBAT_REGISTRATION
+        }
+    }
+    fn tick_model(&self) -> TickModel {
+        self.sortie.tick_model()
+    }
+    fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if dt.is_zero() {
+            return self.sortie.step(&[], dt);
+        }
+        let observation = self
+            .sortie
+            .state
+            .combat_observation(1, self.brain.site_request());
+        let mut actions = if let Some(brain) = &mut self.p1_brain {
+            let o = self
+                .sortie
+                .state
+                .combat_observation(0, brain.site_request());
+            brain.intent(&o).encode(PlayerId::PLAYER_1).to_vec()
+        } else {
+            human_pilot_actions(actions)
+        };
+        actions.extend(self.brain.intent(&observation).encode(PlayerId::PLAYER_2));
+        self.sortie.step(&actions, dt)
+    }
+    fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
+        if self.p1_brain.is_some() {
+            return Vec::new();
+        }
+        human_pilot_actions(&self.sortie.map_input(input, benchmark))
+    }
+    fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        let mut frames = self.sortie.render_frames(renderer, viewport);
+        pilot_hud(&mut frames, self.brain.label());
+        if let Some(brain) = &self.p1_brain {
+            pilot_hud_for(&mut frames, 0, brain.label());
+        }
+        frames
+    }
+    fn frame_layout(&self) -> FrameLayout {
+        self.sortie.frame_layout()
+    }
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
 fn pilot_hud(frames: &mut [RenderFrame], label: &str) {
+    pilot_hud_for(frames, 1, label);
+}
+fn pilot_hud_for(frames: &mut [RenderFrame], player: usize, label: &str) {
     use engine_common::{RenderColor, RenderPrimitive};
     // Reuse the control hint so the physical viewport stays clear at 800x480.
-    for layer in &mut frames[1].layers {
+    for layer in &mut frames[player].layers {
         for primitive in &mut layer.primitives {
             if let RenderPrimitive::Text(text) = primitive
                 && text.text.starts_with("A: thrust")
@@ -378,18 +502,29 @@ impl ClientScenario for SurfaceSortieClientScenario {
             .collect();
         if self.state.has_material_ground() {
             for player in 0..self.state.player_count() {
-                actions.push(
-                    SurfaceImpactAction {
-                        held: input.surface_impact_held(player),
-                        kind: if input.surface_wings_held(player) {
-                            ImpactKind::Heavy
-                        } else {
-                            ImpactKind::Light
-                        },
-                        oblique: false,
-                    }
-                    .encode(PlayerId::from_index(player).expect("bounded seat")),
-                );
+                if self.state.combat_enabled() {
+                    let (_, laser, _) = input.surface_mining_input(player);
+                    actions.push(
+                        SurfaceWeaponAction {
+                            laser,
+                            cannon: input.surface_impact_held(player),
+                        }
+                        .encode(PlayerId::from_index(player).expect("bounded seat")),
+                    );
+                } else {
+                    actions.push(
+                        SurfaceImpactAction {
+                            held: input.surface_impact_held(player),
+                            kind: if input.surface_wings_held(player) {
+                                ImpactKind::Heavy
+                            } else {
+                                ImpactKind::Light
+                            },
+                            oblique: false,
+                        }
+                        .encode(PlayerId::from_index(player).expect("bounded seat")),
+                    );
+                }
                 actions.push(
                     SurfaceWingAction {
                         closed: input.surface_wings_held(player),
@@ -462,6 +597,58 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn combat_host_maps_weapons_owns_p2_and_pauses_without_advancing_policy() {
+        let mut host = COMBAT_REGISTRATION
+            .create(
+                42,
+                &Settings::default(),
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+        let host = host
+            .as_any_mut()
+            .downcast_mut::<MaterialCombatClientScenario>()
+            .unwrap();
+        let mut input = ClientInput::default();
+        input.press(GameKey::TerrainDrill);
+        input.press(GameKey::P1Cannon);
+        let actions = host.map_input(&mut input, false);
+        assert_eq!(
+            actions
+                .iter()
+                .filter_map(SurfaceWeaponAction::decode)
+                .collect::<Vec<_>>(),
+            vec![(
+                PlayerId::PLAYER_1,
+                SurfaceWeaponAction {
+                    laser: true,
+                    cannon: true
+                }
+            )]
+        );
+        assert!(
+            !actions
+                .iter()
+                .any(|a| SurfaceImpactAction::decode(a).is_some())
+        );
+        let interference = SurfaceWeaponAction {
+            laser: true,
+            cannon: true,
+        }
+        .encode(PlayerId::PLAYER_2);
+        assert!(human_pilot_actions(&[interference]).is_empty());
+        let before = host.brain.telemetry().clone();
+        host.step(&actions, Duration::ZERO);
+        assert_eq!(host.brain.telemetry(), &before);
+        assert_eq!(host.sortie.state.observation(0).tick, 0);
+        host.step(&actions, Duration::from_nanos(16_666_667));
+        assert_eq!(host.sortie.state.observation(0).tick, 1);
+        let frames = host.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));
+        assert_eq!(frames.len(), 4);
+    }
 
     #[test]
     fn recovery_host_owns_p2_actions_and_resets_the_single_strike_driver() {

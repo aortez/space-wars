@@ -57,6 +57,11 @@ See [damage and recovery AI](material-recovery-ai.md) for the controlled tuning
 and the `spacewars-terrain-recovery` demonstration, where P2 handles ship loss,
 pod landing, rebuilding and departure autonomously.
 
+Choose `spacewars-terrain-combat` for P1 versus the combat bot, or
+`spacewars-terrain-duel` to watch two bots. These enable forward laser and cannon
+weapons aboard and reuse the same on-foot mining and recovery loop. See
+[Material combat V4](material-combat-ai.md) for controls and validation.
+
 ## Destruction, flags and recovery
 
 The flag is currently the only owned object on a planet. Removing or detaching

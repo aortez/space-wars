@@ -29,7 +29,39 @@ fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
             44.0,
         )
     } else {
-        (ship.position, 100.0)
+        let target = state
+            .combat_enabled()
+            .then(|| {
+                state.pilots.iter().enumerate().find_map(|(seat, pilot)| {
+                    let target = &state.world.ships[pilot.vehicle.0];
+                    (seat != player
+                        && pilot.body.is_none()
+                        && !target.dead
+                        && target.form == ShipForm::Ship
+                        && target.position.distance_to(ship.position) < 260.0)
+                        .then_some(target.position)
+                })
+            })
+            .flatten();
+        if let Some(target) = target {
+            let separation = target - ship.position;
+            (
+                (ship.position + target) * 0.5,
+                (180.0_f32
+                    .max(separation.x.abs() / 0.6)
+                    .max(separation.y.abs() / 0.35))
+                .min(440.0),
+            )
+        } else {
+            (
+                ship.position,
+                if state.combat_enabled() && ship.form == ShipForm::Ship {
+                    260.0
+                } else {
+                    100.0
+                },
+            )
+        }
     };
     Camera2::new(render_point(center), height)
 }
@@ -760,6 +792,7 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
     }
     if !ship.dead {
         render_ship(frame, ship);
+        render_laser(frame, ship);
     }
     if !ship.dead && (ship.form == ShipForm::Ship || state.pilots[player].recovery.is_some()) {
         let (feet, radius) = physics::surface_landing_geometry(ship.form);
@@ -1020,6 +1053,9 @@ fn draw_player_hud(
             -0.46,
             observation.mining.as_ref().map_or(detail, |mining| {
                 if matches!(observation.location, PilotLocation::Aboard(_)) {
+                    if state.combat_enabled() {
+                        return "RT: laser  X: cannon  RB: cruise".to_owned();
+                    }
                     return "X: asteroid / RB+X: heavy".to_owned();
                 }
                 format!(

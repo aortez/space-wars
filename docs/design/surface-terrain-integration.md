@@ -20,6 +20,11 @@ capture, mining and recovery rules, alongside combat and match outcomes.
 The [AI integration plan](surface-ai-integration.md) describes the next slice
 and the evidence needed before expanding it into the normal game.
 
+The controlled combat slice now adds the shared laser/cannon pipeline,
+`rule_pilot_v4` pursuit and firing, and recovery followed by renewed combat.
+See [Material combat V4](../material-combat-ai.md). Random asteroid pressure,
+enemy flag routes and generated multi-planet match integration remain ahead.
+
 ## Player outcome
 
 The player lands the ship on surviving ground, exits, and controls the spaceling

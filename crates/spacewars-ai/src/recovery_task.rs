@@ -293,11 +293,23 @@ impl RecoverShipTask {
         if !self.stabilized && p.landing.phase != LandingPhase::Landed {
             self.goal(RecoveryGoal::StabilizePod, p.tick);
             let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-            if relative.length() < 6.0 && Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.98 {
+            if relative.length() < 6.0
+                && Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.98
+                && p.landing.altitude > 12.0
+            {
                 self.stabilized = true;
             }
             action.horizontal = heading(p, up);
             action.brake_held = true;
+            // A collision can settle a pod on a sloping edge before it has
+            // aligned. Lift clear with ordinary thrust so contact friction
+            // cannot hold the stabilization turn indefinitely.
+            if p.landing.altitude < 14.0
+                && Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.85
+                && !self.stabilized
+            {
+                action.primary_held = true;
+            }
             if p.tick.saturating_sub(self.telemetry.goal_since) > 15 * 60 {
                 self.block("pod did not stabilize", p.tick);
             }
@@ -310,7 +322,8 @@ impl RecoverShipTask {
         }
         if self.climbing {
             action.horizontal = heading(p, up);
-            action.primary_held = Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.98;
+            action.primary_held = Vec2::Y.rotate_radians(p.ship.angle).dot(up)
+                > if p.landing.altitude < 8.0 { 0.85 } else { 0.98 };
             if p.ship.position.distance_to(p.planet.motion.position) > p.planet.radius + 12.0 {
                 self.climbing = false;
             }

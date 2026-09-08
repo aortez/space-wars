@@ -1388,7 +1388,32 @@ impl SpacewarsScenario {
             recover_ship_outside_universe(ship, universe_radius);
         }
         finish_spaceport_ejections(state, dt);
-        let new_shells = spawn_cannon_shells(state, dt);
+        let new_shells = if experimental {
+            state
+                .ships
+                .iter_mut()
+                .enumerate()
+                .filter_map(|(index, ship)| {
+                    let combat = surface_pilots
+                        .iter_mut()
+                        .find(|p| p.vehicle_index() == index)
+                        .and_then(|p| p.combat.as_mut());
+                    if let Some(combat) = combat {
+                        let shell = ship.update_cannon_with_recoil(
+                            dt,
+                            state.tick,
+                            surface_sortie::combat::CANNON_RECOIL,
+                        );
+                        combat.telemetry.shells_fired += u64::from(shell.is_some());
+                        shell
+                    } else {
+                        ship.update_cannon(dt, state.tick)
+                    }
+                })
+                .collect()
+        } else {
+            spawn_cannon_shells(state, dt)
+        };
         state.debris.extend(new_shells);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
@@ -1438,6 +1463,7 @@ impl SpacewarsScenario {
         resolve_physics_collisions(state, &contacts, &accepted_ports);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
+        surface_sortie::combat::record_hits(state, surface_pilots);
 
         spawn_debris_breakup_fragments(state);
         let collision_time = collision_started.elapsed();
@@ -5293,6 +5319,15 @@ impl ShipState {
     }
 
     fn update_cannon(&mut self, dt: f32, tick: u64) -> Option<DebrisState> {
+        self.update_cannon_with_recoil(dt, tick, CANNON_RECOIL_SPEED)
+    }
+
+    fn update_cannon_with_recoil(
+        &mut self,
+        dt: f32,
+        tick: u64,
+        recoil: f32,
+    ) -> Option<DebrisState> {
         if self.form == ShipForm::EscapePod {
             self.cannon_cooldown_remaining = 0.0;
             self.queued_cannon_fire = false;
@@ -5315,7 +5350,7 @@ impl ShipState {
                 self.direction * CANNON_SHELL_SPEED + self.velocity,
                 -self.direction.angle_radians(),
             );
-            self.velocity -= self.direction * CANNON_RECOIL_SPEED;
+            self.velocity -= self.direction * recoil;
             self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
             self.queued_cannon_fire = false;
             Some(shell)
