@@ -1475,6 +1475,7 @@ impl SpacewarsScenario {
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
         surface_sortie::combat::record_hits(state, surface_pilots);
+        surface_sortie::impact::record_contacts(state, surface_pilots);
 
         spawn_debris_breakup_fragments(state);
         let collision_time = collision_started.elapsed();

@@ -1,5 +1,9 @@
 # Material damage and reusable ship recovery
 
+For the subsequent progress-based stabilization change, repeated asteroid and
+missile trials, and current pod/flag limitations, see
+[Pod recovery after severe impacts](pod-impact-recovery.md).
+
 `spacewars-terrain-recovery` adds a controlled collision and recovery journey:
 P2 flies the V2 swept-wing circuit, lands, claims and departs; the host sends one
 heavy asteroid into the ship; `rule_pilot_v3` then lands the escape pod, exits,

@@ -65,6 +65,21 @@ pub struct RecoveryTelemetry {
     pub invalidations: u32,
     pub landing_retries: u32,
     pub relocations: u32,
+    pub stabilization: Option<PodStabilizationTelemetry>,
+}
+
+/// Observed control demand, not a command to clamp or rewrite physical motion.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PodStabilizationTelemetry {
+    pub attempts: u32,
+    pub started_tick: u64,
+    pub settled_tick: Option<u64>,
+    pub last_progress_tick: u64,
+    pub relative_speed: f32,
+    pub relative_spin: f32,
+    pub braking_seconds: f32,
+    pub spin_seconds: f32,
+    pub heading_error: f32,
 }
 #[derive(Debug, Clone)]
 pub struct RecoverShipTask {
@@ -83,6 +98,8 @@ pub struct RecoverShipTask {
     was_interacting: bool,
     was_jumping: bool,
     relocate_until: u64,
+    stabilization_window: Option<(u64, f32)>,
+    settled_since: Option<u64>,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
@@ -103,6 +120,7 @@ impl RecoverShipTask {
                 invalidations: 0,
                 landing_retries: 0,
                 relocations: 0,
+                stabilization: None,
             },
             site: None,
             rejected: Vec::new(),
@@ -117,6 +135,8 @@ impl RecoverShipTask {
             was_interacting: false,
             was_jumping: false,
             relocate_until: 0,
+            stabilization_window: None,
+            settled_since: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -290,30 +310,24 @@ impl RecoverShipTask {
             return action;
         }
         let up = (p.ship.position - p.planet.motion.position).normalized();
+        let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
+        let spin = p.ship.spin - p.planet.motion.spin;
+        if self.stabilized
+            && p.landing.phase != LandingPhase::Landed
+            && (relative.length() > 20.0 || spin.abs() > o.flight.flight.limits.turn_speed * 2.0)
+        {
+            // A new strike can invalidate an otherwise settled approach. Survey
+            // again after arresting the motion, within the original task budget.
+            self.stabilized = false;
+            self.site = None;
+            self.telemetry.site = None;
+            self.final_descent = false;
+            self.climbing = false;
+            self.stabilization_window = None;
+            self.settled_since = None;
+        }
         if !self.stabilized && p.landing.phase != LandingPhase::Landed {
-            self.goal(RecoveryGoal::StabilizePod, p.tick);
-            let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-            if relative.length() < 6.0
-                && Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.98
-                && p.landing.altitude > 12.0
-            {
-                self.stabilized = true;
-            }
-            action.horizontal = heading(p, up);
-            action.brake_held = true;
-            // A collision can settle a pod on a sloping edge before it has
-            // aligned. Lift clear with ordinary thrust so contact friction
-            // cannot hold the stabilization turn indefinitely.
-            if p.landing.altitude < 14.0
-                && Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.85
-                && !self.stabilized
-            {
-                action.primary_held = true;
-            }
-            if p.tick.saturating_sub(self.telemetry.goal_since) > 15 * 60 {
-                self.block("pod did not stabilize", p.tick);
-            }
-            return action;
+            return self.stabilize(o, up);
         }
         if self.telemetry.landing_retries >= 4 {
             self.block("pod landing retries exhausted", p.tick);
@@ -429,6 +443,79 @@ impl RecoverShipTask {
             horizontal: heading(p, desired),
             primary_held: thrust,
             brake_held: true,
+            interact_held: false,
+        }
+    }
+
+    fn stabilize(&mut self, o: &RecoveryTaskObservationV1, up: Vec2) -> SurfaceSortieAction {
+        let p = &o.flight.pilot;
+        let limits = o.flight.flight.limits;
+        self.goal(RecoveryGoal::StabilizePod, p.tick);
+        let speed = (p.ship.velocity - p.planet.velocity_at(p.ship.position)).length();
+        let spin = p.ship.spin - p.planet.motion.spin;
+        let error = shortest_heading_error(up.rotate_radians(-p.ship.angle)).abs();
+        let braking =
+            (speed - 6.0).max(0.0) / (limits.brake_acceleration - p.gravity.length()).max(0.1);
+        let turning = (spin.abs() - 0.5).max(0.0) / limits.turn_acceleration.max(0.1);
+        let clearance = (13.0 - p.landing.altitude).max(0.0);
+        let lift_time =
+            (2.0 * clearance / (limits.thrust_acceleration - p.gravity.length()).max(0.1)).sqrt();
+        let work = braking + turning + error / limits.turn_speed.max(0.1) + lift_time;
+        if self.stabilization_window.is_none() {
+            let attempts = self
+                .telemetry
+                .stabilization
+                .as_ref()
+                .map_or(1, |s| s.attempts + 1);
+            self.telemetry.stabilization = Some(PodStabilizationTelemetry {
+                attempts,
+                started_tick: p.tick,
+                settled_tick: None,
+                last_progress_tick: p.tick,
+                relative_speed: speed,
+                relative_spin: spin,
+                braking_seconds: braking,
+                spin_seconds: turning,
+                heading_error: error,
+            });
+            self.stabilization_window = Some((p.tick, work));
+        }
+        let s = self.telemetry.stabilization.as_mut().unwrap();
+        s.relative_speed = speed;
+        s.relative_spin = spin;
+        s.braking_seconds = braking;
+        s.spin_seconds = turning;
+        s.heading_error = error;
+        let (window_tick, previous_work) = self.stabilization_window.unwrap();
+        if p.tick.saturating_sub(window_tick) >= 60 {
+            // Compare successive windows so another impact cannot make the
+            // pre-impact best value an unreachable progress threshold. The
+            // original two-minute task deadline still bounds repeated strikes.
+            if work < previous_work - 0.1 {
+                s.last_progress_tick = p.tick;
+                self.telemetry.last_progress_tick = p.tick;
+            }
+            self.stabilization_window = Some((p.tick, work));
+        }
+        let aligned = Vec2::Y.rotate_radians(p.ship.angle).dot(up);
+        if speed < 6.0 && spin.abs() < 0.5 && aligned > 0.98 && p.landing.altitude > 12.0 {
+            let since = *self.settled_since.get_or_insert(p.tick);
+            if p.tick.saturating_sub(since) >= 12 {
+                self.stabilized = true;
+                s.settled_tick = Some(p.tick);
+            }
+        } else {
+            self.settled_since = None;
+        }
+        let stalled = p.tick.saturating_sub(s.last_progress_tick) > 15 * 60;
+        if stalled && !self.stabilized {
+            self.block("pod stabilization stopped making progress", p.tick);
+        }
+        SurfaceSortieAction {
+            horizontal: heading(p, up),
+            brake_held: true,
+            // Lift clear of a sloping contact before aligning for descent.
+            primary_held: p.landing.altitude < 14.0 && aligned > 0.85 && !self.stabilized,
             interact_held: false,
         }
     }

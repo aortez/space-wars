@@ -1,6 +1,54 @@
-use super::super::impact::{ImpactKind, SurfaceImpactAction};
+use super::super::impact::{ImpactKind, RecoveryHazard, SurfaceImpactAction};
 use super::*;
 const DT: Duration = Duration::from_nanos(16_666_667);
+
+#[test]
+fn diagnostic_missile_spawns_without_writing_target_motion_and_records_real_contact() {
+    for pod in [false, true] {
+        let mut s = SurfaceSortieScenario::init_material_flight(
+            42,
+            1,
+            &[(
+                PlayerId::PLAYER_1,
+                pilot::MaterialFlightStart {
+                    bearing: 0.0,
+                    altitude: 100.0,
+                    radial_speed: 0.0,
+                    lateral_speed: 0.0,
+                    heading_offset: 0.0,
+                },
+            )],
+        );
+        idle(&mut s, 1);
+        if pod {
+            strike(&mut s, ImpactKind::Heavy);
+            // The next shared lifecycle step installs the pod's body geometry.
+            idle(&mut s, 1);
+        }
+        let before = s.recovery_task_observation(0, None);
+        assert!(!s.spawn_recovery_hazard(1, RecoveryHazard::Missile, false));
+        assert!(s.spawn_recovery_hazard(0, RecoveryHazard::Missile, false));
+        assert_eq!(s.recovery_task_observation(0, None), before);
+        let spawned = s.world.tick;
+        for _ in 0..180 {
+            idle(&mut s, 1);
+            if s.damage_observation(0).last_contact_spawn_tick == Some(spawned) {
+                break;
+            }
+        }
+        let d = s.damage_observation(0);
+        assert_eq!(d.last_contact_spawn_tick, Some(spawned), "pod={pod}: {d:?}");
+        assert_eq!(d.last_contact_source, Some("cannon"));
+        if pod {
+            assert_eq!(s.world.ships[0].form, ShipForm::EscapePod);
+            assert_ne!(
+                s.recovery_task_observation(0, None).flight.pilot.ship,
+                before.flight.pilot.ship
+            );
+        }
+        assert!(s.terrain_diagnostics().issues.is_empty());
+    }
+}
 
 fn strike(state: &mut SurfaceSortieState, kind: ImpactKind) {
     SurfaceSortieScenario::step(

@@ -1,19 +1,163 @@
 use engine_common::Scenario;
+use engine_core::Vec2;
 use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
-        PilotLocation, SurfaceSortieAction, SurfaceSortieScenario, SurfaceSortieState,
+        LandingPhase, PilotLocation, SurfaceSortieAction, SurfaceSortieScenario,
+        SurfaceSortieState,
         impact::{RecoveryDisruption, SurfaceImpactAction},
+        recovery_sensors::RecoveryTaskObservationV1,
     },
 };
 use spacewars_ai::{
     BrainReset,
     flight_pilot::FlightIntent,
     recovery_pilot::RulePilotV3,
-    recovery_task::{RecoverShipTask, TaskStatus},
+    recovery_task::{RecoverShipTask, RecoveryGoal, TaskStatus},
 };
 use std::time::Duration;
 const DT: Duration = Duration::from_nanos(16_666_667);
+
+// Observation fixtures isolate the task's progress/deadline contract. Physical
+// collision and full recovery are exercised separately below and in the soak.
+fn airborne_pod() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    let mut s = SurfaceSortieScenario::init_material(42, 1);
+    SurfaceSortieScenario::step(&mut s, &[], DT);
+    let mut o = s.recovery_task_observation(0, None);
+    let p = &mut o.flight.pilot;
+    p.controls_armed = true;
+    p.ship_form = ShipForm::EscapePod;
+    p.ship_available = true;
+    p.location = PilotLocation::Aboard(p.vehicle);
+    p.planet.motion.spin = 0.0;
+    p.planet.motion.velocity = Vec2::ZERO;
+    p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 100.0);
+    p.ship.velocity = Vec2::ZERO;
+    p.ship.spin = 0.0;
+    p.ship.angle = 0.0;
+    p.gravity = Vec2::ZERO;
+    p.landing.phase = LandingPhase::Flying;
+    p.landing.altitude = 26.0;
+    p.landing.assist_strength = 0.0;
+    (
+        RecoverShipTask::new(BrainReset {
+            actor: p.owner,
+            episode_seed: 42,
+        }),
+        o,
+    )
+}
+
+#[test]
+fn progressing_high_spin_pod_can_take_longer_than_fifteen_seconds() {
+    for turn_acceleration in [3.0, 6.0] {
+        let (mut task, mut o) = airborne_pod();
+        o.flight.flight.limits.turn_acceleration = turn_acceleration;
+        // Both actuators are making observable progress, at their real limits.
+        for tick in 0..=40 * 60 {
+            let p = &mut o.flight.pilot;
+            p.tick = tick;
+            p.ship.spin = (114.0 - turn_acceleration * tick as f32 / 60.0).max(0.0);
+            p.ship.velocity = Vec2::X * (600.0 - 40.0 * tick as f32 / 60.0).max(0.0);
+            let intent = task.step(&o);
+            assert!(intent.controls.brake_held);
+            assert!(!intent.controls.interact_held);
+            assert_eq!(task.telemetry().status, TaskStatus::Running);
+            let telemetry = task.telemetry().clone();
+            assert_eq!(task.step(&o), intent);
+            assert_eq!(task.telemetry(), &telemetry);
+            let s = telemetry.stabilization.as_ref().unwrap();
+            if let Some(settled) = s.settled_tick {
+                assert!(settled > 15 * 60);
+                assert!(s.relative_spin.abs() < 0.5);
+                assert!(s.relative_speed < 6.0);
+                break;
+            }
+        }
+        assert!(
+            task.telemetry()
+                .stabilization
+                .as_ref()
+                .unwrap()
+                .settled_tick
+                .is_some()
+        );
+    }
+}
+
+#[test]
+fn stalled_pod_blocks_and_a_brief_alignment_does_not_count_as_settled() {
+    let (mut task, mut o) = airborne_pod();
+    for tick in 0..=902 {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.ship.spin = 30.0;
+        task.step(&o);
+    }
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("pod stabilization stopped making progress")
+    );
+    assert!(
+        task.telemetry()
+            .stabilization
+            .as_ref()
+            .unwrap()
+            .settled_tick
+            .is_none()
+    );
+
+    let (mut task, mut o) = airborne_pod();
+    for tick in 0..=24 {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.ship.spin = if tick == 10 { 1.0 } else { 0.0 };
+        task.step(&o);
+        let settled = task
+            .telemetry()
+            .stabilization
+            .as_ref()
+            .unwrap()
+            .settled_tick;
+        if tick < 23 {
+            assert!(settled.is_none());
+        } else {
+            assert_eq!(settled, Some(23));
+        }
+    }
+}
+
+#[test]
+fn another_strike_restarts_stabilization_without_restarting_task_budget() {
+    let (mut task, mut o) = airborne_pod();
+    for tick in 0..=13 {
+        o.flight.pilot.tick = tick;
+        task.step(&o);
+    }
+    assert_eq!(task.telemetry().goal, RecoveryGoal::LandPod);
+    assert!(task.site_request().is_some());
+    let started = task.telemetry().started_tick;
+    o.flight.pilot.tick = 14;
+    o.flight.pilot.ship.spin = -50.0;
+    o.flight.pilot.ship.velocity = Vec2::X * 120.0;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::StabilizePod);
+    assert!(task.site_request().is_none());
+    assert_eq!(task.telemetry().stabilization.as_ref().unwrap().attempts, 2);
+    assert_eq!(task.telemetry().started_tick, started);
+    let mut copy = task.clone();
+    o.flight.pilot.tick = 120 * 60 + 1;
+    assert_eq!(task.step(&o), copy.step(&o));
+    assert_eq!(task.telemetry(), copy.telemetry());
+    assert_eq!(
+        task.telemetry().reason,
+        Some("recovery exceeded two-minute task budget")
+    );
+    task.reset(BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    });
+    assert!(task.telemetry().stabilization.is_none());
+}
 
 #[test]
 fn real_strike_recovers_and_departs_in_both_seats_and_angles() {

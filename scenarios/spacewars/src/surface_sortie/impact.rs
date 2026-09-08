@@ -24,6 +24,17 @@ pub enum RecoveryDisruption {
     SpacelingSupport,
     LandingSite(pilot::LandingSiteId),
 }
+
+/// Incoming hazards for headless recovery trials, including follow-up hits on
+/// pods. These spawn ordinary debris; they do not change the target's motion,
+/// health or form. Interactive impact buttons keep their existing gates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryHazard {
+    LightAsteroid,
+    HeavyAsteroid,
+    Missile,
+}
 impl SurfaceImpactAction {
     pub fn encode(self, owner: PlayerId) -> Action {
         Action::scenario(
@@ -70,13 +81,104 @@ pub struct SurfaceDamageObservation {
     pub last_damage_percent: f32,
     pub last_ship_lost: bool,
     pub last_source: Option<&'static str>,
+    /// Physical debris contacts also count when a pod takes no health damage.
+    pub debris_contacts: u64,
+    pub last_contact_tick: Option<u64>,
+    pub last_contact_source: Option<&'static str>,
+    pub last_contact_spawn_tick: Option<u64>,
 }
 #[derive(Debug, Clone, Default)]
 pub(super) struct SurfaceDamageState {
-    seats: [SurfaceDamageObservation; SPACEWARS_PLAYER_COUNT],
     pub(super) held: [bool; SPACEWARS_PLAYER_COUNT],
 }
+
+/// Read contact indices before finished projectiles are removed or fragments
+/// change debris order. The outer sortie step runs after that cleanup.
+pub(crate) fn record_contacts(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
+    for hit in &world.ship_debris_collisions {
+        let Some(debris) = world.debris.get(hit.debris) else {
+            continue;
+        };
+        let Some(pilot) = pilots.iter_mut().find(|p| p.vehicle.0 == hit.ship) else {
+            continue;
+        };
+        let d = &mut pilot.damage;
+        d.debris_contacts += 1;
+        d.last_contact_tick = Some(world.tick + 1);
+        d.last_contact_source = Some(match debris.kind {
+            DebrisKind::Shell => "cannon",
+            DebrisKind::Asteroid => "asteroid",
+            DebrisKind::Fragment => "fragment",
+        });
+        d.last_contact_spawn_tick = Some(debris.spawn_tick);
+    }
+}
 impl SurfaceSortieState {
+    pub fn spawn_recovery_hazard(
+        &mut self,
+        player: usize,
+        hazard: RecoveryHazard,
+        oblique: bool,
+    ) -> bool {
+        if player >= self.player_count() || !self.has_material_ground() {
+            return false;
+        }
+        let vehicle = self.pilots[player].vehicle.0;
+        if self.world.ships[vehicle].dead {
+            return false;
+        }
+        let body = self.world.physics.ship_body(vehicle);
+        let Some(m) = self.world.physics.world.motion(body) else {
+            return false;
+        };
+        let up = (m.position - self.planet_motion(player).position).normalized();
+        let pod = self.world.ships[vehicle].form == ShipForm::EscapePod;
+        let axis = if pod { Vec2::new(up.y, -up.x) } else { up };
+        let direction = -axis.rotate_radians(if oblique { 0.35 } else { 0.0 });
+        // Nearby side impacts isolate pod response from the original radial
+        // wreckage trail. Both colliders start apart; the hazard must travel/hit.
+        let distance = if !pod {
+            40.0
+        } else if hazard == RecoveryHazard::LightAsteroid {
+            6.0
+        } else {
+            12.0
+        };
+        let position = m.position - direction * distance;
+        let speed = match hazard {
+            RecoveryHazard::LightAsteroid => 25.0,
+            RecoveryHazard::HeavyAsteroid => 160.0,
+            RecoveryHazard::Missile => CANNON_SHELL_SPEED,
+        };
+        let velocity = m.linear_velocity + direction * speed;
+        let mut debris = if hazard == RecoveryHazard::Missile {
+            let mut shell = DebrisState::new_shell(
+                (player + 1) % SPACEWARS_PLAYER_COUNT,
+                self.world.tick,
+                position,
+                velocity,
+                -direction.angle_radians(),
+            );
+            shell.rail_launched = true;
+            shell
+        } else {
+            DebrisState::new(
+                DebrisKind::Asteroid,
+                position,
+                velocity,
+                2.0,
+                1.0,
+                Color::scale_255(200.0, 140.0, 70.0),
+            )
+        };
+        debris.spawn_tick = self.world.tick;
+        self.world.debris.push(debris);
+        let d = &mut self.pilots[player].damage;
+        d.strikes += 1;
+        d.last_strike_tick = Some(self.world.tick);
+        true
+    }
+
     pub fn queue_recovery_disruption(
         &mut self,
         player: usize,
@@ -129,7 +231,7 @@ impl SurfaceSortieState {
     }
 
     pub fn damage_observation(&self, player: usize) -> SurfaceDamageObservation {
-        self.damage.seats[player]
+        self.pilots[player].damage
     }
     pub(super) fn read_impact_actions(&mut self, actions: &[Action]) {
         if !self.has_material_ground() || self.combat_enabled() {
@@ -145,7 +247,8 @@ impl SurfaceSortieState {
             if !rising || !self.pilots[seat].controls_armed {
                 continue;
             }
-            if self.damage.seats[seat]
+            if self.pilots[seat]
+                .damage
                 .last_strike_tick
                 .is_some_and(|t| self.world.tick.saturating_sub(t) < 180)
             {
@@ -182,8 +285,8 @@ impl SurfaceSortieState {
             );
             rock.spawn_tick = self.world.tick;
             self.world.debris.push(rock);
-            self.damage.seats[seat].strikes += 1;
-            self.damage.seats[seat].last_strike_tick = Some(self.world.tick);
+            self.pilots[seat].damage.strikes += 1;
+            self.pilots[seat].damage.last_strike_tick = Some(self.world.tick);
         }
     }
     pub(super) fn damage_sample(&self) -> [(f32, f32, u64); SPACEWARS_PLAYER_COUNT] {
@@ -207,7 +310,7 @@ impl SurfaceSortieState {
         for (seat, (life, max_life, losses)) in
             before.into_iter().enumerate().take(self.player_count())
         {
-            let pilot = &self.pilots[seat];
+            let pilot = &mut self.pilots[seat];
             let ship = &self.world.ships[pilot.vehicle.0];
             let lost = pilot
                 .recovery
@@ -231,7 +334,7 @@ impl SurfaceSortieState {
                 .body_impacts
                 .iter()
                 .any(|hit| hit.ship == pilot.vehicle.0 && hit.damage > 0.0);
-            let d = &mut self.damage.seats[seat];
+            let d = &mut pilot.damage;
             d.hits += 1;
             d.last_damage_tick = Some(self.world.tick);
             d.last_damage_percent = damage / max_life.max(f32::EPSILON) * 100.0;
