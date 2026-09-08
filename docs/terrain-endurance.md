@@ -297,6 +297,25 @@ retained separately and are
 not counted as completed acceptance runs. The example saves observations with
 each per-second audit so failed journeys remain inspectable.
 
+## Autonomous pilot runs (2026-09-08)
+
+The first material pilot policy now has a separate three-minute evaluator:
+`cargo run --release -p spacewars-ai --example surface_pilot_soak -- --seconds 180`.
+It drives the same controller as the `spacewars-terrain-ai` client scene.
+See [material pilot AI](material-pilot-ai.md) for its contract and reproduction.
+
+Four flight approaches in both seats completed on desktop and Pi, each
+continuing for 180 simulated seconds: 16 runs, 48 simulated minutes and 2,880
+terrain/motion audits. Capture sorties completed in 30.0–100.1 seconds, including
+up to two landing retries. Pi AI/sensor P95 stayed below 0.009 ms with the kiosk
+running; the worst simulation step was 0.4552 ms. These are light flight/claim
+workloads with no excavation, not new fragmentation capacity measurements.
+
+The runner records policy identity, chosen sites, invalidations, retries,
+milestones, stalls and separate AI/simulation timing. It complements the scripted
+mining/recovery journey above; enemy flag navigation, ownership-loss responses,
+AI mining and recovery are still required for full Spacewars integration.
+
 ## Exploring the historical report
 
 Choose a run from the comparison table. Scrub time or click a chart to inspect a

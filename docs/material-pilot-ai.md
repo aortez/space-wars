@@ -71,10 +71,24 @@ the historical fragmentation performance limits in `terrain-endurance.md`.
 both seats, real landing/capture/departure, cloned continuation and reset,
 neutral handoffs, repeated observations, observation identity, query readiness,
 material revisions, and interactive/headless agreement through a full sortie.
-The new real-window workflow passes launch, pause, restart and both renderers.
+All 18 real-window workflows pass, including the new AI scene's launch, pause,
+restart and both renderers.
 The frozen navigation-v1 (6 episodes) and strategy-v1 (12 episodes) baselines
 still match. Formatting passes; Clippy completes with existing warnings.
 
 Local evidence is under
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/material-pilot-v1-20260908/`.
-Pi endurance and deployment evidence will be recorded alongside these reports.
+The same eight 180-second cases also pass on the Pi with the existing kiosk
+running at 60 Hz. Completion took 30.0–100.1 seconds, with the same retry counts
+as desktop. Pi AI/sensor P95 was 0.0061–0.0085 ms; step P95 was 0.1329–0.1490 ms
+and the worst observed step 0.4552 ms. Together the desktop and Pi matrix covers
+48 simulated minutes and 2,880 conservation/motion audits. These results do not
+measure a fragmented match or competitive play. The built image uses gameplay
+checkpoint `e497b8aed7828d716fd5579f49242265f5abd5c9` and the previously accepted
+Yocto dependency pins; exact image and executable hashes are in the manifest.
+
+Deployment and live verification passed on Pi slot B (`/dev/sda3`). The installed
+executable matches the archived image. In the live scene the P2 bot acquired
+ownership, boarded and departed; the HUD showed `AI: sortie complete / holding`
+with `Planet 0: P2`. The kiosk reported 60.1 FPS/UPS and zero service restarts.
+`pi-flight.png` and `pi-complete.png` preserve the observed gameplay states.
