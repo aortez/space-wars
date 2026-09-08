@@ -231,21 +231,22 @@ accounting, anomaly status, and replay hashes before writing `summary.json`.
 
 The `surface_material_soak` example validates the integrated `spacewars-terrain`
 gameplay separately from the historical stress matrix above. Three optimized
-desktop runs completed 180 simulated seconds each (nine minutes total), using
+runs on each of desktop and Pi completed 180 simulated seconds each (18 minutes
+total), using
 only player actions: natural landing, exit, claim, mine the flag footing,
 neutralization, reclaim, deliberate empty-ship loss, rebuild, board and depart.
 After departure the pilot brakes and the simulation continues, including a
 return to the surface. Every second audits material accounting, finite motion
 and body/collider ownership. The other ship stays simulated in two-player cases.
 
-| Players / driven seat | Seed | Journey complete (sim s) | Full-step P95 (ms) | Worst step (ms) |
+| Players / driven seat | Seed | Journey complete on both (sim s) | Desktop P95 / worst (ms) | Pi P95 / worst (ms) |
 | --- | ---: | ---: | ---: | ---: |
-| One / P1 | 42 | 21.05 | 0.052 | 0.224 |
-| Two / P1 | 7 | 21.05 | 0.050 | 0.160 |
-| Two / P2 | 42 | 21.22 | 0.054 | 0.170 |
+| One / P1 | 42 | 21.05 | 0.052 / 0.224 | 0.125 / 0.472 |
+| Two / P1 | 7 | 21.05 | 0.050 / 0.160 | 0.146 / 0.482 |
+| Two / P2 | 42 | 21.22 | 0.054 / 0.170 | 0.158 / 0.537 |
 
 Each run removed four cells, neutralized the planet once and reclaimed it,
-rebuilt one ship and boarded it without duplicating the pilot. All 540 sampled
+rebuilt one ship and boarded it without duplicating the pilot. All 1,080 sampled
 audits passed; initial material equals remaining plus removed cells. Sampled
 peak body speed was 41.75–51.51 world units/s. These light gameplay journeys
 created no detached fragments; they do not replace the heavy fragmentation
@@ -269,13 +270,25 @@ ownership values or character physics are forced by the journey runner.
 
 The timing wraps the entire `SurfaceSortieScenario::step`, including material
 commit preparation; report serialization and rendering are excluded. Desktop
-uses Rust 1.89 release mode. An ARM64 runner is built with Rust 1.94.1, but the
-combined Pi runs and image deployment are pending SSH key-agent authentication.
+uses Rust 1.89 release mode. The ARM64 runner uses Rust 1.94.1. Pi runs kept the
+existing 60 Hz kiosk running alongside the headless runner.
 Earlier Pi stress results above apply to the historical workload and binary.
 
+The combined image was built from `21bff9f`, using the accepted Pi image's
+Yocto layer revisions, and deployed to `spacewars.local` on slot A (`/dev/sda2`).
+The installed engine-client SHA-256 matches the read-only extraction from the
+archived image:
+`6fb1249ebc083646df8d9c93b21212cc71fbfc2c581abf01182e9411917090dc`.
+The live `spacewars-terrain` scene reports 60.1 FPS/UPS at raster scale 2.00,
+with no service restarts. Its inspected 800×480 screenshot shows both ships
+landed on material ground without a pad; the existing two-player setting was
+preserved. This is a startup/idle rendering check, not a fragmented-world GPU
+benchmark or a substitute for controller playtesting.
+
 Reports and validation records are in the local
-`surface-terrain-integration-20260908` artifact directory. `desktop` contains the
-final three runs; earlier diagnostic attempts are retained separately and are
+`surface-terrain-integration-20260908` artifact directory. `desktop` and `pi`
+contain the final three runs per platform; earlier diagnostic attempts are
+retained separately and are
 not counted as completed acceptance runs. The example saves observations with
 each per-second audit so failed journeys remain inspectable.
 
