@@ -7,6 +7,19 @@ The `spacewars-terrain` launcher now runs the combined one/two-player scene.
 See [the playtest guide](../spacewars-terrain.md) for controls and
 [the endurance report](../terrain-endurance.md) for measured validation.
 
+## Completion target
+
+The user accepted the first Pi gameplay slice and clarified that merging is
+deferred until this work is ready for integration into ordinary Spacewars.
+Working AI is a required part of that milestone. The controlled human-playable
+scene establishes the shared mechanics; it does not complete the overall goal.
+
+The remaining target is a playable Spacewars match on generated destructible
+planets, with human and AI pilots using the same natural landing, disembarking,
+capture, mining and recovery rules, alongside combat and match outcomes.
+The [AI integration plan](surface-ai-integration.md) describes the next slice
+and the evidence needed before expanding it into the normal game.
+
 ## Player outcome
 
 The player lands the ship on surviving ground, exits, and controls the spaceling
