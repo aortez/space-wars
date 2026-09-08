@@ -149,7 +149,9 @@ still has normal motion. Two additional cannon contacts are recorded by tick
 4609, after P2 has switched to patrol because the opponent is now a pod. The
 77-second sample peaks at 567.14 units/s, exceeding the unchanged 500-unit audit
 threshold. Later one-second samples remain below it; the final world's maximum
-speed is 59.10 units/s. Material and finite-motion checks remain valid throughout.
+speed is 59.10 units/s. The struck pod does not complete recovery: its existing
+15-second stabilization budget expires at tick 5502 with `pod did not stabilize`.
+Material and finite-motion checks remain valid throughout.
 
 The evidence points to the pending missiles kicking the much lighter pod, rather
 than a large velocity being introduced at ejection or sustained gravity runaway.
@@ -172,7 +174,7 @@ work before broadening the gameplay envelope.
   physics-step p95 is 0.31ms and AI p95 is 0.31ms. These are headless measurements;
   they exclude rendering, audits and report serialization.
 
-Raw reports, summaries, phase aggregates, diagnostic frames, test logs and build
+Raw reports, summaries, phase aggregates, launcher/live screenshots, test logs and build
 artifacts are retained under:
 
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/tactical-sortie-20260908`
@@ -180,3 +182,28 @@ artifacts are retained under:
 Only `desktop/` and `pi/` contain the final matrices. Prototype, stale-executable
 and earlier baseline directories are retained for investigation and excluded
 from these results.
+
+
+## Pi deployment and live check
+
+Deployed gameplay checkpoint `77bafe10127ce8a4b4c2a38484110eec384112fe` to
+`spacewars.local` / `192.168.1.108`, slot B (`/dev/sda3`). The Yocto image build
+completed all 6,608 tasks, with the known unsupported-build-host warning. The
+installed client SHA-256 matches the binary extracted from the archived image:
+
+- Image: `512f6d4b11fec381d913da7724a24faf840643b136ed9970d588ed4c34915bc5`
+- Client: `44d6a74f80b1cfdb34a72cb8a58f85ff7d6cd08f990ca8ab811fd47c88b575cb`
+
+The real 800×480 raster display exposes the mission choice and retains 8s / 4s
+combat breaks at raster scale 2. The three-minute Capture duel shows P1 owning
+the planet and departing behind cover, then returning to combat. At the end P1
+has a full ship at 71% health, while P2 has landed its pod and exited; P2 reports
+the existing `enemy flag route required` limitation. Captured status samples
+measure 59.9–60.1 FPS/UPS, with zero kiosk restarts. Screenshots and actual capture
+timestamps are in the artifact directory; the first four captures happened
+around 33–39 seconds, after the on-foot claim had already finished.
+
+The Pi is left on a freshly restarted, paused `spacewars-terrain-combat` round
+with **P1 human / P2 Capture**. Press Start to resume. Final UI revision is 30,
+scenario revision 3. Launcher Settings can switch back to Dogfight or select the
+duel preset to watch the capture/interception pairing.

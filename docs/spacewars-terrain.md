@@ -60,7 +60,9 @@ pod landing, rebuilding and departure autonomously.
 Choose `spacewars-terrain-combat` for P1 versus the combat bot, or
 `spacewars-terrain-duel` to watch two bots. These enable forward laser and cannon
 weapons aboard and reuse the same on-foot mining and recovery loop. See
-[Material combat V4](material-combat-ai.md) for controls and validation.
+[Material combat V4](material-combat-ai.md) for controls and validation. Launcher
+Settings also offers **Bot mission: Capture** for a
+[cover-aware landing, claim and departure attempt](tactical-surface-sorties.md).
 
 ## Destruction, flags and recovery
 
