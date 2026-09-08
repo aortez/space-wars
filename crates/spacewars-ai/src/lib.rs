@@ -8,6 +8,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod pilot;
+
 use core::f32::consts::PI;
 
 use engine_core::Vec2;

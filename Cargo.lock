@@ -5109,6 +5109,7 @@ dependencies = [
  "engine-core",
  "scenario-spacewars",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

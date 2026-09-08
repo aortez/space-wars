@@ -6,6 +6,10 @@ use scenario_spacewars::surface_sortie::{
     SurfaceMiningAction, SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario,
     SurfaceSortieState,
 };
+use spacewars_ai::{
+    BrainReset,
+    pilot::{PilotBrain, RulePilotV1},
+};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
@@ -76,6 +80,119 @@ pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistrati
     create: create_material,
     ..EXPEDITION_REGISTRATION
 };
+
+pub(super) const PILOT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-ai",
+    controls_help: "Material pilot AI playtest: P1 is human; P2 flies, lands, exits, claims a neutral planet, boards and departs using the same controls and physics. Watch its goal in the P2 view. After one sortie it holds above the planet. Enemy flag navigation, mining and vehicle recovery are future AI slices; a blocked goal is shown explicitly. P1 controls match Destructible Expedition: A/Space thrusts or jumps; B/X transfers; left/right turns or walks; Down/S brakes; right stick aims, RT/LB mines, Y changes size. Start/Esc pauses; R restarts both pilots. Select spacewars-terrain for one or two human pilots.",
+    create: create_pilot,
+    ..TERRAIN_REGISTRATION
+};
+
+/// Host-owned policy. The scenario still consumes only ordinary encoded actions.
+struct MaterialPilotClientScenario {
+    sortie: SurfaceSortieClientScenario,
+    brain: RulePilotV1,
+}
+
+fn create_pilot(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    use scenario_spacewars::surface_sortie::pilot::MaterialFlightStart;
+    Ok(Box::new(MaterialPilotClientScenario {
+        sortie: SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material_flight(
+                seed,
+                2,
+                &[(
+                    PlayerId::PLAYER_2,
+                    MaterialFlightStart {
+                        bearing: std::f32::consts::PI,
+                        altitude: 45.0,
+                        radial_speed: -5.0,
+                        lateral_speed: 3.0,
+                        heading_offset: -0.45,
+                    },
+                )],
+            ),
+        },
+        brain: RulePilotV1::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: seed,
+        }),
+    }))
+}
+
+fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
+    actions
+        .iter()
+        .filter(|action| {
+            SurfaceSortieAction::decode(action)
+                .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
+                || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| seat == 0)
+        })
+        .cloned()
+        .collect()
+}
+
+impl ClientScenario for MaterialPilotClientScenario {
+    fn registration(&self) -> &'static ScenarioRegistration {
+        &PILOT_REGISTRATION
+    }
+    fn tick_model(&self) -> TickModel {
+        self.sortie.tick_model()
+    }
+    fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if dt.is_zero() {
+            return self.sortie.step(&[], dt);
+        }
+        let observation = self
+            .sortie
+            .state
+            .pilot_observation(1, self.brain.site_request());
+        let mut actions = human_pilot_actions(actions);
+        actions.push(self.brain.intent(&observation).encode(PlayerId::PLAYER_2));
+        self.sortie.step(&actions, dt)
+    }
+    fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
+        human_pilot_actions(&self.sortie.map_input(input, benchmark))
+    }
+    fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        use engine_common::{RenderColor, RenderPrimitive};
+        let mut frames = self.sortie.render_frames(renderer, viewport);
+        // Reuse the existing HUD strip; replacing the control hint leaves the
+        // physical viewport and other pilot's controls unobscured at 800x480.
+        for layer in &mut frames[1].layers {
+            for primitive in &mut layer.primitives {
+                if let RenderPrimitive::Text(text) = primitive
+                    && text.text == "A: thrust/jump  B: board/exit"
+                {
+                    let status = self.brain.telemetry();
+                    text.text = format!(
+                        "AI: {}",
+                        status.blocked_reason.unwrap_or(status.goal.label())
+                    );
+                    text.color = RenderColor::rgb(1.0, 0.82, 0.25);
+                }
+            }
+        }
+        frames
+    }
+    fn frame_layout(&self) -> FrameLayout {
+        self.sortie.frame_layout()
+    }
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
 
 fn create_material(
     seed: u64,
@@ -257,6 +374,77 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn material_ai_host_ignores_p2_hardware_pauses_and_restarts_its_policy() {
+        let make = || {
+            PILOT_REGISTRATION
+                .create(
+                    42,
+                    &Settings::default(),
+                    Viewport::new(800.0, 480.0),
+                    ScenarioStartMode::Normal,
+                )
+                .unwrap()
+        };
+        let mut host = make();
+        let host = host
+            .as_any_mut()
+            .downcast_mut::<MaterialPilotClientScenario>()
+            .unwrap();
+        let mut reference = host.sortie.state.clone();
+        let mut brain = host.brain.clone();
+        let interfering = [
+            SurfaceSortieAction {
+                horizontal: 1.0,
+                primary_held: true,
+                interact_held: true,
+                brake_held: true,
+            }
+            .encode(PlayerId::PLAYER_2),
+            SurfaceMiningAction {
+                aim: engine_core::Vec2::Y,
+                held: true,
+                cycle: true,
+            }
+            .encode(PlayerId::PLAYER_2),
+        ];
+        let before = host.brain.telemetry().clone();
+        host.step(&interfering, Duration::ZERO);
+        assert_eq!(host.brain.telemetry(), &before);
+        assert_eq!(host.sortie.state.observation(1).tick, 0);
+        for _ in 0..120 * 60 {
+            let o = reference.pilot_observation(1, brain.site_request());
+            let action = brain.intent(&o);
+            SurfaceSortieScenario::step(
+                &mut reference,
+                &[action.encode(PlayerId::PLAYER_2)],
+                Duration::from_nanos(16_666_667),
+            );
+            host.step(&interfering, Duration::from_nanos(16_666_667));
+            assert_eq!(host.sortie.state.observation(1), reference.observation(1));
+            if host.brain.telemetry().completed_tick.is_some() {
+                break;
+            }
+        }
+        assert!(
+            host.brain.telemetry().completed_tick.is_some(),
+            "{:?}",
+            host.brain.telemetry()
+        );
+        let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
+        assert_eq!(frames.len(), 4);
+        assert!(frames[1].layers.iter().flat_map(|l| &l.primitives).any(
+            |p| matches!(p, engine_common::RenderPrimitive::Text(t) if t.text.starts_with("AI: "))
+        ));
+        let restarted = make();
+        let restarted = restarted
+            .as_any()
+            .downcast_ref::<MaterialPilotClientScenario>()
+            .unwrap();
+        assert_eq!(restarted.brain.telemetry(), &before);
+        assert_eq!(restarted.sortie.state.observation(1).tick, 0);
+    }
 
     #[test]
     fn material_seats_map_mining_without_ship_weapons_and_release_on_disconnect() {

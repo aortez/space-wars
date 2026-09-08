@@ -25,6 +25,11 @@ can choose sites, respond to opponents or complete a Spacewars match.
 
 ## First AI slice: autonomous landing and capture
 
+Implemented as `rule_pilot_v1` and the `spacewars-terrain-ai` playtest preset.
+See [the controller contract, reproduction and validation](../material-pilot-ai.md).
+This completes the initial controlled-planet sortie, not the following match-AI
+milestones or the overall ordinary-Spacewars integration target.
+
 Implement one versioned pilot policy in `spacewars-ai`, usable by both the
 interactive material scene and a headless evaluator. Its first objective is:
 

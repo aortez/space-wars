@@ -14,6 +14,7 @@ mod landing;
 mod material;
 mod motion;
 mod outpost;
+pub mod pilot;
 mod profiles;
 mod recovery;
 mod render;
@@ -407,7 +408,8 @@ impl SurfaceSortieState {
         self.pilots[player].landing.phase == LandingPhase::Landed
     }
 
-    fn try_transfer(&mut self, player: usize) -> TransferResult {
+    /// Shared by the action gate and read-only controller sensors.
+    fn transfer_readiness(&self, player: usize) -> TransferResult {
         if !self.vehicle_accessible(player) {
             return TransferResult::VehicleUnavailable;
         }
@@ -443,14 +445,6 @@ impl SurfaceSortieState {
             {
                 return TransferResult::MustBeSupported;
             }
-            // The creature remains alive/owned; only its external physical
-            // representation disappears while it occupies the existing ship.
-            self.world
-                .physics
-                .world
-                .remove_entity(pilot_physics_id(self.pilots[player].owner));
-            self.pilots[player].body = None;
-            TransferResult::Boarded
         } else {
             let spec = Self::spec();
             let up = self.access_up(player);
@@ -476,6 +470,29 @@ impl SurfaceSortieState {
             ) {
                 return TransferResult::ExitBlocked;
             }
+        }
+        TransferResult::Ready
+    }
+
+    fn try_transfer(&mut self, player: usize) -> TransferResult {
+        let readiness = self.transfer_readiness(player);
+        if readiness != TransferResult::Ready {
+            return readiness;
+        }
+        if self.pilots[player].body.is_some() {
+            // The creature remains alive/owned; only its external physical
+            // representation disappears while it occupies the existing ship.
+            self.world
+                .physics
+                .world
+                .remove_entity(pilot_physics_id(self.pilots[player].owner));
+            self.pilots[player].body = None;
+            TransferResult::Boarded
+        } else {
+            let spec = Self::spec();
+            let up = self.access_up(player);
+            let position = self.access_position(player) + up * (spec.half_height() + 0.12);
+            let angle = rotation_for_direction(up);
             let Some(body) = SpacelingAssembly::insert(
                 &mut self.world.physics.world,
                 pilot_physics_id(self.pilots[player].owner),
