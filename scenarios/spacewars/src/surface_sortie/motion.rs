@@ -311,9 +311,10 @@ impl SurfaceSortieState {
             && !input.interact_held
             && !input.brake_held;
         if idle {
-            let position = after.map_or(ship.position + SHIP_PIVOT, |snapshot| {
-                snapshot.motion.position
-            });
+            let position = after
+                .map_or(ship.position + physics::ship_pivot(ship.form), |snapshot| {
+                    snapshot.motion.position
+                });
             let local = (position - frame.position).rotate_radians(-frame.angle);
             let on_foot = after.is_some();
             let anchor = pilot

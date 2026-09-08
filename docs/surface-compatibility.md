@@ -100,10 +100,11 @@ prescribed center acceleration, and effective inward/lateral acceleration at
 ship spawn. Units are world units/s² and rad/s, not pixels or per-tick deltas.
 The ship's legacy gravity query point is offset from its Rapier origin; both
 points are reported, and the diagnostic field is checked against the real
-shared solver. Scenario observations are now version 9 (profile identity was
+shared solver. Scenario observations are now version 10 (profile identity was
 added in version 6; version 7 adds travel/support and outpost inventory;
 version 8 wraps per-player views in a `players` array; version 9 adds Expedition
-planet claims and makes the focused outpost optional). These compatibility
+planet claims and makes the focused outpost optional; version 10 adds vehicle
+form and optional Expedition recovery telemetry). These compatibility
 fixtures remain single-pilot configurations;
 compatibility reports retain their version 2 schema with an additive
 `final_landing.planet` frame identifier.

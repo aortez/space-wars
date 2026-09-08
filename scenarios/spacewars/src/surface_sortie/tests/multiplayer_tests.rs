@@ -317,7 +317,7 @@ fn generated_two_player_sessions_replay_and_inactive_or_invalid_seats_are_ignore
         SurfaceSortieScenario::observe(&SurfaceSortieScenario::init_expedition(0, 2)).payload
     );
     let observation: serde_json::Value = serde_json::from_slice(&initial).unwrap();
-    assert_eq!(observation["version"], 9);
+    assert_eq!(observation["version"], 10);
     assert_eq!(observation["players"].as_array().unwrap().len(), 2);
     let mut solo = solo;
     step_pair(

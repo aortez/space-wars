@@ -1339,6 +1339,9 @@ impl SpacewarsScenario {
                 continue;
             }
             if experimental {
+                if ship.dead {
+                    continue;
+                }
                 // The fixture's bounded flight controller owns control impulses;
                 // retain visual exhaust without the legacy brake/turn velocity edits.
                 ship.update_exhaust_trails(dt);
@@ -1357,7 +1360,7 @@ impl SpacewarsScenario {
         finish_spaceport_ejections(state, dt);
         let new_shells = spawn_cannon_shells(state, dt);
         state.debris.extend(new_shells);
-        handle_ship_deaths(state);
+        handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         let lifecycle_started = Instant::now();
         let lifecycle = reconcile_physics(state, dt);
@@ -1371,7 +1374,7 @@ impl SpacewarsScenario {
         };
         let gravity_time = gravity_started.elapsed();
 
-        for pilot in surface_pilots {
+        for pilot in surface_pilots.iter_mut() {
             pilot.control_vehicle(
                 &mut state.physics,
                 &state.ships[pilot.vehicle_index()],
@@ -1388,7 +1391,7 @@ impl SpacewarsScenario {
         let collision_started = Instant::now();
         update_ship_lasers(state);
         state.laser_hits = resolve_laser_hits(state);
-        handle_ship_deaths(state);
+        handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         let contacts = state.physics.contacts();
         let port_intersections = state.physics.spaceport_contacts();
@@ -1398,7 +1401,7 @@ impl SpacewarsScenario {
             resolve_physics_spaceport_contacts(state, &port_intersections)
         };
         resolve_physics_collisions(state, &contacts, &accepted_ports);
-        handle_ship_deaths(state);
+        handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
 
         spawn_debris_breakup_fragments(state);
@@ -2442,10 +2445,11 @@ fn apply_world_gravity_with_pilots(
         ships
             .iter()
             .enumerate()
-            .filter(|(index, _)| {
+            .filter(|(index, ship)| {
                 !physics.ship_is_constrained(*index)
                     && (pilots.is_empty()
-                        || pilots.iter().any(|pilot| pilot.vehicle_index() == *index))
+                        || (!ship.dead
+                            && pilots.iter().any(|pilot| pilot.vehicle_index() == *index)))
             })
             .map(|(index, ship)| {
                 GravityParticipant::target(
@@ -3306,22 +3310,41 @@ fn resolve_particle_body_collision(
     particle.velocity = (particle.velocity - normal * (2.0 * particle.velocity.dot(normal))) * 0.5;
 }
 
+#[cfg(test)]
 fn handle_ship_deaths(state: &mut SpacewarsState) {
+    handle_ship_deaths_with_surface_pilots(state, &mut []);
+}
+
+fn handle_ship_deaths_with_surface_pilots(
+    state: &mut SpacewarsState,
+    pilots: &mut [surface_sortie::SurfacePilot],
+) {
     let mut fragments = Vec::new();
 
-    for ship in &mut state.ships {
+    for (index, ship) in state.ships.iter_mut().enumerate() {
         if !ship.dead || ship.fragmented || ship.form != ShipForm::Ship {
             continue;
         }
 
-        fragments.extend(ship_breakup_fragments(
-            ship,
-            state.seed,
-            state.tick,
-            fragments.len() as u64,
-        ));
+        let survivor = pilots
+            .iter_mut()
+            .find(|pilot| pilot.vehicle_index() == index && pilot.recovery_enabled());
+        let mut breakup =
+            ship_breakup_fragments(ship, state.seed, state.tick, fragments.len() as u64);
+        if survivor.is_some() {
+            // Expedition's transient fragment filter protects the new pod and
+            // external creatures while the initially overlapping pieces disperse.
+            for fragment in &mut breakup {
+                fragment.owner_id = Some(ship.owner_id);
+            }
+        }
+        fragments.extend(breakup);
         ship.fragmented = true;
-        ship.change_to_escape_pod();
+        if let Some(pilot) = survivor {
+            pilot.vehicle_destroyed(ship);
+        } else {
+            ship.change_to_escape_pod();
+        }
     }
 
     state.debris.extend(fragments);

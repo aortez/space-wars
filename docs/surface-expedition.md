@@ -92,6 +92,54 @@ does not interrupt or arm the other. A hatch exit occupied by another spaceling
 is blocked, including transfers in the same physics tick. Spacelings and both
 ships collide in the same Rapier world.
 
+### Ship loss and recovery
+
+Expedition now keeps the pilot and vehicle lifecycles separate:
+
+- Destroying an **occupied ship** leaves that same pilot aboard a flyable escape
+  pod. Pods use the same bounded flight assist and a scaled pair of rear feet;
+  they must actually land and settle before B / X can disembark. Planet ownership
+  is not required to fly, land or exit a pod.
+- Destroying an **empty ship** leaves its existing on-foot spaceling alive.
+  The dead ship disappears; it does not create an empty pod or a second creature.
+- Without a full ship, stand balanced and still on an **owned planet for 8
+  seconds** to rebuild. You can first claim a neutral planet using the normal
+  flag rules. Rebuilding requires no outpost or flag proximity. Jumping, losing
+  support/balance, moving too quickly or losing ownership resets unfinished
+  construction. Standing on a ship or unrelated platform does not qualify.
+- A replacement appears nearby, at full health, with local surface velocity and
+  spin. It must settle naturally; walk to its cyan hatch and board normally.
+  Its pilot remains on foot, and an old pod is removed when the replacement is
+  created. There is never more than one live assigned vehicle per seat.
+
+The HUD reports pod landing, eligibility, rebuild progress and blocked space.
+Placement tries at most four local terrain rays and conservative hull/foot
+clearance checks. It prefers putting the hatch toward the waiting spaceling.
+If all sites are blocked, progress stays at 100% and placement retries every
+half-second while eligibility remains valid. Move along the surface to select
+a different build site; moving fast enough resets the timer.
+
+For a deliberate **loss drill**, hold **A + B + Down together for 3 seconds**
+(P1 keyboard: Space + X + S; P2: numpad 8 + 2 + 5). The chord destroys your
+assigned full ship, even when you are on foot; it never destroys a pod.
+Release early to cancel. While charging, the chord consumes movement/transfer
+input. Release all controls after loss or replacement before continuing.
+Try it both aboard and after disembarking. The drill is an Expedition testing
+affordance, not a weapon or a new ordinary-game control.
+
+Breakup pieces remain physical and visible. For their first half-second they
+cannot hit the surviving owner vehicle or spacelings, allowing initially
+overlapping pieces to disperse. Terrain, debris and opponent-vehicle collisions
+remain active, then normal fragment collisions resume. This exception applies
+only to owner-tagged breakup fragments in the recovery-enabled fixture.
+
+This is deliberately not a complete survival system: **pods and spacelings are
+still invulnerable**, and there is no pilot death/elimination, combat, ship
+swapping, remote rescue or recovery of a living full ship stranded elsewhere.
+The recovery build has been deployed and smoke-checked on the Pi as described
+below. The user subsequently reported that the basic recovery loop worked
+full circle on the device.
+
 ### Initial Pi playtest (2026-09-07)
 
 The earlier single-player and then two-player **outpost-based** Expedition
@@ -99,8 +147,8 @@ builds were deployed to `spacewars.local` through the normal A/B updater.
 The two-player build was observed near 60 FPS / 60 UPS with no service
 restarts; launcher selection, pause/restart and screenshots were checked.
 The user reported successful playtesting, then requested this simpler flag
-loop. That feedback accepts the preceding travel/multiplayer work, **not this
-new flag loop**, which still needs a fresh device playtest.
+loop. That first feedback accepted the preceding travel/multiplayer work;
+the flag loop was then tested separately as described below.
 
 The flag-loop build was subsequently deployed on the same day to slot A
 (`/dev/sda2`), preserving the preceding build in slot B. The installed client
@@ -109,6 +157,25 @@ Expedition was launched and sampled at 60.1 FPS / 60.1 UPS with zero service
 restarts. Both controllers were detected, and an actual 800×480 screenshot
 confirmed the new claim HUD. The user subsequently reported that the flag-loop
 playtest seemed good; this is initial acceptance, not exhaustive route coverage.
+
+The recovery expansion was subsequently built from the working tree after
+`9c8d841` and deployed through the same updater to slot B (`/dev/sda3`), retaining
+the accepted flag build in slot A. The installed client checksum matched the
+fresh package (`ced27785fc6b72ab7022400d552accfbad464c70a3e2e2d89d770259858e91c8`).
+Settings were byte-for-byte unchanged and persistent data remained mounted.
+Two-player Expedition was launched with seed 0 and raster scale 2, sampled at
+60.1 FPS / 60.1 UPS, and an 800×480 screenshot confirmed both landed ships,
+HUDs and minimaps. Both gamepads were detected; the service stayed active with
+zero restarts, including after the screenshot. This is deployment verification,
+separate from the subsequent manual playtest.
+
+The user then reported successful scuttling both in flight and while landed
+aboard a full ship, followed by pod landing, disembarking, claiming a planet
+and returning to a full ship. The existing rebuild percentage and "stand still"
+guidance were visible; no additional UI polish was requested. This accepts the
+basic occupied-ship recovery loop, not exhaustive route or multiplayer failure
+coverage. Scuttling an empty ship while its pilot is already on foot remains
+automatically tested but was not explicitly included in that manual report.
 
 ## Approach is not support
 
@@ -144,12 +211,15 @@ Each completed tick samples each pilot's real support once, then updates the
 small planet list. Scratch space is bounded to two seats. Approach selection
 is allocation-free; the landing feet query their local Rapier contacts. There
 are no all-object scans, extra physics steps or extra gravity solves. An
-outside pilot adds one capsule; boarding removes only that capsule. Ships
-remain present. Expedition no longer spawns physical outpost terminals.
+outside pilot adds one capsule; boarding removes only that capsule. Healthy
+ships remain present while unoccupied. Loss removes or replaces the vehicle
+assembly, and rebuilding reuses the assigned slot with a fresh full assembly.
+Recovery adds bounded per-seat checks, not another physics step or gravity
+solve. Expedition no longer spawns physical outpost terminals.
 
 ## Observations and verification
 
-Scenario observations are version **9**, with a top-level `version` and
+Scenario observations are version **10**, with a top-level `version` and
 `players` array in seat order. Each view retains stable pilot/owner/vehicle IDs,
 input/transfer gates, landing and motion metrics, `travel_enabled`,
 `ship_support_planet` and `pilot_support_planet`.
@@ -168,10 +238,19 @@ Surface action V2 addresses a player explicitly; malformed/inactive seats
 are ignored and continuous input persists separately per seat. These
 observations do not add a live IPC telemetry endpoint.
 
+Version 10 adds `vehicle_form` and optional `recovery` per player (null in
+the pinned non-recovery fixtures). `ship_available` still means an intact full
+ship, not a pod; a live pod remains accessible through the usual landed transfer
+gate. Recovery reports status, build planet, required/progress times, ships
+lost, pod ejections, completed rebuilds, interrupted rebuilds and blocked
+placement attempts. Stable vehicle IDs identify the assigned slot, not a
+particular hull generation; the counters distinguish losses and replacements.
+
 ```sh
 cargo test --locked --release -p scenario-spacewars surface_sortie::claim::tests
 cargo test --locked --release -p scenario-spacewars travel_tests -- --nocapture
 cargo test --locked --release -p scenario-spacewars multiplayer_tests
+cargo test --locked --release -p scenario-spacewars recovery_tests
 
 # Retained comparison: unchanged criteria and pinned outpost fixtures
 cargo run --locked --release -p scenario-spacewars --example surface_compatibility -- \
@@ -212,11 +291,28 @@ Clippy completes with pre-existing warnings outside the surface changes.
 The separate Pi deployment smoke check is recorded above; it does not replace
 manual controller and flag-loop playtesting.
 
+Recovery regressions add an input-only pod → landing → disembark → neutral
+claim → rebuild → board → takeoff journey, pod landings at twelve controlled
+motion/bearing combinations, empty-ship loss, preserved identity/velocity/spin,
+independent two-seat loss gates and repeated/replayed rebuilding. Policy checks
+cover lost ownership/support/balance, relative speed, blocked placement/retries,
+surface-frame spawn velocity, neutral input gates and read-only rendering.
+Client tests use the minimal gamepad mapping and check pod/rebuild/replacement
+HUDs and both renderers at desktop, Pi-sized and portrait resolutions.
+
+Validation including recovery (2026-09-07, Rust 1.89): **861** workspace/all-target
+tests and all **14** real UI workflows pass. Both frozen ordinary-game suites
+still match; Windows client and ARM64 scenario compile checks pass. Clippy
+reports only the existing warnings outside the changed surface paths. Device
+playtesting subsequently accepted the basic occupied-ship recovery loop above.
+All **16** recovery tests also pass in the optimized release build.
+
 ## Remaining integration
 
-Loss/rescue/rebuild rules and versioned bot surface intents remain separate
+Pilot survival/remote rescue and versioned bot surface intents remain separate
 work. There is no combat, ship swapping, economy or ordinary-game docking
-change here. A lost assigned ship can still require a restart. Surface V1's
+change here. An unreachable living ship or stranded airborne spaceling can
+still require a restart. Surface V1's
 passive-approach failures, mutual-field mismatch, arbitrary generated routes
 and long-idle support drift remain known limits. Ownership is now deliberately
 simpler than future outposts, resources and services.

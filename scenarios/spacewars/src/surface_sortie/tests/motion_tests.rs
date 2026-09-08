@@ -320,7 +320,7 @@ fn orbital_motion_metrics_and_rendering_replay_and_restart_deterministically() {
             SurfaceSortieScenario::observe(&SurfaceSortieScenario::init(preset, 123)).payload,
             initial
         );
-        assert_eq!(a.observation(0).version, 9);
+        assert_eq!(a.observation(0).version, 10);
         assert!(a.pilots[0].motion_metrics.on_foot_ticks > 0);
         assert_eq!(a.pilots[0].motion_metrics.jumps, 1);
         assert_eq!(a.pilots[0].motion_metrics.ship_damage, 0.0);

@@ -12,7 +12,7 @@ fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
     let parked = state.vehicle_settled(player);
     let (center, height) = if let Some(snapshot) = snapshot {
         let pilot = snapshot.motion.position;
-        let ship_center = ship.position + SHIP_PIVOT;
+        let ship_center = ship.position + physics::ship_pivot(ship.form);
         if parked && pilot.distance_to(ship_center) < 32.0 {
             // North-up framing must work on the sides/underside too. Keep the
             // nearby ship and pilot in the central band between the HUD strips;
@@ -98,6 +98,12 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
         .filter_map(|claim| claim.flag.as_ref())
     {
         draw_planet_flag(&mut frame, state, flag);
+    }
+    if observation.recovery.is_some() {
+        for debris in state.world.debris.iter().filter(|debris| !debris.dead) {
+            render_debris(&mut frame, debris);
+        }
+        render_particles(&mut frame, &state.world);
     }
     for player in 0..state.player_count() {
         draw_actor(&mut frame, state, player);
@@ -393,25 +399,35 @@ pub(super) fn minimap(
     );
     for player in 0..state.player_count() {
         let ship = &state.world.ships[state.pilots[player].vehicle.0];
-        map.push_primitive(
-            2,
-            RenderPrimitive::Polygon(RenderPolygon {
-                points: [
-                    Vec2::new(0.0, 20.0),
-                    Vec2::new(-12.0, -12.0),
-                    Vec2::new(0.0, -5.0),
-                    Vec2::new(12.0, -12.0),
-                ]
-                .map(|offset| {
-                    render_point(
-                        ship.position + SHIP_PIVOT + offset.rotate_radians(ship.rotation_radians),
-                    )
-                })
-                .to_vec(),
-                fill: Some(Fill::new(render_color(state.world.players[player].color))),
-                stroke: Some(Stroke::new(LIGHT, 1.0)),
-            }),
-        );
+        if !ship.dead {
+            map.push_primitive(
+                2,
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points: [
+                        Vec2::new(0.0, 20.0),
+                        Vec2::new(-12.0, -12.0),
+                        Vec2::new(0.0, -5.0),
+                        Vec2::new(12.0, -12.0),
+                    ]
+                    .map(|offset| {
+                        render_point(
+                            ship.position
+                                + physics::ship_pivot(ship.form)
+                                + (offset
+                                    * if ship.form == ShipForm::EscapePod {
+                                        0.7
+                                    } else {
+                                        1.0
+                                    })
+                                .rotate_radians(ship.rotation_radians),
+                        )
+                    })
+                    .to_vec(),
+                    fill: Some(Fill::new(render_color(state.world.players[player].color))),
+                    stroke: Some(Stroke::new(LIGHT, 1.0)),
+                }),
+            );
+        }
         if let Some(snapshot) = state.spaceling_snapshot(player) {
             map.push_primitive(
                 3,
@@ -699,7 +715,7 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
     let ship = &state.world.ships[state.pilots[player].vehicle.0];
     let snapshot = state.spaceling_snapshot(player);
     let parked = state.vehicle_settled(player);
-    if parked {
+    if parked && !ship.dead {
         circle(
             frame,
             -1,
@@ -708,15 +724,23 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
             CYAN,
         );
     }
-    render_ship(frame, ship);
-    if ship.form == ShipForm::Ship {
-        for foot in physics::LANDING_FEET {
-            let position = ship.position + SHIP_PIVOT + foot.rotate_radians(ship.rotation_radians);
+    if !ship.dead {
+        render_ship(frame, ship);
+    }
+    if !ship.dead && (ship.form == ShipForm::Ship || state.pilots[player].recovery.is_some()) {
+        let (feet, radius) = physics::surface_landing_geometry(ship.form);
+        for foot in feet {
+            let position = ship.position
+                + physics::ship_pivot(ship.form)
+                + foot.rotate_radians(ship.rotation_radians);
             line(
                 frame,
                 1,
                 position,
-                position + Vec2::Y.rotate_radians(ship.rotation_radians) * 1.3,
+                position
+                    + Vec2::Y.rotate_radians(ship.rotation_radians)
+                        * radius
+                        * (1.3 / physics::LANDING_FOOT_RADIUS),
                 LIGHT,
                 2.0,
             );
@@ -724,12 +748,14 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
                 frame,
                 1,
                 position,
-                physics::LANDING_FOOT_RADIUS,
+                radius,
                 if parked { CYAN } else { LIGHT },
             );
         }
     }
-    render_exhaust(frame, ship);
+    if !ship.dead {
+        render_exhaust(frame, ship);
+    }
     if let Some(snapshot) = snapshot {
         draw_spaceling(
             frame,
@@ -775,6 +801,8 @@ fn draw_player_hud(
     }
     let mode = if observation.location == PilotLocation::OnFoot {
         "ON FOOT"
+    } else if ship.form == ShipForm::EscapePod {
+        "POD"
     } else {
         "ABOARD"
     };
@@ -826,6 +854,50 @@ fn draw_player_hud(
             ),
         )
     };
+    let recovery = observation.recovery.as_ref();
+    let vehicle_status = if !observation.ship_available && recovery.is_some() {
+        if ship.dead {
+            "Ship lost / pilot alive".to_owned()
+        } else {
+            format!("Escape pod / {}", observation.landing.phase.label())
+        }
+    } else {
+        format!(
+            "Ship {:.0}%  /  {}",
+            ship.life / ship.life_max * 100.0,
+            observation.landing.phase.label()
+        )
+    };
+    let recovery_message = recovery
+        .filter(|r| r.scuttle_progress > 0.0 || !observation.ship_available)
+        .map(|r| {
+            if r.scuttle_progress > 0.0 {
+                format!(
+                    "Scuttle {:.0}% / release to cancel",
+                    r.scuttle_progress * 100.0
+                )
+            } else if r.rebuild_progress > 0.0 {
+                format!(
+                    "Rebuild {:.0}% / {}",
+                    r.rebuild_progress * 100.0,
+                    if r.status == SurfaceRecoveryStatus::ClearanceBlocked {
+                        "space blocked"
+                    } else {
+                        "stand still"
+                    }
+                )
+            } else if r.status == SurfaceRecoveryStatus::LandPod
+                && observation.landing.phase == LandingPhase::Landed
+            {
+                if observation.last_transfer == TransferResult::ExitBlocked {
+                    "No clear space beside the hatch".to_owned()
+                } else {
+                    "B: exit your landed pod".to_owned()
+                }
+            } else {
+                r.status.label().to_owned()
+            }
+        });
     let lines = [
         (
             0.445,
@@ -836,22 +908,16 @@ fn draw_player_hud(
             ),
             color,
         ),
-        (
-            0.385,
-            format!(
-                "Ship {:.0}%  /  {}",
-                ship.life / ship.life_max * 100.0,
-                observation.landing.phase.label()
-            ),
-            LIGHT,
-        ),
+        (0.385, vehicle_status, LIGHT),
         (0.325, "A: thrust/jump  B: board/exit".to_owned(), LIGHT),
         (
             -0.29,
-            if !observation.ship_available {
+            if !observation.controls_armed {
+                "Release controls to continue".to_owned()
+            } else if let Some(message) = recovery_message {
+                message
+            } else if !observation.ship_available {
                 "Vehicle lost; restart".to_owned()
-            } else if !observation.controls_armed {
-                "Release controls after transfer".to_owned()
             } else {
                 match observation.last_transfer {
                     TransferResult::ExitBlocked => "No clear space beside the hatch",

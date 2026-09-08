@@ -197,10 +197,12 @@ include landing phase, clearance, angle, relative speeds/spin, foot count,
 assist strength, and settling duration for future runners. Outpost observations
 add identity, position/normal, owner, active claimant, capture eligibility and
 progress, capture count, repair eligibility/range, and cumulative health
-restored. The current JSON envelope is version 9 with a `players` array;
+restored. The current JSON envelope is version 10 with a `players` array;
 these pinned presets contain only seat 0. Version 9 makes `outpost` optional
 and adds `planet_claim`/`planet_claims` for Expedition; pinned outpost fixtures
-retain their existing behavior. This does not add a live IPC
+retain their existing behavior. Version 10 adds `vehicle_form` and optional
+Expedition recovery telemetry (`recovery` is null in these pinned fixtures).
+This does not add a live IPC
 telemetry API.
 
 Landing regressions fly gentle approaches at eight bearings, verify physical
@@ -278,7 +280,7 @@ version 4; version 5 adds the optional `generated_case` identifier; version 6
 adds its explicit gravity/motion `profile`; version 7 adds travel, explicit
 support/frame planet IDs and the complete outpost inventory; version 8 wraps
 independent seat views in a `players` array; version 9 adds planet claims and
-an optional focused outpost):
+an optional focused outpost; version 10 adds vehicle form and optional recovery):
 
 - completed planet position, origin velocity, angle/spin, active-body
   surface-relative velocity, and actual support-point velocity/relative speed;

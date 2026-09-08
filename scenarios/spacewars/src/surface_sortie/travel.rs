@@ -165,6 +165,7 @@ impl SurfaceSortieScenario {
                 .physics
                 .enable_surface_sortie(&[0, 1], &state.world.ships);
         }
+        state.enable_recovery();
         state
     }
 }

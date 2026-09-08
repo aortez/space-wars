@@ -56,7 +56,11 @@ pub(super) const WORLD_REGISTRATION: ScenarioRegistration = ScenarioRegistration
 
 pub(super) const EXPEDITION_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "surface-expedition",
-    controls_help: "Surface Expedition: land rear-first, B / X to get out, then stand still on the surface for 3 seconds to claim a neutral planet. Your flag is planted where you stand. An existing enemy flag must be approached (within 3 units) and lowered for 3 seconds before your own flag can rise for another 3 seconds. Opponents near the flag pause progress. Leaving, jumping or losing balance resets the unfinished stage; a fully lowered flag leaves the planet neutral. Minimap colors show planet ownership and triangles locate flags. A / Space thrusts or jumps; left/right turns or walks; Down / S brakes; B / X boards your own landed ship at the cyan hatch. Choose 1 or 2 players in Settings. P2 keyboard: numpad 4/6 turns/walks, 8 thrusts/jumps, 5 brakes, 2 boards/exits. Each assigned gamepad controls its own pilot; release controls after a transfer. Start / Esc pauses; R restarts. Ships start at full health. No outposts, repair, weapons, rescue or rebuilding; ordinary Spacewars is unchanged.",
+    controls_help: concat!(
+        "Surface Expedition: land rear-first, B / X to get out, then stand still on the surface for 3 seconds to claim a neutral planet. Your flag is planted where you stand. An existing enemy flag must be approached (within 3 units) and lowered for 3 seconds before your own flag can rise for another 3 seconds. Opponents near the flag pause progress. Leaving, jumping or losing balance resets the unfinished stage; a fully lowered flag leaves the planet neutral. Minimap colors show planet ownership and triangles locate flags. ",
+        "A / Space thrusts or jumps; left/right turns or walks; Down / S brakes; B / X boards your own landed ship or pod at the cyan hatch. Choose 1 or 2 players in Settings. P2 keyboard: numpad 4/6 turns/walks, 8 thrusts/jumps, 5 brakes, 2 boards/exits. Each assigned gamepad controls its own pilot; release controls after transfers and vehicle loss/replacement. Start / Esc pauses; R restarts. ",
+        "Loss drill: hold A+B+Down (Space+X+S; P2 numpad 8+2+5) for 3 seconds to destroy your assigned full ship; release early to cancel. An occupied ship leaves a flyable pod; an empty ship leaves the existing spaceling alive, not an empty pod. Land the pod rear-first and exit, even on a neutral planet. With no full ship, stand still on an owned planet for 8 seconds to rebuild nearby; no outpost or flag proximity is required. Losing support, balance or ownership resets progress. If space is blocked, move to another clear spot. Board the replacement normally after it settles. Ships start at full health; pods and spacelings remain invulnerable in this lab. No outposts, repair, weapons, ship swapping or remote rescue; ordinary Spacewars is unchanged."
+    ),
     create: create_expedition,
     ..REGISTRATION
 };
@@ -824,6 +828,160 @@ mod tests {
                             .write_image_data(pixels.as_bytes())
                             .unwrap();
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expedition_recovery_is_playable_with_the_minimal_pad_and_visible_in_both_backends() {
+        use scenario_spacewars::ShipForm;
+        use scenario_spacewars::surface_sortie::{LandingPhase, PilotLocation};
+        let mut scenario = SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_expedition(0, 2),
+        };
+        let pads = Rc::new(RefCell::new(GamepadInput::default()));
+        let mut input = ClientInput::new(Rc::clone(&pads));
+        let advance =
+            |scenario: &mut SurfaceSortieClientScenario, input: &mut ClientInput, ticks| {
+                for _ in 0..ticks {
+                    let actions = scenario.map_input(input, false);
+                    scenario.step(&actions, Duration::from_secs_f64(1.0 / 60.0));
+                }
+            };
+        advance(&mut scenario, &mut input, 120);
+        pads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                south: true,
+                east: true,
+                dpad_down: true,
+                ..Default::default()
+            },
+        );
+        advance(&mut scenario, &mut input, 181);
+        assert_eq!(
+            scenario.state.observation(0).vehicle_form,
+            ShipForm::EscapePod
+        );
+        assert!(scenario.state.observation(1).ship_available);
+        pads.borrow_mut().set_seat(
+            0,
+            GamepadSeatInput {
+                connected: true,
+                ..Default::default()
+            },
+        );
+        advance(&mut scenario, &mut input, 300);
+        assert_eq!(
+            scenario.state.observation(0).landing.phase,
+            LandingPhase::Landed
+        );
+        for stage in ["pod", "rebuilding", "replacement"] {
+            if stage == "rebuilding" {
+                pads.borrow_mut().set_seat(
+                    0,
+                    GamepadSeatInput {
+                        connected: true,
+                        east: true,
+                        ..Default::default()
+                    },
+                );
+                advance(&mut scenario, &mut input, 1);
+                pads.borrow_mut().set_seat(
+                    0,
+                    GamepadSeatInput {
+                        connected: true,
+                        ..Default::default()
+                    },
+                );
+                advance(&mut scenario, &mut input, 400);
+                assert_eq!(
+                    scenario.state.observation(0).location,
+                    PilotLocation::OnFoot
+                );
+                let progress = scenario
+                    .state
+                    .observation(0)
+                    .recovery
+                    .unwrap()
+                    .rebuild_progress;
+                assert!(progress > 0.1 && progress < 0.9, "{progress}");
+            } else if stage == "replacement" {
+                advance(&mut scenario, &mut input, 500);
+                assert!(scenario.state.observation(0).ship_available);
+                assert_eq!(scenario.state.observation(0).recovery.unwrap().rebuilds, 1);
+            }
+            for viewport in [
+                Viewport::new(1280.0, 720.0),
+                Viewport::new(800.0, 480.0),
+                Viewport::new(800.0, 1280.0),
+            ] {
+                let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Vector, viewport)
+                );
+                let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                );
+                assert_eq!(presentation.minimaps.len(), 2);
+                let labels =
+                    crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+                assert!(labels.iter().any(|p| p.text.starts_with(if stage == "pod" {
+                    "P1  POD"
+                } else {
+                    "P1  ON FOOT"
+                })));
+                assert!(labels.iter().any(|p| p.text.starts_with("P2  ABOARD")));
+                assert!(
+                    !labels
+                        .iter()
+                        .any(|p| p.text.contains("Vehicle lost; restart"))
+                );
+                if stage == "rebuilding" {
+                    assert!(labels.iter().any(|p| p.text.starts_with("Rebuild ")));
+                }
+                let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                    crate::raster::RasterOptions::default(),
+                );
+                let pixels = image.to_rgb8().unwrap();
+                assert!(
+                    pixels
+                        .as_slice()
+                        .iter()
+                        .filter(|p| if stage == "pod" {
+                            // The existing pod mesh has a blue cockpit/nose.
+                            p.b > 200 && p.r < 80 && p.g < 80
+                        } else {
+                            p.r > 200 && p.g < 80 && p.b < 80
+                        })
+                        .count()
+                        > 20,
+                    "missing P1 actor: {stage} {viewport:?}"
+                );
+                if let Some(directory) = std::env::var_os("SPACEWARS_SORTIE_ARTIFACTS") {
+                    let directory = std::path::PathBuf::from(directory);
+                    std::fs::create_dir_all(&directory).unwrap();
+                    let file = std::fs::File::create(directory.join(format!(
+                        "recovery-{stage}-{}x{}.png",
+                        viewport.width, viewport.height
+                    )))
+                    .unwrap();
+                    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                    encoder.set_color(png::ColorType::Rgb);
+                    encoder.set_depth(png::BitDepth::Eight);
+                    encoder
+                        .write_header()
+                        .unwrap()
+                        .write_image_data(pixels.as_bytes())
+                        .unwrap();
                 }
             }
         }

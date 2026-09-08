@@ -39,6 +39,13 @@ const OUTPOST_TERMINAL_ROLE: ColliderRole = ColliderRole::new(9);
 
 pub(super) const LANDING_FOOT_RADIUS: f32 = 0.45;
 pub(super) const LANDING_FEET: [Vec2; 2] = [Vec2::new(-3.0, -5.0), Vec2::new(3.0, -5.0)];
+const RECOVERY_BREAKUP_GRACE_TICKS: u64 = 30;
+pub(super) fn surface_landing_geometry(form: ShipForm) -> ([Vec2; 2], f32) {
+    match form {
+        ShipForm::Ship => (LANDING_FEET, LANDING_FOOT_RADIUS),
+        ShipForm::EscapePod => ([Vec2::new(-0.7, -0.65), Vec2::new(0.7, -0.65)], 0.2),
+    }
+}
 pub(super) const OUTPOST_TERMINAL_HALF_SIZE: Vec2 = Vec2::new(0.7, 1.1);
 
 pub(super) fn is_planet_surface_support(collider: ColliderId, planet: usize) -> bool {
@@ -182,6 +189,7 @@ pub(super) struct SpacewarsPhysics {
     docked_planets: [Option<usize>; 2],
     // Opt-in physical landing assembly; ordinary Spacewars retains its berths.
     surface_ships: Option<Vec<usize>>,
+    surface_recovery: bool,
     tick: u64,
     contact_last_seen: BTreeMap<(MechanicalEntity, MechanicalEntity), u64>,
     pre_step_motions: BTreeMap<MechanicalEntity, BodyMotion>,
@@ -222,6 +230,7 @@ impl SpacewarsPhysics {
             ship_keys: [None, None],
             docked_planets: [None, None],
             surface_ships: None,
+            surface_recovery: false,
             tick: 0,
             contact_last_seen: BTreeMap::new(),
             pre_step_motions: BTreeMap::new(),
@@ -316,21 +325,9 @@ impl SpacewarsPhysics {
                 .as_ref()
                 .is_some_and(|active| active.contains(&index))
             {
-                self.docked_planets[index] = None;
-                let key = ShipColliderKey {
-                    form: ship.form,
-                    wing_theta: ship.wing_theta.to_bits(),
-                    docked: false,
-                    compact: false,
-                    constrained: false,
-                };
-                if self.ship_keys[index] != Some(key) {
-                    lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
-                    lifecycle.added +=
-                        usize::from(self.insert_ship(index, ship, false, false, false));
-                } else {
-                    synchronize_ship_to_physics(&mut self.world, index, ship);
-                }
+                let changed = self.reconcile_surface_vehicle(index, ship);
+                lifecycle.added += changed.added;
+                lifecycle.removed += changed.removed;
                 continue;
             }
             // A pod is captured automatically so it can rebuild. A full ship
@@ -467,6 +464,78 @@ impl SpacewarsPhysics {
 
     pub(super) fn ship_body(&self, index: usize) -> PhysicsBodyId {
         primary_body(ship_entity(index))
+    }
+
+    pub(super) fn enable_surface_recovery(&mut self) {
+        self.surface_recovery = true;
+    }
+
+    pub(super) fn surface_vehicle_changed(&self, index: usize, ship: &ShipState) -> bool {
+        self.ship_keys[index].map(|key| key.form) != (!ship.dead).then_some(ship.form)
+    }
+
+    /// Materialize a loss/replacement without another physics step or touching
+    /// terrain targets. Ordinary ships retain their existing lifecycle path.
+    pub(super) fn reconcile_surface_vehicle(
+        &mut self,
+        index: usize,
+        ship: &ShipState,
+    ) -> PhysicsLifecycle {
+        debug_assert!(
+            self.surface_ships
+                .as_ref()
+                .is_some_and(|active| active.contains(&index))
+        );
+        let mut lifecycle = PhysicsLifecycle::default();
+        let next = (!ship.dead).then_some(ShipColliderKey {
+            form: ship.form,
+            wing_theta: ship.wing_theta.to_bits(),
+            docked: false,
+            compact: false,
+            constrained: false,
+        });
+        self.docked_planets[index] = None;
+        if self.ship_keys[index] != next {
+            lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
+            self.ship_keys[index] = None;
+            // Replacement contacts belong to the new assembly, not its old hull.
+            self.contact_last_seen.retain(|(a, b), _| {
+                *a != MechanicalEntity::Ship(index) && *b != MechanicalEntity::Ship(index)
+            });
+            if next.is_some() {
+                lifecycle.added += usize::from(self.insert_ship(index, ship, false, false, false));
+            }
+        } else if next.is_some() {
+            synchronize_ship_to_physics(&mut self.world, index, ship);
+        }
+        lifecycle
+    }
+
+    pub(super) fn landing_geometry(&self, index: usize) -> ([Vec2; 2], f32) {
+        surface_landing_geometry(self.ship_keys[index].map_or(ShipForm::Ship, |key| key.form))
+    }
+
+    pub(super) fn surface_vehicle_clearance_radius(ship: &ShipState) -> f32 {
+        let (feet, radius) = surface_landing_geometry(ship.form);
+        ship_collision_hull(ship)
+            .iter()
+            .map(|p| p.length())
+            .chain(feet.map(|p| p.length() + radius))
+            .fold(0.0, f32::max)
+            + 0.1
+    }
+
+    pub(super) fn surface_vehicle_space_is_clear(
+        &self,
+        ship: &ShipState,
+        center: Vec2,
+        radius: f32,
+    ) -> bool {
+        let mut groups = ship_collision_groups(ship, false);
+        groups.filter =
+            (groups.filter & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR)) | GROUP_ROVER_SURFACE;
+        self.world
+            .capsule_is_clear(center, 0.0, 0.0, radius, groups)
     }
 
     pub(super) fn planet_body(&self, index: usize) -> PhysicsBodyId {
@@ -855,7 +924,16 @@ impl SpacewarsPhysics {
 
             let key = DebrisColliderKey {
                 signature: debris_signature(item),
-                armed: item.spawn_tick < tick,
+                armed: if self.surface_recovery
+                    && item.kind == DebrisKind::Fragment
+                    && item.owner_id.is_some()
+                {
+                    // Half a second at the scenario's fixed 60 Hz. Keep collisions
+                    // with terrain/debris/opponent vehicles during breakup grace.
+                    tick.saturating_sub(item.spawn_tick) >= RECOVERY_BREAKUP_GRACE_TICKS
+                } else {
+                    item.spawn_tick < tick
+                },
             };
             if self.debris_keys.get(&item.physics_id) != Some(&key) {
                 let entity = PhysicsId::new(item.physics_id);
@@ -993,7 +1071,7 @@ impl SpacewarsPhysics {
             .as_ref()
             .is_some_and(|active| active.contains(&index))
         {
-            surface_ship_colliders(entity, ship)
+            surface_ship_colliders(entity, ship, self.surface_recovery)
         } else {
             ship_colliders(entity, ship, docked, compact)
         };
@@ -1249,7 +1327,11 @@ fn ship_colliders(
     colliders
 }
 
-fn surface_ship_colliders(entity: PhysicsId, ship: &ShipState) -> Vec<ColliderSpec> {
+fn surface_ship_colliders(
+    entity: PhysicsId,
+    ship: &ShipState,
+    pod_landing: bool,
+) -> Vec<ColliderSpec> {
     let mut colliders = ship_colliders(entity, ship, false, false);
     let hull = &mut colliders[0];
     hull.friction = 0.8;
@@ -1259,12 +1341,11 @@ fn surface_ship_colliders(entity: PhysicsId, ship: &ShipState) -> Vec<ColliderSp
         | GROUP_ROVER_SURFACE;
     hull.solver_groups = hull.collision_groups;
     let groups = hull.collision_groups;
-    if ship.form == ShipForm::Ship {
-        for (part, position) in LANDING_FEET.into_iter().enumerate() {
-            let mut foot = ColliderSpec::ball(
-                collider_id(entity, LANDING_FOOT_ROLE, part as u16),
-                LANDING_FOOT_RADIUS,
-            );
+    if ship.form == ShipForm::Ship || pod_landing {
+        let (feet, radius) = surface_landing_geometry(ship.form);
+        for (part, position) in feet.into_iter().enumerate() {
+            let mut foot =
+                ColliderSpec::ball(collider_id(entity, LANDING_FOOT_ROLE, part as u16), radius);
             foot.local_position = position;
             // Small feet extend behind the hull; no overlapping hull pieces,
             // extra bodies/joints, or changes to the ship's inertial mass.
@@ -1324,19 +1405,19 @@ fn ship_collision_hull(ship: &ShipState) -> Vec<Vec2> {
     lower
 }
 
-fn ship_pivot(form: ShipForm) -> Vec2 {
+pub(super) fn ship_pivot(form: ShipForm) -> Vec2 {
     match form {
         ShipForm::Ship => SHIP_PIVOT,
         ShipForm::EscapePod => POD_PIVOT,
     }
 }
 
-fn physical_angular_velocity(ship: &ShipState) -> f32 {
+pub(super) fn physical_angular_velocity(ship: &ShipState) -> f32 {
     let scale = 1.0 - ship.turn_power / ship.delta_time.max(f32::EPSILON);
     ship.omega * scale
 }
 
-fn control_angular_velocity(ship: &ShipState, physical: f32) -> f32 {
+pub(super) fn control_angular_velocity(ship: &ShipState, physical: f32) -> f32 {
     let scale = 1.0 - ship.turn_power / ship.delta_time.max(f32::EPSILON);
     if scale.abs() <= f32::EPSILON {
         0.0

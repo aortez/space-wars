@@ -14,6 +14,7 @@ mod landing;
 mod motion;
 mod outpost;
 mod profiles;
+mod recovery;
 mod render;
 mod travel;
 pub use claim::{
@@ -23,6 +24,7 @@ pub use landing::{LandingPhase, LandingTelemetry};
 pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPreset};
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 pub use profiles::GeneratedSurfaceProfile;
+pub use recovery::{SurfaceRecoveryObservation, SurfaceRecoveryStatus};
 #[cfg(test)]
 mod tests;
 
@@ -143,6 +145,7 @@ pub(super) struct SurfacePilot {
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
+    recovery: Option<recovery::SurfaceRecovery>,
     id: SpacelingId,
     pub(super) owner: PlayerId,
     vehicle: VehicleId,
@@ -179,6 +182,7 @@ impl SurfacePilot {
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
+            recovery: None,
         }
     }
 
@@ -232,6 +236,8 @@ pub struct SurfaceSortieObservation {
     pub ship_position: Vec2,
     pub ship_health: f32,
     pub ship_available: bool,
+    pub vehicle_form: ShipForm,
+    pub recovery: Option<SurfaceRecoveryObservation>,
     pub access_position: Vec2,
     pub transfers: u64,
     pub last_transfer: TransferResult,
@@ -267,7 +273,7 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         let snapshot = self.spaceling_snapshot(player);
         SurfaceSortieObservation {
-            version: 9,
+            version: 10,
             generated_case: self.generated_case,
             travel_enabled: self.travel_enabled(),
             ship_support_planet: self.ship_support_planet(player),
@@ -290,6 +296,11 @@ impl SurfaceSortieState {
             ship_position: ship.position,
             ship_health: ship.life,
             ship_available: self.vehicle_available(player),
+            vehicle_form: ship.form,
+            recovery: self.pilots[player]
+                .recovery
+                .as_ref()
+                .map(|r| r.observation()),
             access_position: self.access_position(player),
             transfers: self.pilots[player].transfers,
             last_transfer: self.pilots[player].last_transfer,
@@ -317,8 +328,14 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         // A surface access point beside the *actual* ship. No elevated berth
         // or fixed planet marker; the physical landing gate is checked first.
-        let hatch =
-            ship.position + SHIP_PIVOT + Vec2::new(8.0, -5.0).rotate_radians(ship.rotation_radians);
+        let local = if ship.form == ShipForm::Ship {
+            Vec2::new(8.0, -5.0)
+        } else {
+            Vec2::new(2.8, -0.65)
+        };
+        let hatch = ship.position
+            + physics::ship_pivot(ship.form)
+            + local.rotate_radians(ship.rotation_radians);
         (hatch - self.world.planets[self.pilots[player].planet].position).normalized()
     }
 
@@ -341,12 +358,20 @@ impl SurfaceSortieState {
             && ship.owner_id == self.pilots[player].owner.index()
     }
 
+    fn vehicle_accessible(&self, player: usize) -> bool {
+        let ship = &self.world.ships[self.pilots[player].vehicle.0];
+        self.vehicle_available(player)
+            || (self.pilots[player].recovery.is_some()
+                && !ship.dead
+                && ship.owner_id == self.pilots[player].owner.index())
+    }
+
     fn vehicle_settled(&self, player: usize) -> bool {
         self.pilots[player].landing.phase == LandingPhase::Landed
     }
 
     fn try_transfer(&mut self, player: usize) -> TransferResult {
-        if !self.vehicle_available(player) {
+        if !self.vehicle_accessible(player) {
             return TransferResult::VehicleUnavailable;
         }
         if !self.vehicle_settled(player) {
@@ -505,7 +530,9 @@ impl Scenario for SurfaceSortieScenario {
                 state.pilots[player].controls_armed = input == SurfaceSortieAction::default();
             } else {
                 *effective = input;
-                if input.interact_held && !state.pilots[player].interact_was_held {
+                if state.update_scuttle_input(player, input, dt) {
+                    *effective = SurfaceSortieAction::default();
+                } else if input.interact_held && !state.pilots[player].interact_was_held {
                     let result = state.try_transfer(player);
                     state.pilots[player].last_transfer = result;
                     if matches!(result, TransferResult::Exited | TransferResult::Boarded) {
@@ -530,13 +557,17 @@ impl Scenario for SurfaceSortieScenario {
                 pilot.facing = effective.horizontal.signum();
             }
             let ship = &mut state.world.ships[pilot.vehicle.0];
-            ship.set_thrust(if !on_foot && effective.primary_held {
+            ship.set_thrust(if !on_foot && !ship.dead && effective.primary_held {
                 1.0
             } else {
                 0.0
             });
-            ship.set_turn(if on_foot { 0.0 } else { effective.horizontal });
-            ship.set_brake(if !on_foot && effective.brake_held {
+            ship.set_turn(if on_foot || ship.dead {
+                0.0
+            } else {
+                effective.horizontal
+            });
+            ship.set_brake(if !on_foot && !ship.dead && effective.brake_held {
                 1.0
             } else {
                 0.0
@@ -555,6 +586,7 @@ impl Scenario for SurfaceSortieScenario {
             Duration::from_secs_f32(dt),
             &mut state.pilots,
         );
+        state.reconcile_recovery_vehicles();
         for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
             let Some(before) = before else { continue };
             let pilot = &mut state.pilots[player];
@@ -576,13 +608,14 @@ impl Scenario for SurfaceSortieScenario {
         // Resolve all claimants together, then service each eligible vehicle once.
         state.update_outpost(Duration::from_secs_f32(dt));
         state.update_planet_claims(Duration::from_secs_f32(dt));
+        state.update_recovery(Duration::from_secs_f32(dt));
         result
     }
 
     fn observe(state: &SurfaceSortieState) -> Observation {
         Observation {
             payload: serde_json::to_vec(&SurfaceSessionObservation {
-                version: 9,
+                version: 10,
                 players: (0..state.player_count())
                     .map(|player| state.observation(player))
                     .collect(),
