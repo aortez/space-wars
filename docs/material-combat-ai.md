@@ -10,7 +10,7 @@ ordinary Spacewars and the earlier flight/recovery presets remain available.
 | Turn / thrust / brake | Left stick or D-pad / A / Down | A/D or arrows / Space / S |
 | Swept-wing cruise | Hold RB; release to open | J |
 | Forward laser aboard | RT or LB | E |
-| Cannon aboard | X, the west face button | K |
+| Mounted missiles aboard | X, the west face button | K |
 | Exit / board | B | X |
 | Mine on foot / change size | Right stick aims; RT or LB / Y | Arrows aim; E / T |
 
@@ -31,7 +31,9 @@ and debris but do not excavate terrain. The on-foot mining beam remains separate
 
 The material control envelope uses 70/140-unit cruise speeds, so this preset uses
 8 units/s of recoil instead of the ordinary game's 200. Projectile speed, damage,
-health and cooldown keep their shared values. No damage, kill, claim or successful
+health and the 0.5-second launch interval keep their shared values. The combat
+presets now add [ship energy and two mounted rounds](weapon-energy.md), with a
+paid two-second reload for each replacement. No damage, kill, claim or successful
 recovery is scripted in the duel.
 
 `rule_pilot_v4` reuses the ordinary `rule_ship_v5` combat solution: projectile lead,
@@ -41,8 +43,9 @@ and routes around ground that blocks its target. Passing projectiles can inhibit
 fire without forcing a new route. The existing V5 caller retains its original
 configuration and arithmetic for the frozen historical suites.
 
-`CombatObservationV1` adds actual body motion, weapon readiness, first-solid
-visibility, and hit counters to the recovery observation. Queries are read-only
+`CombatObservationV2` adds actual body motion, weapon readiness, energy, loaded
+ammunition, reload progress, first-solid visibility, and hit counters to the
+recovery observation. Queries are read-only
 and fail closed while material geometry is dirty. Contact counters are sampled
 before shared debris cleanup compacts its indices.
 
@@ -76,7 +79,10 @@ planet can be owned here; a pilot stranded on enemy-owned ground still needs a
 future flag-route task. This slice does not yet add random asteroid pressure,
 generated multi-planet matches, or tactical evasive maneuvers.
 
-## Validation, 2026-09-08
+## Validation before energy, 2026-09-08
+
+The following results record the original unlimited-ammunition checkpoint.
+Current energy-equipped runs are documented in [weapon energy](weapon-energy.md).
 
 The workspace all-target run passed 997 tests. The subsequently added physical
 duel regression also passed, and the final client passed all 233 unit tests.

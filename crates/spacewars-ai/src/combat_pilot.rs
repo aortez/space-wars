@@ -12,7 +12,7 @@ use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
         PilotLocation, SurfaceSortieAction, SurfaceWingAction,
-        combat::{CombatObservationV1, SurfaceWeaponAction},
+        combat::{CombatObservationV2, SurfaceWeaponAction},
         pilot::LandingSiteId,
     },
 };
@@ -96,9 +96,9 @@ impl RulePilotV4 {
             |t| t.site_request(),
         )
     }
-    pub fn intent(&mut self, o: &CombatObservationV1) -> CombatIntent {
+    pub fn intent(&mut self, o: &CombatObservationV2) -> CombatIntent {
         let p = &o.recovery.flight.pilot;
-        if o.version != 1
+        if o.version != 2
             || o.recovery.version != 1
             || o.recovery.flight.version != 2
             || p.version != 1
@@ -143,7 +143,7 @@ impl RulePilotV4 {
         self.previous_intent = intent;
         intent
     }
-    fn fly(&mut self, o: &CombatObservationV1) -> CombatIntent {
+    fn fly(&mut self, o: &CombatObservationV2) -> CombatIntent {
         let p = &o.recovery.flight.pilot;
         let delta = p.ship.position - p.planet.motion.position;
         let radius = delta.length();
@@ -243,7 +243,7 @@ impl RulePilotV4 {
                 + up * ((p.planet.radius + 90.0 - radius) * 0.6).clamp(-12.0, 12.0),
         )
     }
-    fn guide(&mut self, o: &CombatObservationV1, relative_velocity: Vec2) -> CombatIntent {
+    fn guide(&mut self, o: &CombatObservationV2, relative_velocity: Vec2) -> CombatIntent {
         let f = &o.recovery.flight;
         let p = &f.pilot;
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
@@ -279,7 +279,7 @@ impl RulePilotV4 {
         }
     }
 }
-fn turn(o: &CombatObservationV1, direction: Vec2) -> f32 {
+fn turn(o: &CombatObservationV2, direction: Vec2) -> f32 {
     let f = &o.recovery.flight;
     let p = &f.pilot;
     let error = shortest_heading_error(direction.rotate_radians(-p.ship.angle));

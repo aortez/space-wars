@@ -979,6 +979,22 @@ fn draw_player_hud(
             }
         });
     let damage = state.damage_observation(player);
+    let supply = (mode == "ABOARD").then(|| ship.weapon_supply()).flatten();
+    let progress = supply.map_or(progress, |s| {
+        let status = if s.laser_recharging {
+            "laser charging".to_owned()
+        } else if let Some(progress) = s.reload_progress {
+            format!(
+                "reload {:.1}s",
+                (1.0 - progress) * weapons::ROUND_RELOAD_SECONDS
+            )
+        } else if s.rounds_loaded < weapons::ROUND_CAPACITY as u8 {
+            "reload needs 25%".to_owned()
+        } else {
+            "rounds ready".to_owned()
+        };
+        format!("Energy {:.0}% / {status}", s.energy_percent)
+    });
     let vehicle_status = if damage
         .last_damage_tick
         .is_some_and(|tick| observation.tick.saturating_sub(tick) < 180)
@@ -1054,7 +1070,7 @@ fn draw_player_hud(
             observation.mining.as_ref().map_or(detail, |mining| {
                 if matches!(observation.location, PilotLocation::Aboard(_)) {
                     if state.combat_enabled() {
-                        return "RT: laser  X: cannon  RB: cruise".to_owned();
+                        return "RT: laser  X: missiles  RB: cruise".to_owned();
                     }
                     return "X: asteroid / RB+X: heavy".to_owned();
                 }
@@ -1079,5 +1095,40 @@ fn draw_player_hud(
             color,
             13.0,
         );
+    }
+    if let Some(supply) = supply {
+        let start = center + Vec2::new(-0.24, -0.434) * height;
+        let end = center + Vec2::new(0.24, -0.434) * height;
+        line(
+            frame,
+            20,
+            start,
+            end,
+            RenderColor::rgb(0.16, 0.22, 0.28),
+            height * 0.006,
+        );
+        line(
+            frame,
+            20,
+            start,
+            start + (end - start) * supply.energy_percent / 100.0,
+            if supply.energy_percent < weapons::ROUND_ENERGY_COST {
+                AMBER
+            } else {
+                CYAN
+            },
+            height * 0.006,
+        );
+        for quarter in 1..4 {
+            let at = start + (end - start) * quarter as f32 / 4.0;
+            line(
+                frame,
+                20,
+                at - Vec2::Y * height * 0.005,
+                at + Vec2::Y * height * 0.005,
+                LIGHT,
+                height * 0.0015,
+            );
+        }
     }
 }

@@ -112,12 +112,19 @@ impl SurfacePilot {
         self.control = SpacelingControl::default();
         self.landing = LandingTelemetry::default();
         if self.body.is_none() {
-            // Keep the completed body's origin, COM velocity and physical spin;
+            // Keep the completed body's origin and physical spin;
             // the legacy mesh pivots/control omega scales differ between forms.
             let origin = ship.position + physics::ship_pivot(ship.form);
+            let velocity = ship.velocity;
             let spin = physics::physical_angular_velocity(ship);
             ship.change_to_escape_pod();
             ship.position = origin - physics::ship_pivot(ship.form);
+            // Combat uses Rapier's resolved velocity: the contact impulse has
+            // already been applied. Keep the older asteroid/recovery fixtures'
+            // ejection behavior until their landing policy is adapted as well.
+            if self.combat.is_some() {
+                ship.velocity = velocity;
+            }
             ship.omega = physics::control_angular_velocity(ship, spin);
             recovery.pod_ejections += 1;
             recovery.status = SurfaceRecoveryStatus::LandPod;
@@ -273,6 +280,9 @@ impl SurfaceSortieState {
             self.world.players[owner.index()].health_percent,
             1.0 / 60.0,
         );
+        if self.pilots[player].combat.is_some() {
+            replacement.enable_weapon_supply();
+        }
         let radius = physics::SpacewarsPhysics::surface_vehicle_clearance_radius(&replacement);
         let right = Vec2::new(up.y, -up.x);
         // Ground and normal come from local terrain rays, not a radius projection.

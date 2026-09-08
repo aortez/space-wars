@@ -1,11 +1,17 @@
-//! Two physical combat pilots, no scripted hits or health edits.
+//! Physical combat, optionally followed by P1 attempting to land under fire.
+//! No scripted hits or health edits; both missions use ordinary controls.
 use engine_common::Scenario;
 use scenario_spacewars::{
     PlayerId,
-    surface_sortie::{SurfaceSortieScenario, pilot::MaterialFlightStart},
+    surface_sortie::{PilotLocation, SurfaceSortieScenario, pilot::MaterialFlightStart},
 };
 use serde_json::json;
-use spacewars_ai::{BrainReset, combat_pilot::RulePilotV4};
+use spacewars_ai::{
+    BrainReset,
+    combat_pilot::{CombatIntent, RulePilotV4},
+    flight_pilot::FlightIntent,
+    pilot::{PilotBrain, RulePilotV1},
+};
 use std::{
     fs,
     path::PathBuf,
@@ -25,6 +31,14 @@ fn main() {
     let mirror = arg("--mirror", "false") == "true";
     let separation: f32 = arg("--separation", "0.5").parse().unwrap();
     assert!((0.3..=1.5).contains(&separation));
+    let land_after_arg = arg("--land-after", "");
+    let land_after: Option<u32> = (!land_after_arg.is_empty()).then(|| {
+        land_after_arg
+            .parse()
+            .expect("--land-after must be a whole number of seconds")
+    });
+    assert!(land_after.is_none_or(|s| s < seconds));
+    let save_frames = arg("--frames", "false") == "true";
     let mut state = SurfaceSortieScenario::init_material_combat_flight(
         seed,
         &[0, 1].map(|seat| {
@@ -46,6 +60,13 @@ fn main() {
             episode_seed: seed,
         })
     });
+    let mut landing = RulePilotV1::new(BrainReset {
+        actor: PlayerId::PLAYER_1,
+        episode_seed: seed,
+    });
+    let mut landing_start = None;
+    let mut exited_tick = None;
+    let mut lost_tick = None;
     let out = PathBuf::from(arg("--out", "/tmp/combat-soak"));
     fs::create_dir_all(&out).unwrap();
     let initial = state.terrain_diagnostics().occupied_cells;
@@ -54,22 +75,51 @@ fn main() {
     let mut previous = ["", ""];
     let mut steps = Vec::new();
     let mut ai = Vec::new();
+    let mut failure = None;
     for tick in 0..seconds * 60 {
         let start = Instant::now();
         let mut actions = Vec::new();
         for seat in 0..2 {
-            let o = state.combat_observation(seat, brains[seat].site_request());
-            actions.extend(
-                brains[seat]
-                    .intent(&o)
-                    .encode(PlayerId::from_index(seat).unwrap()),
-            );
-            let label = brains[seat].label();
+            let landing_now = seat == 0 && land_after.is_some_and(|s| tick >= s * 60);
+            let site = if landing_now {
+                landing.site_request()
+            } else {
+                brains[seat].site_request()
+            };
+            let o = state.combat_observation(seat, site);
+            if landing_now {
+                landing_start.get_or_insert_with(|| o.clone());
+                if o.recovery.flight.pilot.location == PilotLocation::OnFoot {
+                    exited_tick.get_or_insert(tick);
+                }
+                if o.recovery.flight.pilot.ship_form != scenario_spacewars::ShipForm::Ship
+                    || !o.recovery.flight.pilot.ship_available
+                {
+                    lost_tick.get_or_insert(tick);
+                }
+            }
+            let intent = if landing_now {
+                CombatIntent {
+                    flight: FlightIntent {
+                        controls: landing.intent(&o.recovery.flight.pilot),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            } else {
+                brains[seat].intent(&o)
+            };
+            actions.extend(intent.encode(PlayerId::from_index(seat).unwrap()));
+            let label = if landing_now {
+                landing.telemetry().goal.label()
+            } else {
+                brains[seat].label()
+            };
             if label != previous[seat] {
                 if label != "engage ship" && previous[seat] != "engage ship" || tick % 60 == 0 {
                     eprintln!("{:.2}s P{} {label}", tick as f32 / 60.0, seat + 1);
                 }
-                events.push(json!({"tick":tick,"seat":seat,"brain":brains[seat].telemetry(),"observation":o}));
+                events.push(json!({"tick":tick,"seat":seat,"goal":label,"brain":brains[seat].telemetry(),"observation":o}));
                 previous[seat] = label;
             }
         }
@@ -79,15 +129,61 @@ fn main() {
         steps.push(start.elapsed().as_secs_f64() * 1000.0);
         if tick % 60 == 59 {
             let audit = state.terrain_diagnostics();
-            assert!(audit.issues.is_empty(), "{audit:?}");
-            assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
-            assert!(audit.max_speed < 500.0);
+            if !audit.issues.is_empty()
+                || audit.occupied_cells + audit.removed_cells != initial
+                || audit.max_speed >= 500.0
+            {
+                failure = Some(format!("audit failed at {}s: {audit:?}", (tick + 1) / 60));
+            }
+            for (seat, brain) in brains.iter().enumerate() {
+                if let Some(supply) = state.combat_observation(seat, brain.site_request()).supply
+                    && (!(0.0..=100.0).contains(&supply.energy_percent)
+                        || supply.rounds_loaded > 2
+                        || supply
+                            .reload_progress
+                            .is_some_and(|p| !(0.0..=1.0).contains(&p)))
+                {
+                    failure = Some(format!(
+                        "P{} supply invalid at {}s: {supply:?}",
+                        seat + 1,
+                        (tick + 1) / 60
+                    ));
+                }
+            }
             samples.push(json!({"second":(tick+1)/60,"brains":brains.each_ref().map(|b| b.telemetry()),"pilots":[state.combat_observation(0,brains[0].site_request()),state.combat_observation(1,brains[1].site_request())],"audit":audit}));
+            if failure.is_some()
+                || save_frames
+                    && [1, 2, 3, 10, 12, 13, 30, 60, 90, 110, 120, 180].contains(&((tick + 1) / 60))
+            {
+                for seat in 0..2 {
+                    let mut frame = SurfaceSortieScenario::player_frame(&state, seat);
+                    fs::write(
+                        out.join(format!("frame-{}-p{}.json", (tick + 1) / 60, seat + 1)),
+                        serde_json::to_vec(&frame).unwrap(),
+                    )
+                    .unwrap();
+                    frame.layers.retain(|layer| layer.z < 15);
+                    let p = state.pilot_observation(seat, None).ship.position;
+                    frame.camera = engine_common::Camera2::new(
+                        engine_common::RenderPoint::new(p.x, p.y),
+                        28.0,
+                    );
+                    fs::write(
+                        out.join(format!("ship-{}-p{}.json", (tick + 1) / 60, seat + 1)),
+                        serde_json::to_vec(&frame).unwrap(),
+                    )
+                    .unwrap();
+                }
+            }
+            if failure.is_some() {
+                break;
+            }
         }
     }
     steps.sort_by(f64::total_cmp);
     ai.sort_by(f64::total_cmp);
-    let report = json!({"version":1,"seed":seed,"seconds":seconds,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
+    let report = json!({"version":2,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
+        "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":landing.telemetry(),"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
         "samples":samples,"events":events});
     fs::write(
@@ -99,4 +195,8 @@ fn main() {
         "{}",
         json!({"brains":report["brains"],"weapons":report["weapons"],"step_p95_ms":report["step_p95_ms"],"ai_p95_ms":report["ai_p95_ms"]})
     );
+    if let Some(failure) = failure {
+        eprintln!("{failure}");
+        std::process::exit(1);
+    }
 }

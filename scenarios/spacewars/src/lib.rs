@@ -7,6 +7,7 @@
 mod physics;
 pub mod surface_sortie;
 mod terrain;
+pub mod weapons;
 pub use terrain::{
     TerrainDiagnostics, TerrainMotionAnomaly, TerrainMotionBody, TerrainMotionFrame,
     TerrainMotionPeaks, TerrainMotionStage, fixture_controls as terrain_fixture_controls,
@@ -553,6 +554,7 @@ pub struct DebrisState {
     pub color: Color,
     pub owner_id: Option<usize>,
     pub spawn_tick: u64,
+    rail_launched: bool,
     physics_id: u64,
 }
 
@@ -725,6 +727,7 @@ pub struct ShipState {
     thrust_power: f32,
     current_max_omega: f32,
     cannon_cooldown_remaining: f32,
+    armament: Option<weapons::ShipArmament>,
     spaceport_reentry_lockout: f32,
     spaceport_ejection: Option<SpaceportEjection>,
     queued_laser_fire: bool,
@@ -1388,6 +1391,14 @@ impl SpacewarsScenario {
             recover_ship_outside_universe(ship, universe_radius);
         }
         finish_spaceport_ejections(state, dt);
+        for ship in &mut state.ships {
+            if !ship.dead
+                && ship.form == ShipForm::Ship
+                && let Some(armament) = &mut ship.armament
+            {
+                armament.advance(dt);
+            }
+        }
         let new_shells = if experimental {
             state
                 .ships
@@ -1448,7 +1459,7 @@ impl SpacewarsScenario {
             .synchronize_motion(&mut state.ships, &mut state.debris);
 
         let collision_started = Instant::now();
-        update_ship_lasers(state);
+        update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
@@ -2092,14 +2103,20 @@ fn spawn_cannon_shells(state: &mut SpacewarsState, dt: f32) -> Vec<DebrisState> 
         .collect()
 }
 
-fn update_ship_lasers(state: &mut SpacewarsState) {
+fn update_ship_lasers(state: &mut SpacewarsState, dt: f32) {
     for ship in &mut state.ships {
-        if ship.cannon_firing {
+        // Energy-equipped ships can use the laser between actual launches,
+        // including when a human holds both buttons through an empty rack.
+        let cannon_suppresses = ship
+            .armament
+            .as_ref()
+            .map_or(ship.cannon_firing, |a| a.fired_this_step);
+        if cannon_suppresses {
             ship.laser_beam = None;
             continue;
         }
 
-        ship.update_laser();
+        ship.update_laser(dt);
     }
 }
 
@@ -4963,6 +4980,7 @@ impl DebrisState {
             color,
             owner_id: None,
             spawn_tick: 0,
+            rail_launched: false,
             physics_id: 0,
         }
     }
@@ -5214,6 +5232,7 @@ impl ShipState {
             thrust_power: SHIP_THRUST_FORCE / SHIP_MASS * delta_time,
             current_max_omega: BASE_MAX_OMEGA,
             cannon_cooldown_remaining: 0.0,
+            armament: None,
             spaceport_reentry_lockout: 0.0,
             spaceport_ejection: None,
             queued_laser_fire: false,
@@ -5341,15 +5360,24 @@ impl ShipState {
         }
 
         let should_fire = self.cannon_firing || self.queued_cannon_fire;
-        let shell = if should_fire && self.cannon_cooldown_remaining <= 0.0 {
-            let mount_center = ship_mount_center(self);
-            let shell = DebrisState::new_shell(
+        let supplied = self
+            .armament
+            .as_ref()
+            .is_none_or(|a| !self.dead && a.cannon_ready());
+        let shell = if should_fire && supplied && self.cannon_cooldown_remaining <= 0.0 {
+            let mount = self.armament.as_mut().and_then(|a| a.take_round());
+            let position = mount.map_or_else(
+                || ship_mount_center(self) + self.direction * CANNON_SHELL_SPAWN_OFFSET,
+                |mount| weapons::mount_position(self, mount),
+            );
+            let mut shell = DebrisState::new_shell(
                 self.owner_id,
                 tick,
-                mount_center + self.direction * CANNON_SHELL_SPAWN_OFFSET,
+                position,
                 self.direction * CANNON_SHELL_SPEED + self.velocity,
                 -self.direction.angle_radians(),
             );
+            shell.rail_launched = mount.is_some();
             self.velocity -= self.direction * recoil;
             self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
             self.queued_cannon_fire = false;
@@ -5362,7 +5390,7 @@ impl ShipState {
         shell
     }
 
-    fn update_laser(&mut self) {
+    fn update_laser(&mut self, dt: f32) {
         if self.form == ShipForm::EscapePod {
             self.laser_beam = None;
             self.queued_laser_fire = false;
@@ -5378,6 +5406,12 @@ impl ShipState {
         let should_fire = self.laser_firing || self.queued_laser_fire;
         self.queued_laser_fire = false;
         if !should_fire {
+            self.laser_beam = None;
+            return;
+        }
+        if let Some(armament) = &mut self.armament
+            && (self.dead || !armament.power_laser(dt))
+        {
             self.laser_beam = None;
             return;
         }
@@ -5673,6 +5707,7 @@ impl ShipState {
         self.queued_laser_fire = false;
         self.queued_cannon_fire = false;
         self.cannon_cooldown_remaining = 0.0;
+        self.armament = None;
         self.wing_theta = if self.wings_closed {
             MAX_WING_THETA
         } else {
@@ -6178,6 +6213,22 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
     }
 
     if debris.kind == DebrisKind::Shell {
+        if debris.rail_launched {
+            weapons::render_round(
+                frame,
+                DEBRIS_LAYER,
+                Transform2 {
+                    translation: debris.position,
+                    // Shell collision geometry/spin is shared; the round's nose
+                    // follows its flight direction for readability at this scale.
+                    rotation_radians: debris.velocity.angle_radians()
+                        - core::f32::consts::FRAC_PI_2,
+                    ..Transform2::IDENTITY
+                },
+                1.0,
+            );
+            return;
+        }
         push_filled_polygon(
             frame,
             DEBRIS_LAYER,
@@ -6752,6 +6803,7 @@ fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
         dim(base, 1.15),
         outline,
     );
+    weapons::render_mounts(frame, ship);
 }
 
 fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
@@ -9214,7 +9266,7 @@ mod tests {
         ship.set_cannon(true);
 
         ship.change_to_escape_pod();
-        ship.update_laser();
+        ship.update_laser(1.0 / 60.0);
         assert_eq!(ship.form, ShipForm::EscapePod);
         assert!(ship.wings_closed);
         assert_eq!(ship.wing_state, WingState::Closed);
@@ -9839,7 +9891,7 @@ mod tests {
             player: 0,
             on: true,
         });
-        update_ship_lasers(&mut state);
+        update_ship_lasers(&mut state, 1.0 / 60.0);
         state.laser_hits = resolve_laser_hits(&mut state);
 
         let beam = state.ships[0]

@@ -40,4 +40,10 @@ fn physical_duel_loses_rebuilds_and_fires_again_within_three_minutes() {
     assert!(state.combat_telemetry(1 - seat).cannon_hits > 0);
     assert!(state.combat_telemetry(seat).shells_fired > 0);
     assert_eq!(brains[seat].telemetry().completed_recoveries, 1);
+    let supply = state.combat_observation(seat, None).supply.unwrap();
+    assert!((0.0..=100.0).contains(&supply.energy_percent));
+    assert!(
+        supply.rounds_loaded <= 2,
+        "rebuilt ship must use the same supply"
+    );
 }

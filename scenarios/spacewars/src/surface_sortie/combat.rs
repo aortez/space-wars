@@ -63,13 +63,14 @@ pub struct CombatTarget {
     pub ground_occluded: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct CombatObservationV1 {
+pub struct CombatObservationV2 {
     pub version: u32,
     pub recovery: RecoveryTaskObservationV1,
     /// Only a living, occupied full ship is an aerial combat target.
     pub target: Option<CombatTarget>,
     pub laser_available: bool,
     pub cannon_ready: bool,
+    pub supply: Option<weapons::WeaponSupplyObservation>,
     pub weapons: CombatTelemetry,
 }
 
@@ -109,6 +110,7 @@ impl SurfaceSortieScenario {
         let mut state = Self::init_material_flight(seed, 2, starts);
         for pilot in &mut state.pilots {
             pilot.combat = Some(CombatSeat::default());
+            state.world.ships[pilot.vehicle.0].enable_weapon_supply();
         }
         state
     }
@@ -138,7 +140,7 @@ impl SurfaceSortieState {
         &self,
         player: usize,
         site: Option<LandingSiteId>,
-    ) -> CombatObservationV1 {
+    ) -> CombatObservationV2 {
         let recovery = self.recovery_task_observation(player, site);
         let p = &recovery.flight.pilot;
         let ship = &self.world.ships[p.vehicle.0];
@@ -194,11 +196,18 @@ impl SurfaceSortieState {
             && p.ship_available
             && p.ship_form == ShipForm::Ship
             && matches!(p.location, PilotLocation::Aboard(_));
-        CombatObservationV1 {
-            version: 1,
+        CombatObservationV2 {
+            version: 2,
             target,
-            laser_available: available,
-            cannon_ready: available && ship.cannon_cooldown_remaining <= 0.0,
+            laser_available: available
+                && ship
+                    .armament
+                    .as_ref()
+                    .is_some_and(|a| a.laser_ready(ship.delta_time)),
+            cannon_ready: available
+                && ship.cannon_cooldown_remaining <= 0.0
+                && ship.armament.as_ref().is_some_and(|a| a.cannon_ready()),
+            supply: ship.weapon_supply(),
             weapons: self.combat_telemetry(player),
             recovery,
         }
@@ -250,6 +259,19 @@ fn record_taken(pilots: &mut [SurfacePilot], target: usize, tick: u64, source: &
 mod tests {
     use super::*;
     const DT: Duration = Duration::from_nanos(16_666_667);
+    #[test]
+    fn surface_pod_keeps_resolved_motion_without_legacy_damage_kick() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        let ship = &mut state.world.ships[0];
+        ship.velocity = Vec2::new(24.0, -18.0);
+        let origin = ship.position + physics::ship_pivot(ship.form);
+        ship.translate_life_with_impulse(-1000.0, Vec2::new(1000.0, -1000.0));
+        state.pilots[0].vehicle_destroyed(ship);
+        assert_eq!(ship.form, ShipForm::EscapePod);
+        assert_eq!(ship.velocity, Vec2::new(24.0, -18.0));
+        assert_eq!(ship.position + physics::ship_pivot(ship.form), origin);
+        assert!(ship.weapon_supply().is_none());
+    }
     fn face_target(state: &mut SurfaceSortieState) {
         let direction = (state.pilot_observation(1, None).ship.position
             - state.pilot_observation(0, None).ship.position)
@@ -298,6 +320,7 @@ mod tests {
         state.world.ships[0].translate_life(-1000.0);
         SurfaceSortieScenario::step(&mut state, &[], DT);
         assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
+        assert!(state.combat_observation(0, None).supply.is_none());
         assert!(!state.pilots[0].controls_armed);
         SurfaceSortieScenario::step(&mut state, &[], DT);
         assert!(
@@ -387,6 +410,7 @@ mod tests {
             DT,
         );
         assert!(!state.combat_enabled());
+        assert!(state.combat_observation(0, None).supply.is_none());
         assert!(
             state
                 .world
@@ -412,5 +436,49 @@ mod tests {
         assert!(
             SurfaceWeaponAction::decode(&Action::scenario(WEAPON_ACTION, vec![0, 2, 0])).is_none()
         );
+    }
+
+    #[test]
+    fn held_weapons_share_supply_and_pause_clone_and_replay_preserve_reload() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let action = SurfaceWeaponAction {
+            laser: true,
+            cannon: true,
+        }
+        .encode(PlayerId::PLAYER_1);
+        SurfaceSortieScenario::step(&mut state, std::slice::from_ref(&action), DT);
+        assert_eq!(state.combat_telemetry(0).shells_fired, 1);
+        assert!(state.world.ships[0].laser_beam.is_none());
+        assert_eq!(
+            state
+                .combat_observation(0, None)
+                .supply
+                .unwrap()
+                .energy_percent,
+            100.0
+        );
+        SurfaceSortieScenario::step(&mut state, std::slice::from_ref(&action), DT);
+        assert!(state.world.ships[0].laser_beam.is_some());
+        let o = state.combat_observation(0, None);
+        let supply = o.supply.unwrap();
+        assert_eq!(supply.rounds_loaded, 1);
+        assert!((supply.energy_percent - 74.8).abs() < 0.001);
+        assert_eq!(supply.reload_progress, Some(0.0));
+        let opponent = state.combat_observation(1, None).supply.unwrap();
+        assert_eq!(opponent.rounds_loaded, 2);
+        assert_eq!(opponent.energy_percent, 100.0);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::ZERO);
+        assert_eq!(state.combat_observation(0, None), o);
+        let mut other = state.clone();
+        for _ in 0..180 {
+            SurfaceSortieScenario::step(&mut state, std::slice::from_ref(&action), DT);
+            SurfaceSortieScenario::step(&mut other, std::slice::from_ref(&action), DT);
+            assert_eq!(
+                state.combat_observation(0, None),
+                other.combat_observation(0, None)
+            );
+        }
+        assert!(state.combat_telemetry(0).shells_fired <= 3);
     }
 }
