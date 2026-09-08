@@ -130,3 +130,6 @@ exercise flight; the bot demonstration remains in `spacewars-terrain-ai`.
 Human feedback on wing feel and braking distance is the next acceptance check.
 The next integration slice can then exercise damage and recovery deliberately,
 before weapons/dogfighting and random asteroid hazards.
+
+The subsequent [controlled damage and reusable recovery task](material-recovery-ai.md)
+now builds on this accepted flight checkpoint.

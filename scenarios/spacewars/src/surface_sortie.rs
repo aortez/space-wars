@@ -11,6 +11,7 @@ use engine_rapier::{
 mod claim;
 pub mod compatibility;
 pub mod flight;
+pub mod impact;
 mod landing;
 mod material;
 mod motion;
@@ -18,6 +19,7 @@ mod outpost;
 pub mod pilot;
 mod profiles;
 mod recovery;
+pub mod recovery_sensors;
 mod render;
 mod travel;
 pub use claim::{
@@ -141,6 +143,7 @@ pub struct SurfaceSortieState {
     outposts: Vec<outpost::SurfaceOutpost>,
     claims: Vec<claim::SurfacePlanetClaim>,
     mining: Option<material::SurfaceMining>,
+    damage: impact::SurfaceDamageState,
 }
 
 #[derive(Clone)]
@@ -585,6 +588,7 @@ impl Scenario for SurfaceSortieScenario {
         state.reconcile_material_support(footings);
         state.read_mining_actions(actions);
         state.read_wing_actions(actions);
+        state.read_impact_actions(actions);
         for (player, input) in actions.iter().filter_map(SurfaceSortieAction::decode) {
             if let Some(pilot) = state.pilots.get_mut(player.index()) {
                 pilot.input = input;
@@ -602,8 +606,9 @@ impl Scenario for SurfaceSortieScenario {
         {
             let input = state.pilots[player].input;
             if !state.pilots[player].controls_armed {
-                state.pilots[player].controls_armed =
-                    input == SurfaceSortieAction::default() && !state.pilots[player].wing_input;
+                state.pilots[player].controls_armed = input == SurfaceSortieAction::default()
+                    && !state.pilots[player].wing_input
+                    && !state.damage.held[player];
             } else {
                 *effective = input;
                 if state.update_scuttle_input(player, input, dt) {
@@ -654,6 +659,7 @@ impl Scenario for SurfaceSortieScenario {
         // Schedule terrain, solve gravity, and step Rapier exactly once for all seats.
         let dt = dt.as_secs_f32();
         state.update_surface_wings(dt);
+        let damage_before = state.damage_sample();
         for planet in &mut state.world.planets {
             state.motion_preset.advance(planet, state.world.sun, dt);
         }
@@ -665,6 +671,7 @@ impl Scenario for SurfaceSortieScenario {
             Some(prepared),
         );
         state.reconcile_recovery_vehicles();
+        state.record_surface_damage(damage_before);
         for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
             let Some(before) = before else { continue };
             let pilot = &mut state.pilots[player];
@@ -763,6 +770,7 @@ impl SurfaceSortieScenario {
             outposts,
             claims: Vec::new(),
             mining: None,
+            damage: impact::SurfaceDamageState::default(),
         }
     }
 

@@ -11,14 +11,14 @@ receives an observation and emits ordinary actions; it cannot mutate simulation
 state. The interactive and headless hosts share its policies. Keep that boundary
 and the policy-versioning rules in [ship AI](ship-ai.md).
 
-The current policies are built around `ShipObservationV1`, port approach and
+The historical match policies are built around `ShipObservationV1`, port approach and
 ingress, sensed docking, and pad services for capture, repair and rebuilding.
 Their collision avoidance also treats planets as circles. The shared heading
 and moving-target guidance can be reused where applicable, but the port mission
 cannot directly drive material landing and capture on foot.
 
-The material client's `SurfaceSortieClientScenario` currently maps human inputs
-to `SurfaceSortieAction` and `SurfaceMiningAction`; it has no bot driver.
+The material client maps human inputs to ordinary surface, wing, mining and
+impact actions. Separate host-owned policies drive P2 in the AI presets.
 `surface_material_soak` is a prescribed acceptance journey. Its successful runs
 prove those actions can complete the mechanics, not that an autonomous policy
 can choose sites, respond to opponents or complete a Spacewars match.
@@ -114,4 +114,20 @@ The next controlled slice is implemented by `rule_pilot_v2`: grounded takeoff,
 a measured fast circuit, opening/braking, then the V1 landing/capture/departure
 sequence. Both human material seats share the same wing controls and physics.
 See [flight tuning and evidence](../swept-wing-flight.md). Combat, asteroid
-hazards, recovery policy and multiple-planet planning remain later slices.
+hazards and multiple-planet planning remain later slices.
+
+## Reusable recovery checkpoint
+
+`rule_pilot_v3` composes the existing V2 sortie with `RecoverShipTask`, whose
+caller owns the mission and receives running, succeeded or terminal blocked
+status. It restores a full ship from a pod or stranded spaceling using the
+shared mechanics. The `spacewars-terrain-recovery` host adds a controlled
+physical strike after the first sortie. See [task contract, controls and
+validation](../material-recovery-ai.md).
+
+This task is the first reusable recovery building block for future match AI.
+The ordinary match strategy and combat controller have not been replaced.
+Combining them with material travel, landing, claims and recovery remains the
+integration direction. Weapons/dogfighting, random hazards and contested
+single-planet behavior precede generated multi-planet matches. Deep-crater
+escape and enemy flag routing still require local path/mining decisions.

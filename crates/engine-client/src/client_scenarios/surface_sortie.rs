@@ -5,8 +5,9 @@ use scenario_spacewars::PlayerId;
 use scenario_spacewars::surface_sortie::{
     SurfaceMiningAction, SurfaceMotionPreset, SurfaceSortieAction, SurfaceSortieScenario,
     SurfaceSortieState, SurfaceWingAction,
+    impact::{ImpactKind, SurfaceImpactAction},
 };
-use spacewars_ai::{BrainReset, flight_pilot::RulePilotV2};
+use spacewars_ai::{BrainReset, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
@@ -73,14 +74,14 @@ struct SurfaceSortieClientScenario {
 
 pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain",
-    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Hold RB/J to sweep wings and cruise; release to open, then brake for landing. Open wings turn faster; sweeping adds speed. P2 uses PageDown for wings aboard. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
+    controls_help: "Destructible Expedition: land on both rear feet, exit, and stand still 3s to raise your planet flag. A/Space thrusts or jumps; B/X exits or boards. Left/right turns or walks; Down/S brakes. Hold RB/J to sweep wings and cruise; release to open, then brake for landing. Open wings turn faster; sweeping adds speed. P2 uses PageDown for wings aboard. Right stick aims the mining beam; RT or LB mines; Y changes cut size (one cell, radius 1, radius 3). Keyboard E mines, T changes size; arrows aim. P2 uses numpad 4/6, 8, 5, 2 for move, thrust/jump, brake, transfer; End mines, PageDown changes size. A missing flag footing neutralizes the planet. Land an escape pod and stand on owned ground 8s to rebuild. Gamepad X calls a light asteroid; RB+X calls a heavy one (keyboard K / J+K; P2 Home / PageDown+Home). One rock per press, 3s cooldown. Hold A+B+Down 3s for the loss drill. Select 1 or 2 players in Settings. Start/Esc pauses. No landing pad or repair terminal.",
     create: create_material,
     ..EXPEDITION_REGISTRATION
 };
 
 pub(super) const PILOT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-ai",
-    controls_help: "Material pilot AI playtest: P1 is human; P2 takes off, flies a fast swept-wing circuit, opens and brakes, returns, lands, exits, claims a neutral planet, boards and departs using the same controls and physics. Watch its goal in the P2 view. After one sortie it holds above the planet. Enemy flag navigation, mining and vehicle recovery are future AI slices; a blocked goal is shown explicitly. P1 controls match Destructible Expedition: A/Space thrusts or jumps; B/X transfers; left/right turns or walks; Down/S brakes; hold RB/J for swept-wing cruise, release to open; right stick aims, RT/LB mines, Y changes size. Start/Esc pauses; R restarts both pilots. Select spacewars-terrain for one or two human pilots.",
+    controls_help: "Material pilot AI playtest: P1 is human; P2 takes off, flies a fast swept-wing circuit, opens and brakes, returns, lands, exits, claims a neutral planet, boards and departs using the same controls and physics. Watch its goal in the P2 view. After one sortie it holds above the planet. Enemy flag navigation and mining are outside this flight demo; a blocked goal is shown explicitly. Select spacewars-terrain-recovery for the loss and rebuilding demo. P1 controls match Destructible Expedition: A/Space thrusts or jumps; B/X transfers; left/right turns or walks; Down/S brakes; hold RB/J for swept-wing cruise, release to open; right stick aims, RT/LB mines, Y changes size. Start/Esc pauses; R restarts both pilots. Select spacewars-terrain for one or two human pilots.",
     create: create_pilot,
     ..TERRAIN_REGISTRATION
 };
@@ -89,6 +90,38 @@ pub(super) const PILOT_REGISTRATION: ScenarioRegistration = ScenarioRegistration
 struct MaterialPilotClientScenario {
     sortie: SurfaceSortieClientScenario,
     brain: RulePilotV2,
+}
+
+pub(super) const RECOVERY_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-recovery",
+    controls_help: "Recovery AI playtest: P1 is human; P2 flies a swept-wing circuit, lands, claims and departs. A heavy asteroid then strikes its ship. The bot steadies and lands its escape pod, exits, rebuilds on owned ground, boards and flies again. Watch its goal in the P2 view. Only one automatic strike is scheduled; restart to repeat. Human controls match Destructible Expedition. X on the gamepad (K on keyboard) calls a light asteroid toward your assigned ship; hold RB with X (J+K) for a heavy strike. P2 human keyboard uses Home and PageDown+Home. Each press calls one rock, with a 3s cooldown. These are controlled collision drills. Pods and spacelings remain invulnerable. Enemy flag routes and rescue from arbitrary caverns remain outside this task. Start/Esc pauses; R restarts.",
+    create: create_recovery_pilot,
+    ..TERRAIN_REGISTRATION
+};
+
+struct MaterialRecoveryClientScenario {
+    sortie: SurfaceSortieClientScenario,
+    brain: RulePilotV3,
+    strike_sent: bool,
+}
+
+fn create_recovery_pilot(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(MaterialRecoveryClientScenario {
+        sortie: SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material(seed, 2),
+        },
+        brain: RulePilotV3::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: seed,
+        }),
+        strike_sent: false,
+    }))
 }
 
 fn create_pilot(
@@ -118,6 +151,8 @@ fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
                 || SurfaceWingAction::decode(action)
                     .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
                 || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| seat == 0)
+                || SurfaceImpactAction::decode(action)
+                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
         })
         .cloned()
         .collect()
@@ -146,20 +181,74 @@ impl ClientScenario for MaterialPilotClientScenario {
         human_pilot_actions(&self.sortie.map_input(input, benchmark))
     }
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
-        use engine_common::{RenderColor, RenderPrimitive};
         let mut frames = self.sortie.render_frames(renderer, viewport);
-        // Reuse the existing HUD strip; replacing the control hint leaves the
-        // physical viewport and other pilot's controls unobscured at 800x480.
-        for layer in &mut frames[1].layers {
-            for primitive in &mut layer.primitives {
-                if let RenderPrimitive::Text(text) = primitive
-                    && text.text.starts_with("A: thrust")
-                {
-                    text.text = format!("AI: {}", self.brain.label());
-                    text.color = RenderColor::rgb(1.0, 0.82, 0.25);
-                }
+        pilot_hud(&mut frames, self.brain.label());
+        frames
+    }
+    fn frame_layout(&self) -> FrameLayout {
+        self.sortie.frame_layout()
+    }
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+fn pilot_hud(frames: &mut [RenderFrame], label: &str) {
+    use engine_common::{RenderColor, RenderPrimitive};
+    // Reuse the control hint so the physical viewport stays clear at 800x480.
+    for layer in &mut frames[1].layers {
+        for primitive in &mut layer.primitives {
+            if let RenderPrimitive::Text(text) = primitive
+                && text.text.starts_with("A: thrust")
+            {
+                text.text = format!("AI: {label}");
+                text.color = RenderColor::rgb(1.0, 0.82, 0.25);
             }
         }
+    }
+}
+
+impl ClientScenario for MaterialRecoveryClientScenario {
+    fn registration(&self) -> &'static ScenarioRegistration {
+        &RECOVERY_REGISTRATION
+    }
+    fn tick_model(&self) -> TickModel {
+        self.sortie.tick_model()
+    }
+    fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if dt.is_zero() {
+            return self.sortie.step(&[], dt);
+        }
+        let observation = self
+            .sortie
+            .state
+            .recovery_task_observation(1, self.brain.site_request());
+        let mut actions = human_pilot_actions(actions);
+        actions.extend(self.brain.intent(&observation).encode(PlayerId::PLAYER_2));
+        // The demonstration schedules the hazard. The policy sees the same
+        // damage/recovery observations as any future match bot would receive.
+        let strike = !self.strike_sent && self.brain.telemetry().flight.completed_tick.is_some();
+        self.strike_sent |= strike;
+        actions.push(
+            SurfaceImpactAction {
+                held: strike,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2),
+        );
+        self.sortie.step(&actions, dt)
+    }
+    fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
+        human_pilot_actions(&self.sortie.map_input(input, benchmark))
+    }
+    fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        let mut frames = self.sortie.render_frames(renderer, viewport);
+        pilot_hud(&mut frames, self.brain.label());
         frames
     }
     fn frame_layout(&self) -> FrameLayout {
@@ -290,6 +379,18 @@ impl ClientScenario for SurfaceSortieClientScenario {
         if self.state.has_material_ground() {
             for player in 0..self.state.player_count() {
                 actions.push(
+                    SurfaceImpactAction {
+                        held: input.surface_impact_held(player),
+                        kind: if input.surface_wings_held(player) {
+                            ImpactKind::Heavy
+                        } else {
+                            ImpactKind::Light
+                        },
+                        oblique: false,
+                    }
+                    .encode(PlayerId::from_index(player).expect("bounded seat")),
+                );
+                actions.push(
                     SurfaceWingAction {
                         closed: input.surface_wings_held(player),
                     }
@@ -361,6 +462,118 @@ mod tests {
     use super::*;
     use crate::input::{GameKey, GamepadInput, GamepadSeatInput};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn recovery_host_owns_p2_actions_and_resets_the_single_strike_driver() {
+        let make = || {
+            RECOVERY_REGISTRATION
+                .create(
+                    42,
+                    &Settings::default(),
+                    Viewport::new(800.0, 480.0),
+                    ScenarioStartMode::Normal,
+                )
+                .unwrap()
+        };
+        let mut host = make();
+        let host = host
+            .as_any_mut()
+            .downcast_mut::<MaterialRecoveryClientScenario>()
+            .unwrap();
+        let initial = host.brain.telemetry().clone();
+        let interference = [
+            SurfaceImpactAction {
+                held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_2),
+            SurfaceSortieAction {
+                primary_held: true,
+                horizontal: 1.0,
+                interact_held: true,
+                brake_held: true,
+            }
+            .encode(PlayerId::PLAYER_2),
+        ];
+        host.step(&interference, Duration::ZERO);
+        assert_eq!(host.brain.telemetry(), &initial);
+        assert!(!host.strike_sent);
+        for _ in 0..180 * 60 {
+            host.step(&interference, Duration::from_nanos(16_666_667));
+            if host.brain.telemetry().departed_tick.is_some() {
+                break;
+            }
+        }
+        assert!(
+            host.brain.telemetry().departed_tick.is_some(),
+            "{:?}",
+            host.brain.telemetry()
+        );
+        assert_eq!(host.sortie.state.damage_observation(1).strikes, 1);
+        assert_eq!(host.sortie.state.damage_observation(0).strikes, 0);
+        let before = host.brain.telemetry().clone();
+        host.step(&[], Duration::ZERO);
+        assert_eq!(host.brain.telemetry(), &before);
+        let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
+        assert!(frames[1].layers.iter().flat_map(|l| &l.primitives).any(|p|
+            matches!(p, engine_common::RenderPrimitive::Text(t) if t.text == "AI: recovered / flying again")));
+        let fresh = make();
+        let fresh = fresh
+            .as_any()
+            .downcast_ref::<MaterialRecoveryClientScenario>()
+            .unwrap();
+        assert_eq!(fresh.brain.telemetry(), &initial);
+        assert!(!fresh.strike_sent);
+    }
+
+    #[test]
+    fn impact_keys_and_gamepads_are_seat_local_and_release_on_disconnect() {
+        let pads = Rc::new(RefCell::new(GamepadInput::default()));
+        let mut input = ClientInput::new(Rc::clone(&pads));
+        let host = SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material(42, 2),
+        };
+        input.press(GameKey::P1Cannon);
+        input.press(GameKey::P1Wing);
+        input.press(GameKey::P2ZoomOut);
+        let impacts = |actions: Vec<Action>| {
+            actions
+                .iter()
+                .filter_map(SurfaceImpactAction::decode)
+                .collect::<Vec<_>>()
+        };
+        let actions = impacts(host.map_input(&mut input, false));
+        assert_eq!(
+            (actions[0].0, actions[0].1.held, actions[0].1.kind),
+            (PlayerId::PLAYER_1, true, ImpactKind::Heavy)
+        );
+        assert_eq!(
+            (actions[1].0, actions[1].1.held, actions[1].1.kind),
+            (PlayerId::PLAYER_2, true, ImpactKind::Light)
+        );
+        input.release(GameKey::P1Cannon);
+        input.release(GameKey::P1Wing);
+        input.release(GameKey::P2ZoomOut);
+        pads.borrow_mut().set_seat(
+            1,
+            GamepadSeatInput {
+                connected: true,
+                west: true,
+                right_bumper: true,
+                ..Default::default()
+            },
+        );
+        let actions = impacts(host.map_input(&mut input, false));
+        assert!(!actions[0].1.held);
+        assert!(actions[1].1.held);
+        assert_eq!(actions[1].1.kind, ImpactKind::Heavy);
+        pads.borrow_mut().disconnect_seat(1);
+        assert!(
+            impacts(host.map_input(&mut input, false))
+                .iter()
+                .all(|(_, action)| !action.held)
+        );
+    }
 
     #[test]
     fn material_ai_host_ignores_p2_hardware_pauses_and_restarts_its_policy() {

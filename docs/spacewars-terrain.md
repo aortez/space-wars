@@ -29,10 +29,13 @@ movement, contests, loss and recovery.
 | Thrust aboard / jump or get up on foot | A (bottom face) | Space | Numpad 8 |
 | Exit / board the landed assigned vehicle | B (east face) | X | Numpad 2 |
 | Brake | D-pad down | S | Numpad 5 |
+| Swept-wing cruise (release to open) | Hold RB | J | PageDown aboard |
 | Aim mining beam on foot | Right stick | Arrows (left/right also walk) | Facing direction |
 | Mine | RT or LB | E | End |
 | Cycle cut size | Y (top face) | T | PageDown |
 | Deliberate ship-loss drill | Hold A+B+Down for 3s | Space+X+S | Numpad 8+2+5 |
+| Light asteroid strike | X (west face) | K | Home |
+| Heavy asteroid strike | RB + X | J + K | PageDown + Home |
 | Pause / restart menu | Start | Esc | Esc |
 
 Mining has three cut sizes: one cell, radius one (up to five cells), and radius
@@ -47,6 +50,12 @@ Release controls after transfers. Mining has its own release gate, so holding
 its trigger while exiting cannot immediately excavate under the spaceling.
 The small two-button controller can still fly, walk, board and recover; mining
 uses the additional controls of a modern pad or keyboard.
+
+Impact controls spawn a real asteroid toward the assigned full ship, including
+an empty parked ship. One press calls one rock, with a three-second cooldown.
+See [damage and recovery AI](material-recovery-ai.md) for the controlled tuning
+and the `spacewars-terrain-recovery` demonstration, where P2 handles ship loss,
+pod landing, rebuilding and departure autonomously.
 
 ## Destruction, flags and recovery
 

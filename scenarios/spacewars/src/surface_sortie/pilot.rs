@@ -181,6 +181,15 @@ impl SurfaceSortieState {
     }
 
     fn pilot_landing_site(&self, player: usize, id: LandingSiteId) -> Option<PilotLandingSite> {
+        self.vehicle_landing_site(player, id, false)
+    }
+
+    pub(super) fn vehicle_landing_site(
+        &self,
+        player: usize,
+        id: LandingSiteId,
+        pod: bool,
+    ) -> Option<PilotLandingSite> {
         if id.bearing >= LANDING_SITE_COUNT || self.world.physics.material_queries_dirty {
             return None;
         }
@@ -197,18 +206,21 @@ impl SurfaceSortieState {
                 .physics
                 .material_ground_ray(id.planet, origin, direction, length)
         };
-        let left = ground(origin - right * 3.0, -up, 35.0)?;
-        let right_hit = ground(origin + right * 3.0, -up, 35.0)?;
+        let foot_span = if pod { 0.7 } else { 3.0 };
+        let left = ground(origin - right * foot_span, -up, 35.0)?;
+        let right_hit = ground(origin + right * foot_span, -up, 35.0)?;
         if left.normal.dot(up) < 0.65 || right_hit.normal.dot(up) < 0.65 {
             return None;
         }
         let tangent = (right_hit.point - left.point).normalized();
         let normal = Vec2::new(-tangent.y, tangent.x);
-        if normal.dot(up) < 0.98 {
+        // A pod recovery also needs a short walk to the rebuilt ship. Prefer
+        // flatter ground so it does not strand the pilot beside a cell ledge.
+        if normal.dot(up) < if pod { 0.995 } else { 0.98 } {
             return None;
         }
         let position = left.point.midpoint(right_hit.point);
-        let vehicle_position = position + normal * 5.45;
+        let vehicle_position = position + normal * if pod { 0.85 } else { 5.45 };
         // Other pilots' vehicles occupy space even though they cannot be
         // mistaken for material ground by the footing rays.
         if self.pilots.iter().enumerate().any(|(index, pilot)| {
@@ -226,10 +238,24 @@ impl SurfaceSortieState {
         // Check the belly and the exit floor separately. Rays stop on fragments,
         // which therefore cannot masquerade as retained planet material.
         let belly = ground(vehicle_position, -normal, 8.0)?;
-        if belly.distance < 4.4 {
+        if belly.distance < if pod { 0.6 } else { 4.4 } {
             return None;
         }
-        let hatch_origin = vehicle_position + Vec2::new(normal.y, -normal.x) * 8.0 - normal * 3.0;
+        if pod {
+            // The pod hull is wider than its feet. A cell step under either
+            // lower corner can hold both feet off the ground even when the
+            // central belly and the two foot rays look suitable.
+            let tangent = Vec2::new(normal.y, -normal.x);
+            for side in [-1.0, 1.0] {
+                let corner = ground(vehicle_position + tangent * side, -normal, 3.0)?;
+                if corner.distance < 0.42 {
+                    return None;
+                }
+            }
+        }
+        let hatch_origin = vehicle_position
+            + Vec2::new(normal.y, -normal.x) * if pod { 2.8 } else { 8.0 }
+            - normal * if pod { 0.0 } else { 3.0 };
         let hatch = ground(hatch_origin, -normal, 5.0)?;
         if hatch.normal.dot(up) < 0.65 {
             return None;

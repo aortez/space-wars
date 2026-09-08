@@ -945,6 +945,24 @@ fn draw_player_hud(
                 r.status.label().to_owned()
             }
         });
+    let damage = state.damage_observation(player);
+    let vehicle_status = if damage
+        .last_damage_tick
+        .is_some_and(|tick| observation.tick.saturating_sub(tick) < 180)
+    {
+        if damage.last_ship_lost {
+            format!("{} / ship lost", damage.last_source.unwrap_or("Impact"))
+        } else {
+            format!(
+                "{} -{:.0}% / ship {:.0}%",
+                damage.last_source.unwrap_or("Impact"),
+                damage.last_damage_percent,
+                ship.life / ship.life_max * 100.0
+            )
+        }
+    } else {
+        vehicle_status
+    };
     let lines = [
         (
             0.445,
@@ -1001,6 +1019,9 @@ fn draw_player_hud(
         (
             -0.46,
             observation.mining.as_ref().map_or(detail, |mining| {
+                if matches!(observation.location, PilotLocation::Aboard(_)) {
+                    return "X: asteroid / RB+X: heavy".to_owned();
+                }
                 format!(
                     "Cut {} / removed {} / RT: mine Y: size",
                     if mining.radius == 0 {
