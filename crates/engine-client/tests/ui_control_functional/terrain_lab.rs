@@ -21,7 +21,16 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 let interval = "launcher.settings.combat.break-interval.next";
                 let duration = "launcher.settings.combat.break-duration.next";
                 let mission = "launcher.settings.combat.mission.next";
+                let asteroids = "launcher.settings.combat.asteroid-interval.next";
+                let strength = "launcher.settings.combat.asteroid-strength.next";
                 if renderer == "vector" {
+                    assert_eq!(control_value(&state, asteroids), Some("Off"));
+                    for expected in ["8", "3"] {
+                        state = harness.activate_guarded(asteroids, &state);
+                        assert_eq!(control_value(&state, asteroids), Some(expected));
+                    }
+                    state = harness.activate_guarded(strength, &state);
+                    assert_eq!(control_value(&state, strength), Some("Heavy"));
                     assert_eq!(control_value(&state, mission), Some("Dogfight"));
                     state = harness.activate_guarded(mission, &state);
                     assert_eq!(control_value(&state, mission), Some("Capture"));
@@ -34,6 +43,12 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                     state = harness.activate_guarded(duration, &state);
                     assert_eq!(control_value(&state, duration), Some("6"));
                 } else {
+                    assert_eq!(control_value(&state, asteroids), Some("3"));
+                    assert_eq!(control_value(&state, strength), Some("Heavy"));
+                    for expected in ["1", "Off"] {
+                        state = harness.activate_guarded(asteroids, &state);
+                        assert_eq!(control_value(&state, asteroids), Some(expected));
+                    }
                     // Returning through launch/restart reloads the persisted choices.
                     assert_eq!(control_value(&state, mission), Some("Capture"));
                     state = harness.activate_guarded(mission, &state);

@@ -130,8 +130,10 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.spacewars.asteroids"
         | "launcher.settings.clock.falling"
         | "launcher.settings.combat.mission" => 4,
-        "launcher.settings.spacewars.player-health" | "launcher.settings.clock.color-cycle" => 5,
-        "launcher.settings.spacewars.player-2" => 6,
+        "launcher.settings.spacewars.player-health"
+        | "launcher.settings.clock.color-cycle"
+        | "launcher.settings.combat.asteroid-interval" => 5,
+        "launcher.settings.spacewars.player-2" | "launcher.settings.combat.asteroid-strength" => 6,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

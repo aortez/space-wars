@@ -296,6 +296,8 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-combat-break-interval: "15";
     in-out property <string> launcher-combat-break-duration: "4";
     in-out property <string> launcher-combat-mission: "Dogfight";
+    in-out property <string> launcher-combat-asteroid-interval: "Off";
+    in-out property <string> launcher-combat-asteroid-strength: "Mixed";
     property <bool> launcher-material-combat: root.launcher-scenario == "spacewars-terrain-combat" || root.launcher-scenario == "spacewars-terrain-duel";
     in-out property <string> launcher-expedition-players: "1";
     in-out property <string> launcher-p2-controller: "human";
@@ -1290,7 +1292,7 @@ export component MainWindow inherits Window {
                         visible: root.launcher-material-combat;
                         x: 0px;
                         y: 104px;
-                        width: parent.width;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Bot combat breaks";
                         value: root.launcher-combat-break-interval == "Off" ? "Off" : "Every ~" + root.launcher-combat-break-interval + "s";
@@ -1301,9 +1303,9 @@ export component MainWindow inherits Window {
 
                     ChoiceRow {
                         visible: root.launcher-material-combat;
-                        x: 0px;
-                        y: 156px;
-                        width: parent.width;
+                        x: parent.width / 2 + 6px;
+                        y: 104px;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Break duration";
                         value: root.launcher-combat-break-duration + "s";
@@ -1315,7 +1317,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-material-combat;
                         x: 0px;
-                        y: 208px;
+                        y: 156px;
                         width: parent.width;
                         height: 48px;
                         label: "Bot mission";
@@ -1323,6 +1325,32 @@ export component MainWindow inherits Window {
                         selected: root.launcher-settings-focus-index == 4;
                         previous => { root.launcher-settings-focus-index = 4; root.ui-action(2); }
                         next => { root.launcher-settings-focus-index = 4; root.ui-action(3); }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-material-combat;
+                        x: 0px;
+                        y: 208px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Asteroid arrivals";
+                        value: root.launcher-combat-asteroid-interval == "Off" ? "Off" : "Every ~" + root.launcher-combat-asteroid-interval + "s";
+                        selected: root.launcher-settings-focus-index == 5;
+                        previous => { root.launcher-settings-focus-index = 5; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 5; root.ui-action(3); }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-material-combat;
+                        x: parent.width / 2 + 6px;
+                        y: 208px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Asteroid strength";
+                        value: root.launcher-combat-asteroid-strength;
+                        selected: root.launcher-settings-focus-index == 6;
+                        previous => { root.launcher-settings-focus-index = 6; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 6; root.ui-action(3); }
                     }
 
                     ChoiceRow {
@@ -1605,7 +1633,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-material-combat ? 5 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-material-combat ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : (root.launcher-scenario == "surface-expedition" || root.launcher-scenario == "spacewars-terrain") ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

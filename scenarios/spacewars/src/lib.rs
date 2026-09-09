@@ -1293,7 +1293,7 @@ impl Scenario for SpacewarsScenario {
     }
 
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
-        Self::step_with_surface_pilots(state, actions, dt, &mut [], None)
+        Self::step_with_surface_pilots(state, actions, dt, &mut [], None, None)
     }
 
     fn observe(state: &Self::State) -> Observation {
@@ -1328,6 +1328,7 @@ impl SpacewarsScenario {
         dt: Duration,
         surface_pilots: &mut [surface_sortie::SurfacePilot],
         prepared_terrain: Option<(Duration, Duration)>,
+        asteroid_pressure: Option<&mut surface_sortie::asteroids::AsteroidPressure>,
     ) -> StepResult {
         let experimental = !surface_pilots.is_empty();
         state.last_step_metrics = SpacewarsStepMetrics::default();
@@ -1471,6 +1472,10 @@ impl SpacewarsScenario {
         } else {
             resolve_physics_spaceport_contacts(state, &port_intersections)
         };
+        if let Some(pressure) = asteroid_pressure {
+            // Capture incoming size before collision damage chips the asteroid.
+            pressure.record_contacts(state, &contacts);
+        }
         resolve_physics_collisions(state, &contacts, &accepted_ports);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);

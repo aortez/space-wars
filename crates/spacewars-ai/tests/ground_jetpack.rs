@@ -25,11 +25,11 @@ fn lost_ship_pod_crossing_countercapture_rebuild_board_and_depart_use_shared_phy
         pilot::{PilotBrain, RulePilotV1},
         recovery_pilot::RulePilotV3,
     };
-    for (seat, offset) in [(0, -0.5), (1, -0.2)] {
+    for (seed, seat, offset) in [(42, 0, -0.5), (42, 1, -0.2), (7, 0, -0.5)] {
         let owner = PlayerId::from_index(seat).unwrap();
         let defender = PlayerId::from_index(1 - seat).unwrap();
         let mut state = SurfaceSortieScenario::init_material_flight(
-            42,
+            seed,
             2,
             &[(
                 owner,
@@ -45,16 +45,17 @@ fn lost_ship_pod_crossing_countercapture_rebuild_board_and_depart_use_shared_phy
         state.enable_jetpacks();
         let mut guard = RulePilotV1::new(BrainReset {
             actor: defender,
-            episode_seed: 42,
+            episode_seed: seed,
         });
         let mut recovery = RulePilotV3::new(BrainReset {
             actor: owner,
-            episode_seed: 42,
+            episode_seed: seed,
         });
         let mut struck = false;
         let mut captured = false;
         let mut flew = false;
         let mut departed = false;
+        let mut righted = false;
         for tick in 0..180 * 60 {
             let d = state.pilot_observation(1 - seat, guard.site_request());
             let mut actions = vec![guard.intent(&d).encode(defender)];
@@ -69,6 +70,7 @@ fn lost_ship_pod_crossing_countercapture_rebuild_board_and_depart_use_shared_phy
             }
             let o = state.recovery_task_observation(seat, recovery.site_request());
             let p = &o.flight.pilot;
+            righted |= o.pod_righting.is_some_and(|r| r.lifts > 0);
             if p.recovery.as_ref().is_some_and(|r| r.ships_lost > 0) {
                 actions.extend(recovery.intent(&o).encode(owner));
             }
@@ -107,6 +109,12 @@ fn lost_ship_pod_crossing_countercapture_rebuild_board_and_depart_use_shared_phy
             recovery.telemetry()
         );
         let result = state.observation(seat).recovery.unwrap();
+        if seed == 7 {
+            assert!(
+                righted,
+                "the reproduced tipped-pod start must use its real recovery lift"
+            );
+        }
         assert_eq!(
             (result.ships_lost, result.pod_ejections, result.rebuilds),
             (1, 1, 1)

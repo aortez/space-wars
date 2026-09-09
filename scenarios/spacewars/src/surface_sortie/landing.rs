@@ -202,7 +202,12 @@ impl SurfacePilot {
         } else {
             1.0
         };
-        let mut acceleration = forward * (thrust * limits.thrust_acceleration * governor);
+        let thrust_direction = if self.pod_righting_lift(physics, ship, &landing, dt) {
+            up
+        } else {
+            forward
+        };
+        let mut acceleration = thrust_direction * (thrust * limits.thrust_acceleration * governor);
         if ship.brake > 0.0 {
             acceleration += limits.braking(relative);
         } else if thrust == 0.0 {

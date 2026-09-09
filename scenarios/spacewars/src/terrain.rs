@@ -446,6 +446,63 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
 }
 
 fn cannon_edit(field: &Terrain, contact: ContactPoint) -> Option<TerrainEdit> {
+    impact_edit(field, contact, CANNON_RADIUS, CANNON_WORK)
+}
+
+/// Environmental impacts use the contact's local surface point, just like
+/// cannon excavation. The stream bounds how many edits it queues per step.
+pub(super) fn queue_asteroid_hit(
+    state: &mut SpacewarsState,
+    asteroid: u64,
+    target: PhysicsId,
+    radius: u32,
+    work: u8,
+) -> bool {
+    let hit = state
+        .physics
+        .world
+        .contact_events()
+        .iter()
+        .find_map(|event| {
+            for (surface, debris, contact) in [
+                (
+                    event.collider_a.entity,
+                    event.collider_b.entity,
+                    event.local_contact_a,
+                ),
+                (
+                    event.collider_b.entity,
+                    event.collider_a.entity,
+                    event.local_contact_b,
+                ),
+            ] {
+                if debris.value() == asteroid
+                    && surface == target
+                    && let Some(field) = state.terrain.field(surface)
+                    && let Some(edit) = contact.and_then(|p| impact_edit(field, p, radius, work))
+                {
+                    return Some(PendingEdit {
+                        body: surface,
+                        edit,
+                    });
+                }
+            }
+            None
+        });
+    if let Some(edit) = hit {
+        state.terrain.pending.push(edit);
+        true
+    } else {
+        false
+    }
+}
+
+fn impact_edit(
+    field: &Terrain,
+    contact: ContactPoint,
+    radius: u32,
+    work: u8,
+) -> Option<TerrainEdit> {
     let inside = contact.position - contact.normal * 0.001;
     let sampled = field.local_to_cell(inside)?;
     let center = (-1..=1)
@@ -466,11 +523,8 @@ fn cannon_edit(field: &Terrain, contact: ContactPoint) -> Option<TerrainEdit> {
                 .then((a.y, a.x).cmp(&(b.y, b.x)))
         })?;
     Some(TerrainEdit {
-        brush: Brush::Circle {
-            center,
-            radius: CANNON_RADIUS,
-        },
-        mode: EditMode::Damage(CANNON_WORK),
+        brush: Brush::Circle { center, radius },
+        mode: EditMode::Damage(work),
     })
 }
 

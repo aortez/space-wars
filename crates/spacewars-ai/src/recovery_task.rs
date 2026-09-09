@@ -136,7 +136,7 @@ impl RecoverShipTask {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v3",
+                task: "recover_ship_v4",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -666,7 +666,13 @@ impl RecoverShipTask {
             horizontal: heading(p, up),
             brake_held: true,
             // Lift clear of a sloping contact before aligning for descent.
-            primary_held: p.landing.altitude < 14.0 && aligned > 0.85 && !self.stabilized,
+            primary_held: if let Some(righting) = o.pod_righting
+                && (righting.remaining_seconds > 0.0 || righting.eligible)
+            {
+                righting.remaining_seconds > 0.0 || !righting.needs_release
+            } else {
+                p.landing.altitude < 14.0 && aligned > 0.85 && !self.stabilized
+            },
             interact_held: false,
         }
     }

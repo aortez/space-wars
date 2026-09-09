@@ -15,6 +15,7 @@ pub struct RecoveryTaskObservationV1 {
     pub ground: Option<ground_navigation::GroundMap>,
     pub rebuild: Option<rebuild_placement::RebuildRelocationSurvey>,
     pub jetpack: Option<jetpack::JetpackNavigationObservation>,
+    pub pod_righting: Option<pod_righting::PodRightingObservation>,
 }
 impl SurfaceSortieState {
     pub fn recovery_task_observation(
@@ -49,6 +50,13 @@ impl SurfaceSortieState {
         let ground = self.ground_navigation_map(player);
         let rebuild = self.rebuild_relocation_survey(player);
         let jetpack = self.jetpack_navigation_with_ground(player, ground.as_ref());
+        let pod_righting = self.pilots.get(player).and_then(|pilot| {
+            pilot.pod_righting_observation(
+                &self.world.physics,
+                &self.world.ships[pilot.vehicle.0],
+                &p.landing,
+            )
+        });
         RecoveryTaskObservationV1 {
             version: 1,
             flight,
@@ -56,6 +64,7 @@ impl SurfaceSortieState {
             ground,
             rebuild,
             jetpack,
+            pod_righting,
         }
     }
 }

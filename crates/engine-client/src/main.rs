@@ -601,6 +601,19 @@ fn show_launcher(
             engine_common::MaterialCombatMission::Capture => "Capture",
         },
     ));
+    let asteroids = settings.material_combat.asteroids.normalized();
+    window.set_launcher_combat_asteroid_interval(SharedString::from(
+        if asteroids.interval_seconds == 0 {
+            "Off".to_owned()
+        } else {
+            asteroids.interval_seconds.to_string()
+        },
+    ));
+    window.set_launcher_combat_asteroid_strength(SharedString::from(match asteroids.severity {
+        engine_common::MaterialAsteroidSeverity::Light => "Light",
+        engine_common::MaterialAsteroidSeverity::Mixed => "Mixed",
+        engine_common::MaterialAsteroidSeverity::Heavy => "Heavy",
+    }));
     let breaks = settings.combat_breaks.normalized();
     window.set_launcher_combat_break_interval(SharedString::from(
         if breaks.interval_seconds == 0 {
@@ -1208,7 +1221,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
-        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 6,
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
         "clock" => 7,
         "falling" => 1,
         "nes" => 2,
@@ -1270,6 +1283,16 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
             4 => window.set_launcher_combat_mission(SharedString::from(cycle_label(
                 window.get_launcher_combat_mission().as_str(),
                 &["Dogfight", "Capture"],
+                delta,
+            ))),
+            5 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_interval().as_str(),
+                &["Off", "8", "3", "1"],
+                delta,
+            ))),
+            6 => window.set_launcher_combat_asteroid_strength(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_strength().as_str(),
+                &["Light", "Mixed", "Heavy"],
                 delta,
             ))),
             _ => {}
@@ -1867,6 +1890,21 @@ fn launcher_selections_from_window(
         "spacewars-terrain-combat" | "spacewars-terrain-duel"
     ) {
         engine_common::MaterialCombatSettings {
+            asteroids: engine_common::MaterialAsteroidSettings {
+                interval_seconds: match window.get_launcher_combat_asteroid_interval().as_str() {
+                    "Off" => 0,
+                    value => value
+                        .parse()
+                        .map_err(|_| "Asteroid interval must be seconds or Off.".to_owned())?,
+                },
+                severity: match window.get_launcher_combat_asteroid_strength().as_str() {
+                    "Light" => engine_common::MaterialAsteroidSeverity::Light,
+                    "Mixed" => engine_common::MaterialAsteroidSeverity::Mixed,
+                    "Heavy" => engine_common::MaterialAsteroidSeverity::Heavy,
+                    _ => return Err("Unknown asteroid strength.".to_owned()),
+                },
+            }
+            .normalized(),
             mission: match window.get_launcher_combat_mission().as_str() {
                 "Dogfight" => engine_common::MaterialCombatMission::Dogfight,
                 "Capture" => engine_common::MaterialCombatMission::Capture,
@@ -2702,6 +2740,10 @@ mod tests {
         let selections = LauncherSelections {
             material_combat: engine_common::MaterialCombatSettings {
                 mission: engine_common::MaterialCombatMission::Capture,
+                asteroids: engine_common::MaterialAsteroidSettings {
+                    interval_seconds: 3,
+                    severity: engine_common::MaterialAsteroidSeverity::Heavy,
+                },
             },
             combat_breaks: engine_common::CombatBreakSettings {
                 interval_seconds: 8,

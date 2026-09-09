@@ -59,6 +59,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
     pub(crate) combat_mission: String,
+    pub(crate) combat_asteroid_interval: String,
+    pub(crate) combat_asteroid_strength: String,
     pub(crate) expedition_players: String,
     pub(crate) spacewars_preset: String,
     pub(crate) spacewars_planets: String,
@@ -261,12 +263,24 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.combat.mission",
                 &context.combat_mission,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.asteroid-interval",
+                &context.combat_asteroid_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.asteroid-strength",
+                &context.combat_asteroid_strength,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.combat.break-interval",
                 "launcher.settings.combat.break-duration",
                 "launcher.settings.combat.mission",
+                "launcher.settings.combat.asteroid-interval",
+                "launcher.settings.combat.asteroid-strength",
                 "launcher.settings.back",
             ]
         }
@@ -883,7 +897,16 @@ mod tests {
 
     #[test]
     fn every_enabled_control_has_a_semantic_activation_mapping() {
-        for scenario in ["spacewars", "pizza", "clock", "rover-lab", "falling", "nes"] {
+        for scenario in [
+            "spacewars",
+            "pizza",
+            "clock",
+            "rover-lab",
+            "falling",
+            "nes",
+            "spacewars-terrain-combat",
+            "spacewars-terrain-duel",
+        ] {
             let context = context(scenario);
             for screen in [
                 UiScreen::LauncherMain,

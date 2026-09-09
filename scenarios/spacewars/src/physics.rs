@@ -678,6 +678,32 @@ impl SpacewarsPhysics {
             .count()
     }
 
+    /// Retained planetary contact at any part of a surface vehicle. A tipped
+    /// pod may rest on its hull with neither landing foot supporting it.
+    pub(super) fn surface_vehicle_ground_contact(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+    ) -> bool {
+        !self.material_queries_dirty
+            && [
+                (SHIP_HULL_ROLE, 0),
+                (LANDING_FOOT_ROLE, 0),
+                (LANDING_FOOT_ROLE, 1),
+            ]
+            .into_iter()
+            .any(|(role, part)| {
+                self.world
+                    .surface_contacts(collider_id(ship_entity(index), role, part))
+                    .any(|contact| {
+                        is_planet_surface_support(contact.collider, planet)
+                            && contact.separation <= 0.04
+                            && contact.normal.dot(up) >= 0.4
+                    })
+            })
+    }
+
     pub(super) fn landing_support_contacts(
         &self,
         index: usize,
@@ -1055,6 +1081,12 @@ impl SpacewarsPhysics {
         })
     }
 
+    pub(super) fn allocate_debris_id(&mut self) -> u64 {
+        let id = self.next_debris_entity;
+        self.next_debris_entity += 1;
+        id
+    }
+
     fn reconcile_debris(
         &mut self,
         tick: u64,
@@ -1064,8 +1096,7 @@ impl SpacewarsPhysics {
         let mut active = BTreeSet::new();
         for item in debris.iter_mut().filter(|item| !item.dead) {
             if item.physics_id == 0 || !active.insert(item.physics_id) {
-                item.physics_id = self.next_debris_entity;
-                self.next_debris_entity += 1;
+                item.physics_id = self.allocate_debris_id();
                 active.insert(item.physics_id);
             }
 

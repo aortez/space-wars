@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest recovery slice: [jetpack routes across pods and damaged ground](../jetpack-recovery-navigation.md)
+Latest reliability slice: [pod recovery lift and asteroid pressure](../asteroid-pressure.md)
+adds a shared way to free tipped pods, bounded landing retries under changing
+cover, and configurable environmental arrivals in material combat and duel.
+
+The previous recovery slice, [jetpack routes across pods and damaged ground](../jetpack-recovery-navigation.md),
 adds measured short flights, chained walking/flight routes, reachable flag
 approaches, and stable settling at the destination. It builds on
 [reachable replacement ships](../rebuild-access-ai.md) and their shared
@@ -37,8 +41,10 @@ See [Material combat V4](../material-combat-ai.md) and the opt-in
 [cover-aware capture sortie](../tactical-surface-sorties.md), which coordinates
 landing and departure around the existing surface and recovery tasks. Shared
 [ground navigation](../ground-navigation-ai.md) now adds enemy flag traversal
-and routes back to ship hatches on measured material. Pod escape, sustained
-random asteroid pressure and generated multi-planet match integration remain ahead.
+and routes back to ship hatches on measured material. Pod escape and sustained
+random asteroid pressure now have dedicated regression/diagnostic coverage.
+Controlled two-planet missions and generated multi-planet match integration
+remain ahead, along with broader navigation through heavily damaged ground.
 
 ## Player outcome
 

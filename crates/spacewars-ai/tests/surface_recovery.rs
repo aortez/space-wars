@@ -18,6 +18,33 @@ use spacewars_ai::{
 use std::time::Duration;
 const DT: Duration = Duration::from_nanos(16_666_667);
 
+#[test]
+fn tipped_pod_uses_shared_lift_and_releases_before_rearming() {
+    use scenario_spacewars::surface_sortie::pod_righting::PodRightingObservation;
+    let (mut task, mut o) = airborne_pod();
+    o.flight.pilot.ship.angle = 1.7;
+    o.flight.pilot.landing.altitude = 0.2;
+    o.pod_righting = Some(PodRightingObservation {
+        eligible: true,
+        ..Default::default()
+    });
+    let intent = task.step(&o);
+    assert!(intent.controls.brake_held && intent.controls.primary_held);
+    assert!(!intent.controls.interact_held);
+    let telemetry = task.telemetry().clone();
+    assert_eq!(task.step(&o), intent);
+    assert_eq!(task.telemetry(), &telemetry);
+    let mut clone = task.clone();
+    o.flight.pilot.tick += 1;
+    o.pod_righting.as_mut().unwrap().needs_release = true;
+    assert_eq!(task.step(&o), clone.step(&o));
+    assert!(!task.step(&o).controls.primary_held);
+    o.flight.pilot.tick += 1;
+    o.pod_righting.as_mut().unwrap().remaining_seconds = 1.0;
+    assert!(task.step(&o).controls.primary_held);
+    assert_eq!(task.telemetry().started_tick, telemetry.started_tick);
+}
+
 // Observation fixtures isolate the task's progress/deadline contract. Physical
 // collision and full recovery are exercised separately below and in the soak.
 fn airborne_pod() -> (RecoverShipTask, RecoveryTaskObservationV1) {

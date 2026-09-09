@@ -1,5 +1,10 @@
 # Pod recovery after severe impacts
 
+This is the historical severe-impact checkpoint. The subsequent
+[pod recovery lift and asteroid-pressure slice](asteroid-pressure.md) addresses
+the grounded sideways-pod failures recorded below; enemy-flag traversal was
+added in the [jetpack recovery slice](jetpack-recovery-navigation.md).
+
 `RecoverShipTask`, shared by the material recovery demo and combat bots, now
 keeps stabilizing while observed motion is improving. It can also interrupt
 a settled landing approach when another hit creates excessive speed or spin.

@@ -55,6 +55,7 @@ pub struct TacticalTelemetry {
     pub failed_tick: Option<u64>,
     pub failure: Option<&'static str>,
     pub replans: u32,
+    pub cover_replans: u32,
     pub invalidations: u32,
     pub exposed_ticks: u64,
     pub covered_ticks: u64,
@@ -73,6 +74,10 @@ pub struct TacticalSortiePilot {
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
     clear_since: Option<u64>,
+    commit_descent: bool,
+    approach_progress: Option<(f32, u64, u64)>,
+    site_unavailable_since: Option<u64>,
+    cover_lost_since: Option<u64>,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -89,6 +94,7 @@ impl TacticalSortiePilot {
                 failed_tick: None,
                 failure: None,
                 replans: 0,
+                cover_replans: 0,
                 invalidations: 0,
                 exposed_ticks: 0,
                 covered_ticks: 0,
@@ -102,10 +108,26 @@ impl TacticalSortiePilot {
             previous_tick: None,
             previous_intent: CombatIntent::default(),
             clear_since: None,
+            commit_descent: false,
+            approach_progress: None,
+            site_unavailable_since: None,
+            cover_lost_since: None,
         }
     }
+    /// Current capture missions tolerate transient cover/clearance changes and
+    /// budget cover searches separately. Historical V1 retains its old policy.
+    pub(crate) fn with_committed_descent(context: BrainReset, breaks: CombatBreakSettings) -> Self {
+        let mut pilot = Self::new(context, breaks);
+        pilot.commit_descent = true;
+        pilot
+    }
     pub fn reset(&mut self, context: BrainReset) {
+        let commit = self.commit_descent;
         *self = Self::new(context, self.combat.telemetry().breaks.config);
+        self.commit_descent = commit;
+    }
+    pub fn combat_telemetry(&self) -> &crate::combat_pilot::CombatPilotTelemetry {
+        self.combat.telemetry()
     }
     pub fn telemetry(&self) -> &TacticalTelemetry {
         &self.telemetry
@@ -165,8 +187,17 @@ impl TacticalSortiePilot {
     fn replan(&mut self, tick: u64) {
         self.telemetry.replans += 1;
         self.site = None;
+        self.approach_progress = None;
+        self.site_unavailable_since = None;
+        self.cover_lost_since = None;
         self.landing = RulePilotV1::new(self.context);
         self.goal(TacticalGoal::Survey, tick);
+    }
+    fn replan_for_cover(&mut self, tick: u64) {
+        self.replan(tick);
+        if self.commit_descent {
+            self.telemetry.cover_replans += 1;
+        }
     }
     fn choose(&mut self, o: &TacticalSortieObservationV1) -> CombatIntent {
         let c = &o.combat;
@@ -199,7 +230,10 @@ impl TacticalSortiePilot {
             };
         }
         let start = *self.telemetry.started_tick.get_or_insert(p.tick);
-        if p.tick.saturating_sub(start) > 150 * 60 || self.telemetry.replans >= 4 {
+        if p.tick.saturating_sub(start) > 150 * 60
+            || self.telemetry.replans - self.telemetry.cover_replans >= 4
+            || self.telemetry.cover_replans >= 8
+        {
             self.telemetry.failed_tick = Some(p.tick);
             self.telemetry.failure = Some("capture approach exhausted its time or retry budget");
             self.goal(TacticalGoal::Blocked, p.tick);
@@ -266,7 +300,16 @@ impl TacticalSortiePilot {
                             && s.normal.dot(site.normal) > 0.99))
             }) {
                 self.site = Some(*updated);
+                self.site_unavailable_since = None;
             } else {
+                if self.commit_descent && p.planet.revision == site.revision {
+                    let since = *self.site_unavailable_since.get_or_insert(p.tick);
+                    if p.tick.saturating_sub(since) < 60 {
+                        // Moving debris can briefly obstruct a sound site.
+                        // Hold clear while the complete clearance survey retries.
+                        return self.guide(o, up * 5.0, Vec2::ZERO);
+                    }
+                }
                 self.telemetry.invalidations += 1;
                 self.replan(p.tick);
                 return self.guide(o, up * 12.0, Vec2::ZERO);
@@ -317,6 +360,17 @@ impl TacticalSortiePilot {
         let cover = o.cover.iter().find(|s| s.site == site.id);
         let ground_covered = cover.is_some_and(|s| s.grounded);
         let covered = cover.is_some_and(|s| s.grounded && s.approach);
+        let cover_lost = if self.commit_descent {
+            if exposed && !ground_covered {
+                let since = *self.cover_lost_since.get_or_insert(p.tick);
+                p.tick.saturating_sub(since) >= 2 * 60
+            } else {
+                self.cover_lost_since = None;
+                false
+            }
+        } else {
+            true
+        };
         if self.telemetry.goal == TacticalGoal::SeekCover {
             if angle.abs() < 0.2
                 && relative.dot(tangent).abs() < 18.0
@@ -328,7 +382,7 @@ impl TacticalSortiePilot {
                 && exposed
                 && p.tick.saturating_sub(self.telemetry.goal_since) > 120
             {
-                self.replan(p.tick);
+                self.replan_for_cover(p.tick);
                 return self.guide(o, tangent * self.side * 35.0 + up * 5.0, Vec2::ZERO);
             } else {
                 let speed = (angle * radius * 0.9).clamp(-45.0, 45.0);
@@ -342,16 +396,34 @@ impl TacticalSortiePilot {
             self.telemetry.goal,
             TacticalGoal::Approach | TacticalGoal::Surface
         ) && height > 35.0
+            && cover_lost
             && exposed
             && !ground_covered
             && p.tick.saturating_sub(self.telemetry.goal_since) > 120
         {
             // Close to sheltered ground, finish descending instead of climbing
             // back into the opponent's firing line.
-            self.replan(p.tick);
+            self.replan_for_cover(p.tick);
             return self.guide(o, up * 16.0, Vec2::ZERO);
         }
         if self.telemetry.goal == TacticalGoal::Approach {
+            if self.commit_descent {
+                let distance = p.ship.position.distance_to(site.vehicle_position);
+                let (previous, window, progress) = self
+                    .approach_progress
+                    .get_or_insert((distance, p.tick, p.tick));
+                if p.tick.saturating_sub(*window) >= 60 {
+                    if distance < *previous - 0.5 {
+                        *progress = p.tick;
+                    }
+                    *previous = distance;
+                    *window = p.tick;
+                }
+                if p.tick.saturating_sub(*progress) > 10 * 60 {
+                    self.replan(p.tick);
+                    return self.guide(o, up * 12.0, Vec2::ZERO);
+                }
+            }
             if height < 15.0 && side_error.abs() < 1.0 && relative.length() < 4.0 {
                 self.goal(TacticalGoal::Surface, p.tick);
             } else {
@@ -538,6 +610,73 @@ mod tests {
             assert_eq!(brain.site_request().is_none(), replan);
         }
     }
+    #[test]
+    fn committed_descent_tolerates_cover_changes_but_replans_for_stalls_and_lost_ground() {
+        let mut o = observation();
+        let site = o.combat.recovery.flight.pilot.sites[0];
+        let mut brain =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        brain.site = Some(site);
+        brain.telemetry.goal = TacticalGoal::Approach;
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick = 150;
+        p.ship.position = site.vehicle_position + site.normal * 80.0;
+        p.ship.velocity = p.planet.velocity_at(p.ship.position);
+        let target = o.combat.target.as_mut().unwrap();
+        target.motion.position = p.ship.position + Vec2::X * 80.0;
+        target.ground_occluded = false;
+        for cover in &mut o.cover {
+            cover.grounded = false;
+            cover.approach = false;
+        }
+        brain.intent(&o);
+        assert_eq!(brain.site_request(), Some(site.id));
+        let mut exposure = brain.clone();
+        let mut exposed = o.clone();
+        exposed.combat.recovery.flight.pilot.tick += 119;
+        exposure.intent(&exposed);
+        assert_eq!(exposure.site_request(), Some(site.id));
+        exposed.combat.recovery.flight.pilot.tick += 1;
+        exposure.intent(&exposed);
+        assert_eq!(exposure.site_request(), None);
+        assert_eq!(exposure.telemetry().cover_replans, 1);
+        assert!(exposure.telemetry().failed_tick.is_none());
+        let mut lost_ground = brain.clone();
+        let mut obstruction = brain.clone();
+        let mut blocked = o.clone();
+        blocked.combat.recovery.flight.pilot.sites.clear();
+        blocked.combat.recovery.flight.pilot.tick += 1;
+        obstruction.intent(&blocked);
+        assert_eq!(obstruction.site_request(), Some(site.id));
+        blocked.combat.recovery.flight.pilot.planet.revision += 1;
+        lost_ground.intent(&blocked);
+        assert_eq!(lost_ground.telemetry().invalidations, 1);
+        assert_eq!(lost_ground.site_request(), None);
+        blocked.combat.recovery.flight.pilot.tick += 61;
+        obstruction.intent(&blocked);
+        assert_eq!(obstruction.site_request(), None);
+        for cover in &mut o.cover {
+            cover.grounded = true;
+            cover.approach = true;
+        }
+        // A new impact can push the ship farther away. Subsequent actual
+        // descent must count without beating its pre-impact closest approach.
+        for (tick, height) in [(210, 110.0), (510, 100.0), (810, 90.0)] {
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.ship.position = site.vehicle_position + site.normal * height;
+            brain.intent(&o);
+            assert_eq!(brain.site_request(), Some(site.id));
+        }
+        o.combat.recovery.flight.pilot.tick += 601;
+        brain.intent(&o);
+        assert_eq!(brain.site_request(), None);
+        assert_eq!(brain.telemetry().replans, 1);
+        brain.reset(context());
+        assert!(brain.commit_descent);
+        assert!(brain.approach_progress.is_none());
+    }
+
     #[test]
     fn ship_loss_hands_off_to_recovery_even_when_full_ship_flight_is_disabled() {
         let mut o = observation();

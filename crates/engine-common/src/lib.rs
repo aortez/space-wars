@@ -138,6 +138,32 @@ pub struct Settings {
 #[serde(default)]
 pub struct MaterialCombatSettings {
     pub mission: MaterialCombatMission,
+    pub asteroids: MaterialAsteroidSettings,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MaterialAsteroidSettings {
+    /// Mean time between arrivals; zero disables the environmental stream.
+    pub interval_seconds: u32,
+    pub severity: MaterialAsteroidSeverity,
+}
+impl MaterialAsteroidSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            interval_seconds: self.interval_seconds.min(60),
+            ..self
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaterialAsteroidSeverity {
+    Light,
+    #[default]
+    Mixed,
+    Heavy,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

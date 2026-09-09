@@ -14,7 +14,7 @@ parser.add_argument('--ssh-config')
 parser.add_argument('--ssh-option', action='append', default=[])
 parser.add_argument('--remote-out', default='/tmp/jetpack-recovery-trials')
 parser.add_argument('--include-preflight', action='store_true',
-                    help='Also retain three known seed-7 pod stabilization failures before exit')
+                    help='Include the three former seed-7 pod stabilization stalls (now required to recover)')
 args = parser.parse_args()
 args.out.mkdir(parents=True, exist_ok=True)
 ssh = ['ssh', '-o', 'BatchMode=yes']

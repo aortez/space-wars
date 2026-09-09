@@ -1,5 +1,9 @@
 # Jetpack recovery across pods and damaged ground
 
+This report records gameplay checkpoint `73264cc`. The subsequent
+[landing recovery and asteroid-pressure slice](asteroid-pressure.md) addresses
+the pre-exit pod stalls listed here and extends the environmental test bed.
+
 The material-game ground navigator now joins measured vehicle crossings and
 short terrain flights to its walk/jump graph. A bot can land its escape pod,
 exit, cross an obstacle, countercapture, rebuild, board, and depart through the

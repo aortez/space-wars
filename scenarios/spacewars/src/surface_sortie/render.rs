@@ -964,9 +964,22 @@ fn draw_player_hud(
     } else {
         vehicle_status
     };
+    let righting = state.pilots[player].pod_righting_observation(
+        &state.world.physics,
+        ship,
+        &observation.landing,
+    );
     let recovery_message = recovery
         .filter(|r| r.scuttle_progress > 0.0 || !observation.ship_available)
         .map(|r| {
+            if let Some(lift) = righting {
+                if lift.remaining_seconds > 0.0 {
+                    return "Pod recovery lift / turn upright".to_owned();
+                }
+                if lift.eligible {
+                    return "Tipped pod / brake + thrust to lift".to_owned();
+                }
+            }
             if r.scuttle_progress > 0.0 {
                 format!(
                     "Scuttle {:.0}% / release to cancel",

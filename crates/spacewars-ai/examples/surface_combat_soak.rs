@@ -1,6 +1,8 @@
 //! Physical combat, optionally followed by P1 attempting to land under fire.
 //! Fixed initial health is optional; no runtime hits or recovery are scripted.
-use engine_common::{CombatBreakSettings, Scenario};
+use engine_common::{
+    CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
+};
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{PilotLocation, SurfaceSortieScenario, pilot::MaterialFlightStart},
@@ -73,6 +75,16 @@ fn main() {
         "break interval must be 0..120 and duration 1..15"
     );
     let save_frames = arg("--frames", "false") == "true";
+    let asteroid_settings = MaterialAsteroidSettings {
+        interval_seconds: arg("--asteroid-interval", "0").parse().unwrap(),
+        severity: match arg("--asteroid-severity", "mixed").as_str() {
+            "light" => MaterialAsteroidSeverity::Light,
+            "mixed" => MaterialAsteroidSeverity::Mixed,
+            "heavy" => MaterialAsteroidSeverity::Heavy,
+            _ => panic!("asteroid severity must be light, mixed or heavy"),
+        },
+    };
+    assert_eq!(asteroid_settings, asteroid_settings.normalized());
     // Diagnostic continuation retains a failing exit status and the first alarm;
     // use it to distinguish a brief collision kick from sustained acceleration.
     let continue_after_failure = arg("--continue-after-failure", "false")
@@ -119,6 +131,7 @@ fn main() {
             config,
         )
     });
+    state.set_asteroid_pressure(asteroid_settings);
     let mut landing = RulePilotV1::new(BrainReset {
         actor: PlayerId::from_index(subject_seat).unwrap(),
         episode_seed: seed,
@@ -141,6 +154,7 @@ fn main() {
     let mut break_events = Vec::new();
     let mut damage_events = Vec::new();
     let mut audit_events = Vec::new();
+    let mut asteroid_events = Vec::new();
     let mut previous_breaks = [(0, 0, 0, None); 2];
     let mut previous = ["", ""];
     let mut ground_maps = [None, None];
@@ -272,6 +286,10 @@ fn main() {
         let start = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(start.elapsed().as_secs_f64() * 1000.0);
+        let environment = state.asteroid_pressure();
+        if !environment.arrivals.is_empty() || !environment.impacts.is_empty() {
+            asteroid_events.push(json!({"tick":tick + 1,"arrivals":environment.arrivals,"impacts":environment.impacts}));
+        }
         for seat in 0..2 {
             let damage = state.damage_observation(seat);
             if damage.last_damage_tick == Some(u64::from(tick) + 1) {
@@ -332,9 +350,9 @@ fn main() {
                     ));
                 }
             }
-            samples.push(json!({"second":(tick+1)/60,"brains":brains.each_ref().map(|b| b.telemetry()),"pilots":std::array::from_fn::<_,2,_>(|seat| state.combat_observation(seat, if seat == subject_seat && land_after.is_some_and(|s| tick>=s*60) {
+            samples.push(json!({"second":(tick+1)/60,"capture_combat":tactical.combat_telemetry(),"brains":brains.each_ref().map(|b| b.telemetry()),"pilots":std::array::from_fn::<_,2,_>(|seat| state.combat_observation(seat, if seat == subject_seat && land_after.is_some_and(|s| tick>=s*60) {
                 if use_tactical {tactical.site_request()} else {landing.site_request()}
-            } else {brains[seat].site_request()})),"audit":audit,"landing":land_after.filter(|s| tick >= s * 60).map(|_| if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())})}));
+            } else {brains[seat].site_request()})),"audit":audit,"asteroids":state.asteroid_pressure(),"landing":land_after.filter(|s| tick >= s * 60).map(|_| if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())})}));
             if failure.is_some()
                 || save_frames
                     && [1, 2, 3, 10, 12, 13, 30, 60, 90, 110, 120, 180].contains(&((tick + 1) / 60))
@@ -366,7 +384,7 @@ fn main() {
     }
     steps.sort_by(f64::total_cmp);
     ai.sort_by(f64::total_cmp);
-    let report = json!({"version":4,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
+    let report = json!({"version":5,"capture_combat":tactical.combat_telemetry(),"asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
         "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())},"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
         "samples":samples,"events":events,"ground_failures":ground_failures});

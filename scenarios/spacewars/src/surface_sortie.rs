@@ -8,6 +8,7 @@ use engine_rapier::{
     world::PhysicsId,
 };
 
+pub mod asteroids;
 mod claim;
 pub mod combat;
 pub mod compatibility;
@@ -20,6 +21,7 @@ mod material;
 mod motion;
 mod outpost;
 pub mod pilot;
+pub mod pod_righting;
 mod profiles;
 pub mod rebuild_placement;
 mod recovery;
@@ -148,6 +150,7 @@ pub struct SurfaceSortieState {
     claims: Vec<claim::SurfacePlanetClaim>,
     mining: Option<material::SurfaceMining>,
     damage: impact::SurfaceDamageState,
+    asteroids: asteroids::AsteroidPressure,
 }
 
 #[derive(Clone)]
@@ -164,6 +167,7 @@ pub(super) struct SurfacePilot {
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
+    pod_righting: pod_righting::PodRightingState,
     recovery: Option<recovery::SurfaceRecovery>,
     id: SpacelingId,
     pub(super) owner: PlayerId,
@@ -207,6 +211,7 @@ impl SurfacePilot {
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
+            pod_righting: pod_righting::PodRightingState::default(),
             recovery: None,
         }
     }
@@ -602,6 +607,9 @@ impl Scenario for SurfaceSortieScenario {
         if dt.is_zero() {
             return StepResult::default();
         }
+        state
+            .asteroids
+            .begin_step(&mut state.world, dt.as_secs_f32());
         // Invalidate edited support before either seat can transfer or use it.
         let footings = state.material_footings();
         let prepared = SpacewarsScenario::prepare_terrain(&mut state.world, &[]);
@@ -700,6 +708,7 @@ impl Scenario for SurfaceSortieScenario {
             Duration::from_secs_f32(dt),
             &mut state.pilots,
             Some(prepared),
+            Some(&mut state.asteroids),
         );
         state.reconcile_recovery_vehicles();
         state.record_surface_damage(damage_before);
@@ -802,6 +811,7 @@ impl SurfaceSortieScenario {
             claims: Vec::new(),
             mining: None,
             damage: impact::SurfaceDamageState::default(),
+            asteroids: asteroids::AsteroidPressure::default(),
         }
     }
 

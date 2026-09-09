@@ -1,4 +1,4 @@
-//! Capture V2 adds material ground traversal around the retained V1 flight pilot.
+//! Capture V3 adds material traversal and committed descent around V1 flight.
 use crate::{
     BrainReset,
     combat_pilot::CombatIntent,
@@ -37,9 +37,9 @@ pub struct TacticalCapturePilot {
 }
 impl TacticalCapturePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
-        let base = TacticalSortiePilot::new(context, breaks);
+        let base = TacticalSortiePilot::with_committed_descent(context, breaks);
         let mut sortie = base.telemetry().clone();
-        sortie.policy = "tactical_sortie_v2";
+        sortie.policy = "tactical_sortie_v3";
         Self {
             context,
             base,
@@ -57,10 +57,13 @@ impl TacticalCapturePilot {
         self.context = context;
         self.ground = None;
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v2";
+        self.telemetry.sortie.policy = "tactical_sortie_v3";
         self.telemetry.ground = None;
         self.previous_tick = None;
         self.previous_intent = CombatIntent::default();
+    }
+    pub fn combat_telemetry(&self) -> &crate::combat_pilot::CombatPilotTelemetry {
+        self.base.combat_telemetry()
     }
     pub fn telemetry(&self) -> &CaptureTelemetry {
         &self.telemetry
@@ -96,7 +99,7 @@ impl TacticalCapturePilot {
         // version's traversal while outside the destination's interaction range.
         let mut intent = self.base.intent(o);
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v2";
+        self.telemetry.sortie.policy = "tactical_sortie_v3";
         if self.telemetry.completed_tick.is_none()
             && self.telemetry.failed_tick.is_none()
             && o.combat.recovery.flight.flight.enabled
@@ -140,7 +143,7 @@ impl TacticalCapturePilot {
             if ground.telemetry().goal == GroundGoal::Blocked {
                 self.base.abort(p.tick, ground.telemetry().reason.unwrap());
                 self.telemetry.sortie = self.base.telemetry().clone();
-                self.telemetry.sortie.policy = "tactical_sortie_v2";
+                self.telemetry.sortie.policy = "tactical_sortie_v3";
             }
         } else {
             self.telemetry.ground = None;
@@ -197,7 +200,7 @@ mod tests {
         let mut task = TacticalCapturePilot::new(context, CombatBreakSettings::default());
         let first = task.intent(&o);
         assert!(task.telemetry().ground.is_some());
-        assert_eq!(task.telemetry().policy, "tactical_sortie_v2");
+        assert_eq!(task.telemetry().policy, "tactical_sortie_v3");
         let telemetry = task.telemetry().clone();
         assert_eq!(task.intent(&o), first);
         assert_eq!(task.telemetry(), &telemetry);
