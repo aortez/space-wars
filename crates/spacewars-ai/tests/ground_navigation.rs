@@ -107,6 +107,72 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
 }
 
 #[test]
+fn local_route_advances_then_resurveys_without_claiming_arrival() {
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 1.0);
+    o.jetpack.as_mut().unwrap().crossing = None;
+    o.ground.as_mut().unwrap().edges.truncate(1);
+    let original = o.clone();
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    assert!(task.telemetry().route.as_ref().unwrap().partial);
+    assert_eq!(task.telemetry().partial_routes, 1);
+    assert_eq!(o, original, "planning must not mutate the observation");
+    advance(&mut o, 1);
+    assert!(task.step(&o).horizontal > 0.0);
+    let mut replay = task.clone();
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 2.0;
+    advance(&mut o, 60);
+    assert_eq!(task.step(&o), replay.step(&o));
+    assert_eq!(task.telemetry().goal, GroundGoal::Survey);
+    assert!(task.telemetry().path.is_empty());
+    o.ground.as_mut().unwrap().edges.push(GroundEdge {
+        from: 1,
+        to: 2,
+        kind: GroundEdgeKind::Walk,
+        length: 2.0,
+    });
+    advance(&mut o, 61);
+    task.step(&o);
+    assert!(!task.telemetry().route.as_ref().unwrap().partial);
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    task.reset(context);
+    let mut fresh = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    assert_eq!(task.step(&original), fresh.step(&original));
+    assert_eq!(task.telemetry(), fresh.telemetry());
+}
+
+#[test]
+fn knockback_waits_for_contact_then_replans_with_the_original_deadline() {
+    let (context, mut o) = fixture();
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(0.0, 80.0);
+    o.flight.pilot.supported_planet = None;
+    advance(&mut o, 30);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().displacements, 1);
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    advance(&mut o, 600); // Airborne for longer than the normal progress timeout.
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    let mut replay = task.clone();
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(2.0, 60.9);
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    advance(&mut o, 601);
+    assert_eq!(task.step(&o), replay.step(&o));
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    assert_eq!(task.telemetry().replans, 2);
+    advance(&mut o, 90 * 60 + 1);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("ground traversal exceeded ninety seconds")
+    );
+}
+
+#[test]
 fn route_can_chain_two_measured_flights_without_changing_the_sensor_map() {
     use scenario_spacewars::surface_sortie::jetpack::CrossingAnchor;
     let (context, mut o) = fixture();

@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest reliability slice: [pod recovery lift and asteroid pressure](../asteroid-pressure.md)
+Latest navigation slice: [recovery through damaged ground](../damaged-ground-recovery.md)
+adds progressive local routes, replanning after knockback, wider crater launch
+searches and measured rebuild relocation candidates.
+
+The preceding reliability slice, [pod recovery lift and asteroid pressure](../asteroid-pressure.md),
 adds a shared way to free tipped pods, bounded landing retries under changing
 cover, and configurable environmental arrivals in material combat and duel.
 

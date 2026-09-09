@@ -58,7 +58,7 @@ for seed, seat, mirror, interval, severity in cases:
         else:
             assert not arrivals and not impacts
         terminal_goals = sorted({e['goal'] for e in r['events'] if any(word in e['goal'] for word in
-            ['stopped making progress', 'exhausted', 'blocked', 'no measured', 'no reachable'])})
+            ['stopped making progress', 'exhausted', 'blocked', 'no measured', 'no reachable', 'no grounded hatch'])})
         final_pilots = [o['recovery']['flight']['pilot'] for o in r['samples'][-1]['pilots']]
         row = dict(name=name, physics_ok=run.returncode == 0 and r['failure'] is None,
                    mission_completed=mission['completed_tick'] is not None, mission_failure=mission['failure'],

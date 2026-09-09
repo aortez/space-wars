@@ -158,9 +158,12 @@ fn main() {
     let mut previous_breaks = [(0, 0, 0, None); 2];
     let mut previous = ["", ""];
     let mut ground_maps = [None, None];
+    let mut rebuild_surveys = [None, None];
     let mut ground_failures = Vec::new();
     let mut steps = Vec::new();
     let mut ai = Vec::new();
+    let mut sensors = Vec::new();
+    let mut policies = Vec::new();
     let mut failure = None;
     let mut phases = BTreeMap::<String, PhaseMetrics>::new();
     let initial_state = [
@@ -172,6 +175,7 @@ fn main() {
         let mut actions = Vec::new();
         let mut subject_phase = None;
         for seat in 0..2 {
+            let sensor_start = Instant::now();
             let landing_now = seat == subject_seat && land_after.is_some_and(|s| tick >= s * 60);
             let site = if landing_now && use_tactical {
                 tactical.site_request()
@@ -186,8 +190,12 @@ fn main() {
                 || state.combat_observation(seat, site),
                 |o| o.combat.clone(),
             );
+            sensors.push(sensor_start.elapsed().as_secs_f64() * 1000.0);
             if let Some(map) = &o.recovery.ground {
                 ground_maps[seat] = Some(map.clone());
+            }
+            if let Some(survey) = &o.recovery.rebuild {
+                rebuild_surveys[seat] = Some(survey.clone());
             }
             if landing_now {
                 landing_start.get_or_insert_with(|| o.clone());
@@ -203,6 +211,7 @@ fn main() {
                     lost_tick.get_or_insert(tick);
                 }
             }
+            let policy_start = Instant::now();
             let mut intent = if let Some(o) = &tactical_o {
                 tactical.intent(o)
             } else if landing_now {
@@ -216,6 +225,7 @@ fn main() {
             } else {
                 brains[seat].intent(&o)
             };
+            policies.push(policy_start.elapsed().as_secs_f64() * 1000.0);
             if seat != subject_seat && !opponent_fire {
                 intent.weapons = Default::default();
             }
@@ -272,8 +282,24 @@ fn main() {
                     || label.contains("ground traversal")
                     || label.contains("on ground route")
                     || label.contains("no reachable standing")
+                    || label.contains("no grounded hatch")
                 {
-                    ground_failures.push(json!({"tick":tick,"seat":seat,"goal":label,"map":ground_maps[seat],"observation":o,"brain":brains[seat].telemetry(),"tactical":tactical.telemetry()}));
+                    ground_failures.push(json!({"tick":tick,"seat":seat,"goal":label,"map":ground_maps[seat],"last_rebuild_survey":rebuild_surveys[seat],"observation":o,"brain":brains[seat].telemetry(),"capture_combat":tactical.combat_telemetry(),"tactical":tactical.telemetry()}));
+                    if save_frames {
+                        let mut frame = SurfaceSortieScenario::player_frame(&state, seat);
+                        frame.layers.retain(|layer| layer.z < 15);
+                        let p = &o.recovery.flight.pilot;
+                        let point = p.actor.unwrap_or(p.ship).position;
+                        frame.camera = engine_common::Camera2::new(
+                            engine_common::RenderPoint::new(point.x, point.y),
+                            36.0,
+                        );
+                        fs::write(
+                            out.join(format!("failure-{tick}-p{}.json", seat + 1)),
+                            serde_json::to_vec(&frame).unwrap(),
+                        )
+                        .unwrap();
+                    }
                 }
                 if label != "engage ship" && previous[seat] != "engage ship" || tick % 60 == 0 {
                     eprintln!("{:.2}s P{} {label}", tick as f32 / 60.0, seat + 1);
@@ -384,10 +410,12 @@ fn main() {
     }
     steps.sort_by(f64::total_cmp);
     ai.sort_by(f64::total_cmp);
+    sensors.sort_by(f64::total_cmp);
+    policies.sort_by(f64::total_cmp);
     let report = json!({"version":5,"capture_combat":tactical.combat_telemetry(),"asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
         "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())},"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
-        "samples":samples,"events":events,"ground_failures":ground_failures});
+        "ai_max_ms":ai.last(),"sensor_p95_ms":sensors[sensors.len()*95/100],"sensor_max_ms":sensors.last(),"policy_p95_ms":policies[policies.len()*95/100],"policy_max_ms":policies.last(),"samples":samples,"events":events,"ground_failures":ground_failures});
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

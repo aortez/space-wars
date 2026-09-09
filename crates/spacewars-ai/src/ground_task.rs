@@ -34,6 +34,7 @@ pub enum GroundGoal {
     JetpackCross,
     JetpackLand,
     Settle,
+    WaitForShip,
     Arrived,
     Blocked,
 }
@@ -49,6 +50,7 @@ impl GroundGoal {
             Self::JetpackCross => "jetpack: crossing toward the objective",
             Self::JetpackLand => "jetpack: landing to resume the route",
             Self::Settle => "waiting for stable footing",
+            Self::WaitForShip => "waiting for the assigned ship to land",
             Self::Arrived => "at the ground destination",
             Self::Blocked => "ground route blocked",
         }
@@ -73,6 +75,8 @@ pub struct GroundTelemetry {
     pub crossing: Option<CrossingTelemetry>,
     pub jetpack_crossings: u32,
     pub flight_interruptions: u32,
+    pub partial_routes: u32,
+    pub displacements: u32,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -89,13 +93,14 @@ pub struct GroundNavigationTask {
     crossing_plan: Option<CrossingPlan>,
     crossing_task: Option<JetpackCrossingPilot>,
     settling_after_interrupt: bool,
+    settling_after_displacement: bool,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v4",
+                policy: "ground_navigation_v5",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -112,6 +117,8 @@ impl GroundNavigationTask {
                 crossing: None,
                 jetpack_crossings: 0,
                 flight_interruptions: 0,
+                partial_routes: 0,
+                displacements: 0,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -124,6 +131,7 @@ impl GroundNavigationTask {
             crossing_plan: None,
             crossing_task: None,
             settling_after_interrupt: false,
+            settling_after_displacement: false,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -232,6 +240,39 @@ impl GroundNavigationTask {
         let local =
             |point: Vec2| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
         let target_local = target.map(local);
+        let foot = local(actor.position - p.actor_up * 0.9);
+        if let Some(map) = &self.map
+            && !self.telemetry.path.is_empty()
+            && self
+                .telemetry
+                .path
+                .iter()
+                .skip(self.telemetry.waypoint.saturating_sub(1))
+                .filter_map(|id| map.nodes.iter().find(|n| n.id == *id))
+                .map(|n| foot.distance_to(n.position))
+                .min_by(f32::total_cmp)
+                .is_some_and(|distance| distance > 6.0)
+        {
+            // A collision can throw the actor far beyond an ordinary jump.
+            // Let actual contacts settle it, then plan from its new footing.
+            self.telemetry.displacements += 1;
+            self.telemetry.invalidations += 1;
+            self.clear_route();
+            self.map = None;
+            self.settling_after_displacement = true;
+        }
+        if self.settling_after_displacement {
+            if p.tick.saturating_sub(start) > 90 * 60 {
+                self.block("ground traversal exceeded ninety seconds");
+                return action;
+            }
+            if p.supported_planet != Some(p.planet.index) {
+                self.telemetry.goal = GroundGoal::Settle;
+                return action;
+            }
+            self.settling_after_displacement = false;
+            self.telemetry.last_progress_tick = p.tick;
+        }
         if self
             .telemetry
             .target
@@ -264,11 +305,13 @@ impl GroundNavigationTask {
         let Some(target) = target else {
             self.telemetry.goal = if self.telemetry.destination == GroundDestination::Flag {
                 GroundGoal::Arrived
+            } else if self.telemetry.destination == GroundDestination::Hatch {
+                GroundGoal::WaitForShip
             } else {
                 GroundGoal::Survey
             };
             if self.telemetry.destination == GroundDestination::Hatch && p.tick - start > 15 * 60 {
-                self.block("no accessible hatch footing");
+                self.block("assigned ship has no grounded hatch");
             }
             return action;
         };
@@ -371,7 +414,6 @@ impl GroundNavigationTask {
             self.telemetry.goal = GroundGoal::Survey;
             return action;
         };
-        let foot = local(actor.position - p.actor_up * 0.9);
         if self.telemetry.path.is_empty() {
             self.telemetry.goal = GroundGoal::Survey;
             if o.jetpack.as_ref().is_some_and(|pack| !pack.surveyed) {
@@ -387,8 +429,9 @@ impl GroundNavigationTask {
             let (route, crossing) =
                 self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
             self.crossing_plan = crossing;
-            self.telemetry.route = Some(route.diagnostics);
+            self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {
+                self.telemetry.partial_routes += u32::from(route.diagnostics.partial);
                 self.telemetry.path = route.path;
                 self.telemetry.waypoint = 0;
                 self.telemetry.last_progress_tick = p.tick;
@@ -425,6 +468,16 @@ impl GroundNavigationTask {
         let right = Vec2::new(p.actor_up.y, -p.actor_up.x);
         let error = (next - actor.position).dot(right);
         let distance = foot.distance_to(node.position);
+        if distance < 0.85
+            && p.supported_planet == Some(p.planet.index)
+            && index + 1 == self.telemetry.path.len()
+            && self.crossing_plan.is_none()
+            && self.telemetry.route.as_ref().is_some_and(|r| r.partial)
+        {
+            self.clear_route();
+            self.telemetry.goal = GroundGoal::Survey;
+            return action;
+        }
         if distance < 0.85
             && p.supported_planet == Some(p.planet.index)
             && index + 1 < self.telemetry.path.len()

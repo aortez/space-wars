@@ -76,14 +76,65 @@ fn airborne_pod() -> (RecoverShipTask, RecoveryTaskObservationV1) {
 }
 
 #[test]
-fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain() {
+fn rebuild_flight_keeps_its_destination_until_ownership_changes() {
+    use scenario_spacewars::surface_sortie::jetpack::{
+        CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
+    };
+    use spacewars_ai::ground_task::GroundDestination;
+    let (mut task, mut o) = rebuild_relocation_fixture();
+    o.ground.as_mut().unwrap().edges.clear();
+    let site = o.rebuild.as_ref().unwrap().site.unwrap();
+    o.jetpack = Some(JetpackNavigationObservation {
+        charge: 1.0,
+        burning: false,
+        burn_seconds: 0.0,
+        gravity: -Vec2::Y * 18.0,
+        surveyed: true,
+        crossing: None,
+        terrain_crossings: vec![CrossingPlan {
+            planet: site.planet,
+            revision: site.revision,
+            direction: CrossingDirection::Left,
+            start: Vec2::new(0.0, 60.0),
+            destination: site.position,
+            cruise_radius: 64.0,
+            anchor: CrossingAnchor::GroundGap { from: 0, to: 2 },
+        }],
+    });
+    task.step(&o);
+    o.rebuild = None;
+    for tick in 1..=4 {
+        o.flight.pilot.tick = tick;
+        o.ground.as_mut().unwrap().tick = tick;
+        let mut replay = task.clone();
+        assert_eq!(task.step(&o), replay.step(&o));
+        let ground = task.telemetry().ground.as_ref().unwrap();
+        assert!(ground.crossing.is_some());
+        assert_eq!(
+            ground.destination,
+            GroundDestination::Rebuild {
+                planet: site.planet,
+                position: site.position
+            }
+        );
+    }
+    o.flight.pilot.tick = 5;
+    o.flight.pilot.planet.claim.as_mut().unwrap().owner = Some(PlayerId::PLAYER_2);
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().ground.as_ref().unwrap().destination,
+        GroundDestination::Flag
+    );
+}
+
+fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     use scenario_spacewars::surface_sortie::{
         SurfaceRecoveryStatus,
         ground_navigation::{GroundEdge, GroundEdgeKind, GroundMap, GroundNode},
         pilot::PilotMotion,
         rebuild_placement::{RebuildRelocationSurvey, RebuildStandingSite},
     };
-    let (mut task, mut o) = airborne_pod();
+    let (task, mut o) = airborne_pod();
     let p = &mut o.flight.pilot;
     p.tick = 0;
     p.location = PilotLocation::OnFoot;
@@ -133,9 +184,17 @@ fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain()
             revision: p.planet.revision,
             position: Vec2::new(4.0, 60.0),
             walk_length: 4.0,
+            flight_length: 0.0,
+            jetpack_flights: 0,
             hatch_walk_length: 0.0,
         }),
     });
+    (task, o)
+}
+
+#[test]
+fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain() {
+    let (mut task, mut o) = rebuild_relocation_fixture();
     assert_eq!(task.step(&o), FlightIntent::default());
     assert_eq!(task.telemetry().relocations, 1);
     let before = task.telemetry().clone();

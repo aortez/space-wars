@@ -2,7 +2,7 @@
 use super::*;
 use crate::jetpack_crossing::CrossingGoal;
 use scenario_spacewars::surface_sortie::{
-    ground_navigation::{GroundEdge, GroundRoute},
+    ground_navigation::GroundRoute,
     jetpack::{CrossingAnchor, MAX_TERRAIN_CROSSINGS},
 };
 
@@ -44,17 +44,6 @@ impl GroundNavigationTask {
         {
             return (direct, None);
         }
-        let nearest = |point: Vec2| {
-            map.nodes
-                .iter()
-                .filter(|n| n.position.distance_to(point) < 1.4)
-                .min_by(|a, b| {
-                    a.position
-                        .distance_to(point)
-                        .total_cmp(&b.position.distance_to(point))
-                })
-                .map(|n| n.id)
-        };
         let mut graph = map.clone();
         let mut flights = Vec::new();
         for plan in jetpack
@@ -64,26 +53,23 @@ impl GroundNavigationTask {
             .filter(|plan| valid_plan(plan, map))
             .flat_map(|plan| [plan.clone(), plan.reversed()])
         {
-            let (Some(from), Some(to)) = (nearest(plan.start), nearest(plan.destination)) else {
-                continue;
-            };
             // A measured direct ground edge is cheaper. Keep one unambiguous
             // flight per node pair when a vehicle and gap survey overlap.
-            if from == to || graph.edges.iter().any(|e| e.from == from && e.to == to) {
-                continue;
+            if let Some((from, to)) = graph.connect_jetpack(plan.start, plan.destination) {
+                flights.push((from, to, plan));
             }
-            graph.edges.push(GroundEdge {
-                from,
-                to,
-                kind: GroundEdgeKind::Jetpack,
-                length: plan.start.distance_to(plan.destination),
-            });
-            flights.push((from, to, plan));
-        }
-        if flights.is_empty() {
-            return (direct, None);
         }
         let mut combined = route(&graph);
+        if combined.path.is_empty()
+            && matches!(
+                self.telemetry.destination,
+                GroundDestination::Flag | GroundDestination::Hatch
+            )
+        {
+            // Only nearby powered crossings are surveyed. Walk/fly through the
+            // known portion, then survey again from its end before continuing.
+            combined = graph.route_toward_actor_target(foot, target, range);
+        }
         if cost(&combined) + 2.0 < cost(&direct) {
             for (i, pair) in combined.path.windows(2).enumerate() {
                 if let Some((_, _, plan)) = flights
@@ -95,6 +81,7 @@ impl GroundNavigationTask {
                     return (combined, Some(plan));
                 }
             }
+            return (combined, None);
         }
         (direct, None)
     }

@@ -65,6 +65,8 @@ pub enum GroundRouteFailure {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GroundRouteDiagnostics {
     pub failure: Option<GroundRouteFailure>,
+    /// A measured advance toward a destination beyond the current connections.
+    pub partial: bool,
     pub start_node: Option<u16>,
     pub start_distance: Option<f32>,
     pub destination_nodes: usize,
@@ -86,11 +88,55 @@ pub(super) fn standing_height() -> f32 {
     spec.half_segment + (spec.radius + 0.04) / spec.min_support_alignment + 0.08
 }
 
+fn trace_route(
+    route: &mut GroundRoute,
+    parents: &[Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES],
+    end: usize,
+) {
+    route.path.push(end as u16);
+    let mut cursor = end;
+    while let Some((previous, length, kind)) = parents[cursor] {
+        route.path.push(previous);
+        route.diagnostics.length += length;
+        route.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
+        route.diagnostics.flights += usize::from(kind == GroundEdgeKind::Jetpack);
+        cursor = usize::from(previous);
+    }
+    route.path.reverse();
+}
+
 impl GroundMap {
+    /// Join matching surveyed endpoints. The caller must supply a physically
+    /// measured corridor; this graph operation performs no world query or move.
+    pub fn connect_jetpack(&mut self, start: Vec2, destination: Vec2) -> Option<(u16, u16)> {
+        let nearest = |point: Vec2| {
+            self.nodes
+                .iter()
+                .filter(|n| n.position.distance_to(point) < 1.4)
+                .min_by(|a, b| {
+                    a.position
+                        .distance_to(point)
+                        .total_cmp(&b.position.distance_to(point))
+                })
+                .map(|n| n.id)
+        };
+        let (from, to) = (nearest(start)?, nearest(destination)?);
+        if from == to || self.edges.iter().any(|e| e.from == from && e.to == to) {
+            return None;
+        }
+        self.edges.push(GroundEdge {
+            from,
+            to,
+            kind: GroundEdgeKind::Jetpack,
+            length: start.distance_to(destination),
+        });
+        Some((from, to))
+    }
+
     /// Bounded shortest measured route. Absence is evidence about this survey,
     /// not proof that a human cannot traverse the physical terrain.
     pub fn route(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
-        self.route_with_height(start, target, range, 0.0)
+        self.route_with_height(start, target, range, 0.0, false)
     }
 
     /// Boarding measures the supported actor's center against the hatch. This
@@ -108,10 +154,30 @@ impl GroundMap {
             target,
             range,
             SurfaceSortieState::spec().half_height(),
+            false,
         )
     }
 
-    fn route_with_height(&self, start: Vec2, target: Vec2, range: f32, height: f32) -> GroundRoute {
+    /// Advance through measured ground when distant connections are unknown.
+    /// A partial route never establishes arrival or authorizes an unmeasured edge.
+    pub fn route_toward_actor_target(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
+        self.route_with_height(
+            start,
+            target,
+            range,
+            SurfaceSortieState::spec().half_height(),
+            true,
+        )
+    }
+
+    fn route_with_height(
+        &self,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        height: f32,
+        allow_partial: bool,
+    ) -> GroundRoute {
         let destination_distance = |node: &GroundNode| {
             (node.position + node.position.normalized() * height).distance_to(target)
         };
@@ -124,6 +190,7 @@ impl GroundMap {
             path: Vec::new(),
             diagnostics: GroundRouteDiagnostics {
                 failure: None,
+                partial: false,
                 start_node: nearest.map(|n| n.id),
                 start_distance: nearest.map(|n| n.position.distance_to(start)),
                 destination_nodes: self
@@ -147,7 +214,7 @@ impl GroundMap {
             result.diagnostics.failure = Some(GroundRouteFailure::NoStartFooting);
             return result;
         };
-        if result.diagnostics.destination_nodes == 0 {
+        if result.diagnostics.destination_nodes == 0 && !allow_partial {
             result.diagnostics.failure = Some(GroundRouteFailure::NoDestinationFooting);
             return result;
         }
@@ -155,6 +222,17 @@ impl GroundMap {
         let mut parent: [Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES] =
             [None; GROUND_SAMPLES];
         let mut visited = [false; GROUND_SAMPLES];
+        // Surface arc distance still measures progress near the opposite side
+        // of a planet, where a useful walk barely changes straight-line distance.
+        let remaining = |point: Vec2| {
+            (point.x * target.y - point.y * target.x)
+                .atan2(point.dot(target))
+                .abs()
+                * target.length()
+        };
+        let mut frontier = usize::from(initial.id);
+        let mut frontier_distance = remaining(initial.position);
+        let initial_distance = frontier_distance;
         costs[usize::from(initial.id)] = 0.0;
         for _ in 0..GROUND_SAMPLES {
             let Some(index) = (0..GROUND_SAMPLES)
@@ -171,6 +249,10 @@ impl GroundMap {
                 .find(|n| usize::from(n.id) == index)
                 .unwrap();
             let distance = destination_distance(node);
+            if remaining(node.position) < frontier_distance {
+                frontier = index;
+                frontier_distance = remaining(node.position);
+            }
             result.diagnostics.closest_reachable_distance = Some(
                 result
                     .diagnostics
@@ -178,16 +260,7 @@ impl GroundMap {
                     .map_or(distance, |old| old.min(distance)),
             );
             if distance < range {
-                result.path.push(index as u16);
-                let mut cursor = index;
-                while let Some((previous, length, kind)) = parent[cursor] {
-                    result.path.push(previous);
-                    result.diagnostics.length += length;
-                    result.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
-                    result.diagnostics.flights += usize::from(kind == GroundEdgeKind::Jetpack);
-                    cursor = usize::from(previous);
-                }
-                result.path.reverse();
+                trace_route(&mut result, &parent, index);
                 return result;
             }
             for edge in self.edges.iter().filter(|e| usize::from(e.from) == index) {
@@ -205,7 +278,16 @@ impl GroundMap {
                 }
             }
         }
-        result.diagnostics.failure = Some(GroundRouteFailure::Disconnected);
+        if allow_partial && frontier_distance < initial_distance - 1.5 {
+            result.diagnostics.partial = true;
+            trace_route(&mut result, &parent, frontier);
+        } else {
+            result.diagnostics.failure = Some(if result.diagnostics.destination_nodes == 0 {
+                GroundRouteFailure::NoDestinationFooting
+            } else {
+                GroundRouteFailure::Disconnected
+            });
+        }
         result
     }
 

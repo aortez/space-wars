@@ -59,6 +59,8 @@ pub struct RebuildStandingSite {
     pub revision: u64,
     pub position: Vec2,
     pub walk_length: f32,
+    pub flight_length: f32,
+    pub jetpack_flights: usize,
     pub hatch_walk_length: f32,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -337,29 +339,65 @@ impl SurfaceSortieState {
         }
         let actor = self.spaceling_snapshot(player)?;
         let planet = self.motion_planet_index(player);
-        let map = self.local_ground_map(player, planet, actor.motion.position, false)?;
+        let mut map = self.local_ground_map(player, planet, actor.motion.position, false)?;
+        if self.pilots[player].jetpack_charge.is_some() {
+            let plans = self.terrain_crossings(player, &map);
+            for plan in self
+                .crossing_plan(player, jetpack::CrossingDirection::Left)
+                .into_iter()
+                .chain(plans)
+            {
+                map.connect_jetpack(plan.start, plan.destination);
+                map.connect_jetpack(plan.destination, plan.start);
+            }
+        }
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let foot = (actor.motion.position - actor.up * Self::spec().half_height() - frame.position)
             .rotate_radians(-frame.angle);
         let base = self.rebuild_ground_map(player, map.planet, actor.motion.position)?;
-        let bearing = (rotation_for_direction(foot) * GROUND_SAMPLES as f32 / std::f32::consts::TAU)
-            .round() as i32;
         let mut survey = RebuildRelocationSurvey {
             tick: self.world.tick,
             checked: 0,
             attempts: Vec::new(),
             site: None,
         };
-        for offset in [-8, 8, -16, 16, -24, 24, -32, 32] {
-            let id = (bearing + offset).rem_euclid(GROUND_SAMPLES as i32) as u16;
+        // Fixed bearing offsets can all miss viable standing material after a
+        // crater. Spread the bounded previews over actual nearby footing.
+        let mut nearby = map
+            .nodes
+            .iter()
+            .filter(|n| {
+                let distance = n.position.distance_to(foot);
+                (2.0..=MAX_REBUILD_WALK).contains(&distance)
+            })
+            .collect::<Vec<_>>();
+        nearby.sort_by(|a, b| {
+            a.position
+                .distance_to(foot)
+                .total_cmp(&b.position.distance_to(foot))
+                .then(a.id.cmp(&b.id))
+        });
+        let mut candidates: Vec<&ground_navigation::GroundNode> = Vec::new();
+        for node in nearby {
+            if candidates
+                .iter()
+                .all(|old| old.position.distance_to(node.position) >= 2.0)
+            {
+                candidates.push(node);
+                if candidates.len() == 32 {
+                    break;
+                }
+            }
+        }
+        let batches = candidates.len().div_ceil(8).max(1);
+        let batch = (self.world.tick / ground_navigation::GROUND_REFRESH_TICKS) as usize % batches;
+        for node in candidates.into_iter().skip(batch * 8).take(8) {
+            let id = node.id;
             survey.attempts.push(RebuildRelocationAttempt {
                 bearing: id,
                 route: None,
                 placement: None,
             });
-            let Some(node) = map.nodes.iter().find(|n| n.id == id) else {
-                continue;
-            };
             let route = map.route(foot, node.position, 0.8);
             survey.attempts.last_mut().unwrap().route = Some(route.diagnostics.clone());
             if route.diagnostics.failure.is_some() || route.diagnostics.length > MAX_REBUILD_WALK {
@@ -380,11 +418,25 @@ impl SurfaceSortieState {
                     .iter()
                     .find(|a| Some(a.offset) == report.selected_offset)
                     .unwrap();
+                let flight_length = route
+                    .path
+                    .windows(2)
+                    .filter_map(|pair| {
+                        map.edges.iter().find(|e| {
+                            e.from == pair[0]
+                                && e.to == pair[1]
+                                && e.kind == ground_navigation::GroundEdgeKind::Jetpack
+                        })
+                    })
+                    .map(|e| e.length)
+                    .sum::<f32>();
                 survey.site = Some(RebuildStandingSite {
                     planet: map.planet,
                     revision: map.revision,
                     position: node.position,
-                    walk_length: route.diagnostics.length,
+                    walk_length: (route.diagnostics.length - flight_length).max(0.0),
+                    flight_length,
+                    jetpack_flights: route.diagnostics.flights,
                     hatch_walk_length: attempt.route.as_ref().unwrap().length,
                 });
                 break;

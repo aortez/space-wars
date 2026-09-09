@@ -234,7 +234,11 @@ impl SurfaceSortieState {
         }
     }
 
-    fn crossing_plan(&self, player: usize, direction: CrossingDirection) -> Option<CrossingPlan> {
+    pub(super) fn crossing_plan(
+        &self,
+        player: usize,
+        direction: CrossingDirection,
+    ) -> Option<CrossingPlan> {
         let pilot = &self.pilots[player];
         if pilot.jetpack_charge.is_none()
             || self.world.physics.material_queries_dirty
@@ -329,7 +333,7 @@ impl SurfaceSortieState {
         })
     }
 
-    fn terrain_crossings(&self, player: usize, map: &GroundMap) -> Vec<CrossingPlan> {
+    pub(super) fn terrain_crossings(&self, player: usize, map: &GroundMap) -> Vec<CrossingPlan> {
         let Some(actor) = self.spaceling_snapshot(player) else {
             return Vec::new();
         };
@@ -391,10 +395,10 @@ impl SurfaceSortieState {
                 from: map.nodes[i].id,
                 to: map.nodes[(i + 1) % n].id,
             };
-            'endpoints: for margin in 0..4.min(n / 2) {
+            'endpoints: for margin in 0..8.min(n / 2) {
                 let a = map.nodes[(i + n - margin) % n].position;
                 let b = map.nodes[(i + 1 + margin) % n].position;
-                if a.distance_to(b) > 14.0 || a.distance_to(b) < 1.0 {
+                if a.distance_to(b) > 24.0 || a.distance_to(b) < 1.0 {
                     continue;
                 }
                 for height in [3.0, 5.0, 7.0] {

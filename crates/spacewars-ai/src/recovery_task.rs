@@ -136,7 +136,7 @@ impl RecoverShipTask {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v4",
+                task: "recover_ship_v5",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -286,6 +286,18 @@ impl RecoverShipTask {
             {
                 let destination = if p.ship_available && p.ship_form == ShipForm::Ship {
                     GroundDestination::Hatch
+                } else if let Some(site) = self.telemetry.relocation_site
+                    && site.planet == p.planet.index
+                    && site.revision == p.planet.revision
+                    && p.planet
+                        .claim
+                        .as_ref()
+                        .is_some_and(|c| c.owner == Some(p.owner))
+                {
+                    GroundDestination::Rebuild {
+                        planet: site.planet,
+                        position: site.position,
+                    }
                 } else {
                     GroundDestination::Flag
                 };
