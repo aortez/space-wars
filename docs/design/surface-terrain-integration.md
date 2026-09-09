@@ -2,9 +2,10 @@
 
 Latest recovery slice: [reachable replacement ships](../rebuild-access-ai.md) adds shared hatch-access placement, measured bot relocation, and forty controlled desktop/Pi trials.
 
-The opt-in [bot jetpack crossing trial](../jetpack-crossing-ai.md) now proves
-crossing a parked ship in both directions with shared physical movement. Its
-integration into general combat/ground navigation remains subsequent work.
+The [jetpack ground-navigation integration](../jetpack-ground-navigation.md) now
+lets capture and recovery bots choose measured flights over their parked ship.
+Terrain combat and duel equip humans and bots alike. The standalone
+[crossing trial](../jetpack-crossing-ai.md) remains available for demonstration.
 
 Implemented on the isolated `surface-terrain-integration` branch, combining
 Surface Expedition from `6cf12def6b2a84a1a0ab45a26acee5f4a9bca00c` (PR #49)
