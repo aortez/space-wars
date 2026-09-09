@@ -310,6 +310,7 @@ mod tests {
             loaded.settings.clock.events = engine_common::ClockEvents {
                 falling: false,
                 color_cycle: true,
+                meltdown: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -317,6 +318,15 @@ mod tests {
                 loaded.settings.clock
             );
         }
+    }
+
+    #[test]
+    fn older_event_switches_keep_their_values_when_meltdown_defaults_on() {
+        let settings: Settings =
+            toml::from_str("[clock.events]\nfalling = false\ncolor_cycle = false\n").unwrap();
+        assert!(!settings.clock.events.falling);
+        assert!(!settings.clock.events.color_cycle);
+        assert!(settings.clock.events.meltdown);
     }
 
     #[test]

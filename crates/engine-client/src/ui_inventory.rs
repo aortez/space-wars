@@ -68,6 +68,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_event_profile: String,
     pub(crate) clock_falling_enabled: bool,
     pub(crate) clock_color_cycle_enabled: bool,
+    pub(crate) clock_meltdown_enabled: bool,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -291,6 +292,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.color-cycle",
                     context.clock_color_cycle_enabled,
                 ),
+                (
+                    "launcher.settings.clock.meltdown",
+                    context.clock_meltdown_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
@@ -301,6 +306,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.event-profile",
                 "launcher.settings.clock.falling",
                 "launcher.settings.clock.color-cycle",
+                "launcher.settings.clock.meltdown",
                 "launcher.settings.back",
             ]
         }
@@ -463,6 +469,15 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         "pause.clock.preview-event",
         &context.clock_preview,
     );
+    controls.push(
+        UiControl::new("pause.clock.meltdown", "Meltdown", true).with_value(
+            if context.clock_meltdown_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
     controls.push(UiControl::new("pause.clock.back", "Back", true));
     controls.push(UiControl::new(
         "pause.clock.preview",
@@ -482,6 +497,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.preview-event",
                 "pause.clock.back",
                 "pause.clock.preview",
+                "pause.clock.meltdown",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -526,6 +542,7 @@ mod tests {
             clock_event_profile: "Calm".into(),
             clock_falling_enabled: true,
             clock_color_cycle_enabled: true,
+            clock_meltdown_enabled: true,
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -673,7 +690,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 14, "launcher.settings.clock.color-cycle"),
+            ("clock", 16, "launcher.settings.clock.meltdown"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -690,7 +707,7 @@ mod tests {
                 "surface-expedition" => 2,
                 "spacewars" => 6,
                 "pizza" => 3,
-                "clock" => 5,
+                "clock" => 6,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -881,7 +898,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 10);
+        assert_eq!(inventory.controls.len(), 11);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

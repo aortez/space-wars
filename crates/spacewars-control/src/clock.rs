@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 3;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -38,6 +38,7 @@ pub struct ClockState {
     pub palette_rgb: [u8; 3],
     pub body_count: usize,
     pub collider_count: usize,
+    pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -247,6 +248,7 @@ mod tests {
             palette_rgb: [170, 140, 255],
             body_count: 0,
             collider_count: 0,
+            meltdown: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -334,9 +336,33 @@ mod tests {
             r#"{"schema_version":2,"expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":1,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":2,"event":"unknown","expected_scenario_revision":7,"expected_event_id":3}"#,
+            r#"{"schema_version":3,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
         ] {
             assert!(ClockTriggerRequest::from_json(json).is_err());
         }
+    }
+
+    #[test]
+    fn meltdown_diagnostics_and_named_trigger_round_trip() {
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::Meltdown);
+        state.phase = Some("draining".into());
+        state.meltdown = Some(engine_common::ClockMeltdownState {
+            initial_cells: 70,
+            water_columns: 60,
+            pooled_microunits: 30_000_000,
+            drained_microunits: 40_000_000,
+            ..Default::default()
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Meltdown);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
     }
 
     fn after(state: &ClockState) -> ClockStatePredicate {

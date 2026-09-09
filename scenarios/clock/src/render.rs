@@ -32,6 +32,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     );
     render_floor(&mut frame, layout);
     render_segments(&mut frame, state, layout);
+    if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
+        render_meltdown(&mut frame, event, layout);
+    }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
     frame
@@ -84,6 +87,7 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         let anchor = layout.segment_center(segment.id);
         let (position, angle, brightness) = match segment.representation {
             SegmentRepresentation::Anchored => (anchor, 0.0, f32::from(segment.lit)),
+            SegmentRepresentation::Disintegrated => (anchor, 0.0, 0.0),
             SegmentRepresentation::Rigid { position, angle } => (position, angle, 1.0),
             SegmentRepresentation::Reforming {
                 position,
@@ -113,6 +117,75 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                     );
                 }
             }
+        }
+    }
+}
+
+fn render_meltdown(
+    frame: &mut RenderFrame,
+    event: &crate::events::meltdown::MeltdownEvent,
+    layout: Layout,
+) {
+    use crate::events::meltdown::MeltdownEvent;
+    let water_color = RenderColor::rgb(0.08, 0.55, 0.85);
+    let edge_color = RenderColor::rgb(0.36, 0.91, 1.0);
+    for cell in &event.cells {
+        render_square(
+            frame,
+            cell.position,
+            layout.pitch,
+            cell.angle,
+            1.0,
+            DigitPalette::default(),
+        );
+    }
+    let width = MeltdownEvent::column_width(layout);
+    let cell_area = (layout.pitch * 0.8).powi(2);
+    for (index, volume) in event.water.iter().enumerate() {
+        let height = *volume as f32 * cell_area / width;
+        if height < 0.25 {
+            continue;
+        }
+        let left = MeltdownEvent::column_left(layout, index);
+        let top = layout.floor_y + height;
+        frame.push_primitive(
+            ACTIVE_CELL_LAYER,
+            rectangle(
+                RenderPoint::new(left, layout.floor_y),
+                RenderPoint::new(left + width, top),
+                water_color,
+                None,
+            ),
+        );
+        frame.push_primitive(
+            ACTIVE_CELL_LAYER,
+            rectangle(
+                RenderPoint::new(left, top - height.min(1.8)),
+                RenderPoint::new(left + width, top),
+                edge_color,
+                None,
+            ),
+        );
+    }
+    // Bounded visual stream; it represents already-accounted drained volume.
+    // No extra particles are spawned and no water is reintroduced to the pool.
+    if event.stream > 0.005 {
+        let lip = layout.drain_half_width();
+        let thickness = layout.pitch * 0.35 * event.stream.sqrt();
+        for side in [-1.0, 1.0] {
+            let x = side * (lip - thickness * 0.5);
+            frame.push_primitive(
+                ACTIVE_CELL_LAYER,
+                rectangle(
+                    RenderPoint::new(x - thickness * 0.5, layout.bounds_min.y),
+                    RenderPoint::new(x + thickness * 0.5, layout.floor_y),
+                    RenderColor {
+                        a: event.stream.sqrt(),
+                        ..water_color
+                    },
+                    None,
+                ),
+            );
         }
     }
 }

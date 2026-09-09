@@ -228,15 +228,17 @@ pub struct ClockSettings {
 pub enum ClockEventKind {
     Falling = 0,
     ColorCycle = 1,
+    Meltdown = 2,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 2] = [Self::Falling, Self::ColorCycle];
+    pub const ALL: [Self; 3] = [Self::Falling, Self::ColorCycle, Self::Meltdown];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Falling => "falling",
             Self::ColorCycle => "color-cycle",
+            Self::Meltdown => "meltdown",
         }
     }
 
@@ -244,6 +246,7 @@ impl ClockEventKind {
         match self {
             Self::Falling => "Falling",
             Self::ColorCycle => "Color Cycle",
+            Self::Meltdown => "Meltdown",
         }
     }
 }
@@ -254,6 +257,7 @@ impl ClockEventKind {
 pub struct ClockEvents {
     pub falling: bool,
     pub color_cycle: bool,
+    pub meltdown: bool,
 }
 
 impl Default for ClockEvents {
@@ -261,6 +265,7 @@ impl Default for ClockEvents {
         Self {
             falling: true,
             color_cycle: true,
+            meltdown: true,
         }
     }
 }
@@ -270,8 +275,23 @@ impl ClockEvents {
         match kind {
             ClockEventKind::Falling => self.falling,
             ClockEventKind::ColorCycle => self.color_cycle,
+            ClockEventKind::Meltdown => self.meltdown,
         }
     }
+}
+
+/// Bounded Clock-local material, not Rapier bodies. One original square is
+/// 1,000,000 volume units. Rounding each aggregate can differ by one unit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMeltdownState {
+    pub initial_cells: usize,
+    pub waiting_cells: usize,
+    pub airborne_cells: usize,
+    pub water_columns: usize,
+    pub pooled_microunits: u64,
+    pub drained_microunits: u64,
+    /// Residue removed by the bounded reform phase, not counted as drainage.
+    pub reclaimed_microunits: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

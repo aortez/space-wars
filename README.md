@@ -23,9 +23,11 @@ The local launcher currently has twelve entries across eight scenario families:
   seven-segment square cells. The deterministic scenario receives versioned
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
-  Off, Calm, or Demo in Settings and enable Falling and Color Cycle individually.
+  Off, Calm, or Demo in Settings and enable Falling, Color Cycle, and Meltdown individually.
   Events share a deterministic, non-overlapping schedule; Color Cycle changes
-  the readable face palette without physics. **Pause → Clock Controls** (or the
+  the readable face palette without physics. Meltdown turns individual cells into
+  a bounded pool that drains through the floor before the face reforms.
+  **Pause → Clock Controls** (or the
   on-face touch button) changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
   timing, the event catalog, and synchronized preview controls.

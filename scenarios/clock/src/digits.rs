@@ -42,6 +42,8 @@ pub struct SegmentId {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SegmentRepresentation {
     Anchored,
+    /// The event owns individual lit cells; the face draws only dim anchors.
+    Disintegrated,
     Rigid {
         position: Vec2,
         angle: f32,

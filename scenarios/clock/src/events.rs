@@ -1,5 +1,6 @@
 mod color_cycle;
 mod falling;
+pub(crate) mod meltdown;
 #[cfg(test)]
 mod tests;
 
@@ -11,6 +12,7 @@ use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use falling::FallingEvent;
 pub use falling::{FALLING_TICKS, REFORMING_TICKS};
+use meltdown::{DRAINING_TICKS, MELTING_TICKS, MeltdownEvent};
 
 pub const FIXED_HZ: u32 = 60;
 pub const COOLDOWN_TICKS: u64 = 120;
@@ -37,6 +39,8 @@ pub enum EventPhase {
     Falling,
     Reforming,
     Cycling,
+    Melting,
+    Draining,
 }
 
 impl EventPhase {
@@ -45,6 +49,8 @@ impl EventPhase {
             Self::Falling => "falling",
             Self::Reforming => "reforming",
             Self::Cycling => "cycling",
+            Self::Melting => "melting",
+            Self::Draining => "draining",
         }
     }
 }
@@ -85,6 +91,12 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: COLOR_CYCLE_TICKS,
         cooldown_ticks: 15 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Meltdown,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS,
+        cooldown_ticks: 40 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -98,6 +110,7 @@ pub(super) struct EventContext<'a> {
 pub(super) enum ActiveEvent {
     Falling(FallingEvent),
     ColorCycle(ColorCycle),
+    Meltdown(Box<MeltdownEvent>),
 }
 
 impl ActiveEvent {
@@ -105,6 +118,7 @@ impl ActiveEvent {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
+            ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(context, seed))),
         }
     }
 
@@ -112,6 +126,7 @@ impl ActiveEvent {
         match self {
             Self::Falling(_) => ClockEventKind::Falling,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
+            Self::Meltdown(_) => ClockEventKind::Meltdown,
         }
     }
 
@@ -120,6 +135,7 @@ impl ActiveEvent {
         match self {
             Self::Falling(event) => event.step(context),
             Self::ColorCycle(event) => event.step(),
+            Self::Meltdown(event) => event.step(context),
         }
     }
 
@@ -127,6 +143,7 @@ impl ActiveEvent {
         match self {
             Self::Falling(event) => event.phase(),
             Self::ColorCycle(_) => EventPhase::Cycling,
+            Self::Meltdown(event) => event.phase(),
         }
     }
 
@@ -134,13 +151,14 @@ impl ActiveEvent {
         match self {
             Self::Falling(event) => event.phase_tick(),
             Self::ColorCycle(event) => event.tick,
+            Self::Meltdown(event) => event.phase_tick(),
         }
     }
 
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
             Self::Falling(event) => event.physics_counts(),
-            Self::ColorCycle(_) => (0, 0),
+            Self::ColorCycle(_) | Self::Meltdown(_) => (0, 0),
         }
     }
 
@@ -152,7 +170,10 @@ impl ActiveEvent {
     }
 
     pub fn holds_lit_segments(&self) -> bool {
-        self.phase() == EventPhase::Falling
+        matches!(
+            self.phase(),
+            EventPhase::Falling | EventPhase::Melting | EventPhase::Draining
+        )
     }
 }
 
