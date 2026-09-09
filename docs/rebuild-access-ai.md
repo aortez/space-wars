@@ -122,8 +122,45 @@ physics audits but do not finish that recovery. Thus this replay does not
 establish the cause or resolution of the earlier live screenshot. Detailed maps
 are now retained when a terminal route failure does occur.
 
-Remaining limits include genuinely disconnected ground, paths the outer-contour
+Remaining limits include disconnected ground, paths the outer-contour
 survey misses, later obstacles after placement, pinned/sideways pods, and the
 separate severe-impact speed alarm documented in the prior ground-navigation
 report. This slice does not claim unrestricted combat recovery, random-asteroid
 endurance, cave escape, or generated multi-planet integration.
+
+## Pi deployment and live verification
+
+Gameplay commit `6a7f29b` was built into the Pi image and deployed to
+`spacewars.local`. All 6,608 Yocto tasks succeeded (21 rerun). The Pi rebooted
+into slot A, `/dev/sda2`, with an active kiosk service and no service restarts.
+The installed client hash matches the client extracted from the archived image:
+
+```text
+image SHA-256:  8da70b564b009b3501678a7b1857d1e975669830cf3d650704ec35ab10088255
+client SHA-256: 24d4be79f1df19ed881e2f24e0a75f4db71abae8c8e1287d769d11a2a257dc03
+```
+
+A fresh seed-42 material duel ran for about three minutes, with Capture P1,
+interceptor P2, 8s/4s breaks and raster scale 2 at the device's 800×480 output.
+Six sampled status reports show 59.8–60.1 FPS and 59.1–60.1 UPS, with zero service
+restarts. These are periodic rate samples, not a frame-time distribution.
+
+The live run **reproduces the earlier flag-route failure**. P1 owns the planet;
+P2 is still landing its escape pod at the 120-second capture. By 150 seconds it
+has landed and exited, but reports `no measured walk/jump route to destination`.
+That remains at the final capture around 180 seconds, with 58 material cells
+removed. P2 has not countercaptured or reached rebuilding. Thus the controlled
+rebuild results do not establish successful recovery in this combat situation.
+The old/new headless replay discrepancy remains open. No ground map was exported
+from this live client run, so the screenshots do not establish why planning
+failed.
+
+Screenshots and status logs are archived as `pi-live-030` through `pi-live-178`
+in the artifact directory above. `image-manifest.json`,
+`installed-verification.json`, and `validation-manifest.json` retain build,
+installation and validation provenance.
+
+After the observation, a fresh material combat round was restarted and paused
+for controller playtesting: P1 human, P2 Capture, seed 42, breaks 8s/4s. The
+paused state and screenshot are retained as `pi-ready-state.json` and
+`pi-ready-paused.png`. Press Start/B or choose Resume to play.
