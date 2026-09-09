@@ -11,6 +11,7 @@
 pub mod combat_pilot;
 pub mod flight_pilot;
 pub mod ground_task;
+pub mod jetpack_crossing;
 pub mod pilot;
 pub mod recovery_pilot;
 pub mod recovery_task;

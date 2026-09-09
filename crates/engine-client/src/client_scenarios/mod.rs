@@ -381,6 +381,7 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     spacewars::TERRAIN_REGISTRATION,
     surface_sortie::PILOT_REGISTRATION,
     surface_sortie::RECOVERY_REGISTRATION,
+    surface_sortie::JETPACK_REGISTRATION,
     surface_sortie::COMBAT_REGISTRATION,
     surface_sortie::DUEL_REGISTRATION,
 ];
@@ -458,6 +459,7 @@ mod tests {
                 "spacewars-terrain",
                 "spacewars-terrain-ai",
                 "spacewars-terrain-recovery",
+                "spacewars-terrain-jetpack",
                 "spacewars-terrain-combat",
                 "spacewars-terrain-duel"
             ]

@@ -14,6 +14,7 @@ pub mod compatibility;
 pub mod flight;
 pub mod ground_navigation;
 pub mod impact;
+pub mod jetpack;
 mod landing;
 mod material;
 mod motion;
@@ -174,6 +175,7 @@ pub(super) struct SurfacePilot {
     control: SpacelingControl,
     gravity: Vec2,
     facing: f32,
+    jetpack_charge: Option<f32>,
     gait_phase: f32,
     pub(super) ship_gravity_delta: Vec2,
 }
@@ -190,6 +192,7 @@ impl SurfacePilot {
             control: SpacelingControl::default(),
             gravity: Vec2::ZERO,
             facing: 1.0,
+            jetpack_charge: None,
             gait_phase: 0.0,
             ship_gravity_delta: Vec2::ZERO,
             motion_metrics: SurfaceMotionMetrics::default(),
@@ -498,6 +501,13 @@ impl SurfaceSortieState {
         if self.pilots[player].body.is_some() {
             // The creature remains alive/owned; only its external physical
             // representation disappears while it occupies the existing ship.
+            if let Some(pack) = self.pilots[player]
+                .body
+                .as_ref()
+                .and_then(|body| body.jetpack())
+            {
+                self.pilots[player].jetpack_charge = Some(pack.charge);
+            }
             self.world
                 .physics
                 .world
@@ -509,7 +519,7 @@ impl SurfaceSortieState {
             let up = self.access_up(player);
             let position = self.access_position(player) + up * (spec.half_height() + 0.12);
             let angle = rotation_for_direction(up);
-            let Some(body) = SpacelingAssembly::insert(
+            let Some(mut body) = SpacelingAssembly::insert(
                 &mut self.world.physics.world,
                 pilot_physics_id(self.pilots[player].owner),
                 position,
@@ -518,6 +528,9 @@ impl SurfaceSortieState {
             ) else {
                 return TransferResult::ExitBlocked;
             };
+            if let Some(charge) = self.pilots[player].jetpack_charge {
+                assert!(body.equip_jetpack(charge));
+            }
             let surface = self.planet_motion(player);
             self.world.physics.world.set_velocity(
                 body.body(),

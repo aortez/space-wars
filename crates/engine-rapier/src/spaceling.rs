@@ -7,6 +7,7 @@ use crate::world::{
     CollisionGroups, PhysicsId, PhysicsWorld, SurfaceContact,
 };
 
+pub mod jetpack;
 mod recovery;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -191,6 +192,7 @@ pub struct SpacelingAssembly {
     knockdowns: u64,
     recoveries: u64,
     last_knockdown: Option<SpacelingDisturbance>,
+    jetpack: Option<jetpack::Jetpack>,
 }
 
 impl SpacelingAssembly {
@@ -253,6 +255,7 @@ impl SpacelingAssembly {
             knockdowns: 0,
             recoveries: 0,
             last_knockdown: None,
+            jetpack: None,
         })
     }
 
@@ -305,11 +308,25 @@ impl SpacelingAssembly {
         };
         let motion = snapshot.motion;
         let severe = self.update_balance(physics, &snapshot, has_gravity, dt);
+        if let Some(pack) = &mut self.jetpack {
+            pack.active = false;
+            if snapshot.grounded() && !control.jump_held {
+                pack.armed = false;
+                pack.reference_velocity = snapshot.support.unwrap().velocity;
+                if self.balance == SpacelingBalance::Balanced && snapshot.relative_speed.abs() < 1.0
+                {
+                    pack.charge = (pack.charge + dt / jetpack::RECHARGE_SECONDS).min(1.0);
+                }
+            }
+        }
         // A fresh press requests getting up while prone; a held request never
         // turns into an ordinary jump or repeated lift after recovery.
         let jump_pressed = control.jump_held && !self.jump_was_held;
         self.jump_was_held = control.jump_held;
         let get_up_pressed = jump_pressed && snapshot.needs_get_up();
+        if get_up_pressed && let Some(pack) = &mut self.jetpack {
+            pack.armed = false;
+        }
         if !control.jump_held {
             self.pending_get_up = false;
         }
@@ -356,12 +373,36 @@ impl SpacelingAssembly {
         let acceleration = if snapshot.grounded() {
             self.spec.ground_acceleration * if recovering { strength } else { 1.0 }
         } else {
-            self.spec.air_acceleration
+            if self
+                .jetpack
+                .as_ref()
+                .is_some_and(|pack| pack.armed && pack.charge > 0.0)
+            {
+                jetpack::AIR_ACCELERATION
+            } else {
+                self.spec.air_acceleration
+            }
         };
-        // Releasing movement in free flight does not provide invisible braking.
-        if snapshot.grounded() || (!recovering && walk != 0.0) {
-            let delta = (walk * self.spec.walk_speed - snapshot.relative_speed)
-                .clamp(-acceleration * dt, acceleration * dt);
+        // Airborne braking requires an armed, charged jetpack.
+        let powered_steering = !snapshot.grounded()
+            && self
+                .jetpack
+                .as_ref()
+                .is_some_and(|pack| pack.armed && pack.charge > 0.0);
+        if snapshot.grounded() || (!recovering && (walk != 0.0 || powered_steering)) {
+            let speed = if powered_steering {
+                jetpack::AIR_SPEED
+            } else {
+                self.spec.walk_speed
+            };
+            let relative_speed = if powered_steering {
+                (motion.linear_velocity - self.jetpack.as_ref().unwrap().reference_velocity)
+                    .dot(tangent)
+            } else {
+                snapshot.relative_speed
+            };
+            let delta =
+                (walk * speed - relative_speed).clamp(-acceleration * dt, acceleration * dt);
             physics.apply_velocity_delta(self.body, tangent * delta, true);
         }
         self.drive_get_up(physics, gravity, dt);
@@ -375,6 +416,29 @@ impl SpacelingAssembly {
                 true,
             );
             self.jumps += 1;
+        }
+        if let Some(pack) = &mut self.jetpack {
+            if jump {
+                pack.armed = true;
+                pack.reference_velocity = snapshot.support.unwrap().velocity;
+            } else if jump_pressed && !snapshot.grounded() && !snapshot.needs_get_up() {
+                pack.armed = true;
+            }
+            if !snapshot.grounded() && !recovering && pack.armed && control.jump_held {
+                let velocity = physics.motion(self.body).unwrap().linear_velocity;
+                let ascent = (velocity - pack.reference_velocity).dot(self.up);
+                // A thrust limit, not a velocity clamp: impacts retain their momentum.
+                let impulse = (jetpack::RISE_SPEED + gravity.length() * dt - ascent)
+                    .clamp(0.0, jetpack::THRUST * dt)
+                    .min(pack.charge * jetpack::THRUST * jetpack::BURN_SECONDS);
+                if impulse > 0.0 {
+                    physics.apply_velocity_delta(self.body, self.up * impulse, true);
+                    let burn = impulse / jetpack::THRUST;
+                    pack.charge = (pack.charge - burn / jetpack::BURN_SECONDS).max(0.0);
+                    pack.burn_seconds += burn;
+                    pack.active = true;
+                }
+            }
         }
         self.expected_velocity = physics
             .motion(self.body)

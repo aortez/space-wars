@@ -831,6 +831,22 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
             state.pilots[player].gait_phase,
             pilot_color(state, player),
         );
+        if let Some(pack) = state.pilots[player]
+            .body
+            .as_ref()
+            .and_then(|body| body.jetpack())
+        {
+            let position = snapshot.motion.position;
+            let right = Vec2::new(snapshot.up.y, -snapshot.up.x);
+            for side in [-1.0, 1.0] {
+                let nozzle = position + right * side * 0.28 - snapshot.up * 0.2;
+                circle(frame, 5, nozzle, 0.15, CYAN);
+                if pack.active {
+                    line(frame, 4, nozzle, nozzle - snapshot.up * 1.3, ORANGE, 3.0);
+                    line(frame, 5, nozzle, nozzle - snapshot.up * 0.65, LIGHT, 1.5);
+                }
+            }
+        }
         if let Some(support) = snapshot.support {
             line(
                 frame,
@@ -997,6 +1013,13 @@ fn draw_player_hud(
         };
         format!("Energy {:.0}% / {status}", s.energy_percent)
     });
+    let progress = state.pilots[player]
+        .body
+        .as_ref()
+        .and_then(|body| body.jetpack())
+        .map_or(progress, |pack| {
+            format!("Jetpack {:.0}% / hold A for lift", pack.charge * 100.0)
+        });
     let vehicle_status = if damage
         .last_damage_tick
         .is_some_and(|tick| observation.tick.saturating_sub(tick) < 180)

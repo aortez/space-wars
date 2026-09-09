@@ -630,6 +630,20 @@ impl SpacewarsPhysics {
         ship_entity(index)
     }
 
+    pub(super) fn surface_vehicle_outline(
+        &self,
+        index: usize,
+        ship: &ShipState,
+    ) -> Option<Vec<Vec2>> {
+        let body = self.world.motion(self.ship_body(index))?;
+        Some(
+            ship_collision_hull(ship)
+                .into_iter()
+                .map(|point| body.position + point.rotate_radians(body.angle))
+                .collect(),
+        )
+    }
+
     pub(super) fn planet_body(&self, index: usize) -> PhysicsBodyId {
         primary_body(planet_entity(index))
     }

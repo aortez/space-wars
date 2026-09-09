@@ -9,7 +9,8 @@ use scenario_spacewars::surface_sortie::{
     impact::{ImpactKind, SurfaceImpactAction},
 };
 use spacewars_ai::{
-    BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3,
+    BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2,
+    jetpack_crossing::JetpackCrossingPilot, recovery_pilot::RulePilotV3,
     tactical_capture::TacticalCapturePilot,
 };
 
@@ -107,6 +108,76 @@ struct MaterialRecoveryClientScenario {
     sortie: SurfaceSortieClientScenario,
     brain: RulePilotV3,
     strike_sent: bool,
+}
+
+pub(super) const JETPACK_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-jetpack",
+    controls_help: "Jetpack crossing trial: P2 exits, flies over its parked ship, lands and claims, recharges, then crosses back and boards. Both pilots have the same jetpack. Tap A/Space to jump or get up; hold while airborne for lift. Left/right steers. Charge refills while standing still with jump released. B/X transfers at a settled ship's hatch. Watch the jet flames, charge and P2 goal. P1 is human; mining and flight controls match Destructible Expedition. Start/Esc pauses; restart repeats the trial.",
+    create: create_jetpack_pilot,
+    ..TERRAIN_REGISTRATION
+};
+
+struct MaterialJetpackClientScenario {
+    sortie: SurfaceSortieClientScenario,
+    brain: JetpackCrossingPilot,
+}
+
+fn create_jetpack_pilot(
+    seed: u64,
+    _settings: &Settings,
+    _viewport: Viewport,
+    _mode: ScenarioStartMode,
+    _asset: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(Box::new(MaterialJetpackClientScenario {
+        sortie: SurfaceSortieClientScenario {
+            state: SurfaceSortieScenario::init_material_jetpack(seed, 2),
+        },
+        brain: JetpackCrossingPilot::new(BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: seed,
+        }),
+    }))
+}
+
+impl ClientScenario for MaterialJetpackClientScenario {
+    fn registration(&self) -> &'static ScenarioRegistration {
+        &JETPACK_REGISTRATION
+    }
+    fn tick_model(&self) -> TickModel {
+        self.sortie.tick_model()
+    }
+    fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if dt.is_zero() {
+            return self.sortie.step(&[], dt);
+        }
+        let observation = self
+            .sortie
+            .state
+            .jetpack_crossing_observation(1, self.brain.direction());
+        let mut actions = human_pilot_actions(actions);
+        actions.push(self.brain.step(&observation).encode(PlayerId::PLAYER_2));
+        self.sortie.step(&actions, dt)
+    }
+    fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
+        human_pilot_actions(&self.sortie.map_input(input, benchmark))
+    }
+    fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
+        let mut frames = self.sortie.render_frames(renderer, viewport);
+        pilot_hud(&mut frames, self.brain.label());
+        frames
+    }
+    fn frame_layout(&self) -> FrameLayout {
+        self.sortie.frame_layout()
+    }
+    #[cfg(test)]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    #[cfg(test)]
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
 }
 
 fn create_recovery_pilot(
