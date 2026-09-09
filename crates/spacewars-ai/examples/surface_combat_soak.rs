@@ -23,7 +23,7 @@ use spacewars_ai::{
     combat_pilot::{CombatIntent, RulePilotV4},
     flight_pilot::FlightIntent,
     pilot::{PilotBrain, RulePilotV1},
-    tactical_sortie::TacticalSortiePilot,
+    tactical_capture::TacticalCapturePilot,
 };
 use std::{
     fs,
@@ -123,7 +123,7 @@ fn main() {
         actor: PlayerId::from_index(subject_seat).unwrap(),
         episode_seed: seed,
     });
-    let mut tactical = TacticalSortiePilot::new(
+    let mut tactical = TacticalCapturePilot::new(
         BrainReset {
             actor: PlayerId::from_index(subject_seat).unwrap(),
             episode_seed: seed,

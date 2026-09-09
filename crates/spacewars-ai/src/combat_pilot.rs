@@ -170,7 +170,7 @@ impl RulePilotV4 {
         let intent = if let Some(task) = &mut self.task {
             let flight = task.step(&o.recovery);
             let t = task.telemetry();
-            self.telemetry.goal = t.reason.unwrap_or(t.goal.label());
+            self.telemetry.goal = t.label();
             self.telemetry.recovery = Some(t.clone());
             if t.status == TaskStatus::Succeeded {
                 self.telemetry.completed_recoveries += 1;

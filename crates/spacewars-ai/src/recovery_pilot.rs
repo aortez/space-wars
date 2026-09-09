@@ -65,9 +65,7 @@ impl RulePilotV3 {
     }
     pub fn label(&self) -> &'static str {
         if let Some(task) = &self.task {
-            task.telemetry()
-                .reason
-                .unwrap_or(task.telemetry().goal.label())
+            task.telemetry().label()
         } else if self.telemetry.departed_tick.is_some() {
             "recovered / flying again"
         } else if self.telemetry.recovered_tick.is_some() {

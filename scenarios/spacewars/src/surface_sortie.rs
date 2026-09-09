@@ -12,6 +12,7 @@ mod claim;
 pub mod combat;
 pub mod compatibility;
 pub mod flight;
+pub mod ground_navigation;
 pub mod impact;
 mod landing;
 mod material;

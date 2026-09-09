@@ -1,12 +1,17 @@
 //! A reusable task: recover the assigned full ship and board it. The caller
 //! selects the objective and decides what to do after success or a bounded
 //! failure. Blocked tasks stay blocked until the caller resets them. No world writes.
-use crate::{BrainReset, flight_pilot::FlightIntent, shortest_heading_error};
+use crate::{
+    BrainReset,
+    flight_pilot::FlightIntent,
+    ground_task::{GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry},
+    shortest_heading_error,
+};
 use engine_core::Vec2;
 use scenario_spacewars::{
     ShipForm,
     surface_sortie::{
-        LandingPhase, PilotLocation, PlanetClaimStatus, SurfaceRecoveryStatus, SurfaceSortieAction,
+        LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
         TransferResult,
         pilot::{LandingSiteId, PilotLandingSite, PilotObservationV1},
         recovery_sensors::RecoveryTaskObservationV1,
@@ -51,6 +56,7 @@ impl RecoveryGoal {
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RecoveryTelemetry {
+    pub task: &'static str,
     pub status: TaskStatus,
     pub goal: RecoveryGoal,
     pub reason: Option<&'static str>,
@@ -66,6 +72,23 @@ pub struct RecoveryTelemetry {
     pub landing_retries: u32,
     pub relocations: u32,
     pub stabilization: Option<PodStabilizationTelemetry>,
+    pub ground: Option<GroundTelemetry>,
+    /// Granted once when hostile-ground traversal becomes necessary.
+    pub ground_budget_ticks: u64,
+}
+impl RecoveryTelemetry {
+    pub fn label(&self) -> &'static str {
+        if let Some(reason) = self.reason {
+            return reason;
+        }
+        if matches!(self.goal, RecoveryGoal::Claim | RecoveryGoal::Board)
+            && let Some(ground) = &self.ground
+            && ground.goal != GroundGoal::Arrived
+        {
+            return ground.reason.unwrap_or(ground.goal.label());
+        }
+        self.goal.label()
+    }
 }
 
 /// Observed control demand, not a command to clamp or rewrite physical motion.
@@ -100,12 +123,15 @@ pub struct RecoverShipTask {
     relocate_until: u64,
     stabilization_window: Option<(u64, f32)>,
     settled_since: Option<u64>,
+    ground_task: Option<GroundNavigationTask>,
+    previous_claim: Option<(PlanetClaimPhase, f32)>,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
         Self {
             context,
             telemetry: RecoveryTelemetry {
+                task: "recover_ship_v2",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -121,6 +147,8 @@ impl RecoverShipTask {
                 landing_retries: 0,
                 relocations: 0,
                 stabilization: None,
+                ground: None,
+                ground_budget_ticks: 0,
             },
             site: None,
             rejected: Vec::new(),
@@ -137,6 +165,8 @@ impl RecoverShipTask {
             relocate_until: 0,
             stabilization_window: None,
             settled_since: None,
+            ground_task: None,
+            previous_claim: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -206,8 +236,17 @@ impl RecoverShipTask {
                 brake_held: matches!(p.location, PilotLocation::Aboard(_)),
                 ..Default::default()
             }
-        } else if p.tick.saturating_sub(self.telemetry.started_tick.unwrap()) > 120 * 60 {
-            self.block("recovery exceeded two-minute task budget", p.tick);
+        } else if p.tick.saturating_sub(self.telemetry.started_tick.unwrap())
+            > 120 * 60 + self.telemetry.ground_budget_ticks
+        {
+            self.block(
+                if self.telemetry.ground_budget_ticks == 0 {
+                    "recovery exceeded two-minute task budget"
+                } else {
+                    "recovery exceeded combined flight and ground budget"
+                },
+                p.tick,
+            );
             SurfaceSortieAction::default()
         } else {
             self.choose(o)
@@ -241,32 +280,44 @@ impl RecoverShipTask {
                 self.goal(RecoveryGoal::Board, p.tick);
                 if p.transfer == TransferResult::Ready {
                     action.interact_held = !self.was_interacting;
-                } else if let (Some(actor), Some(hatch)) = (p.actor, p.hatch) {
-                    let right = Vec2::new(p.actor_up.y, -p.actor_up.x);
-                    let distance = (hatch - actor.position).dot(right);
-                    self.progress(distance.abs(), p.tick);
-                    if distance.abs() > 0.65 {
-                        action.horizontal = (distance * 0.4).clamp(-1.0, 1.0);
-                        action.primary_held |= p.supported_planet.is_some()
-                            && (p.relative_speed.abs() < 0.4
-                                || p.tick.saturating_sub(self.telemetry.last_progress_tick) > 60)
-                            && !self.was_jumping;
-                    }
+                } else {
+                    action = self.traverse(o, GroundDestination::Hatch);
                 }
-                if p.tick.saturating_sub(self.telemetry.last_progress_tick) > 900 {
+                if self.telemetry.status != TaskStatus::Blocked
+                    && p.tick.saturating_sub(self.telemetry.last_progress_tick) > 900
+                {
                     self.block("replacement hatch inaccessible", p.tick);
                 }
                 return action;
             }
             let claim = p.planet.claim.as_ref();
             if claim.is_none_or(|c| c.owner != Some(p.owner)) {
-                if claim.is_some_and(|c| c.status == PlanetClaimStatus::ApproachFlag) {
-                    self.block("enemy flag route required", p.tick);
-                } else {
-                    self.goal(RecoveryGoal::Claim, p.tick);
-                    if p.tick.saturating_sub(self.telemetry.last_progress_tick) > 15 * 60 {
-                        self.block("no supported claim progress", p.tick);
+                self.goal(RecoveryGoal::Claim, p.tick);
+                if claim.is_some_and(|c| {
+                    c.owner.is_some()
+                        && c.owner != Some(p.owner)
+                        && c.flag.zip(p.actor).is_some_and(|(flag, actor)| {
+                            flag.position.distance_to(actor.position) > c.flag_interaction_range
+                        })
+                }) {
+                    self.telemetry.ground_budget_ticks = 90 * 60;
+                }
+                action = self.traverse(o, GroundDestination::Flag);
+                if let Some(c) = claim {
+                    let progress = (c.phase, c.progress);
+                    if c.progress > 0.0
+                        && self
+                            .previous_claim
+                            .is_none_or(|old| old.0 != progress.0 || old.1 < progress.1)
+                    {
+                        self.telemetry.last_progress_tick = p.tick;
                     }
+                    self.previous_claim = Some(progress);
+                }
+                if self.telemetry.status != TaskStatus::Blocked
+                    && p.tick.saturating_sub(self.telemetry.last_progress_tick) > 15 * 60
+                {
+                    self.block("no supported claim progress", p.tick);
                 }
                 return action;
             }
@@ -445,6 +496,32 @@ impl RecoverShipTask {
             brake_held: true,
             interact_held: false,
         }
+    }
+
+    fn traverse(
+        &mut self,
+        o: &RecoveryTaskObservationV1,
+        destination: GroundDestination,
+    ) -> SurfaceSortieAction {
+        if self
+            .ground_task
+            .as_ref()
+            .is_none_or(|task| task.telemetry().destination != destination)
+        {
+            self.ground_task = Some(GroundNavigationTask::new(self.context, destination));
+        }
+        let task = self.ground_task.as_mut().unwrap();
+        let action = task.step(o);
+        self.telemetry.ground = Some(task.telemetry().clone());
+        self.telemetry.last_progress_tick = self
+            .telemetry
+            .last_progress_tick
+            .max(task.telemetry().last_progress_tick);
+        if task.telemetry().goal == GroundGoal::Blocked {
+            let reason = task.telemetry().reason.unwrap();
+            self.block(reason, o.flight.pilot.tick);
+        }
+        action
     }
 
     fn stabilize(&mut self, o: &RecoveryTaskObservationV1, up: Vec2) -> SurfaceSortieAction {

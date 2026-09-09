@@ -423,3 +423,50 @@ fn dirty_queries_do_not_reject_a_pod_site_but_completed_edits_do() {
     assert_eq!(task.site_request(), None);
     assert_eq!(task.telemetry().invalidations, before + 1);
 }
+
+#[test]
+fn hostile_ground_gets_one_fixed_extension_without_restarting_the_recovery_clock() {
+    use scenario_spacewars::surface_sortie::PlanetFlagObservation;
+    let (mut task, mut o) = airborne_pod();
+    let p = &mut o.flight.pilot;
+    p.tick = 0;
+    p.location = PilotLocation::OnFoot;
+    p.ship_available = false;
+    p.balanced = true;
+    p.supported_planet = Some(p.planet.index);
+    p.actor = Some(p.ship);
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(PlayerId::PLAYER_2);
+    claim.flag = Some(PlanetFlagObservation {
+        player: PlayerId::PLAYER_2,
+        position: p.actor.unwrap().position + Vec2::X * 20.0,
+        normal: Vec2::Y,
+        raised_fraction: 1.0,
+    });
+    task.step(&o);
+    assert_eq!(task.telemetry().ground_budget_ticks, 90 * 60);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    o.flight.pilot.tick = 30;
+    o.flight.pilot.planet.revision += 1;
+    o.flight
+        .pilot
+        .planet
+        .claim
+        .as_mut()
+        .unwrap()
+        .flag
+        .as_mut()
+        .unwrap()
+        .position
+        .x += 1.0;
+    task.step(&o);
+    assert_eq!(task.telemetry().ground_budget_ticks, 90 * 60);
+    assert_eq!(task.telemetry().started_tick, Some(0));
+    o.flight.pilot.tick = 210 * 60 + 1;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("recovery exceeded combined flight and ground budget")
+    );
+}

@@ -10,9 +10,11 @@
 
 pub mod combat_pilot;
 pub mod flight_pilot;
+pub mod ground_task;
 pub mod pilot;
 pub mod recovery_pilot;
 pub mod recovery_task;
+pub mod tactical_capture;
 pub mod tactical_sortie;
 
 use core::f32::consts::PI;

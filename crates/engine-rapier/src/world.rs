@@ -1177,28 +1177,61 @@ impl PhysicsWorld {
         radius: f32,
         groups: CollisionGroups,
     ) -> bool {
-        if !finite_vec2(position)
-            || !angle.is_finite()
-            || !half_segment.is_finite()
-            || half_segment < 0.0
-            || !radius.is_finite()
-            || radius <= 0.0
-        {
-            return false;
+        self.capsule_is_clear_except(position, angle, half_segment, radius, groups, None)
+    }
+
+    /// Clearance for an existing actor's route. Its own collider is excluded;
+    /// all other solid obstacles retain the ordinary collision-group filter.
+    pub fn capsule_is_clear_except(
+        &self,
+        position: Vec2,
+        angle: f32,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        exclude_entity: Option<PhysicsId>,
+    ) -> bool {
+        self.capsule_clearance_test(half_segment, radius, groups, exclude_entity)(position, angle)
+    }
+
+    /// Prepare a read-only predicate for many placements in this completed world.
+    /// Reuse the query shape instead of allocating one per route sample. Holding
+    /// the predicate borrows the world, preventing a step during the survey.
+    pub fn capsule_clearance_test(
+        &self,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        exclude_entity: Option<PhysicsId>,
+    ) -> impl Fn(Vec2, f32) -> bool + '_ {
+        let capsule =
+            (half_segment.is_finite() && half_segment >= 0.0 && radius.is_finite() && radius > 0.0)
+                .then(|| ColliderBuilder::capsule_y(half_segment, radius).build());
+        move |position, angle| {
+            let Some(capsule) = &capsule else {
+                return false;
+            };
+            if !finite_vec2(position) || !angle.is_finite() {
+                return false;
+            }
+            let predicate = |_: ColliderHandle, collider: &Collider| {
+                decode_collider(collider.user_data)
+                    .is_none_or(|id| Some(id.entity) != exclude_entity)
+            };
+            self.raw
+                .intersect_shape(
+                    Pose::new(to_rapier(position), angle),
+                    capsule.shape(),
+                    QueryFilter {
+                        flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                        groups: Some(groups.to_rapier()),
+                        predicate: Some(&predicate),
+                        ..QueryFilter::default()
+                    },
+                )
+                .next()
+                .is_none()
         }
-        let capsule = ColliderBuilder::capsule_y(half_segment, radius).build();
-        self.raw
-            .intersect_shape(
-                Pose::new(to_rapier(position), angle),
-                capsule.shape(),
-                QueryFilter {
-                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
-                    groups: Some(groups.to_rapier()),
-                    ..QueryFilter::default()
-                },
-            )
-            .next()
-            .is_none()
     }
 
     pub fn cast_ray(
@@ -2083,6 +2116,22 @@ mod tests {
         ));
         world.step(1.0 / 60.0);
         assert!(world.capsule_is_clear(Vec2::ZERO, 0.0, 0.6, 0.3, CollisionGroups::ALL));
+    }
+
+    #[test]
+    fn route_clearance_excludes_only_the_requested_actor() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        insert_ball(&mut world, 4, Vec2::ZERO);
+        insert_ball(&mut world, 7, Vec2::new(4.0, 0.0));
+        world.step(1.0 / 60.0);
+        let clear = |position, excluded| {
+            world.capsule_is_clear_except(position, 0.0, 0.6, 0.3, CollisionGroups::ALL, excluded)
+        };
+        assert!(!clear(Vec2::ZERO, None));
+        assert!(clear(Vec2::ZERO, Some(PhysicsId::new(4))));
+        assert!(!clear(Vec2::ZERO, Some(PhysicsId::new(7))));
+        assert!(!clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(4))));
+        assert!(clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(7))));
     }
 
     #[test]

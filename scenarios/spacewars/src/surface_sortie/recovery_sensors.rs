@@ -10,6 +10,9 @@ pub struct RecoveryTaskObservationV1 {
     /// Candidate sites for the current vehicle geometry, including pod feet
     /// and hatch. Empty while queries are dirty, or the vehicle is unavailable.
     pub sites: Vec<PilotLandingSite>,
+    /// Bounded, read-only outer-surface sampling for on-foot tasks. Historical
+    /// flight/pilot observations and their policies remain unchanged.
+    pub ground: Option<ground_navigation::GroundMap>,
 }
 impl SurfaceSortieState {
     pub fn recovery_task_observation(
@@ -45,6 +48,7 @@ impl SurfaceSortieState {
             version: 1,
             flight,
             sites,
+            ground: self.ground_navigation_map(player),
         }
     }
 }

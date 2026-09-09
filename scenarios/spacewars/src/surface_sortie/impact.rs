@@ -23,6 +23,7 @@ pub enum RecoveryDisruption {
     FlagFooting,
     SpacelingSupport,
     LandingSite(pilot::LandingSiteId),
+    GroundRouteNode { node: u16, radius: u32 },
 }
 
 /// Incoming hazards for headless recovery trials, including follow-up hits on
@@ -191,6 +192,13 @@ impl SurfaceSortieState {
             return false;
         }
         let planet = self.motion_planet_index(player);
+        let radius = match disruption {
+            RecoveryDisruption::GroundRouteNode { radius, .. } if (1..=8).contains(&radius) => {
+                radius
+            }
+            RecoveryDisruption::GroundRouteNode { .. } => return false,
+            _ => 2,
+        };
         let point = match disruption {
             RecoveryDisruption::FlagFooting => self
                 .claim_observation(planet, player)
@@ -208,6 +216,26 @@ impl SurfaceSortieState {
                 .vehicle_landing_site(player, id, true)
                 .map(|s| s.position - s.normal * 0.08),
             RecoveryDisruption::LandingSite(_) => None,
+            RecoveryDisruption::GroundRouteNode { node, .. }
+                if usize::from(node) < ground_navigation::GROUND_SAMPLES =>
+            {
+                let frame = self.planet_motion(player);
+                let up = Vec2::Y.rotate_radians(
+                    frame.angle
+                        + f32::from(node) * std::f32::consts::TAU
+                            / ground_navigation::GROUND_SAMPLES as f32,
+                );
+                self.world
+                    .physics
+                    .material_ground_ray(
+                        planet,
+                        frame.position + up * (self.world.planets[planet].radius + 8.0),
+                        -up,
+                        self.world.planets[planet].radius + 8.0,
+                    )
+                    .map(|hit| hit.point - hit.normal * 0.08)
+            }
+            RecoveryDisruption::GroundRouteNode { .. } => None,
         };
         let Some(point) = point else {
             return false;
@@ -223,7 +251,7 @@ impl SurfaceSortieState {
             .queue_planet_edit(
                 planet,
                 TerrainEdit {
-                    brush: Brush::Circle { center, radius: 2 },
+                    brush: Brush::Circle { center, radius },
                     mode: EditMode::Remove,
                 },
             )

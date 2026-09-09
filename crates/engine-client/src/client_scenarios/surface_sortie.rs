@@ -10,7 +10,7 @@ use scenario_spacewars::surface_sortie::{
 };
 use spacewars_ai::{
     BrainReset, combat_pilot::RulePilotV4, flight_pilot::RulePilotV2, recovery_pilot::RulePilotV3,
-    tactical_sortie::TacticalSortiePilot,
+    tactical_capture::TacticalCapturePilot,
 };
 
 use super::{
@@ -148,7 +148,7 @@ fn create_pilot(
 
 pub(super) const COMBAT_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-combat",
-    controls_help: "Material combat: P1 human versus P2 combat bot. Set Bot mission to Capture in launcher Settings to intercept P2 as it seeks shelter, lands, captures, boards and departs. After its attempt it fights or recovers. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. Launcher Settings adjust Bot combat breaks (Off, 8s, 15s or 30s of combat on average) and break duration. During a flyby the bot keeps moving with weapons off and remains vulnerable. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Enemy flag routes and escape from arbitrary caverns remain limited. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
+    controls_help: "Material combat: P1 human versus P2 combat bot. Set Bot mission to Capture in launcher Settings to intercept P2 as it seeks shelter, lands, captures, boards and departs. After its attempt it fights or recovers. A/Space thrusts; left/right or A/D turns; Down/S brakes; hold RB/J to sweep wings and cruise. RT or LB fires the forward laser; X (west face) launches a missile. Keyboard E laser, K missiles. Two visible rounds share an energy supply: each automatic reload costs 25% and takes 2s, one round at a time. Energy regenerates at 10%/s; laser draws 12%/s and resumes at 10% after depletion. Loaded rounds can fire with an empty battery. Recoil is tuned for this flight scale; shells excavate terrain and solid ground blocks laser shots. Land rear-first, B/X to exit or board. On foot, right stick aims, RT/LB mines, Y changes cut size; E/T on keyboard. Stand still 3s to claim neutral ground. Ship loss leaves a pod; land, exit and stand on owned ground 8s to rebuild, then board normally. Destroying the flag footing neutralizes ownership. Launcher Settings adjust Bot combat breaks (Off, 8s, 15s or 30s of combat on average) and break duration. During a flyby the bot keeps moving with weapons off and remains vulnerable. The bot pursues full occupied ships, routes around the planet and uses the recovery task after losing its ship. Pods and spacelings remain invulnerable. Capture and recovery bots can walk and jump along measured ground to enemy flags and ship hatches. Large gaps, obstructing vehicles and caves can still block a route. No scheduled asteroid strikes in this preset. Start/Esc pauses; R restarts.",
     create: create_combat_pilot,
     ..TERRAIN_REGISTRATION
 };
@@ -156,7 +156,7 @@ struct MaterialCombatClientScenario {
     sortie: SurfaceSortieClientScenario,
     brain: RulePilotV4,
     p1_brain: Option<RulePilotV4>,
-    tactical: Option<TacticalSortiePilot>,
+    tactical: Option<TacticalCapturePilot>,
 }
 fn create_combat_pilot(
     seed: u64,
@@ -183,7 +183,7 @@ fn create_combat_pilot(
 
 pub(super) const DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-duel",
-    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Set Bot mission to Capture in launcher Settings for P1 to attempt a sheltered landing, capture and departure while P2 intercepts. After its attempt P1 fights or recovers. Launcher Settings adjust combat breaks and their duration for both bots. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; enemy flag routes and arbitrary crater escape remain limited.",
+    controls_help: "Watch two material combat bots use ordinary controls, weapons and recovery. Damage, pod ejection, landing, claims and rebuilding are physical gameplay; no hits or ownership are scripted. Each view shows its bot's current task. Set Bot mission to Capture in launcher Settings for P1 to attempt a sheltered landing, capture and departure while P2 intercepts. After its attempt P1 fights or recovers. Launcher Settings adjust combat breaks and their duration for both bots. Start/Esc pauses; R restarts. Select spacewars-terrain-combat to fly P1 against the bot. A three-minute run may end during another recovery; bots can approach enemy flags over measured ground; large gaps, obstructing vehicles and caves can still block a route.",
     create: create_combat_duel,
     ..COMBAT_REGISTRATION
 };
@@ -216,9 +216,9 @@ fn create_combat_duel(
     }))
 }
 
-fn capture_pilot(seed: u64, actor: PlayerId, settings: &Settings) -> Option<TacticalSortiePilot> {
+fn capture_pilot(seed: u64, actor: PlayerId, settings: &Settings) -> Option<TacticalCapturePilot> {
     (settings.material_combat.mission == engine_common::MaterialCombatMission::Capture).then(|| {
-        TacticalSortiePilot::new(
+        TacticalCapturePilot::new(
             BrainReset {
                 actor,
                 episode_seed: seed,

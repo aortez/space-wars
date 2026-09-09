@@ -51,7 +51,10 @@ progress again. It never writes ownership or creates a replacement itself.
 
 Attempts have limits: four landing retries, four local build-space moves,
 15 seconds without progress toward a replacement hatch, and a two-minute
-overall task budget. A blocked task stays blocked until its caller explicitly
+overall task budget. The current [ground task](ground-navigation-ai.md) adds
+hostile-flag traversal and grants one fixed 90-second extension when a distant
+enemy flag requires that work. Its own route and stall deadlines also apply.
+A blocked task stays blocked until its caller explicitly
 resets or replaces it. It does not silently restart its deadline every tick.
 
 `RecoveryTaskObservationV1` adds pod-compatible sites around the unchanged

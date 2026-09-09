@@ -154,6 +154,14 @@ impl TacticalSortiePilot {
         self.previous_intent = intent;
         intent
     }
+
+    /// A composing mission may abort its added work while retaining V1's
+    /// existing combat/recovery fallback. Historical V1 never calls this hook.
+    pub(crate) fn abort(&mut self, tick: u64, reason: &'static str) {
+        self.telemetry.failed_tick.get_or_insert(tick);
+        self.telemetry.failure = Some(reason);
+        self.goal(TacticalGoal::Blocked, tick);
+    }
     fn replan(&mut self, tick: u64) {
         self.telemetry.replans += 1;
         self.site = None;
