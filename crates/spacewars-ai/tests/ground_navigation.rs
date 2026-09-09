@@ -80,7 +80,7 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
 
 fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
     use scenario_spacewars::surface_sortie::jetpack::{
-        CrossingDirection, CrossingPlan, JetpackNavigationObservation,
+        CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
     };
     o.jetpack = Some(JetpackNavigationObservation {
         charge,
@@ -88,6 +88,7 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
         burn_seconds: 0.0,
         gravity: -Vec2::Y * 18.0,
         surveyed: true,
+        terrain_crossings: Vec::new(),
         crossing: Some(CrossingPlan {
             planet: o.flight.pilot.planet.index,
             revision: o.flight.pilot.planet.revision,
@@ -95,10 +96,107 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
             start: Vec2::new(0.0, 60.0),
             destination: Vec2::new(6.0, 60.0),
             cruise_radius: 72.0,
-            ship_position: Vec2::new(3.0, 60.0),
-            ship_angle: 0.0,
+            anchor: CrossingAnchor::Vehicle {
+                index: 0,
+                form: scenario_spacewars::ShipForm::Ship,
+                position: Vec2::new(3.0, 60.0),
+                angle: 0.0,
+            },
         }),
     });
+}
+
+#[test]
+fn route_can_chain_two_measured_flights_without_changing_the_sensor_map() {
+    use scenario_spacewars::surface_sortie::jetpack::CrossingAnchor;
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 1.0);
+    let map = o.ground.as_mut().unwrap();
+    map.nodes = (0..9)
+        .map(|id| GroundNode {
+            id,
+            position: Vec2::new(f32::from(id) * 2.0, 60.0),
+            normal: Vec2::Y,
+        })
+        .collect();
+    map.edges = (0..8)
+        .filter(|id| *id != 1 && *id != 5)
+        .map(|id| GroundEdge {
+            from: id,
+            to: id + 1,
+            kind: GroundEdgeKind::Walk,
+            length: 2.0,
+        })
+        .collect();
+    let mut second = o.jetpack.as_ref().unwrap().crossing.clone().unwrap();
+    second.start = Vec2::new(8.0, 60.0);
+    second.destination = Vec2::new(16.0, 60.0);
+    second.anchor = CrossingAnchor::GroundGap { from: 5, to: 6 };
+    o.jetpack.as_mut().unwrap().terrain_crossings.push(second);
+    let original = o.ground.clone();
+    let mut task = GroundNavigationTask::new(
+        context,
+        GroundDestination::Rebuild {
+            planet: o.flight.pilot.planet.index,
+            position: Vec2::new(16.0, 60.0),
+        },
+    );
+    task.step(&o);
+    assert!(
+        task.is_crossing(),
+        "neither flight alone reaches the objective"
+    );
+    assert_eq!(task.telemetry().route.as_ref().unwrap().flights, 2);
+    assert_eq!(o.ground, original);
+    assert_eq!(
+        task.telemetry()
+            .crossing
+            .as_ref()
+            .unwrap()
+            .plan
+            .as_ref()
+            .unwrap()
+            .start,
+        Vec2::new(0.0, 60.0)
+    );
+}
+
+#[test]
+fn flag_route_uses_the_supported_actor_center_and_the_real_interaction_range() {
+    let (context, mut o) = fixture();
+    let p = &mut o.flight.pilot;
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(PlayerId::PLAYER_2);
+    claim.flag = Some(PlanetFlagObservation {
+        player: PlayerId::PLAYER_2,
+        position: Vec2::new(8.5, 60.0),
+        normal: Vec2::Y,
+        raised_fraction: 1.0,
+    });
+    assert_eq!(claim.flag_interaction_range, 3.0);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+    task.step(&o);
+    assert!(!task.telemetry().path.is_empty());
+    assert_eq!(task.telemetry().route.as_ref().unwrap().failure, None);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.9);
+    advance(&mut o, 1);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    o.flight.pilot.supported_planet = None;
+    advance(&mut o, 2);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(
+        task.telemetry().goal,
+        GroundGoal::Settle,
+        "contact loss near the flag must settle without restarting a jump"
+    );
+    advance(&mut o, 90 * 60 + 1);
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().goal,
+        GroundGoal::Blocked,
+        "waiting near a destination cannot reset the task deadline"
+    );
 }
 
 #[test]

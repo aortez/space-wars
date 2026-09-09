@@ -1,7 +1,10 @@
-//! A measured ship crossing is an optional leg in the ordinary ground route.
+//! Measured flights join the ordinary walk/jump graph; execute its first flight.
 use super::*;
 use crate::jetpack_crossing::CrossingGoal;
-use scenario_spacewars::surface_sortie::ground_navigation::GroundRoute;
+use scenario_spacewars::surface_sortie::{
+    ground_navigation::{GroundEdge, GroundRoute},
+    jetpack::{CrossingAnchor, MAX_TERRAIN_CROSSINGS},
+};
 
 impl GroundNavigationTask {
     pub(super) fn route_with_jetpack(
@@ -12,45 +15,88 @@ impl GroundNavigationTask {
         range: f32,
         o: &RecoveryTaskObservationV1,
     ) -> (GroundRoute, Option<CrossingPlan>) {
-        let route = |start| {
+        let route = |map: &GroundMap| {
             if self.telemetry.destination == GroundDestination::Hatch {
-                map.route_to_hatch(start, target)
+                map.route_to_hatch(foot, target)
+            } else if self.telemetry.destination == GroundDestination::Flag {
+                map.route_to_actor_target(foot, target, range)
             } else {
-                map.route(start, target, range - 0.6)
+                map.route(foot, target, range - 0.6)
             }
         };
         let cost = |r: &GroundRoute| {
             if r.path.is_empty() {
                 f32::INFINITY
             } else {
-                r.diagnostics.length + r.diagnostics.jumps as f32 * 2.0
+                r.diagnostics.length
+                    + r.diagnostics.jumps as f32 * 2.0
+                    + r.diagnostics.flights as f32 * 30.0
             }
         };
-        let mut best = route(foot);
-        let mut best_cost = cost(&best);
-        let mut crossing = None;
-        if let Some(jetpack) = &o.jetpack
-            && jetpack.surveyed
-            && jetpack.charge.is_finite()
-            && (0.0..=1.0).contains(&jetpack.charge)
-            && let Some(plan) = &jetpack.crossing
-            && valid_plan(plan, map)
+        let direct = route(map);
+        let Some(jetpack) = &o.jetpack else {
+            return (direct, None);
+        };
+        if !jetpack.surveyed
+            || !jetpack.charge.is_finite()
+            || !(0.0..=1.0).contains(&jetpack.charge)
+            || jetpack.terrain_crossings.len() > MAX_TERRAIN_CROSSINGS
         {
-            for plan in [plan.clone(), plan.reversed()] {
-                let approach = map.route(foot, plan.start, 1.4);
-                let finish = route(plan.destination);
-                // Flight needs lift, descent and possibly four seconds of
-                // charging. Prefer the existing short walking route when usable.
-                let flight_cost = plan.start.distance_to(plan.destination) + 30.0;
-                let candidate_cost = cost(&approach) + flight_cost + cost(&finish);
-                if candidate_cost + 2.0 < best_cost {
-                    best_cost = candidate_cost;
-                    best = approach;
-                    crossing = Some(plan);
+            return (direct, None);
+        }
+        let nearest = |point: Vec2| {
+            map.nodes
+                .iter()
+                .filter(|n| n.position.distance_to(point) < 1.4)
+                .min_by(|a, b| {
+                    a.position
+                        .distance_to(point)
+                        .total_cmp(&b.position.distance_to(point))
+                })
+                .map(|n| n.id)
+        };
+        let mut graph = map.clone();
+        let mut flights = Vec::new();
+        for plan in jetpack
+            .crossing
+            .iter()
+            .chain(&jetpack.terrain_crossings)
+            .filter(|plan| valid_plan(plan, map))
+            .flat_map(|plan| [plan.clone(), plan.reversed()])
+        {
+            let (Some(from), Some(to)) = (nearest(plan.start), nearest(plan.destination)) else {
+                continue;
+            };
+            // A measured direct ground edge is cheaper. Keep one unambiguous
+            // flight per node pair when a vehicle and gap survey overlap.
+            if from == to || graph.edges.iter().any(|e| e.from == from && e.to == to) {
+                continue;
+            }
+            graph.edges.push(GroundEdge {
+                from,
+                to,
+                kind: GroundEdgeKind::Jetpack,
+                length: plan.start.distance_to(plan.destination),
+            });
+            flights.push((from, to, plan));
+        }
+        if flights.is_empty() {
+            return (direct, None);
+        }
+        let mut combined = route(&graph);
+        if cost(&combined) + 2.0 < cost(&direct) {
+            for (i, pair) in combined.path.windows(2).enumerate() {
+                if let Some((_, _, plan)) = flights
+                    .iter()
+                    .find(|(a, b, _)| *a == pair[0] && *b == pair[1])
+                {
+                    let plan = plan.clone();
+                    combined.path.truncate(i + 1);
+                    return (combined, Some(plan));
                 }
             }
         }
-        (best, crossing)
+        (direct, None)
     }
 
     pub(super) fn follow_crossing(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
@@ -62,8 +108,8 @@ impl GroundNavigationTask {
         if !jetpack.charge.is_finite() || !(0.0..=1.0).contains(&jetpack.charge) {
             return self.interrupt_crossing(p.tick);
         }
-        let observation = jetpack.for_crossing(p, task.direction());
         let old = task.telemetry().plan.as_ref().unwrap();
+        let observation = jetpack.for_crossing(p, old);
         if jetpack.surveyed {
             if observation
                 .plan
@@ -121,10 +167,17 @@ impl GroundNavigationTask {
 fn valid_plan(plan: &CrossingPlan, map: &GroundMap) -> bool {
     plan.planet == map.planet
         && plan.revision == map.revision
-        && [plan.start, plan.destination, plan.ship_position]
+        && [plan.start, plan.destination]
             .iter()
             .all(|v| v.x.is_finite() && v.y.is_finite())
-        && plan.ship_angle.is_finite()
+        && match &plan.anchor {
+            CrossingAnchor::Vehicle {
+                position, angle, ..
+            } => position.x.is_finite() && position.y.is_finite() && angle.is_finite(),
+            CrossingAnchor::GroundGap { from, to } => {
+                usize::from(*from) < GROUND_SAMPLES && usize::from(*to) < GROUND_SAMPLES
+            }
+        }
         && plan.cruise_radius.is_finite()
         && plan.start.distance_to(plan.destination) > 1.0
         && plan.start.distance_to(plan.destination) < 30.0

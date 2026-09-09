@@ -45,10 +45,10 @@ impl GroundGoal {
             Self::Jump => "jumping a ground obstacle",
             Self::GetUp => "getting up on the route",
             Self::Recharge => "recharging for the ground route",
-            Self::JetpackLift => "jetpack: climbing over the ship",
+            Self::JetpackLift => "jetpack: climbing over an obstacle",
             Self::JetpackCross => "jetpack: crossing toward the objective",
             Self::JetpackLand => "jetpack: landing to resume the route",
-            Self::Settle => "waiting for footing after interrupted flight",
+            Self::Settle => "waiting for stable footing",
             Self::Arrived => "at the ground destination",
             Self::Blocked => "ground route blocked",
         }
@@ -95,7 +95,7 @@ impl GroundNavigationTask {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v3",
+                policy: "ground_navigation_v4",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -273,13 +273,27 @@ impl GroundNavigationTask {
             return action;
         };
         let range = match self.telemetry.destination {
-            GroundDestination::Flag => 2.3,
+            GroundDestination::Flag => p
+                .planet
+                .claim
+                .as_ref()
+                .map_or(2.8, |claim| claim.flag_interaction_range - 0.2),
             GroundDestination::Hatch => HATCH_APPROACH_RANGE,
             GroundDestination::Rebuild { .. } => 1.4,
         };
-        if actor.position.distance_to(target) < range && p.supported_planet == Some(p.planet.index)
-        {
-            self.telemetry.goal = GroundGoal::Arrived;
+        if actor.position.distance_to(target) < range {
+            self.telemetry.goal = if p.supported_planet == Some(p.planet.index) {
+                self.telemetry.last_progress_tick = p.tick;
+                GroundGoal::Arrived
+            } else {
+                // Brief contact loss at the destination needs a quiet landing.
+                // Resuming an old jump edge here repeatedly interrupts claims.
+                GroundGoal::Settle
+            };
+            if p.tick.saturating_sub(start) > 90 * 60 && self.telemetry.goal != GroundGoal::Arrived
+            {
+                self.block("ground traversal exceeded ninety seconds");
+            }
             return action;
         }
         if p.tick.saturating_sub(start) > 90 * 60 {
@@ -330,6 +344,7 @@ impl GroundNavigationTask {
                         || !ids[usize::from(e.to)]
                         || !e.length.is_finite()
                         || e.length <= 0.0
+                        || e.kind == GroundEdgeKind::Jetpack
                 })
             {
                 self.block("invalid ground map geometry");

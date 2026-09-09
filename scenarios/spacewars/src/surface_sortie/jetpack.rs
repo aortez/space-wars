@@ -1,6 +1,23 @@
-//! Measured local flights across the assigned parked ship. No policy or world writes in sensors.
+//! Bounded flights across vehicles and breaks in retained ground. Read-only sensors.
 use super::*;
 use engine_rapier::spaceling::jetpack as motor;
+use ground_navigation::GroundMap;
+
+pub const MAX_TERRAIN_CROSSINGS: usize = 8;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum CrossingAnchor {
+    Vehicle {
+        index: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+    },
+    GroundGap {
+        from: u16,
+        to: u16,
+    },
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum CrossingDirection {
@@ -17,11 +34,48 @@ pub struct CrossingPlan {
     pub start: Vec2,
     pub destination: Vec2,
     pub cruise_radius: f32,
-    pub ship_position: Vec2,
-    pub ship_angle: f32,
+    pub anchor: CrossingAnchor,
 }
 
 impl CrossingPlan {
+    pub fn same_corridor(&self, other: &Self) -> bool {
+        let anchor_matches = match (&self.anchor, &other.anchor) {
+            (
+                CrossingAnchor::Vehicle {
+                    index: a,
+                    form: af,
+                    position: ap,
+                    angle: aa,
+                },
+                CrossingAnchor::Vehicle {
+                    index: b,
+                    form: bf,
+                    position: bp,
+                    angle: ba,
+                },
+            ) => {
+                a == b
+                    && af == bf
+                    && ap.distance_to(*bp) <= 0.5
+                    && ((aa - ba + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+                        - std::f32::consts::PI)
+                        .abs()
+                        <= 0.1
+            }
+            (
+                CrossingAnchor::GroundGap { from: a, to: b },
+                CrossingAnchor::GroundGap { from: c, to: d },
+            ) => a == c && b == d,
+            _ => false,
+        };
+        anchor_matches
+            && self.planet == other.planet
+            && self.direction == other.direction
+            && self.start.distance_to(other.start) <= 0.5
+            && self.destination.distance_to(other.destination) <= 0.5
+            && (self.cruise_radius - other.cruise_radius).abs() <= 0.25
+    }
+
     pub fn reversed(&self) -> Self {
         Self {
             direction: match self.direction {
@@ -35,8 +89,8 @@ impl CrossingPlan {
     }
 }
 
-/// Equipment is sampled every tick; the single bidirectional corridor is
-/// measured at the same staggered cadence as the ground map.
+/// Equipment is sampled every tick; bounded bidirectional corridors use the
+/// same completed, staggered survey as the ground map.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JetpackNavigationObservation {
     pub charge: f32,
@@ -45,13 +99,14 @@ pub struct JetpackNavigationObservation {
     pub gravity: Vec2,
     pub surveyed: bool,
     pub crossing: Option<CrossingPlan>,
+    pub terrain_crossings: Vec<CrossingPlan>,
 }
 
 impl JetpackNavigationObservation {
     pub fn for_crossing(
         &self,
         pilot: &pilot::PilotObservationV1,
-        direction: CrossingDirection,
+        selected: &CrossingPlan,
     ) -> JetpackCrossingObservation {
         JetpackCrossingObservation {
             version: 1,
@@ -63,13 +118,12 @@ impl JetpackNavigationObservation {
             thrust: motor::THRUST,
             air_speed: motor::AIR_SPEED,
             surveyed: self.surveyed,
-            plan: self.crossing.as_ref().map(|plan| {
-                if plan.direction == direction {
-                    plan.clone()
-                } else {
-                    plan.reversed()
-                }
-            }),
+            plan: self
+                .crossing
+                .iter()
+                .chain(&self.terrain_crossings)
+                .flat_map(|plan| [plan.clone(), plan.reversed()])
+                .find(|plan| selected.same_corridor(plan)),
         }
     }
 }
@@ -102,6 +156,14 @@ impl SurfaceSortieState {
         &self,
         player: usize,
     ) -> Option<JetpackNavigationObservation> {
+        self.jetpack_navigation_with_ground(player, self.ground_navigation_map(player).as_ref())
+    }
+
+    pub(super) fn jetpack_navigation_with_ground(
+        &self,
+        player: usize,
+        ground: Option<&GroundMap>,
+    ) -> Option<JetpackNavigationObservation> {
         let pilot = &self.pilots[player];
         let pack = pilot.body.as_ref().and_then(|body| body.jetpack());
         let charge = pack.map(|p| p.charge).or(pilot.jetpack_charge)?;
@@ -117,6 +179,9 @@ impl SurfaceSortieState {
             crossing: surveyed
                 .then(|| self.crossing_plan(player, CrossingDirection::Left))
                 .flatten(),
+            terrain_crossings: ground
+                .filter(|_| surveyed)
+                .map_or_else(Vec::new, |map| self.terrain_crossings(player, map)),
         })
     }
 
@@ -178,7 +243,7 @@ impl SurfaceSortieState {
             return None;
         }
         let ship = &self.world.ships[pilot.vehicle.0];
-        if ship.dead || ship.form != ShipForm::Ship {
+        if ship.dead {
             return None;
         }
         let planet = pilot.planet;
@@ -219,8 +284,13 @@ impl SurfaceSortieState {
                 rotation_for_direction(point.normalized().rotate_radians(frame.angle)),
             )
         };
+        let half_width = outline
+            .iter()
+            .map(|&point| (local(point) - center).dot(right).abs())
+            .fold(0.0, f32::max);
         let endpoint = |side: f32| {
-            [8.0, 9.0, 10.0, 11.0, 12.0].into_iter().find_map(|offset| {
+            (0..5).find_map(|i| {
+                let offset = (half_width + 2.0).ceil() + i as f32;
                 let ray_up = (center + right * side * offset).normalized();
                 let hit = self.world.physics.material_ground_ray(
                     planet,
@@ -240,32 +310,8 @@ impl SurfaceSortieState {
             CrossingDirection::Left => (right, left),
             CrossingDirection::Right => (left, right),
         };
-        let top_start = start.normalized() * cruise_radius;
-        let top_end = destination.normalized() * cruise_radius;
-        let segment_clear = |a: Vec2, b: Vec2| {
-            let count = (a.distance_to(b) / 0.20).ceil() as usize;
-            count <= 128
-                && (0..=count).all(|i| point_clear(a + (b - a) * (i as f32 / count.max(1) as f32)))
-        };
-        // Inflated capsule samples overlap along each short segment. The arc is
-        // split into bounded chords, with the same real ship collider present.
-        if !segment_clear(start + start.normalized() * 1.25, top_start)
-            || !segment_clear(top_end, destination + destination.normalized() * 1.25)
-        {
+        if !corridor_clear(start, destination, cruise_radius, &point_clear) {
             return None;
-        }
-        let angle =
-            (top_start.x * top_end.y - top_start.y * top_end.x).atan2(top_start.dot(top_end));
-        if angle.abs() > 0.55 {
-            return None;
-        }
-        for i in 0..16 {
-            if !segment_clear(
-                top_start.rotate_radians(angle * i as f32 / 16.0),
-                top_start.rotate_radians(angle * (i + 1) as f32 / 16.0),
-            ) {
-                return None;
-            }
         }
         Some(CrossingPlan {
             planet,
@@ -274,10 +320,132 @@ impl SurfaceSortieState {
             start,
             destination,
             cruise_radius,
-            ship_position: center,
-            ship_angle: body.angle - frame.angle,
+            anchor: CrossingAnchor::Vehicle {
+                index: pilot.vehicle.0,
+                form: ship.form,
+                position: center,
+                angle: body.angle - frame.angle,
+            },
         })
     }
+
+    fn terrain_crossings(&self, player: usize, map: &GroundMap) -> Vec<CrossingPlan> {
+        let Some(actor) = self.spaceling_snapshot(player) else {
+            return Vec::new();
+        };
+        let frame = motion::SurfaceFrame::read(&self.world.physics, map.planet);
+        let local = (actor.motion.position - frame.position).rotate_radians(-frame.angle);
+        let n = map.nodes.len();
+        if n < 2 {
+            return Vec::new();
+        }
+        let mut indices = [usize::MAX; ground_navigation::GROUND_SAMPLES];
+        for (i, node) in map.nodes.iter().enumerate() {
+            indices[usize::from(node.id)] = i;
+        }
+        let mut adjacent = vec![0_u8; n];
+        for edge in &map.edges {
+            let a = indices[usize::from(edge.from)];
+            let b = indices[usize::from(edge.to)];
+            if (a + 1) % n == b {
+                adjacent[a] |= 1;
+            }
+            if (b + 1) % n == a {
+                adjacent[b] |= 2;
+            }
+        }
+        let mut gaps = (0..n)
+            .filter(|&i| {
+                adjacent[i] != 3
+                    && map.nodes[i]
+                        .position
+                        .distance_to(map.nodes[(i + 1) % n].position)
+                        <= 12.0
+            })
+            .collect::<Vec<_>>();
+        gaps.sort_by(|&a, &b| {
+            map.nodes[a]
+                .position
+                .distance_to(local)
+                .total_cmp(&map.nodes[b].position.distance_to(local))
+                .then(a.cmp(&b))
+        });
+        let spec = Self::spec();
+        let capsule = self.world.physics.world.capsule_clearance_test_excluding(
+            spec.half_segment,
+            spec.radius + 0.20,
+            spec.collision_groups,
+            vec![pilot_physics_id(self.pilots[player].owner)],
+        );
+        let clear = |point: Vec2| {
+            capsule(
+                frame.position + point.rotate_radians(frame.angle),
+                rotation_for_direction(point.normalized().rotate_radians(frame.angle)),
+            )
+        };
+        let mut plans = Vec::new();
+        // Reuse accepted retained footing. A few wider endpoints allow a climb
+        // beside an overhanging pod or a short step without standing on debris.
+        for i in gaps.into_iter().take(MAX_TERRAIN_CROSSINGS) {
+            let anchor = CrossingAnchor::GroundGap {
+                from: map.nodes[i].id,
+                to: map.nodes[(i + 1) % n].id,
+            };
+            'endpoints: for margin in 0..4.min(n / 2) {
+                let a = map.nodes[(i + n - margin) % n].position;
+                let b = map.nodes[(i + 1 + margin) % n].position;
+                if a.distance_to(b) > 14.0 || a.distance_to(b) < 1.0 {
+                    continue;
+                }
+                for height in [3.0, 5.0, 7.0] {
+                    let cruise = a.length().max(b.length()) + height;
+                    if cruise > a.length().min(b.length()) + 10.0 {
+                        continue;
+                    }
+                    if corridor_clear(a, b, cruise, &clear) {
+                        plans.push(CrossingPlan {
+                            planet: map.planet,
+                            revision: map.revision,
+                            direction: CrossingDirection::Left,
+                            start: a,
+                            destination: b,
+                            cruise_radius: cruise,
+                            anchor: anchor.clone(),
+                        });
+                        break 'endpoints;
+                    }
+                }
+            }
+        }
+        plans
+    }
+}
+
+fn corridor_clear(
+    start: Vec2,
+    destination: Vec2,
+    radius: f32,
+    clear: &impl Fn(Vec2) -> bool,
+) -> bool {
+    let top_start = start.normalized() * radius;
+    let top_end = destination.normalized() * radius;
+    let segment = |a: Vec2, b: Vec2| {
+        let count = (a.distance_to(b) / 0.20).ceil() as usize;
+        count <= 128 && (0..=count).all(|i| clear(a + (b - a) * (i as f32 / count.max(1) as f32)))
+    };
+    if !segment(start + start.normalized() * 1.25, top_start)
+        || !segment(top_end, destination + destination.normalized() * 1.25)
+    {
+        return false;
+    }
+    let angle = (top_start.x * top_end.y - top_start.y * top_end.x).atan2(top_start.dot(top_end));
+    angle.abs() <= 0.55
+        && (0..16).all(|i| {
+            segment(
+                top_start.rotate_radians(angle * i as f32 / 16.0),
+                top_start.rotate_radians(angle * (i + 1) as f32 / 16.0),
+            )
+        })
 }
 
 #[cfg(test)]
@@ -354,6 +522,10 @@ mod tests {
         let dirty = state.jetpack_crossing_observation(0, CrossingDirection::Left);
         assert!(!dirty.surveyed && dirty.plan.is_none());
         let navigation = state.jetpack_navigation_observation(0).unwrap();
-        assert!(!navigation.surveyed && navigation.crossing.is_none());
+        assert!(
+            !navigation.surveyed
+                && navigation.crossing.is_none()
+                && navigation.terrain_crossings.is_empty()
+        );
     }
 }

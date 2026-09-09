@@ -48,13 +48,14 @@ impl SurfaceSortieState {
         };
         let ground = self.ground_navigation_map(player);
         let rebuild = self.rebuild_relocation_survey(player);
+        let jetpack = self.jetpack_navigation_with_ground(player, ground.as_ref());
         RecoveryTaskObservationV1 {
             version: 1,
             flight,
             sites,
             ground,
             rebuild,
-            jetpack: self.jetpack_navigation_observation(player),
+            jetpack,
         }
     }
 }

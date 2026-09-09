@@ -66,7 +66,7 @@ impl JetpackCrossingPilot {
         Self {
             context,
             telemetry: CrossingTelemetry {
-                policy: "jetpack_crossing_v1",
+                policy: "jetpack_crossing_v2",
                 goal: CrossingGoal::Exit,
                 reason: None,
                 started_tick: None,
@@ -96,25 +96,17 @@ impl JetpackCrossingPilot {
     }
 
     pub(crate) fn revalidate(&mut self, plan: &CrossingPlan) -> bool {
-        if ![plan.start, plan.destination, plan.ship_position]
+        if ![plan.start, plan.destination]
             .iter()
             .all(|p| p.x.is_finite() && p.y.is_finite())
             || !plan.cruise_radius.is_finite()
-            || !plan.ship_angle.is_finite()
         {
             return false;
         }
         let Some(old) = &self.telemetry.plan else {
             return false;
         };
-        if old.planet != plan.planet
-            || old.direction != plan.direction
-            || old.start.distance_to(plan.start) > 0.5
-            || old.destination.distance_to(plan.destination) > 0.5
-            || (old.cruise_radius - plan.cruise_radius).abs() > 0.25
-            || old.ship_position.distance_to(plan.ship_position) > 0.5
-            || angle_difference(old.ship_angle, plan.ship_angle).abs() > 0.1
-        {
+        if !old.same_corridor(plan) {
             return false;
         }
         self.telemetry.plan = Some(plan.clone());
@@ -233,11 +225,13 @@ impl JetpackCrossingPilot {
                 if plan.direction != self.direction() {
                     return a;
                 }
-                if self.telemetry.plan.as_ref().is_some_and(|old| {
-                    old.ship_position.distance_to(plan.ship_position) > 0.5
-                        || angle_difference(old.ship_angle, plan.ship_angle).abs() > 0.1
-                }) {
-                    self.block("parked ship moved across the flight route");
+                if self
+                    .telemetry
+                    .plan
+                    .as_ref()
+                    .is_some_and(|old| !old.same_corridor(plan))
+                {
+                    self.block("measured flight corridor changed");
                     return a;
                 }
                 if self.telemetry.plan.is_none() {
@@ -338,8 +332,4 @@ impl JetpackCrossingPilot {
         }
         a
     }
-}
-
-fn angle_difference(a: f32, b: f32) -> f32 {
-    (a - b + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }

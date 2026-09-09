@@ -18,6 +18,8 @@ pub struct GroundNode {
 pub enum GroundEdgeKind {
     Walk,
     Jump,
+    /// Added only to the AI's route graph from a measured flight corridor.
+    Jetpack,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct GroundEdge {
@@ -71,6 +73,7 @@ pub struct GroundRouteDiagnostics {
     pub closest_reachable_distance: Option<f32>,
     pub length: f32,
     pub jumps: usize,
+    pub flights: usize,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GroundRoute {
@@ -94,10 +97,16 @@ impl GroundMap {
     /// includes nearby lower footing; climbing onto the hatch ray's hit is not
     /// required by the human transfer rule.
     pub fn route_to_hatch(&self, start: Vec2, target: Vec2) -> GroundRoute {
+        self.route_to_actor_target(start, target, HATCH_APPROACH_RANGE)
+    }
+
+    /// Route using a standing-center envelope. Hatch transfer measures this
+    /// center; claims still independently check the real supported flag anchor.
+    pub fn route_to_actor_target(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
         self.route_with_height(
             start,
             target,
-            HATCH_APPROACH_RANGE,
+            range,
             SurfaceSortieState::spec().half_height(),
         )
     }
@@ -131,6 +140,7 @@ impl GroundMap {
                 closest_reachable_distance: None,
                 length: 0.0,
                 jumps: 0,
+                flights: 0,
             },
         };
         let Some(initial) = nearest.filter(|n| n.position.distance_to(start) < 3.0) else {
@@ -174,6 +184,7 @@ impl GroundMap {
                     result.path.push(previous);
                     result.diagnostics.length += length;
                     result.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
+                    result.diagnostics.flights += usize::from(kind == GroundEdgeKind::Jetpack);
                     cursor = usize::from(previous);
                 }
                 result.path.reverse();
@@ -183,10 +194,10 @@ impl GroundMap {
                 let next = usize::from(edge.to);
                 let cost = costs[index]
                     + edge.length
-                    + if edge.kind == GroundEdgeKind::Jump {
-                        2.0
-                    } else {
-                        0.0
+                    + match edge.kind {
+                        GroundEdgeKind::Walk => 0.0,
+                        GroundEdgeKind::Jump => 2.0,
+                        GroundEdgeKind::Jetpack => 30.0,
                     };
                 if cost < costs[next] {
                     costs[next] = cost;

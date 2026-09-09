@@ -108,6 +108,7 @@ fn main() {
     let mut previous_interact = false;
     let mut last_ground = None;
     let mut last_map = None;
+    let mut last_jetpack_survey = None;
     let mut ground_failures = Vec::new();
     let initial_cells = state.terrain_diagnostics().occupied_cells;
     for tick in 0..180 * 60 {
@@ -137,6 +138,9 @@ fn main() {
         );
         if o.ground.is_some() {
             last_map = o.ground.clone();
+        }
+        if o.jetpack.as_ref().is_some_and(|j| j.surveyed) {
+            last_jetpack_survey = Some(json!({"tick": tick, "jetpack": o.jetpack}));
         }
         let p = &o.flight.pilot;
         let lost = p.recovery.as_ref().is_some_and(|r| r.ships_lost > 0);
@@ -305,7 +309,7 @@ fn main() {
                 .is_some_and(|g| g.goal == GroundGoal::Blocked)
             {
                 ground_failures.push(
-                    json!({"tick":tick,"ground":ground,"map":last_map,"pilot":o.flight.pilot}),
+                    json!({"tick":tick,"ground":ground,"map":last_map,"pilot":o.flight.pilot,"jetpack_survey":last_jetpack_survey}),
                 );
             }
             eprintln!("{:.2}s {label}", tick as f32 / 60.0);

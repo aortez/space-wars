@@ -35,7 +35,9 @@ for seed, seat, mode, edit in cases:
     out = args.out / name
     out.mkdir(parents=True, exist_ok=True)
     destination = f'{args.remote_out}/{name}' if args.ssh else str(out.resolve())
-    expected = 'blocked' if edit == 'blocked' else 'complete'
+    # The P2 two-cut layout is reachable by the new measured terrain hop.
+    # P1's cut still has no authorized corridor. Keep both outcomes explicit.
+    expected = 'blocked' if edit == 'blocked' and (not args.jetpacks or seat == 0) else 'complete'
     command = [args.binary, '--seed', str(seed), '--seat', str(seat), '--mode', mode,
                '--edit', edit, '--expect', expected, '--out', destination]
     if args.jetpacks:

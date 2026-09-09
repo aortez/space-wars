@@ -1,5 +1,9 @@
 # Jetpack routes in ordinary material gameplay
 
+This records the initial full-ship integration milestone. The subsequent
+[pod and damaged-ground recovery slice](jetpack-recovery-navigation.md) extends
+these routes and records the next validation results.
+
 The material combat and duel presets now equip both pilots with the shared
 spaceling jetpack. `GroundNavigationTask` (`ground_navigation_v3`) can combine
 walking/jumping with one measured crossing of its assigned parked full ship.
