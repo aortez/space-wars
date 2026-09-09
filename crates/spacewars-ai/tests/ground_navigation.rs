@@ -59,6 +59,7 @@ fn fixture() -> (BrainReset, RecoveryTaskObservationV1) {
                 normal: Vec2::Y,
             })
             .collect(),
+        rejected: Vec::new(),
         edges: (0..3)
             .map(|id| GroundEdge {
                 from: id,
@@ -82,7 +83,7 @@ fn traversal_replay_clone_reset_and_local_frame_contract() {
     let (context, mut o) = fixture();
     let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
     task.step(&o);
-    assert_eq!(task.telemetry().path, vec![0, 1, 2, 3]);
+    assert_eq!(task.telemetry().path, vec![0, 1, 2]);
     advance(&mut o, 1);
     let action = task.step(&o);
     assert!(action.horizontal > 0.0);
@@ -313,7 +314,38 @@ fn a_cut_edge_can_replan_to_an_alternative_jump() {
     });
     advance(&mut o, 1);
     task.step(&o);
-    assert_eq!(task.telemetry().path, vec![0, 2, 3]);
+    assert_eq!(task.telemetry().path, vec![0, 2]);
     assert_eq!(task.telemetry().invalidations, 1);
     assert_eq!(task.telemetry().replans, 2);
+}
+
+#[test]
+fn route_diagnostics_distinguish_missing_footing_from_disconnected_ground() {
+    use scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure;
+    let (_, o) = fixture();
+    let mut map = o.ground.unwrap();
+    let start = Vec2::new(0.0, 60.0);
+    let target = Vec2::new(6.0, 60.0);
+    let route = map.route(start, target, 0.8);
+    assert_eq!(route.path, vec![0, 1, 2, 3]);
+    assert_eq!(route.diagnostics.failure, None);
+    assert_eq!(route.diagnostics.length, 6.0);
+    assert_eq!(
+        map.route(start + Vec2::Y * 5.0, target, 0.8)
+            .diagnostics
+            .failure,
+        Some(GroundRouteFailure::NoStartFooting)
+    );
+    assert_eq!(
+        map.route(start, target + Vec2::Y * 5.0, 0.8)
+            .diagnostics
+            .failure,
+        Some(GroundRouteFailure::NoDestinationFooting)
+    );
+    map.edges.retain(|e| e.from != 1);
+    let failed = map.route(start, target, 0.8).diagnostics;
+    assert_eq!(failed.failure, Some(GroundRouteFailure::Disconnected));
+    assert_eq!(failed.destination_nodes, 1);
+    assert_eq!(failed.reachable_nodes, 2);
+    assert_eq!(failed.closest_reachable_distance, Some(4.0));
 }

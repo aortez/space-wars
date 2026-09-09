@@ -13,6 +13,7 @@ pub struct RecoveryTaskObservationV1 {
     /// Bounded, read-only outer-surface sampling for on-foot tasks. Historical
     /// flight/pilot observations and their policies remain unchanged.
     pub ground: Option<ground_navigation::GroundMap>,
+    pub rebuild: Option<rebuild_placement::RebuildRelocationSurvey>,
 }
 impl SurfaceSortieState {
     pub fn recovery_task_observation(
@@ -44,11 +45,14 @@ impl SurfaceSortieState {
                 })
                 .collect()
         };
+        let ground = self.ground_navigation_map(player);
+        let rebuild = self.rebuild_relocation_survey(player);
         RecoveryTaskObservationV1 {
             version: 1,
             flight,
             sites,
-            ground: self.ground_navigation_map(player),
+            ground,
+            rebuild,
         }
     }
 }

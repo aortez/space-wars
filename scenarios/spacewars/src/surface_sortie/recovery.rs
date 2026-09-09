@@ -1,8 +1,8 @@
 //! Expedition-only vehicle loss and replacement. No actor duplication, old
 //! docking services, invincibility changes, or additional physics steps.
 
+use super::rebuild_placement::RebuildPlacementReport;
 use super::*;
-use engine_rapier::world::RayCastOptions;
 
 const SCUTTLE_TIME: Duration = Duration::from_secs(3);
 const REBUILD_TIME: Duration = Duration::from_secs(8);
@@ -22,6 +22,7 @@ pub enum SurfaceRecoveryStatus {
     NeedOwnedPlanet,
     Rebuilding,
     ClearanceBlocked,
+    HatchBlocked,
 }
 
 impl SurfaceRecoveryStatus {
@@ -36,6 +37,7 @@ impl SurfaceRecoveryStatus {
             Self::NeedOwnedPlanet => "claim this planet to rebuild",
             Self::Rebuilding => "rebuilding; stand still",
             Self::ClearanceBlocked => "build space blocked; move along surface",
+            Self::HatchBlocked => "hatch access blocked; move along surface",
         }
     }
 }
@@ -53,6 +55,7 @@ pub struct SurfaceRecoveryObservation {
     pub rebuilds: u64,
     pub rebuild_interruptions: u64,
     pub blocked_attempts: u64,
+    pub placement: Option<RebuildPlacementReport>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -67,6 +70,7 @@ pub(super) struct SurfaceRecovery {
     rebuilds: u64,
     rebuild_interruptions: u64,
     blocked_attempts: u64,
+    placement: Option<RebuildPlacementReport>,
 }
 
 impl SurfaceRecovery {
@@ -87,6 +91,7 @@ impl SurfaceRecovery {
             rebuilds: self.rebuilds,
             rebuild_interruptions: self.rebuild_interruptions,
             blocked_attempts: self.blocked_attempts,
+            placement: self.placement.clone(),
         }
     }
 
@@ -95,6 +100,7 @@ impl SurfaceRecovery {
         self.planet = None;
         self.elapsed = Duration::ZERO;
         self.retry = Duration::ZERO;
+        self.placement = None;
     }
 }
 
@@ -258,12 +264,18 @@ impl SurfaceSortieState {
             }
             recovery.retry = recovery.retry.saturating_sub(dt);
             if !recovery.retry.is_zero() {
-                recovery.status = SurfaceRecoveryStatus::ClearanceBlocked;
+                recovery.status = recovery.placement.as_ref().map_or(
+                    SurfaceRecoveryStatus::ClearanceBlocked,
+                    RebuildPlacementReport::blocked_status,
+                );
                 continue;
             }
             if !self.try_rebuild_vehicle(player, planet, point, normal) {
                 let recovery = self.pilots[player].recovery.as_mut().unwrap();
-                recovery.status = SurfaceRecoveryStatus::ClearanceBlocked;
+                recovery.status = recovery.placement.as_ref().map_or(
+                    SurfaceRecoveryStatus::ClearanceBlocked,
+                    RebuildPlacementReport::blocked_status,
+                );
                 recovery.blocked_attempts += 1;
                 recovery.retry = PLACEMENT_RETRY;
             }
@@ -271,110 +283,109 @@ impl SurfaceSortieState {
     }
 
     fn try_rebuild_vehicle(&mut self, player: usize, planet: usize, point: Vec2, up: Vec2) -> bool {
-        let owner = self.pilots[player].owner;
         let index = self.pilots[player].vehicle.0;
-        let mut replacement = ShipState::new(
-            owner.index(),
-            Vec2::ZERO,
-            self.world.players[owner.index()].color,
-            self.world.players[owner.index()].health_percent,
-            1.0 / 60.0,
+        let map = self.rebuild_ground_map(player, planet, point);
+        let (pose, report) = self.find_rebuild_placement(player, planet, point, up, map.as_ref());
+        self.pilots[player].recovery.as_mut().unwrap().placement = Some(report);
+        let Some(pose) = pose else {
+            return false;
+        };
+        let center = pose.center;
+        let mut replacement = self.replacement_ship(player);
+        let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
+        replacement.position = center - SHIP_PIVOT;
+        replacement.rotation_radians = rotation_for_direction(pose.normal);
+        replacement.direction = pose.normal;
+        replacement.velocity = motion::point_velocity(frame, center);
+        replacement.omega = physics::control_angular_velocity(&replacement, frame.angular_velocity);
+        self.world.ships[index] = replacement;
+        self.reconcile_recovery_vehicles();
+        // Rapier stores COM velocity, while the surface frame is evaluated
+        // at the assembly origin. Account for the off-center hull mass.
+        let body = self.world.physics.ship_body(index);
+        let origin_velocity = self
+            .world
+            .physics
+            .world
+            .velocity_at_point(body, center)
+            .unwrap();
+        self.world.physics.world.apply_velocity_delta(
+            body,
+            motion::point_velocity(frame, center) - origin_velocity,
+            true,
         );
-        if self.pilots[player].combat.is_some() {
-            replacement.enable_weapon_supply();
+        self.world.ships[index].velocity = self
+            .world
+            .physics
+            .world
+            .motion(body)
+            .unwrap()
+            .linear_velocity;
+        let pilot = &mut self.pilots[player];
+        pilot.planet = planet;
+        pilot.landing = LandingTelemetry::default();
+        pilot.controls_armed = false;
+        let recovery = pilot.recovery.as_mut().unwrap();
+        recovery.planet = None;
+        recovery.elapsed = Duration::ZERO;
+        recovery.retry = Duration::ZERO;
+        recovery.rebuilds += 1;
+        recovery.status = SurfaceRecoveryStatus::ShipAvailable;
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relocation_surveys_are_read_only_local_and_between_full_surveys() {
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        let dt = Duration::from_nanos(16_666_667);
+        for _ in 0..120 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
         }
-        let radius = physics::SpacewarsPhysics::surface_vehicle_clearance_radius(&replacement);
-        let right = Vec2::new(up.y, -up.x);
-        // Ground and normal come from local terrain rays, not a radius projection.
-        // Bounded attempts keep construction local and make blocked sites visible.
-        // Prefer the side that puts the ship's hatch toward the waiting pilot;
-        // a parked pod may rule out the closest spot on that side.
-        for offset in [-8.0, -14.0, 8.0, 14.0] {
-            let Some(hit) = self.world.physics.world.cast_ray(
-                point + right * offset + up * 12.0,
-                -up,
-                RayCastOptions {
-                    max_distance: 24.0,
-                    collision_groups: physics::spaceling_collision_groups(),
-                    ..RayCastOptions::default()
-                },
-            ) else {
-                continue;
-            };
-            if !physics::is_planet_surface_support(hit.collider, planet) || hit.normal.dot(up) < 0.8
-            {
-                continue;
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[SurfaceSortieAction {
+                interact_held: true,
+                ..Default::default()
             }
-            let center = hit.point + hit.normal * (radius + 0.6);
-            if !self
-                .world
-                .physics
-                .surface_vehicle_space_is_clear(&replacement, center, radius)
-            {
-                continue;
-            }
-            // Newly rebuilt vehicles or same-tick transfers are not in the last
-            // step's spatial index yet. Check the bounded seat list as well.
-            if self.pilots.iter().any(|pilot| {
-                pilot.snapshot(&self.world.physics).is_some_and(|s| {
-                    s.motion.position.distance_to(center) < radius + Self::spec().half_height()
-                }) || self
-                    .world
-                    .physics
-                    .world
-                    .motion(self.world.physics.ship_body(pilot.vehicle.0))
-                    .is_some_and(|motion| {
-                        motion.position.distance_to(center)
-                            < radius
-                                + physics::SpacewarsPhysics::surface_vehicle_clearance_radius(
-                                    &self.world.ships[pilot.vehicle.0],
-                                )
-                    })
-            }) {
-                continue;
-            }
-            let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
-            replacement.position = center - SHIP_PIVOT;
-            replacement.rotation_radians = rotation_for_direction(hit.normal);
-            replacement.direction = hit.normal;
-            replacement.velocity = motion::point_velocity(frame, center);
-            replacement.omega =
-                physics::control_angular_velocity(&replacement, frame.angular_velocity);
-            self.world.ships[index] = replacement;
-            self.reconcile_recovery_vehicles();
-            // Rapier stores COM velocity, while the surface frame is evaluated
-            // at the assembly origin. Account for the off-center hull mass.
-            let body = self.world.physics.ship_body(index);
-            let origin_velocity = self
-                .world
-                .physics
-                .world
-                .velocity_at_point(body, center)
-                .unwrap();
-            self.world.physics.world.apply_velocity_delta(
-                body,
-                motion::point_velocity(frame, center) - origin_velocity,
-                true,
-            );
-            self.world.ships[index].velocity = self
-                .world
-                .physics
-                .world
-                .motion(body)
-                .unwrap()
-                .linear_velocity;
-            let pilot = &mut self.pilots[player];
-            pilot.planet = planet;
-            pilot.landing = LandingTelemetry::default();
-            pilot.controls_armed = false;
-            let recovery = pilot.recovery.as_mut().unwrap();
-            recovery.planet = None;
-            recovery.elapsed = Duration::ZERO;
-            recovery.retry = Duration::ZERO;
-            recovery.rebuilds += 1;
-            recovery.status = SurfaceRecoveryStatus::ShipAvailable;
-            return true;
+            .encode(PlayerId::PLAYER_1)],
+            dt,
+        );
+        for _ in 0..240 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
         }
-        false
+        state.world.ships[0].translate_life(-state.world.ships[0].life_max);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let mut ground_ticks = Vec::new();
+        let mut rebuild_ticks = Vec::new();
+        for _ in 0..60 {
+            // Isolate the blocked-site sensor contract from the build timer.
+            state.pilots[0].recovery.as_mut().unwrap().status = SurfaceRecoveryStatus::HatchBlocked;
+            let before = state.world.physics.snapshot_bytes();
+            let tick = state.world.tick;
+            let o = state.recovery_task_observation(0, None);
+            assert_eq!(state.world.physics.snapshot_bytes(), before);
+            assert_eq!(state.world.tick, tick);
+            assert!(o.ground.is_none() || o.rebuild.is_none());
+            if o.ground.is_some() {
+                ground_ticks.push(tick);
+            }
+            if let Some(survey) = o.rebuild {
+                assert!(survey.checked <= 8 && survey.attempts.len() <= 8);
+                rebuild_ticks.push(tick);
+            }
+            SurfaceSortieScenario::step(&mut state, &[], dt);
+        }
+        assert_eq!(ground_ticks.len(), 2);
+        assert_eq!(rebuild_ticks.len(), 2);
+        assert!(ground_ticks.iter().all(|tick| tick % 30 == 0));
+        assert!(rebuild_ticks.iter().all(|tick| tick % 30 == 15));
+        state.world.physics.material_queries_dirty = true;
+        assert!(state.rebuild_relocation_survey(0).is_none());
+        assert!(state.world.physics.material_queries_dirty);
     }
 }

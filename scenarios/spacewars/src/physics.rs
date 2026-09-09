@@ -593,6 +593,8 @@ impl SpacewarsPhysics {
         ship: &ShipState,
         center: Vec2,
         radius: f32,
+        replacing: usize,
+        actor: PhysicsId,
     ) -> bool {
         if self.material_queries_dirty {
             return false;
@@ -601,8 +603,31 @@ impl SpacewarsPhysics {
         groups.filter = (groups.filter & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
             | GROUP_ROVER_SURFACE
             | GROUP_MATERIAL;
-        self.world
-            .capsule_is_clear(center, 0.0, 0.0, radius, groups)
+        self.world.capsule_clearance_test_excluding(
+            0.0,
+            radius,
+            groups,
+            vec![ship_entity(replacing), actor],
+        )(center, 0.0)
+    }
+
+    pub(super) fn replacement_capsule_clearance(
+        &self,
+        player: usize,
+        ship: &ShipState,
+        half_segment: f32,
+        radius: f32,
+    ) -> impl Fn(Vec2, f32, Vec2, f32) -> bool + use<> {
+        PhysicsWorld::capsule_assembly_clearance_test(
+            &surface_ship_colliders(ship_entity(player), ship, true),
+            half_segment,
+            radius,
+            spaceling_collision_groups(),
+        )
+    }
+
+    pub(super) fn surface_vehicle_entity(&self, index: usize) -> PhysicsId {
+        ship_entity(index)
     }
 
     pub(super) fn planet_body(&self, index: usize) -> PhysicsBodyId {

@@ -44,7 +44,7 @@ fn main() {
     );
     let bearing_offset: f32 = arg("--offset", "0.6").parse().unwrap();
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
-    assert!(["none", "crater", "blocked", "flag"].contains(&edit.as_str()));
+    assert!(["none", "crater", "blocked", "flag", "rebuild"].contains(&edit.as_str()));
     assert!(["complete", "blocked", "bounded"].contains(&expected.as_str()));
     let owner = PlayerId::from_index(seat).unwrap();
     let defender = PlayerId::from_index(1 - seat).unwrap();
@@ -80,6 +80,7 @@ fn main() {
     let mut last = String::new();
     let mut sensor_times = Vec::new();
     let mut refresh_times = Vec::new();
+    let mut rebuild_times = Vec::new();
     let mut step_times = Vec::new();
     let mut audits = Vec::new();
     let mut defender_claimed = None;
@@ -92,6 +93,7 @@ fn main() {
     let mut previous_interact = false;
     let mut last_ground = None;
     let mut last_map = None;
+    let mut ground_failures = Vec::new();
     let initial_cells = state.terrain_diagnostics().occupied_cells;
     for tick in 0..180 * 60 {
         let mut controls = [SurfaceSortieAction::default(); 2];
@@ -220,10 +222,33 @@ fn main() {
                 events.push(json!({"tick":tick,"edit":edit,"ground":g}));
             }
         }
+        if edit == "rebuild"
+            && edit_tick.is_none()
+            && lost
+            && p.recovery
+                .as_ref()
+                .is_some_and(|r| r.rebuild_progress > 0.3)
+            && let Some(actor) = p.actor
+        {
+            let foot = (actor.position - p.actor_up * 0.9 - p.planet.motion.position)
+                .rotate_radians(-p.planet.motion.angle);
+            let bearing = ((-foot.x).atan2(foot.y) * GROUND_SAMPLES as f32 / std::f32::consts::TAU)
+                .round() as i32;
+            let node = (bearing + 15).rem_euclid(GROUND_SAMPLES as i32) as u16;
+            assert!(state.queue_recovery_disruption(
+                seat,
+                RecoveryDisruption::GroundRouteNode { node, radius: 4 }
+            ));
+            edit_tick = Some(tick);
+            events.push(json!({"tick":tick,"edit":edit,"node":node,"pilot":p}));
+        }
         let sensor_ms = start.elapsed().as_secs_f64() * 1000.0;
         sensor_times.push(sensor_ms);
         if o.ground.is_some() {
             refresh_times.push(sensor_ms);
+        }
+        if o.rebuild.is_some() {
+            rebuild_times.push(sensor_ms);
         }
         let label = if lost {
             recovery.label()
@@ -236,6 +261,14 @@ fn main() {
                 .unwrap_or(navigation.telemetry().goal.label())
         };
         if label != last {
+            if ground
+                .as_ref()
+                .is_some_and(|g| g.goal == GroundGoal::Blocked)
+            {
+                ground_failures.push(
+                    json!({"tick":tick,"ground":ground,"map":last_map,"pilot":o.flight.pilot}),
+                );
+            }
             eprintln!("{:.2}s {label}", tick as f32 / 60.0);
             events.push(json!({"tick":tick,"goal":label,"ground":ground,"pilot":o.flight.pilot,"capture":capture.telemetry(),"recovery":recovery.telemetry()}));
             last = label.to_owned();
@@ -281,14 +314,16 @@ fn main() {
     std::fs::create_dir_all(&out).unwrap();
     sensor_times.sort_by(f64::total_cmp);
     refresh_times.sort_by(f64::total_cmp);
+    rebuild_times.sort_by(f64::total_cmp);
     step_times.sort_by(f64::total_cmp);
     let report = json!({"version":1,"seed":seed,"seat":seat,"offset":bearing_offset,"mode":mode,"edit":edit,"seconds":180,
         "expected":expected,"complete":complete,"captured":captured,"blocked":blocked,"defender_claimed_tick":defender_claimed,"exited_tick":exited_tick,
         "claimed_tick":claimed_tick,"lowering_tick":lowering_tick,"departed_tick":departed_tick,"strike_tick":strike_tick,"edit_tick":edit_tick,
-        "capture":capture.telemetry(),"recovery":recovery.telemetry(),"ground":last_ground,"map":last_map,"damage":state.damage_observation(seat),
+        "capture":capture.telemetry(),"recovery":recovery.telemetry(),"ground":last_ground,"map":last_map,"ground_failures":ground_failures,"damage":state.damage_observation(seat),
         "audit_passed":audits.is_empty(),"audit_failures":audits,"samples":samples,"events":events,
         "sensor_p95_ms":sensor_times[(sensor_times.len()-1)*95/100],"sensor_max_ms":sensor_times.last(),
         "ground_refresh_p95_ms":refresh_times.get(refresh_times.len().saturating_sub(1)*95/100),"ground_refresh_max_ms":refresh_times.last(),
+        "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
     std::fs::write(
         out.join("report.json"),
@@ -320,6 +355,16 @@ fn main() {
     }
     if edit == "none" || edit == "crater" {
         assert!(lowering_tick.is_some());
+    }
+    if edit == "rebuild" {
+        assert!(
+            recovery
+                .telemetry()
+                .recovery
+                .as_ref()
+                .is_some_and(|r| r.relocations > 0),
+            "fixture must exercise measured relocation"
+        );
     }
     if mode == "pod" || mode == "recovery" {
         let r = state.observation(seat).recovery.unwrap();

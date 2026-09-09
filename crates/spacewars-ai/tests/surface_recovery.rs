@@ -49,6 +49,99 @@ fn airborne_pod() -> (RecoverShipTask, RecoveryTaskObservationV1) {
 }
 
 #[test]
+fn rebuild_relocation_uses_measured_walk_controls_and_invalidates_with_terrain() {
+    use scenario_spacewars::surface_sortie::{
+        SurfaceRecoveryStatus,
+        ground_navigation::{GroundEdge, GroundEdgeKind, GroundMap, GroundNode},
+        pilot::PilotMotion,
+        rebuild_placement::{RebuildRelocationSurvey, RebuildStandingSite},
+    };
+    let (mut task, mut o) = airborne_pod();
+    let p = &mut o.flight.pilot;
+    p.tick = 0;
+    p.location = PilotLocation::OnFoot;
+    p.ship_available = false;
+    p.balanced = true;
+    p.supported_planet = Some(p.planet.index);
+    p.actor_up = Vec2::Y;
+    p.planet.motion.position = Vec2::ZERO;
+    p.planet.motion.angle = 0.0;
+    p.actor = Some(PilotMotion {
+        position: Vec2::new(0.0, 60.9),
+        velocity: Vec2::ZERO,
+        angle: 0.0,
+        spin: 0.0,
+    });
+    p.planet.claim.as_mut().unwrap().owner = Some(p.owner);
+    p.recovery.as_mut().unwrap().status = SurfaceRecoveryStatus::HatchBlocked;
+    o.ground = Some(GroundMap {
+        version: 1,
+        actor: p.owner,
+        planet: p.planet.index,
+        revision: p.planet.revision,
+        tick: 0,
+        nodes: (0..3)
+            .map(|id| GroundNode {
+                id,
+                position: Vec2::new(f32::from(id) * 2.0, 60.0),
+                normal: Vec2::Y,
+            })
+            .collect(),
+        edges: (0..2)
+            .map(|from| GroundEdge {
+                from,
+                to: from + 1,
+                kind: GroundEdgeKind::Walk,
+                length: 2.0,
+            })
+            .collect(),
+        rejected: Vec::new(),
+    });
+    o.rebuild = Some(RebuildRelocationSurvey {
+        tick: 0,
+        checked: 2,
+        attempts: Vec::new(),
+        site: Some(RebuildStandingSite {
+            planet: p.planet.index,
+            revision: p.planet.revision,
+            position: Vec2::new(4.0, 60.0),
+            walk_length: 4.0,
+            hatch_walk_length: 0.0,
+        }),
+    });
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().relocations, 1);
+    let before = task.telemetry().clone();
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry(), &before);
+    o.rebuild = None;
+    for tick in 1..=2 {
+        o.flight.pilot.tick = tick;
+        o.ground.as_mut().unwrap().tick = tick;
+        let action = task.step(&o);
+        if tick == 2 {
+            assert!(action.controls.horizontal > 0.0);
+            assert!(!action.controls.interact_held);
+        }
+    }
+    o.flight.pilot.tick = 3;
+    o.flight.pilot.planet.revision += 1;
+    o.ground = None;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert!(task.telemetry().relocation_site.is_none());
+    assert_eq!(task.telemetry().invalidations, 1);
+    o.flight.pilot.tick = 304;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("no reachable standing site with hatch access")
+    );
+    o.flight.pilot.tick = 305;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+}
+
+#[test]
 fn progressing_high_spin_pod_can_take_longer_than_fifteen_seconds() {
     for turn_acceleration in [3.0, 6.0] {
         let (mut task, mut o) = airborne_pod();
@@ -278,8 +371,12 @@ fn standalone_task_rebuilds_after_real_loss_and_flag_or_support_removal() {
             episode_seed: 42,
         });
         let mut edited = false;
+        let mut last_survey = None;
         for _ in 0..120 * 60 {
             let o = s.recovery_task_observation(0, task.site_request());
+            if o.rebuild.is_some() {
+                last_survey = o.rebuild.clone();
+            }
             let intent = task.step(&o);
             if !edited && o.flight.pilot.recovery.as_ref().unwrap().rebuild_progress > 0.3 {
                 assert!(s.queue_recovery_disruption(0, disruption));
@@ -294,8 +391,10 @@ fn standalone_task_rebuilds_after_real_loss_and_flag_or_support_removal() {
         assert_eq!(
             task.telemetry().status,
             TaskStatus::Succeeded,
-            "{disruption:?}: {:?}",
-            task.telemetry()
+            "{disruption:?}: {:?}\nsurvey: {}\nstate: {:?}",
+            task.telemetry(),
+            serde_json::to_string_pretty(&last_survey).unwrap(),
+            s.observation(0)
         );
         let r = s.observation(0).recovery.unwrap();
         assert!(r.rebuild_interruptions > 0);

@@ -3,16 +3,20 @@ use crate::BrainReset;
 use engine_core::Vec2;
 use scenario_spacewars::surface_sortie::{
     PilotLocation, SurfaceSortieAction,
-    ground_navigation::{GROUND_NEIGHBOR_SPAN, GROUND_SAMPLES, GroundEdgeKind, GroundMap},
+    ground_navigation::{
+        GROUND_NEIGHBOR_SPAN, GROUND_SAMPLES, GroundEdgeKind, GroundMap, GroundRouteDiagnostics,
+        HATCH_APPROACH_RANGE,
+    },
     recovery_sensors::RecoveryTaskObservationV1,
 };
 use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GroundDestination {
     Flag,
     Hatch,
+    Rebuild { planet: usize, position: Vec2 },
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -51,6 +55,7 @@ pub struct GroundTelemetry {
     pub replans: u32,
     pub invalidations: u32,
     pub jumps: u32,
+    pub route: Option<GroundRouteDiagnostics>,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -70,7 +75,7 @@ impl GroundNavigationTask {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v1",
+                policy: "ground_navigation_v2",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -83,6 +88,7 @@ impl GroundNavigationTask {
                 replans: 0,
                 invalidations: 0,
                 jumps: 0,
+                route: None,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -164,6 +170,13 @@ impl GroundNavigationTask {
                 .and_then(|c| c.flag)
                 .map(|flag| flag.position),
             GroundDestination::Hatch => p.hatch,
+            GroundDestination::Rebuild { planet, position } => {
+                if planet != p.planet.index {
+                    self.block("rebuild footing is on another planet");
+                    return action;
+                }
+                Some(p.planet.motion.position + position.rotate_radians(p.planet.motion.angle))
+            }
         };
         let local =
             |point: Vec2| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
@@ -208,10 +221,10 @@ impl GroundNavigationTask {
             }
             return action;
         };
-        let range = if self.telemetry.destination == GroundDestination::Flag {
-            2.3
-        } else {
-            1.4
+        let range = match self.telemetry.destination {
+            GroundDestination::Flag => 2.3,
+            GroundDestination::Hatch => HATCH_APPROACH_RANGE,
+            GroundDestination::Rebuild { .. } => 1.4,
         };
         if actor.position.distance_to(target) < range && p.supported_planet == Some(p.planet.index)
         {
@@ -300,8 +313,14 @@ impl GroundNavigationTask {
             }
             self.last_plan_tick = Some(map.tick);
             self.telemetry.replans += 1;
-            if let Some(path) = route(map, foot, target_local.unwrap(), range - 0.6) {
-                self.telemetry.path = path;
+            let route = if self.telemetry.destination == GroundDestination::Hatch {
+                map.route_to_hatch(foot, target_local.unwrap())
+            } else {
+                map.route(foot, target_local.unwrap(), range - 0.6)
+            };
+            self.telemetry.route = Some(route.diagnostics);
+            if !route.path.is_empty() {
+                self.telemetry.path = route.path;
                 self.telemetry.waypoint = 0;
                 self.telemetry.last_progress_tick = p.tick;
                 self.missing_since = None;
@@ -367,56 +386,4 @@ impl GroundNavigationTask {
         }
         action
     }
-}
-
-fn route(map: &GroundMap, start: Vec2, target: Vec2, range: f32) -> Option<Vec<u16>> {
-    let initial = map
-        .nodes
-        .iter()
-        .filter(|n| n.position.distance_to(start) < 3.0)
-        .min_by(|a, b| {
-            a.position
-                .distance_to(start)
-                .total_cmp(&b.position.distance_to(start))
-        })?
-        .id;
-    let mut costs = [f32::INFINITY; GROUND_SAMPLES];
-    let mut parent = [None; GROUND_SAMPLES];
-    let mut visited = [false; GROUND_SAMPLES];
-    costs[usize::from(initial)] = 0.0;
-    for _ in 0..GROUND_SAMPLES {
-        let index = (0..GROUND_SAMPLES)
-            .filter(|&i| !visited[i] && costs[i].is_finite())
-            .min_by(|&a, &b| costs[a].total_cmp(&costs[b]))?;
-        visited[index] = true;
-        if map
-            .nodes
-            .iter()
-            .any(|n| usize::from(n.id) == index && n.position.distance_to(target) < range)
-        {
-            let mut path = vec![index as u16];
-            let mut cursor = index;
-            while let Some(previous) = parent[cursor] {
-                path.push(previous);
-                cursor = usize::from(previous);
-            }
-            path.reverse();
-            return Some(path);
-        }
-        for edge in map.edges.iter().filter(|e| usize::from(e.from) == index) {
-            let next = usize::from(edge.to);
-            let cost = costs[index]
-                + edge.length
-                + if edge.kind == GroundEdgeKind::Jump {
-                    2.0
-                } else {
-                    0.0
-                };
-            if cost < costs[next] {
-                costs[next] = cost;
-                parent[next] = Some(index as u16);
-            }
-        }
-    }
-    None
 }

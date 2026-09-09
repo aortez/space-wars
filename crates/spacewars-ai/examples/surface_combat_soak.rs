@@ -143,6 +143,8 @@ fn main() {
     let mut audit_events = Vec::new();
     let mut previous_breaks = [(0, 0, 0, None); 2];
     let mut previous = ["", ""];
+    let mut ground_maps = [None, None];
+    let mut ground_failures = Vec::new();
     let mut steps = Vec::new();
     let mut ai = Vec::new();
     let mut failure = None;
@@ -170,6 +172,9 @@ fn main() {
                 || state.combat_observation(seat, site),
                 |o| o.combat.clone(),
             );
+            if let Some(map) = &o.recovery.ground {
+                ground_maps[seat] = Some(map.clone());
+            }
             if landing_now {
                 landing_start.get_or_insert_with(|| o.clone());
                 if lost_tick.is_none()
@@ -249,6 +254,13 @@ fn main() {
                 );
             }
             if label != previous[seat] {
+                if label.contains("no measured")
+                    || label.contains("ground traversal")
+                    || label.contains("on ground route")
+                    || label.contains("no reachable standing")
+                {
+                    ground_failures.push(json!({"tick":tick,"seat":seat,"goal":label,"map":ground_maps[seat],"observation":o,"brain":brains[seat].telemetry(),"tactical":tactical.telemetry()}));
+                }
                 if label != "engage ship" && previous[seat] != "engage ship" || tick % 60 == 0 {
                     eprintln!("{:.2}s P{} {label}", tick as f32 / 60.0, seat + 1);
                 }
@@ -357,7 +369,7 @@ fn main() {
     let report = json!({"version":4,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
         "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())},"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
-        "samples":samples,"events":events});
+        "samples":samples,"events":events,"ground_failures":ground_failures});
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

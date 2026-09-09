@@ -240,20 +240,30 @@ impl SurfaceSortieState {
             .physics
             .world
             .motion(self.world.physics.ship_body(pilot.vehicle.0))?;
-        let local = if ship.form == ShipForm::Ship {
+        self.material_access_at(pilot.planet, ship.form, body.position, body.angle)
+    }
+
+    pub(super) fn material_access_at(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+    ) -> Option<RayHit> {
+        let local = if form == ShipForm::Ship {
             Vec2::new(8.0, -5.0)
         } else {
             Vec2::new(2.8, -0.65)
         };
-        let hatch = body.position + local.rotate_radians(body.angle);
-        let surface = motion::SurfaceFrame::read(&self.world.physics, pilot.planet);
-        let up = (body.position - surface.position).normalized();
+        let hatch = position + local.rotate_radians(angle);
+        let surface = motion::SurfaceFrame::read(&self.world.physics, planet);
+        let up = (position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
         // The hatch can straddle a cell edge. Search one cell to either side
         // for nearby footing without extending its reach down a deep shaft.
         [0.0, -1.0, 1.0].into_iter().find_map(|offset| {
             let hit = self.world.physics.material_ground_ray(
-                pilot.planet,
+                planet,
                 hatch + right * offset + up * 2.0,
                 -up,
                 5.0,

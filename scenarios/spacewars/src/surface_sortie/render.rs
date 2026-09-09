@@ -960,10 +960,12 @@ fn draw_player_hud(
                 format!(
                     "Rebuild {:.0}% / {}",
                     r.rebuild_progress * 100.0,
-                    if r.status == SurfaceRecoveryStatus::ClearanceBlocked {
-                        "space blocked"
-                    } else {
-                        "stand still"
+                    match r.status {
+                        SurfaceRecoveryStatus::ClearanceBlocked =>
+                            "space blocked; move along surface",
+                        SurfaceRecoveryStatus::HatchBlocked =>
+                            "hatch access blocked; move along surface",
+                        _ => "stand still",
                     }
                 )
             } else if r.status == SurfaceRecoveryStatus::LandPod

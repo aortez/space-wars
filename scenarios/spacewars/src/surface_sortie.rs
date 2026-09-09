@@ -20,6 +20,7 @@ mod motion;
 mod outpost;
 pub mod pilot;
 mod profiles;
+pub mod rebuild_placement;
 mod recovery;
 pub mod recovery_sensors;
 mod render;

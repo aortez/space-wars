@@ -1204,6 +1204,23 @@ impl PhysicsWorld {
         groups: CollisionGroups,
         exclude_entity: Option<PhysicsId>,
     ) -> impl Fn(Vec2, f32) -> bool + '_ {
+        self.capsule_clearance_test_excluding(
+            half_segment,
+            radius,
+            groups,
+            exclude_entity.into_iter().collect(),
+        )
+    }
+
+    /// A replacement preview may exclude the actor and the assembly being
+    /// replaced. Callers must keep all other solid obstacles in the query.
+    pub fn capsule_clearance_test_excluding(
+        &self,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        excluded: Vec<PhysicsId>,
+    ) -> impl Fn(Vec2, f32) -> bool + '_ {
         let capsule =
             (half_segment.is_finite() && half_segment >= 0.0 && radius.is_finite() && radius > 0.0)
                 .then(|| ColliderBuilder::capsule_y(half_segment, radius).build());
@@ -1215,8 +1232,7 @@ impl PhysicsWorld {
                 return false;
             }
             let predicate = |_: ColliderHandle, collider: &Collider| {
-                decode_collider(collider.user_data)
-                    .is_none_or(|id| Some(id.entity) != exclude_entity)
+                decode_collider(collider.user_data).is_none_or(|id| !excluded.contains(&id.entity))
             };
             self.raw
                 .intersect_shape(
@@ -1231,6 +1247,51 @@ impl PhysicsWorld {
                 )
                 .next()
                 .is_none()
+        }
+    }
+
+    /// Read-only capsule tests against a proposed assembly at an explicit pose.
+    /// Uses the same collider geometry as insertion without allocating bodies,
+    /// changing the spatial index, or advancing a speculative physics world.
+    pub fn capsule_assembly_clearance_test(
+        colliders: &[ColliderSpec],
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+    ) -> impl Fn(Vec2, f32, Vec2, f32) -> bool + use<> {
+        let capsule =
+            (half_segment.is_finite() && half_segment >= 0.0 && radius.is_finite() && radius > 0.0)
+                .then(|| ColliderBuilder::capsule_y(half_segment, radius).build());
+        let shapes: Option<Vec<_>> = colliders
+            .iter()
+            .filter(|c| {
+                !c.sensor
+                    && groups.memberships & c.collision_groups.filter != 0
+                    && groups.filter & c.collision_groups.memberships != 0
+            })
+            .map(|c| build_collider(c, false))
+            .collect();
+        move |point, angle, assembly_position, assembly_angle| {
+            let (Some(capsule), Some(shapes)) = (&capsule, &shapes) else {
+                return false;
+            };
+            if !finite_vec2(point)
+                || !angle.is_finite()
+                || !finite_vec2(assembly_position)
+                || !assembly_angle.is_finite()
+            {
+                return false;
+            }
+            let pose = Pose::new(to_rapier(point), angle);
+            let assembly = Pose::new(to_rapier(assembly_position), assembly_angle);
+            shapes.iter().all(|shape| {
+                rapier2d::parry::query::intersection_test(
+                    &pose,
+                    capsule.shape(),
+                    &(assembly * shape.position()),
+                    shape.shape(),
+                ) == Ok(false)
+            })
         }
     }
 
@@ -2132,6 +2193,64 @@ mod tests {
         assert!(!clear(Vec2::ZERO, Some(PhysicsId::new(7))));
         assert!(!clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(4))));
         assert!(clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(7))));
+    }
+
+    #[test]
+    fn proposed_assembly_capsule_checks_match_inserted_rotated_geometry() {
+        let id = PhysicsId::new(900);
+        let mut hull = ColliderSpec::convex_polygon(
+            ColliderId::new(id, ColliderRole::PRIMARY, 0),
+            vec![
+                Vec2::new(-2.0, -1.0),
+                Vec2::new(2.0, -1.0),
+                Vec2::new(0.0, 3.0),
+            ],
+        );
+        hull.local_angle = 0.2;
+        let mut foot = ColliderSpec::ball(ColliderId::new(id, ColliderRole::PRIMARY, 1), 0.4);
+        foot.local_position = Vec2::new(1.5, -1.5);
+        let colliders = [hull, foot];
+        let clear = PhysicsWorld::capsule_assembly_clearance_test(
+            &colliders,
+            0.6,
+            0.3,
+            CollisionGroups::ALL,
+        );
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let position = Vec2::new(12.0, -5.0);
+        let angle = 0.7;
+        assert!(world.insert_body(
+            BodyId::new(id, BodyRole::PRIMARY),
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position,
+                angle,
+                ..Default::default()
+            },
+            &colliders
+        ));
+        world.step(1.0 / 60.0);
+        let before = world.snapshot_bytes().unwrap();
+        for x in -5..=5 {
+            for y in -4..=5 {
+                let point = position + Vec2::new(x as f32, y as f32) * 0.7;
+                for axis in [0.0, 1.2] {
+                    assert_eq!(
+                        clear(point, axis, position, angle),
+                        world.capsule_is_clear(point, axis, 0.6, 0.3, CollisionGroups::ALL)
+                    );
+                }
+            }
+        }
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        assert!(!clear(position, f32::NAN, position, angle));
+        let invalid = PhysicsWorld::capsule_assembly_clearance_test(
+            &colliders,
+            0.6,
+            -1.0,
+            CollisionGroups::ALL,
+        );
+        assert!(!invalid(Vec2::ZERO, 0.0, position, angle));
     }
 
     #[test]

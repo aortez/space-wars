@@ -14,6 +14,7 @@ use scenario_spacewars::{
         LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
         TransferResult,
         pilot::{LandingSiteId, PilotLandingSite, PilotObservationV1},
+        rebuild_placement::RebuildStandingSite,
         recovery_sensors::RecoveryTaskObservationV1,
     },
 };
@@ -71,6 +72,8 @@ pub struct RecoveryTelemetry {
     pub invalidations: u32,
     pub landing_retries: u32,
     pub relocations: u32,
+    pub relocation_site: Option<RebuildStandingSite>,
+    pub relocation_surveys: u32,
     pub stabilization: Option<PodStabilizationTelemetry>,
     pub ground: Option<GroundTelemetry>,
     /// Granted once when hostile-ground traversal becomes necessary.
@@ -81,8 +84,10 @@ impl RecoveryTelemetry {
         if let Some(reason) = self.reason {
             return reason;
         }
-        if matches!(self.goal, RecoveryGoal::Claim | RecoveryGoal::Board)
-            && let Some(ground) = &self.ground
+        if matches!(
+            self.goal,
+            RecoveryGoal::Claim | RecoveryGoal::Board | RecoveryGoal::FindBuildSpace
+        ) && let Some(ground) = &self.ground
             && ground.goal != GroundGoal::Arrived
         {
             return ground.reason.unwrap_or(ground.goal.label());
@@ -120,7 +125,7 @@ pub struct RecoverShipTask {
     previous_action: FlightIntent,
     was_interacting: bool,
     was_jumping: bool,
-    relocate_until: u64,
+    relocation_missing_since: Option<u64>,
     stabilization_window: Option<(u64, f32)>,
     settled_since: Option<u64>,
     ground_task: Option<GroundNavigationTask>,
@@ -131,7 +136,7 @@ impl RecoverShipTask {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v2",
+                task: "recover_ship_v3",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -146,6 +151,8 @@ impl RecoverShipTask {
                 invalidations: 0,
                 landing_retries: 0,
                 relocations: 0,
+                relocation_site: None,
+                relocation_surveys: 0,
                 stabilization: None,
                 ground: None,
                 ground_budget_ticks: 0,
@@ -162,7 +169,7 @@ impl RecoverShipTask {
             previous_action: FlightIntent::default(),
             was_interacting: false,
             was_jumping: false,
-            relocate_until: 0,
+            relocation_missing_since: None,
             stabilization_window: None,
             settled_since: None,
             ground_task: None,
@@ -322,24 +329,73 @@ impl RecoverShipTask {
                 return action;
             }
             let recovery = p.recovery.as_ref().unwrap();
-            if p.tick < self.relocate_until {
-                self.goal(RecoveryGoal::FindBuildSpace, p.tick);
-                action.horizontal = if self.telemetry.relocations % 2 == 1 {
-                    0.6
+            if let Some(site) = self.telemetry.relocation_site {
+                if site.planet != p.planet.index || site.revision != p.planet.revision {
+                    self.telemetry.relocation_site = None;
+                    self.ground_task = None;
+                    self.telemetry.invalidations += 1;
                 } else {
-                    -0.6
-                };
-                return action;
-            }
-            if recovery.status == SurfaceRecoveryStatus::ClearanceBlocked {
-                if self.telemetry.relocations >= 4 {
-                    self.block("no clear rebuild space after four moves", p.tick);
+                    self.goal(RecoveryGoal::FindBuildSpace, p.tick);
+                    action = self.traverse(
+                        o,
+                        GroundDestination::Rebuild {
+                            planet: site.planet,
+                            position: site.position,
+                        },
+                    );
+                    if self
+                        .telemetry
+                        .ground
+                        .as_ref()
+                        .is_some_and(|g| g.goal == GroundGoal::Arrived)
+                    {
+                        self.telemetry.relocation_site = None;
+                        self.ground_task = None;
+                        self.telemetry.last_progress_tick = p.tick;
+                    }
                     return action;
                 }
-                self.telemetry.relocations += 1;
-                self.relocate_until = p.tick + 90;
+            }
+            if matches!(
+                recovery.status,
+                SurfaceRecoveryStatus::ClearanceBlocked | SurfaceRecoveryStatus::HatchBlocked
+            ) {
                 self.goal(RecoveryGoal::FindBuildSpace, p.tick);
+                let since = *self.relocation_missing_since.get_or_insert(p.tick);
+                if self.telemetry.relocations >= 4 {
+                    self.block(
+                        "no accessible rebuild after four measured relocations",
+                        p.tick,
+                    );
+                    return action;
+                }
+                if let Some(survey) = &o.rebuild {
+                    if survey.tick != p.tick {
+                        self.block("stale rebuild relocation survey", p.tick);
+                        return action;
+                    }
+                    self.telemetry.relocation_surveys += 1;
+                    if let Some(site) = survey.site {
+                        if site.planet != p.planet.index
+                            || site.revision != p.planet.revision
+                            || !site.position.x.is_finite()
+                            || !site.position.y.is_finite()
+                        {
+                            self.block("invalid rebuild relocation footing", p.tick);
+                            return action;
+                        }
+                        self.telemetry.relocations += 1;
+                        self.telemetry.relocation_site = Some(site);
+                        self.relocation_missing_since = None;
+                        self.ground_task = None;
+                    }
+                }
+                if self.telemetry.relocation_site.is_none() && p.tick.saturating_sub(since) > 5 * 60
+                {
+                    self.block("no reachable standing site with hatch access", p.tick);
+                }
             } else {
+                self.relocation_missing_since = None;
                 self.goal(RecoveryGoal::Rebuild, p.tick);
                 if recovery.rebuild_progress > self.previous_build_progress {
                     self.telemetry.last_progress_tick = p.tick;

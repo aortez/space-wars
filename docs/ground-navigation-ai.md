@@ -1,5 +1,10 @@
 # Enemy flags and shared spaceling navigation
 
+Current follow-up: [reachable replacement ships](rebuild-access-ai.md).
+`ground_navigation_v2` / `recover_ship_v3` add shared hatch-access placement,
+measured rebuild relocation, and route diagnostics. The validation and deployed
+limits below record the preceding `0dc5d67` checkpoint.
+
 The material Capture mission and ship recovery now share `GroundNavigationTask`.
 After landing and exiting, a bot can approach an enemy flag, lower it for three
 seconds, and raise its own for another three. It then returns to its ship, or

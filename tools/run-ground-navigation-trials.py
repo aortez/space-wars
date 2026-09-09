@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sixteen controlled three-minute flag/return trials, locally or over SSH."""
+"""Twenty controlled three-minute flag/return trials, locally or over SSH."""
 import argparse
 import json
 import pathlib
@@ -26,6 +26,7 @@ cases = [(42, seat, mode, edit) for mode, edit in [
     ('capture', 'none'), ('recovery', 'none'), ('navigation', 'crater'),
     ('navigation', 'flag'), ('navigation', 'blocked'), ('pod', 'none'),
 ] for seat in [0, 1]]
+cases += [(42, seat, mode, 'rebuild') for mode in ['recovery', 'pod'] for seat in [0, 1]]
 cases += [(7, seat, mode, 'none') for mode in ['capture', 'recovery'] for seat in [0, 1]]
 rows = []
 for seed, seat, mode, edit in cases:
@@ -33,9 +34,7 @@ for seed, seat, mode, edit in cases:
     out = args.out / name
     out.mkdir(parents=True, exist_ok=True)
     destination = f'{args.remote_out}/{name}' if args.ssh else str(out.resolve())
-    # Pod returns can be obstructed by the parked pod/rebuilt hull. Require
-    # countercapture and a bounded outcome; preserve incomplete returns explicitly.
-    expected = 'blocked' if edit == 'blocked' else 'bounded' if mode == 'pod' else 'complete'
+    expected = 'blocked' if edit == 'blocked' else 'complete'
     command = [args.binary, '--seed', str(seed), '--seat', str(seat), '--mode', mode,
                '--edit', edit, '--expect', expected, '--out', destination]
     with (out / 'runner.log').open('w') as log:
@@ -53,10 +52,13 @@ for seed, seat, mode, edit in cases:
                    complete=report['complete'], captured=report['captured'],
                    blocked=report['blocked'], audit_passed=report['audit_passed'],
                    ground_failure=(report.get('ground') or {}).get('reason'),
+                   relocations=((report.get('recovery') or {}).get('recovery') or {}).get('relocations', 0),
                    claimed_tick=report['claimed_tick'], departed_tick=report['departed_tick'],
                    sensor_p95_ms=report['sensor_p95_ms'],
                    ground_refresh_p95_ms=report['ground_refresh_p95_ms'],
                    ground_refresh_max_ms=report['ground_refresh_max_ms'],
+                   rebuild_refresh_p95_ms=report['rebuild_refresh_p95_ms'],
+                   rebuild_refresh_max_ms=report['rebuild_refresh_max_ms'],
                    step_p95_ms=report['step_p95_ms'], step_max_ms=report['step_max_ms'])
     except (OSError, ValueError, KeyError, AssertionError, subprocess.CalledProcessError) as error:
         row = dict(name=name, expected=expected, accepted=False, error=str(error), exit_code=result.returncode)

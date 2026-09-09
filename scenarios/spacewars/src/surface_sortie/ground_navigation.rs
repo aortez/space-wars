@@ -5,6 +5,7 @@ use super::*;
 pub const GROUND_SAMPLES: usize = 512;
 pub const GROUND_NEIGHBOR_SPAN: usize = 6;
 pub const GROUND_REFRESH_TICKS: u64 = 30;
+pub const HATCH_APPROACH_RANGE: f32 = BOARDING_RANGE - 0.2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct GroundNode {
@@ -36,6 +37,206 @@ pub struct GroundMap {
     pub tick: u64,
     pub nodes: Vec<GroundNode>,
     pub edges: Vec<GroundEdge>,
+    pub rejected: Vec<GroundRejectedNode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroundNodeRejection {
+    NoRetainedFloor,
+    SteepFloor,
+    CapsuleObstructed,
+    ReplacementObstructed,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct GroundRejectedNode {
+    pub id: u16,
+    pub reason: GroundNodeRejection,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroundRouteFailure {
+    NoStartFooting,
+    NoDestinationFooting,
+    Disconnected,
+}
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GroundRouteDiagnostics {
+    pub failure: Option<GroundRouteFailure>,
+    pub start_node: Option<u16>,
+    pub start_distance: Option<f32>,
+    pub destination_nodes: usize,
+    pub nearest_destination_distance: Option<f32>,
+    pub reachable_nodes: usize,
+    pub closest_reachable_distance: Option<f32>,
+    pub length: f32,
+    pub jumps: usize,
+}
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct GroundRoute {
+    pub path: Vec<u16>,
+    pub diagnostics: GroundRouteDiagnostics,
+}
+
+pub(super) fn standing_height() -> f32 {
+    let spec = SurfaceSortieState::spec();
+    spec.half_segment + (spec.radius + 0.04) / spec.min_support_alignment + 0.08
+}
+
+impl GroundMap {
+    /// Bounded shortest measured route. Absence is evidence about this survey,
+    /// not proof that a human cannot traverse the physical terrain.
+    pub fn route(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
+        self.route_with_height(start, target, range, 0.0)
+    }
+
+    /// Boarding measures the supported actor's center against the hatch. This
+    /// includes nearby lower footing; climbing onto the hatch ray's hit is not
+    /// required by the human transfer rule.
+    pub fn route_to_hatch(&self, start: Vec2, target: Vec2) -> GroundRoute {
+        self.route_with_height(
+            start,
+            target,
+            HATCH_APPROACH_RANGE,
+            SurfaceSortieState::spec().half_height(),
+        )
+    }
+
+    fn route_with_height(&self, start: Vec2, target: Vec2, range: f32, height: f32) -> GroundRoute {
+        let destination_distance = |node: &GroundNode| {
+            (node.position + node.position.normalized() * height).distance_to(target)
+        };
+        let nearest = self.nodes.iter().min_by(|a, b| {
+            a.position
+                .distance_to(start)
+                .total_cmp(&b.position.distance_to(start))
+        });
+        let mut result = GroundRoute {
+            path: Vec::new(),
+            diagnostics: GroundRouteDiagnostics {
+                failure: None,
+                start_node: nearest.map(|n| n.id),
+                start_distance: nearest.map(|n| n.position.distance_to(start)),
+                destination_nodes: self
+                    .nodes
+                    .iter()
+                    .filter(|n| destination_distance(n) < range)
+                    .count(),
+                nearest_destination_distance: self
+                    .nodes
+                    .iter()
+                    .map(destination_distance)
+                    .min_by(f32::total_cmp),
+                reachable_nodes: 0,
+                closest_reachable_distance: None,
+                length: 0.0,
+                jumps: 0,
+            },
+        };
+        let Some(initial) = nearest.filter(|n| n.position.distance_to(start) < 3.0) else {
+            result.diagnostics.failure = Some(GroundRouteFailure::NoStartFooting);
+            return result;
+        };
+        if result.diagnostics.destination_nodes == 0 {
+            result.diagnostics.failure = Some(GroundRouteFailure::NoDestinationFooting);
+            return result;
+        }
+        let mut costs = [f32::INFINITY; GROUND_SAMPLES];
+        let mut parent: [Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES] =
+            [None; GROUND_SAMPLES];
+        let mut visited = [false; GROUND_SAMPLES];
+        costs[usize::from(initial.id)] = 0.0;
+        for _ in 0..GROUND_SAMPLES {
+            let Some(index) = (0..GROUND_SAMPLES)
+                .filter(|&i| !visited[i] && costs[i].is_finite())
+                .min_by(|&a, &b| costs[a].total_cmp(&costs[b]))
+            else {
+                break;
+            };
+            visited[index] = true;
+            result.diagnostics.reachable_nodes += 1;
+            let node = self
+                .nodes
+                .iter()
+                .find(|n| usize::from(n.id) == index)
+                .unwrap();
+            let distance = destination_distance(node);
+            result.diagnostics.closest_reachable_distance = Some(
+                result
+                    .diagnostics
+                    .closest_reachable_distance
+                    .map_or(distance, |old| old.min(distance)),
+            );
+            if distance < range {
+                result.path.push(index as u16);
+                let mut cursor = index;
+                while let Some((previous, length, kind)) = parent[cursor] {
+                    result.path.push(previous);
+                    result.diagnostics.length += length;
+                    result.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
+                    cursor = usize::from(previous);
+                }
+                result.path.reverse();
+                return result;
+            }
+            for edge in self.edges.iter().filter(|e| usize::from(e.from) == index) {
+                let next = usize::from(edge.to);
+                let cost = costs[index]
+                    + edge.length
+                    + if edge.kind == GroundEdgeKind::Jump {
+                        2.0
+                    } else {
+                        0.0
+                    };
+                if cost < costs[next] {
+                    costs[next] = cost;
+                    parent[next] = Some((index as u16, edge.length, edge.kind));
+                }
+            }
+        }
+        result.diagnostics.failure = Some(GroundRouteFailure::Disconnected);
+        result
+    }
+
+    /// Filter a measured route against the proposed ship's real hull and feet.
+    pub(super) fn avoiding(&self, gravity: f32, clear: impl Fn(Vec2) -> bool) -> Self {
+        let mut map = self.clone();
+        map.nodes.retain(|node| {
+            let ok = clear(node.position + node.position.normalized() * standing_height());
+            if !ok {
+                map.rejected.push(GroundRejectedNode {
+                    id: node.id,
+                    reason: GroundNodeRejection::ReplacementObstructed,
+                });
+            }
+            ok
+        });
+        let mut nodes = [None; GROUND_SAMPLES];
+        for node in &map.nodes {
+            nodes[usize::from(node.id)] = Some(*node);
+        }
+        let jump_height = SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * gravity.max(1.0));
+        map.edges.retain(|edge| {
+            let (Some(a), Some(b)) = (nodes[usize::from(edge.from)], nodes[usize::from(edge.to)])
+            else {
+                return false;
+            };
+            (0..=8).all(|sample| {
+                let t = sample as f32 / 8.0;
+                let foot = a.position + (b.position - a.position) * t;
+                clear(
+                    foot + foot.normalized()
+                        * (standing_height()
+                            + if edge.kind == GroundEdgeKind::Jump {
+                                4.0 * t * (1.0 - t) * jump_height * 0.85
+                            } else {
+                                0.0
+                            }),
+                )
+            })
+        });
+        map
+    }
 }
 
 impl SurfaceSortieState {
@@ -46,21 +247,47 @@ impl SurfaceSortieState {
         {
             return None;
         }
-        let planet = self.motion_planet_index(player);
+        self.survey_ground(
+            player,
+            self.motion_planet_index(player),
+            0..GROUND_SAMPLES as u16,
+            false,
+        )
+    }
+
+    /// Local rebuild previews use the same measurements at a bounded subset of
+    /// bearings. The old pod is absent only in the proposed replacement world.
+    pub(super) fn survey_ground(
+        &self,
+        player: usize,
+        planet: usize,
+        bearings: impl Iterator<Item = u16>,
+        replacing: bool,
+    ) -> Option<GroundMap> {
+        if self.world.physics.material_queries_dirty {
+            return None;
+        }
         let terrain = self.world.terrain.planets.get(&planet)?;
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let spec = Self::spec();
         // On a staircase the support normal and gravity-relative capsule axis
         // differ. Reserve the capsule's full projected foot radius on slopes.
-        let standing_height =
-            spec.half_segment + (spec.radius + 0.04) / spec.min_support_alignment + 0.08;
+        let standing_height = standing_height();
         let radius = self.world.planets[planet].radius;
         let world_point = |point: Vec2| frame.position + point.rotate_radians(frame.angle);
-        let capsule_clear = self.world.physics.world.capsule_clearance_test(
+        let mut excluded = vec![pilot_physics_id(self.pilots[player].owner)];
+        if replacing {
+            excluded.push(
+                self.world
+                    .physics
+                    .surface_vehicle_entity(self.pilots[player].vehicle.0),
+            );
+        }
+        let capsule_clear = self.world.physics.world.capsule_clearance_test_excluding(
             spec.half_segment,
             spec.radius + 0.02,
             spec.collision_groups,
-            Some(pilot_physics_id(self.pilots[player].owner)),
+            excluded,
         );
         let clear = |point: Vec2| {
             let up = point.normalized();
@@ -70,7 +297,8 @@ impl SurfaceSortieState {
             )
         };
         let mut nodes = Vec::new();
-        for id in 0..GROUND_SAMPLES {
+        let mut rejected = Vec::new();
+        for id in bearings {
             let up =
                 Vec2::Y.rotate_radians(id as f32 * std::f32::consts::TAU / GROUND_SAMPLES as f32);
             let world_up = up.rotate_radians(frame.angle);
@@ -80,17 +308,29 @@ impl SurfaceSortieState {
                 -world_up,
                 radius + 8.0,
             ) else {
+                rejected.push(GroundRejectedNode {
+                    id,
+                    reason: GroundNodeRejection::NoRetainedFloor,
+                });
                 continue;
             };
             if hit.normal.dot(world_up) < spec.min_support_alignment {
+                rejected.push(GroundRejectedNode {
+                    id,
+                    reason: GroundNodeRejection::SteepFloor,
+                });
                 continue;
             }
             let position = (hit.point - frame.position).rotate_radians(-frame.angle);
             if !clear(position + up * standing_height) {
+                rejected.push(GroundRejectedNode {
+                    id,
+                    reason: GroundNodeRejection::CapsuleObstructed,
+                });
                 continue;
             }
             nodes.push(GroundNode {
-                id: id as u16,
+                id,
                 position,
                 normal: hit.normal.rotate_radians(-frame.angle),
             });
@@ -181,6 +421,7 @@ impl SurfaceSortieState {
             tick: self.world.tick,
             nodes,
             edges,
+            rejected,
         })
     }
 }

@@ -1,5 +1,7 @@
 # Surface gameplay and destructible terrain integration
 
+Latest recovery slice: [reachable replacement ships](../rebuild-access-ai.md) adds shared hatch-access placement, measured bot relocation, and forty controlled desktop/Pi trials.
+
 Implemented on the isolated `surface-terrain-integration` branch, combining
 Surface Expedition from `6cf12def6b2a84a1a0ab45a26acee5f4a9bca00c` (PR #49)
 with the preserved terrain checkpoint `4acfaa5` on `terrain-checkpoint-20260907`.
