@@ -18,6 +18,7 @@ pub mod impact;
 pub mod jetpack;
 mod landing;
 mod material;
+pub mod mission;
 mod motion;
 mod outpost;
 pub mod pilot;

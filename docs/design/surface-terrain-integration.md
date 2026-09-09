@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest navigation slice: [recovery through damaged ground](../damaged-ground-recovery.md)
+Latest mission slice: [controlled two-planet missions](../two-planet-missions.md)
+adds destination selection, travel, local-task handoffs and replanning on fixed
+destructible planets. Generated-world match integration remains ahead.
+
+The preceding navigation slice, [recovery through damaged ground](../damaged-ground-recovery.md),
 adds progressive local routes, replanning after knockback, wider crater launch
 searches and measured rebuild relocation candidates.
 

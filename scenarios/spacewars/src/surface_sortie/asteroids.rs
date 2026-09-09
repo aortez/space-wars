@@ -1,7 +1,7 @@
 //! Seeded environmental arrivals, independent of actors and mission phases.
 //! Ordinary asteroid bodies travel, collide, take damage and break up through
 //! the shared step. Only their source distribution and bounded terrain work
-//! belong to this one-planet pressure experiment.
+//! belong to the material pressure experiments.
 use super::*;
 use engine_common::{MaterialAsteroidSettings, MaterialAsteroidSeverity};
 
@@ -23,6 +23,26 @@ pub struct AsteroidArrival {
 mod tests {
     use super::*;
     const DT: Duration = Duration::from_nanos(16_666_667);
+
+    #[test]
+    fn multi_planet_arrivals_cover_both_bodies_and_replay() {
+        let mut a = SurfaceSortieScenario::init_material_travel(42, false);
+        a.set_asteroid_pressure(MaterialAsteroidSettings {
+            interval_seconds: 1,
+            severity: MaterialAsteroidSeverity::Mixed,
+        });
+        let mut b = a.clone();
+        let mut planets = std::collections::BTreeSet::new();
+        for _ in 0..1800 {
+            SurfaceSortieScenario::step(&mut a, &[], DT);
+            SurfaceSortieScenario::step(&mut b, &[], DT);
+            assert_eq!(a.asteroid_pressure(), b.asteroid_pressure());
+            for arrival in &a.asteroid_pressure().arrivals {
+                planets.insert(arrival.planet);
+            }
+        }
+        assert_eq!(planets, std::collections::BTreeSet::from([0, 1]));
+    }
 
     #[test]
     fn arrival_distribution_is_seeded_independent_of_actors_and_bounded() {
@@ -173,7 +193,15 @@ impl AsteroidPressure {
             o.skipped_at_capacity += 1;
             return;
         }
-        let planet_index = *world.terrain.planets.keys().next().unwrap();
+        // Preserve the original single-planet random stream. Multi-planet
+        // arrivals sample retained bodies uniformly, independently of actors.
+        let count = world.terrain.planets.len();
+        let ordinal = if count == 1 {
+            0
+        } else {
+            ((random_unit_f32(&mut rng) * count as f32) as usize).min(count - 1)
+        };
+        let planet_index = *world.terrain.planets.keys().nth(ordinal).unwrap();
         let planet = world.planets[planet_index];
         let up = Vec2::from_radians(random_unit_f32(&mut rng) * std::f32::consts::TAU);
         let tangent = Vec2::new(-up.y, up.x);

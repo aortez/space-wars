@@ -63,6 +63,30 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 }
                 harness.capture_screenshot(&format!("{scenario}-{renderer}-break-settings.png"));
             }
+            if scenario.starts_with("spacewars-terrain-travel") {
+                let asteroids = "launcher.settings.travel.asteroid-interval.next";
+                let strength = "launcher.settings.travel.asteroid-strength.next";
+                assert_eq!(
+                    control_value(&state, "launcher.settings.combat.mission.next"),
+                    None
+                );
+                if renderer == "vector" {
+                    assert_eq!(control_value(&state, asteroids), Some("Off"));
+                    state = harness.activate_guarded(asteroids, &state);
+                    assert_eq!(control_value(&state, asteroids), Some("8"));
+                    state = harness.activate_guarded(strength, &state);
+                    assert_eq!(control_value(&state, strength), Some("Heavy"));
+                } else {
+                    assert_eq!(control_value(&state, asteroids), Some("8"));
+                    assert_eq!(control_value(&state, strength), Some("Heavy"));
+                    state = harness.activate_guarded(
+                        "launcher.settings.travel.asteroid-interval.previous",
+                        &state,
+                    );
+                    assert_eq!(control_value(&state, asteroids), Some("Off"));
+                }
+                harness.capture_screenshot(&format!("{scenario}-{renderer}-settings.png"));
+            }
             if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
                 state = harness.activate_guarded("launcher.settings.renderer.next", &state);
             }

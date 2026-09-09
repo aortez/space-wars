@@ -14,6 +14,9 @@ use spacewars_ai::{
     tactical_capture::TacticalCapturePilot,
 };
 
+mod mission;
+pub(super) use mission::{TRAVEL_DUEL_REGISTRATION, TRAVEL_REGISTRATION};
+
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
     ScenarioRegistration, ScenarioStartMode, spaceling_lab::spaceling_controls,

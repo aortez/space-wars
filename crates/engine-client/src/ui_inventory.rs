@@ -284,6 +284,35 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
+        "spacewars-terrain-travel" | "spacewars-terrain-travel-duel" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.asteroid-interval",
+                &context.combat_asteroid_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.asteroid-strength",
+                &context.combat_asteroid_strength,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.travel.asteroid-interval",
+                "launcher.settings.travel.asteroid-strength",
+                "launcher.settings.back",
+            ]
+        }
         "pizza" => {
             push_choice(
                 &mut controls,
@@ -906,6 +935,8 @@ mod tests {
             "nes",
             "spacewars-terrain-combat",
             "spacewars-terrain-duel",
+            "spacewars-terrain-travel",
+            "spacewars-terrain-travel-duel",
         ] {
             let context = context(scenario);
             for screen in [

@@ -4,6 +4,12 @@ The human-controlled material Expedition loop has passed Pi playtesting.
 The user's completion target is integration into ordinary Spacewars, including
 working AI. Merging is deferred until that gameplay milestone is ready.
 
+Latest checkpoint: [controlled two-planet missions](../two-planet-missions.md)
+composes destination selection and interplanetary travel with the established
+local flight, combat, capture, ground navigation and recovery tasks. The scenes
+below document their earlier introduction. Generated material matches and match
+outcomes remain the next integration boundary.
+
 ## Current boundary
 
 The existing `spacewars-ai` library has the right authority boundary: a brain
