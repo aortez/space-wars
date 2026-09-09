@@ -103,3 +103,26 @@ transitions, completion/failure, remaining charge and separate timings.
 
 The local archive, including the complete matrix driver and frozen binaries, is:
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/jetpack-crossing-20260909/`.
+
+## Pi deployment and live verification
+
+Gameplay checkpoint `ceb9762a8f1d0447fd1c2eb1a3ecc18fec99da5a` was built with
+the accepted Yocto layer pins. All 6,608 tasks succeeded (21 rerun). The archived
+image is `spacewars-image-ceb9762.ext4.gz`; its extracted client SHA-256 is
+`a5993ab87e26a05a4f72edb74f427ce3ca63a7c937aa720712bc871b286111a5`.
+The installed `/usr/bin/engine-client` matches that hash. The Pi booted slot B
+(`/dev/sda3`) with `spacewars-kiosk.service` active and zero restarts.
+
+The live 800×480 raster client shows P2 airborne over the hull, standing on the
+far side while raising its flag, flying back after recharging, and then aboard
+with the goal “crossed both ways / back aboard.” The completion screenshot was
+captured about 25 seconds after launch. After 180 seconds, both ships are still
+landed, P2 still owns the planet, and the service has zero restarts. The final
+status records 10,844 updates, 60.1 FPS and 60.1 UPS. These are sampled client
+rates; the artifact logs retain the readings and actual capture timestamps.
+
+The archive contains the image/install manifests, build/deploy logs, UI action
+history, and screenshots `pi-first-crossing.png`, `pi-claim.png`,
+`pi-return-crossing.png`, `pi-back-aboard.png` and `pi-stability-180s.png`.
+The demo is restarted and paused for playtesting. Resume with Start; leave P1
+aboard while watching P2's neutral-planet trial. Restart repeats the sequence.
