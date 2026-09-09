@@ -51,8 +51,9 @@ landing and departure around the existing surface and recovery tasks. Shared
 [ground navigation](../ground-navigation-ai.md) now adds enemy flag traversal
 and routes back to ship hatches on measured material. Pod escape and sustained
 random asteroid pressure now have dedicated regression/diagnostic coverage.
-Controlled two-planet missions and generated multi-planet match integration
-remain ahead, along with broader navigation through heavily damaged ground.
+Controlled two-planet missions now exercise destination selection and task
+handoffs. Generated multi-planet match integration remains ahead, along with
+broader navigation through heavily damaged ground.
 
 ## Player outcome
 
