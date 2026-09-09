@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest recovery slice: [reachable replacement ships](../rebuild-access-ai.md) adds shared hatch-access placement, measured bot relocation, and forty controlled desktop/Pi trials.
+Latest recovery slice: [jetpack routes across pods and damaged ground](../jetpack-recovery-navigation.md)
+adds measured short flights, chained walking/flight routes, reachable flag
+approaches, and stable settling at the destination. It builds on
+[reachable replacement ships](../rebuild-access-ai.md) and their shared
+hatch-access placement and measured bot relocation.
 
 The [jetpack ground-navigation integration](../jetpack-ground-navigation.md) now
 lets capture and recovery bots choose measured flights over their parked ship.

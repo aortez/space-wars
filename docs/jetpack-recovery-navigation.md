@@ -92,3 +92,72 @@ The local evidence archive is
 `/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/pod-terrain-jetpack-20260909/`.
 It retains the old baselines, initial failures, the flag/settling investigations,
 and subsequent validation separately.
+
+## Final desktop and Pi validation
+
+The gameplay checkpoint is `73264ccfe6828db23dd76c0605a5bdfb43855e1a`.
+The final matrices contain 82 three-minute runs, totaling 4 hours 6 minutes of
+simulation. Every run completes 180 simulated seconds with clean physical and
+material audits. The source-identified runners, their hashes, raw reports and
+`validation.json` are retained in the archive.
+
+| Suite | Desktop mission completions | Pi mission completions |
+| --- | ---: | ---: |
+| Ground, capture, recovery and rebuild regression matrix | 19/20 | 19/20 |
+| Pod/terrain-flight and flag-approach regressions | 13/13 | 13/13 |
+| Capture under armed opposition | 8/8 | 7/8 |
+
+Each ground matrix includes one intentional unreachable cut. The other
+incomplete mission is the existing Pi seed-7/P2 unmirrored capture approach,
+which exhausts its flight time/retry budget before exit. These three incomplete
+missions remain visible: 79 mission completions are not 82 successful sorties.
+
+The 26 focused recovery/approach cases complete 32 measured flights without a
+flight interruption. Pod recovery cases retain at least 53.3% charge on desktop
+and 40.0% on Pi at landing; the full-ship approach cases retain at least 20.5%.
+Ordinary scenario events verify countercapture, exactly one rebuild after the
+scripted asteroid loss, boarding and departure. Edits use the normal queued
+material boundary, including edits during a powered flight.
+
+The saved seed-42 combat recovery completes on both architectures. Desktop
+exits at tick 6250, observes its rebuilt ship at 9863 and boards at 10059. Pi
+exits at 6922, observes its rebuilt ship at 9932 and boards at 10118. Neither
+final combat matrix records a ground-navigation failure.
+
+Across the ground and focused recovery matrices, the largest sampled survey
+cost is 6.27 ms desktop / 15.86 ms Pi; the largest shared step is 3.68 ms / 9.05 ms.
+The Pi survey peak still leaves little room in a 16.67 ms frame. These are
+sampled costs, not isolated benchmarks: desktop image compilation overlapped
+validation, and the Pi kiosk remained running and paused during headless tests.
+
+All 1,052 workspace/all-target tests pass; 22 display/hardware workflows remain
+ignored by default. Six material launcher workflows then pass explicitly under
+Xvfb, including pause/restart and both renderers. Formatting passes, Clippy
+completes with inherited warnings, and both frozen ordinary-game AI baselines
+match (six navigation and twelve strategy episodes).
+
+The Yocto build completes all 6,608 tasks, with 21 rerun and the inherited host
+warning. The archived image's extracted client SHA-256 is
+`6daec88db3a4ce364c3cc13b4e11711d2e6457be0cc7a30317129fb1129a1773`.
+
+## Deployed live verification
+
+The Pi boots slot B (`/dev/sda3`), and its installed client matches the archived
+image hash above. The 800×480 raster duel uses P1 Capture versus P2 interceptor,
+with combat breaks at 8s/4s. P1 owns the planet and is departing at the first
+sample. At the two-minute sample P2 is landing its escape pod.
+
+At the three-minute sample, P2 is on foot, has countercaptured the planet and is
+24% through rebuilding. The HUD again shows 58 removed cells; the earlier live
+run stalled during this recovery phase. A follow-up at 228.6 seconds confirms P2
+aboard its replacement full ship and flying again. This additional live
+observation is separate from the strictly 180-second headless matrices.
+
+The six live samples report 59.6–60.1 FPS/UPS, zero service restarts, and no pause;
+the last records 13,697 updates. Actual capture timestamps, screenshots and
+status logs are retained, including `pi-live-180s.png` and
+`pi-live-followup.png`. These sampled rates do not eliminate survey peak costs.
+
+The playtest setup is a fresh paused `spacewars-terrain-combat` round, P1 human
+versus P2 Capture, combat breaks 8s/4s. Start or B resumes; after landing and
+exiting, hold A and steer to use the shared jetpack. No merge or push was made.
