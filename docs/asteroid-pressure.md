@@ -101,4 +101,108 @@ and step/policy timing. A clean physics run does not count as a successful
 mission. The diagnostic runner returns nonzero for audit, report or hazard
 coverage failures; gameplay failures remain explicit report fields.
 
-Validation and deployment results will be recorded after the final runs.
+## Validation — 2026-09-09
+
+Gameplay source is `d20b8b1c81800395cd255237fcd90a16c36489a4`. Final binaries
+completed 200 three-minute simulations across desktop and Raspberry Pi 5:
+ten simulated hours, excluding earlier investigation runs and the ordinary
+Spacewars baseline suites.
+
+| Suite | Desktop | Pi 5 | Acceptance |
+| --- | ---: | ---: | --- |
+| Controlled impact recovery | 36/36 | 36/36 | Recover, rebuild and depart; physical audit passes |
+| Pod/ship jetpack routes and flag approaches, including former stalls | 16/16 | 16/16 | Each case's route/recovery objective and physical audit pass |
+| Sustained asteroid pressure | 48/48 | 48/48 | Full duration, physical/material audits and hazard coverage pass |
+| Capture sorties inside the pressure matrix | 43/48 | 45/48 | Capture and departure complete before the deadline |
+
+The seed-7/P1 sideways pod now exits at tick 2394 on both machines. It completes
+the enemy-flag/rebuild/departure journey at tick 5532 on desktop and 5533 on Pi.
+The original Pi cover-retry failure (seed 7, subject P2, unmirrored, asteroids
+Off) now lands at tick 3535, claims at 3728 and completes departure at 4244,
+using two cover replans. It later loses its ship and completes recovery too.
+
+Each pressure row below contains eight arrangements per platform. These are
+small diagnostic samples, not estimates of a balanced win rate; heavier rocks
+can also disrupt the opponent.
+
+| Mean arrival interval / strength | Desktop capture completions | Pi capture completions |
+| --- | ---: | ---: |
+| Off / Mixed | 7/8 | 7/8 |
+| 8 seconds / Mixed | 8/8 | 8/8 |
+| 3 seconds / Mixed | 7/8 | 8/8 |
+| 1 second / Mixed | 6/8 | 7/8 |
+| 3 seconds / Light | 7/8 | 7/8 |
+| 3 seconds / Heavy | 8/8 | 8/8 |
+
+The eight incomplete capture sorties comprise three ship losses, three
+exhausted approach budgets, and two occurrences of inaccessible hatch footing
+in the same Light-pressure arrangement. Ten completed capture sorties later
+encounter a terminal ground-route or hatch-access failure during recovery.
+One desktop case stops making progress on its ground route; the other reports
+say no measured route or no reachable standing site with hatch access. These
+remain explicit failures. Other late ship losses are still recovering when
+the three-minute observation ends. Capture success therefore does not imply
+indefinite recovery success on continuously damaged ground.
+
+The enabled streams record 593 vehicle contacts and 2,732 queued terrain edits
+across both platforms. The 1-second setting exercises the live-arrival cap
+(two skipped spawns on desktop, one on Pi); the Pi also records one terrain-edit
+budget skip. Natural ownership neutralizations occur, including in Off runs
+where weapons still damage material. These are observed contacts and gameplay
+events, not scripted hits on the player or flag.
+
+The largest per-run Pi step p95 is 0.406 ms, largest single measured step
+12.12 ms, and largest AI p95 0.338 ms. These headless timings exclude rendering;
+they do not establish a multi-planet frame budget or bound every survey spike.
+
+The workspace/all-target suite passes 1,057 tests with 22 display-dependent
+tests ignored. After the final launcher mapping fix, all 237 client tests pass
+again, and six material UI workflows pass under Xvfb in both renderers. Settings,
+launch, pause and restart are exercised. The ordinary navigation and strategy
+baselines still match their six and twelve episodes. Workspace Clippy completes
+with existing warnings, and formatting/diff checks pass.
+
+Raw reports, rejected controller experiments, binary hashes, logs and image
+provenance are retained outside the repository at:
+
+```text
+/home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/asteroid-pressure-20260909/
+```
+
+Final evidence directories are `final-desktop-pressure`, `final-pi-pressure`,
+`desktop-impact`, `final-pi-impact`, `verified-desktop-jetpack` and
+`final-pi-jetpack`. The final native combat and recovery executables are
+byte-identical to the executables used in their earlier named result directories;
+the jetpack matrix was rerun with the rebuilt final executable. Aggregated
+pressure results are in `aggregate-results.json`.
+
+## Pi deployment and playtest
+
+The Yocto image for `d20b8b1` was deployed to `spacewars.local`, switching the
+active root from slot B (`/dev/sda3`) to slot A (`/dev/sda2`). The installed
+`engine-client` matches the executable extracted from the archived image:
+
+```text
+image SHA-256:  4e958e817505d58e5ec765c255481277dd04f98f528b72a06b5f3c656316303f
+client SHA-256: 01e1fe62cb23e364d81fcc921fb1da009ac380612b5c7bb8f0c60d3d6e4d5341
+```
+
+A live three-minute duel used Capture, 8/4-second combat breaks and Mixed
+asteroids at a 3-second mean. Four screenshots/status samples at 30, 75, 120
+and 180 seconds report 59.8–60.1 FPS/UPS with no service restarts. P1 had claimed
+and departed by the first sample; the second shows excavated ground and a
+neutral planet. P2 is landing its escape pod at the final sample. That last
+recovery is still in progress; the live check does not claim a completed rebuild.
+The launcher layout was also inspected on the Pi's 800×480 display.
+
+The Pi is left in a fresh, paused `spacewars-terrain-combat` round: P1 human,
+P2 Capture, 8/4-second combat breaks, and Mixed asteroids at the gentler 8-second
+mean. Start resumes. A tipped pod can use **A + d-pad down** (keyboard
+**Space + S**) for the shared recovery lift, then turn upright. Release before
+trying another lift. Arrivals can be disabled or increased in Launcher Settings.
+
+This closes the reproduced pod/cover-stall slice and establishes the sustained
+pressure test bed. The next navigation work is the saved damaged-ground and
+hatch failures above, followed by a controlled two-planet objective loop.
+Generated multi-planet matches, lethal pod/spaceling damage and world-scale
+hazard balance remain outside this checkpoint. Nothing has been merged or pushed.

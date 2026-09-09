@@ -29,6 +29,7 @@ movement, contests, loss and recovery.
 | Thrust aboard / jump or get up on foot | A (bottom face) | Space | Numpad 8 |
 | Exit / board the landed assigned vehicle | B (east face) | X | Numpad 2 |
 | Brake | D-pad down | S | Numpad 5 |
+| Lift a tipped, grounded pod | A + d-pad down | Space + S | Numpad 8 + 5 |
 | Swept-wing cruise (release to open) | Hold RB | J | PageDown aboard |
 | Aim mining beam on foot | Right stick | Arrows (left/right also walk) | Facing direction |
 | Mine | RT or LB | E | End |
@@ -63,6 +64,11 @@ weapons aboard and reuse the same on-foot mining and recovery loop. See
 [Material combat V4](material-combat-ai.md) for controls and validation. Launcher
 Settings also offers **Bot mission: Capture** for a
 [cover-aware landing, claim and departure attempt](tactical-surface-sorties.md).
+**Asteroid arrivals** and **Asteroid strength** add a seeded stream of natural
+impacts, with Off retaining the previous setup. See
+[pod recovery and asteroid pressure](asteroid-pressure.md) for the settings and
+validation. The pod recovery lift lasts at most 1.5 seconds; release the chord
+before trying again and use normal turning to stand the pod upright.
 
 ## Destruction, flags and recovery
 
