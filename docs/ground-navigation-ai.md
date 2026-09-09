@@ -181,3 +181,33 @@ restart and both renderers. Navigation V1's six frozen episodes and Strategy
 V1's twelve episodes match. Clippy completes with inherited repository warnings;
 the new ground-navigation files have no remaining warnings. Formatting and
 diff whitespace checks pass. No merge or push was performed.
+
+## Pi deployment and live verification
+
+Gameplay checkpoint: `0dc5d67c1e5a5ed4d5cf1fd9589ba5d08c3e7241`.
+The Yocto image completed all 6,608 tasks (21 rerun), with the inherited host
+distribution warning. The archived image was deployed to `spacewars.local`
+(`192.168.1.108`), which booted slot B, `/dev/sda3`.
+
+- Image SHA-256: `66b5c46150976f56fa9a8bf380c5fa45ee115702d954f06314ebd5b8e489266e`
+- Installed client SHA-256: `c53e1670c01458995d916096e985ce4d88c7abbe59dedc899fa8eff7b0c6e665`
+
+The installed executable matches the binary extracted from the archived image
+and includes `ground_navigation_v1`. The kiosk was active as PID 478 with zero
+service restarts. The subsequent live duel used P1 Capture versus P2 interceptor,
+800×480 raster rendering at scale 2, with combat breaks 8s/4s. Six captures from
+30 through 178 requested seconds measured 59.1–60.1 fps and 60.1 updates/s,
+without a pause or service restart. Actual capture timestamps are archived.
+
+At 30 seconds P1 owns the planet and is departing behind cover. At 90 seconds
+P2 is landing its escape pod. At 150 and 178 seconds P2 is on foot and reports
+`no measured walk/jump route to destination`; the world reports 58 removed
+cells. This live combat recovery remains incomplete. The screenshot does not
+establish whether a human could cross the route; it demonstrates a remaining
+planner limitation after combat damage, not a successful recovery.
+
+The final state is a fresh paused `spacewars-terrain-combat` round: P1 human,
+P2 Capture, combat breaks 8s/4s. Press B or Start to resume. To exercise enemy
+countercapture, plant a flag, board and leave the area; staying near the flag
+will contest its claim. The archive contains `pi-ready-paused.png`, the live
+screenshots, installed binary verification and the final settings/UI state.
