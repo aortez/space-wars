@@ -5,6 +5,9 @@ with `material_mission_v1`: a coordinator around the existing capture, ground,
 recovery and combat policies. It is a controlled experiment on two fixed
 destructible planets, preceding generated-world match integration.
 
+Follow-up: [pod landing retries](pod-landing-retries.md) addresses the failed
+approach and permanently rejected footing found in this checkpoint's reports.
+
 ## Playtest
 
 - `spacewars-terrain-travel`: P1 human, P2 mission bot.

@@ -1,6 +1,9 @@
 # Surface gameplay and destructible terrain integration
 
-Latest mission slice: [controlled two-planet missions](../two-planet-missions.md)
+Latest reliability slice: [pod landing retries](../pod-landing-retries.md) keeps
+recovery moving after a failed approach without bypassing physical access gates.
+
+The [controlled two-planet mission slice](../two-planet-missions.md)
 adds destination selection, travel, local-task handoffs and replanning on fixed
 destructible planets. Generated-world match integration remains ahead.
 

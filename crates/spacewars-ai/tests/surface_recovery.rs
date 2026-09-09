@@ -75,6 +75,151 @@ fn airborne_pod() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     )
 }
 
+fn rejected_pod_site() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    let (mut task, mut o) = airborne_pod();
+    o.sites.truncate(1);
+    assert_eq!(o.sites.len(), 1);
+    for tick in 0..=13 {
+        o.flight.pilot.tick = tick;
+        task.step(&o);
+    }
+    assert!(task.site_request().is_some());
+    // A stationary approach exhausts the existing ten-second progress budget.
+    o.flight.pilot.tick = 614;
+    task.step(&o);
+    assert_eq!(task.telemetry().landing_retries, 1);
+    assert_eq!(task.telemetry().landing_rejections.len(), 1);
+    (task, o)
+}
+
+#[test]
+fn landing_retry_reuses_pod_righting_and_accepts_actual_hatch_access() {
+    use scenario_spacewars::surface_sortie::{
+        TransferResult, pod_righting::PodRightingObservation,
+    };
+    let (mut task, mut o) = rejected_pod_site();
+    let started = task.telemetry().started_tick;
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.ship.angle = 1.7;
+    o.flight.pilot.landing.altitude = 1.0;
+    o.pod_righting = Some(PodRightingObservation {
+        eligible: true,
+        ..Default::default()
+    });
+    let intent = task.step(&o);
+    assert!(intent.controls.primary_held && intent.controls.brake_held);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::StabilizePod);
+    assert_eq!(task.telemetry().stabilization.as_ref().unwrap().attempts, 2);
+    let telemetry = task.telemetry().clone();
+    assert_eq!(task.step(&o), intent);
+    assert_eq!(task.telemetry(), &telemetry);
+    let mut clone = task.clone();
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.landing.phase = LandingPhase::Landed;
+    o.flight.pilot.transfer = TransferResult::Ready;
+    o.sites.clear();
+    let intent = task.step(&o);
+    assert_eq!(intent, clone.step(&o));
+    assert!(intent.controls.interact_held && !intent.controls.primary_held);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::ExitPod);
+    assert_eq!(task.telemetry().started_tick, started);
+}
+
+#[test]
+fn failed_footing_is_reconsidered_after_cooldown_or_local_geometry_change() {
+    for changed in [false, true] {
+        let (mut task, mut o) = rejected_pod_site();
+        for tick in 615..=628 {
+            o.flight.pilot.tick = tick;
+            task.step(&o);
+        }
+        assert_eq!(task.telemetry().goal, RecoveryGoal::SurveyPod);
+        assert!(task.site_request().is_none());
+        assert_eq!(task.telemetry().site_search_since, Some(628));
+        let retry_after = task.telemetry().landing_rejections[0].retry_after_tick;
+        o.flight.pilot.tick = 629;
+        o.flight.pilot.queries_ready = false;
+        task.step(&o);
+        assert_eq!(task.telemetry().status, TaskStatus::Running);
+        o.flight.pilot.queries_ready = true;
+        if changed {
+            o.sites[0].local_position.x += 0.6;
+            o.sites[0].revision += 1;
+            o.flight.pilot.tick += 1;
+        } else {
+            o.flight.pilot.tick = retry_after;
+        }
+        task.step(&o);
+        assert_eq!(task.site_request(), Some(o.sites[0].id));
+        assert_eq!(task.telemetry().goal, RecoveryGoal::LandPod);
+        assert_eq!(task.telemetry().landing_retries, 1);
+        assert_eq!(task.telemetry().site_search_since, None);
+        assert_eq!(task.telemetry().started_tick, Some(0));
+    }
+}
+
+#[test]
+fn empty_pod_survey_waits_for_landing_but_retains_a_finite_failure_budget() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = airborne_pod();
+    o.sites.clear();
+    for tick in 0..=13 {
+        o.flight.pilot.tick = tick;
+        task.step(&o);
+    }
+    assert_eq!(task.telemetry().goal, RecoveryGoal::SurveyPod);
+    let mut landed = task.clone();
+    o.flight.pilot.tick = 13 + 6 * 60;
+    o.flight.pilot.landing.phase = LandingPhase::Landed;
+    o.flight.pilot.transfer = TransferResult::Ready;
+    assert!(landed.step(&o).controls.interact_held);
+    assert_eq!(landed.telemetry().goal, RecoveryGoal::ExitPod);
+    o.flight.pilot.landing.phase = LandingPhase::Flying;
+    o.flight.pilot.tick = 13 + 15 * 60 + 1;
+    task.step(&o);
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("no suitable pod landing site")
+    );
+    let mut expired = landed.clone();
+    o.flight.pilot.tick = 120 * 60 + 1;
+    expired.step(&o);
+    assert_eq!(
+        expired.telemetry().reason,
+        Some("recovery exceeded two-minute task budget")
+    );
+}
+
+#[test]
+fn exhausted_pod_retries_allow_a_ready_exit_but_cannot_restart_forever() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = airborne_pod();
+    o.flight.pilot.landing.phase = LandingPhase::Landed;
+    o.flight.pilot.transfer = TransferResult::ExitBlocked;
+    for retry in 0..4 {
+        o.flight.pilot.tick = retry * 122;
+        task.step(&o);
+        o.flight.pilot.tick += 121;
+        task.step(&o);
+    }
+    assert_eq!(task.telemetry().landing_retries, 4);
+    let mut ready = task.clone();
+    o.flight.pilot.tick += 1;
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("pod landing retries exhausted")
+    );
+    o.flight.pilot.transfer = TransferResult::Ready;
+    assert!(ready.step(&o).controls.interact_held);
+    for tick in 600..800 {
+        o.flight.pilot.tick = tick;
+        task.step(&o);
+    }
+    assert_eq!(task.telemetry().landing_retries, 4);
+}
+
 #[test]
 fn rebuild_flight_keeps_its_destination_until_ownership_changes() {
     use scenario_spacewars::surface_sortie::jetpack::{

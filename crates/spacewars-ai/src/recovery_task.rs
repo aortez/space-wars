@@ -31,6 +31,7 @@ pub enum TaskStatus {
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryGoal {
     StabilizePod,
+    SurveyPod,
     LandPod,
     ExitPod,
     Claim,
@@ -44,6 +45,7 @@ impl RecoveryGoal {
     pub fn label(self) -> &'static str {
         match self {
             Self::StabilizePod => "stabilizing escape pod",
+            Self::SurveyPod => "checking another pod landing site",
             Self::LandPod => "landing escape pod",
             Self::ExitPod => "leaving escape pod",
             Self::Claim => "claiming recovery ground",
@@ -71,6 +73,8 @@ pub struct RecoveryTelemetry {
     pub site: Option<LandingSiteId>,
     pub invalidations: u32,
     pub landing_retries: u32,
+    pub landing_rejections: Vec<PodLandingRejection>,
+    pub site_search_since: Option<u64>,
     pub relocations: u32,
     pub relocation_site: Option<RebuildStandingSite>,
     pub relocation_surveys: u32,
@@ -79,6 +83,18 @@ pub struct RecoveryTelemetry {
     /// Granted once when hostile-ground traversal becomes necessary.
     pub ground_budget_ticks: u64,
 }
+
+/// A failed approach defers measured footing; it does not prove it unusable forever.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PodLandingRejection {
+    pub site: LandingSiteId,
+    pub revision: u64,
+    pub local_position: Vec2,
+    pub tick: u64,
+    pub retry_after_tick: u64,
+}
+
+const POD_SITE_WAIT_TICKS: u64 = 15 * 60;
 impl RecoveryTelemetry {
     pub fn label(&self) -> &'static str {
         if let Some(reason) = self.reason {
@@ -114,8 +130,6 @@ pub struct RecoverShipTask {
     context: BrainReset,
     telemetry: RecoveryTelemetry,
     site: Option<PilotLandingSite>,
-    rejected: Vec<LandingSiteId>,
-    climbing: bool,
     stabilized: bool,
     final_descent: bool,
     best_distance: f32,
@@ -136,7 +150,7 @@ impl RecoverShipTask {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v5",
+                task: "recover_ship_v6",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -150,6 +164,8 @@ impl RecoverShipTask {
                 site: None,
                 invalidations: 0,
                 landing_retries: 0,
+                landing_rejections: Vec::new(),
+                site_search_since: None,
                 relocations: 0,
                 relocation_site: None,
                 relocation_surveys: 0,
@@ -158,8 +174,6 @@ impl RecoverShipTask {
                 ground_budget_ticks: 0,
             },
             site: None,
-            rejected: Vec::new(),
-            climbing: false,
             stabilized: false,
             final_descent: false,
             best_distance: f32::INFINITY,
@@ -212,13 +226,22 @@ impl RecoverShipTask {
     }
     fn retry(&mut self, tick: u64) {
         if let Some(site) = self.site.take() {
-            self.rejected.push(site.id);
+            self.telemetry.landing_rejections.push(PodLandingRejection {
+                site: site.id,
+                revision: site.revision,
+                local_position: site.local_position,
+                tick,
+                retry_after_tick: tick + POD_SITE_WAIT_TICKS,
+            });
         }
         self.telemetry.site = None;
         self.telemetry.landing_retries += 1;
-        self.climbing = true;
+        self.telemetry.site_search_since = None;
+        self.stabilized = false;
+        self.stabilization_window = None;
+        self.settled_since = None;
         self.final_descent = false;
-        self.goal(RecoveryGoal::LandPod, tick);
+        self.goal(RecoveryGoal::StabilizePod, tick);
         self.telemetry.last_progress_tick = tick;
         self.best_distance = f32::INFINITY;
     }
@@ -440,11 +463,29 @@ impl RecoverShipTask {
             self.block("no controllable pod or spaceling", p.tick);
             return action;
         }
+        // Actual landing and hatch access take precedence over survey/retry intent.
+        if p.landing.phase == LandingPhase::Landed {
+            self.telemetry.site_search_since = None;
+            self.telemetry.landed_tick.get_or_insert(p.tick);
+            self.goal(RecoveryGoal::ExitPod, p.tick);
+            if p.transfer == TransferResult::Ready {
+                action.interact_held = !self.was_interacting;
+            } else if self.telemetry.landing_retries >= 4 {
+                self.block("pod landing retries exhausted", p.tick);
+            } else if p.tick.saturating_sub(self.telemetry.last_progress_tick) > 120 {
+                self.retry(p.tick);
+            }
+            return action;
+        }
         let up = (p.ship.position - p.planet.motion.position).normalized();
+        if self.telemetry.landing_retries >= 4 {
+            self.block("pod landing retries exhausted", p.tick);
+            action.brake_held = true;
+            return action;
+        }
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
         let spin = p.ship.spin - p.planet.motion.spin;
         if self.stabilized
-            && p.landing.phase != LandingPhase::Landed
             && (relative.length() > 20.0 || spin.abs() > o.flight.flight.limits.turn_speed * 2.0)
         {
             // A new strike can invalidate an otherwise settled approach. Survey
@@ -453,38 +494,13 @@ impl RecoverShipTask {
             self.site = None;
             self.telemetry.site = None;
             self.final_descent = false;
-            self.climbing = false;
+            self.telemetry.site_search_since = None;
             self.stabilization_window = None;
             self.settled_since = None;
         }
-        if !self.stabilized && p.landing.phase != LandingPhase::Landed {
+        if !self.stabilized {
             return self.stabilize(o, up);
         }
-        if self.telemetry.landing_retries >= 4 {
-            self.block("pod landing retries exhausted", p.tick);
-            action.brake_held = true;
-            return action;
-        }
-        if self.climbing {
-            action.horizontal = heading(p, up);
-            action.primary_held = Vec2::Y.rotate_radians(p.ship.angle).dot(up)
-                > if p.landing.altitude < 8.0 { 0.85 } else { 0.98 };
-            if p.ship.position.distance_to(p.planet.motion.position) > p.planet.radius + 12.0 {
-                self.climbing = false;
-            }
-            return action;
-        }
-        if p.landing.phase == LandingPhase::Landed {
-            self.telemetry.landed_tick.get_or_insert(p.tick);
-            self.goal(RecoveryGoal::ExitPod, p.tick);
-            if p.transfer == TransferResult::Ready {
-                action.interact_held = !self.was_interacting;
-            } else if p.tick.saturating_sub(self.telemetry.last_progress_tick) > 120 {
-                self.retry(p.tick);
-            }
-            return action;
-        }
-        self.goal(RecoveryGoal::LandPod, p.tick);
         if !p.queries_ready {
             action.brake_held = true;
             action.horizontal = heading(p, up);
@@ -509,7 +525,13 @@ impl RecoverShipTask {
             self.site = o
                 .sites
                 .iter()
-                .filter(|s| !self.rejected.contains(&s.id))
+                .filter(|s| {
+                    !self.telemetry.landing_rejections.iter().any(|rejected| {
+                        rejected.site == s.id
+                            && p.tick < rejected.retry_after_tick
+                            && rejected.local_position.distance_to(s.local_position) < 0.5
+                    })
+                })
                 .min_by(|a, b| {
                     a.vehicle_position
                         .distance_to(p.ship.position)
@@ -518,10 +540,17 @@ impl RecoverShipTask {
                 .copied();
         }
         let Some(site) = self.site else {
-            self.block("no suitable pod landing site", p.tick);
+            self.goal(RecoveryGoal::SurveyPod, p.tick);
+            let since = *self.telemetry.site_search_since.get_or_insert(p.tick);
+            if p.tick.saturating_sub(since) > POD_SITE_WAIT_TICKS {
+                self.block("no suitable pod landing site", p.tick);
+            }
             action.brake_held = true;
+            action.horizontal = heading(p, up);
             return action;
         };
+        self.telemetry.site_search_since = None;
+        self.goal(RecoveryGoal::LandPod, p.tick);
         self.telemetry.site = Some(site.id);
         let offset = site.vehicle_position - p.ship.position;
         let lateral = offset.dot(Vec2::new(site.normal.y, -site.normal.x));

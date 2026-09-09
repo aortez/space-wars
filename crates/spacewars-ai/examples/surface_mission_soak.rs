@@ -8,6 +8,7 @@ use spacewars_ai::{BrainReset, combat_pilot::RulePilotV4, mission_pilot::Materia
 use std::{
     collections::BTreeSet,
     fs,
+    io::{BufWriter, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -31,6 +32,7 @@ fn main() {
     let mode = arg("--mode", "quiet");
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
+    let trace = arg("--trace", "false") == "true";
     let require_route = arg("--require-route", "false") == "true";
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
@@ -38,6 +40,8 @@ fn main() {
     assert!(["quiet", "intercept", "duel"].contains(&mode.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
+    let mut trace =
+        trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
     let mut state = SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing);
     state.set_asteroid_pressure(MaterialAsteroidSettings {
         interval_seconds: interval,
@@ -93,6 +97,20 @@ fn main() {
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 actions.extend(intent.encode(owner));
                 let label = pilots[i].label();
+                if let Some(trace) = &mut trace
+                    && (tick % 60 == 0 || label != last[i])
+                {
+                    serde_json::to_writer(
+                        &mut *trace,
+                        &json!({
+                            "version": 1, "tick": tick, "seat": i,
+                            "observation": o, "actions": intent.encode(owner),
+                            "mission": pilots[i].telemetry(),
+                        }),
+                    )
+                    .unwrap();
+                    writeln!(trace).unwrap();
+                }
                 if label != last[i] {
                     events.push(json!({"tick":tick,"seat":i,"label":label,"telemetry":pilots[i].telemetry()}));
                     eprintln!("{:.2}s P{} {label}", tick as f64 / 60.0, i + 1);
@@ -140,6 +158,9 @@ fn main() {
                 }
             }
         }
+    }
+    if let Some(trace) = &mut trace {
+        trace.flush().unwrap();
     }
     let completed: BTreeSet<_> = pilots[seat]
         .telemetry()
