@@ -9,7 +9,8 @@ the default and retains the existing combat policy.
 The current Capture implementation is `TacticalCapturePilot` (`tactical_sortie_v2`),
 which adds [shared ground navigation](ground-navigation-ai.md) to the retained
 V1 flight mission described below. It can approach enemy flags and return to a
-hatch across measured walk/jump routes. Earlier result tables describe their
+hatch across measured walk/jump routes and now selects [jetpack crossings](jetpack-ground-navigation.md)
+when its parked ship obstructs the useful route. Earlier result tables describe their
 recorded V1 checkpoint; they are not reruns of V2.
 
 This is one bounded mission: approach → land → exit → claim → board → depart.

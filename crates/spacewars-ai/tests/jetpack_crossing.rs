@@ -91,8 +91,12 @@ fn physical_trial_crosses_both_directions_and_preserves_remaining_charge_on_boar
             actor: owner,
             episode_seed: 42,
         });
+        let mut before_boarding = 1.0;
         for _ in 0..2400 {
             let o = state.jetpack_crossing_observation(seat, bot.direction());
+            if o.pilot.location == scenario_spacewars::surface_sortie::PilotLocation::OnFoot {
+                before_boarding = o.charge.unwrap();
+            }
             let a = bot.step(&o);
             SurfaceSortieScenario::step(
                 &mut state,
@@ -115,6 +119,7 @@ fn physical_trial_crosses_both_directions_and_preserves_remaining_charge_on_boar
         assert_eq!(bot.telemetry().crossings, 2);
         assert!(bot.telemetry().claimed);
         let aboard = state.jetpack_crossing_observation(seat, bot.direction());
-        assert!(aboard.charge.unwrap() > 0.01 && aboard.charge.unwrap() < 0.2);
+        assert!(aboard.charge.unwrap() > 0.01 && aboard.charge.unwrap() < 0.8);
+        assert!((aboard.charge.unwrap() - before_boarding).abs() <= 1.0 / 240.0 + 1e-6);
     }
 }

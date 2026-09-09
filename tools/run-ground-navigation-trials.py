@@ -13,6 +13,7 @@ parser.add_argument('--ssh', help='Optional SSH destination; install the binary 
 parser.add_argument('--ssh-option', action='append', default=[])
 parser.add_argument('--ssh-config', help='Optional SSH configuration file (for example /dev/null)')
 parser.add_argument('--remote-out', default='/tmp/ground-navigation-trials')
+parser.add_argument('--jetpacks', action='store_true', help='Equip both pilots with the shared jetpack')
 args = parser.parse_args()
 args.out.mkdir(parents=True, exist_ok=True)
 ssh = ['ssh', '-o', 'BatchMode=yes']
@@ -37,6 +38,8 @@ for seed, seat, mode, edit in cases:
     expected = 'blocked' if edit == 'blocked' else 'complete'
     command = [args.binary, '--seed', str(seed), '--seat', str(seat), '--mode', mode,
                '--edit', edit, '--expect', expected, '--out', destination]
+    if args.jetpacks:
+        command.extend(['--jetpacks', 'true'])
     with (out / 'runner.log').open('w') as log:
         result = subprocess.run(ssh + [shlex.join(command)] if args.ssh else command,
                                 stdout=log, stderr=subprocess.STDOUT)
@@ -48,6 +51,7 @@ for seed, seat, mode, edit in cases:
         identity = (report['version'], report['seed'], report['seat'], report['mode'],
                     report['edit'], report['expected'], report['seconds'])
         assert identity == (1, seed, seat, mode, edit, expected, 180)
+        assert report.get('jetpacks', False) == args.jetpacks
         row = dict(name=name, expected=expected, accepted=result.returncode == 0,
                    complete=report['complete'], captured=report['captured'],
                    blocked=report['blocked'], audit_passed=report['audit_passed'],
@@ -60,6 +64,9 @@ for seed, seat, mode, edit in cases:
                    rebuild_refresh_p95_ms=report['rebuild_refresh_p95_ms'],
                    rebuild_refresh_max_ms=report['rebuild_refresh_max_ms'],
                    step_p95_ms=report['step_p95_ms'], step_max_ms=report['step_max_ms'])
+        row['jetpack_crossings'] = len({c['completed_tick'] for e in report['events']
+                                      if (c := (e.get('ground') or {}).get('crossing')) and c.get('completed_tick') is not None})
+        row['flight_interruptions'] = max((e.get('ground') or {}).get('flight_interruptions', 0) for e in report['events'])
     except (OSError, ValueError, KeyError, AssertionError, subprocess.CalledProcessError) as error:
         row = dict(name=name, expected=expected, accepted=False, error=str(error), exit_code=result.returncode)
     rows.append(row)

@@ -1,6 +1,8 @@
 //! Shared, bounded spaceling traversal over measured material ground.
 use crate::BrainReset;
+use crate::jetpack_crossing::{CrossingTelemetry, JetpackCrossingPilot};
 use engine_core::Vec2;
+use scenario_spacewars::surface_sortie::jetpack::CrossingPlan;
 use scenario_spacewars::surface_sortie::{
     PilotLocation, SurfaceSortieAction,
     ground_navigation::{
@@ -10,6 +12,8 @@ use scenario_spacewars::surface_sortie::{
     recovery_sensors::RecoveryTaskObservationV1,
 };
 use serde::Serialize;
+
+mod jetpack;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -25,6 +29,11 @@ pub enum GroundGoal {
     Walk,
     Jump,
     GetUp,
+    Recharge,
+    JetpackLift,
+    JetpackCross,
+    JetpackLand,
+    Settle,
     Arrived,
     Blocked,
 }
@@ -35,6 +44,11 @@ impl GroundGoal {
             Self::Walk => "walking along the ground route",
             Self::Jump => "jumping a ground obstacle",
             Self::GetUp => "getting up on the route",
+            Self::Recharge => "recharging for the ground route",
+            Self::JetpackLift => "jetpack: climbing over the ship",
+            Self::JetpackCross => "jetpack: crossing toward the objective",
+            Self::JetpackLand => "jetpack: landing to resume the route",
+            Self::Settle => "waiting for footing after interrupted flight",
             Self::Arrived => "at the ground destination",
             Self::Blocked => "ground route blocked",
         }
@@ -56,6 +70,9 @@ pub struct GroundTelemetry {
     pub invalidations: u32,
     pub jumps: u32,
     pub route: Option<GroundRouteDiagnostics>,
+    pub crossing: Option<CrossingTelemetry>,
+    pub jetpack_crossings: u32,
+    pub flight_interruptions: u32,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -69,13 +86,16 @@ pub struct GroundNavigationTask {
     previous_tick: Option<u64>,
     previous_action: SurfaceSortieAction,
     last_plan_tick: Option<u64>,
+    crossing_plan: Option<CrossingPlan>,
+    crossing_task: Option<JetpackCrossingPilot>,
+    settling_after_interrupt: bool,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v2",
+                policy: "ground_navigation_v3",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -89,6 +109,9 @@ impl GroundNavigationTask {
                 invalidations: 0,
                 jumps: 0,
                 route: None,
+                crossing: None,
+                jetpack_crossings: 0,
+                flight_interruptions: 0,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -98,6 +121,9 @@ impl GroundNavigationTask {
             previous_tick: None,
             previous_action: SurfaceSortieAction::default(),
             last_plan_tick: None,
+            crossing_plan: None,
+            crossing_task: None,
+            settling_after_interrupt: false,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -105,6 +131,15 @@ impl GroundNavigationTask {
     }
     pub fn reset(&mut self, context: BrainReset) {
         *self = Self::new(context, self.telemetry.destination);
+    }
+    pub fn is_crossing(&self) -> bool {
+        self.crossing_task.is_some() || self.settling_after_interrupt
+    }
+    /// Finish an active landing before following a changed objective.
+    pub fn retarget(&mut self, destination: GroundDestination) {
+        self.telemetry.destination = destination;
+        self.telemetry.target = None;
+        self.clear_route();
     }
     fn block(&mut self, reason: &'static str) {
         self.telemetry.goal = GroundGoal::Blocked;
@@ -115,6 +150,7 @@ impl GroundNavigationTask {
         self.telemetry.waypoint = 0;
         self.best_distance = f32::INFINITY;
         self.last_plan_tick = None;
+        self.crossing_plan = None;
     }
     pub fn step(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
         let p = &o.flight.pilot;
@@ -160,6 +196,21 @@ impl GroundNavigationTask {
                 self.block("ground traversal exceeded ninety seconds");
             }
             return action;
+        }
+        if self.is_crossing() {
+            if p.tick.saturating_sub(start) > 90 * 60 {
+                self.block("ground traversal exceeded ninety seconds");
+                return action;
+            }
+            if self.crossing_task.is_some() {
+                return self.follow_crossing(o);
+            }
+            if p.supported_planet != Some(p.planet.index) {
+                self.telemetry.goal = GroundGoal::Settle;
+                return action;
+            }
+            self.settling_after_interrupt = false;
+            self.telemetry.last_progress_tick = p.tick;
         }
         let target = match self.telemetry.destination {
             GroundDestination::Flag => p
@@ -308,16 +359,19 @@ impl GroundNavigationTask {
         let foot = local(actor.position - p.actor_up * 0.9);
         if self.telemetry.path.is_empty() {
             self.telemetry.goal = GroundGoal::Survey;
+            if o.jetpack.as_ref().is_some_and(|pack| !pack.surveyed) {
+                // Compare walking and powered routes from the same completed
+                // survey, including immediately after a landing or interruption.
+                return action;
+            }
             if self.last_plan_tick == Some(map.tick) {
                 return action;
             }
             self.last_plan_tick = Some(map.tick);
             self.telemetry.replans += 1;
-            let route = if self.telemetry.destination == GroundDestination::Hatch {
-                map.route_to_hatch(foot, target_local.unwrap())
-            } else {
-                map.route(foot, target_local.unwrap(), range - 0.6)
-            };
+            let (route, crossing) =
+                self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
+            self.crossing_plan = crossing;
             self.telemetry.route = Some(route.diagnostics);
             if !route.path.is_empty() {
                 self.telemetry.path = route.path;
@@ -328,12 +382,25 @@ impl GroundNavigationTask {
                 let since = *self.missing_since.get_or_insert(p.tick);
                 self.telemetry.goal = GroundGoal::Survey;
                 if p.tick - since > 5 * 60 {
-                    self.block("no measured walk/jump route to destination");
+                    self.block(if o.jetpack.is_some() {
+                        "no measured walk/jump/jetpack route to destination"
+                    } else {
+                        "no measured walk/jump route to destination"
+                    });
                 }
                 return action;
             }
         }
         let index = self.telemetry.waypoint;
+        if let Some(plan) = &self.crossing_plan
+            && index + 1 == self.telemetry.path.len()
+            && foot.distance_to(plan.start) < 1.5
+            && p.supported_planet == Some(p.planet.index)
+            && p.balanced
+        {
+            self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, plan.clone()));
+            return self.follow_crossing(o);
+        }
         let node_id = self.telemetry.path[index];
         let Some(node) = map.nodes.iter().find(|n| n.id == node_id) else {
             self.clear_route();

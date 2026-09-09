@@ -52,13 +52,14 @@ pub struct CrossingTelemetry {
     pub lowest_charge: f32,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct JetpackCrossingPilot {
     context: BrainReset,
     telemetry: CrossingTelemetry,
     previous_tick: Option<u64>,
     previous_action: SurfaceSortieAction,
     missing_since: Option<u64>,
+    traversal: bool,
 }
 impl JetpackCrossingPilot {
     pub fn new(context: BrainReset) -> Self {
@@ -78,15 +79,54 @@ impl JetpackCrossingPilot {
             previous_tick: None,
             previous_action: SurfaceSortieAction::default(),
             missing_since: None,
+            traversal: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
         *self = Self::new(context);
     }
+    /// Reuse the trial's physical maneuver as one route leg. The caller owns
+    /// approach routing, the objective, interruption and the total deadline.
+    pub(crate) fn traversal(context: BrainReset, plan: CrossingPlan) -> Self {
+        let mut task = Self::new(context);
+        task.traversal = true;
+        task.telemetry.goal = CrossingGoal::Recharge;
+        task.telemetry.plan = Some(plan);
+        task
+    }
+
+    pub(crate) fn revalidate(&mut self, plan: &CrossingPlan) -> bool {
+        if ![plan.start, plan.destination, plan.ship_position]
+            .iter()
+            .all(|p| p.x.is_finite() && p.y.is_finite())
+            || !plan.cruise_radius.is_finite()
+            || !plan.ship_angle.is_finite()
+        {
+            return false;
+        }
+        let Some(old) = &self.telemetry.plan else {
+            return false;
+        };
+        if old.planet != plan.planet
+            || old.direction != plan.direction
+            || old.start.distance_to(plan.start) > 0.5
+            || old.destination.distance_to(plan.destination) > 0.5
+            || (old.cruise_radius - plan.cruise_radius).abs() > 0.25
+            || old.ship_position.distance_to(plan.ship_position) > 0.5
+            || angle_difference(old.ship_angle, plan.ship_angle).abs() > 0.1
+        {
+            return false;
+        }
+        self.telemetry.plan = Some(plan.clone());
+        true
+    }
     pub fn telemetry(&self) -> &CrossingTelemetry {
         &self.telemetry
     }
     pub fn direction(&self) -> CrossingDirection {
+        if self.traversal {
+            return self.telemetry.plan.as_ref().unwrap().direction;
+        }
         if self.telemetry.crossings == 0 {
             CrossingDirection::Left
         } else {
@@ -262,6 +302,11 @@ impl JetpackCrossingPilot {
             && error.abs() < 1.0
         {
             self.telemetry.crossings += 1;
+            if self.traversal {
+                self.telemetry.goal = CrossingGoal::Complete;
+                self.telemetry.completed_tick = Some(p.tick);
+                return a;
+            }
             self.telemetry.goal = if self.telemetry.crossings == 1 {
                 CrossingGoal::Claim
             } else {
@@ -278,6 +323,15 @@ impl JetpackCrossingPilot {
         };
         let desired_rise = ((target_radius - local.length()) * 1.8).clamp(-6.0, 7.0);
         a.primary_held = radial_speed < desired_rise;
+        if self.telemetry.goal == CrossingGoal::Descend
+            && local.length() < plan.destination.length() + 1.5
+            && error.abs() < 1.0
+        {
+            // Once aligned just above the measured footing, commit to contact.
+            // Trying to hover at capsule height wastes the landing reserve on
+            // stepped/sloping terrain. Charged lateral steering still brakes.
+            a.primary_held = false;
+        }
         a.horizontal = (error * 1.8).clamp(-8.0, 8.0) / o.air_speed;
         if charge <= 0.0 && p.supported_planet.is_none() {
             self.block("jetpack charge exhausted before landing");

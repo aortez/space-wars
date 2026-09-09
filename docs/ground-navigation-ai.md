@@ -1,6 +1,8 @@
 # Enemy flags and shared spaceling navigation
 
-Current follow-up: [reachable replacement ships](rebuild-access-ai.md).
+Current follow-up: [jetpack routes in ordinary material gameplay](jetpack-ground-navigation.md).
+`ground_navigation_v3` adds measured ship crossings for capture and recovery.
+The preceding follow-up is [reachable replacement ships](rebuild-access-ai.md).
 `ground_navigation_v2` / `recover_ship_v3` add shared hatch-access placement,
 measured rebuild relocation, and route diagnostics. The validation and deployed
 limits below record the preceding `0dc5d67` checkpoint.

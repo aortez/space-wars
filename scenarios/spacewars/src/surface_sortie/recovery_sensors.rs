@@ -14,6 +14,7 @@ pub struct RecoveryTaskObservationV1 {
     /// flight/pilot observations and their policies remain unchanged.
     pub ground: Option<ground_navigation::GroundMap>,
     pub rebuild: Option<rebuild_placement::RebuildRelocationSurvey>,
+    pub jetpack: Option<jetpack::JetpackNavigationObservation>,
 }
 impl SurfaceSortieState {
     pub fn recovery_task_observation(
@@ -53,6 +54,7 @@ impl SurfaceSortieState {
             sites,
             ground,
             rebuild,
+            jetpack: self.jetpack_navigation_observation(player),
         }
     }
 }

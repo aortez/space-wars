@@ -9,10 +9,10 @@ the neutral-planet trial without contesting its claim. Restart repeats the trial
 Both pilots have the same equipment and controls in this preset. Tap A/Space to
 jump or get up; hold while airborne for lift, with ordinary left/right steering.
 The two jet nozzles and flames show when lift is active, and the HUD shows charge.
-Other material presets and historical movement fixtures do not enable this
-equipment yet. The existing combat bot's blocked flag route is still a separate
-integration task; this trial proves the crossing maneuver before adding it to
-general ground navigation.
+The subsequent [ground-navigation integration](jetpack-ground-navigation.md) also
+enables this equipment in terrain combat and duel. Other material presets and
+historical movement fixtures retain their prior equipment. Results below record
+the original dedicated trial checkpoint.
 
 ## Shared movement and measured flight
 

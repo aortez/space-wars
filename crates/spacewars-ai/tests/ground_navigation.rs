@@ -78,6 +78,106 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
     }
 }
 
+fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
+    use scenario_spacewars::surface_sortie::jetpack::{
+        CrossingDirection, CrossingPlan, JetpackNavigationObservation,
+    };
+    o.jetpack = Some(JetpackNavigationObservation {
+        charge,
+        burning: false,
+        burn_seconds: 0.0,
+        gravity: -Vec2::Y * 18.0,
+        surveyed: true,
+        crossing: Some(CrossingPlan {
+            planet: o.flight.pilot.planet.index,
+            revision: o.flight.pilot.planet.revision,
+            direction: CrossingDirection::Left,
+            start: Vec2::new(0.0, 60.0),
+            destination: Vec2::new(6.0, 60.0),
+            cruise_radius: 72.0,
+            ship_position: Vec2::new(3.0, 60.0),
+            ship_angle: 0.0,
+        }),
+    });
+}
+
+#[test]
+fn walking_wins_on_clear_ground_and_disconnected_ground_waits_for_real_charge() {
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 0.2);
+    let mut walking = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    walking.step(&o);
+    assert!(!walking.is_crossing());
+    o.ground.as_mut().unwrap().edges.retain(|e| e.from != 1);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    o.jetpack.as_mut().unwrap().surveyed = false;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Survey);
+    assert!(!task.is_crossing());
+    advance(&mut o, 1);
+    o.jetpack.as_mut().unwrap().surveyed = true;
+    let first = task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Recharge);
+    assert!(!first.primary_held);
+    assert_eq!(task.step(&o), first);
+    let mut copy = task.clone();
+    advance(&mut o, 90);
+    assert_eq!(task.step(&o), copy.step(&o));
+    assert_eq!(task.telemetry(), copy.telemetry());
+    assert_eq!(
+        task.telemetry().goal,
+        GroundGoal::Recharge,
+        "elapsed time is not a refill"
+    );
+    o.jetpack.as_mut().unwrap().charge = 0.99;
+    advance(&mut o, 91);
+    task.step(&o);
+    advance(&mut o, 92);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::JetpackLift);
+    task.reset(context);
+    assert!(!task.is_crossing());
+}
+
+#[test]
+fn objective_changes_preserve_landing_and_missing_corridors_interrupt_without_resetting_deadline() {
+    let (context, mut o) = fixture();
+    add_jetpack(&mut o, 1.0);
+    o.ground.as_mut().unwrap().edges.retain(|e| e.from != 1);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    for tick in 0..3 {
+        advance(&mut o, tick);
+        task.step(&o);
+    }
+    assert!(task.is_crossing());
+    o.flight.pilot.supported_planet = None;
+    o.flight.pilot.actor.as_mut().unwrap().position.y += 5.0;
+    task.retarget(GroundDestination::Flag);
+    advance(&mut o, 3);
+    task.step(&o);
+    assert!(
+        task.is_crossing(),
+        "a vanished flag must not abandon an airborne actor"
+    );
+    o.jetpack.as_mut().unwrap().crossing = None;
+    advance(&mut o, 4);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().flight_interruptions, 1);
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    let mut landed = task.clone();
+    let mut footing = o.clone();
+    footing.flight.pilot.supported_planet = Some(footing.flight.pilot.planet.index);
+    advance(&mut footing, 5);
+    landed.step(&footing);
+    assert_eq!(landed.telemetry().goal, GroundGoal::Arrived);
+    advance(&mut o, 90 * 60 + 1);
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("ground traversal exceeded ninety seconds")
+    );
+}
+
 #[test]
 fn traversal_replay_clone_reset_and_local_frame_contract() {
     let (context, mut o) = fixture();

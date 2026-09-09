@@ -120,12 +120,19 @@ impl TacticalCapturePilot {
                 .as_ref()
                 .is_none_or(|g| g.telemetry().destination != destination)
             {
-                self.ground = Some(GroundNavigationTask::new(self.context, destination));
+                if let Some(ground) = &mut self.ground
+                    && ground.is_crossing()
+                {
+                    ground.retarget(destination);
+                } else {
+                    self.ground = Some(GroundNavigationTask::new(self.context, destination));
+                }
             }
             let ground = self.ground.as_mut().unwrap();
             let controls = ground.step(&o.combat.recovery);
-            if ground.telemetry().goal != GroundGoal::Arrived
-                && (!owned || p.transfer != TransferResult::Ready)
+            if ground.is_crossing()
+                || ground.telemetry().goal != GroundGoal::Arrived
+                    && (!owned || p.transfer != TransferResult::Ready)
             {
                 intent.flight.controls = controls;
             }

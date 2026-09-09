@@ -21,6 +21,59 @@ pub struct CrossingPlan {
     pub ship_angle: f32,
 }
 
+impl CrossingPlan {
+    pub fn reversed(&self) -> Self {
+        Self {
+            direction: match self.direction {
+                CrossingDirection::Left => CrossingDirection::Right,
+                CrossingDirection::Right => CrossingDirection::Left,
+            },
+            start: self.destination,
+            destination: self.start,
+            ..self.clone()
+        }
+    }
+}
+
+/// Equipment is sampled every tick; the single bidirectional corridor is
+/// measured at the same staggered cadence as the ground map.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct JetpackNavigationObservation {
+    pub charge: f32,
+    pub burning: bool,
+    pub burn_seconds: f32,
+    pub gravity: Vec2,
+    pub surveyed: bool,
+    pub crossing: Option<CrossingPlan>,
+}
+
+impl JetpackNavigationObservation {
+    pub fn for_crossing(
+        &self,
+        pilot: &pilot::PilotObservationV1,
+        direction: CrossingDirection,
+    ) -> JetpackCrossingObservation {
+        JetpackCrossingObservation {
+            version: 1,
+            pilot: pilot.clone(),
+            charge: Some(self.charge),
+            burning: self.burning,
+            burn_seconds: self.burn_seconds,
+            gravity: self.gravity,
+            thrust: motor::THRUST,
+            air_speed: motor::AIR_SPEED,
+            surveyed: self.surveyed,
+            plan: self.crossing.as_ref().map(|plan| {
+                if plan.direction == direction {
+                    plan.clone()
+                } else {
+                    plan.reversed()
+                }
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JetpackCrossingObservation {
     pub version: u32,
@@ -45,6 +98,28 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    pub fn jetpack_navigation_observation(
+        &self,
+        player: usize,
+    ) -> Option<JetpackNavigationObservation> {
+        let pilot = &self.pilots[player];
+        let pack = pilot.body.as_ref().and_then(|body| body.jetpack());
+        let charge = pack.map(|p| p.charge).or(pilot.jetpack_charge)?;
+        let surveyed = self.location(player) == PilotLocation::OnFoot
+            && !self.world.physics.material_queries_dirty
+            && (self.world.tick + player as u64 * 15).is_multiple_of(30);
+        Some(JetpackNavigationObservation {
+            charge,
+            burning: pack.is_some_and(|p| p.active),
+            burn_seconds: pack.map_or(0.0, |p| p.burn_seconds),
+            gravity: pilot.gravity,
+            surveyed,
+            crossing: surveyed
+                .then(|| self.crossing_plan(player, CrossingDirection::Left))
+                .flatten(),
+        })
+    }
+
     pub fn enable_jetpacks(&mut self) {
         for pilot in &mut self.pilots {
             if pilot.jetpack_charge.is_none() {
@@ -216,7 +291,27 @@ mod tests {
         for _ in 0..120 {
             SurfaceSortieScenario::step(&mut state, &[], DT);
         }
+        assert!(!state.jetpack_navigation_observation(0).unwrap().surveyed);
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[SurfaceSortieAction {
+                interact_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1)],
+            DT,
+        );
+        for _ in 0..29 {
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+        }
         let before = state.world.physics.world.snapshot_bytes().unwrap();
+        let navigation = state.jetpack_navigation_observation(0).unwrap();
+        assert_eq!(
+            Some(navigation.clone()),
+            state.jetpack_navigation_observation(0)
+        );
+        let both = navigation.crossing.as_ref().unwrap();
+        assert_eq!(both.reversed().reversed(), *both);
         let o = state.jetpack_crossing_observation(0, CrossingDirection::Left);
         assert_eq!(
             Some(o.clone()),
@@ -258,5 +353,7 @@ mod tests {
         state.world.physics.material_queries_dirty = true;
         let dirty = state.jetpack_crossing_observation(0, CrossingDirection::Left);
         assert!(!dirty.surveyed && dirty.plan.is_none());
+        let navigation = state.jetpack_navigation_observation(0).unwrap();
+        assert!(!navigation.surveyed && navigation.crossing.is_none());
     }
 }

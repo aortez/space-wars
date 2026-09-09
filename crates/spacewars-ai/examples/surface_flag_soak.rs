@@ -43,8 +43,20 @@ fn main() {
         },
     );
     let bearing_offset: f32 = arg("--offset", "0.6").parse().unwrap();
+    let jetpacks: bool = arg("--jetpacks", "false").parse().unwrap();
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
-    assert!(["none", "crater", "blocked", "flag", "rebuild"].contains(&edit.as_str()));
+    assert!(
+        [
+            "none",
+            "crater",
+            "blocked",
+            "flag",
+            "rebuild",
+            "flight-flag",
+            "flight-crater"
+        ]
+        .contains(&edit.as_str())
+    );
     assert!(["complete", "blocked", "bounded"].contains(&expected.as_str()));
     let owner = PlayerId::from_index(seat).unwrap();
     let defender = PlayerId::from_index(1 - seat).unwrap();
@@ -67,6 +79,9 @@ fn main() {
         actor: owner,
         episode_seed: seed,
     };
+    if jetpacks {
+        state.enable_jetpacks();
+    }
     let mut navigation = GroundNavigationTask::new(context, GroundDestination::Flag);
     let mut recovery = RulePilotV3::new(context);
     let mut capture = TacticalCapturePilot::new(context, CombatBreakSettings::default());
@@ -182,6 +197,30 @@ fn main() {
             strike_tick = Some(tick);
         }
         actions.push(SurfaceImpactAction::default().encode(owner));
+        if edit_tick.is_none()
+            && let Some(g) = &ground
+            && g.goal == GroundGoal::JetpackCross
+            && matches!(edit.as_str(), "flight-flag" | "flight-crater")
+        {
+            let cut = if edit == "flight-flag" {
+                RecoveryDisruption::FlagFooting
+            } else {
+                // Revise the retained planet away from the active corridor;
+                // the bot must revalidate the flight, then resume its objective.
+                let local = g.crossing.as_ref().unwrap().plan.as_ref().unwrap().start;
+                let bearing = ((-local.x).atan2(local.y) * GROUND_SAMPLES as f32
+                    / std::f32::consts::TAU)
+                    .round() as i32;
+                RecoveryDisruption::GroundRouteNode {
+                    node: (bearing + GROUND_SAMPLES as i32 / 4).rem_euclid(GROUND_SAMPLES as i32)
+                        as u16,
+                    radius: 1,
+                }
+            };
+            assert!(state.queue_recovery_disruption(seat, cut));
+            edit_tick = Some(tick);
+            events.push(json!({"tick":tick,"edit":edit,"ground":g}));
+        }
         if edit_tick.is_none()
             && let Some(g) = &ground
             && g.destination == GroundDestination::Flag
@@ -316,7 +355,7 @@ fn main() {
     refresh_times.sort_by(f64::total_cmp);
     rebuild_times.sort_by(f64::total_cmp);
     step_times.sort_by(f64::total_cmp);
-    let report = json!({"version":1,"seed":seed,"seat":seat,"offset":bearing_offset,"mode":mode,"edit":edit,"seconds":180,
+    let report = json!({"version":1,"seed":seed,"seat":seat,"offset":bearing_offset,"mode":mode,"edit":edit,"seconds":180,"jetpacks":jetpacks,
         "expected":expected,"complete":complete,"captured":captured,"blocked":blocked,"defender_claimed_tick":defender_claimed,"exited_tick":exited_tick,
         "claimed_tick":claimed_tick,"lowering_tick":lowering_tick,"departed_tick":departed_tick,"strike_tick":strike_tick,"edit_tick":edit_tick,
         "capture":capture.telemetry(),"recovery":recovery.telemetry(),"ground":last_ground,"map":last_map,"ground_failures":ground_failures,"damage":state.damage_observation(seat),

@@ -142,6 +142,7 @@ impl SurfaceSortieScenario {
         starts: &[(PlayerId, MaterialFlightStart)],
     ) -> SurfaceSortieState {
         let mut state = Self::init_material_flight(seed, 2, starts);
+        state.enable_jetpacks();
         for pilot in &mut state.pilots {
             pilot.combat = Some(CombatSeat::default());
             state.world.ships[pilot.vehicle.0].enable_weapon_supply();

@@ -279,6 +279,18 @@ impl RecoverShipTask {
             if !p.queries_ready {
                 return action;
             }
+            if self
+                .ground_task
+                .as_ref()
+                .is_some_and(|task| task.is_crossing())
+            {
+                let destination = if p.ship_available && p.ship_form == ShipForm::Ship {
+                    GroundDestination::Hatch
+                } else {
+                    GroundDestination::Flag
+                };
+                return self.traverse(o, destination);
+            }
             if !p.balanced && p.supported_planet.is_some() {
                 action.primary_held = !self.was_jumping;
             }
@@ -564,7 +576,13 @@ impl RecoverShipTask {
             .as_ref()
             .is_none_or(|task| task.telemetry().destination != destination)
         {
-            self.ground_task = Some(GroundNavigationTask::new(self.context, destination));
+            if let Some(task) = &mut self.ground_task
+                && task.is_crossing()
+            {
+                task.retarget(destination);
+            } else {
+                self.ground_task = Some(GroundNavigationTask::new(self.context, destination));
+            }
         }
         let task = self.ground_task.as_mut().unwrap();
         let action = task.step(o);
