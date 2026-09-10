@@ -26,13 +26,14 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..4 {
+            for bits in 0..8 {
                 let settings = ClockSettings {
                     time_format,
                     event_profile,
                     events: ClockEvents {
                         falling: bits & 1 != 0,
                         color_cycle: bits & 2 != 0,
+                        meltdown: bits & 4 != 0,
                     },
                 };
                 assert_eq!(
@@ -48,7 +49,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
         vec![2, 0, 24, 1, 3],
         vec![1, 0, 13, 1, 3],
         vec![1, 0, 24, 3, 3],
-        vec![1, 0, 24, 1, 4],
+        vec![1, 0, 24, 1, 8],
         vec![1, 0, 24, 1, 3, 0],
     ] {
         assert_eq!(
@@ -62,7 +63,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             Some(ClockAction::PreviewEvent(kind))
         );
     }
-    for payload in [vec![1, 0], vec![1, 0, 2], vec![2, 0, 0], vec![1, 0, 0, 0]] {
+    for payload in [vec![1, 0], vec![1, 0, 3], vec![2, 0, 0], vec![1, 0, 0, 0]] {
         assert_eq!(
             ClockAction::decode(&Action::scenario(CLOCK_ACTION_PREVIEW_EVENT, payload)),
             None
@@ -87,6 +88,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
         events: ClockEvents {
             falling: false,
             color_cycle: false,
+            meltdown: false,
         },
     };
     ClockScenario::step(

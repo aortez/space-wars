@@ -21,6 +21,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.event-profile.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.falling", "Off", &page);
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         let configured = harness.clock_state();
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -296,7 +297,10 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 assert!((5..=32).contains(&active.body_count));
                 assert!(active.collider_count <= 100);
             } else {
-                assert_eq!(active.event_kind, Some(ClockEventKind::ColorCycle));
+                assert!(matches!(
+                    active.event_kind,
+                    Some(ClockEventKind::ColorCycle | ClockEventKind::Meltdown)
+                ));
                 assert_eq!((active.body_count, active.collider_count), (0, 0));
             }
             let recovered = harness.clock_wait(&initial, "idle", event_id, 0);
@@ -319,6 +323,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         for id in [
             "launcher.settings.clock.falling.next",
             "launcher.settings.clock.color-cycle.next",
+            "launcher.settings.clock.meltdown.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -392,6 +397,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
         for id in [
             "launcher.settings.clock.falling.next",
             "launcher.settings.clock.color-cycle.next",
+            "launcher.settings.clock.meltdown.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
         }
@@ -527,4 +533,104 @@ impl FunctionalHarness {
             TRANSITION_TIMEOUT,
         )
     }
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
+    run_functional_test("clock-meltdown", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.event-profile.next"),
+            Some("Off")
+        );
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        harness.clock_trigger_event(&initial, ClockEventKind::Meltdown);
+        let melting = harness.clock_wait(&initial, "melting", 1, 75);
+        assert!(melting.meltdown.unwrap().airborne_cells > 0);
+        assert_eq!((melting.body_count, melting.collider_count), (0, 0));
+        harness.capture_screenshot("clock-melting.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
+        assert_eq!(harness.clock_state().meltdown, paused.meltdown);
+        // All three event switches remain reachable through controller navigation.
+        let page = harness.press_guarded(UiAction::Left, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.color-cycle")
+        );
+        let page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.meltdown")
+        );
+        let page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        let page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Meltdown")
+        );
+        harness.capture_screenshot("clock-meltdown-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let draining = harness.clock_wait(&initial, "draining", 2, 10);
+        let material = draining.meltdown.unwrap();
+        assert!(material.drained_microunits > 0 && material.pooled_microunits > 0);
+        assert!(material.water_columns <= scenario_clock::WATER_COLUMNS);
+        assert_eq!(draining.scenario_revision, initial.scenario_revision);
+        assert!(!draining.settings.events.meltdown);
+        harness.capture_screenshot("clock-draining.png");
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        harness.activate_guarded("pause.resume", &menu);
+        let reforming = harness.clock_wait(&initial, "reforming", 2, 15);
+        let material = reforming.meltdown.unwrap();
+        assert_eq!(
+            (
+                material.waiting_cells,
+                material.airborne_cells,
+                material.water_columns
+            ),
+            (0, 0, 0)
+        );
+        assert!(material.drained_microunits > material.initial_cells as u64 * 990_000);
+        harness.capture_screenshot("clock-melt-reforming.png");
+        let idle = harness.clock_wait(&initial, "idle", 2, 0);
+        assert_eq!(idle.meltdown, None);
+        assert_eq!(idle.next_event_tick, None);
+        harness.capture_screenshot("clock-melt-recovered.png");
+        harness.clock_trigger_event(&idle, ClockEventKind::Meltdown);
+        harness.clock_wait(&idle, "melting", 3, 30);
+        let gameplay = harness.state();
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, idle.scenario_revision);
+        assert_eq!(restarted.meltdown, None);
+        assert_eq!(restarted.event_id, 0);
+        assert!(!restarted.settings.events.meltdown);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        let relaunched = harness.clock_state();
+        assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
+        assert_eq!(relaunched.meltdown, None);
+        assert!(!relaunched.settings.events.meltdown);
+    });
 }

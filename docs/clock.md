@@ -8,8 +8,8 @@ reads the system clock. Configure the device's timezone/NTP as described in
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling** and **Color Cycle** switches select the automatic event mix;
-both default to On and are saved with the other Clock settings. These values
+The **Falling**, **Color Cycle**, and **Meltdown** switches select the automatic event mix;
+all default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
 
 | Profile | Idle wait before selecting an event |
@@ -23,12 +23,15 @@ kind when another is eligible. Adding event types does not multiply the trigger
 rate. Events never overlap. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait. Each kind also has an automatic
 reuse delay; the scheduler waits longer if no enabled event is eligible yet.
-With both switches Off, no automatic event is scheduled.
+With all switches Off, no automatic event is scheduled. Older settings files
+retain their existing switches and default the new Meltdown switch to On;
+the Off profile still disables every automatic event.
 
 | Event ID | Effect | Duration | Automatic reuse delay after completion |
 | --- | --- | --- | --- |
 | `falling` | Digit geometry / rigid bodies | 3.5 s fall + 1.5 s reform | 30 s |
 | `color-cycle` | Appearance only | 6 s | 15 s |
+| `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
 
 Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -38,6 +41,22 @@ open. Dim anchor cells remain visible behind the action.
 Color Cycle eases the illuminated cells and colon through violet, pink, gold,
 and green, returning to the normal cyan palette. Digits remain anchored and
 follow live time throughout; the event creates no physics objects.
+
+Meltdown releases the lit digit cells individually, with seeded release delays,
+gravity, spin and side-wall reflection. On first floor contact a cell becomes
+water, which pools, flows toward the existing center opening and drains away.
+The colon and dim face outline stay visible. After seven seconds, the latest
+time fades back in over 1.5 seconds. Water is a lightweight Clock-local effect:
+ballistic cells do not collide with each other, and the pool uses conservative
+neighbor leveling plus a stylized inward current, not a general fluid solver.
+
+The resource ceiling is **96 cells and 128 water columns**, with no Rapier bodies
+or growing droplet lists. The two floor halves meet the existing drain lips
+exactly. Each fixed tick performs two bounded pool passes. Drain-stream geometry
+is visual only; it never introduces additional simulated volume. The reform
+boundary accounts for and clears any remaining material rather than reporting
+it as successfully drained. Preview replacement, resize and restart drop the
+whole event-local representation. This does not depend on destructible terrain.
 
 All durations use fixed 60 Hz simulation ticks, so pause freezes the event and
 its schedule. The strict `clock trigger` command requires unpaused, synchronized,
@@ -57,7 +76,7 @@ desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
-**Falling/Color Cycle automatic switches**. Changes apply at the next host tick,
+**Falling/Color Cycle/Meltdown automatic switches**. Changes apply at the next host tick,
 even while paused, and are saved for restart/relaunch. A save failure is shown
 on the page; settings then remain active for the current session. Setting
 changes do not interrupt the current animation or reset its physics, event ID,
@@ -88,7 +107,7 @@ mutation. Animation ticks still do not invalidate UI revision guards.
 
 The face reforms using the **latest** reading, even across minute/hour changes
 or a host-time correction. Resizing during an event restores the current face
-and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Physics
+and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Rapier
 exists only during the falling phase: at most 28 moving bars plus four arena
 bodies and 100 colliders, with no accumulating debris.
 
@@ -107,8 +126,8 @@ resizing drops the active event and restores the latest face and base palette.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
 no concurrent composition yet: affected-area metadata does not permit overlap.
 
-This slice does not implement time-change triggers, cell disintegration,
-melting/water, or duck events. Those can add bounded event-local representations
+This slice does not implement time-change triggers or duck events. Those can
+add bounded event-local representations
 without moving scheduling or wall-clock reads into the individual animations.
 
 ## Public controls and synchronized captures
@@ -127,6 +146,12 @@ spacewars-cli clock wait --lifecycle idle --event-id 1
 spacewars-cli clock trigger color-cycle --json
 spacewars-cli clock wait --event color-cycle --phase cycling --event-id 2 --min-phase-tick 72
 spacewars-cli screenshot /tmp/clock-color-cycle.png
+spacewars-cli clock wait --lifecycle idle --event-id 2
+spacewars-cli clock trigger meltdown --json
+spacewars-cli clock wait --event meltdown --phase melting --event-id 3 --min-phase-tick 75
+spacewars-cli screenshot /tmp/clock-melting.png
+spacewars-cli clock wait --event meltdown --phase draining --event-id 3 --min-phase-tick 10
+spacewars-cli screenshot /tmp/clock-draining.png
 ```
 
 Use the event ID returned by `trigger`, not necessarily `1`. For robust remote
@@ -134,15 +159,22 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **3** and reports scenario-instance revision,
+`clock state` uses schema version **4** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
-phase (`falling`, `reforming`, `cycling`), pause state, profile, schedule, current
+phase (`falling`, `reforming`, `cycling`, `melting`, `draining`), pause state, profile, schedule, current
 reading/target digits, palette RGB, physics counts, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
 enablement and per-kind automatic-ready ticks; `clock events` displays it.
-These diagnostics do not affect `ui state` revisions.
+These diagnostics do not affect `ui state` revisions. The optional `meltdown`
+object is present only during Meltdown (including its reform phase). It reports
+initial/waiting/airborne cells, occupied water columns, and pooled, drained and
+reclaimed volume. One original cell equals 1,000,000 micro-units; independently
+rounded totals can differ by one unit. Waiting plus airborne cell volume plus
+the three volume aggregates must equal the initial material. Reclaimed volume
+is explicit deadline cleanup, not drainage. Idle and other events report null.
+Use matching client/CLI builds: schema 3 requests are rejected.
 
 `clock trigger` fetches state and guards the mutation with both instance revision
 and event ID; `--expect-scenario-revision` and `--expect-event-id` override those
@@ -152,8 +184,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 3, `event`
-(`falling` or `color-cycle`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 4, `event`
+(`falling`, `color-cycle`, or `meltdown`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -168,6 +200,42 @@ SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \
 See [functional tests](functional-tests.md) for display setup, coverage, and
 failure artifacts. The same CLI works on the deployed Pi for phase-aware smoke
 tests and screenshots.
+
+### Meltdown local validation (2026-09-09)
+
+The workspace/all-target suite passed **869 tests**, with 15 display-dependent
+workflows ignored in that command. The five Clock workflows were run explicitly
+on the local X display and passed. Strict Clippy passed for the Clock/common/
+control/CLI packages; client Clippy completed with existing unrelated warnings.
+The final launcher layout was rechecked through the Color Cycle workflow and
+an 800×480 pointer test after screenshot review caught an overlapping new row.
+
+Focused tests verify seeded motion, nonnegative/conserved pool volume, more than
+99% drainage before reform, pause and latest-time recovery, all event replacements,
+resize in every phase, and repeated cleanup at aspect ratios 0.25, 0.75, 800/480
+and 4. Raster checks at 800×480, 480×800 and 1280×720 require visible water during
+the effect and no water after recovery; the same draw lists reach the vector path.
+Five real Clock UI workflows pass locally, including Meltdown's switches,
+disabled-event preview, pause, restart/relaunch and state diagnostics.
+
+The reproducible release benchmark runs 24 seeded events at each of three sizes:
+
+```sh
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client meltdown_reaches -- --nocapture
+```
+
+On this desktop with Rust 1.89, the 72 events (612 simulated seconds) had a
+per-size step p95 of 0.0009 ms and draw-list p95 of 0.0042–0.0043 ms. The largest
+observed step was 0.0028 ms. Peak usage was 88 cells, 128 wet columns and 416
+draw primitives, with at most 0.000028 cell-volumes reclaimed at the deadline.
+The injected `08:08` face is deliberately dense. These timings exclude
+rasterization, presentation and host work; they are not device FPS measurements.
+
+**Meltdown has not been deployed or tested on the Pi.** Coordinate with the
+other task using `spacewars.local` and obtain confirmation before deployment.
+The device captures below document the earlier events, not Meltdown.
 
 ## Device captures
 

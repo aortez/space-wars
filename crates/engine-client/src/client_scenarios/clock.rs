@@ -137,6 +137,7 @@ impl ClientScenario for ClockClientScenario {
             },
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
+            meltdown: self.state.meltdown_state(),
             reading: self
                 .state
                 .reading()
@@ -237,5 +238,98 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+    }
+
+    #[test]
+    fn meltdown_reaches_both_render_paths_and_raster_water_is_visible() {
+        for viewport in [
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+            Viewport::new(1280.0, 720.0),
+        ] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: viewport.aspect_ratio(),
+                    event_profile: engine_common::ClockEventProfile::Off,
+                    ..ClockConfig::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[
+                    ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                    ClockAction::trigger_event(engine_common::ClockEventKind::Meltdown),
+                ],
+                Duration::ZERO,
+            );
+            let mut scenario = ClockClientScenario {
+                state,
+                last_emitted_reading: Cell::new(None),
+            };
+            let mut renderer = crate::raster::RasterRenderer::new();
+            for tick in 0..=510 {
+                if tick > 0 {
+                    scenario.step(&[], Duration::from_nanos(16_666_667));
+                }
+                if ![0, 75, 125, 210, 450, 510].contains(&tick) {
+                    continue;
+                }
+                let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Vector, viewport)
+                );
+                assert!(
+                    frames[0]
+                        .layers
+                        .iter()
+                        .map(|l| l.primitives.len())
+                        .sum::<usize>()
+                        <= 500
+                );
+                let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                );
+                assert!(!presentation.main_primitives.is_empty());
+                let image = renderer.image_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                    crate::raster::RasterOptions::default(),
+                );
+                let pixels = image.to_rgb8().unwrap();
+                let blue = pixels
+                    .as_slice()
+                    .iter()
+                    .filter(|p| p.r < 50 && p.g > 100 && p.b > 180)
+                    .count();
+                if tick == 125 || tick == 210 {
+                    assert!(blue > 100, "missing water at tick {tick} {viewport:?}");
+                }
+                if tick == 0 || tick == 510 {
+                    assert_eq!(blue, 0);
+                }
+                if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                    let directory = std::path::PathBuf::from(directory);
+                    std::fs::create_dir_all(&directory).unwrap();
+                    let file = std::fs::File::create(directory.join(format!(
+                        "meltdown-{tick}-{}x{}.png",
+                        viewport.width, viewport.height
+                    )))
+                    .unwrap();
+                    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                    encoder.set_color(png::ColorType::Rgb);
+                    encoder.set_depth(png::BitDepth::Eight);
+                    encoder
+                        .write_header()
+                        .unwrap()
+                        .write_image_data(pixels.as_bytes())
+                        .unwrap();
+                }
+            }
+        }
     }
 }

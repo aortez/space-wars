@@ -115,9 +115,22 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     // Pi-sized page: left-hand event switch and time-format row are hittable.
     click(&window, 240.0, 222.0);
     assert_eq!(adjusted.get(), Some((2, 1)));
+    click(&window, 585.0, 222.0);
+    assert_eq!(adjusted.get(), Some((7, 1)));
     adjusted.set(None);
     click(&window, 649.0, 110.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
+    // The extra launcher row must not overlap Back/Start at 800×480.
+    window.set_ingame_menu_visible(false);
+    window.set_launcher_visible(true);
+    window.set_launcher_settings_visible(true);
+    assert!(window.get_launcher_clock_meltdown_enabled());
+    click(&window, 728.0, 324.0);
+    assert!(!window.get_launcher_clock_meltdown_enabled());
+    assert!(window.get_launcher_settings_visible());
+    assert_eq!(window.get_launcher_settings_focus_index(), 6);
+    click(&window, 100.0, 384.0);
+    assert!(!window.get_launcher_settings_visible());
 }
 
 fn click(window: &MainWindow, x: f32, y: f32) {

@@ -303,6 +303,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-clock-event-profile: "Calm";
     in-out property <bool> launcher-clock-falling-enabled: true;
     in-out property <bool> launcher-clock-color-cycle-enabled: true;
+    in-out property <bool> launcher-clock-meltdown-enabled: true;
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";
@@ -864,22 +865,32 @@ export component MainWindow inherits Window {
                 MenuButton {
                     x: 0px;
                     y: 112px;
-                    width: (parent.width - 10px) / 2;
+                    width: (parent.width - 20px) / 3;
                     height: 48px;
-                    text: "Falling: " + (root.launcher-clock-falling-enabled ? "On" : "Off");
+                    text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 2;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(2, 1); }
                 }
                 MenuButton {
-                    x: (parent.width + 10px) / 2;
+                    x: (parent.width + 10px) / 3;
                     y: 112px;
-                    width: (parent.width - 10px) / 2;
+                    width: (parent.width - 20px) / 3;
                     height: 48px;
-                    text: "Color Cycle: " + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
+                    text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 3;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(3, 1); }
+                }
+                MenuButton {
+                    x: 2 * (parent.width + 10px) / 3;
+                    y: 112px;
+                    width: (parent.width - 20px) / 3;
+                    height: 48px;
+                    text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 7;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(7, 1); }
                 }
                 ChoiceRow {
                     y: 168px;
@@ -1248,7 +1259,7 @@ export component MainWindow inherits Window {
                         visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
                         x: 0px;
                         y: 0px;
-                        width: root.launcher-scenario == "spacewars" ? (parent.width - 12px) / 2 : parent.width;
+                        width: root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: "Renderer";
                         value: root.launcher-renderer;
@@ -1265,9 +1276,9 @@ export component MainWindow inherits Window {
 
                     ChoiceRow {
                         visible: root.launcher-scenario != "falling" && root.launcher-scenario != "nes";
-                        x: root.launcher-scenario == "spacewars" ? parent.width / 2 + 6px : 0px;
-                        y: root.launcher-scenario == "spacewars" ? 0px : 52px;
-                        width: root.launcher-scenario == "spacewars" ? (parent.width - 12px) / 2 : parent.width;
+                        x: root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? parent.width / 2 + 6px : 0px;
+                        y: root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? 0px : 52px;
+                        width: root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
                         label: "Raster Scale";
                         value: root.launcher-raster-scale-text + "×";
@@ -1418,7 +1429,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "clock";
                         x: 0px;
-                        y: 104px;
+                        y: 52px;
                         width: parent.width;
                         height: 48px;
                         label: "Time Format";
@@ -1437,7 +1448,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "clock";
                         x: 0px;
-                        y: 156px;
+                        y: 104px;
                         width: parent.width;
                         height: 48px;
                         label: "Event Profile";
@@ -1456,7 +1467,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "clock";
                         x: 0px;
-                        y: 208px;
+                        y: 156px;
                         width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Falling";
@@ -1475,7 +1486,7 @@ export component MainWindow inherits Window {
                     ChoiceRow {
                         visible: root.launcher-scenario == "clock";
                         x: parent.width / 2 + 6px;
-                        y: 208px;
+                        y: 156px;
                         width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Color Cycle";
@@ -1487,6 +1498,25 @@ export component MainWindow inherits Window {
                         }
                         next => {
                             root.launcher-settings-focus-index = 5;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: 0px;
+                        y: 208px;
+                        width: parent.width;
+                        height: 48px;
+                        label: "Meltdown";
+                        value: root.launcher-clock-meltdown-enabled ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 6;
+                        previous => {
+                            root.launcher-settings-focus-index = 6;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 6;
                             root.ui-action(3);
                         }
                     }
@@ -1562,7 +1592,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "clock" ? 6 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }

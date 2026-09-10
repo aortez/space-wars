@@ -19,7 +19,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling or color-cycle.
+        /// Event ID: falling, color-cycle or meltdown.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -39,7 +39,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -61,7 +61,9 @@ fn parse_event(value: &str) -> Result<ClockEventKind, String> {
     ClockEventKind::ALL
         .into_iter()
         .find(|kind| kind.as_str() == value)
-        .ok_or_else(|| format!("Unknown Clock event {value:?}; choose falling or color-cycle"))
+        .ok_or_else(|| {
+            format!("Unknown Clock event {value:?}; choose falling, color-cycle or meltdown")
+        })
 }
 
 pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError> {
@@ -198,6 +200,17 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.next_event_tick,
             state.can_trigger
         );
+        if let Some(material) = state.meltdown {
+            println!(
+                "Meltdown: {} waiting, {} airborne, {} wet columns; water {:.3}, drained {:.3}, reclaimed {:.3} cell-volumes",
+                material.waiting_cells,
+                material.airborne_cells,
+                material.water_columns,
+                material.pooled_microunits as f64 / 1_000_000.0,
+                material.drained_microunits as f64 / 1_000_000.0,
+                material.reclaimed_microunits as f64 / 1_000_000.0
+            );
+        }
     }
     Ok(())
 }
