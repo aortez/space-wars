@@ -1,0 +1,15 @@
+[Unit]
+Description=Select Space-Wars display and audio hardware
+Requires=boot.mount
+After=boot.mount systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=spacewars-kiosk.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/spacewars-hardware
+RemainAfterExit=yes
+RuntimeDirectory=spacewars-hardware
+
+[Install]
+WantedBy=multi-user.target

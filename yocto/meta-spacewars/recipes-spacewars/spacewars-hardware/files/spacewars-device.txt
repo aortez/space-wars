@@ -1,0 +1,5 @@
+# Select ONE profile: hdmi, hyperpixel, or picade. Reboot after changing it.
+# This file lives on the shared boot partition and survives A/B rootfs updates.
+[all]
+include spacewars-profiles/hdmi.txt
+[all]

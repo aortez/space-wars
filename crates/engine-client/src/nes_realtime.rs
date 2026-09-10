@@ -659,7 +659,7 @@ impl NesRealtimeRuntime {
     }
 
     #[cfg(test)]
-    fn spawn_with_audio_endpoint<C: RealtimeNesCore>(
+    pub(crate) fn spawn_with_audio_endpoint<C: RealtimeNesCore>(
         core: C,
         audio: RealtimeAudioEndpoint,
     ) -> Result<Self, RealtimeStartError> {

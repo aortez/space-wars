@@ -5,6 +5,7 @@ sstate-cache/
 .ccache/
 .hosttools/
 node_modules/
+__pycache__/
 
 # KAS checkouts.
 poky/

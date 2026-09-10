@@ -8,7 +8,7 @@ header:
   version: 14
 
 distro: poky
-machine: raspberrypi5
+machine: raspberrypi-spacewars
 
 repos:
   poky:
@@ -77,6 +77,10 @@ local_conf_header:
     BB_NUMBER_THREADS = "8"
     PARALLEL_MAKE = "-j 8"
 
+    # Leave enough room for running tasks to finish and for other checkouts.
+    BB_DISKMON_DIRS = "STOPTASKS,${TMPDIR},20G,200K HALT,${TMPDIR},10G,100K WARN,${TMPDIR},25G,300K"
+    BB_DISKMON_WARNINTERVAL = "1G,50K"
+
     BB_ENV_PASSTHROUGH_ADDITIONS:append = " SPACEWARS_CACHE_ROOT"
     SPACEWARS_CACHE_ROOT = "${@os.getenv('SPACEWARS_CACHE_ROOT', '/home/data/linux1/yocto-cache' if os.path.isdir('/home/data/linux1') else '/home/data/workspace/yocto-cache')}"
     DL_DIR ?= "${SPACEWARS_CACHE_ROOT}/downloads"
@@ -99,21 +103,17 @@ local_conf_header:
     DISABLE_SPLASH = "1"
     CMDLINE:append = " console=tty1 fbcon=map:01"
 
-    # Include the HyperPixel overlay in the boot partition. The stock
-    # raspberrypi5 machine does not deploy this overlay by default.
-    RPI_KERNEL_DEVICETREE_OVERLAYS:append = " overlays/vc4-kms-dpi-hyperpixel4.dtbo"
-
-    # Use the same Pi5 HyperPixel KMS setup as DirtSim. Slint's linuxkms backend
-    # will choose the DRM device at runtime.
+    # The firmware selects the board's KMS driver. A separate file selects
+    # cabinet/display hardware, and is preserved by rootfs-only A/B updates.
     RPI_EXTRA_CONFIG = '\n\
-    # Pi5 - HyperPixel 4.0 DPI display\n\
+    [pi4]\n\
+    dtoverlay=vc4-kms-v3d-pi4\n\
     [pi5]\n\
     dtoverlay=vc4-kms-v3d-pi5\n\
-    dtoverlay=vc4-kms-dpi-hyperpixel4\n\
-    \n\
-    # Common settings\n\
     [all]\n\
-    hdmi_force_hotplug=1\n\
+    arm_64bit=1\n\
+    include spacewars-device.txt\n\
+    [all]\n\
     '
 
 target: spacewars-image

@@ -4,6 +4,7 @@ LICENSE = "MIT"
 
 inherit pi-base-image
 inherit extrausers
+require spacewars-boot-identity.inc
 
 # The upstream pi-base image class asks for networkmanager-nmtui, but the
 # NetworkManager recipe in this layer set does not emit that split package.
@@ -34,6 +35,8 @@ setup_spacewars_ota_sudoers() {
     cat > ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota << 'EOF'
 # Allow the kiosk user to perform A/B OTA updates through yocto/scripts/yolo-update.mjs.
 spacewars ALL=(root) NOPASSWD: /usr/sbin/ab-update-with-key *, /usr/bin/systemctl reboot
+# Application-only updates install a fixed client/CLI pair and restart only the kiosk.
+spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-fast-update *
 EOF
     chmod 0440 ${IMAGE_ROOTFS}/etc/sudoers.d/spacewars-ota
 }
@@ -70,28 +73,6 @@ EOF
 }
 ROOTFS_POSTPROCESS_COMMAND:append = " setup_boot_mount;"
 
-setup_hyperpixel_backlight() {
-    install -d ${IMAGE_ROOTFS}/etc/systemd/system
-
-    cat > ${IMAGE_ROOTFS}/etc/systemd/system/hyperpixel-backlight.service << 'EOF'
-[Unit]
-Description=Enable HyperPixel backlight
-After=systemd-udev-settle.service
-Wants=systemd-udev-settle.service
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'for i in $(seq 1 50); do if [ -e /sys/class/backlight/backlight/bl_power ]; then echo 0 > /sys/class/backlight/backlight/bl_power; echo 1 > /sys/class/backlight/backlight/brightness; exit 0; fi; sleep 0.1; done; exit 0'
-
-[Install]
-WantedBy=sysinit.target
-EOF
-
-    install -d ${IMAGE_ROOTFS}/etc/systemd/system/sysinit.target.wants
-    ln -sf ../hyperpixel-backlight.service ${IMAGE_ROOTFS}/etc/systemd/system/sysinit.target.wants/hyperpixel-backlight.service
-}
-ROOTFS_POSTPROCESS_COMMAND:append = " setup_hyperpixel_backlight;"
-
 setup_spacewars_coredumps() {
     install -d ${IMAGE_ROOTFS}/etc/systemd
     cat > ${IMAGE_ROOTFS}/etc/systemd/coredump.conf << 'EOF'
@@ -127,5 +108,6 @@ IMAGE_INSTALL:append = " \
 
 IMAGE_INSTALL:append = " \
     spacewars \
+    spacewars-hardware \
     spacewars-ssh-host-keys \
 "

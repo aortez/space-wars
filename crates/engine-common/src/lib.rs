@@ -178,7 +178,7 @@ impl Default for VideoSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AudioSettings {
     pub master_volume: f32,
@@ -188,8 +188,21 @@ pub struct AudioSettings {
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
-            master_volume: 0.8,
+            master_volume: 0.25,
             muted: false,
+        }
+    }
+}
+
+impl AudioSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            master_volume: if self.master_volume.is_finite() {
+                self.master_volume.clamp(0.0, 1.0)
+            } else {
+                Self::default().master_volume
+            },
+            ..self
         }
     }
 }

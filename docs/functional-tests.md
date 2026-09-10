@@ -45,6 +45,17 @@ Restart and relaunch must create clean instances and retain event settings.
 Busy, paused, stale-instance, stale-event, and inactive-Clock controls are
 rejected. Animation ticks must not invalidate UI revision guards.
 
+The Sound workflow changes master volume and mute in the launcher, launches
+Falling muted, opens paused Sound controls, forces a save failure with a
+temporary directory at the settings-file destination, and retries successfully.
+It checks persistence across scenario restart, switching to Clock, and a fresh
+client process using the same isolated config. Non-Winit keyboard/touch tests
+exercise the 800×480 panel and ensure Back does not resume gameplay. Audio tests
+check live gain/mute and pause/resume independence. The shared background-writer
+tests use explicit channel gates, not storage-speed expectations, to verify
+ordered, coalesced saves and that an old completion cannot acknowledge a newer
+pending snapshot.
+
 Short negative Clock waits check that a paused event does not advance; they
 are not response-latency requirements. A timeout may have no snapshot if no
 reply arrived before its deadline. The UI workflows compare any returned

@@ -86,13 +86,17 @@ pub(super) fn spawn_native_nes_client(
     audio_device: Option<CpalAudioOutput>,
     settings: &Settings,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    // Install output preferences before the worker can emit its first sample.
+    if let Some(audio) = &audio_device {
+        let settings = settings.audio.normalized();
+        audio.endpoint().set_volume(settings.master_volume);
+        audio.endpoint().set_muted(settings.muted);
+    }
     let runtime = match audio_device {
         Some(audio) => NesRealtimeRuntime::spawn_with_audio(core, audio),
         None => NesRealtimeRuntime::spawn(core),
     }
     .map_err(|error| map_realtime_start_error(registration.id, error))?;
-    runtime.set_audio_volume(settings.audio.master_volume);
-    runtime.set_audio_muted(settings.audio.muted);
     Ok(Box::new(NativeNesClientScenario {
         registration,
         runtime,
@@ -183,6 +187,12 @@ impl ClientScenario for NativeNesClientScenario {
 
     fn set_realtime_paused(&self, paused: bool) {
         self.runtime.set_paused(paused);
+    }
+
+    fn set_audio_settings(&self, settings: engine_common::AudioSettings) {
+        let settings = settings.normalized();
+        self.runtime.set_audio_volume(settings.master_volume);
+        self.runtime.set_audio_muted(settings.muted);
     }
 
     fn shutdown_realtime(&mut self) {
@@ -324,5 +334,39 @@ mod tests {
             Err(error) => error,
         };
         assert!(matches!(error, ScenarioCreateError::MissingAsset { .. }));
+    }
+
+    #[test]
+    fn shared_nes_adapter_changes_audio_while_paused_without_changing_emulation() {
+        let image = engine_nes::CartridgeImage::parse(&NromBuilder::new_16k().build()).unwrap();
+        let state = NesScenarioState::try_new(NesScenarioConfig::new(image)).unwrap();
+        let endpoint = crate::nes_audio::RealtimeAudioEndpoint::new(1);
+        let runtime = NesRealtimeRuntime::spawn_with_audio_endpoint(
+            CartridgeRealtimeCore { state },
+            endpoint.clone(),
+        )
+        .unwrap();
+        let mut scenario = NativeNesClientScenario {
+            registration: &REGISTRATION,
+            runtime,
+        };
+        scenario.set_realtime_paused(true);
+        let before = scenario.runtime.telemetry().emulated_frames;
+        let audio = engine_common::AudioSettings {
+            master_volume: 0.25,
+            muted: true,
+        };
+        scenario.set_audio_settings(audio);
+        assert!(endpoint.telemetry().muted);
+        assert!(!endpoint.telemetry().active);
+        assert_eq!(scenario.runtime.telemetry().emulated_frames, before);
+        scenario.set_realtime_paused(false);
+        assert!(endpoint.telemetry().muted);
+        scenario.set_audio_settings(engine_common::AudioSettings {
+            muted: false,
+            ..audio
+        });
+        assert!(!endpoint.telemetry().muted);
+        scenario.shutdown_realtime();
     }
 }

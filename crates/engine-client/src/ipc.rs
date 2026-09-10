@@ -407,7 +407,21 @@ fn handle_request(
                 .ok(format!("screenshot saved to {}", output.display())),
             Err(err) => request.response.error(err.to_string()),
         },
-        ControlCommand::Status => request.response.ok(window.get_runtime_diagnostics()),
+        ControlCommand::Status => {
+            let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            let launch = window.get_launcher_diagnostics();
+            if !launch.is_empty() {
+                diagnostics.push('\n');
+                diagnostics.push_str(launch.as_str());
+            }
+            diagnostics.push_str(&format!(
+                "\nmaster_volume_percent={}\nmaster_muted={}\nsettings_save_pending={}",
+                window.get_sound_volume_percent(),
+                window.get_sound_muted(),
+                window.get_settings_save_pending()
+            ));
+            request.response.ok(diagnostics);
+        }
         ControlCommand::UiState => {
             match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
                 Ok(json) => request.response.ok(json),
@@ -430,13 +444,17 @@ fn handle_request(
             );
         }
         ControlCommand::HostBenchmark => {
-            if !window.get_scenario_benchmark_available() {
+            if window.get_launcher_busy() {
+                request.response.error("a launch is already in progress");
+            } else if !window.get_scenario_benchmark_available() {
                 request
                     .response
                     .error("the selected scenario does not support benchmark mode");
             } else if window.get_launcher_visible() {
                 window.invoke_launcher_start_benchmark();
-                if window.get_launcher_visible() {
+                if window.get_launcher_busy() {
+                    request.response.ok("benchmark requested");
+                } else if window.get_launcher_visible() {
                     let detail = window.get_launcher_error_text();
                     if detail.is_empty() {
                         request
@@ -526,6 +544,9 @@ fn handle_clock_request(
 #[cfg(unix)]
 fn clock_snapshot(window: &MainWindow, controls: &host::ScenarioControls) -> Option<ClockState> {
     controls.clock_state().map(|mut state| {
+        // Message acknowledgements include durable persistence, even though
+        // storage now runs independently of the simulation/UI thread.
+        state.settings_pending |= window.get_settings_save_pending();
         state.settings_error = non_empty(window.get_clock_settings_error().as_str());
         state
     })
@@ -820,6 +841,8 @@ fn validate_ui_preconditions(
 #[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
+        launcher_busy: window.get_launcher_busy(),
+        sound: window.get_sound_visible(),
         launcher: window.get_launcher_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
@@ -834,6 +857,13 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            launcher_busy_stage: window.get_launcher_busy_stage().to_string(),
+            launcher_busy_elapsed: window.get_launcher_busy_elapsed().to_string(),
+            sound_focus_index: window.get_sound_focus_index(),
+            sound_volume_percent: window.get_sound_volume_percent(),
+            sound_muted: window.get_sound_muted(),
+            settings_save_pending: window.get_settings_save_pending(),
+            settings_save_error: non_empty(window.get_settings_save_error().as_str()),
             selected_scenario: selected_scenario.clone(),
             launcher_focus_index: window.get_launcher_focus_index(),
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
@@ -938,6 +968,100 @@ fn write_rgba_png(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn busy_screen_exposes_read_only_progress_and_rejects_launch_actions() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+        use std::rc::Rc;
+
+        struct TestPlatform;
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+            }
+        }
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_visible(true);
+        window.set_launcher_settings_visible(true);
+        window.set_launcher_busy(true);
+        window.set_launcher_scenario("pizza".into());
+        window.set_launcher_busy_stage("saving_settings".into());
+        window.set_launcher_busy_elapsed("12.4 s".into());
+        window.set_launcher_diagnostics("launch_state=busy\nlaunch_save_ms=0".into());
+        // A previous instance must not appear active behind the busy launcher.
+        window.set_runtime_diagnostics(
+            "scenario=clock\nscenario_revision=4\npaused=true\nbenchmark_active=false".into(),
+        );
+        let controls = host::new_scenario_controls();
+        let mut tracker = UiStateTracker::default();
+        let mut request = |command| {
+            let (mut reader, stream) = std::os::unix::net::UnixStream::pair().unwrap();
+            reader
+                .set_read_timeout(Some(Duration::from_secs(1)))
+                .unwrap();
+            handle_request(
+                &window,
+                ControlRequest {
+                    command,
+                    response: ResponseWriter { stream },
+                },
+                &mut tracker,
+                &controls,
+            );
+            let mut reply = String::new();
+            reader.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        let reply = request(ControlCommand::UiState);
+        let state = UiState::from_json(reply.trim().strip_prefix("ok ").unwrap()).unwrap();
+        assert_eq!(state.screen, UiScreen::LauncherBusy);
+        assert_eq!(state.selected_scenario, "pizza");
+        assert!(state.active_scenario.is_none());
+        assert!(state.scenario_revision.is_none());
+        assert!(state.actions.is_empty());
+        assert_eq!(state.controls[0].value.as_deref(), Some("saving_settings"));
+        assert_eq!(state.controls[1].value.as_deref(), Some("12.4 s"));
+        assert!(request(ControlCommand::Status).contains("launch_state=busy"));
+        for (command, expected) in [
+            (
+                ControlCommand::UiPress(UiPressRequest::new(UiAction::Start)),
+                ControlFailureCode::ActionUnavailable,
+            ),
+            (
+                ControlCommand::UiActivate(UiActivateRequest::new("launcher.start")),
+                ControlFailureCode::ControlUnavailable,
+            ),
+            (
+                ControlCommand::UiActivate(UiActivateRequest::new("launcher.busy.stage")),
+                ControlFailureCode::ControlDisabled,
+            ),
+        ] {
+            let reply = request(command);
+            let failure =
+                ControlFailure::from_json(reply.trim().strip_prefix("error ").unwrap()).unwrap();
+            assert_eq!(failure.code, expected);
+            assert_eq!(failure.current_state, Some(state.clone()));
+        }
+        assert_eq!(
+            request(ControlCommand::HostBenchmark),
+            "error a launch is already in progress\n"
+        );
+        // Status retains the previous launch timings after the overlay closes.
+        window.set_launcher_busy(false);
+        window.set_launcher_diagnostics("launch_state=complete\nlaunch_save_ms=13512".into());
+        assert!(request(ControlCommand::Status).contains("launch_save_ms=13512"));
+        // Benchmark callers must receive an acknowledgement, not a launch
+        // failure merely because the menu is still visible during preparation.
+        window.set_scenario_benchmark_available(true);
+        let weak = window.as_weak();
+        window.on_launcher_start_benchmark(move || weak.upgrade().unwrap().set_launcher_busy(true));
+        assert_eq!(
+            request(ControlCommand::HostBenchmark),
+            "ok benchmark requested\n"
+        );
+    }
 
     #[test]
     fn parse_screenshot_command() {

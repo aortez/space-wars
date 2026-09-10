@@ -11,6 +11,8 @@ enum ActivationFocus {
     LauncherControls(i32),
     TouchTest,
     PauseMain(i32),
+    PauseSound,
+    Sound(i32),
     PauseControls,
     PauseClock(i32),
     GameOver(i32),
@@ -42,6 +44,13 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::TouchTest | ActivationFocus::PauseControls | ActivationFocus::Gameplay => {
         }
         ActivationFocus::PauseMain(index) => window.set_ingame_menu_focus_index(index),
+        ActivationFocus::PauseSound => window.set_ingame_menu_focus_index(
+            4 + i32::from(
+                window.get_scenario_benchmark_available()
+                    || window.get_launcher_scenario() == "clock",
+            ),
+        ),
+        ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
         ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
@@ -66,6 +75,16 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "launcher.settings" => launcher(2, UiAction::Confirm),
         "launcher.controls" => launcher(3, UiAction::Confirm),
         "launcher.quit" => launcher(4, UiAction::Confirm),
+        "launcher.sound" => launcher(5, UiAction::Confirm),
+        "pause.sound" => ActivationTarget {
+            focus: ActivationFocus::PauseSound,
+            action: UiAction::Confirm,
+        },
+        "sound.volume.previous" => sound(0, UiAction::Left),
+        "sound.volume.next" => sound(0, UiAction::Right),
+        "sound.mute" => sound(1, UiAction::Confirm),
+        "sound.back" => sound(2, UiAction::Confirm),
+        "sound.retry" => sound(3, UiAction::Confirm),
         "launcher.settings.back" => launcher_settings(None, UiAction::Back),
         "launcher.settings.start" => launcher_settings(None, UiAction::Start),
         "launcher.controls.back" => launcher_controls(0),
@@ -144,6 +163,13 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
 const fn launcher(index: i32, action: UiAction) -> ActivationTarget {
     ActivationTarget {
         focus: ActivationFocus::Launcher(index),
+        action,
+    }
+}
+
+const fn sound(index: i32, action: UiAction) -> ActivationTarget {
+    ActivationTarget {
+        focus: ActivationFocus::Sound(index),
         action,
     }
 }

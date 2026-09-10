@@ -125,6 +125,13 @@ To run your own cartridge directly:
 cargo run -p engine-client -- --rom /path/to/game.nes
 ```
 
+**Sound** in the launcher or pause menu controls master volume and mute for all
+audio-producing scenarios. Left/right (or the touch arrows) adjusts volume in
+1% steps up to 20%, then 5% steps; A/Enter toggles the selected mute control. B/Esc returns to the previous
+menu without resuming a paused game. Changes apply live and save in the
+background. New settings default to 25%; existing saved levels are preserved.
+A failed save leaves the controls usable and offers **Retry Save**.
+
 For launcher selection, copy `.nes` files into the `roms` directory beside
 `settings.toml` (normally `~/.config/spacewars/roms` on Linux), then reopen the
 launcher. `--config-dir /path/to/config` makes the library location explicit.
@@ -220,6 +227,14 @@ revision.
 Returning to the launcher clears active-scenario state while preserving the
 launcher selection. The existing `status` command remains the detailed
 performance and scenario diagnostics interface.
+
+Starting a scenario first returns `launcher.busy`: the menu shows the current
+launch stage, an animated activity indicator, and elapsed time. Settings saves
+and NES cartridge loading run off the UI thread. Input is temporarily disabled
+to prevent duplicate launches; automation should wait for `gameplay` or a
+launcher error instead of assuming the start request completed the launch.
+`ui state` exposes `launcher.busy.stage` and `launcher.busy.elapsed`, and `status`
+retains the last launch's outcome and `launch_*_ms` timings after it finishes.
 
 Route the same actions used by keyboards and gamepads through the visible menu:
 
@@ -478,7 +493,9 @@ opens the host pause menu.
 
 ## Raspberry Pi / kiosk launch
 
-The Pi image launches the scenario selector fullscreen:
+The shared Pi 4/5 image launches the scenario selector fullscreen. Per-device
+profiles support HDMI, the existing HyperPixel kiosk, and a Pi 4 Picade X HAT
+cabinet. See [Picade bring-up and hardware profiles](docs/picade.md).
 
 ```sh
 engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
@@ -498,7 +515,7 @@ See [`docs/pi-kiosk.md`](docs/pi-kiosk.md) for the current Pi runbook and
 example systemd service. The Yocto image scaffold is under [`yocto/`](yocto/).
 
 Once an OTA-capable image has been flashed, build and deploy an update from the
-repository root:
+repository root (the boot assets must match the rootfs image's `.boot-id` sidecar):
 
 ```sh
 ./update.sh
@@ -508,6 +525,14 @@ This updates `spacewars@spacewars.local` by default, reboots into the newly
 written A/B slot, and verifies that `spacewars-kiosk.service` is active. Use
 `./update.sh --skip-build` to deploy the existing image or `./update.sh --help`
 for target, user, image, SSH key, dry-run, and confirmation options.
+Use `--target picade.local` for the cabinet. Migrating an old Pi 5 image to the
+unified machine requires a full USB image flash, not a rootfs-only OTA update.
+
+For application-only iteration, use `./update.sh --fast --target picade.local`.
+It builds and transfers just the matching client/CLI pair, then restarts the
+application without flashing or rebooting. One normal update is needed first
+to install the restricted helper. See [fast updates](docs/pi-kiosk.md#fast-application-updates)
+for compatibility checks and recovery details.
 
 ## History
 
