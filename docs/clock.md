@@ -5,11 +5,18 @@ Clock displays the device's local `HH:MM`, with a blinking seconds colon and
 reads the system clock. Configure the device's timezone/NTP as described in
 [Pi kiosk](pi-kiosk.md).
 
+Implementation checkpoint for [#19](https://github.com/aortez/space-wars/issues/19):
+the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
+Duck and composed Marquee/saved text (#53). The issue's September 6 resume notes
+predate those deliveries. This slice adds time-change-triggered Digit Slide;
+rain/storm, flashlight/glow polish and concurrent events remain future work.
+
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, and **Marquee** switches select the automatic event mix;
-all default to On and are saved with the other Clock settings. These values
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, and **Marquee** switches select the periodic event mix.
+**Digit Slide** enables minute-change transitions. All switches
+default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
 
 | Profile | Idle wait before selecting an event |
@@ -18,10 +25,12 @@ can also be changed live through **Pause → Clock Controls**, without relaunchi
 | Calm (default) | Seeded 45–75 seconds |
 | Demo | Seeded 6–10 seconds |
 
-One global schedule selects one enabled, eligible event, avoiding the previous
+One global periodic schedule selects one enabled, eligible event, avoiding the previous
 kind when another is eligible. Adding event types does not multiply the trigger
 rate. Events never overlap. After completion or cancellation, there is a shared
-2-second cooldown, followed by a new idle wait. Each kind also has an automatic
+2-second cooldown, followed by a new idle wait for periodic events. Digit Slide
+preserves the pending periodic deadline instead of restarting that wait; a
+deadline reached during the slide runs after cooldown. Each kind also has an automatic
 reuse delay; the scheduler waits longer if no enabled event is eligible yet.
 With all switches Off, no automatic event is scheduled. Older settings files
 retain their existing switches and default missing event switches to On;
@@ -34,6 +43,28 @@ the Off profile still disables every automatic event.
 | `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
 | `duck` | Temporary floor course and a physical runner | 10 s envelope, including doors/reset | 30 s |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
+| `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
+
+Digit Slide is triggered by a forward minute change, not the periodic lottery.
+Only changed slots move: old cells roll out below while new cells enter from
+above. Dim slot outlines stay fixed; the colon and AM/PM always follow the latest
+reading. A minute/hour/midnight rollover works in either time format, including
+12-hour blank leading digits. The transition is sampled from two four-digit
+snapshots and elapsed ticks; it creates no bodies, particles or growing lists.
+It uses fewer than 300 draw primitives, with clipping shared by both render paths.
+
+Initial synchronization, backwards/skipped minutes, a forward reading gap over
+three seconds, and zero-duration control synchronization snap to the latest time.
+If another event or cooldown is active, the slide is skipped, never queued. A
+changed target during a slide cancels it immediately; seconds/duplicate readings
+do not restart it. Pause freezes playback. Format changes that alter the digits,
+resize, restart and preview replacement release the transition. Turning its
+switch Off leaves the current slide alone; the Off profile disables all automatic
+events, including slides. With only Digit Slide enabled there is no periodic timer.
+
+Manual `digit-slide` triggers and **Preview & Resume** roll the *current* digits
+out and back in. They never fabricate a different clock reading. This preview
+works even with the switch/profile Off and is reported as `preview: true`.
 
 Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -101,7 +132,7 @@ desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
-**Falling/Color Cycle/Meltdown/Duck/Marquee automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
+**Falling/Color Cycle/Meltdown/Duck/Marquee/Digit Slide automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
 even while paused, and are saved for restart/relaunch. A save failure is shown
 on the page; settings then remain active for the current session. Setting
 changes do not interrupt the current animation or reset its physics, event ID,
@@ -145,7 +176,7 @@ cooldowns. The typed `ActiveEvent` enum delegates to event-local implementations
 in `scenarios/clock/src/events/`; each owns its phase and temporary resources.
 Animation randomness uses a separate per-event seed, never the schedule's RNG.
 
-The catalog declares each event's affected area and timing. Add a kind, its
+The catalog declares each event's trigger (`periodic` or `time-change`), affected area and timing. Add a kind, its
 settings/launcher control, catalog entry, and an enum implementation when adding
 an event; keep shared lifecycle tests and add event-specific tests. Finishing or
 resizing drops the active event and restores the latest face and base palette.
@@ -251,9 +282,9 @@ The initial recipe catalog is intentionally small and typed. New messages or
 recipes can reuse these passes; a general scene graph, 3D projection, arbitrary
 user-authored effect graphs, and concurrent event scheduling are outside this slice.
 
-This slice does not implement time-change triggers or flashlights. Those can
-add bounded event-local representations
-without moving scheduling or wall-clock reads into the individual animations.
+Digit Slide adds the first time-change trigger, using the shared non-overlapping
+lifecycle and a bounded event-local representation. More time-change effects or
+flashlights can follow without moving wall-clock reads into animations.
 
 ## Public controls and synchronized captures
 
@@ -293,15 +324,15 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **7** and reports scenario-instance revision,
+`clock state` uses schema version **8** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
-`exiting`, `resetting`, `presenting`), pause state, profile, schedule, current
+`exiting`, `resetting`, `presenting`, `sliding`), pause state, profile, schedule, current
 reading/target digits, palette RGB, physics counts, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
-enablement and per-kind automatic-ready ticks; `clock events` displays it.
+trigger type, enablement and per-kind automatic-ready ticks; `clock events` displays it.
 These diagnostics do not affect `ui state` revisions. The optional `meltdown`
 object is present only during Meltdown (including its reform phase). It reports
 initial/waiting/airborne cells, occupied water columns, and pooled, drained and
@@ -321,13 +352,16 @@ configured choices for the next event; they can differ from the currently active
 content. `settings_pending` covers queued settings and background persistence;
 the acknowledgement waits for saving without blocking the UI. `settings_error` is
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
-are null. Use matching client/CLI builds: schema 6 and older requests are rejected.
-The internal Clock action payload is version 3; event ordinals 0–3 are unchanged
-and Marquee is 4. Configure contains the switch bits, a validated recipe byte, and
-1–32 message bytes. Version 1/2 actions are rejected; observation remains version 1.
+are null. The optional `digit_slide` object reports old/new digits, changed slots,
+eased progress in thousandths, and whether this is a manual preview; it is null
+after completion or cancellation. Use matching client/CLI builds: schema 7 and
+older requests are rejected. The internal Clock action payload is version 4;
+event ordinals 0–4 are unchanged and Digit Slide is 5. Configure contains six
+switch bits, a validated recipe byte, and 1–32 message bytes. Version 1–3 actions
+are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 7, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 8, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -344,8 +378,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 7, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, or `marquee`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 8, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, or `digit-slide`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -360,6 +394,53 @@ SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \
 See [functional tests](functional-tests.md) for display setup, coverage, and
 failure artifacts. The same CLI works on the deployed Pi for phase-aware smoke
 tests and screenshots.
+
+### Digit Slide verification
+
+Local validation (2026-09-10): all **921 workspace/all-target tests** passed on
+Rust 1.89; all **20 real-client UI workflows** passed on the local X display.
+Strict Clippy passed for Clock/common/control/CLI on the installed stable
+toolchain. Landscape/portrait slide captures and both settings pages were
+visually inspected. These are local checks, not device performance claims.
+
+Picade validation (2026-09-10): deployed to the Raspberry Pi 4 at 1024×768,
+raster scale 2.0. Inspected the live controls, manual preview, and an automatic
+16:05 → 16:06 transition: only the last digit moved, no physics objects were
+created, and the ordinary face returned after completion. The kiosk remained
+healthy with no service restarts, and device time synchronized through NTP.
+Restored the existing Demo profile/event switches and left volume at 5%.
+Unpaused status samples were approximately 34 FPS and 60 updates/sec; there is
+no matching pre-change measurement, so this does not establish a regression
+or a 60 FPS rendering guarantee. A controlled Pi 4 rendering baseline is a
+useful follow-up before heavier effects.
+
+```sh
+cargo test --locked -p scenario-clock digit_slide
+SPACEWARS_CLOCK_ARTIFACTS=target/clock-slide-captures \
+  cargo test --locked -p engine-client digit_slide_clips -- --nocapture
+SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 \
+  cargo test --locked -p engine-client --test ui_control_functional \
+  clock::digit_slide -- --ignored --test-threads=1
+```
+
+Injected readings cover ordinary minute changes, midnight/noon, 12-hour leading
+blanks, duplicate/skipped/backwards readings, pause, new-target cancellation,
+disabled/busy behavior and no delayed backlog. Scheduling tests check that slide
+activity does not consume the periodic RNG or postpone its deadline, including
+preview replacement and changes to the profile. Rendering/cleanup are checked
+at four aspect ratios; raster captures at 800×480, 480×800 and 1280×720 verify
+motion, untouched digits and exact restoration. The real-client workflow covers
+both controls pages, controller navigation, guarded disabled previews, cleanup,
+restart/relaunch and persistence. It waits for the durable completion state,
+not for a busy CI runner to catch an animation shorter than a second; exact phase
+and pause behavior are deterministic tests.
+
+On a running client, use **Clock Controls → Preview Event → Digit Slide →
+Preview & Resume**, or `spacewars-cli clock trigger digit-slide` from idle.
+`clock wait --event digit-slide --phase sliding` is useful interactively, but
+may miss the short phase; use its event ID and `--lifecycle idle` to confirm
+completion reliably. Device validation/deployment is tracked separately from
+these local checks.
 
 ### Meltdown local validation (2026-09-09)
 

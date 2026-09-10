@@ -7,13 +7,14 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 7;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
     pub kind: ClockEventKind,
     pub label: String,
     pub effect: String,
+    pub trigger: engine_common::ClockEventTrigger,
     pub duration_ticks: u64,
     pub cooldown_ticks: u64,
     pub enabled: bool,
@@ -42,6 +43,7 @@ pub struct ClockState {
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     pub marquee: Option<engine_common::ClockMarqueeState>,
+    pub digit_slide: Option<engine_common::ClockDigitSlideState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -348,6 +350,7 @@ mod tests {
             meltdown: None,
             duck: None,
             marquee: None,
+            digit_slide: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -533,6 +536,46 @@ mod tests {
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
+    }
+
+    #[test]
+    fn digit_slide_diagnostics_trigger_metadata_and_guards_round_trip() {
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::DigitSlide);
+        state.phase = Some("sliding".into());
+        state.digit_slide = Some(engine_common::ClockDigitSlideState {
+            from_digits: [Some(2), Some(3), Some(5), Some(9)],
+            to_digits: [Some(0); 4],
+            changed_slots: [true; 4],
+            progress_milli: 500,
+            preview: false,
+        });
+        state.events.push(ClockEventInfo {
+            kind: ClockEventKind::DigitSlide,
+            label: "Digit Slide".into(),
+            effect: "digit-geometry".into(),
+            trigger: engine_common::ClockEventTrigger::TimeChange,
+            duration_ticks: 48,
+            cooldown_ticks: 120,
+            enabled: true,
+            automatic_ready_at_tick: 0,
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::DigitSlide);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        for version in 1..CLOCK_STATE_SCHEMA_VERSION {
+            let mut stale = request.clone();
+            stale.schema_version = version;
+            assert!(
+                ClockTriggerRequest::from_json(&serde_json::to_string(&stale).unwrap()).is_err()
+            );
+        }
     }
 
     #[test]

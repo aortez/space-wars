@@ -86,6 +86,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_meltdown_enabled: bool,
     pub(crate) clock_duck_enabled: bool,
     pub(crate) clock_marquee_enabled: bool,
+    pub(crate) clock_digit_slide_enabled: bool,
     pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
 }
@@ -333,6 +334,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.marquee",
                     context.clock_marquee_enabled,
                 ),
+                (
+                    "launcher.settings.clock.digit-slide",
+                    context.clock_digit_slide_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
@@ -345,6 +350,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.clock.time-format",
+                "launcher.settings.clock.digit-slide",
                 "launcher.settings.clock.event-profile",
                 "launcher.settings.clock.falling",
                 "launcher.settings.clock.color-cycle",
@@ -592,6 +598,15 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         "Preview & Resume",
         true,
     ));
+    controls.push(
+        UiControl::new("pause.clock.digit-slide", "Digit Slide", true).with_value(
+            if context.clock_digit_slide_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
@@ -609,6 +624,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.duck",
                 "pause.clock.marquee",
                 "pause.clock.marquee-preset",
+                "pause.clock.digit-slide",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -656,6 +672,7 @@ mod tests {
             clock_meltdown_enabled: true,
             clock_duck_enabled: true,
             clock_marquee_enabled: true,
+            clock_digit_slide_enabled: true,
             clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
@@ -833,7 +850,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 22, "launcher.settings.clock.duck"),
+            ("clock", 24, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -850,7 +867,7 @@ mod tests {
                 "surface-expedition" => 2,
                 "spacewars" => 6,
                 "pizza" => 3,
-                "clock" => 7,
+                "clock" => 8,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -1043,7 +1060,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 15);
+        assert_eq!(inventory.controls.len(), 16);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

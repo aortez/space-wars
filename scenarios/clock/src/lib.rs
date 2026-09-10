@@ -1,5 +1,7 @@
 //! Deterministic low-resolution clock scenario.
 
+#[cfg(test)]
+mod digit_slide_tests;
 mod digits;
 #[cfg(test)]
 mod event_tests;
@@ -23,6 +25,7 @@ use engine_common::{
     ClockMarqueePreset, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
     StepResult, TickModel,
 };
+pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
 pub use events::marquee::MARQUEE_TICKS;
 pub use events::meltdown::{DRAINING_TICKS, MAX_MELTDOWN_CELLS, MELTING_TICKS, WATER_COLUMNS};
@@ -33,7 +36,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 3;
+pub const CLOCK_ACTION_VERSION: u16 = 4;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -103,7 +106,8 @@ impl ClockAction {
                 | (u8::from(settings.events.color_cycle) << 1)
                 | (u8::from(settings.events.meltdown) << 2)
                 | (u8::from(settings.events.duck) << 3)
-                | (u8::from(settings.events.marquee) << 4),
+                | (u8::from(settings.events.marquee) << 4)
+                | (u8::from(settings.events.digit_slide) << 5),
         );
         payload.push(settings.marquee_preset as u8);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
@@ -149,7 +153,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 7..=MAX_CONFIGURE_BYTES) if payload[4] <= 31 => {
+            (CLOCK_ACTION_CONFIGURE, 7..=MAX_CONFIGURE_BYTES) if payload[4] <= 63 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -168,6 +172,7 @@ impl ClockAction {
                         meltdown: payload[4] & 4 != 0,
                         duck: payload[4] & 8 != 0,
                         marquee: payload[4] & 16 != 0,
+                        digit_slide: payload[4] & 32 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
                     marquee_message: std::str::from_utf8(&payload[6..]).ok()?.parse().ok()?,
@@ -243,7 +248,7 @@ impl ClockState {
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
         if let Some(reading) = self.reading {
-            self.apply_reading(reading);
+            self.apply_reading(reading, false);
         }
     }
 
@@ -346,6 +351,12 @@ impl ClockState {
             _ => None,
         }
     }
+    pub fn digit_slide_state(&self) -> Option<engine_common::ClockDigitSlideState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::DigitSlide(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
     pub fn can_trigger_event(&self) -> bool {
         self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
     }
@@ -366,6 +377,14 @@ impl ClockState {
     }
 
     fn start_event(&mut self, kind: ClockEventKind) {
+        self.start_event_from(kind, None);
+    }
+
+    fn start_event_from(
+        &mut self,
+        kind: ClockEventKind,
+        previous_display: Option<DisplaySnapshot>,
+    ) {
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
         self.active_event = Some(ActiveEvent::new(
@@ -378,6 +397,7 @@ impl ClockState {
             seed,
             self.config.marquee_preset,
             self.config.marquee_message,
+            previous_display,
         ));
     }
 
@@ -407,9 +427,29 @@ impl ClockState {
         }
     }
 
-    fn apply_reading(&mut self, reading: ClockReading) {
+    fn apply_reading(&mut self, reading: ClockReading, animate: bool) {
+        let previous = self.display;
+        let next = digits::snapshot(reading, self.config.time_format);
+        let minute_changed = previous.digits != next.digits;
+        // Only near-contiguous forward readings animate. Initial sync, skipped
+        // minutes, backwards corrections and paused control synchronization snap
+        // straight to the truth; there is no backlog of stale transitions.
+        let slide = animate
+            && minute_changed
+            && self.reading.is_some_and(|old| {
+                let seconds = |r: ClockReading| {
+                    u32::from(r.hour()) * 3600 + u32::from(r.minute()) * 60 + u32::from(r.second())
+                };
+                let delta = (seconds(reading) + 86400 - seconds(old)) % 86400;
+                (1..=3).contains(&delta)
+            });
         self.reading = Some(reading);
-        self.display = digits::snapshot(reading, self.config.time_format);
+        self.display = next;
+        // A second changed target supersedes a slide instead of letting old
+        // digits finish over a newer reading. Ordinary seconds don't restart it.
+        if matches!(self.active_event, Some(ActiveEvent::DigitSlide(_))) && minute_changed {
+            self.finish_event();
+        }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
         }
@@ -419,6 +459,9 @@ impl ClockState {
             .is_some_and(ActiveEvent::holds_lit_segments)
         {
             digits::apply_snapshot(&mut self.segments, self.display);
+        }
+        if slide && let Some(kind) = self.schedule.time_change_event() {
+            self.start_event_from(kind, Some(previous));
         }
     }
 }
@@ -443,7 +486,7 @@ impl Scenario for ClockScenario {
     fn step(state: &mut Self::State, actions: &[Action], dt: Duration) -> StepResult {
         for action in actions.iter().filter_map(ClockAction::decode) {
             match action {
-                ClockAction::SetReading(reading) => state.apply_reading(reading),
+                ClockAction::SetReading(reading) => state.apply_reading(reading, !dt.is_zero()),
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),

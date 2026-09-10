@@ -114,6 +114,15 @@ verify a real successful save. Unit tests cover settings migration/recovery,
 CLI validation, compact action bounds, and agreement between the shared text
 validator and every ASCII entry in the bitmap font.
 
+Digit Slide's workflow checks its time-change catalog entry, launcher/live
+enablement, a guarded manual trigger with profile/switch Off, controller access,
+Preview & Resume, cleanup and persisted settings across restart/relaunch. Since
+the effect lasts 0.8 seconds, it waits for completed event IDs rather than making
+CI catch that brief phase. Exact injected minute transitions, pause and clipping
+remain deterministic core/adapter tests. The new controls are pointer-tested at
+800×480; Clock's launcher settings also use a conditional Slint item tree to keep
+ordinary debug-test stack usage bounded.
+
 Spaceling Lab's workflow selects the scenario, renders it through both vector and
 raster paths, and verifies pause, restart, return, and relaunch with fresh
 scenario revisions. It retains gameplay screenshots when artifact retention is

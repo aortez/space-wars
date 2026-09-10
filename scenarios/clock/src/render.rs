@@ -8,6 +8,7 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod digit_slide;
 mod duck;
 mod marquee;
 
@@ -113,6 +114,10 @@ fn render_floor(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    if let Some(crate::events::ActiveEvent::DigitSlide(event)) = &state.active_event {
+        digit_slide::render(frame, event, layout, state.palette());
+        return;
+    }
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);

@@ -294,6 +294,32 @@ pub struct ClockMarqueeState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum ClockEventTrigger {
+    Periodic,
+    TimeChange,
+}
+
+impl ClockEventTrigger {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Periodic => "periodic",
+            Self::TimeChange => "time-change",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDigitSlideState {
+    pub from_digits: [Option<u8>; 4],
+    pub to_digits: [Option<u8>; 4],
+    pub changed_slots: [bool; 4],
+    pub progress_milli: u32,
+    /// Manual previews roll the current digits, without fabricating a reading.
+    pub preview: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 #[repr(u8)]
 pub enum ClockEventKind {
     Falling = 0,
@@ -301,15 +327,17 @@ pub enum ClockEventKind {
     Meltdown = 2,
     Duck = 3,
     Marquee = 4,
+    DigitSlide = 5,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
         Self::Duck,
         Self::Marquee,
+        Self::DigitSlide,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -319,6 +347,7 @@ impl ClockEventKind {
             Self::Meltdown => "meltdown",
             Self::Duck => "duck",
             Self::Marquee => "marquee",
+            Self::DigitSlide => "digit-slide",
         }
     }
 
@@ -329,6 +358,7 @@ impl ClockEventKind {
             Self::Meltdown => "Meltdown",
             Self::Duck => "Duck",
             Self::Marquee => "Marquee",
+            Self::DigitSlide => "Digit Slide",
         }
     }
 }
@@ -342,6 +372,7 @@ pub struct ClockEvents {
     pub meltdown: bool,
     pub duck: bool,
     pub marquee: bool,
+    pub digit_slide: bool,
 }
 
 impl Default for ClockEvents {
@@ -352,6 +383,7 @@ impl Default for ClockEvents {
             meltdown: true,
             duck: true,
             marquee: true,
+            digit_slide: true,
         }
     }
 }
@@ -364,6 +396,7 @@ impl ClockEvents {
             ClockEventKind::Meltdown => self.meltdown,
             ClockEventKind::Duck => self.duck,
             ClockEventKind::Marquee => self.marquee,
+            ClockEventKind::DigitSlide => self.digit_slide,
         }
     }
 }

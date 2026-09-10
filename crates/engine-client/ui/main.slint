@@ -320,6 +320,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-meltdown-enabled: true;
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
+    in-out property <bool> launcher-clock-digit-slide-enabled: true;
     in-out property <string> launcher-clock-marquee-preset: "Clock wave";
     // Settings/CLI only for now; retained when other menu settings are saved.
     in-out property <string> launcher-clock-marquee-message: "SPACE WARS";
@@ -903,7 +904,7 @@ export component MainWindow inherits Window {
                 MenuButton {
                     x: 0px;
                     y: 112px;
-                    width: (parent.width - 30px) / 4;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
                     text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 2;
@@ -911,9 +912,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(2, 1); }
                 }
                 MenuButton {
-                    x: (parent.width + 10px) / 4;
+                    x: (parent.width + 10px) / 5;
                     y: 112px;
-                    width: (parent.width - 30px) / 4;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
                     text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 3;
@@ -921,9 +922,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(3, 1); }
                 }
                 MenuButton {
-                    x: 2 * (parent.width + 10px) / 4;
+                    x: 2 * (parent.width + 10px) / 5;
                     y: 112px;
-                    width: (parent.width - 30px) / 4;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
                     text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 7;
@@ -931,14 +932,24 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(7, 1); }
                 }
                 MenuButton {
-                    x: 3 * (parent.width + 10px) / 4;
+                    x: 3 * (parent.width + 10px) / 5;
                     y: 112px;
-                    width: (parent.width - 30px) / 4;
+                    width: (parent.width - 40px) / 5;
                     height: 48px;
                     text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 8;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(8, 1); }
+                }
+                MenuButton {
+                    x: 4 * (parent.width + 10px) / 5;
+                    y: 112px;
+                    width: (parent.width - 40px) / 5;
+                    height: 48px;
+                    text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 11;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(11, 1); }
                 }
                 ChoiceRow {
                     y: 168px;
@@ -1511,144 +1522,157 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: 0px;
-                        y: 52px;
+                    // Keep Clock's settings in a conditional item tree, like
+                    // its live controls, to bound the root initializer stack.
+                    if root.launcher-scenario == "clock": Rectangle {
                         width: parent.width;
-                        height: 48px;
-                        label: "Time Format";
-                        value: root.launcher-clock-time-format;
-                        selected: root.launcher-settings-focus-index == 2;
-                        previous => {
-                            root.launcher-settings-focus-index = 2;
-                            root.ui-action(2);
-                        }
-                        next => {
-                            root.launcher-settings-focus-index = 2;
-                            root.ui-action(3);
-                        }
-                    }
+                        height: parent.height;
+                        background: transparent;
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: 0px;
-                        y: 104px;
-                        width: parent.width;
-                        height: 48px;
-                        label: "Event Profile";
-                        value: root.launcher-clock-event-profile;
-                        selected: root.launcher-settings-focus-index == 3;
-                        previous => {
-                            root.launcher-settings-focus-index = 3;
-                            root.ui-action(2);
+                        ChoiceRow {
+                            x: 0px;
+                            y: 52px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Time Format";
+                            value: root.launcher-clock-time-format;
+                            selected: root.launcher-settings-focus-index == 2;
+                            previous => {
+                                root.launcher-settings-focus-index = 2;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 2;
+                                root.ui-action(3);
+                            }
                         }
-                        next => {
-                            root.launcher-settings-focus-index = 3;
-                            root.ui-action(3);
-                        }
-                    }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: 0px;
-                        y: 156px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Falling";
-                        value: root.launcher-clock-falling-enabled ? "On" : "Off";
-                        selected: root.launcher-settings-focus-index == 4;
-                        previous => {
-                            root.launcher-settings-focus-index = 4;
-                            root.ui-action(2);
+                        ChoiceRow {
+                            x: parent.width / 2 + 6px;
+                            y: 52px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Digit Slide";
+                            value: root.launcher-clock-digit-slide-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 3;
+                            previous => { root.launcher-settings-focus-index = 3; root.ui-action(2); }
+                            next => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
                         }
-                        next => {
-                            root.launcher-settings-focus-index = 4;
-                            root.ui-action(3);
-                        }
-                    }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: parent.width / 2 + 6px;
-                        y: 156px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Color Cycle";
-                        value: root.launcher-clock-color-cycle-enabled ? "On" : "Off";
-                        selected: root.launcher-settings-focus-index == 5;
-                        previous => {
-                            root.launcher-settings-focus-index = 5;
-                            root.ui-action(2);
+                        ChoiceRow {
+                            x: 0px;
+                            y: 104px;
+                            width: parent.width;
+                            height: 48px;
+                            label: "Event Profile";
+                            value: root.launcher-clock-event-profile;
+                            selected: root.launcher-settings-focus-index == 4;
+                            previous => {
+                                root.launcher-settings-focus-index = 4;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 4;
+                                root.ui-action(3);
+                            }
                         }
-                        next => {
-                            root.launcher-settings-focus-index = 5;
-                            root.ui-action(3);
-                        }
-                    }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: 0px;
-                        y: 208px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Meltdown";
-                        value: root.launcher-clock-meltdown-enabled ? "On" : "Off";
-                        selected: root.launcher-settings-focus-index == 6;
-                        previous => {
-                            root.launcher-settings-focus-index = 6;
-                            root.ui-action(2);
+                        ChoiceRow {
+                            x: 0px;
+                            y: 156px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Falling";
+                            value: root.launcher-clock-falling-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 5;
+                            previous => {
+                                root.launcher-settings-focus-index = 5;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 5;
+                                root.ui-action(3);
+                            }
                         }
-                        next => {
-                            root.launcher-settings-focus-index = 6;
-                            root.ui-action(3);
-                        }
-                    }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: parent.width / 2 + 6px;
-                        y: 208px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Duck";
-                        value: root.launcher-clock-duck-enabled ? "On" : "Off";
-                        selected: root.launcher-settings-focus-index == 7;
-                        previous => {
-                            root.launcher-settings-focus-index = 7;
-                            root.ui-action(2);
+                        ChoiceRow {
+                            x: parent.width / 2 + 6px;
+                            y: 156px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Color Cycle";
+                            value: root.launcher-clock-color-cycle-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 6;
+                            previous => {
+                                root.launcher-settings-focus-index = 6;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 6;
+                                root.ui-action(3);
+                            }
                         }
-                        next => {
-                            root.launcher-settings-focus-index = 7;
-                            root.ui-action(3);
-                        }
-                    }
 
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: 0px;
-                        y: 260px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Marquee";
-                        value: root.launcher-clock-marquee-enabled ? "On" : "Off";
-                        selected: root.launcher-settings-focus-index == 8;
-                        previous => { root.launcher-settings-focus-index = 8; root.ui-action(2); }
-                        next => { root.launcher-settings-focus-index = 8; root.ui-action(3); }
-                    }
-                    ChoiceRow {
-                        visible: root.launcher-scenario == "clock";
-                        x: parent.width / 2 + 6px;
-                        y: 260px;
-                        width: (parent.width - 12px) / 2;
-                        height: 48px;
-                        label: "Recipe";
-                        label-fraction: 0.25;
-                        value: root.launcher-clock-marquee-preset;
-                        selected: root.launcher-settings-focus-index == 9;
-                        previous => { root.launcher-settings-focus-index = 9; root.ui-action(2); }
-                        next => { root.launcher-settings-focus-index = 9; root.ui-action(3); }
+                        ChoiceRow {
+                            x: 0px;
+                            y: 208px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Meltdown";
+                            value: root.launcher-clock-meltdown-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 7;
+                            previous => {
+                                root.launcher-settings-focus-index = 7;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 7;
+                                root.ui-action(3);
+                            }
+                        }
+
+                        ChoiceRow {
+                            x: parent.width / 2 + 6px;
+                            y: 208px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Duck";
+                            value: root.launcher-clock-duck-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 8;
+                            previous => {
+                                root.launcher-settings-focus-index = 8;
+                                root.ui-action(2);
+                            }
+                            next => {
+                                root.launcher-settings-focus-index = 8;
+                                root.ui-action(3);
+                            }
+                        }
+
+                        ChoiceRow {
+                            x: 0px;
+                            y: 260px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Marquee";
+                            value: root.launcher-clock-marquee-enabled ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 9;
+                            previous => { root.launcher-settings-focus-index = 9; root.ui-action(2); }
+                            next => { root.launcher-settings-focus-index = 9; root.ui-action(3); }
+                        }
+                        ChoiceRow {
+                            x: parent.width / 2 + 6px;
+                            y: 260px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            label: "Recipe";
+                            label-fraction: 0.25;
+                            value: root.launcher-clock-marquee-preset;
+                            selected: root.launcher-settings-focus-index == 10;
+                            previous => { root.launcher-settings-focus-index = 10; root.ui-action(2); }
+                            next => { root.launcher-settings-focus-index = 10; root.ui-action(3); }
+                        }
+
                     }
 
                     ChoiceRow {
@@ -1722,7 +1746,7 @@ export component MainWindow inherits Window {
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "clock" ? 10 : root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "clock" ? 11 : root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
