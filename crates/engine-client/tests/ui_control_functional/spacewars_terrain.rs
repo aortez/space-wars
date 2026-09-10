@@ -45,3 +45,15 @@ fn material_travel_launch_pause_restart_and_both_renderers() {
 fn material_travel_duel_launch_pause_restart_and_both_renderers() {
     super::terrain_lab::run_terrain_lifecycle("spacewars-terrain-travel-duel");
 }
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_arena_launch_pause_restart_and_both_renderers() {
+    super::terrain_lab::run_terrain_lifecycle("spacewars-terrain-arena");
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_arena_duel_launch_pause_restart_and_both_renderers() {
+    super::terrain_lab::run_terrain_lifecycle("spacewars-terrain-arena-duel");
+}

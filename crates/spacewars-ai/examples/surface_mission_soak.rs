@@ -1,4 +1,4 @@
-//! Shared two-planet policy in a bounded, reproducible physical trial.
+//! Shared mission policy in fixed or generated reproducible physical trials.
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -37,13 +37,21 @@ fn main() {
     let require_claim_recovery = arg("--require-claim-recovery", "false") == "true";
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
+    let world_kind = arg("--world", "fixed");
     assert!(seat < 2 && (1..=180).contains(&seconds));
     assert!(["quiet", "intercept", "duel"].contains(&mode.as_str()));
+    assert!(["fixed", "generated"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
-    let mut state = SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing);
+    let mut state = if world_kind == "generated" {
+        SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
+    } else {
+        SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
+    };
+    let initial_world = state.mission_observation(seat, None);
+    let planet_count = initial_world.planets.len();
     state.set_asteroid_pressure(MaterialAsteroidSettings {
         interval_seconds: interval,
         severity: MaterialAsteroidSeverity::Mixed,
@@ -148,6 +156,7 @@ fn main() {
                                 "support": s.support.map(|contact| json!({
                                     "collider": format!("{:?}", contact.collider),
                                     "position": contact.position, "normal": contact.normal,
+                                    "local_surface": {"position": contact.local_surface.position, "normal": contact.local_surface.normal},
                                     "velocity": contact.velocity, "spin": contact.angular_velocity,
                                     "separation": contact.separation,
                                 })),
@@ -193,7 +202,7 @@ fn main() {
             let observations = std::array::from_fn::<_, 2, _>(|i| {
                 state.pilot_observation(i, pilots[i].site_request())
             });
-            samples.push(json!({"second":(tick+1)/60,"pilots":observations,"missions":pilots.each_ref().map(|p|p.telemetry()),"audit":audit}));
+            samples.push(json!({"second":(tick+1)/60,"pilots":observations,"missions":pilots.each_ref().map(|p|p.telemetry()),"planets":state.mission_observation(seat, None).planets,"audit":audit}));
             if frames && ((tick + 1) / 60 == 1 || (tick + 1) % 1800 == 0) {
                 for i in 0..2 {
                     fs::write(
@@ -217,6 +226,7 @@ fn main() {
         .filter_map(|e| e.planet)
         .collect();
     let report = json!({"version":1,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
+        "world":world_kind,"initial_world":initial_world,
         "physics_ok":failures.is_empty(),"audit_failures":failures,"distinct_departures":completed,
         "missions":pilots.each_ref().map(|p|p.telemetry()),"interceptor":interceptor.telemetry(),"strike_tick":strike_tick,
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
@@ -233,7 +243,11 @@ fn main() {
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
     if require_route {
-        assert_eq!(completed.len(), 2, "both planet sorties must complete");
+        assert_eq!(
+            completed.len(),
+            planet_count,
+            "every planet sortie must complete"
+        );
     }
     if require_claim_recovery {
         assert!(

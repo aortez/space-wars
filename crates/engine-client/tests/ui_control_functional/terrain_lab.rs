@@ -63,7 +63,9 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 }
                 harness.capture_screenshot(&format!("{scenario}-{renderer}-break-settings.png"));
             }
-            if scenario.starts_with("spacewars-terrain-travel") {
+            if scenario.starts_with("spacewars-terrain-travel")
+                || scenario.starts_with("spacewars-terrain-arena")
+            {
                 let asteroids = "launcher.settings.travel.asteroid-interval.next";
                 let strength = "launcher.settings.travel.asteroid-strength.next";
                 assert_eq!(

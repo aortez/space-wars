@@ -383,6 +383,9 @@ pub struct ContactPoint {
 pub struct SurfaceContact {
     pub collider: ColliderId,
     pub position: Vec2,
+    /// Point and outward normal in the supporting body's local frame. Unlike
+    /// the solver's world point, this remains attached after body integration.
+    pub local_surface: ContactPoint,
     /// Points out of the supporting surface toward the querying collider.
     pub normal: Vec2,
     pub velocity: Vec2,
@@ -1151,9 +1154,21 @@ impl PhysicsWorld {
                             .filter_map(move |contact| {
                                 let other = other?;
                                 let body = self.raw.bodies.get(other.parent()?)?;
+                                let point = manifold.points.get(contact.contact_id[0] as usize)?;
+                                let (subshape, position, normal) = if direction < 0.0 {
+                                    (manifold.subshape_pos2, point.local_p2, manifold.local_n2)
+                                } else {
+                                    (manifold.subshape_pos1, point.local_p1, manifold.local_n1)
+                                };
+                                let pose = other.position_wrt_parent().copied().unwrap_or_default()
+                                    * subshape.unwrap_or_default();
                                 Some(SurfaceContact {
                                     collider: decode_collider(other.user_data)?,
                                     position: from_rapier(contact.point),
+                                    local_surface: ContactPoint {
+                                        position: from_rapier(pose * position),
+                                        normal: from_rapier(pose.rotation * normal),
+                                    },
                                     normal: from_rapier(manifold.data.normal) * direction,
                                     velocity: from_rapier(body.velocity_at_point(contact.point)),
                                     angular_velocity: body.angvel(),
@@ -2447,5 +2462,53 @@ mod tests {
         world.step(1.0 / 60.0);
 
         assert!(world.motion(dynamic).unwrap().linear_velocity.x > 0.0);
+    }
+
+    #[test]
+    fn surface_contact_anchor_stays_on_the_support_after_integration() {
+        for reverse in [false, true] {
+            let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+            let (_, floor, floor_collider) = ball_ids(if reverse { 2 } else { 1 });
+            let (_, actor, actor_collider) = ball_ids(if reverse { 1 } else { 2 });
+            let insert_floor = |world: &mut PhysicsWorld| {
+                world.insert_body(
+                    floor,
+                    BodySpec {
+                        kind: BodyKind::KinematicPosition,
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::cuboid(floor_collider, 5.0, 0.5)],
+                )
+            };
+            let insert_actor = |world: &mut PhysicsWorld| {
+                world.insert_body(
+                    actor,
+                    BodySpec {
+                        position: Vec2::new(0.0, 0.98),
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::ball(actor_collider, 0.5)],
+                )
+            };
+            if reverse {
+                assert!(insert_actor(&mut world));
+                assert!(insert_floor(&mut world));
+            } else {
+                assert!(insert_floor(&mut world));
+                assert!(insert_actor(&mut world));
+            }
+            world.set_next_kinematic_pose(floor, Vec2::new(0.2, 0.3), 0.03);
+            world.step(1.0 / 60.0);
+            let before = world.snapshot_bytes().unwrap();
+            let contact = world.surface_contacts(actor_collider).next().unwrap();
+            assert_eq!(contact.collider, floor_collider);
+            assert!((contact.local_surface.position.y - 0.5).abs() < 1e-5);
+            assert!(contact.local_surface.normal.distance_to(Vec2::Y) < 1e-5);
+            let motion = world.motion(floor).unwrap();
+            let current =
+                motion.position + contact.local_surface.position.rotate_radians(motion.angle);
+            assert!(current.distance_to(contact.position) > 0.1);
+            assert_eq!(world.snapshot_bytes().unwrap(), before);
+        }
     }
 }

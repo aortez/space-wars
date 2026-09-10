@@ -267,8 +267,19 @@ impl TacticalSortiePilot {
         {
             // Keep the existing transfer/milestone bookkeeping while guiding the
             // launch with observed motion and cover instead of a radial climb.
-            self.landing.intent(p);
+            let lift = self.landing.intent(p);
             self.goal(TacticalGoal::Depart, p.tick);
+            if self.commit_descent && p.landing.supported_feet > 0 {
+                // Lift clear before requesting a lateral departure. Supported
+                // feet can prevent the rotation needed for that flight vector.
+                return CombatIntent {
+                    flight: FlightIntent {
+                        controls: lift,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+            }
             if let Some(enemy) = c.target {
                 self.side = if tangent.dot(enemy.motion.position - p.ship.position) >= 0.0 {
                     -1.0
@@ -291,6 +302,21 @@ impl TacticalSortiePilot {
                 up * 18.0 + tangent * self.side * 38.0 * (altitude / 35.0).clamp(0.0, 1.0),
                 Vec2::ZERO,
             );
+        }
+        if self.commit_descent
+            && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
+            && p.transfer == TransferResult::Ready
+        {
+            // Physical landing and hatch access can finish an approach at a
+            // different valid point from the planner's proposed site.
+            self.goal(TacticalGoal::Surface, p.tick);
+            return CombatIntent {
+                flight: FlightIntent {
+                    controls: self.landing.intent(p),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
         }
         if let Some(site) = self.site {
             if let Some(updated) = p.sites.iter().find(|s| {

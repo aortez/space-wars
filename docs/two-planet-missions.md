@@ -1,5 +1,7 @@
 # Controlled two-planet missions
 
+The next world-expansion slice is the [generated material arena](generated-material-arena.md).
+
 This extends the [damaged-ground recovery checkpoint](damaged-ground-recovery.md)
 with `material_mission_v1`: a coordinator around the existing capture, ground,
 recovery and combat policies. It is a controlled experiment on two fixed

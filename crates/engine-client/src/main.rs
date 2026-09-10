@@ -1222,7 +1222,10 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "spacewars" => 8,
         "pizza" => 5,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
-        "spacewars-terrain-travel" | "spacewars-terrain-travel-duel" => 5,
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => 5,
         "clock" => 7,
         "falling" => 1,
         "nes" => 2,
@@ -1298,7 +1301,10 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
             ))),
             _ => {}
         },
-        "spacewars-terrain-travel" | "spacewars-terrain-travel-duel" => match focus {
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => match focus {
             2 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
                 window.get_launcher_combat_asteroid_interval().as_str(),
                 &["Off", "8", "3", "1"],
@@ -1905,6 +1911,8 @@ fn launcher_selections_from_window(
             | "spacewars-terrain-duel"
             | "spacewars-terrain-travel"
             | "spacewars-terrain-travel-duel"
+            | "spacewars-terrain-arena"
+            | "spacewars-terrain-arena-duel"
     ) {
         engine_common::MaterialCombatSettings {
             asteroids: engine_common::MaterialAsteroidSettings {

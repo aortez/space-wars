@@ -284,7 +284,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
-        "spacewars-terrain-travel" | "spacewars-terrain-travel-duel" => {
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -937,6 +940,8 @@ mod tests {
             "spacewars-terrain-duel",
             "spacewars-terrain-travel",
             "spacewars-terrain-travel-duel",
+            "spacewars-terrain-arena",
+            "spacewars-terrain-arena-duel",
         ] {
             let context = context(scenario);
             for screen in [

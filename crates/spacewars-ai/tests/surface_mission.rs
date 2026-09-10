@@ -172,3 +172,91 @@ fn both_seats_physically_capture_board_and_depart_from_both_planets() {
         assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
     }
 }
+
+#[test]
+fn sun_and_intervening_owned_planet_are_flight_obstacles_not_destinations() {
+    use engine_core::Vec2;
+    use scenario_spacewars::surface_sortie::mission::MissionObstacle;
+    use spacewars_ai::mission_pilot::MissionObstacleId;
+    let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    for sun in [false, true] {
+        let mut o = state.mission_observation(0, None);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.ship.position = Vec2::new(500.0, 500.0);
+        p.ship.velocity = Vec2::ZERO;
+        p.controls_armed = true;
+        let position = Vec2::new(560.0, 500.0);
+        if sun {
+            o.sun = Some(MissionObstacle {
+                position,
+                radius: 20.0,
+            });
+        } else {
+            let mut planet = o.planets[0].clone();
+            planet.index = 2;
+            planet.motion.position = position;
+            planet.radius = 20.0;
+            planet.claim.as_mut().unwrap().owner = Some(context(0).actor);
+            o.planets.push(planet);
+        }
+        let before = o.clone();
+        let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+        let intent = brain.intent(&o);
+        assert_eq!(brain.intent(&o), intent);
+        assert_eq!(o, before);
+        assert_eq!(brain.telemetry().target, Some(1));
+        let avoidance = brain.telemetry().avoidance.unwrap();
+        assert_eq!(
+            avoidance.obstacle,
+            if sun {
+                MissionObstacleId::Sun
+            } else {
+                MissionObstacleId::Planet(2)
+            }
+        );
+        assert!((avoidance.waypoint.y - 500.0).abs() > 10.0);
+    }
+}
+
+#[test]
+fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
+    for (seed, seat, required) in [(0, 0, 1), (2, 1, 3), (3, 1, 3), (7, 0, 3)] {
+        let owner = PlayerId::from_index(seat).unwrap();
+        let mut state = SurfaceSortieScenario::init_material_arena(seed);
+        let mut brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor: owner,
+                episode_seed: seed,
+            },
+            CombatBreakSettings::default(),
+        );
+        let initial = state.terrain_diagnostics().occupied_cells;
+        for _ in 0..180 * 60 {
+            let o = state.mission_observation(seat, brain.site_request());
+            let mut intent = brain.intent(&o);
+            intent.weapons = Default::default();
+            SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+            if brain.telemetry().completed_sorties >= required {
+                break;
+            }
+        }
+        assert!(
+            brain.telemetry().completed_sorties >= required,
+            "seed {seed} seat {seat}: {:?}",
+            brain.telemetry()
+        );
+        if seed == 0 {
+            assert!(
+                brain
+                    .telemetry()
+                    .events
+                    .iter()
+                    .any(|e| e.kind == "departed" && e.tick < 60 * 60)
+            );
+        }
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty());
+        assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+    }
+}

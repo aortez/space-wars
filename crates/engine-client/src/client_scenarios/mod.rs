@@ -386,6 +386,8 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     surface_sortie::DUEL_REGISTRATION,
     surface_sortie::TRAVEL_REGISTRATION,
     surface_sortie::TRAVEL_DUEL_REGISTRATION,
+    surface_sortie::ARENA_REGISTRATION,
+    surface_sortie::ARENA_DUEL_REGISTRATION,
 ];
 
 pub fn registrations() -> &'static [ScenarioRegistration] {
@@ -465,7 +467,9 @@ mod tests {
                 "spacewars-terrain-combat",
                 "spacewars-terrain-duel",
                 "spacewars-terrain-travel",
-                "spacewars-terrain-travel-duel"
+                "spacewars-terrain-travel-duel",
+                "spacewars-terrain-arena",
+                "spacewars-terrain-arena-duel"
             ]
         );
     }

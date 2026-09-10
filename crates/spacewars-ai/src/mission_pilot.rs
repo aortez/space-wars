@@ -19,7 +19,7 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v1";
+pub const MISSION_POLICY: &str = "material_mission_v2";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -68,6 +68,20 @@ pub struct MissionTelemetry {
     pub events: Vec<MissionEvent>,
     pub capture: Option<CaptureTelemetry>,
     pub recovery: Option<RecoveryTelemetry>,
+    pub avoidance: Option<MissionAvoidance>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MissionObstacleId {
+    Planet(usize),
+    Sun,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MissionAvoidance {
+    pub obstacle: MissionObstacleId,
+    pub waypoint: Vec2,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +121,7 @@ impl MaterialMissionPilot {
                 events: Vec::new(),
                 capture: None,
                 recovery: None,
+                avoidance: None,
             },
             capture: None,
             recovery: None,
@@ -218,6 +233,7 @@ impl MaterialMissionPilot {
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        self.telemetry.avoidance = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
@@ -386,21 +402,30 @@ impl MaterialMissionPilot {
             let entry = target.motion.position
                 + (p.ship.position - target.motion.position).normalized() * (target.radius + 85.0);
             let mut waypoint = entry;
-            for obstacle in &o.planets {
-                if obstacle.index == target.index {
-                    continue;
-                }
+            for (id, position, radius) in o
+                .planets
+                .iter()
+                .filter(|planet| planet.index != target.index)
+                .map(|planet| {
+                    (
+                        MissionObstacleId::Planet(planet.index),
+                        planet.motion.position,
+                        planet.radius,
+                    )
+                })
+                .chain(
+                    o.sun
+                        .map(|sun| (MissionObstacleId::Sun, sun.position, sun.radius)),
+                )
+            {
                 let delta = entry - p.ship.position;
-                let along = ((obstacle.motion.position - p.ship.position).dot(delta)
+                let along = ((position - p.ship.position).dot(delta)
                     / delta.length_squared().max(0.01))
                 .clamp(0.0, 1.0);
-                let clearance = obstacle
-                    .motion
-                    .position
-                    .distance_to(p.ship.position + delta * along);
-                if clearance < obstacle.radius + 65.0 {
-                    let radial = (p.ship.position - obstacle.motion.position).normalized();
-                    let toward = (entry - obstacle.motion.position).normalized();
+                let clearance = position.distance_to(p.ship.position + delta * along);
+                if clearance < radius + 65.0 {
+                    let radial = (p.ship.position - position).normalized();
+                    let toward = (entry - position).normalized();
                     let angle =
                         (radial.x * toward.y - radial.y * toward.x).atan2(radial.dot(toward));
                     let turn = if angle.abs() < 0.01 {
@@ -408,8 +433,11 @@ impl MaterialMissionPilot {
                     } else {
                         angle.clamp(-0.5, 0.5)
                     };
-                    waypoint = obstacle.motion.position
-                        + radial.rotate_radians(turn) * (obstacle.radius + 105.0);
+                    waypoint = position + radial.rotate_radians(turn) * (radius + 105.0);
+                    self.telemetry.avoidance = Some(MissionAvoidance {
+                        obstacle: id,
+                        waypoint,
+                    });
                     break;
                 }
             }

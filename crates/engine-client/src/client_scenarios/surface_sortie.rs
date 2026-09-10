@@ -15,7 +15,9 @@ use spacewars_ai::{
 };
 
 mod mission;
-pub(super) use mission::{TRAVEL_DUEL_REGISTRATION, TRAVEL_REGISTRATION};
+pub(super) use mission::{
+    ARENA_DUEL_REGISTRATION, ARENA_REGISTRATION, TRAVEL_DUEL_REGISTRATION, TRAVEL_REGISTRATION,
+};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,

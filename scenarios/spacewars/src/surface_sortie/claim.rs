@@ -355,9 +355,10 @@ impl SurfaceSortieState {
             candidate.status = PlanetClaimStatus::NeedSettle;
             return candidate;
         }
-        let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
-        let position = (support.position - frame.position).rotate_radians(-frame.angle);
-        let normal = support.normal.rotate_radians(-frame.angle);
+        // The solver world point predates integration. On an orbiting planet
+        // it can already be outside the retained cell in the completed frame.
+        let position = support.local_surface.position;
+        let normal = support.local_surface.normal;
         let footing = self.world.terrain.planets.get(&planet).and_then(|terrain| {
             terrain
                 .field

@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest reliability slice: [ship return recovery](../ship-return-recovery.md)
+Latest arena slice: [generated material arena](../generated-material-arena.md)
+adds three seeded, orbiting destructible planets, shared mission bots and sun
+avoidance. Full ordinary-match lifecycle integration remains ahead.
+
+Previous reliability slice: [ship return recovery](../ship-return-recovery.md)
 provides a bounded replacement path when the assigned ship cannot be reached
 after capture, using the existing human scuttle and rebuild rules.
 
@@ -56,8 +60,9 @@ landing and departure around the existing surface and recovery tasks. Shared
 and routes back to ship hatches on measured material. Pod escape and sustained
 random asteroid pressure now have dedicated regression/diagnostic coverage.
 Controlled two-planet missions now exercise destination selection and task
-handoffs. Generated multi-planet match integration remains ahead, along with
-broader navigation through heavily damaged ground.
+handoffs. The generated three-planet arena now varies sizes, spacing and orbital motion.
+Ordinary-match lifecycle integration remains ahead, along with broader
+navigation through heavily damaged ground.
 
 ## Player outcome
 

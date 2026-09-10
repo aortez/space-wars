@@ -14,17 +14,35 @@ pub(crate) const TRAVEL_DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegist
     ..TRAVEL_REGISTRATION
 };
 
+pub(crate) const ARENA_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-arena",
+    controls_help: "Generated three-planet arena: P1 human, P2 mission bot. The launch seed reproduces planet sizes, spacing and motion. Land, exit and raise a flag where you stand; destroying its footing returns ownership to neutral. The bot chooses destinations, captures on foot, boards and travels onward. A/Space thrusts or jumps; left/right turns or walks; Down/S brakes; B/X exits or boards. Hold RB/J for swept cruise. RT/LB or E fires the laser aboard and mines on foot; gamepad X or K launches a missile. On foot, right stick aims, Y/T changes cut size, and holding A in the air uses the jetpack. Stand still on owned ground to rebuild after losing your ship. Hold A+B+Down for three seconds to scuttle a stranded full ship. Settings adjust asteroid arrivals and strength across all three planets. Start/Esc pauses; R restarts the same seed. Pods and spacelings are invulnerable in this playtest; match victory is not enabled. Select spacewars-terrain-arena-duel to watch two mission bots.",
+    create: create_arena_human,
+    ..TRAVEL_REGISTRATION
+};
+pub(crate) const ARENA_DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-terrain-arena-duel",
+    create: create_arena_duel,
+    ..ARENA_REGISTRATION
+};
+
 struct MaterialMissionClientScenario {
     sortie: SurfaceSortieClientScenario,
     pilots: [MaterialMissionPilot; 2],
     duel: bool,
+    arena: bool,
 }
-fn create(seed: u64, settings: &Settings, duel: bool) -> Box<dyn ClientScenario> {
-    let mut state = SurfaceSortieScenario::init_material_travel(seed, false);
+fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
+    let mut state = if arena {
+        SurfaceSortieScenario::init_material_arena(seed)
+    } else {
+        SurfaceSortieScenario::init_material_travel(seed, false)
+    };
     state.set_asteroid_pressure(settings.material_combat.asteroids);
     Box::new(MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario { state },
         duel,
+        arena,
         pilots: std::array::from_fn(|seat| {
             MaterialMissionPilot::new(
                 BrainReset {
@@ -43,7 +61,7 @@ fn create_human(
     _: ScenarioStartMode,
     _: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(create(seed, settings, false))
+    Ok(create(seed, settings, false, false))
 }
 fn create_duel(
     seed: u64,
@@ -52,10 +70,35 @@ fn create_duel(
     _: ScenarioStartMode,
     _: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(create(seed, settings, true))
+    Ok(create(seed, settings, true, false))
+}
+fn create_arena_human(
+    seed: u64,
+    settings: &Settings,
+    _: Viewport,
+    _: ScenarioStartMode,
+    _: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(create(seed, settings, false, true))
+}
+fn create_arena_duel(
+    seed: u64,
+    settings: &Settings,
+    _: Viewport,
+    _: ScenarioStartMode,
+    _: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(create(seed, settings, true, true))
 }
 impl ClientScenario for MaterialMissionClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
+        if self.arena {
+            return if self.duel {
+                &ARENA_DUEL_REGISTRATION
+            } else {
+                &ARENA_REGISTRATION
+            };
+        }
         if self.duel {
             &TRAVEL_DUEL_REGISTRATION
         } else {
@@ -119,9 +162,9 @@ mod tests {
     use super::*;
     #[test]
     fn mission_hosts_own_bot_inputs_preserve_pause_and_reset_and_render_destinations() {
-        for duel in [false, true] {
+        for (duel, arena) in [(false, false), (true, false), (false, true), (true, true)] {
             let settings = Settings::default();
-            let mut host = create(42, &settings, duel);
+            let mut host = create(42, &settings, duel, arena);
             let host = host
                 .as_any_mut()
                 .downcast_mut::<MaterialMissionClientScenario>()
@@ -138,11 +181,20 @@ mod tests {
             for _ in 0..120 {
                 host.step(&input, Duration::from_nanos(16_666_667));
             }
-            assert_eq!(host.pilots[1].telemetry().target, Some(0));
-            assert_eq!(
-                host.pilots[0].telemetry().target,
-                if duel { Some(1) } else { None }
-            );
+            if arena {
+                assert_eq!(
+                    host.sortie.state.mission_observation(0, None).planets.len(),
+                    3
+                );
+                assert!(host.pilots[1].telemetry().target.is_some());
+                assert_eq!(host.pilots[0].telemetry().target.is_some(), duel);
+            } else {
+                assert_eq!(host.pilots[1].telemetry().target, Some(0));
+                assert_eq!(
+                    host.pilots[0].telemetry().target,
+                    if duel { Some(1) } else { None }
+                );
+            }
             assert_eq!(host.sortie.state.combat_telemetry(1).shells_fired, 0);
             let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
             let expected = format!("AI: {}", host.pilots[1].label());
@@ -151,7 +203,7 @@ mod tests {
                     |p| matches!(p,engine_common::RenderPrimitive::Text(t) if t.text==expected)
                 )
             );
-            let reset = create(42, &settings, duel);
+            let reset = create(42, &settings, duel, arena);
             let reset = reset
                 .as_any()
                 .downcast_ref::<MaterialMissionClientScenario>()

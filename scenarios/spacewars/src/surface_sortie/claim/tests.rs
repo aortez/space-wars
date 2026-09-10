@@ -359,7 +359,9 @@ fn landing_disembarking_and_waiting_claims_without_a_terminal_on_moving_planets(
                 if anchor.is_none() && claim.phase == PlanetClaimPhase::Raising {
                     let frame = motion::SurfaceFrame::read(&state.world.physics, 0);
                     let support = state.spaceling_snapshot(0).unwrap().support.unwrap();
-                    assert!(claim.flag.unwrap().position.distance_to(support.position) < 0.02);
+                    let current_contact =
+                        frame.position + support.local_surface.position.rotate_radians(frame.angle);
+                    assert!(claim.flag.unwrap().position.distance_to(current_contact) < 0.02);
                     anchor = Some(state.claims[0].flag.unwrap().anchor);
                     assert!((claim.flag.unwrap().position - frame.position).length() > 1.0);
                 }
