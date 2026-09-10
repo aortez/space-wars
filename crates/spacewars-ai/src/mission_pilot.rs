@@ -525,6 +525,21 @@ impl MaterialMissionPilot {
         )
     }
     fn detour_velocity(&self, o: &MissionObservationV1, destination_velocity: Vec2) -> Vec2 {
+        // Pursuit can pass several moving obstacles before reaching the
+        // opponent. While circling one, follow its frame instead of adding
+        // the distant opponent's velocity to this local waypoint.
+        if matches!(self.telemetry.goal, MissionGoal::Hunt | MissionGoal::Watch)
+            && let Some(avoidance) = self.telemetry.avoidance
+        {
+            match avoidance.obstacle {
+                MissionObstacleId::Sun => return Vec2::ZERO,
+                MissionObstacleId::Planet(index) => {
+                    if let Some(planet) = o.planets.iter().find(|p| p.index == index) {
+                        return planet.motion.velocity;
+                    }
+                }
+            }
+        }
         if let Some((index, _)) = self.solar_detour
             && self
                 .telemetry
@@ -713,6 +728,20 @@ mod solar_route_tests {
         let clear = o.local.combat.recovery.flight.pilot.ship.position + Vec2::X * 100.0;
         assert_eq!(brain.route_waypoint(&o, clear, Some(1)), clear);
         assert_eq!(brain.solar_detour, None);
+        brain.telemetry.goal = MissionGoal::Hunt;
+        brain.telemetry.avoidance = Some(MissionAvoidance {
+            obstacle: MissionObstacleId::Planet(0),
+            waypoint: first,
+        });
+        assert_eq!(
+            brain.detour_velocity(&o, Vec2::X * -50.0),
+            Vec2::new(4.0, 3.0)
+        );
+        brain.telemetry.avoidance = Some(MissionAvoidance {
+            obstacle: MissionObstacleId::Sun,
+            waypoint: first,
+        });
+        assert_eq!(brain.detour_velocity(&o, Vec2::X * -50.0), Vec2::ZERO);
         brain.reset(context);
         assert_eq!(brain.solar_detour, None);
     }

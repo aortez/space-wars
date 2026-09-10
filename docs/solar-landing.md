@@ -42,6 +42,12 @@ planet's velocity until the route clears. This avoids alternating detours or
 adding the distant destination's motion to a local solar detour. It remains a
 local routing policy, with the existing emergency escape as a final safeguard.
 
+During pursuit, all obstacle waypoints use the obstructing body's motion (zero
+for the sun). Adding the distant opponent's velocity while circling an
+intervening planet could pull the hunter into that planet and waste the
+remaining pursuit window. Generated seed 7/P1 in both reflections is now part
+of the physical capture-then-contact acceptance test.
+
 The forecast is bounded. Long ground excursions, weapon damage, impacts and
 late changes can still require escape or recovery. This change adds no actor
 transport, physics step, gravity solve, invulnerability or landing permission.

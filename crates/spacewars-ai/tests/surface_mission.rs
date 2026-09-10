@@ -337,7 +337,7 @@ fn solar_escape_takes_priority_over_hunting_and_does_not_fire() {
 
 #[test]
 fn physical_mission_captures_then_finds_and_hits_the_opponent() {
-    for (seed, seat, mirror) in [(0, 0, false), (7, 0, true)] {
+    for (seed, seat, mirror) in [(0, 0, false), (7, 0, false), (7, 0, true)] {
         let actor = PlayerId::from_index(seat).unwrap();
         let mut state = SurfaceSortieScenario::init_material_arena_trial(seed, mirror, 0.0);
         let mut brain = MaterialMissionPilot::new(
