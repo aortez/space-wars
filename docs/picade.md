@@ -153,6 +153,15 @@ Installer/rollback tests additionally use `bubblewrap` with user namespaces to
 isolate the real shell helper from the workstation. CI requires these tests;
 locally they report a skip if that sandbox is unavailable.
 
+The CI tools job is pinned to Ubuntu 24.04 and loads the CI-only
+[`bwrap` AppArmor profile](../.github/ci/bwrap.apparmor) to permit user namespaces
+for Bubblewrap without changing the system-wide restriction. A named preflight
+checks namespace creation as the normal runner user before the tests run;
+failed jobs report namespace settings and AppArmor/kernel diagnostics. The
+profile is not installed by the application build or deployment tools. To
+require the same installer coverage locally, run
+`SPACEWARS_REQUIRE_UPDATE_SANDBOX=1 npm --prefix yocto test` from the repo root.
+
 The default build directory is outside the Rust workspace and distinct from
 other checkouts and the old Pi 5 build:
 
