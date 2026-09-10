@@ -1,4 +1,6 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/mission_metrics.rs"]
+mod mission_metrics;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -33,6 +35,7 @@ fn main() {
     let seat: usize = arg("--seat", "1").parse().unwrap();
     let mirror = arg("--mirror", "false").parse().unwrap();
     let seconds: u64 = arg("--seconds", "180").parse().unwrap();
+    let prepare_seconds: u64 = arg("--prepare-seconds", "180").parse().unwrap();
     let mode = arg("--mode", "quiet");
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
@@ -43,9 +46,20 @@ fn main() {
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     let world_kind = arg("--world", "fixed");
+    let defaults = CombatBreakSettings::default();
+    let breaks = CombatBreakSettings {
+        interval_seconds: arg("--break-interval", &defaults.interval_seconds.to_string())
+            .parse()
+            .unwrap(),
+        duration_seconds: arg("--break-duration", &defaults.duration_seconds.to_string())
+            .parse()
+            .unwrap(),
+    }
+    .normalized();
     assert!(seat < 2 && (1..=180).contains(&seconds));
-    assert!(["quiet", "intercept", "duel", "hunt"].contains(&mode.as_str()));
-    assert!(!require_hunt || mode == "hunt");
+    assert!(["quiet", "intercept", "duel", "hunt", "pursuit"].contains(&mode.as_str()));
+    assert!(!require_hunt || mode == "hunt" || mode == "pursuit");
+    assert!((1..=180).contains(&prepare_seconds));
     assert!(["fixed", "generated"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
@@ -68,7 +82,7 @@ fn main() {
                 actor: PlayerId::from_index(i).unwrap(),
                 episode_seed: seed,
             },
-            CombatBreakSettings::default(),
+            breaks,
         )
     });
     let mut interceptor = RulePilotV4::with_combat_breaks(
@@ -76,7 +90,7 @@ fn main() {
             actor: PlayerId::from_index(1 - seat).unwrap(),
             episode_seed: seed,
         },
-        CombatBreakSettings::default(),
+        breaks,
     );
     let initial = state.terrain_diagnostics().occupied_cells;
     let mut sensors = Vec::new();
@@ -91,7 +105,26 @@ fn main() {
     let mut strike_tick = None;
     let mut pending_claim_footing = [None; 2];
     let mut claim_footing_recoveries = Vec::new();
-    for tick in 0..seconds * 60 {
+    let mut metrics =
+        std::array::from_fn::<_, 2, _>(|_| mission_metrics::MissionMetrics::default());
+    let mut pursuit_started_tick = None;
+    let mut elapsed_ticks = 0;
+    // Pursuit trials prepare a real captured world with the same controls and
+    // physics. The preparation and measured chase each have their own bounded
+    // window; ordinary hunt trials retain the original end-to-end cutoff.
+    let max_ticks = if mode == "pursuit" {
+        (prepare_seconds + seconds) * 60
+    } else {
+        seconds * 60
+    };
+    for tick in 0..max_ticks {
+        if mode == "pursuit"
+            && pursuit_started_tick.map_or(tick >= prepare_seconds * 60, |start| {
+                tick >= start + seconds * 60
+            })
+        {
+            break;
+        }
         if strike && strike_tick.is_none() && pilots[seat].telemetry().completed_sorties > 0 {
             assert!(state.spawn_recovery_hazard(
                 seat,
@@ -109,12 +142,29 @@ fn main() {
                 sensors.push(clock.elapsed().as_secs_f64() * 1000.0);
                 let clock = Instant::now();
                 let mut intent = pilots[i].intent(&o);
+                policies.push(clock.elapsed().as_secs_f64() * 1000.0);
+                metrics[i].observe(&o, pilots[i].telemetry());
+                if mode == "pursuit" && i == seat && metrics[i].first_hunt_tick.is_some() {
+                    if pursuit_started_tick.is_none() && frames {
+                        for player in 0..2 {
+                            fs::write(
+                                out.join(format!("pursuit-start-p{}.json", player + 1)),
+                                serde_json::to_vec(&SurfaceSortieScenario::player_frame(
+                                    &state, player,
+                                ))
+                                .unwrap(),
+                            )
+                            .unwrap();
+                        }
+                    }
+                    pursuit_started_tick.get_or_insert(tick);
+                }
                 if mode == "quiet"
-                    || mode == "hunt" && pilots[i].telemetry().goal != MissionGoal::Hunt
+                    || matches!(mode.as_str(), "hunt" | "pursuit")
+                        && pilots[i].telemetry().goal != MissionGoal::Hunt
                 {
                     intent.weapons = Default::default();
                 }
-                policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 let p = &o.local.combat.recovery.flight.pilot;
                 let telemetry = pilots[i].telemetry();
                 let ground = telemetry
@@ -193,6 +243,13 @@ fn main() {
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
+        elapsed_ticks = tick + 1;
+        for (i, metrics) in metrics.iter_mut().enumerate() {
+            let combat = state.combat_telemetry(i);
+            if combat.cannon_hits > 0 || combat.laser_hit_ticks > 0 {
+                metrics.first_contact_tick.get_or_insert(tick + 1);
+            }
+        }
         let asteroids = state.asteroid_pressure();
         if !asteroids.arrivals.is_empty() || !asteroids.impacts.is_empty() {
             asteroid_events.push(
@@ -229,6 +286,13 @@ fn main() {
     if let Some(trace) = &mut trace {
         trace.flush().unwrap();
     }
+    let final_audit = state.terrain_diagnostics();
+    if !final_audit.issues.is_empty()
+        || final_audit.occupied_cells + final_audit.removed_cells != initial
+        || final_audit.max_speed >= 500.0
+    {
+        failures.push(json!({"tick":elapsed_ticks,"audit":final_audit}));
+    }
     let completed: BTreeSet<_> = pilots[seat]
         .telemetry()
         .events
@@ -236,7 +300,15 @@ fn main() {
         .filter(|e| e.kind == "departed")
         .filter_map(|e| e.planet)
         .collect();
-    let report = json!({"version":1,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
+    // Include the final completed tick even when the chase ends between the
+    // one-second samples; contact latency never depends on sample alignment.
+    let final_combat = [state.combat_telemetry(0), state.combat_telemetry(1)];
+    let report = json!({"version":2,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
+        "elapsed_ticks":elapsed_ticks,"metrics":metrics,"final_combat":final_combat,"final_audit":final_audit,
+        "combat_breaks":breaks,
+        "pursuit_trial":(mode=="pursuit").then(|| json!({"prepare_limit_seconds":prepare_seconds,
+            "started_tick":pursuit_started_tick,"measured_ticks":pursuit_started_tick.map(|start|elapsed_ticks-start),
+            "preparation_ok":pursuit_started_tick.is_some()})),
         "world":world_kind,"initial_world":initial_world,
         "physics_ok":failures.is_empty(),"audit_failures":failures,"distinct_departures":completed,
         "missions":pilots.each_ref().map(|p|p.telemetry()),"interceptor":interceptor.telemetry(),"strike_tick":strike_tick,
@@ -253,6 +325,12 @@ fn main() {
         json!({"physics_ok":report["physics_ok"],"distinct_departures":completed,"steps":report["steps"],"sensors":report["sensors"]})
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
+    if mode == "pursuit" {
+        assert!(
+            pursuit_started_tick.is_some(),
+            "capture preparation did not reach pursuit"
+        );
+    }
     if require_hunt {
         let combat = state.combat_telemetry(seat);
         assert!(

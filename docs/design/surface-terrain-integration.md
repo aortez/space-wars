@@ -1,5 +1,9 @@
 # Surface gameplay and destructible terrain integration
 
+The [mission reliability pass](../mission-reliability.md) preserves physical
+capture/departure milestones and separates pursuit measurements from capture
+time. Match completion and promotion into ordinary Spacewars remain later work.
+
 Latest gameplay slice: [solar collisions and post-capture pursuit](../solar-hunt.md)
 fixes surface actors passing through the sun, adds heat, and sends the mission
 bot after its opponent once all planets are secured.

@@ -1,4 +1,4 @@
-//! Capture V7 adds solar-safe approach selection to committed material landings.
+//! Capture V8 bounds circling stalls before retrying a material landing.
 use crate::{
     BrainReset,
     combat_pilot::CombatIntent,
@@ -39,7 +39,7 @@ impl TacticalCapturePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
         let base = TacticalSortiePilot::with_committed_descent(context, breaks);
         let mut sortie = base.telemetry().clone();
-        sortie.policy = "tactical_sortie_v7";
+        sortie.policy = "tactical_sortie_v8";
         Self {
             context,
             base,
@@ -57,7 +57,7 @@ impl TacticalCapturePilot {
         self.context = context;
         self.ground = None;
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v7";
+        self.telemetry.sortie.policy = "tactical_sortie_v8";
         self.telemetry.ground = None;
         self.previous_tick = None;
         self.previous_intent = CombatIntent::default();
@@ -74,7 +74,7 @@ impl TacticalCapturePilot {
     pub(crate) fn reject_solar_approach(&mut self, tick: u64) {
         self.base.reject_solar_approach(tick);
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v7";
+        self.telemetry.sortie.policy = "tactical_sortie_v8";
     }
     pub fn label(&self) -> &'static str {
         if let Some(ground) = &self.telemetry.ground
@@ -104,7 +104,7 @@ impl TacticalCapturePilot {
         // version's traversal while outside the destination's interaction range.
         let mut intent = self.base.intent(o);
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v7";
+        self.telemetry.sortie.policy = "tactical_sortie_v8";
         if self.telemetry.completed_tick.is_none()
             && self.telemetry.failed_tick.is_none()
             && o.combat.recovery.flight.flight.enabled
@@ -148,7 +148,7 @@ impl TacticalCapturePilot {
             if ground.telemetry().goal == GroundGoal::Blocked {
                 self.base.abort(p.tick, ground.telemetry().reason.unwrap());
                 self.telemetry.sortie = self.base.telemetry().clone();
-                self.telemetry.sortie.policy = "tactical_sortie_v7";
+                self.telemetry.sortie.policy = "tactical_sortie_v8";
             }
         } else {
             self.telemetry.ground = None;
@@ -205,7 +205,7 @@ mod tests {
         let mut task = TacticalCapturePilot::new(context, CombatBreakSettings::default());
         let first = task.intent(&o);
         assert!(task.telemetry().ground.is_some());
-        assert_eq!(task.telemetry().policy, "tactical_sortie_v7");
+        assert_eq!(task.telemetry().policy, "tactical_sortie_v8");
         let telemetry = task.telemetry().clone();
         assert_eq!(task.intent(&o), first);
         assert_eq!(task.telemetry(), &telemetry);

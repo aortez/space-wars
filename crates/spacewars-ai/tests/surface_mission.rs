@@ -359,6 +359,11 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
                         .iter()
                         .all(|p| p.claim.as_ref().unwrap().owner == Some(actor))
                 );
+                assert_eq!(
+                    brain.telemetry().completed_sorties as usize,
+                    o.planets.len(),
+                    "claim and boarding must survive changes of approach planet"
+                );
                 hunted = true;
             }
             SurfaceSortieScenario::step(&mut state, &intent.encode(actor), DT);
@@ -374,6 +379,59 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
             brain.telemetry()
         );
         assert!(state.terrain_diagnostics().issues.is_empty());
+    }
+}
+
+#[test]
+fn pursuit_reaches_weapon_contact_after_physical_capture_preparation() {
+    // These parked opponents exposed routing through intervening bodies and
+    // repeated climb/aim transitions. Preparation retains the full-mission
+    // budget; contact has its own window so late claims cannot hide a stall.
+    for (seed, seat, mirror) in [(0, 1, false), (42, 0, true), (7, 1, true)] {
+        let actor = PlayerId::from_index(seat).unwrap();
+        let mut state = SurfaceSortieScenario::init_material_arena_trial(seed, mirror, 0.0);
+        let initial = state.terrain_diagnostics().occupied_cells;
+        let mut brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor,
+                episode_seed: seed,
+            },
+            CombatBreakSettings::default(),
+        );
+        let mut pursuit = None;
+        let mut hit = false;
+        for tick in 0..270 * 60 {
+            if pursuit.map_or(tick >= 180 * 60, |start| tick >= start + 90 * 60) {
+                break;
+            }
+            let o = state.mission_observation(seat, brain.site_request());
+            let mut intent = brain.intent(&o);
+            if brain.telemetry().goal == MissionGoal::Hunt {
+                assert!(
+                    o.planets
+                        .iter()
+                        .all(|p| p.claim.as_ref().unwrap().owner == Some(actor))
+                );
+                assert_eq!(brain.telemetry().completed_sorties, 3);
+                pursuit.get_or_insert(tick);
+            } else {
+                intent.weapons = Default::default();
+            }
+            SurfaceSortieScenario::step(&mut state, &intent.encode(actor), DT);
+            let combat = state.combat_telemetry(seat);
+            if combat.cannon_hits > 0 || combat.laser_hit_ticks > 0 {
+                hit = true;
+                break;
+            }
+        }
+        assert!(
+            pursuit.is_some() && hit,
+            "seed {seed}, seat {seat}, mirror {mirror}: {:?}",
+            brain.telemetry()
+        );
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty() && audit.max_speed < 500.0);
+        assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
     }
 }
 

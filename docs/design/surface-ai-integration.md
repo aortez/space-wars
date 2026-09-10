@@ -1,5 +1,10 @@
 # AI for Spacewars on destructible ground
 
+The current [mission reliability pass](../mission-reliability.md) adds bounded
+circling retries, preserves departure across approach-frame changes, and
+measures capture and pursuit separately. Match outcomes and ordinary Spacewars
+integration remain the following gameplay milestones.
+
 Latest reliability slice: [parked ship return](../parked-ship-return.md) fixes
 corner-contact landing recognition and adds bounded visible-hatch waits in
 `ground_navigation_v9` and `recover_ship_v8`.

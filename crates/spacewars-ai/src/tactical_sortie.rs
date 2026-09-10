@@ -58,6 +58,9 @@ pub struct TacticalTelemetry {
     pub replans: u32,
     pub cover_replans: u32,
     pub solar_replans: u32,
+    pub circling_replans: u32,
+    pub circling_remaining: Option<f32>,
+    pub circling_progress_tick: Option<u64>,
     pub solar: Option<SolarLandingPlan>,
     pub invalidations: u32,
     pub exposed_ticks: u64,
@@ -80,6 +83,7 @@ pub struct TacticalSortiePilot {
     clear_since: Option<u64>,
     commit_descent: bool,
     approach_progress: Option<(f32, u64, u64)>,
+    circling_progress: Option<(f32, u64)>,
     site_unavailable_since: Option<u64>,
     cover_lost_since: Option<u64>,
     rejected_sites: Vec<(LandingSiteId, u64)>,
@@ -103,6 +107,9 @@ impl TacticalSortiePilot {
                 replans: 0,
                 cover_replans: 0,
                 solar_replans: 0,
+                circling_replans: 0,
+                circling_remaining: None,
+                circling_progress_tick: None,
                 solar: None,
                 invalidations: 0,
                 exposed_ticks: 0,
@@ -120,6 +127,7 @@ impl TacticalSortiePilot {
             clear_since: None,
             commit_descent: false,
             approach_progress: None,
+            circling_progress: None,
             site_unavailable_since: None,
             cover_lost_since: None,
             rejected_sites: Vec::new(),
@@ -205,6 +213,9 @@ impl TacticalSortiePilot {
         self.long_approach = false;
         self.telemetry.solar = None;
         self.approach_progress = None;
+        self.circling_progress = None;
+        self.telemetry.circling_remaining = None;
+        self.telemetry.circling_progress_tick = None;
         self.site_unavailable_since = None;
         self.cover_lost_since = None;
         self.landing = RulePilotV1::new(self.context);
@@ -508,6 +519,7 @@ impl TacticalSortiePilot {
                 && relative.dot(tangent).abs() < 18.0
                 && (covered || (ground_covered && height < 40.0) || !exposed)
             {
+                self.circling_progress = None;
                 self.goal(TacticalGoal::Approach, p.tick);
             } else if angle.abs() < 0.2
                 && !covered
@@ -517,6 +529,26 @@ impl TacticalSortiePilot {
                 self.replan_for_cover(p.tick);
                 return self.guide(o, tangent * self.side * 35.0 + up * 5.0, Vec2::ZERO);
             } else {
+                if self.commit_descent {
+                    // Measure the remaining arc in the selected planet's
+                    // moving frame. Repeated oscillations must not refresh the
+                    // budget simply because half of each oscillation closes.
+                    let remaining =
+                        angle.abs() * (p.planet.radius + 60.0) + (altitude - 60.0).abs();
+                    let (best, progress) =
+                        self.circling_progress.get_or_insert((remaining, p.tick));
+                    if remaining < *best - 2.0 {
+                        *best = remaining;
+                        *progress = p.tick;
+                    }
+                    self.telemetry.circling_remaining = Some(remaining);
+                    self.telemetry.circling_progress_tick = Some(*progress);
+                    if p.tick.saturating_sub(*progress) > 10 * 60 {
+                        self.telemetry.circling_replans += 1;
+                        self.retry_landing(p.tick);
+                        return self.guide(o, up * 12.0, Vec2::ZERO);
+                    }
+                }
                 let speed = (angle * radius * 0.9).clamp(-45.0, 45.0);
                 let vertical = ((p.planet.radius + 60.0 - radius) * 0.8).clamp(-12.0, 18.0);
                 let world_velocity = p.ship.velocity - p.planet.motion.velocity;
@@ -936,6 +968,62 @@ mod tests {
         brain.reset(context());
         assert!(brain.commit_descent);
         assert!(brain.approach_progress.is_none());
+    }
+
+    #[test]
+    fn circling_stall_retries_once_and_real_arc_progress_keeps_the_site() {
+        let mut o = observation();
+        o.combat.target = None;
+        o.sun = None;
+        let site = o.combat.recovery.flight.pilot.sites[0];
+        let center = o.combat.recovery.flight.pilot.planet.motion.position;
+        let radius = o.combat.recovery.flight.pilot.planet.radius + 60.0;
+        let site_up = (site.vehicle_position - center).normalized();
+        let mut brain =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        brain.site = Some(site);
+        brain.telemetry.goal = TacticalGoal::SeekCover;
+        let mut advancing = brain.clone();
+        // A ship rocking back and forth around the same bearing never gets
+        // closer overall. Merely closing during each half-cycle is not progress.
+        for tick in 0..=660 {
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.ship.position =
+                center + site_up.rotate_radians(if tick % 120 < 60 { 1.0 } else { 1.1 }) * radius;
+            p.ship.velocity = p.planet.velocity_at(p.ship.position);
+            p.landing.phase = scenario_spacewars::surface_sortie::LandingPhase::Flying;
+            brain.intent(&o);
+            if brain.telemetry().circling_replans > 0 {
+                assert!(tick <= 601);
+                break;
+            }
+        }
+        assert_eq!(brain.telemetry().circling_replans, 1);
+        assert_eq!(brain.site_request(), None);
+        assert!(brain.clearing_ground);
+        assert!(brain.rejected_sites.contains(&(site.id, site.revision)));
+        // The long safe route can legitimately take more than ten seconds.
+        advancing.long_approach = true;
+        advancing.side = 1.0;
+        for (tick, arc) in [
+            (0, 5.0_f32),
+            (300, 4.0),
+            (600, 3.0),
+            (900, 2.0),
+            (1200, 1.0),
+        ] {
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.ship.position = center + site_up.rotate_radians(-arc) * radius;
+            p.ship.velocity = p.planet.velocity_at(p.ship.position);
+            advancing.intent(&o);
+            assert_eq!(advancing.site_request(), Some(site.id));
+            assert_eq!(advancing.telemetry().circling_replans, 0);
+        }
+        brain.reset(context());
+        assert!(brain.circling_progress.is_none());
+        assert_eq!(brain.telemetry().circling_replans, 0);
     }
 
     #[test]
