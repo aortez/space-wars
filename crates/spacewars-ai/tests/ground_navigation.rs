@@ -971,3 +971,49 @@ fn claim_relocation_exhausts_four_proposals_and_airborne_wait_keeps_task_deadlin
         Some("ground traversal exceeded ninety seconds")
     );
 }
+
+#[test]
+fn hatch_route_cannot_cross_between_retained_planets() {
+    use scenario_spacewars::surface_sortie::LandingPhase;
+    use spacewars_ai::ground_task::ShipReturnFailure;
+    let (context, mut o) = fixture();
+    o.flight.pilot.landing.phase = LandingPhase::Landed;
+    o.flight.pilot.landing.supported_feet = 2;
+    o.flight.pilot.landing.planet = Some(o.flight.pilot.planet.index + 1);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    o.flight.pilot.supported_planet = None;
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    assert!(task.telemetry().return_failure.is_none());
+    advance(&mut o, 1);
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(
+        task.telemetry().return_failure,
+        Some(ShipReturnFailure::OtherPlanet)
+    );
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    assert!(task.telemetry().path.is_empty());
+    assert!(task.telemetry().target.is_none());
+}
+
+#[test]
+fn a_displaced_hatch_gets_a_fresh_settling_wait_within_the_original_task_budget() {
+    use spacewars_ai::ground_task::ShipReturnFailure;
+    let (context, mut o) = fixture();
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    advance(&mut o, 300);
+    o.flight.pilot.hatch = None;
+    task.step(&o);
+    advance(&mut o, 901);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::WaitForShip);
+    advance(&mut o, 1201);
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().return_failure,
+        Some(ShipReturnFailure::NoGroundedHatch)
+    );
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+}

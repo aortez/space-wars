@@ -30,6 +30,7 @@ pub mod rebuild_placement;
 mod recovery;
 pub mod recovery_sensors;
 mod render;
+pub mod return_trial;
 mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,

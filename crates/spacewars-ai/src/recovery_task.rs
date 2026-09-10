@@ -4,7 +4,9 @@
 use crate::{
     BrainReset,
     flight_pilot::FlightIntent,
-    ground_task::{GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry},
+    ground_task::{
+        GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry, ShipReturnFailure,
+    },
     shortest_heading_error,
 };
 use engine_core::Vec2;
@@ -30,6 +32,7 @@ pub enum TaskStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryGoal {
+    Scuttle,
     StabilizePod,
     SurveyPod,
     LandPod,
@@ -44,6 +47,7 @@ pub enum RecoveryGoal {
 impl RecoveryGoal {
     pub fn label(self) -> &'static str {
         match self {
+            Self::Scuttle => "replacing an unreachable ship",
             Self::StabilizePod => "stabilizing escape pod",
             Self::SurveyPod => "checking another pod landing site",
             Self::LandPod => "landing escape pod",
@@ -82,6 +86,10 @@ pub struct RecoveryTelemetry {
     pub ground: Option<GroundTelemetry>,
     /// Granted once when hostile-ground traversal becomes necessary.
     pub ground_budget_ticks: u64,
+    pub return_failure: Option<ShipReturnFailure>,
+    pub scuttle_started_tick: Option<u64>,
+    pub scuttled_tick: Option<u64>,
+    pub scuttle_attempts: u32,
 }
 
 /// A failed approach defers measured footing; it does not prove it unusable forever.
@@ -144,13 +152,14 @@ pub struct RecoverShipTask {
     settled_since: Option<u64>,
     ground_task: Option<GroundNavigationTask>,
     previous_claim: Option<(PlanetClaimPhase, f32)>,
+    return_fallback_since: Option<u64>,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v6",
+                task: "recover_ship_v7",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -172,6 +181,10 @@ impl RecoverShipTask {
                 stabilization: None,
                 ground: None,
                 ground_budget_ticks: 0,
+                return_failure: None,
+                scuttle_started_tick: None,
+                scuttled_tick: None,
+                scuttle_attempts: 0,
             },
             site: None,
             stabilized: false,
@@ -188,6 +201,7 @@ impl RecoverShipTask {
             settled_since: None,
             ground_task: None,
             previous_claim: None,
+            return_fallback_since: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -258,6 +272,10 @@ impl RecoverShipTask {
         if self.previous_tick == Some(p.tick) {
             return self.previous_action;
         }
+        if self.previous_tick.is_some_and(|tick| p.tick < tick) {
+            self.block("observation tick moved backwards", p.tick);
+            return FlightIntent::default();
+        }
         self.telemetry.started_tick.get_or_insert(p.tick);
         let controls = if !p.controls_armed || self.telemetry.status == TaskStatus::Succeeded {
             SurfaceSortieAction::default()
@@ -302,6 +320,9 @@ impl RecoverShipTask {
             if !p.queries_ready {
                 return action;
             }
+            if self.return_fallback_since.is_some() {
+                return self.replace_unreachable_ship(o);
+            }
             if self
                 .ground_task
                 .as_ref()
@@ -336,6 +357,9 @@ impl RecoverShipTask {
                     action.interact_held = !self.was_interacting;
                 } else {
                     action = self.traverse(o, GroundDestination::Hatch);
+                }
+                if self.return_fallback_since.is_some() {
+                    return self.replace_unreachable_ship(o);
                 }
                 if self.telemetry.status != TaskStatus::Blocked
                     && p.tick.saturating_sub(self.telemetry.last_progress_tick) > 900
@@ -634,9 +658,100 @@ impl RecoverShipTask {
             .max(task.telemetry().last_progress_tick);
         if task.telemetry().goal == GroundGoal::Blocked {
             let reason = task.telemetry().reason.unwrap();
-            self.block(reason, o.flight.pilot.tick);
+            if destination == GroundDestination::Hatch
+                && let Some(failure) = task.telemetry().return_failure
+            {
+                self.telemetry.return_failure = Some(failure);
+                self.return_fallback_since = Some(o.flight.pilot.tick);
+                self.goal(RecoveryGoal::Scuttle, o.flight.pilot.tick);
+            } else {
+                self.block(reason, o.flight.pilot.tick);
+            }
         }
         action
+    }
+
+    fn replace_unreachable_ship(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
+        let p = &o.flight.pilot;
+        let mut action = SurfaceSortieAction::default();
+        if !p.ship_available {
+            self.telemetry.scuttled_tick = self.telemetry.scuttle_started_tick.map(|_| p.tick);
+            self.return_fallback_since = None;
+            self.ground_task = None;
+            self.telemetry.ground = None;
+            self.telemetry.last_progress_tick = p.tick;
+            return action;
+        }
+        // A recovered hatch cancels the hold and resumes ordinary boarding.
+        if p.transfer == TransferResult::Ready
+            || p.hatch.is_some() && p.landing.planet == Some(p.planet.index)
+        {
+            self.return_fallback_since = None;
+            self.ground_task = None;
+            self.telemetry.ground = None;
+            return action;
+        }
+        let since = self
+            .return_fallback_since
+            .expect("return fallback was requested");
+        self.goal(RecoveryGoal::Scuttle, p.tick);
+        if p.tick.saturating_sub(since) > 15 * 60 {
+            self.block(
+                "unreachable ship replacement could not start or finish",
+                p.tick,
+            );
+            return action;
+        }
+        let supported = p.supported_planet == Some(p.planet.index);
+        let stable = p.actor.is_some_and(|actor| {
+            (actor.velocity - p.planet.velocity_at(actor.position)).length() <= 1.0
+        });
+        if !supported || !p.balanced || !stable {
+            // The normal get-up action can establish safe, stable footing.
+            action.primary_held = supported && !p.balanced && !self.was_jumping;
+            return action;
+        }
+        let confirmed = match self.telemetry.return_failure {
+            Some(ShipReturnFailure::OtherPlanet) => {
+                p.landing.phase == LandingPhase::Landed
+                    && p.landing.supported_feet == 2
+                    && p.landing
+                        .planet
+                        .is_some_and(|planet| planet != p.planet.index)
+            }
+            Some(ShipReturnFailure::NoGroundedHatch) => {
+                p.hatch.is_none()
+                    && p.landing.planet == Some(p.planet.index)
+                    && p.landing.descent_speed.abs() < 1.0
+                    && p.landing.lateral_speed.abs() < 1.0
+                    && p.landing.relative_spin.abs() < 0.2
+                    && p.actor
+                        .is_some_and(|actor| actor.position.distance_to(p.ship.position) < 24.0)
+            }
+            None => false,
+        };
+        if !confirmed || p.ship_form != ShipForm::Ship {
+            return action;
+        }
+        if self.telemetry.scuttle_started_tick.is_none() {
+            if self.telemetry.scuttle_attempts > 0 {
+                self.block("replacement ship also has no accessible return", p.tick);
+                return action;
+            }
+            self.telemetry.scuttle_attempts += 1;
+            self.telemetry.scuttle_started_tick = Some(p.tick);
+        } else if self.telemetry.scuttled_tick.is_some() {
+            self.block("replacement ship also has no accessible return", p.tick);
+            return action;
+        }
+        // The shared three-second chord consumes movement and transfer. The
+        // world performs the loss; neutral input must rearm the survivor next.
+        SurfaceSortieAction {
+            primary_held: true,
+            interact_held: true,
+            brake_held: true,
+            ..Default::default()
+        }
     }
 
     fn stabilize(&mut self, o: &RecoveryTaskObservationV1, up: Vec2) -> SurfaceSortieAction {

@@ -4,8 +4,9 @@ The human-controlled material Expedition loop has passed Pi playtesting.
 The user's completion target is integration into ordinary Spacewars, including
 working AI. Merging is deferred until that gameplay milestone is ready.
 
-Latest reliability slice: [pod landing retries](../pod-landing-retries.md) reuses
-physical righting after a failed approach and bounds site deferral/search.
+Latest reliability slice: [ship return recovery](../ship-return-recovery.md)
+recognizes foreign-planet hatches and persistently unsettled nearby ships, then
+uses the shared scuttle/rebuild controls within the original recovery budget.
 
 The [controlled two-planet mission checkpoint](../two-planet-missions.md)
 composes destination selection and interplanetary travel with the established

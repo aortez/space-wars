@@ -800,3 +800,221 @@ fn hostile_ground_gets_one_fixed_extension_without_restarting_the_recovery_clock
         Some("recovery exceeded combined flight and ground budget")
     );
 }
+
+fn ship_on_other_planet() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    let (task, mut o) = airborne_pod();
+    let p = &mut o.flight.pilot;
+    p.location = PilotLocation::OnFoot;
+    p.ship_form = ShipForm::Ship;
+    p.balanced = true;
+    p.relative_speed = 0.0;
+    p.supported_planet = Some(p.planet.index);
+    p.actor = Some(p.ship);
+    p.landing.phase = LandingPhase::Landed;
+    p.landing.supported_feet = 2;
+    p.landing.planet = Some(p.planet.index + 1);
+    p.hatch = Some(p.ship.position);
+    p.transfer = scenario_spacewars::surface_sortie::TransferResult::TooFar;
+    (task, o)
+}
+
+#[test]
+fn unreachable_ship_uses_shared_scuttle_then_releases_and_retains_recovery_budget() {
+    let (mut task, mut o) = ship_on_other_planet();
+    let first = task.step(&o);
+    assert!(
+        first.controls.primary_held && first.controls.interact_held && first.controls.brake_held
+    );
+    assert_eq!(task.telemetry().goal, RecoveryGoal::Scuttle);
+    assert_eq!(task.telemetry().scuttle_attempts, 1);
+    let initial = task.telemetry().started_tick;
+    assert_eq!(task.step(&o), first);
+    let mut copy = task.clone();
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.queries_ready = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().started_tick, initial);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.queries_ready = true;
+    o.flight.pilot.ship_available = false;
+    o.flight.pilot.controls_armed = false;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(copy.step(&o), FlightIntent::default());
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.controls_armed = true;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    assert_eq!(task.telemetry().scuttled_tick, Some(o.flight.pilot.tick));
+    assert_eq!(task.telemetry().started_tick, initial);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.planet.claim.as_mut().unwrap().owner = Some(o.flight.pilot.owner);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, RecoveryGoal::Rebuild);
+}
+
+#[test]
+fn returning_ship_cancels_scuttle_and_support_loss_never_holds_the_chord() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    let (mut task, mut o) = ship_on_other_planet();
+    task.step(&o);
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.supported_planet = None;
+    assert_eq!(task.step(&o), FlightIntent::default());
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    o.flight.pilot.landing.planet = Some(o.flight.pilot.planet.index);
+    o.flight.pilot.transfer = TransferResult::Ready;
+    assert_eq!(
+        task.step(&o),
+        FlightIntent::default(),
+        "release the cancelled chord"
+    );
+    o.flight.pilot.tick += 1;
+    let board = task.step(&o).controls;
+    assert!(board.interact_held && !board.primary_held && !board.brake_held);
+    assert!(task.telemetry().scuttled_tick.is_none());
+}
+
+#[test]
+fn an_unsettled_nearby_ship_waits_before_replacement_but_moving_ships_do_not_qualify() {
+    for moving in [false, true] {
+        let (mut task, mut o) = ship_on_other_planet();
+        let p = &mut o.flight.pilot;
+        p.landing.planet = Some(p.planet.index);
+        p.landing.phase = LandingPhase::Assisted;
+        p.landing.supported_feet = 0;
+        p.landing.lateral_speed = if moving { 5.0 } else { 0.0 };
+        p.hatch = None;
+        task.step(&o);
+        assert_eq!(task.telemetry().scuttle_attempts, 0);
+        o.flight.pilot.tick += 901;
+        let action = task.step(&o).controls;
+        assert_eq!(
+            action.interact_held && action.brake_held && action.primary_held,
+            !moving
+        );
+        if moving {
+            o.flight.pilot.tick += 901;
+            task.step(&o);
+            assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+            assert_eq!(task.telemetry().scuttle_attempts, 0);
+        }
+    }
+}
+
+#[test]
+fn a_replacement_cannot_trigger_another_scuttle_in_the_same_task() {
+    let (mut task, mut o) = ship_on_other_planet();
+    task.step(&o);
+    o.flight.pilot.tick += 181;
+    o.flight.pilot.ship_available = false;
+    task.step(&o);
+    assert!(task.telemetry().scuttled_tick.is_some());
+    o.flight.pilot.tick += 1;
+    o.flight.pilot.ship_available = true;
+    let action = task.step(&o);
+    assert_eq!(action, FlightIntent::default());
+    assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+    assert_eq!(task.telemetry().scuttle_attempts, 1);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("replacement ship also has no accessible return")
+    );
+}
+
+#[test]
+fn both_host_policies_keep_the_active_recovery_clock_across_a_deliberate_loss() {
+    use engine_common::CombatBreakSettings;
+    use spacewars_ai::mission_pilot::MaterialMissionPilot;
+    let (_, mut o) = ship_on_other_planet();
+    let context = BrainReset {
+        actor: o.flight.pilot.owner,
+        episode_seed: 42,
+    };
+    let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut mission_o = state.mission_observation(0, None);
+    let mut mission = MaterialMissionPilot::new(context, CombatBreakSettings::default());
+    let mut sortie = RulePilotV3::new(context);
+    // A prior loss starts the standalone host's recovery. Both hosts then
+    // encounter the same unavailable return and ordinary scuttle observation.
+    o.flight.pilot.recovery.as_mut().unwrap().ships_lost = 1;
+    mission_o.local.combat.recovery = o.clone();
+    mission.intent(&mission_o);
+    sortie.intent(&o);
+    let started = o.flight.pilot.tick;
+    for tick in [started + 181, started + 182] {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.ship_available = false;
+        o.flight.pilot.recovery.as_mut().unwrap().ships_lost = 2;
+        mission_o.local.combat.recovery = o.clone();
+        mission.intent(&mission_o);
+        sortie.intent(&o);
+        for telemetry in [
+            mission.telemetry().recovery.as_ref().unwrap(),
+            sortie.telemetry().recovery.as_ref().unwrap(),
+        ] {
+            assert_eq!(telemetry.started_tick, Some(started));
+            assert_eq!(telemetry.scuttle_attempts, 1);
+            assert_eq!(telemetry.scuttled_tick, Some(started + 181));
+        }
+    }
+}
+
+#[test]
+fn physical_return_boards_and_departs_with_replacement_only_when_needed() {
+    use scenario_spacewars::surface_sortie::return_trial::ReturnTrial;
+    for (seat, mirror, bearing, trial) in [
+        (0, false, 0.0, ReturnTrial::Reachable),
+        (
+            1,
+            true,
+            std::f32::consts::FRAC_PI_2,
+            ReturnTrial::TippedShip,
+        ),
+        (0, true, 0.0, ReturnTrial::OtherPlanet),
+    ] {
+        let owner = PlayerId::from_index(seat).unwrap();
+        let mut state =
+            SurfaceSortieScenario::init_material_return_trial(42, seat, mirror, bearing, trial);
+        let initial = state.terrain_diagnostics().occupied_cells;
+        let mut task = RecoverShipTask::new(BrainReset {
+            actor: owner,
+            episode_seed: 42,
+        });
+        let mut claimed = false;
+        let mut departed = false;
+        for _ in 0..90 * 60 {
+            let o = state.recovery_task_observation(seat, task.site_request());
+            let p = &o.flight.pilot;
+            claimed |= p
+                .planet
+                .claim
+                .as_ref()
+                .is_some_and(|c| c.owner == Some(owner));
+            let mut intent = if claimed {
+                task.step(&o)
+            } else {
+                FlightIntent::default()
+            };
+            if task.telemetry().status == TaskStatus::Succeeded {
+                assert!(matches!(p.location, PilotLocation::Aboard(_)));
+                if p.ship.position.distance_to(p.planet.motion.position) > p.planet.radius + 70.0 {
+                    departed = true;
+                    break;
+                }
+                intent.controls.primary_held = true;
+            }
+            SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+        }
+        assert!(departed, "{trial:?}: {:?}", task.telemetry());
+        let r = state.observation(seat).recovery.unwrap();
+        let expected = u64::from(trial != ReturnTrial::Reachable);
+        assert_eq!(
+            (r.ships_lost, r.pod_ejections, r.rebuilds),
+            (expected, 0, expected)
+        );
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty());
+        assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+    }
+}

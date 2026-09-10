@@ -158,9 +158,7 @@ impl GroundNavigationTask {
                     ))
                 })
                 .min_by(|a, b| a.1.total_cmp(&b.1));
-            let Some((position, _)) = choice else {
-                return None;
-            };
+            let (position, _) = choice?;
             self.claim_relocation.site = Some((p.planet.revision, position));
             self.claim_relocation.tried.push(position);
             self.telemetry.claim_target = Some(position);

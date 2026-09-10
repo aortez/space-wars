@@ -1,7 +1,8 @@
 # Surface gameplay and destructible terrain integration
 
-Latest reliability slice: [pod landing retries](../pod-landing-retries.md) keeps
-recovery moving after a failed approach without bypassing physical access gates.
+Latest reliability slice: [ship return recovery](../ship-return-recovery.md)
+provides a bounded replacement path when the assigned ship cannot be reached
+after capture, using the existing human scuttle and rebuild rules.
 
 The [controlled two-planet mission slice](../two-planet-missions.md)
 adds destination selection, travel, local-task handoffs and replanning on fixed

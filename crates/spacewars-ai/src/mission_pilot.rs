@@ -221,7 +221,10 @@ impl MaterialMissionPilot {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
-        if losses > self.seen_losses
+        let replacing = self.recovery.as_ref().is_some_and(|task| {
+            task.telemetry().goal == crate::recovery_task::RecoveryGoal::Scuttle
+        });
+        if losses > self.seen_losses && !replacing
             || self.recovery.is_none()
                 && (!p.ship_available
                     || p.ship_form != ShipForm::Ship

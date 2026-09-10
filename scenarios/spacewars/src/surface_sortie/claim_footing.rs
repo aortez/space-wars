@@ -65,7 +65,9 @@ impl SurfaceSortieState {
                 let position =
                     node.position + node.position.normalized() * Self::spec().half_height();
                 let distance = position.distance_to(center);
-                (distance >= 1.25 && distance <= CLAIM_SEARCH_RADIUS).then_some(position)
+                (1.25..=CLAIM_SEARCH_RADIUS)
+                    .contains(&distance)
+                    .then_some(position)
             })
             .collect();
         positions.sort_by(|a, b| a.distance_to(center).total_cmp(&b.distance_to(center)));

@@ -4,7 +4,7 @@ use crate::jetpack_crossing::{CrossingTelemetry, JetpackCrossingPilot};
 use engine_core::Vec2;
 use scenario_spacewars::surface_sortie::jetpack::CrossingPlan;
 use scenario_spacewars::surface_sortie::{
-    PilotLocation, SurfaceSortieAction,
+    LandingPhase, PilotLocation, SurfaceSortieAction,
     ground_navigation::{
         GROUND_NEIGHBOR_SPAN, GROUND_SAMPLES, GroundEdgeKind, GroundMap, GroundRouteDiagnostics,
         HATCH_APPROACH_RANGE,
@@ -24,6 +24,13 @@ pub enum GroundDestination {
     Flag,
     Hatch,
     Rebuild { planet: usize, position: Vec2 },
+}
+/// Recoverable return failures, distinct from malformed sensors or route errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShipReturnFailure {
+    OtherPlanet,
+    NoGroundedHatch,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -87,6 +94,7 @@ pub struct GroundTelemetry {
     pub crawl_target: Option<Vec2>,
     pub claim_relocations: u32,
     pub claim_target: Option<Vec2>,
+    pub return_failure: Option<ShipReturnFailure>,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -108,13 +116,14 @@ pub struct GroundNavigationTask {
     crawl_origin: Option<Vec2>,
     crawl_step: Option<(u64, u64, CrawlStep)>,
     claim_relocation: claim::ClaimRelocation,
+    hatch_missing_since: Option<u64>,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v7",
+                policy: "ground_navigation_v8",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -138,6 +147,7 @@ impl GroundNavigationTask {
                 crawl_target: None,
                 claim_relocations: 0,
                 claim_target: None,
+                return_failure: None,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -155,6 +165,7 @@ impl GroundNavigationTask {
             crawl_origin: None,
             crawl_step: None,
             claim_relocation: claim::ClaimRelocation::default(),
+            hatch_missing_since: None,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -169,6 +180,8 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.hatch_missing_since = None;
+        self.telemetry.return_failure = None;
         self.claim_relocation = claim::ClaimRelocation::default();
         self.telemetry.claim_target = None;
         self.telemetry.target = None;
@@ -258,6 +271,30 @@ impl GroundNavigationTask {
             }
             self.settling_after_interrupt = false;
             self.telemetry.last_progress_tick = p.tick;
+        }
+        if self.telemetry.destination == GroundDestination::Hatch
+            && p.landing.phase == LandingPhase::Landed
+            && p.landing.supported_feet == 2
+            && p.landing
+                .planet
+                .is_some_and(|planet| planet != p.planet.index)
+        {
+            // A ground route stays on the actor's retained planet. Finish any
+            // active flight above, then wait for real contact before handoff.
+            self.telemetry.target = None;
+            self.clear_route();
+            if p.supported_planet == Some(p.planet.index) {
+                self.telemetry.return_failure = Some(ShipReturnFailure::OtherPlanet);
+                self.block("assigned ship is landed on another planet");
+            } else if p.tick.saturating_sub(start) > 90 * 60 {
+                self.block("ground traversal exceeded ninety seconds");
+            } else {
+                self.telemetry.goal = GroundGoal::Settle;
+            }
+            return action;
+        }
+        if self.telemetry.destination == GroundDestination::Hatch && p.hatch.is_some() {
+            self.hatch_missing_since = None;
         }
         let mut target = match self.telemetry.destination {
             GroundDestination::Flag => p
@@ -364,8 +401,14 @@ impl GroundNavigationTask {
             } else {
                 GroundGoal::Survey
             };
-            if self.telemetry.destination == GroundDestination::Hatch && p.tick - start > 15 * 60 {
-                self.block("assigned ship has no grounded hatch");
+            if self.telemetry.destination == GroundDestination::Hatch {
+                let since = *self.hatch_missing_since.get_or_insert(p.tick);
+                if p.tick - since > 15 * 60 {
+                    self.telemetry.return_failure = Some(ShipReturnFailure::NoGroundedHatch);
+                    self.block("assigned ship has no grounded hatch");
+                } else if p.tick.saturating_sub(start) > 90 * 60 {
+                    self.block("ground traversal exceeded ninety seconds");
+                }
             }
             return action;
         };

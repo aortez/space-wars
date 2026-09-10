@@ -3,7 +3,7 @@
 use crate::{
     BrainReset,
     flight_pilot::{FlightIntent, FlightTelemetry, RulePilotV2},
-    recovery_task::{RecoverShipTask, RecoveryTelemetry, TaskStatus},
+    recovery_task::{RecoverShipTask, RecoveryGoal, RecoveryTelemetry, TaskStatus},
 };
 use scenario_spacewars::{
     ShipForm,
@@ -87,7 +87,11 @@ impl RulePilotV3 {
             return self.previous_intent;
         }
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
-        if losses > self.seen_losses
+        let replacing = self
+            .task
+            .as_ref()
+            .is_some_and(|task| task.telemetry().goal == RecoveryGoal::Scuttle);
+        if losses > self.seen_losses && !replacing
             || self.task.is_none() && (!p.ship_available || p.ship_form == ShipForm::EscapePod)
         {
             self.task = Some(RecoverShipTask::new(self.context));
