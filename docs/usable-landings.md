@@ -82,8 +82,103 @@ physical capture preparation from the chase, each with its own three-minute
 cap. Outcomes come from real claim, board, departure and hit ticks; timing out
 is not counted as success. Desktop and Pi results are evaluated separately.
 
-Final source identities, paired results, workspace checks and deployment
-verification will be recorded here after validation completes.
+## Results at `7726c09`
+
+All 1,117 workspace tests and nine example tests passed: **1,126 tests**.
+The workspace invocation ignored twenty-six display-dependent tests; all ten
+terrain UI workflows were run explicitly under Xvfb and passed, with their
+eighty-two artifact files archived. Formatting and Clippy passed (existing
+advisories remain outside the changed code). The six frozen navigation and
+twelve strategy episodes matched their baselines.
+
+All **76 final trials** passed physical/material audits, covering **4.53
+simulated hours**, including pursuit preparation. The two preparation timeouts
+below are reported as failures to prepare, not successful pursuits.
+
+| Three-minute result | Desktop before → after | Pi before → after |
+| --- | ---: | ---: |
+| Complete capture/departure routes | 12/13 → 12/13 | 12/13 → 12/13 |
+| Actual weapon contact | 9/13 → 11/13 | 9/13 → 11/13 |
+| Required contact regressions | 7/7 → 7/7 | 7/7 → 7/7 |
+| Additional quiet routes completed | 4/4 → 4/4 | 2/4 → 4/4 |
+
+The separated pursuit trials prepare 12/13 worlds on each platform, and all
+twenty-four prepared trials reach actual weapon contact. Chase times are
+10.68–62.20s desktop and 10.70–66.15s Pi. Reflected seed 42/P1 still needs
+slightly more than the whole-mission three-minute window to make contact;
+its isolated chase succeeds on both platforms.
+
+The diagnostic reproductions show where time was saved:
+
+| Visit | Desktop landing time, before → after | Pi landing time, before → after |
+| --- | ---: | ---: |
+| Seed 0/P2, reflected, planet 2 | 126.97s → 77.72s | 126.82s → 77.80s |
+| Seed 2/P2, planet 0 | 170.83s → 142.53s | 143.38s → 143.58s |
+| Seed 7/P2, unreflected, planet 0 | 94.62s → 66.37s | 95.30s → 66.50s |
+
+These are times since mission start. Arrival times for each compared visit
+are unchanged, so these differences measure landing time rather than a shorter
+journey. The reflected seed 0/P2 visit proceeds through claim, boarding and
+departure at 84.70s desktop and 84.78s Pi, about forty-nine seconds earlier.
+Its complete Pi quiet route now finishes at 136.87s, including the previously
+blocked final exit. The other reflected seed 0 quiet route also completes on Pi.
+
+Some landings take longer after a fresh-site retry. Seed 1/P2's planet 2 visit,
+for example, lands at 95.92s desktop and 96.10s Pi; the earlier baseline landed
+at 76.65s and 82.92s. The final policy preserves the original ship and completes
+all three departures on both platforms. The paired results support an overall
+improvement, not a claim that every touchdown is faster.
+
+Seed 7/P2 without reflection remains the preparation/departure timeout. Its
+inner-planet landing improves by about twenty-eight seconds and retains zero
+sampled solar exposure, but the later itinerary still exceeds the limit.
+Desktop captures the third planet at 177.87s and boards at 177.90s, without
+departing by 180s. Pi is still approaching its third landing. Thus desktop
+reaches ownership of all planets in 13/13 cases, while complete departures and
+prepared pursuits remain 12/13. The limits were not extended to count this as
+completion.
+
+Across the final diagnostic workloads, policy p95 ranges from 0.000250–0.006402ms
+desktop and 0.001148–0.017166ms Pi; sensor p95 ranges from 0.021531–0.970764ms
+and 0.059407–2.095451ms respectively. These are concurrent headless trials,
+not rendered frame-rate measurements. The additional clearance queries belong
+to sensor time, not policy time.
+
+## Deployment verification
+
+The image uses the same five accepted Yocto layer revisions as the previous
+deployment, pinned in the archived build configuration. The Pi soak runner
+uses a frozen copy of the installed Pi's `libm`, with its hash recorded. An
+initial runner linked through a mutable build-directory symlink failed to
+start; that rejected binary and launch logs are archived separately from the
+final trials. No failed image or incompatible runner was installed as the game.
+
+The archived image contains the expected `material_mission_v6`,
+`tactical_sortie_v9` and `material_landing_v3` identities. OTA deployment to
+`spacewars.local` completed on slot B (`/dev/sda3`). The installed client hash
+matches the extracted image binary:
+
+```text
+source: 7726c0907d2aecaad9d87a88e19a27a8dc328d0f
+client: 20d6f02af1b691d7963d18872e1cb1b11faa50ec9d0206fb6aea2c91e9e545ac
+image:  e0d492d039162065afead31b4dd6383e61277f9cfeadc6091879070f69aead67
+```
+
+A three-minute live two-bot run used Mixed asteroid arrivals every three
+seconds, the raster renderer and 2× raster scale. Captures at 30, 75, 120 and
+180 seconds recorded 40.6–51.4 FPS and 59.3–60.1 updates per second, with zero
+service restarts. The screenshots show real landing, exit, claiming, boarding
+and travel to the next planet. They also show a later ground-route block after
+capture at 120s and 180s, so this run is evidence of stable operation rather
+than complete bot navigation under pressure. Those later route/return failures
+remain work alongside objective-aware landing selection.
+
+After the live run, a fresh human-P1 versus mission-bot-P2 material arena was
+restarted and paused, with Mixed asteroid arrivals every eight seconds.
+Independent installed-binary, service and UI-state checks confirmed this
+playtest-ready state. All Pi trial reports, traces, frame recordings and
+runners were archived before reboot; the final archive was checked against
+the local reports, traces and binary hashes.
 
 Artifacts, including diagnostic baseline replays and rejected candidates:
 
