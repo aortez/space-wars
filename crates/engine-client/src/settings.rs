@@ -312,6 +312,7 @@ mod tests {
                 color_cycle: true,
                 meltdown: false,
                 duck: false,
+                marquee: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -329,6 +330,23 @@ mod tests {
         assert!(!settings.clock.events.color_cycle);
         assert!(settings.clock.events.meltdown);
         assert!(settings.clock.events.duck);
+    }
+
+    #[test]
+    fn pre_marquee_settings_keep_existing_switches_and_recipes_round_trip() {
+        let mut settings:Settings=toml::from_str("[clock]\nevent_profile='off'\n[clock.events]\nfalling=false\ncolor_cycle=true\nmeltdown=false\nduck=false\n").unwrap();
+        assert!(settings.clock.events.marquee);
+        assert!(!settings.clock.events.duck);
+        assert!(!settings.clock.events.falling);
+        assert_eq!(
+            settings.clock.marquee_preset,
+            engine_common::ClockMarqueePreset::ClockWave
+        );
+        for preset in engine_common::ClockMarqueePreset::ALL {
+            settings.clock.marquee_preset = preset;
+            let decoded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(decoded.clock, settings.clock);
+        }
     }
 
     #[test]

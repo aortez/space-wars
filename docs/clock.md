@@ -8,7 +8,7 @@ reads the system clock. Configure the device's timezone/NTP as described in
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, and **Duck** switches select the automatic event mix;
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, and **Marquee** switches select the automatic event mix;
 all default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
 
@@ -33,6 +33,7 @@ the Off profile still disables every automatic event.
 | `color-cycle` | Appearance only | 6 s | 15 s |
 | `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
 | `duck` | Temporary floor course and a physical runner | 10 s envelope, including doors/reset | 30 s |
+| `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 
 Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -100,7 +101,7 @@ desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
-**Falling/Color Cycle/Meltdown/Duck automatic switches**. Changes apply at the next host tick,
+**Falling/Color Cycle/Meltdown/Duck/Marquee automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
 even while paused, and are saved for restart/relaunch. A save failure is shown
 on the page; settings then remain active for the current session. Setting
 changes do not interrupt the current animation or reset its physics, event ID,
@@ -149,7 +150,61 @@ settings/launcher control, catalog entry, and an enum implementation when adding
 an event; keep shared lifecycle tests and add event-specific tests. Finishing or
 resizing drops the active event and restores the latest face and base palette.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
-no concurrent composition yet: affected-area metadata does not permit overlap.
+no concurrent scheduler events: affected-area metadata does not permit overlap.
+Marquee composes presentation passes *inside* one event; it does not opt out of
+the shared scheduling or cleanup rules.
+
+### Composed Marquee effects
+
+Choose **Recipe** in the launcher or live Clock Controls, select **Marquee** as
+the Preview Event, then **Preview & Resume**. The default is **Clock wave**.
+Explicit previews work even with the Marquee switch or profile Off.
+
+| Recipe | Content | Motion | Lighting |
+| --- | --- | --- | --- |
+| Clock chase | Live time | Anchored | Clockwise digit-outline chase, separate middle-bar pass |
+| Clock wave | Live time | Whole digits bob along a wave | Color cycle |
+| Clock spin | Live time | Entire face rotates around its center | Color cycle |
+| Digit spin | Live time | Each digit rotates about its own pivot | Moving highlight |
+| Text scroll | SPACE WARS | Right-to-left traversal | Color cycle |
+| Text ribbon | SPACE WARS | Scrolling plus a per-cell ribbon wave | Moving highlight |
+| Text spin | SPACE WARS | Each letter rotates about its own pivot | Moving highlight |
+
+The active recipe is captured when the event starts. A setting change is saved
+for the next event; Preview deliberately replaces the current one. Each event
+lasts 720 fixed ticks (12 seconds). The ordinary face crossfades out/in over
+45 ticks at either end. Pause freezes playback. Time continues to be authoritative:
+clock recipes rebuild their lit cells from the latest supplied reading, including
+the colon and AM/PM, without advancing playback. Text never replaces the actual
+time state. Completion, resize, restart, and preview replacement restore the
+latest face and drop temporary content.
+
+The Clock-local `presentation/` module separates content generation from effects.
+Cells have immutable positions, glyph pivots, and stable lighting-route positions.
+Seven-segment clock content and the code-native 5×7 font feed the same recipe
+sampler. The font accepts up to **32 ASCII bytes / 1,120 cells**, supports letters,
+digits and basic punctuation, folds lowercase, and rejects empty, oversized, or
+unsupported text. Built-in recipes currently use **SPACE WARS**; arbitrary-message
+entry is not yet exposed in the UI or CLI.
+
+A recipe has a fixed set of optional passes: wave in content space, pivoted
+rotation, fit/scroll placement, then rectangular clipping. Lighting samples the
+original coordinates, so a highlight moves with the content rather than becoming
+accidentally screen-anchored. A glyph wave translates the letter; a cell wave
+deforms its corners like a ribbon. Whole-content and per-glyph rotation use
+different pivots. Rotations are 2D. Color Cycle now shares the palette sampler.
+
+Each frame is sampled from original content and elapsed ticks, never integrated
+from the previous rendered pose. Content buffers are reused when time changes;
+clipping uses an eight-vertex stack buffer. Only visible cells become ordinary
+filled `RenderPolygon`s in the existing draw list. There are no new shaders,
+textures, physics objects, or growing trails. Both render paths consume the same
+geometry. Raster polygon fill uses one span per row so translucent cells do not
+double-blend along internal triangulation edges.
+
+The initial recipe catalog is intentionally small and typed. New messages or
+recipes can reuse these passes; a general scene graph, 3D projection, arbitrary
+user-authored effect graphs, and concurrent event scheduling are outside this slice.
 
 This slice does not implement time-change triggers or flashlights. Those can
 add bounded event-local representations
@@ -182,6 +237,10 @@ spacewars-cli clock trigger duck --json
 spacewars-cli clock wait --event duck --phase running --event-id 4 --min-phase-tick 140
 spacewars-cli screenshot /tmp/clock-duck.png
 spacewars-cli clock wait --event duck --phase resetting --event-id 4 --min-phase-tick 5
+spacewars-cli clock wait --lifecycle idle --event-id 4
+spacewars-cli clock trigger marquee --json
+spacewars-cli clock wait --event marquee --phase presenting --event-id 5 --min-phase-tick 180
+spacewars-cli screenshot /tmp/clock-marquee.png
 ```
 
 Use the event ID returned by `trigger`, not necessarily `1`. For robust remote
@@ -189,10 +248,10 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **5** and reports scenario-instance revision,
+`clock state` uses schema version **6** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
-`exiting`, `resetting`), pause state, profile, schedule, current
+`exiting`, `resetting`, `presenting`), pause state, profile, schedule, current
 reading/target digits, palette RGB, physics counts, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
@@ -210,7 +269,13 @@ render world units, grounded state, jumps, cleared/total obstacles, door opennes
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only
 during Duck; position is null before spawn and after despawn. Outcomes remain
 available during reset, not as a persistent event history.
-Use matching client/CLI builds: schema 4 and older requests are rejected.
+The optional `marquee` object reports the active recipe, content, cell/group
+counts, progress in thousandths, scrolling/waving flags, rotation target and
+lighting mode. `settings.marquee_preset` is the saved choice for the next event;
+it can differ from the currently active recipe. Outside Marquee its diagnostics
+are null. Use matching client/CLI builds: schema 5 and older requests are rejected.
+The internal Clock action payload is version 2; event ordinals 0–3 are unchanged
+and Marquee is 4. Configure adds the fifth switch bit and a validated recipe byte.
 
 `clock trigger` fetches state and guards the mutation with both instance revision
 and event ID; `--expect-scenario-revision` and `--expect-event-id` override those
@@ -220,8 +285,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 5, `event`
-(`falling`, `color-cycle`, `meltdown`, or `duck`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 6, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, or `marquee`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -300,6 +365,40 @@ SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-captures \
 
 **Duck has not been deployed or tested on the Pi.** Ask before deploying; another
 task may be testing there.
+
+### Marquee local verification
+
+The workspace/all-target suite passed **888 tests** (17 display-dependent
+workflows ignored). All **seven Clock UI workflows** passed explicitly on the
+local X display. Strict Clippy passed for Clock/common/control/CLI; client
+Clippy completed with existing unrelated warnings. No device deployment was made.
+
+```sh
+cargo test --locked -p scenario-clock presentation
+SPACEWARS_CLOCK_ARTIFACTS=target/clock-marquee-captures \
+  cargo test --locked -p engine-client marquee_recipes_render -- --nocapture
+SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 \
+  cargo test --locked -p engine-client --test ui_control_functional \
+  clock::marquee_recipes -- --ignored --test-threads=1
+cargo run --locked --release -p scenario-clock --example marquee_benchmark
+```
+
+Core checks cover every recipe at four aspect ratios, immutable physical/time
+state, stable chase paths, font limits, pivot semantics, clipping, deterministic
+sampling, pause, changed settings/readings, and exact cleanup. Raster captures
+cover all seven recipes at 800×480, 480×800 and 1280×720, check visible content,
+and compare draw lists with the vector path. The real-client workflow verifies
+launcher/live controls, controller-style navigation, disabled preview, pause,
+latched active recipes, settings persistence, completion, restart and relaunch.
+The release workload measures simulation and draw-list construction only, not
+rasterization/presentation or device FPS. No timing thresholds are unit-test gates.
+
+On this desktop with Rust 1.89, the 252-event run (181,440 ticks / 3,024 simulated
+seconds) had per-recipe draw-list p95 values of **0.0060–0.0128 ms**, with a maximum
+of 250 draw primitives across the built-in recipes and sizes. These are local
+CPU construction costs, not Pi or end-to-end latency measurements.
+
+**Marquee has not been deployed or tested on the Pi.** Ask before deploying.
 
 ## Device captures
 

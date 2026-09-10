@@ -88,6 +88,9 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "pause.clock.color-cycle" => pause_clock(3, UiAction::Confirm),
         "pause.clock.meltdown" => pause_clock(7, UiAction::Confirm),
         "pause.clock.duck" => pause_clock(8, UiAction::Confirm),
+        "pause.clock.marquee" => pause_clock(9, UiAction::Confirm),
+        "pause.clock.marquee-preset.previous" => pause_clock(10, UiAction::Left),
+        "pause.clock.marquee-preset.next" => pause_clock(10, UiAction::Right),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -131,6 +134,8 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.spacewars.player-health" | "launcher.settings.clock.color-cycle" => 5,
         "launcher.settings.spacewars.player-2" | "launcher.settings.clock.meltdown" => 6,
         "launcher.settings.clock.duck" => 7,
+        "launcher.settings.clock.marquee" => 8,
+        "launcher.settings.clock.marquee-preset" => 9,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

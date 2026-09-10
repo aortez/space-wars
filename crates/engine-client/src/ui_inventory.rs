@@ -70,6 +70,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_color_cycle_enabled: bool,
     pub(crate) clock_meltdown_enabled: bool,
     pub(crate) clock_duck_enabled: bool,
+    pub(crate) clock_marquee_enabled: bool,
+    pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -298,9 +300,18 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     context.clock_meltdown_enabled,
                 ),
                 ("launcher.settings.clock.duck", context.clock_duck_enabled),
+                (
+                    "launcher.settings.clock.marquee",
+                    context.clock_marquee_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.marquee-preset",
+                &context.clock_marquee_preset,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -310,6 +321,8 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.color-cycle",
                 "launcher.settings.clock.meltdown",
                 "launcher.settings.clock.duck",
+                "launcher.settings.clock.marquee",
+                "launcher.settings.clock.marquee-preset",
                 "launcher.settings.back",
             ]
         }
@@ -489,6 +502,20 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             "Off"
         },
     ));
+    controls.push(
+        UiControl::new("pause.clock.marquee", "Marquee", true).with_value(
+            if context.clock_marquee_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    push_choice(
+        &mut controls,
+        "pause.clock.marquee-preset",
+        &context.clock_marquee_preset,
+    );
     controls.push(UiControl::new(
         "pause.clock.preview",
         "Preview & Resume",
@@ -509,6 +536,8 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.preview",
                 "pause.clock.meltdown",
                 "pause.clock.duck",
+                "pause.clock.marquee",
+                "pause.clock.marquee-preset",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -555,6 +584,8 @@ mod tests {
             clock_color_cycle_enabled: true,
             clock_meltdown_enabled: true,
             clock_duck_enabled: true,
+            clock_marquee_enabled: true,
+            clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -702,7 +733,7 @@ mod tests {
         let cases = [
             ("spacewars", 16, "launcher.settings.spacewars.player-2"),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 18, "launcher.settings.clock.duck"),
+            ("clock", 22, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -910,7 +941,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 12);
+        assert_eq!(inventory.controls.len(), 15);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

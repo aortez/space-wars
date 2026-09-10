@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 5;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 6;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -40,6 +40,7 @@ pub struct ClockState {
     pub collider_count: usize,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
+    pub marquee: Option<engine_common::ClockMarqueeState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -251,6 +252,7 @@ mod tests {
             collider_count: 0,
             meltdown: None,
             duck: None,
+            marquee: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -340,6 +342,7 @@ mod tests {
             r#"{"schema_version":2,"event":"unknown","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":3,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":4,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
+            r#"{"schema_version":5,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
         ] {
             assert!(ClockTriggerRequest::from_json(json).is_err());
         }
@@ -393,6 +396,36 @@ mod tests {
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
+    }
+
+    #[test]
+    fn marquee_diagnostics_settings_and_named_trigger_round_trip() {
+        for preset in engine_common::ClockMarqueePreset::ALL {
+            let mut state = clock_state();
+            state.settings.marquee_preset = preset;
+            state.event_kind = Some(ClockEventKind::Marquee);
+            state.phase = Some("presenting".into());
+            state.marquee = Some(engine_common::ClockMarqueeState {
+                preset,
+                content: "SPACE WARS".into(),
+                cell_count: 150,
+                group_count: 10,
+                progress_milli: 400,
+                scrolling: true,
+                waving: true,
+                rotation_target: None,
+                lighting: "sweep".into(),
+            });
+            assert_eq!(
+                ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+                state
+            );
+            let request = ClockTriggerRequest::new(&state, ClockEventKind::Marquee);
+            assert_eq!(
+                ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+                request
+            );
+        }
     }
 
     fn after(state: &ClockState) -> ClockStatePredicate {

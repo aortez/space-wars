@@ -26,32 +26,38 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..16 {
-                let settings = ClockSettings {
-                    time_format,
-                    event_profile,
-                    events: ClockEvents {
-                        falling: bits & 1 != 0,
-                        color_cycle: bits & 2 != 0,
-                        meltdown: bits & 4 != 0,
-                        duck: bits & 8 != 0,
-                    },
-                };
-                assert_eq!(
-                    ClockAction::decode(&ClockAction::configure(settings)),
-                    Some(ClockAction::Configure(settings))
-                );
+            for bits in 0..32 {
+                for marquee_preset in ClockMarqueePreset::ALL {
+                    let settings = ClockSettings {
+                        time_format,
+                        event_profile,
+                        marquee_preset,
+                        events: ClockEvents {
+                            falling: bits & 1 != 0,
+                            color_cycle: bits & 2 != 0,
+                            meltdown: bits & 4 != 0,
+                            duck: bits & 8 != 0,
+                            marquee: bits & 16 != 0,
+                        },
+                    };
+                    assert_eq!(
+                        ClockAction::decode(&ClockAction::configure(settings)),
+                        Some(ClockAction::Configure(settings))
+                    );
+                }
             }
         }
     }
     for payload in [
         vec![],
-        vec![1, 0],
+        vec![2, 0],
+        vec![1, 0, 24, 1, 3],
         vec![2, 0, 24, 1, 3],
-        vec![1, 0, 13, 1, 3],
-        vec![1, 0, 24, 3, 3],
-        vec![1, 0, 24, 1, 16],
-        vec![1, 0, 24, 1, 3, 0],
+        vec![2, 0, 13, 1, 3, 0],
+        vec![2, 0, 24, 3, 3, 0],
+        vec![2, 0, 24, 1, 32, 0],
+        vec![2, 0, 24, 1, 3, 7],
+        vec![2, 0, 24, 1, 3, 0, 0],
     ] {
         assert_eq!(
             ClockAction::decode(&Action::scenario(CLOCK_ACTION_CONFIGURE, payload)),
@@ -64,7 +70,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             Some(ClockAction::PreviewEvent(kind))
         );
     }
-    for payload in [vec![1, 0], vec![1, 0, 4], vec![2, 0, 0], vec![1, 0, 0, 0]] {
+    for payload in [vec![2, 0], vec![2, 0, 5], vec![1, 0, 0], vec![2, 0, 0, 0]] {
         assert_eq!(
             ClockAction::decode(&Action::scenario(CLOCK_ACTION_PREVIEW_EVENT, payload)),
             None
@@ -91,7 +97,9 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             color_cycle: false,
             meltdown: false,
             duck: false,
+            marquee: false,
         },
+        marquee_preset: ClockMarqueePreset::default(),
     };
     ClockScenario::step(
         &mut state,
@@ -144,6 +152,9 @@ fn live_cadence_changes_reschedule_only_when_needed_and_preserve_cooldowns() {
     ticks(&mut state, 600);
     settings.event_profile = ClockEventProfile::Demo;
     settings.events.falling = false;
+    settings.events.meltdown = false;
+    settings.events.duck = false;
+    settings.events.marquee = false;
     ClockScenario::step(
         &mut state,
         &[ClockAction::configure(settings)],

@@ -625,6 +625,8 @@ fn show_launcher(
     window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
     window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
+    window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
+    window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -1193,7 +1195,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
-        "clock" => 9,
+        "clock" => 11,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition" => 4,
@@ -1330,6 +1332,20 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 8 {
+        window.set_launcher_clock_marquee_enabled(!window.get_launcher_clock_marquee_enabled());
+        return;
+    }
+    if focus == 9 {
+        let labels = engine_common::ClockMarqueePreset::ALL.map(|preset| preset.label());
+        let next = cycle_label(
+            window.get_launcher_clock_marquee_preset().as_str(),
+            &labels,
+            delta,
+        );
+        window.set_launcher_clock_marquee_preset(next.into());
+        return;
+    }
     if focus == 7 {
         window.set_launcher_clock_duck_enabled(!window.get_launcher_clock_duck_enabled());
         return;
@@ -1857,7 +1873,12 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             color_cycle: window.get_launcher_clock_color_cycle_enabled(),
             meltdown: window.get_launcher_clock_meltdown_enabled(),
             duck: window.get_launcher_clock_duck_enabled(),
+            marquee: window.get_launcher_clock_marquee_enabled(),
         },
+        marquee_preset: engine_common::ClockMarqueePreset::ALL
+            .into_iter()
+            .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
+            .ok_or("Unknown Clock marquee recipe")?,
     })
 }
 
@@ -2645,7 +2666,9 @@ mod tests {
                     color_cycle: true,
                     meltdown: false,
                     duck: false,
+                    marquee: false,
                 },
+                marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

@@ -6,7 +6,7 @@ use crate::{SegmentId, digits};
 pub(crate) const CAMERA_HEIGHT: f32 = 480.0;
 pub(crate) const FACE_WIDTH_UNITS: f32 = 30.0;
 const FACE_HEIGHT_UNITS: f32 = 9.0;
-const DIGIT_ORIGINS: [f32; 4] = [0.0, 7.0, 17.0, 24.0];
+pub(crate) const DIGIT_ORIGINS: [f32; 4] = [0.0, 7.0, 17.0, 24.0];
 
 /// The rendered cells and their colliders use the same geometry.
 #[derive(Debug, Clone, Copy)]

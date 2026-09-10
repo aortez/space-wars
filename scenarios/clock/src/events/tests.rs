@@ -11,7 +11,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
     for (kind, definition) in ClockEventKind::ALL.into_iter().zip(EVENT_CATALOG.iter()) {
         assert_eq!(definition.kind, kind);
         assert_eq!(EVENT_CATALOG[kind as usize].kind, kind);
-        assert!(definition.duration_ticks > 0 && definition.duration_ticks <= 10 * 60);
+        assert!(definition.duration_ticks > 0 && definition.duration_ticks <= 12 * 60);
         assert!(definition.cooldown_ticks >= COOLDOWN_TICKS);
     }
 }
@@ -47,6 +47,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             color_cycle: kind == ClockEventKind::ColorCycle,
             meltdown: kind == ClockEventKind::Meltdown,
             duck: kind == ClockEventKind::Duck,
+            marquee: kind == ClockEventKind::Marquee,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -80,6 +81,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 color_cycle: false,
                 meltdown: false,
                 duck: false,
+                marquee: false,
             },
         ),
     ] {

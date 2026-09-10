@@ -56,6 +56,7 @@ fn create(
             time_format: settings.clock.time_format,
             event_profile: settings.clock.event_profile,
             events: settings.clock.events,
+            marquee_preset: settings.clock.marquee_preset,
         },
         seed,
     );
@@ -139,6 +140,7 @@ impl ClientScenario for ClockClientScenario {
             collider_count: self.state.collider_count(),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
+            marquee: self.state.marquee_state(),
             reading: self
                 .state
                 .reading()
@@ -239,6 +241,109 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+    }
+
+    #[test]
+    fn marquee_recipes_render_on_both_backends_at_landscape_and_portrait_sizes() {
+        for viewport in [
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+            Viewport::new(1280.0, 720.0),
+        ] {
+            for preset in engine_common::ClockMarqueePreset::ALL {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: viewport.aspect_ratio(),
+                        marquee_preset: preset,
+                        event_profile: engine_common::ClockEventProfile::Off,
+                        ..ClockConfig::default()
+                    },
+                    42,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::set_reading(
+                        ClockReading::new(8, 24, 0).unwrap(),
+                    )],
+                    Duration::ZERO,
+                );
+                let normal = ClockScenario::render_frame(&state);
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::preview_event(
+                        engine_common::ClockEventKind::Marquee,
+                    )],
+                    Duration::ZERO,
+                );
+                let mut scenario = ClockClientScenario {
+                    state,
+                    last_emitted_reading: Cell::new(None),
+                };
+                let mut renderer = crate::raster::RasterRenderer::new();
+                let mut previous_frame = None;
+                for tick in 0..=scenario_clock::MARQUEE_TICKS {
+                    if tick > 0 {
+                        scenario.step(&[], Duration::from_nanos(16_666_667));
+                    }
+                    if ![0, 180, 360, 600, scenario_clock::MARQUEE_TICKS].contains(&tick) {
+                        continue;
+                    }
+                    let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                    assert_eq!(
+                        frames,
+                        scenario.render_frames(RenderBackend::Vector, viewport)
+                    );
+                    let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                        &frames,
+                        viewport,
+                        scenario.frame_layout(),
+                    );
+                    assert!(!presentation.main_primitives.is_empty());
+                    let image = renderer.image_from_frames_with_layout(
+                        &frames,
+                        viewport,
+                        scenario.frame_layout(),
+                        crate::raster::RasterOptions::default(),
+                    );
+                    let pixels = image.to_rgb8().unwrap();
+                    if tick == 0 || tick == scenario_clock::MARQUEE_TICKS {
+                        assert_eq!(frames[0], normal);
+                    } else {
+                        let lit = pixels
+                            .as_slice()
+                            .iter()
+                            .filter(|p| p.r > 140 || p.g > 140)
+                            .count();
+                        assert!(
+                            lit > 100,
+                            "missing content: {preset:?}, tick={tick}, {viewport:?}"
+                        );
+                        assert_ne!(frames[0], normal);
+                        if let Some(previous) = &previous_frame {
+                            assert_ne!(&frames[0], previous);
+                        }
+                        previous_frame = Some(frames[0].clone());
+                    }
+                    if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                        let directory = std::path::PathBuf::from(directory);
+                        std::fs::create_dir_all(&directory).unwrap();
+                        let file = std::fs::File::create(directory.join(format!(
+                            "marquee-{}-{tick}-{}x{}.png",
+                            preset as u8, viewport.width, viewport.height
+                        )))
+                        .unwrap();
+                        let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                        encoder.set_color(png::ColorType::Rgb);
+                        encoder.set_depth(png::BitDepth::Eight);
+                        encoder
+                            .write_header()
+                            .unwrap()
+                            .write_image_data(pixels.as_bytes())
+                            .unwrap();
+                    }
+                }
+            }
+        }
     }
 
     #[test]

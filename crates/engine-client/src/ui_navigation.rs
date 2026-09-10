@@ -53,13 +53,13 @@ pub(crate) fn moved_ingame_selection(
 
 pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
     // Keep existing control indices stable: the event row is [2, 3, 7, 8],
-    // followed by preview choice 4 and the [5, 6] action row.
-    let current = current.clamp(0, 8) as usize;
+    // followed by preview 4, Marquee toggle/recipe [9, 10], actions [5, 6].
+    let current = current.clamp(0, 10) as usize;
     match action {
-        UiAction::Up => [5, 0, 1, 1, 2, 4, 4, 1, 1][current],
-        UiAction::Down => [1, 2, 4, 4, 5, 0, 0, 4, 4][current],
-        UiAction::Left => [0, 1, 8, 2, 4, 6, 5, 3, 7][current],
-        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 8, 2][current],
+        UiAction::Up => [5, 0, 1, 1, 2, 9, 10, 1, 1, 4, 4][current],
+        UiAction::Down => [1, 2, 4, 4, 9, 0, 0, 4, 4, 5, 6][current],
+        UiAction::Left => [0, 1, 8, 2, 4, 6, 5, 3, 7, 10, 10][current],
+        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 8, 2, 10, 10][current],
         _ => current as i32,
     }
 }
@@ -88,6 +88,10 @@ mod tests {
         assert_eq!(moved_clock_selection(8, UiAction::Up), 1);
         assert_eq!(moved_clock_selection(7, UiAction::Down), 4);
         assert_eq!(moved_clock_selection(7, UiAction::Up), 1);
+        assert_eq!(moved_clock_selection(4, UiAction::Down), 9);
+        assert_eq!(moved_clock_selection(9, UiAction::Right), 10);
+        assert_eq!(moved_clock_selection(10, UiAction::Down), 6);
+        assert_eq!(moved_clock_selection(6, UiAction::Up), 10);
     }
 
     #[test]

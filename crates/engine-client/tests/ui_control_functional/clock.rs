@@ -3,6 +3,112 @@ use spacewars_control::{ClockEventKind, ClockState, ClockStatePredicate, ClockTr
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
+    use engine_common::ClockMarqueePreset;
+    run_functional_test("clock-marquee", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let mut state = harness.activate_guarded("launcher.settings", &state);
+        state = harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        state = harness.activate_guarded("launcher.settings.clock.marquee.next", &state);
+        for _ in 0..4 {
+            state = harness.activate_guarded("launcher.settings.clock.marquee-preset.next", &state);
+        }
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.marquee-preset.next"),
+            Some("Text ribbon")
+        );
+        harness.capture_screenshot("clock-marquee-launcher.png");
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        assert!(!initial.settings.events.marquee);
+        assert_eq!(
+            initial.settings.marquee_preset,
+            ClockMarqueePreset::TextRibbon
+        );
+        harness.clock_trigger_event(&initial, ClockEventKind::Marquee);
+        let running = harness.clock_wait(&initial, "presenting", 1, 180);
+        assert_eq!(running.event_kind, Some(ClockEventKind::Marquee));
+        assert_eq!((running.body_count, running.collider_count), (0, 0));
+        let marquee = running.marquee.unwrap();
+        assert!(marquee.scrolling && marquee.waving);
+        assert_eq!(marquee.content, "SPACE WARS");
+        harness.capture_screenshot("clock-marquee-ribbon.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        assert_eq!(harness.clock_state().marquee, paused.marquee);
+        // D-pad reaches Marquee and its recipe without triggering gameplay.
+        for _ in 0..4 {
+            page = harness.press_guarded(UiAction::Down, &page);
+        }
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.marquee")
+        );
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.marquee-preset")
+        );
+        page = harness.change_clock_setting("pause.clock.marquee-preset.next", "Text spin", &page);
+        let configured = harness.clock_state();
+        assert_eq!(
+            configured.marquee.unwrap().preset,
+            ClockMarqueePreset::TextRibbon
+        );
+        assert_eq!(
+            configured.settings.marquee_preset,
+            ClockMarqueePreset::TextSpin
+        );
+        assert_eq!(configured.phase_tick, paused.phase_tick);
+        for _ in 0..4 {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Marquee")
+        );
+        harness.capture_screenshot("clock-marquee-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let spinning = harness.clock_wait(&initial, "presenting", 2, 150);
+        assert_eq!(
+            spinning.marquee.unwrap().preset,
+            ClockMarqueePreset::TextSpin
+        );
+        harness.capture_screenshot("clock-marquee-spin.png");
+        let idle = harness.clock_wait(&initial, "idle", 2, 0);
+        assert!(idle.marquee.is_none());
+        assert_eq!(idle.next_event_tick, None);
+        assert_eq!((idle.body_count, idle.collider_count), (0, 0));
+        harness.capture_screenshot("clock-marquee-recovered.png");
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_eq!(restarted.settings, configured.settings);
+        assert!(restarted.marquee.is_none());
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        assert_eq!(harness.clock_state().settings, configured.settings);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_relaunch() {
     run_functional_test("clock-live-controls", |harness| {
         let state = harness.wait_until_ready();
@@ -23,6 +129,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         let configured = harness.clock_state();
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -303,7 +410,11 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             } else {
                 assert!(matches!(
                     active.event_kind,
-                    Some(ClockEventKind::ColorCycle | ClockEventKind::Meltdown)
+                    Some(
+                        ClockEventKind::ColorCycle
+                            | ClockEventKind::Meltdown
+                            | ClockEventKind::Marquee
+                    )
                 ));
                 assert_eq!((active.body_count, active.collider_count), (0, 0));
             }
@@ -329,6 +440,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
+            "launcher.settings.clock.marquee.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -404,6 +516,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
+            "launcher.settings.clock.marquee.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
         }

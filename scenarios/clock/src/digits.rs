@@ -170,7 +170,7 @@ pub fn apply_snapshot(segments: &mut [SegmentState], snapshot: DisplaySnapshot) 
     }
 }
 
-const fn digit_mask(digit: u8) -> u8 {
+pub(crate) const fn digit_mask(digit: u8) -> u8 {
     use SegmentKind::{Bottom, LowerLeft, LowerRight, Middle, Top, UpperLeft, UpperRight};
 
     match digit {

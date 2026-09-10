@@ -122,6 +122,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     adjusted.set(None);
     click(&window, 649.0, 110.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
+    click(&window, 175.0, 334.0);
+    assert_eq!(adjusted.get(), Some((9, 1)));
+    click(&window, 649.0, 334.0);
+    assert_eq!(adjusted.get(), Some((10, 1)));
     // The extra launcher row must not overlap Back/Start at 800×480.
     window.set_ingame_menu_visible(false);
     window.set_launcher_visible(true);
@@ -135,7 +139,13 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 728.0, 324.0);
     assert!(!window.get_launcher_clock_duck_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 7);
-    click(&window, 100.0, 384.0);
+    click(&window, 372.0, 376.0);
+    assert!(!window.get_launcher_clock_marquee_enabled());
+    assert_eq!(window.get_launcher_settings_focus_index(), 8);
+    click(&window, 728.0, 376.0);
+    assert_eq!(window.get_launcher_clock_marquee_preset(), "Clock spin");
+    assert_eq!(window.get_launcher_settings_focus_index(), 9);
+    click(&window, 100.0, 428.0);
     assert!(!window.get_launcher_settings_visible());
 }
 

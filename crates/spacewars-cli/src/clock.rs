@@ -19,7 +19,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown or duck.
+        /// Event ID: falling, color-cycle, meltdown, duck or marquee.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -39,7 +39,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -62,7 +62,7 @@ fn parse_event(value: &str) -> Result<ClockEventKind, String> {
         .into_iter()
         .find(|kind| kind.as_str() == value)
         .ok_or_else(|| {
-            format!("Unknown Clock event {value:?}; choose falling, color-cycle, meltdown or duck")
+            format!("Unknown Clock event {value:?}; choose falling, color-cycle, meltdown, duck or marquee")
         })
 }
 
@@ -224,6 +224,20 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 duck.obstacle_count,
                 duck.grounded,
                 duck.outcome
+            );
+        }
+        if let Some(marquee) = &state.marquee {
+            println!(
+                "marquee: {} content={:?} cells={} groups={} progress={:.1}% scroll={} wave={} rotation={} lighting={}",
+                marquee.preset.label(),
+                marquee.content,
+                marquee.cell_count,
+                marquee.group_count,
+                marquee.progress_milli as f32 / 10.0,
+                marquee.scrolling,
+                marquee.waving,
+                marquee.rotation_target.as_deref().unwrap_or("none"),
+                marquee.lighting
             );
         }
     }
