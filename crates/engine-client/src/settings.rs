@@ -260,6 +260,55 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn clock_message_defaults_migrates_and_round_trips_without_resetting_other_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(
+            &path,
+            "[clock]\nmarquee_preset = \"text-ribbon\"\n[clock.events]\nmarquee = false\n",
+        )
+        .unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.settings.clock.marquee_message.as_str(), "SPACE WARS");
+        assert_eq!(
+            loaded.settings.clock.marquee_preset,
+            engine_common::ClockMarqueePreset::TextRibbon
+        );
+        assert!(!loaded.settings.clock.events.marquee);
+        loaded.settings.clock.marquee_message = "Hi, it's 12:34!".parse().unwrap();
+        save_settings(&loaded.settings, &path).unwrap();
+        let reloaded = load_settings(&path).unwrap();
+        assert_eq!(reloaded.settings.clock, loaded.settings.clock);
+        assert_eq!(reloaded.status, LoadStatus::Existing);
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("marquee_message = \"HI, IT'S 12:34!\"")
+        );
+    }
+
+    #[test]
+    fn malformed_clock_message_is_backed_up_not_silently_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        for text in ["", "   ", "é", "A_B", &"A".repeat(33)] {
+            let original = format!("[clock]\nmarquee_message = {text:?}\n");
+            fs::write(&path, &original).unwrap();
+            let loaded = load_settings(&path).unwrap();
+            let LoadStatus::RecoveredMalformed {
+                backup_path,
+                reason,
+            } = loaded.status
+            else {
+                panic!()
+            };
+            assert!(reason.contains("Clock message"));
+            assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
+            assert_eq!(loaded.settings.clock.marquee_message.as_str(), "SPACE WARS");
+        }
+    }
+
+    #[test]
     fn previous_settings_default_to_one_expedition_player_and_both_counts_round_trip() {
         use engine_common::SurfaceExpeditionPlayers;
 

@@ -32,6 +32,7 @@ The local launcher currently has twelve entries across eight scenario families:
   using one dynamic body and guaranteed arena cleanup.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
+  Save custom text through `clock message` in the CLI or the Clock settings file.
   **Pause → Clock Controls** (or the
   on-face touch button) changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for

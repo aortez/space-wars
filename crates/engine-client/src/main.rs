@@ -627,6 +627,7 @@ fn show_launcher(
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
+    window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -1879,6 +1880,11 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             .into_iter()
             .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
             .ok_or("Unknown Clock marquee recipe")?,
+        marquee_message: window
+            .get_launcher_clock_marquee_message()
+            .as_str()
+            .parse()
+            .map_err(|error: engine_common::ClockMessageError| error.to_string())?,
     })
 }
 
@@ -2669,6 +2675,7 @@ mod tests {
                     marquee: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
+                marquee_message: "CUSTOM TEXT".parse().unwrap(),
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

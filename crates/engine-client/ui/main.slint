@@ -308,6 +308,8 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <string> launcher-clock-marquee-preset: "Clock wave";
+    // Settings/CLI only for now; retained when other menu settings are saved.
+    in-out property <string> launcher-clock-marquee-message: "SPACE WARS";
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";

@@ -92,6 +92,17 @@ polygons blend each pixel once and respect their viewport clip. Clock's live
 control page is a conditional Slint item tree, keeping its initialization out
 of the large root constructor and within ordinary debug-test thread stack limits.
 
+The same Marquee workflow changes its message through the guarded public API:
+the current ribbon keeps its original text, a subsequent letter-spin preview
+uses the new text, other menu changes retain it, and restart/relaunch and the
+saved file agree. A separate message workflow rejects invalid text, stale
+instance/message guards, unpaused and inactive Clock edits. It forces a settings
+save failure with an owned directory at the test's destination, verifies the
+applied-but-unsaved error, restores the path, and retries the same value to
+verify a real successful save. Unit tests cover settings migration/recovery,
+CLI validation, compact action bounds, and agreement between the shared text
+validator and every ASCII entry in the bitmap font.
+
 Spaceling Lab's workflow selects the scenario, renders it through both vector and
 raster paths, and verifies pause, restart, return, and relaunch with fresh
 scenario revisions. It retains gameplay screenshots when artifact retention is

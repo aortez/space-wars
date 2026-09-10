@@ -10,8 +10,10 @@ use serde::{
     de::{IgnoredAny, MapAccess, SeqAccess, Visitor},
 };
 
+mod clock_message;
 pub mod render;
 
+pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
 pub use render::*;
 
 pub const DEFAULT_CONTROL_SOCKET: &str = "/tmp/spacewars-control.sock";
@@ -221,6 +223,7 @@ pub struct ClockSettings {
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,
+    pub marquee_message: ClockMarqueeMessage,
 }
 
 /// Bounded recipes, not separate scheduler events. The choice is captured when

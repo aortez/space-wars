@@ -24,6 +24,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_duck_enabled(settings.events.duck);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
+    window.set_launcher_clock_marquee_message(settings.marquee_message.as_str().into());
 }
 
 pub(crate) fn install(

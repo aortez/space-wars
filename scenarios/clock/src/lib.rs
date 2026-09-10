@@ -19,8 +19,9 @@ pub use digits::{
 };
 
 use engine_common::{
-    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockMarqueePreset, ClockSettings,
-    ClockTimeFormat, Observation, RenderFrame, Scenario, StepResult, TickModel,
+    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockMarqueeMessage,
+    ClockMarqueePreset, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
+    StepResult, TickModel,
 };
 pub use events::duck::DUCK_TICKS;
 pub use events::marquee::MARQUEE_TICKS;
@@ -32,7 +33,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 2;
+pub const CLOCK_ACTION_VERSION: u16 = 3;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -42,6 +43,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
+const MAX_CONFIGURE_BYTES: usize = 6 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -104,6 +106,7 @@ impl ClockAction {
                 | (u8::from(settings.events.marquee) << 4),
         );
         payload.push(settings.marquee_preset as u8);
+        payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
 
@@ -146,7 +149,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 6) if payload[4] <= 31 => {
+            (CLOCK_ACTION_CONFIGURE, 7..=MAX_CONFIGURE_BYTES) if payload[4] <= 31 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -167,6 +170,7 @@ impl ClockAction {
                         marquee: payload[4] & 16 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
+                    marquee_message: std::str::from_utf8(&payload[6..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -181,6 +185,7 @@ pub struct ClockConfig {
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,
+    pub marquee_message: ClockMarqueeMessage,
 }
 
 impl Default for ClockConfig {
@@ -191,6 +196,7 @@ impl Default for ClockConfig {
             event_profile: ClockEventProfile::default(),
             events: ClockEvents::default(),
             marquee_preset: ClockMarqueePreset::default(),
+            marquee_message: ClockMarqueeMessage::default(),
         }
     }
 }
@@ -203,6 +209,7 @@ impl ClockConfig {
             event_profile: self.event_profile,
             events: self.events,
             marquee_preset: self.marquee_preset,
+            marquee_message: self.marquee_message,
         }
     }
 }
@@ -223,6 +230,7 @@ impl ClockState {
             event_profile: self.config.event_profile,
             events: self.config.events,
             marquee_preset: self.config.marquee_preset,
+            marquee_message: self.config.marquee_message,
         }
     }
 
@@ -233,6 +241,7 @@ impl ClockState {
         self.config.event_profile = settings.event_profile;
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
+        self.config.marquee_message = settings.marquee_message;
         if let Some(reading) = self.reading {
             self.apply_reading(reading);
         }
@@ -368,6 +377,7 @@ impl ClockState {
             },
             seed,
             self.config.marquee_preset,
+            self.config.marquee_message,
         ));
     }
 

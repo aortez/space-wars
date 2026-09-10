@@ -166,11 +166,11 @@ Explicit previews work even with the Marquee switch or profile Off.
 | Clock wave | Live time | Whole digits bob along a wave | Color cycle |
 | Clock spin | Live time | Entire face rotates around its center | Color cycle |
 | Digit spin | Live time | Each digit rotates about its own pivot | Moving highlight |
-| Text scroll | SPACE WARS | Right-to-left traversal | Color cycle |
-| Text ribbon | SPACE WARS | Scrolling plus a per-cell ribbon wave | Moving highlight |
-| Text spin | SPACE WARS | Each letter rotates about its own pivot | Moving highlight |
+| Text scroll | Saved message | Right-to-left traversal | Color cycle |
+| Text ribbon | Saved message | Scrolling plus a per-cell ribbon wave | Moving highlight |
+| Text spin | Saved message | Each letter rotates about its own pivot | Moving highlight |
 
-The active recipe is captured when the event starts. A setting change is saved
+The active recipe and message are captured when the event starts. A setting change is saved
 for the next event; Preview deliberately replaces the current one. Each event
 lasts 720 fixed ticks (12 seconds). The ordinary face crossfades out/in over
 45 ticks at either end. Pause freezes playback. Time continues to be authoritative:
@@ -184,8 +184,53 @@ Cells have immutable positions, glyph pivots, and stable lighting-route position
 Seven-segment clock content and the code-native 5×7 font feed the same recipe
 sampler. The font accepts up to **32 ASCII bytes / 1,120 cells**, supports letters,
 digits and basic punctuation, folds lowercase, and rejects empty, oversized, or
-unsupported text. Built-in recipes currently use **SPACE WARS**; arbitrary-message
-entry is not yet exposed in the UI or CLI.
+unsupported text. The default message is **SPACE WARS**. The shared
+`ClockMarqueeMessage` type validates text at settings, CLI/protocol, and action
+boundaries and stores at most 32 bytes inline. Text cells are built once when an
+event starts, not each frame, and never create physics objects.
+
+#### Custom text
+
+Select one of the three **Text** recipes. To change its saved message in a running
+client, pause Clock (with the controller, touch controls, or `host pause`), then:
+
+```sh
+spacewars-cli host pause                  # omit if already paused
+spacewars-cli clock message "Hello, pi!"
+spacewars-cli clock state                 # shows saved and active content separately
+```
+
+Open **Clock Controls → Preview Event → Marquee → Preview & Resume** to see the
+new message immediately. Simply resuming an existing text event keeps its old
+message until that event finishes. The command does not change the recipe,
+automatic-event switches, profile, or pause state. Clock-digit recipes ignore
+the message. Text entry is intentionally settings/CLI-only, not a gamepad editor.
+
+Alternatively, with the client **stopped**, edit its existing `settings.toml`
+(`$SPACEWARS_CONFIG_DIR/settings.toml`, or the platform config directory;
+`~/.config/spacewars/settings.toml` on Linux). Add/change fields in the existing
+`[clock]` section, preserving the other sections:
+
+```toml
+[clock]
+marquee_preset = "text-ribbon"
+marquee_message = "HELLO, PI!"
+```
+
+Messages must contain **1–32 ASCII characters**, including spaces. Supported
+characters are letters, digits, spaces and `. , : - ! ? / '`. Lowercase is saved
+and rendered as uppercase; spaces are preserved, but all-space text is invalid.
+Oversized, unsupported, empty, and multiline messages are rejected, not truncated.
+Existing settings without this field retain all other choices and default to
+`SPACE WARS`. Invalid hand-edited TOML follows the existing settings recovery
+policy: back up the original file and load defaults. Prefer the CLI for validated
+edits without risking the other settings; a running client does not hot-reload TOML.
+
+The CLI waits for application and disk-save confirmation. If saving fails it
+returns an error and reports the message as effective only for this session.
+Fix the filesystem problem and repeat the same command to retry the save.
+
+#### Effect sampling
 
 A recipe has a fixed set of optional passes: wave in content space, pivoted
 rotation, fit/scroll placement, then rectangular clipping. Lighting samples the
@@ -248,7 +293,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **6** and reports scenario-instance revision,
+`clock state` uses schema version **7** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`), pause state, profile, schedule, current
@@ -271,11 +316,24 @@ during Duck; position is null before spawn and after despawn. Outcomes remain
 available during reset, not as a persistent event history.
 The optional `marquee` object reports the active recipe, content, cell/group
 counts, progress in thousandths, scrolling/waving flags, rotation target and
-lighting mode. `settings.marquee_preset` is the saved choice for the next event;
-it can differ from the currently active recipe. Outside Marquee its diagnostics
-are null. Use matching client/CLI builds: schema 5 and older requests are rejected.
-The internal Clock action payload is version 2; event ordinals 0–3 are unchanged
-and Marquee is 4. Configure adds the fifth switch bit and a validated recipe byte.
+lighting mode. `settings.marquee_preset` and `settings.marquee_message` are the
+configured choices for the next event; they can differ from the currently active
+content. `settings_pending` acknowledges queued settings; `settings_error` is
+non-null if those settings could not be persisted. Outside Marquee its diagnostics
+are null. Use matching client/CLI builds: schema 6 and older requests are rejected.
+The internal Clock action payload is version 3; event ordinals 0–3 are unchanged
+and Marquee is 4. Configure contains the switch bits, a validated recipe byte, and
+1–32 message bytes. Version 1/2 actions are rejected; observation remains version 1.
+
+`clock message TEXT` requires a paused active Clock. Its raw request includes
+schema version 7, `message`, `expected_scenario_revision`, and `expected_message`.
+The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
+the instance explicitly. Only the message is changed, using the latest values
+for other settings. Invalid text, a changed instance/message, an unpaused or
+inactive Clock, and pending host controls are rejected. The response acknowledges
+the queue; `ControlClient::wait_for_clock_message` confirms application and save,
+with the same bounded polling/deadline behavior as event waits. Restart/resume
+may supersede a queued request; an acknowledgement is not a completion receipt.
 
 `clock trigger` fetches state and guards the mutation with both instance revision
 and event ID; `--expect-scenario-revision` and `--expect-event-id` override those
@@ -285,7 +343,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 6, `event`
+tick. A raw `clock trigger` request must include schema version 7, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, or `marquee`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
@@ -368,8 +426,8 @@ task may be testing there.
 
 ### Marquee local verification
 
-The workspace/all-target suite passed **888 tests** (17 display-dependent
-workflows ignored). All **seven Clock UI workflows** passed explicitly on the
+The workspace/all-target suite passed **895 tests** (18 display-dependent
+workflows ignored). All **eight Clock UI workflows** passed explicitly on the
 local X display. Strict Clippy passed for Clock/common/control/CLI; client
 Clippy completed with existing unrelated warnings. No device deployment was made.
 
@@ -389,13 +447,19 @@ sampling, pause, changed settings/readings, and exact cleanup. Raster captures
 cover all seven recipes at 800×480, 480×800 and 1280×720, check visible content,
 and compare draw lists with the vector path. The real-client workflow verifies
 launcher/live controls, controller-style navigation, disabled preview, pause,
-latched active recipes, settings persistence, completion, restart and relaunch.
+latched active recipes/messages, settings persistence, completion, restart and
+relaunch. Message tests cover invalid text, stale guards, paused-only edits,
+settings migration/backup, unchanged active content, and a forced disk-save
+failure followed by a successful same-message retry. Maximum-length custom
+content remains bounded and clipped; the public validator and font agree on
+every ASCII character. CLI help/argument validation and the real-client custom
+text screenshot were also checked locally.
 The release workload measures simulation and draw-list construction only, not
 rasterization/presentation or device FPS. No timing thresholds are unit-test gates.
 
 On this desktop with Rust 1.89, the 252-event run (181,440 ticks / 3,024 simulated
 seconds) had per-recipe draw-list p95 values of **0.0060–0.0128 ms**, with a maximum
-of 250 draw primitives across the built-in recipes and sizes. These are local
+of 250 draw primitives across the recipes and sizes with the default message. These are local
 CPU construction costs, not Pi or end-to-end latency measurements.
 
 **Marquee has not been deployed or tested on the Pi.** Ask before deploying.

@@ -57,6 +57,7 @@ fn create(
             event_profile: settings.clock.event_profile,
             events: settings.clock.events,
             marquee_preset: settings.clock.marquee_preset,
+            marquee_message: settings.clock.marquee_message,
         },
         seed,
     );
@@ -148,6 +149,8 @@ impl ClientScenario for ClockClientScenario {
             display_digits: self.state.display().digits,
             can_trigger: self.state.can_trigger_event(),
             trigger_pending: false,
+            settings_pending: false,
+            settings_error: None,
         })
     }
 

@@ -151,15 +151,18 @@ impl ActiveEvent {
         context: EventContext<'_>,
         seed: u64,
         marquee_preset: engine_common::ClockMarqueePreset,
+        marquee_message: engine_common::ClockMarqueeMessage,
     ) -> Self {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
             ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(context, seed))),
             ClockEventKind::Duck => Self::Duck(Box::new(DuckEvent::new(context.layout, seed))),
-            ClockEventKind::Marquee => {
-                Self::Marquee(Box::new(MarqueeEvent::new(marquee_preset, context.display)))
-            }
+            ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
+                marquee_preset,
+                marquee_message,
+                context.display,
+            ))),
         }
     }
 

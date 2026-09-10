@@ -1,4 +1,4 @@
-use engine_common::{ClockMarqueePreset, ClockMarqueeState};
+use engine_common::{ClockMarqueeMessage, ClockMarqueePreset, ClockMarqueeState};
 
 use crate::{
     DisplaySnapshot,
@@ -10,7 +10,6 @@ use crate::{
 
 pub const MARQUEE_TICKS: u64 = 12 * 60;
 const FADE_TICKS: u64 = 45;
-pub(crate) const MARQUEE_MESSAGE: &str = "SPACE WARS";
 
 pub(crate) struct MarqueeEvent {
     pub tick: u64,
@@ -18,11 +17,16 @@ pub(crate) struct MarqueeEvent {
     pub recipe: Recipe,
     pub content: Content,
     pub uses_clock: bool,
+    message: ClockMarqueeMessage,
     display: DisplaySnapshot,
 }
 
 impl MarqueeEvent {
-    pub fn new(preset: ClockMarqueePreset, display: DisplaySnapshot) -> Self {
+    pub fn new(
+        preset: ClockMarqueePreset,
+        message: ClockMarqueeMessage,
+        display: DisplaySnapshot,
+    ) -> Self {
         let uses_clock = matches!(
             preset,
             ClockMarqueePreset::ClockChase
@@ -83,11 +87,12 @@ impl MarqueeEvent {
             preset,
             recipe,
             uses_clock,
+            message,
             display,
             content: if uses_clock {
                 Content::clock(display)
             } else {
-                Content::text(MARQUEE_MESSAGE).expect("built-in message fits the bitmap font")
+                Content::text(message.as_str()).expect("validated message fits the bitmap font")
             },
         }
     }
@@ -122,7 +127,7 @@ impl MarqueeEvent {
             content: if self.uses_clock {
                 "clock"
             } else {
-                MARQUEE_MESSAGE
+                self.message.as_str()
             }
             .into(),
             cell_count: self.content.cells.len(),

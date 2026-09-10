@@ -1,5 +1,7 @@
 use super::*;
-use spacewars_control::{ClockEventKind, ClockState, ClockStatePredicate, ClockTriggerRequest};
+use spacewars_control::{
+    ClockEventKind, ClockMessageRequest, ClockState, ClockStatePredicate, ClockTriggerRequest,
+};
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
@@ -36,10 +38,18 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         assert_eq!(marquee.content, "SPACE WARS");
         harness.capture_screenshot("clock-marquee-ribbon.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
-        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
         let paused = harness.clock_state();
         harness.assert_clock_stays_paused(&paused);
         assert_eq!(harness.clock_state().marquee, paused.marquee);
+        let updated = harness.clock_message(&paused, "Hello, pi!");
+        assert_eq!(updated.settings.marquee_message.as_str(), "HELLO, PI!");
+        assert_eq!(updated.marquee, paused.marquee);
+        assert_eq!(updated.phase_tick, paused.phase_tick);
+        assert_eq!(updated.simulation_tick, paused.simulation_tick);
+        // Read a fresh UI snapshot: settings acknowledgement may briefly disable
+        // controls and therefore legitimately change its revision.
+        let mut page = harness.state();
         // D-pad reaches Marquee and its recipe without triggering gameplay.
         for _ in 0..4 {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -75,10 +85,9 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         harness.activate_guarded("pause.clock.preview", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let spinning = harness.clock_wait(&initial, "presenting", 2, 150);
-        assert_eq!(
-            spinning.marquee.unwrap().preset,
-            ClockMarqueePreset::TextSpin
-        );
+        let content = spinning.marquee.unwrap();
+        assert_eq!(content.preset, ClockMarqueePreset::TextSpin);
+        assert_eq!(content.content, "HELLO, PI!");
         harness.capture_screenshot("clock-marquee-spin.png");
         let idle = harness.clock_wait(&initial, "idle", 2, 0);
         assert!(idle.marquee.is_none());
@@ -104,6 +113,102 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         )
         .unwrap();
         assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn marquee_message_guards_validation_and_save_failure_retry() {
+    run_functional_test("clock-message", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        harness.activate_guarded("launcher.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        let request = ClockMessageRequest::new(&initial, "HELLO!".parse().unwrap());
+        let Err(ControlClientError::Failure(failure)) = harness
+            .client
+            .clock_message_before(&request, request_deadline())
+        else {
+            panic!("running Clock must reject settings changes")
+        };
+        assert_eq!(failure.code, ControlFailureCode::WrongScreen);
+        assert_eq!(harness.clock_state().settings, initial.settings);
+        harness.pause_guarded(&gameplay);
+        harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        let paused = harness.clock_state();
+        for stale in [
+            ClockMessageRequest {
+                expected_scenario_revision: initial.scenario_revision + 1,
+                ..request.clone()
+            },
+            ClockMessageRequest {
+                expected_message: "STALE".parse().unwrap(),
+                ..request.clone()
+            },
+        ] {
+            let Err(ControlClientError::Failure(failure)) = harness
+                .client
+                .clock_message_before(&stale, request_deadline())
+            else {
+                panic!("stale guard must fail")
+            };
+            assert_eq!(failure.code, ControlFailureCode::StaleRevision);
+            assert_eq!(failure.current_clock_state.as_ref(), Some(&paused));
+        }
+        for invalid in ["", "é", "A\nB", &"A".repeat(33)] {
+            let mut value = serde_json::to_value(&request).unwrap();
+            value["message"] = invalid.into();
+            let Err(ControlClientError::Failure(failure)) = harness
+                .client
+                .request_before(&format!("clock message\n{value}\n"), request_deadline())
+            else {
+                panic!("invalid message must fail")
+            };
+            assert_eq!(failure.code, ControlFailureCode::InvalidRequest);
+        }
+        assert_eq!(harness.clock_state(), paused);
+
+        // An owned, empty directory at the destination forces persistence to fail
+        // even when tests run as root. No permissions or timing assumptions.
+        let path = harness.run_path().join("config/settings.toml");
+        let backup = harness.run_path().join("config/settings-before-error.toml");
+        fs::rename(&path, &backup).unwrap();
+        fs::create_dir(&path).unwrap();
+        let result = harness
+            .client
+            .clock_message_before(&request, request_deadline());
+        harness.require_clock("clock message before forced save failure", result);
+        let Err(ControlClientError::Failure(failure)) = harness
+            .client
+            .wait_for_clock_message(&request, TRANSITION_TIMEOUT)
+        else {
+            panic!("save failure must be reported")
+        };
+        assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+        let failed = failure.current_clock_state.unwrap();
+        assert_eq!(failed.settings.marquee_message, request.message);
+        assert!(failed.settings_error.is_some());
+        assert_eq!(failed.simulation_tick, paused.simulation_tick);
+        fs::remove_dir(&path).unwrap();
+        fs::rename(&backup, &path).unwrap();
+        // Retrying the SAME effective value must actually retry the disk write.
+        let saved = harness.clock_message(&failed, request.message.as_str());
+        assert!(saved.settings_error.is_none());
+        let persisted: engine_common::Settings =
+            toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(persisted.clock, saved.settings);
+        let menu = harness.state();
+        assert_eq!(menu.screen, UiScreen::PauseMain);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        let Err(ControlClientError::Failure(failure)) = harness
+            .client
+            .clock_message_before(&request, request_deadline())
+        else {
+            panic!("inactive Clock must reject settings changes")
+        };
+        assert_eq!(failure.code, ControlFailureCode::ControlUnavailable);
     });
 }
 
@@ -225,6 +330,18 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
 }
 
 impl FunctionalHarness {
+    fn clock_message(&mut self, state: &ClockState, text: &str) -> ClockState {
+        let request = ClockMessageRequest::new(state, text.parse().unwrap());
+        let result = self
+            .client
+            .clock_message_before(&request, request_deadline());
+        let queued = self.require_clock("clock message", result);
+        assert!(queued.settings_pending);
+        let result = self
+            .client
+            .wait_for_clock_message(&request, TRANSITION_TIMEOUT);
+        self.require_clock("clock message applied and saved", result)
+    }
     fn change_clock_setting(&mut self, id: &str, value: &str, state: &UiState) -> UiState {
         let pending = self.activate_guarded(id, state);
         let applied = self.wait_clock_screen(UiScreen::PauseClock, pending.revision);

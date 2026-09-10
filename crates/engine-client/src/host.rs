@@ -101,6 +101,8 @@ impl ScenarioControls {
                 )
             );
             state.can_trigger &= self.request.is_none();
+            state.settings_pending =
+                matches!(self.request, Some(ScenarioControlRequest::ClockSettings(_)));
             state
         })
     }
@@ -693,7 +695,7 @@ pub fn start_scenario_loop(
         controls.borrow_mut().publish_clock_state(&scenario, scenario_revision, paused);
         let clock_settings = controls.borrow().clock_state.as_ref().map(|clock| clock.settings);
         if let Some(clock_settings) = clock_settings
-            && settings.clock != clock_settings
+            && (settings.clock != clock_settings || step_result.clock_settings_applied)
         {
             settings.clock = clock_settings;
             crate::clock_controls::publish_settings(&window, clock_settings);
@@ -795,6 +797,7 @@ struct HostStepResult {
     scenario_replaced: bool,
     ingame_controls_visible: Option<bool>,
     scenario_error_text: Option<String>,
+    clock_settings_applied: bool,
 }
 
 impl HostStepResult {
@@ -805,6 +808,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: None,
             scenario_error_text: None,
+            clock_settings_applied: false,
         }
     }
 
@@ -815,6 +819,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: None,
             scenario_error_text: None,
+            clock_settings_applied: false,
         }
     }
 
@@ -825,6 +830,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: Some(visible),
             scenario_error_text: None,
+            clock_settings_applied: false,
         }
     }
 
@@ -913,7 +919,10 @@ fn step_scenario_inner(
                 if *paused {
                     scenario.inner.configure_clock(settings);
                 }
-                return HostStepResult::default();
+                return HostStepResult {
+                    clock_settings_applied: *paused,
+                    ..HostStepResult::default()
+                };
             }
             ScenarioControlRequest::ClockPreview(event) => {
                 if *paused {

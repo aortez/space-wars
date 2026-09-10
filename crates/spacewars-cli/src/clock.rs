@@ -1,7 +1,8 @@
 use super::{CliError, control_error, human_error, parse_timeout};
 use clap::Subcommand;
 use spacewars_control::{
-    ClockEventKind, ClockState, ClockStatePredicate, ClockTriggerRequest, ControlClient,
+    ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState, ClockStatePredicate,
+    ClockTriggerRequest, ControlClient,
 };
 use std::time::{Duration, Instant};
 
@@ -14,6 +15,19 @@ pub enum ClockCommand {
     },
     /// List named events, their effects, automatic enablement, and cooldowns.
     Events {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Save text for future marquee events. Requires a paused Clock.
+    Message {
+        /// 1-32 ASCII characters: letters, digits, spaces and . , : - ! ? / '
+        /// Lowercase is displayed and saved as uppercase; all-space text is invalid.
+        text: ClockMarqueeMessage,
+        /// Reject a stale Clock instance; defaults to the current instance.
+        #[arg(long)]
+        expect_scenario_revision: Option<u64>,
+        #[arg(long, default_value = "3s", value_parser = parse_timeout)]
+        timeout: Duration,
         #[arg(long)]
         json: bool,
     },
@@ -134,6 +148,40 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                 .map_err(|e| control_error(e, json))?;
             print_state(&state, json)
         }
+        ClockCommand::Message {
+            text,
+            expect_scenario_revision,
+            timeout,
+            json,
+        } => {
+            let deadline = deadline(timeout)?;
+            let state = client
+                .clock_state_before(deadline)
+                .map_err(|e| control_error(e, json))?;
+            let request = ClockMessageRequest {
+                expected_scenario_revision: expect_scenario_revision
+                    .unwrap_or(state.scenario_revision),
+                ..ClockMessageRequest::new(&state, text)
+            };
+            client
+                .clock_message_before(&request, deadline)
+                .map_err(|e| control_error(e, json))?;
+            let state = client
+                .wait_for_clock_message(
+                    &request,
+                    deadline.saturating_duration_since(Instant::now()),
+                )
+                .map_err(|e| control_error(e, json))?;
+            if json {
+                print_state(&state, true)
+            } else {
+                println!(
+                    "Saved marquee message: {:?}. Used by the next text event; active content is unchanged.",
+                    state.settings.marquee_message.as_str()
+                );
+                Ok(())
+            }
+        }
         ClockCommand::Wait {
             lifecycle,
             phase,
@@ -200,6 +248,15 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.next_event_tick,
             state.can_trigger
         );
+        println!(
+            "Configured marquee: {} / {:?}; settings pending={}",
+            state.settings.marquee_preset.label(),
+            state.settings.marquee_message.as_str(),
+            state.settings_pending
+        );
+        if let Some(error) = &state.settings_error {
+            println!("Settings warning: {error}");
+        }
         if let Some(material) = state.meltdown {
             println!(
                 "Meltdown: {} waiting, {} airborne, {} wet columns; water {:.3}, drained {:.3}, reclaimed {:.3} cell-volumes",
@@ -242,4 +299,29 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Args, Command};
+    use clap::Parser;
+
+    #[test]
+    fn message_cli_validates_before_contacting_the_client() {
+        let args =
+            Args::try_parse_from(["spacewars-cli", "clock", "message", "Hello, pi!", "--json"])
+                .unwrap();
+        let Command::Clock {
+            command: ClockCommand::Message { text, json, .. },
+        } = args.command
+        else {
+            panic!()
+        };
+        assert!(json);
+        assert_eq!(text.as_str(), "HELLO, PI!");
+        for message in ["", "   ", "A\nB", "é", "A_B", &"A".repeat(33)] {
+            assert!(Args::try_parse_from(["spacewars-cli", "clock", "message", message]).is_err());
+        }
+    }
 }

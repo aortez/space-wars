@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 mod client;
 mod clock;
 pub use clock::{
-    CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND, ClockEventInfo,
-    ClockEventKind, ClockState, ClockStatePredicate, ClockTriggerRequest,
+    CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND,
+    ClockEventInfo, ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState,
+    ClockStatePredicate, ClockTriggerRequest,
 };
 
 pub use client::{ControlClient, ControlClientError, UiStatePredicate};

@@ -3,7 +3,10 @@ use engine_core::Vec2;
 use super::{Bounds, font};
 use crate::{DisplaySnapshot, SegmentKind, digits};
 
-pub(crate) const MAX_TEXT_BYTES: usize = 32;
+use engine_common::ClockMarqueeMessage;
+pub(crate) use engine_common::{
+    ClockMessageError as TextError, MAX_CLOCK_MESSAGE_BYTES as MAX_TEXT_BYTES,
+};
 pub(crate) const MAX_CONTENT_CELLS: usize = MAX_TEXT_BYTES * 35;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -20,13 +23,6 @@ pub(crate) struct Content {
     pub cells: Vec<Cell>,
     pub bounds: Bounds,
     pub groups: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TextError {
-    Empty,
-    TooLong,
-    UnsupportedCharacter,
 }
 
 impl Content {
@@ -109,15 +105,8 @@ impl Content {
     }
 
     pub fn text(message: &str) -> Result<Self, TextError> {
-        if message.len() > MAX_TEXT_BYTES {
-            return Err(TextError::TooLong);
-        }
-        if message.is_empty() || message.bytes().all(|b| b == b' ') {
-            return Err(TextError::Empty);
-        }
-        if !message.bytes().all(|b| font::glyph(b).is_some()) {
-            return Err(TextError::UnsupportedCharacter);
-        }
+        let validated: ClockMarqueeMessage = message.parse()?;
+        let message = validated.as_str();
         let mut result = Self {
             cells: Vec::with_capacity(message.len() * 35),
             bounds: Bounds {

@@ -37,6 +37,16 @@ fn clock(preset: ClockMarqueePreset, aspect_ratio: f32) -> ClockState {
 
 #[test]
 fn bitmap_font_is_bounded_explicit_and_case_insensitive() {
+    // The public validator and the private bitmap font must agree exhaustively.
+    // Prefix a visible letter so a single space is not rejected as blank text.
+    for byte in 0..=127 {
+        let text = format!("A{}", char::from(byte));
+        assert_eq!(
+            text.parse::<engine_common::ClockMarqueeMessage>().is_ok(),
+            font::glyph(byte).is_some(),
+            "byte {byte}"
+        );
+    }
     assert_eq!(
         Content::text("space wars").unwrap().cells,
         Content::text("SPACE WARS").unwrap().cells
@@ -62,6 +72,83 @@ fn bitmap_font_is_bounded_explicit_and_case_insensitive() {
     assert_eq!(largest.groups, MAX_TEXT_BYTES);
     assert!(largest.cells.len() <= MAX_CONTENT_CELLS);
     assert!(largest.cells.capacity() <= MAX_CONTENT_CELLS);
+}
+
+#[test]
+fn custom_message_is_latched_and_shared_by_every_text_recipe() {
+    for preset in [
+        ClockMarqueePreset::TextScroll,
+        ClockMarqueePreset::TextRibbon,
+        ClockMarqueePreset::TextSpin,
+    ] {
+        let mut state = clock(preset, 800.0 / 480.0);
+        let mut settings = state.settings();
+        settings.marquee_message = "Hello, pi!".parse().unwrap();
+        ClockScenario::step(
+            &mut state,
+            &[
+                ClockAction::configure(settings),
+                ClockAction::preview_event(ClockEventKind::Marquee),
+            ],
+            Duration::ZERO,
+        );
+        step(&mut state, 180);
+        let before = ClockScenario::render_frame(&state);
+        let active = state.marquee_state().unwrap();
+        assert_eq!(active.content, "HELLO, PI!");
+        assert_eq!(active.group_count, 10);
+        settings.marquee_message = "8".repeat(MAX_TEXT_BYTES).parse().unwrap();
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::configure(settings)],
+            Duration::ZERO,
+        );
+        assert_eq!(state.marquee_state(), Some(active));
+        assert_eq!(ClockScenario::render_frame(&state), before);
+        assert_eq!(state.settings().marquee_message, settings.marquee_message);
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::preview_event(ClockEventKind::Marquee)],
+            Duration::ZERO,
+        );
+        assert_eq!(
+            state.marquee_state().unwrap().content,
+            "8".repeat(MAX_TEXT_BYTES)
+        );
+        let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event else {
+            panic!()
+        };
+        assert_eq!(
+            event.content.cells,
+            Content::text(settings.marquee_message.as_str())
+                .unwrap()
+                .cells
+        );
+        assert!(event.content.cells.len() <= MAX_CONTENT_CELLS);
+        step(&mut state, MARQUEE_TICKS / 2);
+        let frame = ClockScenario::render_frame(&state);
+        let cells: Vec<_> = frame
+            .layers
+            .iter()
+            .filter(|layer| layer.z == 3)
+            .flat_map(|layer| &layer.primitives)
+            .collect();
+        assert!(!cells.is_empty() && cells.len() <= MAX_CONTENT_CELLS);
+        let layout = crate::layout::Layout::new(state.aspect_ratio());
+        for primitive in cells {
+            let RenderPrimitive::Polygon(polygon) = primitive else {
+                panic!()
+            };
+            for p in &polygon.points {
+                assert!(p.x.is_finite() && p.y.is_finite());
+                assert!(p.x >= layout.bounds_min.x + 7.9999 && p.x <= layout.bounds_max.x - 7.9999);
+                assert!(p.y >= layout.floor_y + 7.9999 && p.y <= layout.bounds_max.y - 27.9999);
+            }
+        }
+        step(&mut state, MARQUEE_TICKS / 2);
+        assert!(state.marquee_state().is_none());
+        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+    }
 }
 
 #[test]
@@ -376,6 +463,7 @@ fn resize_and_preview_replacement_release_content_and_restore_latest_time() {
 fn combined_recipe_samples_all_three_independent_effects() {
     let event = MarqueeEvent::new(
         ClockMarqueePreset::TextRibbon,
+        engine_common::ClockMarqueeMessage::default(),
         DisplaySnapshot::unsynchronized(),
     );
     assert!(event.recipe.scroll);
