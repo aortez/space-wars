@@ -1,6 +1,11 @@
 # AI for Spacewars on destructible ground
 
-The current [usable landing pass](../usable-landings.md) checks hull and hatch
+The current [objective landing pass](../objective-landings.md) measures a walking
+and jumping round trip to enemy flags before choosing a landing, and adds
+bounded recovery for cramped returns under the parked hull. Prospective jetpack
+access and reliable crater/exposed approaches remain unfinished.
+
+The preceding [usable landing pass](../usable-landings.md) checks hull and hatch
 clearance across touchdown offsets, corrects stationary one-foot approaches,
 and keeps departure guidance stable between nearby planets.
 

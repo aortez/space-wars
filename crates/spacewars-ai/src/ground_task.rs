@@ -17,6 +17,7 @@ use serde::Serialize;
 mod claim;
 mod jetpack;
 mod posture;
+mod rejoin;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -32,6 +33,7 @@ pub enum ShipReturnFailure {
     OtherPlanet,
     NoGroundedHatch,
     UnsettledShip,
+    NoStandingRoute,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -41,6 +43,7 @@ pub enum GroundGoal {
     Jump,
     GetUp,
     Crawl,
+    Rejoin,
     Recharge,
     JetpackLift,
     JetpackCross,
@@ -58,6 +61,7 @@ impl GroundGoal {
             Self::Jump => "jumping a ground obstacle",
             Self::GetUp => "getting up on the route",
             Self::Crawl => "crawling clear to stand up",
+            Self::Rejoin => "walking clear to rejoin the ground route",
             Self::Recharge => "recharging for the ground route",
             Self::JetpackLift => "jetpack: climbing over an obstacle",
             Self::JetpackCross => "jetpack: crossing toward the objective",
@@ -91,6 +95,7 @@ pub struct GroundTelemetry {
     pub partial_routes: u32,
     pub displacements: u32,
     pub get_up_repositions: u32,
+    pub start_repositions: u32,
     pub crawl_direction: Option<f32>,
     pub crawl_target: Option<Vec2>,
     pub claim_relocations: u32,
@@ -119,13 +124,14 @@ pub struct GroundNavigationTask {
     claim_relocation: claim::ClaimRelocation,
     hatch_missing_since: Option<u64>,
     hatch_unsettled_since: Option<u64>,
+    rejoin: Option<rejoin::GroundRejoin>,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v9",
+                policy: "ground_navigation_v10",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -145,6 +151,7 @@ impl GroundNavigationTask {
                 partial_routes: 0,
                 displacements: 0,
                 get_up_repositions: 0,
+                start_repositions: 0,
                 crawl_direction: None,
                 crawl_target: None,
                 claim_relocations: 0,
@@ -169,6 +176,7 @@ impl GroundNavigationTask {
             claim_relocation: claim::ClaimRelocation::default(),
             hatch_missing_since: None,
             hatch_unsettled_since: None,
+            rejoin: None,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -189,6 +197,7 @@ impl GroundNavigationTask {
         self.claim_relocation = claim::ClaimRelocation::default();
         self.telemetry.claim_target = None;
         self.telemetry.target = None;
+        self.rejoin = None;
         self.clear_route();
     }
     fn block(&mut self, reason: &'static str) {
@@ -476,6 +485,9 @@ impl GroundNavigationTask {
         };
         if self.telemetry.path.is_empty() {
             self.telemetry.goal = GroundGoal::Survey;
+            if self.rejoin.is_some() && self.last_plan_tick == Some(map.tick) {
+                return self.rejoin_ground(o);
+            }
             if o.jetpack.as_ref().is_some_and(|pack| !pack.surveyed) {
                 // Compare walking and powered routes from the same completed
                 // survey, including immediately after a landing or interruption.
@@ -491,12 +503,26 @@ impl GroundNavigationTask {
             self.crossing_plan = crossing;
             self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {
+                self.rejoin = None;
                 self.telemetry.partial_routes += u32::from(route.diagnostics.partial);
                 self.telemetry.path = route.path;
                 self.telemetry.waypoint = 0;
                 self.telemetry.last_progress_tick = p.tick;
                 self.missing_since = None;
             } else {
+                if route.diagnostics.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting)
+                    && route.diagnostics.start_distance.is_some_and(|distance| distance <= 8.0)
+                    && p.balanced && p.supported_planet == Some(p.planet.index)
+                    && (self.rejoin.is_some() || o.posture.as_ref().is_some_and(|posture| !posture.standing_clear))
+                {
+                    let node = map.nodes.iter().find(|n| Some(n.id) == route.diagnostics.start_node).unwrap();
+                    if self.rejoin.is_none() {
+                        self.rejoin = Some(rejoin::GroundRejoin::new(p.tick, local(actor.position), node.position));
+                        self.telemetry.start_repositions += 1;
+                    }
+                    return self.rejoin_ground(o);
+                }
+                self.rejoin = None;
                 let since = *self.missing_since.get_or_insert(p.tick);
                 self.telemetry.goal = GroundGoal::Survey;
                 if p.tick - since > 5 * 60 {
@@ -591,6 +617,13 @@ impl GroundNavigationTask {
             .as_ref()
             .is_some_and(|m| m.planet != p.planet.index || m.revision != p.planet.revision)
         {
+            if self
+                .map
+                .as_ref()
+                .is_some_and(|m| m.planet != p.planet.index)
+            {
+                self.rejoin = None;
+            }
             self.telemetry.invalidations += 1;
             self.clear_route();
             self.map = None;

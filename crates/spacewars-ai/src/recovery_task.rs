@@ -153,13 +153,14 @@ pub struct RecoverShipTask {
     ground_task: Option<GroundNavigationTask>,
     previous_claim: Option<(PlanetClaimPhase, f32)>,
     return_fallback_since: Option<u64>,
+    return_route_checked: Option<(usize, u64, u64, bool)>,
 }
 impl RecoverShipTask {
     pub fn new(context: BrainReset) -> Self {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v8",
+                task: "recover_ship_v9",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -202,6 +203,7 @@ impl RecoverShipTask {
             ground_task: None,
             previous_claim: None,
             return_fallback_since: None,
+            return_route_checked: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -683,10 +685,18 @@ impl RecoverShipTask {
             return action;
         }
         // A recovered hatch cancels the hold and resumes ordinary boarding.
+        let standing_route =
+            if self.telemetry.return_failure == Some(ShipReturnFailure::NoStandingRoute) {
+                self.check_standing_route(o)
+            } else {
+                None
+            };
         if p.transfer == TransferResult::Ready
+            || standing_route == Some(false)
             || p.hatch.is_some()
                 && p.landing.phase == LandingPhase::Landed
                 && p.landing.planet == Some(p.planet.index)
+                && self.telemetry.return_failure != Some(ShipReturnFailure::NoStandingRoute)
         {
             self.return_fallback_since = None;
             self.ground_task = None;
@@ -730,6 +740,12 @@ impl RecoverShipTask {
                     && p.actor
                         .is_some_and(|actor| actor.position.distance_to(p.ship.position) < 24.0)
             }
+            Some(ShipReturnFailure::NoStandingRoute) => {
+                standing_route == Some(true)
+                    && p.landing.planet == Some(p.planet.index)
+                    && p.actor
+                        .is_some_and(|actor| actor.position.distance_to(p.ship.position) < 24.0)
+            }
             None => false,
         };
         if !confirmed || p.ship_form != ShipForm::Ship {
@@ -754,6 +770,63 @@ impl RecoverShipTask {
             brake_held: true,
             ..Default::default()
         }
+    }
+
+    /// The assigned ship can have a grounded hatch while its pilot is trapped
+    /// below the upright graph. Confirm that particular failed return, caching
+    /// only between the regular half-second surveys. Any regained route or
+    /// dirty/changed material cancels the ordinary scuttle chord.
+    fn check_standing_route(&mut self, o: &RecoveryTaskObservationV1) -> Option<bool> {
+        use scenario_spacewars::surface_sortie::ground_navigation::{
+            GROUND_REFRESH_TICKS, GROUND_SAMPLES,
+        };
+        let p = &o.flight.pilot;
+        if !p.queries_ready {
+            self.return_route_checked = None;
+            return None;
+        }
+        let posture = o.posture.as_ref().filter(|posture| {
+            posture.version == 1
+                && posture.owner == p.owner
+                && posture.planet == p.planet.index
+                && posture.revision == p.planet.revision
+                && posture.tick == p.tick
+        })?;
+        if posture.standing_clear {
+            return Some(false);
+        }
+        let actor = p.actor?;
+        if let Some(map) = &o.ground {
+            if map.version != 1
+                || map.actor != p.owner
+                || map.planet != p.planet.index
+                || map.revision != p.planet.revision
+                || map.tick != p.tick
+                || map.nodes.is_empty()
+                || map.nodes.len() > GROUND_SAMPLES
+                || map
+                    .nodes
+                    .iter()
+                    .any(|n| !n.position.x.is_finite() || !n.position.y.is_finite())
+            {
+                self.return_route_checked = None;
+                return None;
+            }
+            let foot = (actor.position - p.actor_up * 0.9 - p.planet.motion.position)
+                .rotate_radians(-p.planet.motion.angle);
+            let blocked = map
+                .nodes
+                .iter()
+                .all(|node| node.position.distance_to(foot) >= 3.0);
+            self.return_route_checked = Some((map.planet, map.revision, p.tick, blocked));
+        }
+        self.return_route_checked
+            .filter(|(planet, revision, tick, _)| {
+                *planet == p.planet.index
+                    && *revision == p.planet.revision
+                    && p.tick.saturating_sub(*tick) < GROUND_REFRESH_TICKS
+            })
+            .map(|(_, _, _, blocked)| blocked)
     }
 
     fn stabilize(&mut self, o: &RecoveryTaskObservationV1, up: Vec2) -> SurfaceSortieAction {

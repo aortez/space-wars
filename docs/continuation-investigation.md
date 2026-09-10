@@ -3,7 +3,8 @@
 Historical investigation on 2026-09-10 against implementation `5a090b1`,
 documented at `25fbe2b`. The findings below describe that checkpoint. The first
 implementation chunk is now covered by [usable landings](usable-landings.md);
-objective-aware landing selection and the match lifecycle remain subsequent work.
+[objective landing selection](objective-landings.md) now has a bounded first implementation.
+Prospective jetpack access, damaged approaches and the match lifecycle remain work.
 The source review and archived desktop/Pi traces add detail to the
 [mission reliability results](mission-reliability.md).
 

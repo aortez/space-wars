@@ -44,6 +44,9 @@ fn main() {
     );
     let bearing_offset: f32 = arg("--offset", "0.6").parse().unwrap();
     let jetpacks: bool = arg("--jetpacks", "false").parse().unwrap();
+    let survey_landing = arg("--survey-landing", "false") == "true";
+    let landing_threat = arg("--landing-threat", "false") == "true";
+    assert!(!survey_landing || mode == "capture");
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
     assert!(
         [
@@ -106,6 +109,9 @@ fn main() {
     let mut edit_tick = None;
     let mut strike_tick = None;
     let mut previous_interact = false;
+    let mut approach_started_tick = None;
+    let mut approach_landed_tick = None;
+    let mut objective_surveys: Vec<serde_json::Value> = Vec::new();
     let mut last_ground = None;
     let mut last_map = None;
     let mut last_jetpack_survey = None;
@@ -130,8 +136,13 @@ fn main() {
         };
         // Reuse the tactical observation's recovery component. Surveying twice
         // here would inflate the measured cost beyond the interactive host.
-        let tactical = matches!(mode.as_str(), "capture" | "recovery")
+        let mut tactical = matches!(mode.as_str(), "capture" | "recovery")
             .then(|| state.tactical_sortie_observation(seat, site));
+        if survey_landing && !landing_threat {
+            // This paired trial isolates a quiet contested landing. The defender
+            // remains a physical obstacle; asteroid duels separately test cover.
+            tactical.as_mut().unwrap().combat.target = None;
+        }
         let mut o = tactical.as_ref().map_or_else(
             || state.recovery_task_observation(seat, site),
             |o| o.combat.recovery.clone(),
@@ -143,6 +154,11 @@ fn main() {
             last_jetpack_survey = Some(json!({"tick": tick, "jetpack": o.jetpack}));
         }
         let p = &o.flight.pilot;
+        if approach_started_tick.is_some()
+            && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
+        {
+            approach_landed_tick.get_or_insert(tick);
+        }
         let lost = p.recovery.as_ref().is_some_and(|r| r.ships_lost > 0);
         if p.location == PilotLocation::OnFoot {
             exited_tick.get_or_insert(tick);
@@ -188,10 +204,47 @@ fn main() {
                 ground = capture.telemetry().ground.clone();
                 intent_encoded = true;
             }
+        } else if survey_landing && defender_claimed.is_some() {
+            // Prepare an airborne attacker through ordinary thrust only, after
+            // the defender has physically raised the contested flag.
+            let up = (p.ship.position - p.planet.motion.position).normalized();
+            if p.ship.position.distance_to(p.planet.motion.position) > p.planet.radius + 60.0 {
+                approach_started_tick.get_or_insert(tick);
+            }
+            if approach_started_tick.is_some() {
+                actions.extend(capture.intent(tactical.as_ref().unwrap()).encode(owner));
+                ground = capture.telemetry().ground.clone();
+                intent_encoded = true;
+            } else {
+                let error = spacewars_ai::shortest_heading_error(up.rotate_radians(-p.ship.angle));
+                controls[seat] = SurfaceSortieAction {
+                    horizontal: (error * 2.5).clamp(-1.0, 1.0),
+                    primary_held: engine_core::Vec2::Y.rotate_radians(p.ship.angle).dot(up) > 0.9,
+                    ..Default::default()
+                };
+            }
         } else if mode != "pod" {
             let arrival = state.pilot_observation(seat, approach.site_request());
             controls[seat] = approach.intent(&arrival);
             controls[seat].interact_held &= defender_claimed.is_some() && !previous_interact;
+        }
+        if survey_landing
+            && edit_tick.is_none()
+            && approach_started_tick.is_some_and(|start| tick >= start + 120)
+        {
+            let cut = match edit.as_str() {
+                "flag" => Some(RecoveryDisruption::FlagFooting),
+                "crater" if p.sites.len() == 1 => Some(RecoveryDisruption::GroundRouteNode {
+                    node: u16::from(p.sites[0].id.bearing) * 8,
+                    radius: 2,
+                }),
+                _ => None,
+            };
+            if let Some(cut) = cut {
+                assert!(state.queue_recovery_disruption(seat, cut));
+                edit_tick = Some(tick);
+                events.push(json!({"tick":tick,"edit":edit,"phase":"approach"}));
+            }
         }
         let strike = strike_tick.is_none()
             && defender_claimed.is_some()
@@ -287,6 +340,9 @@ fn main() {
         }
         let sensor_ms = start.elapsed().as_secs_f64() * 1000.0;
         sensor_times.push(sensor_ms);
+        if let Some(survey) = tactical.as_ref().and_then(|t| t.landing_objective.as_ref()) {
+            objective_surveys.push(json!(survey));
+        }
         if o.ground.is_some() {
             refresh_times.push(sensor_ms);
         }
@@ -359,7 +415,7 @@ fn main() {
     refresh_times.sort_by(f64::total_cmp);
     rebuild_times.sort_by(f64::total_cmp);
     step_times.sort_by(f64::total_cmp);
-    let report = json!({"version":1,"seed":seed,"seat":seat,"offset":bearing_offset,"mode":mode,"edit":edit,"seconds":180,"jetpacks":jetpacks,
+    let mut report = json!({"version":1,"seed":seed,"seat":seat,"offset":bearing_offset,"mode":mode,"edit":edit,"seconds":180,"jetpacks":jetpacks,
         "expected":expected,"complete":complete,"captured":captured,"blocked":blocked,"defender_claimed_tick":defender_claimed,"exited_tick":exited_tick,
         "claimed_tick":claimed_tick,"lowering_tick":lowering_tick,"departed_tick":departed_tick,"strike_tick":strike_tick,"edit_tick":edit_tick,
         "capture":capture.telemetry(),"recovery":recovery.telemetry(),"ground":last_ground,"map":last_map,"ground_failures":ground_failures,"damage":state.damage_observation(seat),
@@ -368,6 +424,11 @@ fn main() {
         "ground_refresh_p95_ms":refresh_times.get(refresh_times.len().saturating_sub(1)*95/100),"ground_refresh_max_ms":refresh_times.last(),
         "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
+    report["survey_landing"] = json!(survey_landing);
+    report["landing_threat"] = json!(landing_threat);
+    report["approach_started_tick"] = json!(approach_started_tick);
+    report["approach_landed_tick"] = json!(approach_landed_tick);
+    report["objective_surveys"] = json!(objective_surveys);
     std::fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),

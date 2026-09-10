@@ -20,6 +20,7 @@ pub mod impact;
 pub mod jetpack;
 mod landing;
 mod landing_diagnostics;
+pub mod landing_objective;
 mod material;
 pub mod mission;
 mod motion;

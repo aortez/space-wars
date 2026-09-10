@@ -19,7 +19,7 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v6";
+pub const MISSION_POLICY: &str = "material_mission_v7";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]

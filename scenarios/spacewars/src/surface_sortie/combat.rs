@@ -90,6 +90,7 @@ pub struct TacticalSortieObservationV1 {
     pub version: u32,
     pub combat: CombatObservationV2,
     pub cover: Vec<LandingCover>,
+    pub landing_objective: Option<landing_objective::LandingObjectiveSurvey>,
     pub sun: Option<SolarHazard>,
     /// Prescribed circular motion about the sun, absent for linear fixtures.
     pub planet_orbit_omega: Option<f32>,
@@ -160,7 +161,7 @@ impl SurfaceSortieState {
         site: Option<LandingSiteId>,
     ) -> TacticalSortieObservationV1 {
         let combat = self.combat_observation(player, site);
-        let cover = combat
+        let cover: Vec<_> = combat
             .recovery
             .flight
             .pilot
@@ -197,6 +198,11 @@ impl SurfaceSortieState {
             .collect();
         TacticalSortieObservationV1 {
             version: 1,
+            landing_objective: self.landing_objective_survey(
+                player,
+                &combat.recovery.flight.pilot,
+                &cover,
+            ),
             combat,
             cover,
             sun: self.solar_hazard(),

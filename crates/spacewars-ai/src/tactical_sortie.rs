@@ -15,6 +15,7 @@ use scenario_spacewars::{
     surface_sortie::{
         PilotLocation, SurfaceSortieAction, TransferResult,
         combat::TacticalSortieObservationV1,
+        landing_objective::{LandingObjective, LandingObjectiveRoute},
         pilot::{LandingSiteId, PilotLandingSite},
     },
 };
@@ -63,6 +64,8 @@ pub struct TacticalTelemetry {
     pub circling_progress_tick: Option<u64>,
     pub solar: Option<SolarLandingPlan>,
     pub invalidations: u32,
+    pub objective_replans: u32,
+    pub objective_route: Option<LandingObjectiveRoute>,
     pub exposed_ticks: u64,
     pub covered_ticks: u64,
     pub site: Option<LandingSiteId>,
@@ -89,6 +92,7 @@ pub struct TacticalSortiePilot {
     rejected_sites: Vec<(LandingSiteId, u64)>,
     solar_rejected: Vec<(LandingSiteId, u64)>,
     clearing_ground: bool,
+    objective: Option<LandingObjective>,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -112,6 +116,8 @@ impl TacticalSortiePilot {
                 circling_progress_tick: None,
                 solar: None,
                 invalidations: 0,
+                objective_replans: 0,
+                objective_route: None,
                 exposed_ticks: 0,
                 covered_ticks: 0,
                 site: None,
@@ -133,6 +139,7 @@ impl TacticalSortiePilot {
             rejected_sites: Vec::new(),
             solar_rejected: Vec::new(),
             clearing_ground: false,
+            objective: None,
         }
     }
     /// Current capture missions tolerate transient cover/clearance changes and
@@ -210,6 +217,8 @@ impl TacticalSortiePilot {
     fn replan(&mut self, tick: u64) {
         self.telemetry.replans += 1;
         self.site = None;
+        self.objective = None;
+        self.telemetry.objective_route = None;
         self.long_approach = false;
         self.telemetry.solar = None;
         self.approach_progress = None;
@@ -375,10 +384,65 @@ impl TacticalSortiePilot {
                 };
             }
         }
+        let objective = self
+            .commit_descent
+            .then(|| LandingObjective::read(p))
+            .flatten();
+        let survey = o.landing_objective.as_ref().filter(|survey| {
+            survey.version == 1
+                && survey.actor == p.owner
+                && survey.tick == p.tick
+                && objective.is_some_and(|target| target.matches(survey.objective))
+                && survey.sites.len()
+                    <= scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
+        });
+        if self.site.is_some()
+            && match (self.objective, objective) {
+                (Some(old), Some(new)) => !old.same_flag(new),
+                (None, None) => false,
+                _ => true,
+            }
+        {
+            self.telemetry.objective_replans += 1;
+            self.replan(p.tick);
+            return self.guide(o, up * 5.0, Vec2::ZERO);
+        }
+        if let (Some(site), Some(old), Some(new), Some(survey)) =
+            (self.site, self.objective, objective, survey)
+            && old.revision != new.revision
+        {
+            if let Some(route) = survey
+                .sites
+                .iter()
+                .find(|r| r.site == Some(site.id) && r.cost().is_some())
+            {
+                self.objective = Some(new);
+                self.telemetry.objective_route = Some(route.clone());
+            } else if survey.actual.as_ref().and_then(|r| r.cost()).is_none() {
+                self.telemetry.objective_replans += 1;
+                self.replan(p.tick);
+                return self.guide(o, up * 5.0, Vec2::ZERO);
+            }
+        }
         if self.commit_descent
             && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
             && p.transfer == TransferResult::Ready
         {
+            if objective.is_some() {
+                let Some(survey) = survey else {
+                    return CombatIntent::default();
+                };
+                if survey
+                    .actual
+                    .as_ref()
+                    .and_then(|route| route.cost())
+                    .is_none()
+                {
+                    self.telemetry.objective_replans += 1;
+                    self.retry_landing(p.tick);
+                    return CombatIntent::default();
+                }
+            }
             // Physical landing and hatch access can finish an approach at a
             // different valid point from the planner's proposed site.
             self.goal(TacticalGoal::Surface, p.tick);
@@ -436,6 +500,15 @@ impl TacticalSortiePilot {
                             return None;
                         }
                         let cover = o.cover.iter().find(|s| s.site == site.id);
+                        let ground_cost = if objective.is_some() {
+                            survey?
+                                .sites
+                                .iter()
+                                .find(|route| route.site == Some(site.id))?
+                                .cost()?
+                        } else {
+                            0.0
+                        };
                         // Avoid a long cover detour when this ship is already
                         // unexposed. Such detours can leave a moving planet's
                         // approach frame during an otherwise local retry.
@@ -459,13 +532,19 @@ impl TacticalSortiePilot {
                             *site,
                             side,
                             solar,
-                            angle.abs() * (p.planet.radius + 60.0) + penalty,
+                            angle.abs() * (p.planet.radius + 60.0)
+                                + penalty * if objective.is_some() { 10.0 } else { 1.0 }
+                                + ground_cost,
                         ))
                     })
                 })
                 .min_by(|a, b| a.3.total_cmp(&b.3))
             {
                 self.site = Some(site);
+                self.objective = objective;
+                self.telemetry.objective_route = survey
+                    .and_then(|s| s.sites.iter().find(|r| r.site == Some(site.id)))
+                    .cloned();
                 self.telemetry.solar = solar;
                 self.landing = if self.commit_descent {
                     RulePilotV1::with_committed_descent(self.context, site)

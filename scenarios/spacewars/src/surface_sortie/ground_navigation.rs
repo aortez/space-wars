@@ -357,6 +357,23 @@ impl SurfaceSortieState {
         bearings: impl Iterator<Item = u16>,
         replacing: bool,
     ) -> Option<GroundMap> {
+        self.survey_ground_with_gravity(
+            player,
+            planet,
+            bearings,
+            replacing,
+            self.pilots[player].gravity.length(),
+        )
+    }
+
+    pub(super) fn survey_ground_with_gravity(
+        &self,
+        player: usize,
+        planet: usize,
+        bearings: impl Iterator<Item = u16>,
+        replacing: bool,
+        gravity: f32,
+    ) -> Option<GroundMap> {
         if self.world.physics.material_queries_dirty {
             return None;
         }
@@ -428,7 +445,7 @@ impl SurfaceSortieState {
                 normal: hit.normal.rotate_radians(-frame.angle),
             });
         }
-        let gravity = self.pilots[player].gravity.length().max(1.0);
+        let gravity = gravity.max(1.0);
         let jump_height = spec.jump_speed.powi(2) / (2.0 * gravity);
         let mut nodes_by_id = [None; GROUND_SAMPLES];
         for node in &nodes {

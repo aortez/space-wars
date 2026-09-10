@@ -23,6 +23,10 @@ pub struct GroundPostureObservation {
     pub get_up_result: SpacelingGetUpResult,
     pub get_up_attempts: u64,
     pub stable: bool,
+    /// Space for the conservative upright pose used by the ground map.
+    pub standing_clear: bool,
+    pub crawl_clearance: [Option<f32>; 2],
+    pub crawl_floor: [Option<bool>; 2],
     /// Left and right, checked afresh against the completed physics step.
     pub crawl: [Option<CrawlStep>; 2],
 }
@@ -48,6 +52,17 @@ impl SurfaceSortieState {
                 && (snapshot.motion.angular_velocity - contact.angular_velocity).abs()
                     <= spec.balance.settle_angular_speed
         });
+        let standing_clear = snapshot.support.is_none_or(|contact| {
+            physics.capsule_clearance_test_excluding(
+                spec.half_segment,
+                spec.radius + 0.02,
+                spec.collision_groups,
+                vec![pilot_physics_id(p.owner)],
+            )(
+                contact.position + snapshot.up * ground_navigation::standing_height(),
+                rotation_for_direction(snapshot.up),
+            )
+        });
         let mut observation = GroundPostureObservation {
             version: 1,
             owner: p.owner,
@@ -58,11 +73,15 @@ impl SurfaceSortieState {
             get_up_result: snapshot.get_up_result,
             get_up_attempts: snapshot.get_up_attempts,
             stable,
+            standing_clear,
+            crawl_clearance: [None, None],
+            crawl_floor: [None, None],
             crawl: [None, None],
         };
         if !stable
-            || snapshot.balance != SpacelingBalance::Recovering
-            || snapshot.get_up_result != SpacelingGetUpResult::Blocked
+            || !(snapshot.balance == SpacelingBalance::Recovering
+                && snapshot.get_up_result == SpacelingGetUpResult::Blocked
+                || snapshot.balance == SpacelingBalance::Balanced && !standing_clear)
             || p.supported_planet != Some(p.planet.index)
         {
             return Some(observation);
@@ -76,29 +95,45 @@ impl SurfaceSortieState {
         for (i, direction) in [-1.0, 1.0].into_iter().enumerate() {
             let travel = tangent * direction;
             let start = snapshot.motion.position + contact.normal * 0.025;
-            if physics
-                .collider_translation_clearance_at(
-                    body.collider(),
-                    start,
-                    snapshot.motion.angle,
-                    travel,
-                    CRAWL_DISTANCE + 0.04,
-                )
-                .is_none_or(|distance| distance < CRAWL_DISTANCE + 0.02)
-            {
+            observation.crawl_clearance[i] = physics.collider_translation_clearance_at(
+                body.collider(),
+                start,
+                snapshot.motion.angle,
+                travel,
+                CRAWL_DISTANCE + 0.04,
+            );
+            let Some(clearance) = observation.crawl_clearance[i] else {
+                continue;
+            };
+            // A tilted but supported capsule may only have room for a fraction
+            // of a step under the hull. Recheck after each ordinary input as
+            // contacts rotate it, reserving more than one walking tick of space.
+            let distance = if snapshot.balance == SpacelingBalance::Balanced {
+                (clearance - 0.04).min(CRAWL_DISTANCE)
+            } else if clearance >= CRAWL_DISTANCE + 0.02 {
+                CRAWL_DISTANCE
+            } else {
+                0.0
+            };
+            if distance < 0.10 {
                 continue;
             }
             // Require surviving floor throughout the short corridor. Detached
             // fragments and unsupported edges never supply crawl eligibility.
-            let floor = [0.2, 0.4, CRAWL_DISTANCE].into_iter().all(|distance| {
-                let origin = contact.position + travel * distance + contact.normal * 0.2;
-                self.world
-                    .physics
-                    .material_ground_ray(p.planet.index, origin, -contact.normal, 0.4)
-                    .is_some_and(|hit| hit.normal.dot(snapshot.up) >= spec.min_support_alignment)
-            });
+            let floor = [distance / 3.0, distance * 2.0 / 3.0, distance]
+                .into_iter()
+                .all(|distance| {
+                    let origin = contact.position + travel * distance + contact.normal * 0.2;
+                    self.world
+                        .physics
+                        .material_ground_ray(p.planet.index, origin, -contact.normal, 0.4)
+                        .is_some_and(|hit| {
+                            hit.normal.dot(snapshot.up) >= spec.min_support_alignment
+                        })
+                });
+            observation.crawl_floor[i] = Some(floor);
             if floor {
-                let position = snapshot.motion.position + travel * CRAWL_DISTANCE;
+                let position = snapshot.motion.position + travel * distance;
                 observation.crawl[i] = Some(CrawlStep {
                     direction,
                     position: (position - p.planet.motion.position)

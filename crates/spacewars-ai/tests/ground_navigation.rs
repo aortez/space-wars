@@ -102,6 +102,9 @@ fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
         get_up_result: SpacelingGetUpResult::Blocked,
         get_up_attempts: 1,
         stable: true,
+        standing_clear: false,
+        crawl_clearance: [None, None],
+        crawl_floor: [None, None],
         crawl: [
             Some(CrawlStep {
                 direction: -1.0,
@@ -110,6 +113,91 @@ fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
             None,
         ],
     });
+}
+
+#[test]
+fn cramped_supported_start_uses_fresh_sweeps_then_rejoins_without_jumping() {
+    use scenario_spacewars::surface_sortie::ground_posture::{
+        SpacelingBalance, SpacelingGetUpResult,
+    };
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    for node in &mut o.ground.as_mut().unwrap().nodes {
+        node.position.x += 5.0;
+    }
+    o.flight.pilot.hatch.as_mut().unwrap().x = 11.0;
+    blocked_posture(&mut o);
+    o.flight.pilot.balanced = true;
+    let posture = o.posture.as_mut().unwrap();
+    posture.balance = SpacelingBalance::Balanced;
+    posture.get_up_result = SpacelingGetUpResult::NotRequested;
+    posture.crawl.swap(0, 1);
+    let step = posture.crawl[1].as_mut().unwrap();
+    step.direction = 1.0;
+    step.position.x = 0.6;
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    let action = task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Rejoin);
+    assert_eq!(action.horizontal, 1.0);
+    assert!(!action.primary_held && !action.interact_held);
+    assert_eq!(task.step(&o), action);
+    let mut copy = task.clone();
+    let mut saved_map = o.ground.take().unwrap();
+    o.jetpack = SurfaceSortieScenario::init_material_combat(42).jetpack_navigation_observation(0);
+    assert!(o.jetpack.as_ref().is_some_and(|j| !j.surveyed));
+    advance(&mut o, 1);
+    assert_eq!(
+        task.step(&o).horizontal,
+        1.0,
+        "fresh crawl sweeps run between expensive jetpack surveys"
+    );
+    assert_eq!(copy.step(&o), task.step(&o));
+    advance(&mut o, 2);
+    o.posture.as_mut().unwrap().crawl = [None, None];
+    assert_eq!(
+        task.step(&o).horizontal,
+        1.0,
+        "finish the short measured step while contact rotates the capsule"
+    );
+    assert_eq!(copy.step(&o), task.step(&o));
+    advance(&mut o, 16);
+    assert_eq!(
+        task.step(&o).horizontal,
+        0.0,
+        "a retained step cannot renew itself without another measurement"
+    );
+    assert_eq!(copy.step(&o), task.step(&o));
+    saved_map.tick = 30;
+    o.ground = Some(saved_map);
+    o.jetpack = None;
+    advance(&mut o, 30);
+    o.flight.pilot.actor.as_mut().unwrap().position.x = 3.0;
+    o.posture.as_mut().unwrap().standing_clear = true;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Walk);
+    assert_eq!(task.telemetry().start_repositions, 1);
+    assert!(task.telemetry().route.as_ref().unwrap().failure.is_none());
+}
+
+#[test]
+fn cramped_start_with_no_clear_corridor_has_a_fixed_deadline() {
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    for node in &mut o.ground.as_mut().unwrap().nodes {
+        node.position.x += 5.0;
+    }
+    o.flight.pilot.hatch.as_mut().unwrap().x = 11.0;
+    blocked_posture(&mut o);
+    o.flight.pilot.balanced = true;
+    o.posture.as_mut().unwrap().balance =
+        scenario_spacewars::surface_sortie::ground_posture::SpacelingBalance::Balanced;
+    o.posture.as_mut().unwrap().crawl = [None, None];
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    advance(&mut o, 8 * 60 + 1);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    assert_eq!(task.telemetry().start_repositions, 1);
 }
 
 #[test]

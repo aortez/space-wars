@@ -1,5 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
+The current [objective landing pass](../objective-landings.md) measures a walking
+and jumping round trip to enemy flags before choosing a landing, and adds
+bounded recovery for cramped returns under the parked hull. Prospective jetpack
+access and reliable crater/exposed approaches remain unfinished.
+
 The [usable landing pass](../usable-landings.md) strengthens hull and hatch
 surveys and chooses a clear neighboring exit through the shared transfer logic.
 The bot uses bounded rotation to finish one-foot touchdowns through ordinary controls.

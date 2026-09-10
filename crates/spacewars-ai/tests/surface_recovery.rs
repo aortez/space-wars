@@ -818,6 +818,127 @@ fn ship_on_other_planet() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     (task, o)
 }
 
+fn cramped_return() -> (RecoverShipTask, RecoveryTaskObservationV1) {
+    use scenario_spacewars::surface_sortie::{
+        ground_navigation::{GroundMap, GroundNode},
+        ground_posture::{GroundPostureObservation, SpacelingBalance, SpacelingGetUpResult},
+    };
+    let (task, mut o) = ship_on_other_planet();
+    let p = &mut o.flight.pilot;
+    p.tick = 0;
+    p.planet.motion.position = Vec2::ZERO;
+    p.planet.motion.velocity = Vec2::ZERO;
+    p.planet.motion.angle = 0.0;
+    p.planet.motion.spin = 0.0;
+    p.ship.position = Vec2::new(0.0, 65.0);
+    p.actor.as_mut().unwrap().position = Vec2::new(0.0, 60.9);
+    p.actor.as_mut().unwrap().velocity = Vec2::ZERO;
+    p.actor_up = Vec2::Y;
+    p.hatch = Some(Vec2::new(10.0, 60.0));
+    p.landing.planet = Some(p.planet.index);
+    o.jetpack = None;
+    o.ground = Some(GroundMap {
+        version: 1,
+        actor: p.owner,
+        planet: p.planet.index,
+        revision: p.planet.revision,
+        tick: 0,
+        nodes: vec![GroundNode {
+            id: 0,
+            position: Vec2::new(5.0, 60.0),
+            normal: Vec2::Y,
+        }],
+        edges: vec![],
+        rejected: vec![],
+    });
+    o.posture = Some(GroundPostureObservation {
+        version: 1,
+        owner: p.owner,
+        planet: p.planet.index,
+        revision: p.planet.revision,
+        tick: 0,
+        balance: SpacelingBalance::Balanced,
+        get_up_result: SpacelingGetUpResult::NotRequested,
+        get_up_attempts: 0,
+        stable: true,
+        standing_clear: false,
+        crawl: [None, None],
+        crawl_clearance: [None, None],
+        crawl_floor: [None, None],
+    });
+    (task, o)
+}
+
+fn refresh_return(o: &mut RecoveryTaskObservationV1, tick: u64) {
+    o.flight.pilot.tick = tick;
+    if let Some(map) = &mut o.ground {
+        map.tick = tick;
+    }
+    o.posture.as_mut().unwrap().tick = tick;
+}
+
+#[test]
+fn a_grounded_but_inaccessible_hatch_uses_replacement_only_after_bounded_escape() {
+    use spacewars_ai::ground_task::ShipReturnFailure;
+    let (mut task, mut o) = cramped_return();
+    assert!(!task.step(&o).controls.interact_held);
+    assert_eq!(task.telemetry().scuttle_attempts, 0);
+    refresh_return(&mut o, 8 * 60 + 1);
+    let hold = task.step(&o).controls;
+    assert!(hold.primary_held && hold.interact_held && hold.brake_held);
+    assert_eq!(
+        task.telemetry().return_failure,
+        Some(ShipReturnFailure::NoStandingRoute)
+    );
+    assert_eq!(task.telemetry().scuttle_attempts, 1);
+    let mut clone = task.clone();
+    o.ground = None;
+    refresh_return(&mut o, 8 * 60 + 2);
+    assert_eq!(task.step(&o), clone.step(&o));
+    assert!(
+        task.step(&o).controls.interact_held,
+        "confirmed obstruction persists between scheduled surveys"
+    );
+    refresh_return(&mut o, 8 * 60 + 31);
+    assert_eq!(
+        task.step(&o),
+        FlightIntent::default(),
+        "expired measurements cannot hold the scuttle chord"
+    );
+}
+
+#[test]
+fn regained_footing_or_changed_evidence_cancels_a_cramped_return_hold() {
+    for fault in 0..7 {
+        let (mut task, mut o) = cramped_return();
+        task.step(&o);
+        refresh_return(&mut o, 8 * 60 + 1);
+        assert!(task.step(&o).controls.interact_held);
+        refresh_return(&mut o, 8 * 60 + 2);
+        match fault {
+            0 => o.flight.pilot.actor.as_mut().unwrap().position.x = 3.0,
+            1 => o.posture.as_mut().unwrap().standing_clear = true,
+            2 => {
+                o.flight.pilot.transfer = scenario_spacewars::surface_sortie::TransferResult::Ready
+            }
+            3 => o.flight.pilot.supported_planet = None,
+            4 => o.flight.pilot.queries_ready = false,
+            5 => {
+                o.flight.pilot.planet.revision += 1;
+                o.ground = None;
+            }
+            _ => o.ground.as_mut().unwrap().tick += 1,
+        }
+        let action = task.step(&o).controls;
+        assert!(
+            !(action.primary_held && action.interact_held && action.brake_held),
+            "fault {fault}"
+        );
+        assert_eq!(task.telemetry().scuttle_attempts, 1);
+        assert!(task.telemetry().scuttled_tick.is_none());
+    }
+}
+
 #[test]
 fn unreachable_ship_uses_shared_scuttle_then_releases_and_retains_recovery_budget() {
     let (mut task, mut o) = ship_on_other_planet();

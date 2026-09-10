@@ -1,4 +1,6 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/ground_start_probe.rs"]
+mod ground_start_probe;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
 use engine_common::{
@@ -40,6 +42,8 @@ fn main() {
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
     let trace = arg("--trace", "false") == "true";
+    let probe_ground_start = arg("--probe-ground-start", "false") == "true";
+    let mut probed_ground_start = false;
     let require_route = arg("--require-route", "false") == "true";
     let require_hunt = arg("--require-hunt", "false") == "true";
     let require_claim_recovery = arg("--require-claim-recovery", "false") == "true";
@@ -94,6 +98,7 @@ fn main() {
     );
     let initial = state.terrain_diagnostics().occupied_cells;
     let mut sensors = Vec::new();
+    let mut objective_sensors = Vec::new();
     let mut policies = Vec::new();
     let mut steps = Vec::new();
     let mut samples = Vec::new();
@@ -139,7 +144,11 @@ fn main() {
             if i == seat || mode == "duel" {
                 let clock = Instant::now();
                 let o = state.mission_observation(i, pilots[i].site_request());
-                sensors.push(clock.elapsed().as_secs_f64() * 1000.0);
+                let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
+                sensors.push(sensor_ms);
+                if o.local.landing_objective.is_some() {
+                    objective_sensors.push(sensor_ms);
+                }
                 let clock = Instant::now();
                 let mut intent = pilots[i].intent(&o);
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -172,6 +181,12 @@ fn main() {
                     .as_ref()
                     .and_then(|c| c.ground.as_ref())
                     .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
+                if probe_ground_start && !probed_ground_start && i == seat
+                    && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting))
+                {
+                    ground_start_probe::run(&state, i, &out);
+                    probed_ground_start = true;
+                }
                 if ground.is_some_and(|g| g.claim_target.is_some()) {
                     pending_claim_footing[i].get_or_insert((p.planet.index, tick));
                 }
@@ -304,7 +319,7 @@ fn main() {
     // Include the final completed tick even when the chase ends between the
     // one-second samples; contact latency never depends on sample alignment.
     let final_combat = [state.combat_telemetry(0), state.combat_telemetry(1)];
-    let report = json!({"version":2,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
+    let mut report = json!({"version":2,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
         "elapsed_ticks":elapsed_ticks,"metrics":metrics,"final_combat":final_combat,"final_audit":final_audit,
         "combat_breaks":breaks,
         "pursuit_trial":(mode=="pursuit").then(|| json!({"prepare_limit_seconds":prepare_seconds,
@@ -316,6 +331,8 @@ fn main() {
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
+    report["objective_refresh"] =
+        json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
