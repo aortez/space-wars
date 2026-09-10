@@ -21,6 +21,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_falling_enabled(settings.events.falling);
     window.set_launcher_clock_color_cycle_enabled(settings.events.color_cycle);
     window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
+    window.set_launcher_clock_duck_enabled(settings.events.duck);
 }
 
 pub(crate) fn install(
@@ -137,6 +138,7 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         2 => settings.events.falling = !settings.events.falling,
         3 => settings.events.color_cycle = !settings.events.color_cycle,
         7 => settings.events.meltdown = !settings.events.meltdown,
+        8 => settings.events.duck = !settings.events.duck,
         _ => return None,
     }
     Some(settings)
@@ -160,7 +162,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6 | 7) {
+            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));
@@ -171,7 +173,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || index == 7 => {
+        UiAction::Confirm if index <= 4 || index == 7 || index == 8 => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

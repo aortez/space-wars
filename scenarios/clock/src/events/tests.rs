@@ -46,6 +46,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             falling: kind == ClockEventKind::Falling,
             color_cycle: kind == ClockEventKind::ColorCycle,
             meltdown: kind == ClockEventKind::Meltdown,
+            duck: kind == ClockEventKind::Duck,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -78,6 +79,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 falling: false,
                 color_cycle: false,
                 meltdown: false,
+                duck: false,
             },
         ),
     ] {

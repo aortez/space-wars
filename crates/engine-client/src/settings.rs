@@ -311,6 +311,7 @@ mod tests {
                 falling: false,
                 color_cycle: true,
                 meltdown: false,
+                duck: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -327,6 +328,20 @@ mod tests {
         assert!(!settings.clock.events.falling);
         assert!(!settings.clock.events.color_cycle);
         assert!(settings.clock.events.meltdown);
+        assert!(settings.clock.events.duck);
+    }
+
+    #[test]
+    fn pre_duck_settings_preserve_all_existing_switches() {
+        let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\n[clock.events]\nfalling = false\ncolor_cycle = true\nmeltdown = false\n").unwrap();
+        assert!(settings.clock.events.duck);
+        assert!(!settings.clock.events.falling);
+        assert!(settings.clock.events.color_cycle);
+        assert!(!settings.clock.events.meltdown);
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
     }
 
     #[test]

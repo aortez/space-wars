@@ -22,6 +22,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.falling", "Off", &page);
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
         let configured = harness.clock_state();
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -296,6 +297,9 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             if active.event_kind == Some(ClockEventKind::Falling) {
                 assert!((5..=32).contains(&active.body_count));
                 assert!(active.collider_count <= 100);
+            } else if active.event_kind == Some(ClockEventKind::Duck) {
+                assert!(active.body_count <= 5 && active.collider_count <= 5);
+                assert!(active.duck.is_some());
             } else {
                 assert!(matches!(
                     active.event_kind,
@@ -324,6 +328,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.falling.next",
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
+            "launcher.settings.clock.duck.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);
@@ -398,6 +403,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.falling.next",
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
+            "launcher.settings.clock.duck.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
         }
@@ -562,7 +568,7 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         harness.assert_clock_stays_paused(&paused);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         assert_eq!(harness.clock_state().meltdown, paused.meltdown);
-        // All three event switches remain reachable through controller navigation.
+        // The original event switches remain reachable through controller navigation.
         let page = harness.press_guarded(UiAction::Left, &page);
         assert_eq!(
             page.selected_control.as_deref(),
@@ -632,5 +638,88 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         assert_ne!(relaunched.scenario_revision, restarted.scenario_revision);
         assert_eq!(relaunched.meltdown, None);
         assert!(!relaunched.settings.events.meltdown);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
+    run_functional_test("clock-duck", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_guarded("launcher.settings.clock.duck.next", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.duck.next"),
+            Some("Off")
+        );
+        harness.capture_screenshot("clock-duck-launcher.png");
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        harness.clock_trigger_event(&initial, ClockEventKind::Duck);
+        // Short door phases are checked at exact simulation ticks in the core
+        // tests. A loaded UI runner need not catch a sub-second animation.
+        let running = harness.clock_wait(&initial, "running", 1, 140);
+        assert_eq!((running.body_count, running.collider_count), (5, 5));
+        assert!(running.duck.unwrap().jumps >= 1);
+        harness.capture_screenshot("clock-duck-running.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        assert_eq!(harness.clock_state().duck, paused.duck);
+        // Four event switches and the preview are accessible using a D-pad.
+        let mut page = harness.press_guarded(UiAction::Down, &page);
+        page = harness.press_guarded(UiAction::Down, &page);
+        for _ in 0..3 {
+            page = harness.press_guarded(UiAction::Right, &page);
+        }
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.duck"));
+        for _ in 0..3 {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Duck")
+        );
+        harness.capture_screenshot("clock-duck-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let resetting = harness.clock_wait(&initial, "resetting", 2, 5);
+        assert_eq!(resetting.scenario_revision, initial.scenario_revision);
+        assert!(!resetting.settings.events.duck);
+        let duck = resetting.duck.unwrap();
+        assert_eq!(duck.outcome, Some(engine_common::ClockDuckOutcome::Exited));
+        assert_eq!((duck.jumps, duck.cleared_obstacles), (3, 3));
+        assert_eq!((resetting.body_count, resetting.collider_count), (0, 0));
+        harness.capture_screenshot("clock-duck-resetting.png");
+        let idle = harness.clock_wait(&initial, "idle", 2, 0);
+        assert_eq!(idle.duck, None);
+        assert_eq!(idle.next_event_tick, None);
+        harness.capture_screenshot("clock-duck-recovered.png");
+        harness.clock_trigger_event(&idle, ClockEventKind::Duck);
+        harness.clock_wait(&idle, "running", 3, 60);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert_eq!(restarted.duck, None);
+        assert_eq!(restarted.body_count, 0);
+        assert!(!restarted.settings.events.duck);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        let relaunched = harness.clock_state();
+        assert_eq!(relaunched.duck, None);
+        assert_eq!(relaunched.body_count, 0);
+        assert!(!relaunched.settings.events.duck);
     });
 }

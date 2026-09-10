@@ -624,6 +624,7 @@ fn show_launcher(
     window.set_launcher_clock_falling_enabled(settings.clock.events.falling);
     window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
     window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
+    window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -1192,7 +1193,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
         "spacewars" => 8,
         "pizza" => 5,
-        "clock" => 8,
+        "clock" => 9,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition" => 4,
@@ -1329,6 +1330,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 7 {
+        window.set_launcher_clock_duck_enabled(!window.get_launcher_clock_duck_enabled());
+        return;
+    }
     if focus == 6 {
         window.set_launcher_clock_meltdown_enabled(!window.get_launcher_clock_meltdown_enabled());
         return;
@@ -1851,6 +1856,7 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             falling: window.get_launcher_clock_falling_enabled(),
             color_cycle: window.get_launcher_clock_color_cycle_enabled(),
             meltdown: window.get_launcher_clock_meltdown_enabled(),
+            duck: window.get_launcher_clock_duck_enabled(),
         },
     })
 }
@@ -2638,6 +2644,7 @@ mod tests {
                     falling: false,
                     color_cycle: true,
                     meltdown: false,
+                    duck: false,
                 },
             },
             spacewars: SpacewarsSettings {

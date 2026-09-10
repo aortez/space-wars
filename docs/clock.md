@@ -8,7 +8,7 @@ reads the system clock. Configure the device's timezone/NTP as described in
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, and **Meltdown** switches select the automatic event mix;
+The **Falling**, **Color Cycle**, **Meltdown**, and **Duck** switches select the automatic event mix;
 all default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
 
@@ -24,7 +24,7 @@ rate. Events never overlap. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait. Each kind also has an automatic
 reuse delay; the scheduler waits longer if no enabled event is eligible yet.
 With all switches Off, no automatic event is scheduled. Older settings files
-retain their existing switches and default the new Meltdown switch to On;
+retain their existing switches and default missing event switches to On;
 the Off profile still disables every automatic event.
 
 | Event ID | Effect | Duration | Automatic reuse delay after completion |
@@ -32,6 +32,7 @@ the Off profile still disables every automatic event.
 | `falling` | Digit geometry / rigid bodies | 3.5 s fall + 1.5 s reform | 30 s |
 | `color-cycle` | Appearance only | 6 s | 15 s |
 | `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
+| `duck` | Temporary floor course and a physical runner | 10 s envelope, including doors/reset | 30 s |
 
 Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
@@ -58,6 +59,29 @@ boundary accounts for and clears any remaining material rather than reporting
 it as successfully drained. Preview replacement, resize and restart drop the
 whole event-local representation. This does not depend on destructible terrain.
 
+Duck opens a side door, spawns a yellow pixel duck, and runs it across two small
+hurdles and one pit. Seeded variations choose the hurdle heights/positions, pit
+width, and entrance side. The opposite door opens as the duck approaches; after
+it exits, both doors and the temporary course fade away, restoring the ordinary
+floor and center drain. The clock remains anchored and follows live time above.
+
+The duck uses **one dynamic round body**, two fixed floor pieces, and two fixed
+hurdles: at most **five bodies and five colliders**, no joints, and no growing
+particle/entity lists. A small horizontal velocity servo runs it forward. Its
+rule controller looks ahead to the next obstacle and applies a jump velocity
+change only while supported by a real upward-facing contact. Gravity and Rapier
+contacts handle the resulting motion; it does not teleport across obstacles.
+The upright pixel sprite and sliding doors are presentation, not articulated
+physics. Doors are logical backstage entry/exit markers, not trapping colliders.
+
+Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
+still blocked at 9.5 seconds enters reset; successful exits normally occur sooner.
+Reset immediately drops all physics, fades the course over half a second, and
+keeps the last outcome available until the fixed ten-second event envelope ends.
+Resize, restart, or preview replacement also release the whole event. Narrow
+layouts scale the duck and jump height down; wider layouts increase running
+speed and horizontal course spacing while keeping the action below the face.
+
 All durations use fixed 60 Hz simulation ticks, so pause freezes the event and
 its schedule. The strict `clock trigger` command requires unpaused, synchronized,
 idle Clock gameplay. It bypasses automatic enablement and per-kind reuse delays, but not
@@ -76,7 +100,7 @@ desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
-**Falling/Color Cycle/Meltdown automatic switches**. Changes apply at the next host tick,
+**Falling/Color Cycle/Meltdown/Duck automatic switches**. Changes apply at the next host tick,
 even while paused, and are saved for restart/relaunch. A save failure is shown
 on the page; settings then remain active for the current session. Setting
 changes do not interrupt the current animation or reset its physics, event ID,
@@ -108,8 +132,9 @@ mutation. Animation ticks still do not invalidate UI revision guards.
 The face reforms using the **latest** reading, even across minute/hour changes
 or a host-time correction. Resizing during an event restores the current face
 and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Rapier
-exists only during the falling phase: at most 28 moving bars plus four arena
-bodies and 100 colliders, with no accumulating debris.
+exists only during Falling's falling phase or Duck's running/exiting phases:
+at most 28 moving bars plus four arena bodies and 100 colliders for Falling,
+or five bodies/colliders for Duck, with no accumulating debris.
 
 ## Extending the event system
 
@@ -126,7 +151,7 @@ resizing drops the active event and restores the latest face and base palette.
 Restart/relaunch constructs a fresh scenario. There is no plugin framework and
 no concurrent composition yet: affected-area metadata does not permit overlap.
 
-This slice does not implement time-change triggers or duck events. Those can
+This slice does not implement time-change triggers or flashlights. Those can
 add bounded event-local representations
 without moving scheduling or wall-clock reads into the individual animations.
 
@@ -152,6 +177,11 @@ spacewars-cli clock wait --event meltdown --phase melting --event-id 3 --min-pha
 spacewars-cli screenshot /tmp/clock-melting.png
 spacewars-cli clock wait --event meltdown --phase draining --event-id 3 --min-phase-tick 10
 spacewars-cli screenshot /tmp/clock-draining.png
+spacewars-cli clock wait --lifecycle idle --event-id 3
+spacewars-cli clock trigger duck --json
+spacewars-cli clock wait --event duck --phase running --event-id 4 --min-phase-tick 140
+spacewars-cli screenshot /tmp/clock-duck.png
+spacewars-cli clock wait --event duck --phase resetting --event-id 4 --min-phase-tick 5
 ```
 
 Use the event ID returned by `trigger`, not necessarily `1`. For robust remote
@@ -159,9 +189,10 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **4** and reports scenario-instance revision,
+`clock state` uses schema version **5** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
-phase (`falling`, `reforming`, `cycling`, `melting`, `draining`), pause state, profile, schedule, current
+phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
+`exiting`, `resetting`), pause state, profile, schedule, current
 reading/target digits, palette RGB, physics counts, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
@@ -174,7 +205,12 @@ reclaimed volume. One original cell equals 1,000,000 micro-units; independently
 rounded totals can differ by one unit. Waiting plus airborne cell volume plus
 the three volume aggregates must equal the initial material. Reclaimed volume
 is explicit deadline cleanup, not drainage. Idle and other events report null.
-Use matching client/CLI builds: schema 3 requests are rejected.
+The optional `duck` object reports entrance side, position in thousandths of
+render world units, grounded state, jumps, cleared/total obstacles, door openness
+in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only
+during Duck; position is null before spawn and after despawn. Outcomes remain
+available during reset, not as a persistent event history.
+Use matching client/CLI builds: schema 4 and older requests are rejected.
 
 `clock trigger` fetches state and guards the mutation with both instance revision
 and event ID; `--expect-scenario-revision` and `--expect-event-id` override those
@@ -184,8 +220,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 4, `event`
-(`falling`, `color-cycle`, or `meltdown`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 5, `event`
+(`falling`, `color-cycle`, `meltdown`, or `duck`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -236,6 +272,34 @@ rasterization, presentation and host work; they are not device FPS measurements.
 **Meltdown has not been deployed or tested on the Pi.** Coordinate with the
 other task using `spacewars.local` and obtain confirmation before deployment.
 The device captures below document the earlier events, not Meltdown.
+
+### Duck local validation
+
+The workspace/all-target suite passed **875 tests** (16 display-dependent
+workflows ignored); all **six Clock UI workflows** were then run explicitly on
+the local X display and passed. Strict Clippy passed for Clock/common/control/CLI.
+
+The deterministic course test runs 32 seeds at each of four aspect ratios
+(0.25, 0.75, 800/480, and 4): every run must jump all three obstacles, reach the
+exit, and release every body. Each jump must start from physical support; door
+openness and spawn/despawn are checked at exact simulation ticks. Separate tests
+inject a fall and an unjumpable wall to verify bounded recovery. Pause, time
+changes, resize, repeatability, and replacement by every other event are covered
+too. Raster tests at 800×480,
+480×800, and 1280×720 check visible duck pixels and exact restoration of the
+normal frame, with fewer than 300 draw primitives; the same frames reach vector
+presentation. The real-client Duck workflow checks both settings pages, disabled
+previews, controller navigation, phase telemetry, pause, exit, and restart/relaunch.
+It does not need to catch the brief door animations on a busy machine.
+
+```sh
+cargo test --locked -p scenario-clock events::duck
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client duck_course_reaches -- --nocapture
+```
+
+**Duck has not been deployed or tested on the Pi.** Ask before deploying; another
+task may be testing there.
 
 ## Device captures
 

@@ -776,6 +776,21 @@ mod tests {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "events", "--json"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "falling"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "meltdown"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "duck"]).is_ok());
+        for phase in ["opening", "running", "exiting", "resetting"] {
+            assert!(
+                Args::try_parse_from([
+                    "spacewars-cli",
+                    "clock",
+                    "wait",
+                    "--event",
+                    "duck",
+                    "--phase",
+                    phase
+                ])
+                .is_ok()
+            );
+        }
         for phase in ["melting", "draining", "reforming"] {
             assert!(
                 Args::try_parse_from([

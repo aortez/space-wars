@@ -229,16 +229,18 @@ pub enum ClockEventKind {
     Falling = 0,
     ColorCycle = 1,
     Meltdown = 2,
+    Duck = 3,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 3] = [Self::Falling, Self::ColorCycle, Self::Meltdown];
+    pub const ALL: [Self; 4] = [Self::Falling, Self::ColorCycle, Self::Meltdown, Self::Duck];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Falling => "falling",
             Self::ColorCycle => "color-cycle",
             Self::Meltdown => "meltdown",
+            Self::Duck => "duck",
         }
     }
 
@@ -247,6 +249,7 @@ impl ClockEventKind {
             Self::Falling => "Falling",
             Self::ColorCycle => "Color Cycle",
             Self::Meltdown => "Meltdown",
+            Self::Duck => "Duck",
         }
     }
 }
@@ -258,6 +261,7 @@ pub struct ClockEvents {
     pub falling: bool,
     pub color_cycle: bool,
     pub meltdown: bool,
+    pub duck: bool,
 }
 
 impl Default for ClockEvents {
@@ -266,6 +270,7 @@ impl Default for ClockEvents {
             falling: true,
             color_cycle: true,
             meltdown: true,
+            duck: true,
         }
     }
 }
@@ -276,6 +281,7 @@ impl ClockEvents {
             ClockEventKind::Falling => self.falling,
             ClockEventKind::ColorCycle => self.color_cycle,
             ClockEventKind::Meltdown => self.meltdown,
+            ClockEventKind::Duck => self.duck,
         }
     }
 }
@@ -292,6 +298,29 @@ pub struct ClockMeltdownState {
     pub drained_microunits: u64,
     /// Residue removed by the bounded reform phase, not counted as drainage.
     pub reclaimed_microunits: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckOutcome {
+    Exited,
+    Fell,
+    TimedOut,
+}
+
+/// Temporary course/controller telemetry. Position is in thousandths of render
+/// world units; the duck and its physics are absent during opening/resetting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckState {
+    pub left_to_right: bool,
+    pub position_milli: Option<[i32; 2]>,
+    pub grounded: bool,
+    pub jumps: u32,
+    pub cleared_obstacles: usize,
+    pub obstacle_count: usize,
+    pub entrance_open_milli: u32,
+    pub exit_open_milli: u32,
+    pub outcome: Option<ClockDuckOutcome>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -8,6 +8,8 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod duck;
+
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
 const INACTIVE_CELL_LAYER: i32 = 2;
@@ -34,6 +36,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         render_meltdown(&mut frame, event, layout);
+    }
+    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+        duck::render(&mut frame, event);
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);

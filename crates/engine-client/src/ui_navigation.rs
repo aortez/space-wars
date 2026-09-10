@@ -52,14 +52,14 @@ pub(crate) fn moved_ingame_selection(
 }
 
 pub(crate) fn moved_clock_selection(current: i32, action: UiAction) -> i32 {
-    // Keep existing control indices stable: the event row is [2, 3, 7],
+    // Keep existing control indices stable: the event row is [2, 3, 7, 8],
     // followed by preview choice 4 and the [5, 6] action row.
-    let current = current.clamp(0, 7) as usize;
+    let current = current.clamp(0, 8) as usize;
     match action {
-        UiAction::Up => [5, 0, 1, 1, 2, 4, 4, 1][current],
-        UiAction::Down => [1, 2, 4, 4, 5, 0, 0, 4][current],
-        UiAction::Left => [0, 1, 7, 2, 4, 6, 5, 3][current],
-        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 2][current],
+        UiAction::Up => [5, 0, 1, 1, 2, 4, 4, 1, 1][current],
+        UiAction::Down => [1, 2, 4, 4, 5, 0, 0, 4, 4][current],
+        UiAction::Left => [0, 1, 8, 2, 4, 6, 5, 3, 7][current],
+        UiAction::Right => [0, 1, 3, 7, 4, 6, 5, 8, 2][current],
         _ => current as i32,
     }
 }
@@ -79,9 +79,13 @@ mod tests {
     fn clock_event_row_reaches_every_switch_without_changing_preview() {
         assert_eq!(moved_clock_selection(2, UiAction::Right), 3);
         assert_eq!(moved_clock_selection(3, UiAction::Right), 7);
-        assert_eq!(moved_clock_selection(7, UiAction::Right), 2);
+        assert_eq!(moved_clock_selection(7, UiAction::Right), 8);
+        assert_eq!(moved_clock_selection(8, UiAction::Right), 2);
         assert_eq!(moved_clock_selection(7, UiAction::Left), 3);
-        assert_eq!(moved_clock_selection(2, UiAction::Left), 7);
+        assert_eq!(moved_clock_selection(2, UiAction::Left), 8);
+        assert_eq!(moved_clock_selection(8, UiAction::Left), 7);
+        assert_eq!(moved_clock_selection(8, UiAction::Down), 4);
+        assert_eq!(moved_clock_selection(8, UiAction::Up), 1);
         assert_eq!(moved_clock_selection(7, UiAction::Down), 4);
         assert_eq!(moved_clock_selection(7, UiAction::Up), 1);
     }

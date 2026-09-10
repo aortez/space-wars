@@ -138,6 +138,7 @@ impl ClientScenario for ClockClientScenario {
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
             meltdown: self.state.meltdown_state(),
+            duck: self.state.duck_state(),
             reading: self
                 .state
                 .reading()
@@ -238,6 +239,107 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+    }
+
+    #[test]
+    fn duck_course_reaches_both_render_paths_and_resets_to_the_normal_arena() {
+        for viewport in [
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+            Viewport::new(1280.0, 720.0),
+        ] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: viewport.aspect_ratio(),
+                    event_profile: engine_common::ClockEventProfile::Off,
+                    ..ClockConfig::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(8, 8, 0).unwrap(),
+                )],
+                Duration::ZERO,
+            );
+            let normal = ClockScenario::render_frame(&state);
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::trigger_event(
+                    engine_common::ClockEventKind::Duck,
+                )],
+                Duration::ZERO,
+            );
+            let mut scenario = ClockClientScenario {
+                state,
+                last_emitted_reading: Cell::new(None),
+            };
+            let mut renderer = crate::raster::RasterRenderer::new();
+            for tick in 0..=scenario_clock::DUCK_TICKS {
+                if tick > 0 {
+                    scenario.step(&[], Duration::from_nanos(16_666_667));
+                }
+                if ![0, 18, 60, 170, 260, 395, 460, 590, 600].contains(&tick) {
+                    continue;
+                }
+                let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Vector, viewport)
+                );
+                assert!(
+                    frames[0]
+                        .layers
+                        .iter()
+                        .map(|l| l.primitives.len())
+                        .sum::<usize>()
+                        < 300
+                );
+                let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                );
+                assert!(!presentation.main_primitives.is_empty());
+                let image = renderer.image_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                    crate::raster::RasterOptions::default(),
+                );
+                let pixels = image.to_rgb8().unwrap();
+                let yellow = pixels
+                    .as_slice()
+                    .iter()
+                    .filter(|p| p.r > 240 && p.g > 200 && p.b < 50)
+                    .count();
+                if [60, 170, 260, 395].contains(&tick) {
+                    assert!(yellow > 25, "duck missing at {tick} in {viewport:?}");
+                }
+                if tick == 0 || tick == 600 {
+                    assert_eq!(yellow, 0);
+                    assert_eq!(frames[0], normal);
+                }
+                if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                    let directory = std::path::PathBuf::from(directory);
+                    std::fs::create_dir_all(&directory).unwrap();
+                    let file = std::fs::File::create(directory.join(format!(
+                        "duck-{tick}-{}x{}.png",
+                        viewport.width, viewport.height
+                    )))
+                    .unwrap();
+                    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                    encoder.set_color(png::ColorType::Rgb);
+                    encoder.set_depth(png::BitDepth::Eight);
+                    encoder
+                        .write_header()
+                        .unwrap()
+                        .write_image_data(pixels.as_bytes())
+                        .unwrap();
+                }
+            }
+        }
     }
 
     #[test]

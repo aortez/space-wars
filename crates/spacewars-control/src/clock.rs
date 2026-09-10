@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 4;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -39,6 +39,7 @@ pub struct ClockState {
     pub body_count: usize,
     pub collider_count: usize,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
+    pub duck: Option<engine_common::ClockDuckState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -249,6 +250,7 @@ mod tests {
             body_count: 0,
             collider_count: 0,
             meltdown: None,
+            duck: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -337,6 +339,7 @@ mod tests {
             r#"{"schema_version":1,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":2,"event":"unknown","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":3,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
+            r#"{"schema_version":4,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
         ] {
             assert!(ClockTriggerRequest::from_json(json).is_err());
         }
@@ -359,6 +362,33 @@ mod tests {
             state
         );
         let request = ClockTriggerRequest::new(&state, ClockEventKind::Meltdown);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+    }
+
+    #[test]
+    fn duck_diagnostics_and_named_trigger_round_trip() {
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::Duck);
+        state.phase = Some("resetting".into());
+        state.duck = Some(engine_common::ClockDuckState {
+            left_to_right: false,
+            position_milli: None,
+            grounded: false,
+            jumps: 3,
+            cleared_obstacles: 3,
+            obstacle_count: 3,
+            entrance_open_milli: 0,
+            exit_open_milli: 700,
+            outcome: Some(engine_common::ClockDuckOutcome::Exited),
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Duck);
         assert_eq!(
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request

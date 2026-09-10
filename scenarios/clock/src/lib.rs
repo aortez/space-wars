@@ -21,6 +21,7 @@ use engine_common::{
     Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockSettings, ClockTimeFormat,
     Observation, RenderFrame, Scenario, StepResult, TickModel,
 };
+pub use events::duck::DUCK_TICKS;
 pub use events::meltdown::{DRAINING_TICKS, MAX_MELTDOWN_CELLS, MELTING_TICKS, WATER_COLUMNS};
 use events::{ActiveEvent, EventContext, EventSchedule};
 pub use events::{
@@ -96,7 +97,8 @@ impl ClockAction {
         payload.push(
             u8::from(settings.events.falling)
                 | (u8::from(settings.events.color_cycle) << 1)
-                | (u8::from(settings.events.meltdown) << 2),
+                | (u8::from(settings.events.meltdown) << 2)
+                | (u8::from(settings.events.duck) << 3),
         );
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -140,7 +142,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 5) if payload[4] <= 7 => {
+            (CLOCK_ACTION_CONFIGURE, 5) if payload[4] <= 15 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -157,6 +159,7 @@ impl ClockAction {
                         falling: payload[4] & 1 != 0,
                         color_cycle: payload[4] & 2 != 0,
                         meltdown: payload[4] & 4 != 0,
+                        duck: payload[4] & 8 != 0,
                     },
                 }))
             }
@@ -307,6 +310,13 @@ impl ClockState {
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
             ActiveEvent::Meltdown(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+
+    pub fn duck_state(&self) -> Option<engine_common::ClockDuckState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Duck(event) => Some(event.diagnostics()),
             _ => None,
         }
     }

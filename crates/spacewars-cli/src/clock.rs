@@ -19,7 +19,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle or meltdown.
+        /// Event ID: falling, color-cycle, meltdown or duck.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -39,7 +39,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -62,7 +62,7 @@ fn parse_event(value: &str) -> Result<ClockEventKind, String> {
         .into_iter()
         .find(|kind| kind.as_str() == value)
         .ok_or_else(|| {
-            format!("Unknown Clock event {value:?}; choose falling, color-cycle or meltdown")
+            format!("Unknown Clock event {value:?}; choose falling, color-cycle, meltdown or duck")
         })
 }
 
@@ -209,6 +209,21 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 material.pooled_microunits as f64 / 1_000_000.0,
                 material.drained_microunits as f64 / 1_000_000.0,
                 material.reclaimed_microunits as f64 / 1_000_000.0
+            );
+        }
+        if let Some(duck) = state.duck {
+            println!(
+                "Duck: {}; {} jumps, {}/{} obstacles cleared, grounded={}; outcome {:?}",
+                if duck.left_to_right {
+                    "left to right"
+                } else {
+                    "right to left"
+                },
+                duck.jumps,
+                duck.cleared_obstacles,
+                duck.obstacle_count,
+                duck.grounded,
+                duck.outcome
             );
         }
     }

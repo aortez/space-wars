@@ -10,6 +10,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 falling: true,
                 color_cycle: false,
                 meltdown: false,
+                duck: false,
             },
             ..ClockConfig::default()
         },
@@ -397,6 +398,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         assert_eq!(a.segments(), b.segments());
         assert_eq!(a.palette(), b.palette());
         assert_eq!(a.meltdown_state(), b.meltdown_state());
+        assert_eq!(a.duck_state(), b.duck_state());
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }
