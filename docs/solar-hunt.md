@@ -76,3 +76,78 @@ Artifacts, logs, images and reproduction scripts:
 ```text
 /home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/solar-hunt-20260910/
 ```
+
+## Results at `1f89ec8`
+
+The full workspace passed **1,105 tests**, with 26 display-dependent tests
+ignored in that invocation. Eight example tests also passed: **1,113 total**.
+All ten terrain UI workflows passed explicitly under Xvfb, including both
+renderers; 82 artifact files were archived. Formatting and Clippy passed, with
+existing advisories outside the changed code. The six frozen navigation and
+twelve strategy episodes matched. A rendered heat probe verifies the visible
+corona and the HUD at 90% hull health and 10%/s exposure.
+
+Desktop and Pi each completed 24 three-minute runs: twelve capture-then-hunt
+trials (eight generated, four fixed), eight generated two-bot trials with
+3-second Mixed asteroid arrivals, and four additional quiet generated routes.
+That is **48 runs / 2.4 simulated hours**, all passing finite-motion, speed and
+retained-plus-removed material audits. Reports, traces and 336 Pi frames were
+archived before deployment.
+
+| Capture-then-hunt result | Desktop | Pi |
+| --- | ---: | ---: |
+| Completed runs | 12/12 | 12/12 |
+| All planet capture/boarding/departure trips | 11/12 | 11/12 |
+| Actual weapon contact after securing all planets | 10/12 | 10/12 |
+| Mandatory hunt acceptance cases | 6/6 | 6/6 |
+
+Both seats and both reflections are represented. The fixed trials all scored
+contacts. Generated seed 0/P1 began pursuit at 116.68s desktop and 116.62s Pi;
+both scored their first per-second recorded hit at 135s. Its desktop opponent
+lost a ship and the hunter switched to tracking the pod. The two-bot asteroid
+trials caused no ship losses in this set, so they add environmental/mission
+coverage rather than additional recovery milestones. Timing was collected with
+concurrent runners and compilation; it is not a controlled performance comparison.
+
+### Remaining route work exposed by a solid sun
+
+The two missed hunt trials have distinct causes:
+
+- Seed 2/P2 entered pursuit at 179.18s desktop and 179.70s Pi,
+  leaving less than a second for pursuit before the cutoff.
+- Seed 7/P2 still struggled to land on planet 0's sunward side and completed no
+  departure. The previous successful trajectory went **20.08 units inside the
+  sun on desktop and 18.20 on Pi**. The new trajectory's minimum sampled
+  clearance was 23.37 and 28.94 units respectively, but local landing selection
+  still proposed approaches that repeatedly triggered solar escape. Desktop
+  took a small amount of heat damage; Pi retained full hull health. This is a
+  newly exposed need for solar-aware landing-site selection, not a successful
+  capture or pursuit result.
+
+The extra quiet cases also retain unfinished ground/landing routes at 180s.
+Three of four desktop and two of four Pi cases completed all three departures.
+Match victory/elimination and broader difficult-ground navigation remain ahead.
+
+## Pi deployment and live check
+
+Yocto completed all 6,608 tasks successfully (21 rerun), with the existing
+unvalidated-host warning. The archived image is
+`spacewars-image-1f89ec8.ext4.gz`, SHA-256
+`ff6524d238b4a654fd520eedcfa75617006e45482000af6a4c19824b5ab4859a`.
+The installed `/usr/bin/engine-client` hash was verified as
+`1b5a964f96601f25dfaeb044d47acf863dbca7f4d9b602127626af54237ea375`.
+The Pi booted slot A, `/dev/sda2`, with `spacewars-kiosk.service` active and zero
+restarts. Source implementation: `1f89ec86c17a105a756c4effc16a8a98f7d06989`.
+
+A 180-wall-second live arena duel used the verified raster renderer at scale 2
+and 3-second Mixed asteroid arrivals. At 30/75/120/180 seconds, sampled FPS was
+48.7/51.9/52.6/52.8 and UPS was 59.6/59.9/59.5/59.8, with zero service restarts.
+Screenshots show normal landing, claiming and jetpack ground travel, and the
+solar corona during transfer. At 180 seconds P1 was still circling into cover
+at neutral planet 0 and P2 was on foot on P1-owned planet 1. This live run did
+not reach the post-capture pursuit phase; the headless hunt trials cover it.
+
+The final state is a fresh `spacewars-terrain-arena` round, P1 human versus P2
+mission bot, with 8-second Mixed arrivals. It is paused at revision 38; B or
+Start resumes. Final UI state, settings, screenshots and installed-build records
+are saved with the artifacts above. No branch merge or push was performed.
