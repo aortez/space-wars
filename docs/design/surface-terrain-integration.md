@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-Latest arena slice: [generated material arena](../generated-material-arena.md)
+Latest reliability slice: [landing on generated material planets](../large-planet-landing.md)
+adds committed touchdown, distinct-site retries and shared hatch prediction.
+The reports separate landing/capture from later boarding and pressured missions.
+
+The [generated material arena](../generated-material-arena.md)
 adds three seeded, orbiting destructible planets, shared mission bots and sun
 avoidance. Full ordinary-match lifecycle integration remains ahead.
 

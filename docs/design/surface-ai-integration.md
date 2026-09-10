@@ -4,7 +4,12 @@ The human-controlled material Expedition loop has passed Pi playtesting.
 The user's completion target is integration into ordinary Spacewars, including
 working AI. Merging is deferred until that gameplay milestone is ready.
 
-Latest reliability slice: [ship return recovery](../ship-return-recovery.md)
+Latest reliability slice: [landing on generated material planets](../large-planet-landing.md)
+uses committed touchdown and nearby retries when unexposed, with landing surveys
+checking the real hatch geometry. The [generated arena](../generated-material-arena.md)
+exercises this shared policy on three orbiting destructible planets.
+
+The earlier [ship return recovery](../ship-return-recovery.md)
 recognizes foreign-planet hatches and persistently unsettled nearby ships, then
 uses the shared scuttle/rebuild controls within the original recovery budget.
 

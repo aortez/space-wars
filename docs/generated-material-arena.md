@@ -1,5 +1,9 @@
 # Generated material arena
 
+For the subsequent landing fixes and their separate measurements, see
+[landing on generated material planets](large-planet-landing.md). The validation
+below records the original `abd29ec` arena checkpoint.
+
 This extends [controlled two-planet missions](two-planet-missions.md) and
 [ship return recovery](ship-return-recovery.md) into a bounded generated world.
 The launcher offers `spacewars-terrain-arena` (P1 human, P2 mission bot) and
