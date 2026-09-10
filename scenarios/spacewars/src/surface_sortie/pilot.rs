@@ -253,17 +253,32 @@ impl SurfaceSortieState {
                 }
             }
         }
-        let hatch_origin = vehicle_position
-            + Vec2::new(normal.y, -normal.x) * if pod { 2.8 } else { 8.0 }
-            - normal * if pod { 0.0 } else { 3.0 };
-        let hatch = ground(hatch_origin, -normal, 5.0)?;
-        if hatch.normal.dot(up) < 0.65 {
+        let hatch_up = if pod {
+            up
+        } else {
+            (vehicle_position - frame.position).normalized()
+        };
+        let hatch = if pod {
+            let origin = vehicle_position + Vec2::new(normal.y, -normal.x) * 2.8;
+            ground(origin, -normal, 5.0)?
+        } else {
+            // Survey the same radial hatch rays used by the real transfer
+            // gate. A ray along the estimated foot plane can invent an exit
+            // that the settled ship cannot actually use on cell steps.
+            self.material_access_at(
+                id.planet,
+                ShipForm::Ship,
+                vehicle_position,
+                rotation_for_direction(normal),
+            )?
+        };
+        if hatch.normal.dot(hatch_up) < 0.65 {
             return None;
         }
         let spec = Self::spec();
         if !self.world.physics.world.capsule_is_clear(
-            hatch.point + up * (spec.half_height() + 0.12),
-            rotation_for_direction(up),
+            hatch.point + hatch_up * (spec.half_height() + 0.12),
+            rotation_for_direction(hatch_up),
             spec.half_segment,
             spec.radius + 0.04,
             spec.collision_groups,

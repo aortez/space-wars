@@ -262,6 +262,74 @@ fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
 }
 
 #[test]
+fn large_moving_planets_land_exit_claim_and_depart_in_both_reflections() {
+    use scenario_spacewars::surface_sortie::{LandingPhase, PilotLocation};
+    for mirror in [false, true] {
+        let owner = PlayerId::PLAYER_2;
+        let mut state = SurfaceSortieScenario::init_material_arena_trial(0, mirror, 0.0);
+        let mut pilot = MaterialMissionPilot::new(
+            BrainReset {
+                actor: owner,
+                episode_seed: 0,
+            },
+            CombatBreakSettings::default(),
+        );
+        let initial = state.terrain_diagnostics().occupied_cells;
+        let mut landed = None;
+        let mut exited = None;
+        let mut claimed = None;
+        for tick in 0..180 * 60 {
+            let o = state.mission_observation(1, pilot.site_request());
+            let p = &o.local.combat.recovery.flight.pilot;
+            if p.planet.index == 0 {
+                assert!(p.planet.radius > 120.0 && p.planet.motion.velocity.length() > 10.0);
+                if p.landing.phase == LandingPhase::Landed {
+                    landed.get_or_insert(tick);
+                }
+                if p.location == PilotLocation::OnFoot {
+                    assert!(landed.is_some());
+                    exited.get_or_insert(tick);
+                    if p.planet
+                        .claim
+                        .as_ref()
+                        .is_some_and(|c| c.owner == Some(owner))
+                    {
+                        assert_eq!(p.supported_planet, Some(0));
+                        claimed.get_or_insert(tick);
+                    }
+                }
+            }
+            let mut intent = pilot.intent(&o);
+            intent.weapons = Default::default();
+            SurfaceSortieScenario::step(&mut state, &intent.encode(owner), DT);
+            if pilot.telemetry().completed_sorties > 0 {
+                break;
+            }
+        }
+        assert!(
+            landed.is_some() && exited.is_some() && claimed.is_some(),
+            "mirror {mirror}: {:?}",
+            pilot.telemetry()
+        );
+        let departure = pilot
+            .telemetry()
+            .events
+            .iter()
+            .find(|e| e.kind == "departed" && e.planet == Some(0));
+        assert!(
+            departure.is_some(),
+            "mirror {mirror}: {:?}",
+            pilot.telemetry()
+        );
+        assert!(landed <= exited && exited <= claimed);
+        assert!(claimed.unwrap() < departure.unwrap().tick);
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty());
+        assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+    }
+}
+
+#[test]
 fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
     for seed in [2, 3] {
         let mut state = SurfaceSortieScenario::init_material_arena(seed);

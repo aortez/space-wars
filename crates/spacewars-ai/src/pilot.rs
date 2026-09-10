@@ -85,6 +85,7 @@ pub struct RulePilotV1 {
     best_distance: f32,
     rejected_sites: Vec<LandingSiteId>,
     climbing: bool,
+    commit_descent: bool,
     claim_progress: (PlanetClaimPhase, f32),
 }
 
@@ -94,6 +95,15 @@ impl RulePilotV1 {
     pub fn with_site(context: BrainReset, site: PilotLandingSite) -> Self {
         let mut pilot = Self::new(context);
         pilot.site = Some(site);
+        pilot
+    }
+
+    /// Current capture missions commit to the surface normal near touchdown.
+    /// Keep the original controller available for historical policy replays.
+    pub(crate) fn with_committed_descent(context: BrainReset, site: PilotLandingSite) -> Self {
+        let mut pilot = Self::with_site(context, site);
+        pilot.commit_descent = true;
+        pilot.telemetry.policy = "material_landing_v2";
         pilot
     }
 
@@ -125,6 +135,7 @@ impl RulePilotV1 {
             best_distance: f32::INFINITY,
             rejected_sites: Vec::new(),
             climbing: false,
+            commit_descent: false,
             claim_progress: (PlanetClaimPhase::Idle, 0.0),
         }
     }
@@ -328,8 +339,14 @@ impl RulePilotV1 {
         let lateral = offset.dot(Vec2::new(site.normal.y, -site.normal.x));
         let height = -offset.dot(site.normal);
         let alignment = Vec2::Y.rotate_radians(o.ship.angle).dot(site.normal);
+        // Near slow touchdown, aim at the feet's measured surface normal and
+        // let ordinary landing assist descend. Hover thrust follows gravity,
+        // which need not align with this site on a moving, stepped planet.
+        let near_descent = self.commit_descent
+            && alignment > 0.8
+            && (o.ship.velocity - o.planet.velocity_at(o.ship.position)).length() < 4.0;
         let settling = self.telemetry.goal == PilotGoal::Land
-            || (height < 12.0 && lateral.abs() < 0.8 && alignment > 0.99);
+            || (height < 12.0 && lateral.abs() < 0.8 && (alignment > 0.99 || near_descent));
         self.goal(
             if settling {
                 PilotGoal::Land
@@ -392,7 +409,7 @@ impl RulePilotV1 {
     }
 }
 
-fn heading(o: &PilotObservationV1, direction: Vec2) -> f32 {
+pub(crate) fn heading(o: &PilotObservationV1, direction: Vec2) -> f32 {
     let error = shortest_heading_error(direction.rotate_radians(-o.ship.angle));
     // Surface controls command a rate (positive input turns clockwise).
     let desired_spin = (-error * 2.5).clamp(-1.4, 1.4) + o.planet.motion.spin;
@@ -407,7 +424,12 @@ fn heading(o: &PilotObservationV1, direction: Vec2) -> f32 {
 
 impl PilotBrain for RulePilotV1 {
     fn reset(&mut self, context: BrainReset) {
+        let commit_descent = self.commit_descent;
         *self = Self::new(context);
+        self.commit_descent = commit_descent;
+        if commit_descent {
+            self.telemetry.policy = "material_landing_v2";
+        }
     }
     fn site_request(&self) -> Option<LandingSiteId> {
         self.site.map(|s| s.id)
@@ -432,5 +454,70 @@ impl PilotBrain for RulePilotV1 {
         self.previous_tick = Some(observation.tick);
         self.previous_intent = action;
         action
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use engine_common::Scenario;
+    use scenario_spacewars::surface_sortie::SurfaceSortieScenario;
+    use std::time::Duration;
+
+    #[test]
+    fn committed_touchdown_aligns_without_hovering_or_granting_landing() {
+        let context = BrainReset {
+            actor: scenario_spacewars::PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.pilot_observation(0, None);
+        let site = o.sites[0];
+        o.controls_armed = true;
+        o.ship.position = site.vehicle_position + site.normal * 6.0;
+        o.ship.velocity = o.planet.velocity_at(o.ship.position);
+        o.ship.angle = (-site.normal.x).atan2(site.normal.y) + 0.3;
+        o.landing.phase = LandingPhase::Assisted;
+        o.transfer = TransferResult::ShipNotSettled;
+        let mut historical = RulePilotV1::with_site(context, site);
+        historical.intent(&o);
+        assert_eq!(historical.telemetry().goal, PilotGoal::Approach);
+        let mut pilot = RulePilotV1::with_committed_descent(context, site);
+        for _ in 0..30 {
+            o.tick += 1;
+            let action = pilot.intent(&o);
+            assert_eq!(pilot.telemetry().goal, PilotGoal::Land);
+            assert!(!action.primary_held && !action.brake_held && !action.interact_held);
+            assert!(action.horizontal.abs() > 0.01);
+            assert!(pilot.telemetry().landed_tick.is_none());
+            let telemetry = pilot.telemetry().clone();
+            assert_eq!(pilot.intent(&o), action);
+            assert_eq!(pilot.telemetry(), &telemetry);
+        }
+        let mut cloned = pilot.clone();
+        o.tick += 601;
+        assert_eq!(pilot.intent(&o), cloned.intent(&o));
+        assert_eq!(pilot.telemetry().goal, PilotGoal::Reposition);
+        pilot.reset(context);
+        assert_eq!(pilot.telemetry().policy, "material_landing_v2");
+        assert_eq!(pilot.site_request(), None);
+        assert!(pilot.commit_descent);
+
+        for (height, lateral, speed, angle) in [
+            (20.0, 0.0, 0.0, 0.3),
+            (6.0, 3.0, 0.0, 0.3),
+            (6.0, 0.0, 10.0, 0.3),
+            (6.0, 0.0, 0.0, 1.0),
+        ] {
+            let mut pilot = RulePilotV1::with_committed_descent(context, site);
+            o.ship.position = site.vehicle_position
+                + site.normal * height
+                + Vec2::new(site.normal.y, -site.normal.x) * lateral;
+            o.ship.velocity = o.planet.velocity_at(o.ship.position) + site.normal * speed;
+            o.ship.angle = (-site.normal.x).atan2(site.normal.y) + angle;
+            pilot.intent(&o);
+            assert_eq!(pilot.telemetry().goal, PilotGoal::Approach);
+        }
     }
 }

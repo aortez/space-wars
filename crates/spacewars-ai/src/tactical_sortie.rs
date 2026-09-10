@@ -78,6 +78,8 @@ pub struct TacticalSortiePilot {
     approach_progress: Option<(f32, u64, u64)>,
     site_unavailable_since: Option<u64>,
     cover_lost_since: Option<u64>,
+    rejected_sites: Vec<(LandingSiteId, u64)>,
+    clearing_ground: bool,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -112,6 +114,8 @@ impl TacticalSortiePilot {
             approach_progress: None,
             site_unavailable_since: None,
             cover_lost_since: None,
+            rejected_sites: Vec::new(),
+            clearing_ground: false,
         }
     }
     /// Current capture missions tolerate transient cover/clearance changes and
@@ -135,6 +139,8 @@ impl TacticalSortiePilot {
     pub fn label(&self) -> &'static str {
         if self.telemetry.failed_tick.is_some() || self.telemetry.completed_tick.is_some() {
             self.combat.label()
+        } else if self.clearing_ground {
+            "lifting clear to retry landing"
         } else if self.telemetry.goal == TacticalGoal::Surface {
             self.landing.telemetry().goal.label()
         } else {
@@ -192,6 +198,15 @@ impl TacticalSortiePilot {
         self.cover_lost_since = None;
         self.landing = RulePilotV1::new(self.context);
         self.goal(TacticalGoal::Survey, tick);
+    }
+    fn retry_landing(&mut self, tick: u64) {
+        if self.commit_descent {
+            if let Some(site) = self.site {
+                self.rejected_sites.push((site.id, site.revision));
+            }
+            self.clearing_ground = true;
+        }
+        self.replan(tick);
     }
     fn replan_for_cover(&mut self, tick: u64) {
         self.replan(tick);
@@ -303,6 +318,23 @@ impl TacticalSortiePilot {
                 Vec2::ZERO,
             );
         }
+        if self.clearing_ground {
+            if p.landing.supported_feet == 0 && p.landing.altitude > 25.0 {
+                self.clearing_ground = false;
+            } else {
+                return CombatIntent {
+                    flight: FlightIntent {
+                        controls: SurfaceSortieAction {
+                            horizontal: crate::pilot::heading(p, up),
+                            primary_held: up.dot(Vec2::Y.rotate_radians(p.ship.angle)) > 0.9,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+            }
+        }
         if self.commit_descent
             && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
             && p.transfer == TransferResult::Ready
@@ -345,16 +377,24 @@ impl TacticalSortiePilot {
             if let Some(site) = p
                 .sites
                 .iter()
+                .filter(|site| !self.rejected_sites.contains(&(site.id, site.revision)))
                 .min_by(|a, b| {
                     let score = |site: &PilotLandingSite| {
                         let cover = o.cover.iter().find(|s| s.site == site.id);
-                        let penalty = cover.map_or(400.0, |s| {
-                            if s.departure && s.approach && s.grounded {
-                                0.0
-                            } else {
-                                400.0
-                            }
-                        });
+                        // Avoid a long cover detour when this ship is already
+                        // unexposed. Such detours can leave a moving planet's
+                        // approach frame during an otherwise local retry.
+                        let penalty = if self.commit_descent && !exposed {
+                            0.0
+                        } else {
+                            cover.map_or(400.0, |s| {
+                                if s.departure && s.approach && s.grounded {
+                                    0.0
+                                } else {
+                                    400.0
+                                }
+                            })
+                        };
                         let direction =
                             (site.vehicle_position - p.planet.motion.position).normalized();
                         angle_between(up, direction).abs() * (p.planet.radius + 60.0) + penalty
@@ -364,7 +404,11 @@ impl TacticalSortiePilot {
                 .copied()
             {
                 self.site = Some(site);
-                self.landing = RulePilotV1::with_site(self.context, site);
+                self.landing = if self.commit_descent {
+                    RulePilotV1::with_committed_descent(self.context, site)
+                } else {
+                    RulePilotV1::with_site(self.context, site)
+                };
                 self.side = angle_between(
                     up,
                     (site.vehicle_position - p.planet.motion.position).normalized(),
@@ -446,7 +490,7 @@ impl TacticalSortiePilot {
                     *window = p.tick;
                 }
                 if p.tick.saturating_sub(*progress) > 10 * 60 {
-                    self.replan(p.tick);
+                    self.retry_landing(p.tick);
                     return self.guide(o, up * 12.0, Vec2::ZERO);
                 }
             }
@@ -462,7 +506,7 @@ impl TacticalSortiePilot {
         }
         let controls = self.landing.intent(p);
         if self.landing.telemetry().goal == PilotGoal::Reposition {
-            self.replan(p.tick);
+            self.retry_landing(p.tick);
         }
         CombatIntent {
             flight: FlightIntent {
@@ -550,6 +594,101 @@ mod tests {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         SurfaceSortieScenario::step(&mut state, &[], DT);
         state.tactical_sortie_observation(0, None)
+    }
+    #[test]
+    fn current_capture_prefers_nearby_ground_unless_exposed() {
+        use scenario_spacewars::surface_sortie::combat::LandingCover;
+        let mut o = observation();
+        let near = o.combat.recovery.flight.pilot.sites[0];
+        let far = o.combat.recovery.flight.pilot.sites[1];
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.controls_armed = true;
+        let up = (near.vehicle_position - p.planet.motion.position).normalized();
+        p.ship.position = near.vehicle_position + up * 60.0;
+        p.sites = vec![near, far];
+        o.cover = vec![
+            LandingCover {
+                site: near.id,
+                grounded: false,
+                approach: false,
+                departure: false,
+            },
+            LandingCover {
+                site: far.id,
+                grounded: true,
+                approach: true,
+                departure: true,
+            },
+        ];
+        for exposed in [false, true] {
+            let target = o.combat.target.as_mut().unwrap();
+            target.motion.position = o.combat.recovery.flight.pilot.ship.position + up * 100.0;
+            target.ground_occluded = !exposed;
+            let mut pilot = TacticalSortiePilot::with_committed_descent(
+                context(),
+                CombatBreakSettings::default(),
+            );
+            pilot.intent(&o);
+            assert_eq!(
+                pilot.site_request(),
+                Some(if exposed { far.id } else { near.id })
+            );
+        }
+    }
+    #[test]
+    fn landing_retry_lifts_clear_and_rejects_the_unchanged_failed_site() {
+        let mut o = observation();
+        let sites = o.combat.recovery.flight.pilot.sites.clone();
+        assert!(sites.len() > 1);
+        let site = sites[0];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        pilot.site = Some(site);
+        pilot.retry_landing(1);
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick = 2;
+        p.controls_armed = true;
+        p.ship.position = site.vehicle_position;
+        let up = (p.ship.position - p.planet.motion.position).normalized();
+        p.ship.angle = (-up.x).atan2(up.y);
+        p.landing.supported_feet = 1;
+        p.landing.altitude = 0.0;
+        p.transfer = TransferResult::ShipNotSettled;
+        let action = pilot.intent(&o);
+        assert!(action.flight.controls.primary_held);
+        assert!(!action.flight.controls.interact_held);
+        assert_eq!(pilot.site_request(), None);
+        assert_eq!(pilot.label(), "lifting clear to retry landing");
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.landing.supported_feet = 0;
+        p.landing.altitude = 26.0;
+        p.ship.position += up * 35.0;
+        p.sites = vec![site];
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), None);
+        let mut after_edit = pilot.clone();
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.sites = sites;
+        pilot.intent(&o);
+        assert!(pilot.site_request().is_some());
+        assert_ne!(pilot.site_request(), Some(site.id));
+        assert_eq!(pilot.telemetry().replans, 1);
+
+        // A new material revision can make the same bearing usable again.
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.planet.revision += 1;
+        p.sites = vec![PilotLandingSite {
+            revision: p.planet.revision,
+            ..site
+        }];
+        after_edit.intent(&o);
+        assert_eq!(after_edit.site_request(), Some(site.id));
+        pilot.reset(context());
+        assert!(pilot.rejected_sites.is_empty());
+        assert!(!pilot.clearing_ground);
+        assert!(pilot.commit_descent);
     }
     #[test]
     fn tactical_policy_validates_repeats_and_resets_without_changing_configuration() {
