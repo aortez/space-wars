@@ -123,3 +123,134 @@ Artifacts and reproduction scripts:
 ```text
 /home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/generated-material-arena-20260909/
 ```
+
+## Validation at `abd29ec`
+
+The release workspace suite passed **1,088 tests**, with zero failures and 26
+ignored display-dependent tests. Eight example tests also passed: **1,096
+workspace/example tests** in total. All ten terrain UI workflows were then run
+explicitly under Xvfb and passed, including both arena variants, settings
+persistence, pause/restart and actual vector/raster rendering. Formatting passed;
+Clippy completed with advisory warnings in unchanged code. All six frozen
+`navigation-v1` and twelve `strategy-v1` episodes matched.
+
+Each platform completed 48 generated arena runs, 52 fixed-world missions,
+36 impact recoveries and 24 ship-return trials for three simulated minutes:
+**320 runs / 16 simulated hours**. Every physical audit passed. All 72 impact
+trials recovered and departed; all 48 return trials boarded and departed. The
+sixteen reachable-ship controls kept their original ships, and the 32 tipped or
+foreign-planet fixtures each completed one replacement. Their departure-time
+ranges remain 5.65–6.07, 32.37–32.52 and 17.35–17.50 seconds respectively.
+
+### Generated-world outcomes
+
+The six seeds cover radii from 18.0 to 145.8 units. A completed trip means a
+captured planet followed by boarding and departure, recorded by the mission
+event stream. Ownership is independently read from per-second world samples;
+it can be earned outside a completed capture task or lost again under attack.
+The two duel subjects run the same seeded two-bot world independently and
+report their respective pilot outcomes.
+
+| Generated outcome | Desktop | Pi |
+| --- | ---: | ---: |
+| Quiet: at least one completed trip | 23/24 | 22/24 |
+| Quiet: completed trips on all three planets | 10/24 | 12/24 |
+| Quiet: all three planets owned at cutoff | 14/24 | 16/24 |
+| Quiet: permanently blocked subjects at cutoff | 0/24 | 0/24 |
+| Interceptor: at least one completed trip | 9/12 | 12/12 |
+| Interceptor: completed trips on all three planets | 3/12 | 4/12 |
+| Interceptor: all three planets owned at cutoff | 4/12 | 7/12 |
+| Interceptor: permanently blocked subjects at cutoff | 1/12 | 0/12 |
+| Duel + asteroids: at least one completed trip | 10/12 | 9/12 |
+| Duel + asteroids: completed trips on all three planets | 1/12 | 1/12 |
+| Duel + asteroids: all three planets owned at cutoff | 0/12 | 1/12 |
+| Duel + asteroids: permanently blocked subjects at cutoff | 2/12 | 1/12 |
+
+Per-second telemetry records sun avoidance in 33/48 desktop and 34/48 Pi runs,
+and intervening-planet avoidance in 46/48 runs on each platform. This proves
+those routes are exercised; it does not establish a globally complete planner.
+The archived Pi corpus includes all 672 renderer frames, copied before reboot.
+
+The quiet cases without a completed trip are P2 on seed 0: mirrored on desktop,
+both reflections on Pi. They remain in approach/transfer tasks at cutoff. The
+mirrored desktop report reaches planets 0 and 1, exhausts their local approach
+budgets, and chooses another destination; it has no ship loss or terminal block.
+
+Under generated pressure, the remaining desktop blocks are seed 1/P2 intercept
+(replacement cannot start or finish), seed 2/P2 duel (no measured ground route)
+and seed 3/P2 duel (replacement hatch inaccessible). Pi seed 7/P2 duel stops
+making progress along its ground route. Their full observations, events and
+final task telemetry are retained in `generated-navigation-findings.json`.
+
+### Fixed-world comparison with `8283fe1`
+
+| Fixed mission outcome | Desktop before → after | Pi before → after |
+| --- | ---: | ---: |
+| Quiet: capture and depart both planets | 12/12 → 12/12 | 12/12 → 12/12 |
+| Deliberate loss: recover replacement | 8/8 → 8/8 | 8/8 → 8/8 |
+| Deliberate loss: also complete both trips | 5/8 → 6/8 | 6/8 → 6/8 |
+| Combat/asteroids: complete both trips | 17/32 → 14/32 | 15/32 → 18/32 |
+| Completed recovery events during combat/asteroids | 10 → 10 | 7 → 6 |
+| Final blocked subjects | 0 → 2 | 0 → 0 |
+
+The fixes change per-second motion hashes in 49/52 desktop and all 52 Pi fixed
+mission trajectories. The two remaining desktop blocks are the seed-7 mirrored
+P1 duel ground route and the seed-42 non-mirrored P2 duel replacement gate. Both
+use 3-second Mixed arrivals. Preserved quiet/forced-loss gates and improved Pi
+outcomes do not erase the desktop pressured-route regression. Broader landing
+and hatch-route reliability remains the next navigation work.
+
+### Timing and build identity
+
+The Pi's largest generated-case p95 times were 0.336 ms for sensors, 0.014 ms
+for policy and 2.578 ms for physics; recorded maxima were 19.269, 2.043 and
+9.787 ms. Fixed-world p95 maxima were 0.225, 0.020 and 0.469 ms. These are
+headless measurements, separate from live rendering. Mission/return batches
+used four desktop processes or two independent Pi processes; Pi impact trials
+ran serially, and the gameplay host was paused. Desktop jobs overlapped build
+work. These timings are not a controlled performance comparison with the
+previous single-process Pi batch.
+
+Both source checkpoints preceded their builds. The earlier `91d9132` candidate
+was withheld after the generated asteroid matrix found the debris assertion.
+Its runners and failed replays remain under `candidate-91d9132/`. The final
+`abd29ec` image completed all 6,608 Yocto tasks, with 21 rerun. The archived
+image and extracted client are identified by:
+
+```text
+source commit: abd29ec16563ed4bf2e53807d6aad944d3da140c
+image SHA256:  7a457c7d24bf7e06c031ec6f1f332280e73f798b61dfa190d7562ff42af698f5
+client SHA256: ae6bfa1b7bc3fd2d3f020d12c5494860c98c42b9eeb0c651793ed62567abb450
+```
+
+## Deployment and live playtest
+
+`spacewars.local` booted the archived `abd29ec` image in slot B (`/dev/sda3`).
+The installed client hash matches the extracted image binary. The kiosk was
+active and running with zero restarts and a zero exit status.
+
+The generated two-bot arena ran for three wall-clock minutes with 3-second
+Mixed asteroid arrivals and raster scale 2. Captures at 30/75/120/180 seconds
+recorded **51.9/53.0/54.6/50.7 FPS** and **59.8/59.9/59.6/59.6 updates/s**, with
+zero service restarts. Actual screenshot completion times are retained in
+`live-summary.json`. This establishes a working installed simulation but leaves
+a rendering gap against the 60 FPS target for these larger scenes.
+
+Both bots approached planet 1, then travelled to other destinations. The later
+screenshots show P2 capturing planet 2 and continuing onward; by the last
+capture all three minimap planets are green. P2 is on foot at planet 0 with its
+local flag raised, returning to its landed ship. P1 is on foot at planet 1,
+waiting for stable footing while attempting a route on P2-owned ground. This
+live result establishes capture and onward travel, without treating every
+pilot's approach or ground route as solved.
+
+The device was then returned to a fresh, paused `spacewars-terrain-arena` round:
+P1 human, P2 mission bot, **8-second Mixed arrivals**, raster scale 2. Start or B
+resumes. Screenshots, UI state/history, build hashes, physical reports and the
+remaining blocked-case observations are archived with the reproduction scripts.
+
+The next work is landing reliability on the large generated planets, ground
+and replacement-hatch routes under pressure, and the Pi rendering budget. The
+ordinary-match victory/elimination lifecycle remains a separate integration
+step. Merging is still deferred. This results update is documentation only;
+the installed implementation remains `abd29ec`.
