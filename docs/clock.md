@@ -318,7 +318,8 @@ The optional `marquee` object reports the active recipe, content, cell/group
 counts, progress in thousandths, scrolling/waving flags, rotation target and
 lighting mode. `settings.marquee_preset` and `settings.marquee_message` are the
 configured choices for the next event; they can differ from the currently active
-content. `settings_pending` acknowledges queued settings; `settings_error` is
+content. `settings_pending` covers queued settings and background persistence;
+the acknowledgement waits for saving without blocking the UI. `settings_error` is
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. Use matching client/CLI builds: schema 6 and older requests are rejected.
 The internal Clock action payload is version 3; event ordinals 0–3 are unchanged

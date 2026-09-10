@@ -1,0 +1,3 @@
+# Keep the gamepad and utility keyboard separate: libinput ignores gamepads.
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Space-Wars Picade", ENV{ID_INPUT_JOYSTICK}="1", ENV{ID_INPUT_KEYBOARD}="", ENV{ID_INPUT_KEY}=""
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="Space-Wars Picade Keys", ENV{ID_INPUT_KEYBOARD}="1", ENV{ID_INPUT_JOYSTICK}="", TAG+="power-switch"

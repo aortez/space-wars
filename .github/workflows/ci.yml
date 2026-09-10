@@ -18,6 +18,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  yocto-tools:
+    name: Pi hardware profiles and update safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install device-tree and isolated updater test tools
+        run: sudo apt-get update && sudo apt-get install --yes device-tree-compiler bubblewrap
+      - run: npm --prefix yocto test
+        env:
+          SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
+      - run: shellcheck update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh
+
   nes-core:
     name: NES core, golden tests, and benchmark
     runs-on: ubuntu-latest

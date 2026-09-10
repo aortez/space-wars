@@ -14,10 +14,11 @@ Usage:
 Options:
   --target <host>       Target host [default: spacewars.local]
   --user <user>         SSH user [default: spacewars]
+  --fast                Build/copy client + CLI and restart (no rootfs flash/reboot)
   --remote-tmp <path>   Remote staging directory [default: /tmp]
   --image <path>        Use a specific rootfs .ext4.gz image
   --ssh-key <path>      Public SSH key to inject into the updated slot
-  --skip-build          Push the existing image without rebuilding
+  --skip-build          Push the existing image (or fast bundle) without rebuilding
   --dry-run             Print the update actions without changing the Pi
   --prompt              Ask for the final "yolo" confirmation
   -h, --help            Show this help
@@ -25,6 +26,7 @@ Options:
 Examples:
   npm run update
   npm run update -- --skip-build
+  npm run update -- --fast --target picade.local
   npm run update -- --target spacewars.local --dry-run
 `);
 }
@@ -47,6 +49,11 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.includes('-h') || args.includes('--help')) {
     usage();
+    return;
+  }
+
+  if (args.includes('--fast')) {
+    await run(process.execPath, [join(YOCTO_DIR, 'scripts/fast-update.mjs'), ...args], { cwd: YOCTO_DIR });
     return;
   }
 

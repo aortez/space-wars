@@ -1,6 +1,9 @@
 # Raspberry Pi Kiosk Runbook
 
-This is the first-pass runtime plan for running Space-Wars on a Raspberry Pi 5.
+Space-Wars uses a shared Pi 4/5 USB image with per-device hardware profiles.
+See [Picade and hardware profiles](picade.md) for cabinet bring-up, profile
+selection, and boot/OTA compatibility. HyperPixel-specific details below
+describe the existing Pi 5 kiosk, not defaults for every device.
 Do not flash an attached USB drive from this repository until the target block
 device has been identified and explicitly confirmed.
 
@@ -50,7 +53,7 @@ npm run build
 Expected image artifact:
 
 ```text
-/home/data/workspace/.space-wars-yocto-build/tmp/deploy/images/raspberrypi5/spacewars-image-raspberrypi5.rootfs.wic.gz
+/home/data/workspace/.space-wars-yocto-build-raspberrypi-spacewars/tmp/deploy/images/raspberrypi-spacewars/spacewars-image-raspberrypi-spacewars.rootfs.wic.gz
 ```
 
 The build wrapper sets `KAS_BUILD_DIR` outside the Rust workspace by default so
@@ -81,7 +84,7 @@ service sets `SLINT_BACKEND` explicitly so the client uses the image's LinuxKMS
 backend instead of the desktop `winit` backend. Use `--kiosk` instead when the
 saved/default scenario should launch directly.
 
-The current Yocto service sets:
+With the `hyperpixel` profile selected, the Yocto hardware service supplies:
 
 ```sh
 ALSA_CARD=Audio
@@ -96,7 +99,7 @@ sink is connected; CPAL then cannot open the default stream and Falling
 continues silently. Confirm the expected card ID with `aplay -l` before using
 this unit on different hardware.
 
-The Yocto image is configured for the same Raspberry Pi 5 HyperPixel 4 KMS path
+The HyperPixel profile selects the same Raspberry Pi 5 HyperPixel 4 KMS path
 used by DirtSim:
 
 ```text
@@ -104,8 +107,8 @@ dtoverlay=vc4-kms-v3d-pi5
 dtoverlay=vc4-kms-dpi-hyperpixel4
 ```
 
-The image also installs a HyperPixel backlight oneshot service so the backlight
-is enabled once the sysfs node appears.
+The hardware-profile oneshot also enables the HyperPixel backlight once the
+sysfs node appears. HDMI and Picade profiles do not touch that backlight.
 
 The kiosk service starts a small project-owned `spacewars-seatd.service` before
 the Slint LinuxKMS process. Slint uses libseat to claim DRM and input devices;
@@ -181,6 +184,21 @@ also include their current displayed value. Visible launcher or scenario errors
 appear in the same state. A launcher snapshot always has no active scenario,
 including after returning from gameplay. `status` remains available for detailed
 performance and scenario-specific diagnostics.
+
+Scenario launches display a busy overlay with the current stage and elapsed
+time. During slow storage writes, the activity indicator keeps moving and
+`spacewars-cli ui state` reports `launcher.busy` with read-only stage/elapsed
+controls. Menu input is disabled until launch completes or returns an error.
+`spacewars-cli status` includes `launch_state`, `launch_stage`, and total,
+settings-save, cartridge-load, and scenario-start timings (`launch_elapsed_ms`,
+`launch_save_ms`, `launch_asset_ms`, `launch_start_ms`). The completed timings
+remain available during gameplay and after returning to the launcher.
+
+Settings saves and cartridge loading run on a worker without holding the
+shared settings lock. Final scenario construction and first-frame presentation
+still run on the UI thread, after yielding with the `starting_scenario` stage;
+their duration is measured separately. This does not yet cover initial process
+startup or the ROM-library rescan when returning to the launcher.
 
 Drive the visible menu through the same action handler as keyboard and gamepad
 input. Preconditions protect an observe-then-act sequence from UI races:
@@ -344,26 +362,20 @@ uses a different runtime user, update the unit before enabling it.
 
 ## USB Flashing
 
-The known removable target from the development host discovery pass was
-`/dev/sdb`:
-
-```text
-/dev/sdb  SanDisk 3.2Gen1  114.6G  usb
-```
-
-Verify this every time before writing:
+Identify and confirm the actual USB target every time before writing:
 
 ```sh
 lsblk -o NAME,PATH,SIZE,TYPE,TRAN,MODEL,MOUNTPOINTS,FSTYPE,LABEL
 ```
 
-Once the image exists and `/dev/sdb` has been confirmed as the destructive
-target:
+Once the image exists and the target has been confirmed, replace `/dev/sdX`
+below with that exact device. This example selects the existing HyperPixel
+kiosk; use `--profile picade --hostname picade` for the cabinet instead:
 
 ```sh
 npm run flash -- --list
-npm run flash -- --dry-run --device /dev/sdb
-npm run flash -- --device /dev/sdb
+npm run flash -- --dry-run --profile hyperpixel --device /dev/sdX
+npm run flash -- --profile hyperpixel --device /dev/sdX
 ```
 
 `npm run flash` uses the same model as DirtSim's mature flash path. It uses
@@ -382,7 +394,7 @@ the project-root A/B updater over SSH:
 
 Run these from the repository root. The OTA path builds unless `--skip-build`
 is passed, transfers the latest
-`spacewars-image-raspberrypi5.rootfs.ext4.gz` to the Pi, verifies its checksum,
+`spacewars-image-raspberrypi-spacewars.rootfs.ext4.gz` to the Pi, verifies its checksum,
 flashes it to the inactive slot with SSH key injection, switches boot slots,
 reboots, and verifies that `spacewars-kiosk.service` is active. The image
 includes a narrow sudoers entry for the `spacewars` user so the node script can
@@ -390,8 +402,59 @@ run `sudo /usr/sbin/ab-update-with-key ...` and `sudo systemctl reboot`, matchin
 DirtSim's no-local-sudo update model. The lower-level command remains available
 as `cd yocto && npm run update`.
 
+The `.ext4.gz.boot-id` sidecar must match the device's `/boot/spacewars-boot-id`
+before transfer. The updater cannot replace boot files. An old Pi 5 image
+must be migrated by full USB flash, and later kernel/firmware/profile-definition
+changes also require a full flash. Profile selection and boot overrides persist
+across rootfs-only A/B updates. See [the compatibility boundary](picade.md#updates-and-the-boot-compatibility-boundary).
+
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
 device identity.
+
+### Fast application updates
+
+After **one normal update** installs the fast-update helper and sudoers rule:
+
+```sh
+./update.sh --fast --target picade.local
+./update.sh --fast --target picade.local --skip-build
+./update.sh --fast --target picade.local --dry-run
+```
+
+The default host is still `spacewars.local`; always specify `picade.local` for
+the cabinet. Fast mode builds the `spacewars` recipe only (no rootfs/image),
+exports the stripped `engine-client` and `spacewars-cli` together to
+`tmp/deploy/images/raspberrypi-spacewars/spacewars-fast/`, checks their AArch64
+headers and SHA-256 hashes, copies them, and restarts only the kiosk service.
+`--skip-build` explicitly reuses that bundle, not binaries from an old image.
+`--dry-run` performs no build or remote operations. `--prompt` asks before the
+application restart. Games in progress end when the application restarts.
+
+The installed runtime identity must match the bundle. It fingerprints the
+build target, shared libraries in the recipe sysroot, installed service files,
+data initialization and installer helper. Missing helpers, changed libraries
+or service setup fail before installation: run a normal update without
+`--fast`. Hardware/kernel/firmware changes still require the full-flash checks
+described above. Fast mode does **not** update OS packages, units, boot files,
+`engine-agent`, `engine-os-manager`, or `falling-benchmark`, and does not sync
+user data/ROMs. Use normal updates for those changes and `sync-data.sh` for ROMs.
+The fingerprint is a conservative guard, not a general OS/package upgrade tool.
+
+The only extra sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
+a fixed pair of binaries from a validated staging directory, reads them as the
+kiosk user, verifies hashes again, and serializes installs with a lock. It keeps
+backups before stopping the app and requires three control-API responses from
+the same new PID. A failed install/start/health check restores the previous pair
+and restarts it. No arbitrary copy command or generic service-control sudo is
+granted. The previous successful pair is retained, root-owned, under
+`/usr/lib/spacewars-fast-update/` for manual recovery.
+
+Unlike A/B rootfs updates, this modifies the **current** root slot. File renames
+are atomic individually, but the pair is not power-loss-atomic: do not unplug
+during an update. Normal A/B updates replace fast-installed binaries in their
+destination slot. If SSH is lost during installation, reconnect and check
+`spacewars-cli status`/service health before retrying; do not assume success
+from a dropped connection.
 
 For first-boot Wi-Fi, create `yocto/wifi-creds.local` before flashing:
 
@@ -406,16 +469,8 @@ The file is ignored by git. The flash script writes a NetworkManager connection
 into `/data/NetworkManager/system-connections/`, which is bind-mounted into
 `/etc/NetworkManager/system-connections/` before NetworkManager starts.
 
-Manual fallback without the script:
-
-```sh
-cd yocto
-sudo umount /dev/sdb?*
-gzip -dc /home/data/workspace/.space-wars-yocto-build/tmp/deploy/images/raspberrypi5/spacewars-image-raspberrypi5.rootfs.wic.gz | sudo dd of=/dev/sdb bs=8M status=progress conv=fsync
-sync
-sudo partprobe /dev/sdb
-lsblk -f /dev/sdb
-```
+Manual image writers must also select the hardware profile, provision SSH
+access and set the hostname. The raw unified image defaults to generic HDMI.
 
 Flashing checklist:
 

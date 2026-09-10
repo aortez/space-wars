@@ -583,5 +583,17 @@ mod tests {
         endpoint.write_output(&mut output, 1);
         assert_eq!(output, [0.0]);
         assert_eq!(endpoint.telemetry().consumed_samples, 2);
+        // Pause/resume must not clear the user's mute or remembered volume.
+        endpoint.set_paused(true);
+        endpoint.set_volume(0.25);
+        endpoint.set_paused(false);
+        endpoint.push_samples(&[16_384]);
+        endpoint.write_output(&mut output, 1);
+        assert_eq!(output, [0.0]);
+        endpoint.set_muted(false);
+        endpoint.push_samples(&[16_384]);
+        endpoint.write_output(&mut output, 1);
+        assert_eq!(output, [0.125]);
+        assert_eq!(endpoint.telemetry().consumed_samples, 4);
     }
 }

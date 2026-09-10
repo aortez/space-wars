@@ -156,8 +156,12 @@ impl From<UiActionArg> for UiAction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum UiScreenArg {
+    #[value(name = "launcher.busy")]
+    LauncherBusy,
     #[value(name = "launcher.main")]
     LauncherMain,
+    #[value(name = "launcher.sound")]
+    LauncherSound,
     #[value(name = "launcher.settings")]
     LauncherSettings,
     #[value(name = "launcher.controls")]
@@ -168,6 +172,8 @@ enum UiScreenArg {
     Gameplay,
     #[value(name = "pause.main")]
     PauseMain,
+    #[value(name = "pause.sound")]
+    PauseSound,
     #[value(name = "pause.controls")]
     PauseControls,
     #[value(name = "pause.clock")]
@@ -179,12 +185,15 @@ enum UiScreenArg {
 impl From<UiScreenArg> for UiScreen {
     fn from(screen: UiScreenArg) -> Self {
         match screen {
+            UiScreenArg::LauncherBusy => Self::LauncherBusy,
             UiScreenArg::LauncherMain => Self::LauncherMain,
+            UiScreenArg::LauncherSound => Self::LauncherSound,
             UiScreenArg::LauncherSettings => Self::LauncherSettings,
             UiScreenArg::LauncherControls => Self::LauncherControls,
             UiScreenArg::LauncherTouchTest => Self::LauncherTouchTest,
             UiScreenArg::Gameplay => Self::Gameplay,
             UiScreenArg::PauseMain => Self::PauseMain,
+            UiScreenArg::PauseSound => Self::PauseSound,
             UiScreenArg::PauseControls => Self::PauseControls,
             UiScreenArg::PauseClock => Self::PauseClock,
             UiScreenArg::GameOver => Self::GameOver,

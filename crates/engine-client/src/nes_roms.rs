@@ -170,7 +170,7 @@ impl std::error::Error for NesRomLoadError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NesRomCatalog {
     directory: PathBuf,
     entries: Vec<NesRomCatalogEntry>,

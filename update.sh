@@ -4,6 +4,7 @@
 # Usage:
 #   ./update.sh                         # Build + OTA flash + reboot + verify
 #   ./update.sh --skip-build            # Deploy the existing image
+#   ./update.sh --fast --target picade.local # Copy client/CLI, restart app only
 #   ./update.sh --target 192.168.1.108   # Override the target host
 #   ./update.sh --user spacewars        # Override the SSH user
 #   ./update.sh --dry-run               # Show actions without changing the Pi
@@ -31,10 +32,11 @@ Options:
   --target <host>       Target host [default: spacewars.local]
   --host <host>         Alias for --target
   --user <user>         SSH user [default: spacewars]
+  --fast                Build/copy client + CLI and restart (no flash or reboot)
   --remote-tmp <path>   Remote staging directory [default: /tmp]
   --image <path>        Use a specific rootfs .ext4.gz image
   --ssh-key <path>      Public SSH key to inject into the updated slot
-  --skip-build          Deploy the existing image without rebuilding
+  --skip-build          Deploy the existing image (or fast bundle) without rebuilding
   --dry-run             Print update actions without changing the Pi
   --prompt              Ask for final confirmation before flashing
   -h, --help            Show this help
@@ -42,11 +44,15 @@ Options:
 Examples:
   ./update.sh
   ./update.sh --skip-build
+  ./update.sh --fast --target picade.local
   ./update.sh --target 192.168.1.108 --dry-run
 
 User ROM data is persistent and deployed separately:
   ./sync-data.sh --dry-run
   ./sync-data.sh
+
+Fast updates require one normal image update to install the restricted helper.
+Use normal updates for OS, libraries, service, or hardware configuration changes.
 EOF
 }
 

@@ -141,7 +141,8 @@ fn load_settings_from_bytes(path: &Path, bytes: &[u8]) -> Result<LoadedSettings,
     };
 
     match toml::from_str::<Settings>(text) {
-        Ok(settings) => {
+        Ok(mut settings) => {
+            settings.audio = settings.audio.normalized();
             let normalized = serialize_settings(&settings)?;
             let status = if normalized.as_bytes() == bytes {
                 LoadStatus::Existing
@@ -445,7 +446,7 @@ mod tests {
         assert_eq!(loaded.settings.video.width, 1920);
         assert_eq!(loaded.settings.video.height, 720);
         assert!(!loaded.settings.video.fullscreen);
-        assert_eq!(loaded.settings.audio.master_volume, 0.8);
+        assert_eq!(loaded.settings.audio.master_volume, 0.25);
         assert_eq!(loaded.settings.launch.scenario, "spacewars");
         assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
         assert_eq!(loaded.settings.runtime.log_level, "info");
@@ -461,6 +462,30 @@ mod tests {
         assert!(migrated.contains("[spacewars]"));
         assert!(migrated.contains("[clock]"));
         assert!(migrated.contains("[runtime]"));
+    }
+
+    #[test]
+    fn audio_load_preserves_saved_levels_and_normalizes_invalid_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        for (raw, expected) in [
+            ("0.8", 0.8),
+            ("0.0", 0.0),
+            ("-1.0", 0.0),
+            ("3.0", 1.0),
+            ("nan", 0.25),
+            ("inf", 0.25),
+        ] {
+            let text = format!("[audio]\nmaster_volume = {raw}\nmuted = true\n");
+            let loaded = load_settings_from_bytes(&path, text.as_bytes()).unwrap();
+            assert_eq!(loaded.settings.audio.master_volume, expected, "{raw}");
+            assert!(loaded.settings.audio.muted);
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.audio,
+                loaded.settings.audio
+            );
+        }
     }
 
     #[test]

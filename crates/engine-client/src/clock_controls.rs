@@ -1,7 +1,6 @@
 //! Live Clock menu operations. Touch, keyboard, gamepad and guarded UI control
 //! all enter here; the host applies changes at a simulation boundary.
 
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
@@ -9,7 +8,7 @@ use engine_common::{ClockEventKind, ClockEventProfile, ClockSettings, ClockTimeF
 use slint::ComponentHandle;
 use spacewars_control::UiAction;
 
-use crate::{MainWindow, host, settings, ui_navigation};
+use crate::{MainWindow, host, ui_navigation};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_time_format(
@@ -31,7 +30,7 @@ pub(crate) fn install(
     window: &MainWindow,
     controls: host::SharedScenarioControls,
     settings: Arc<RwLock<Settings>>,
-    settings_path: PathBuf,
+    writer: crate::settings_writer::SettingsWriter,
 ) {
     window.set_clock_event_labels(slint::ModelRc::new(slint::VecModel::from(
         ClockEventKind::ALL
@@ -104,17 +103,15 @@ pub(crate) fn install(
         let Ok(clock) = crate::clock_setup_from_window(&window) else {
             return;
         };
-        let mut settings = settings.write().unwrap();
-        settings.clock = clock;
-        match settings::save_settings(&settings, &settings_path) {
-            Ok(()) => window.set_clock_settings_error("".into()),
-            Err(error) => {
-                tracing::error!(%error, "could not save live Clock settings.");
-                window.set_clock_settings_error(
-                    "Applied for this session; could not save settings.".into(),
-                );
-            }
-        }
+        let snapshot = {
+            let mut settings = settings.write().unwrap();
+            settings.clock = clock;
+            settings.clone()
+        };
+        writer.save(snapshot);
+        window.set_settings_save_pending(true);
+        window.set_settings_save_error("".into());
+        window.set_clock_settings_error("".into());
     });
 }
 

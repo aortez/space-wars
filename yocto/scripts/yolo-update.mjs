@@ -4,18 +4,16 @@ import { existsSync, statSync } from 'fs';
 import { basename, isAbsolute, join, resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { spawn } from 'child_process';
-import { defaultBuildDir, YOCTO_DIR } from './paths.mjs';
+import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
+import { assertBootCompatibility, readBootIdentity } from './hardware.mjs';
 
-const DEFAULT_IMAGE_DIR = join(defaultBuildDir(), 'tmp/deploy/images/raspberrypi5');
+const DEFAULT_IMAGE_DIR = defaultImageDir();
 const CONFIG_FILE = join(YOCTO_DIR, '.flash-config.json');
 const DEFAULT_HOST = 'spacewars.local';
 const DEFAULT_USER = 'spacewars';
 const DEFAULT_REMOTE_TMP = '/tmp';
 const IMAGE_SUFFIX = '.ext4.gz';
-const PREFERRED_IMAGES = [
-  'spacewars-image-raspberrypi5.rootfs.ext4.gz',
-  'spacewars-image.rootfs.ext4.gz',
-];
+const PREFERRED_IMAGES = preferredImages('ext4.gz');
 
 function usage() {
   console.log(`
@@ -149,6 +147,9 @@ function checkRemoteOtaPrivilege(utils, remoteTarget) {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args.includes('--fast')) {
+    throw new Error('Use ./update.sh --fast or npm run update -- --fast for application-only updates.');
+  }
   if (args.includes('-h') || args.includes('--help')) {
     usage();
     return;
@@ -189,6 +190,8 @@ async function main() {
   utils.info(`Built: ${image.stat.mtime.toLocaleString()}`);
   utils.info(`Target: ${remoteTarget}`);
   utils.info(`Remote staging: ${remoteTmp}`);
+  const bootIdentity = readBootIdentity(image.path);
+  utils.info(`Required boot assets: ${bootIdentity.substring(0, 16)}...`);
 
   const sshKeyPath = resolveSshKey(utils, sshKeyArg);
   if (sshKeyPath) {
@@ -205,6 +208,9 @@ async function main() {
     utils.warn(`Cannot reach ${remoteTarget} over SSH; continuing because this is a dry run.`);
   } else {
     utils.success(`${targetHost} is reachable`);
+    const remoteBootIdentity = utils.ssh(remoteTarget, 'cat /boot/spacewars-boot-id 2>/dev/null || true');
+    assertBootCompatibility(bootIdentity, remoteBootIdentity);
+    utils.success('Boot assets match; rootfs-only A/B update is compatible.');
   }
 
   if (!dryRun && !checkRemoteOtaPrivilege(utils, remoteTarget)) {

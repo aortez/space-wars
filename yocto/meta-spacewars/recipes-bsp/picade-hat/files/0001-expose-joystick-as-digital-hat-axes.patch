@@ -1,0 +1,59 @@
+From: Space-Wars contributors
+Subject: [PATCH] Expose the joystick as two standard digital hat axes
+
+gilrs-core requires two axes when discovering a Linux gamepad. gpio-keys-polled
+supports EV_ABS ranges and recenters released axes, unlike gpio-keys in 6.6.
+Use its 4 ms poll interval; no userspace input translator is necessary.
+Buttons retain configurable evdev codes; Enter/Escape/Power remain keys.
+
+Upstream-Status: Inappropriate [Space-Wars controller profile]
+---
+ picade.dts | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/picade.dts b/picade.dts
+--- a/picade.dts
++++ b/picade.dts
+@@ -43,7 +43,9 @@
+ 		__overlay__ {
+ 			gpio_keys: gpio_keys {
+-				compatible = "gpio-keys";
++				compatible = "gpio-keys-polled";
++				label = "Space-Wars Picade";
++				poll-interval = <4>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&picade_pins>;
+ 				status = "okay";
+ 
+@@ -52 +54,3 @@
+-					linux,code = <103>;
++					linux,input-type = <3>; /* EV_ABS */
++					linux,code = <17>; /* ABS_HAT0Y */
++					linux,input-value = <0xffffffff>; /* -1 */
+@@ -56,5 +60,7 @@
+ 				down: down {
+ 					label = "Down";
+-					linux,code = <108>;
++					linux,input-type = <3>;
++					linux,code = <17>;
++					linux,input-value = <1>;
+ 					gpios = <&gpio 6 1>;
+ 				};
+@@ -62,5 +68,7 @@
+ 				left: left {
+ 					label = "Left";
+-					linux,code = <105>;
++					linux,input-type = <3>;
++					linux,code = <16>; /* ABS_HAT0X */
++					linux,input-value = <0xffffffff>;
+ 					gpios = <&gpio 20 1>;
+ 				};
+@@ -68,5 +76,7 @@
+ 				right: right {
+ 					label = "Right";
+-					linux,code = <106>;
++					linux,input-type = <3>;
++					linux,code = <16>;
++					linux,input-value = <1>;
+ 					gpios = <&gpio 16 1>;
+ 				};

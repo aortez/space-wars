@@ -254,6 +254,10 @@ pub trait ClientScenario {
 
     fn set_realtime_paused(&self, _paused: bool) {}
 
+    /// Host-wide output preferences, independent of deterministic simulation.
+    /// Sound-producing adapters must apply these to their playback endpoints.
+    fn set_audio_settings(&self, _settings: engine_common::AudioSettings) {}
+
     fn shutdown_realtime(&mut self) {}
 
     fn record_realtime_displayed_loop_iteration(&self) {}

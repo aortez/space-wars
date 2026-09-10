@@ -70,6 +70,7 @@ pub type SharedScenarioControls = Rc<RefCell<ScenarioControls>>;
 
 #[derive(Debug, Default)]
 pub struct ScenarioControls {
+    audio: Option<engine_common::AudioSettings>,
     request: Option<ScenarioControlRequest>,
     clock_state: Option<spacewars_control::ClockState>,
 }
@@ -92,6 +93,9 @@ pub fn new_scenario_controls() -> SharedScenarioControls {
 }
 
 impl ScenarioControls {
+    pub fn set_audio_settings(&mut self, settings: engine_common::AudioSettings) {
+        self.audio = Some(settings.normalized());
+    }
     pub fn clock_state(&self) -> Option<spacewars_control::ClockState> {
         self.clock_state.clone().map(|mut state| {
             state.trigger_pending = matches!(
@@ -606,6 +610,12 @@ pub fn start_scenario_loop(
         let now = Instant::now();
         let elapsed = now.saturating_duration_since(last_tick);
         last_tick = now;
+        if let Some(audio) = controls.borrow().audio
+            && settings.audio != audio
+        {
+            settings.audio = audio;
+            scenario.inner.set_audio_settings(audio);
+        }
         if let Some(error) = realtime_presenter
             .borrow_mut()
             .as_mut()
@@ -1269,6 +1279,10 @@ fn set_ingame_menu(window: &MainWindow, paused: bool) {
     if !visible {
         window.set_ingame_controls_visible(false);
         window.set_ingame_clock_visible(false);
+        // Launcher Sound is independent of the paused-scenario menu.
+        if !window.get_launcher_visible() {
+            window.set_sound_visible(false);
+        }
     }
 }
 
