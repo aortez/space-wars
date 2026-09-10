@@ -59,6 +59,29 @@ below records these outcomes separately. The shared capture policy version is
 `tactical_sortie_v5`; ground navigation remains `ground_navigation_v8` and
 recovery remains `recover_ship_v7`.
 
+## Microscopic breakup debris
+
+The first full generated desktop matrix exposed a collider-lifecycle assertion
+in eight duel subjects (four seeded worlds) with 3-second Mixed asteroid
+arrivals. A diagnostic replay located a live, non-damaging breakup triangle
+with radius 0.0000142 and 81% health. Repeated grazing damage compounded its
+existing shrink rule until convex-hull construction rejected the replacement;
+gravity then attempted to address a body that had not been inserted.
+
+Breakup triangles now retire as dust below radius 0.1, before losing usable
+collider geometry. The ordinary cleanup path removes their bodies and mappings,
+and suppresses further breakup. This is distinct from excavated material
+fragments, whose retained-plus-removed accounting and physical lifecycle remain
+unchanged. A lifecycle regression repeatedly applies tiny positive damage and
+checks live body access followed by complete removal. Two generated asteroid
+duels also run for three simulated minutes in the regular test suite.
+
+An initial attempt to make breakup size proportional to original health kept
+larger wreckage in play and failed an established pod-recovery regression. The
+bounded retirement rule preserves the existing breakup behavior at useful
+sizes. Debris insertion now asserts at the actual failing lifecycle operation
+with the offending state, rather than first failing during the gravity solve.
+
 ## Validation design
 
 Decision checks cover sun and owned-planet avoidance, read-only observations

@@ -117,6 +117,8 @@ const DEFAULT_PLAYER_VIEW_HEIGHT: f32 = 320.0;
 const MIN_PLAYER_VIEW_HEIGHT: f32 = 15.0;
 const DEBRIS_DEATH_SHRINK_FACTOR: f32 = 0.01;
 const DEBRIS_DEATH_LIFE_FACTOR: f32 = 0.8;
+// Non-damaging breakup triangles become dust before collider precision fails.
+const MIN_BREAKUP_FRAGMENT_RADIUS: f32 = 0.1;
 const DEBRIS_BODY_DAMAGE_SCALAR: f32 = 0.05;
 const CANNON_SHELL_SPEED: f32 = 300.0;
 const CANNON_RECOIL_SPEED: f32 = 200.0;
@@ -5126,6 +5128,15 @@ impl DebrisState {
             for point in shape {
                 *point *= factor;
             }
+        }
+        // Repeated grazing damage can shrink visual breakup debris long before
+        // its health reaches the normal death threshold. Retire it while the
+        // collider still has a usable size; retained terrain fragments have a
+        // separate material lifecycle and never pass through this path.
+        if self.kind == DebrisKind::Fragment && self.radius < MIN_BREAKUP_FRAGMENT_RADIUS {
+            self.life = 0.0;
+            self.dead = true;
+            self.fragmented = true;
         }
     }
 }
@@ -10152,6 +10163,47 @@ mod tests {
         assert_close(debris.radius, 9.0);
         assert!(!debris.dead);
         assert_close(debris.mass(), core::f32::consts::TAU * 9.0);
+    }
+
+    #[test]
+    fn tiny_breakup_fragments_retire_before_losing_their_physical_collider() {
+        let mut state = init_deathmatch_no_asteroids();
+        let baseline = state.physics.body_count();
+        let mut fragment = DebrisState::new_fragment(
+            Vec2::new(600.0, 600.0),
+            [
+                Vec2::new(-1.0, -1.0),
+                Vec2::new(3.0, -1.0),
+                Vec2::new(-2.0, 2.0),
+            ],
+            Vec2::ZERO,
+            0.0,
+            Color::WHITE,
+        );
+        fragment.translate_life(-fragment.life_max * 0.1);
+        state.debris.push(fragment);
+        for _ in 0..1000 {
+            // Positive grazing damage below one health ULP still applies the
+            // established breakup shrink; it must eventually retire the body.
+            state.debris[0].apply_damage(f32::EPSILON * 0.01);
+            reconcile_physics(&mut state, 1.0 / 60.0);
+            let fragment = state.debris[0];
+            if fragment.dead {
+                assert!(fragment.fragmented);
+                assert!(fragment.radius < MIN_BREAKUP_FRAGMENT_RADIUS);
+                assert_eq!(state.physics.body_count(), baseline);
+                remove_finished_debris(&mut state);
+                assert!(state.debris.is_empty());
+                return;
+            }
+            assert!(fragment.radius >= MIN_BREAKUP_FRAGMENT_RADIUS);
+            assert_eq!(state.physics.body_count(), baseline + 1);
+            assert!(state.physics.apply_velocity_delta(
+                MechanicalEntity::Debris(fragment.physics_id),
+                Vec2::Y * 0.01
+            ));
+        }
+        panic!("grazing fragment never retired");
     }
 
     #[test]

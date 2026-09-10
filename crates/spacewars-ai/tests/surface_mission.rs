@@ -260,3 +260,52 @@ fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
         assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
     }
 }
+
+#[test]
+fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
+    for seed in [2, 3] {
+        let mut state = SurfaceSortieScenario::init_material_arena(seed);
+        state.set_asteroid_pressure(engine_common::MaterialAsteroidSettings {
+            interval_seconds: 3,
+            severity: engine_common::MaterialAsteroidSeverity::Mixed,
+        });
+        let initial = state.terrain_diagnostics().occupied_cells;
+        let mut pilots = std::array::from_fn::<_, 2, _>(|seat| {
+            MaterialMissionPilot::new(
+                BrainReset {
+                    episode_seed: seed,
+                    ..context(seat)
+                },
+                CombatBreakSettings::default(),
+            )
+        });
+        for tick in 0..180 * 60 {
+            let mut actions = Vec::new();
+            for (seat, pilot) in pilots.iter_mut().enumerate() {
+                let observation = state.mission_observation(seat, pilot.site_request());
+                actions.extend(
+                    pilot
+                        .intent(&observation)
+                        .encode(PlayerId::from_index(seat).unwrap()),
+                );
+            }
+            SurfaceSortieScenario::step(&mut state, &actions, DT);
+            if tick % 60 == 59 {
+                let audit = state.terrain_diagnostics();
+                assert!(
+                    audit.issues.is_empty(),
+                    "seed {seed}, tick {tick}: {:?}",
+                    audit.issues
+                );
+                assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+                assert!(audit.max_speed < 500.0);
+            }
+        }
+        assert!(state.asteroid_pressure().spawned > 0);
+        assert!(
+            pilots
+                .iter()
+                .any(|pilot| pilot.telemetry().completed_sorties > 0)
+        );
+    }
+}

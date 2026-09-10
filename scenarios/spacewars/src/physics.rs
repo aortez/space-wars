@@ -1366,7 +1366,7 @@ impl SpacewarsPhysics {
             },
             &[collider],
         );
-        debug_assert!(inserted);
+        assert!(inserted, "could not insert debris: {debris:?}");
         inserted
     }
 }
