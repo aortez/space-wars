@@ -42,6 +42,11 @@ fn fixture() -> (BrainReset, RecoveryTaskObservationV1) {
         spin: 0.0,
     });
     p.hatch = Some(Vec2::new(6.0, 60.0));
+    // This fixture isolates traversal to an already landed ship. Tests for an
+    // unsettled hatch explicitly replace these observed boarding conditions.
+    p.landing.phase = scenario_spacewars::surface_sortie::LandingPhase::Landed;
+    p.landing.supported_feet = 2;
+    p.transfer = scenario_spacewars::surface_sortie::TransferResult::TooFar;
     let context = BrainReset {
         actor: p.owner,
         episode_seed: 42,
@@ -1016,4 +1021,71 @@ fn a_displaced_hatch_gets_a_fresh_settling_wait_within_the_original_task_budget(
         Some(ShipReturnFailure::NoGroundedHatch)
     );
     assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+}
+
+#[test]
+fn a_visible_unsettled_hatch_waits_without_renewing_progress_then_reports_return_failure() {
+    use scenario_spacewars::surface_sortie::{LandingPhase, TransferResult};
+    use spacewars_ai::ground_task::ShipReturnFailure;
+    let (context, mut o) = fixture();
+    let p = &mut o.flight.pilot;
+    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * 0.9;
+    p.landing.phase = LandingPhase::Settling;
+    p.landing.supported_feet = 1;
+    p.transfer = TransferResult::ShipNotSettled;
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::WaitForShip);
+    let progress = task.telemetry().last_progress_tick;
+    advance(&mut o, 1);
+    task.step(&o);
+    assert_eq!(task.telemetry().last_progress_tick, progress);
+    let mut copy = task.clone();
+    // World motion, a changing hatch target and brief actor contact loss must
+    // not grant a new wait. No crossing is active in this return fixture.
+    for tick in [300, 600, 900] {
+        advance(&mut o, tick);
+        o.flight.pilot.planet.motion.position.x += 10.0;
+        o.flight.pilot.hatch.as_mut().unwrap().x += 11.0;
+        o.flight.pilot.actor.as_mut().unwrap().position.x += 11.0;
+        o.flight.pilot.supported_planet = (tick != 600).then_some(o.flight.pilot.planet.index);
+        assert_eq!(task.step(&o), copy.step(&o));
+        assert_eq!(task.telemetry().goal, GroundGoal::WaitForShip);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    }
+    advance(&mut o, 901);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    assert_eq!(
+        task.telemetry().return_failure,
+        Some(ShipReturnFailure::UnsettledShip)
+    );
+    assert!(task.telemetry().last_progress_tick < 901);
+    assert_eq!(progress, 0);
+    task.reset(context);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::WaitForShip);
+    assert!(task.telemetry().return_failure.is_none());
+}
+
+#[test]
+fn a_hatch_that_settles_in_time_remains_an_ordinary_return() {
+    use scenario_spacewars::surface_sortie::{LandingPhase, TransferResult};
+    let (context, mut o) = fixture();
+    let p = &mut o.flight.pilot;
+    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * 0.9;
+    p.landing.phase = LandingPhase::Settling;
+    p.transfer = TransferResult::ShipNotSettled;
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    advance(&mut o, 600);
+    o.flight.pilot.transfer = TransferResult::Ready;
+    o.flight.pilot.landing.phase = LandingPhase::Landed;
+    o.flight.pilot.landing.supported_feet = 2;
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    advance(&mut o, 901);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().return_failure.is_none());
 }

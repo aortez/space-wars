@@ -377,3 +377,68 @@ fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
         );
     }
 }
+
+#[test]
+fn generated_corner_return_boards_the_original_ship_and_departs() {
+    use scenario_spacewars::surface_sortie::PilotLocation;
+    for mirror in [false, true] {
+        let mut state = SurfaceSortieScenario::init_material_arena_trial(0, mirror, 0.0);
+        let mut pilot = MaterialMissionPilot::new(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 0,
+            },
+            CombatBreakSettings::default(),
+        );
+        let initial = state.terrain_diagnostics().occupied_cells;
+        let mut claimed = None;
+        let mut boarded = None;
+        for tick in 0..180 * 60 {
+            let o = state.mission_observation(0, pilot.site_request());
+            let p = &o.local.combat.recovery.flight.pilot;
+            if p.planet.index == 2
+                && p.location == PilotLocation::OnFoot
+                && p.planet
+                    .claim
+                    .as_ref()
+                    .is_some_and(|c| c.owner == Some(p.owner))
+            {
+                claimed.get_or_insert(tick);
+            }
+            if claimed.is_some() && matches!(p.location, PilotLocation::Aboard(_)) {
+                boarded.get_or_insert(tick);
+            }
+            assert_eq!(
+                p.recovery.as_ref().unwrap().ships_lost,
+                0,
+                "a supported corner landing must retain the original ship"
+            );
+            let mut intent = pilot.intent(&o);
+            intent.weapons = Default::default();
+            SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), DT);
+            if pilot
+                .telemetry()
+                .events
+                .iter()
+                .any(|e| e.kind == "departed" && e.planet == Some(2))
+            {
+                break;
+            }
+        }
+        let departure = pilot
+            .telemetry()
+            .events
+            .iter()
+            .find(|e| e.kind == "departed" && e.planet == Some(2));
+        assert!(
+            claimed.is_some() && boarded.is_some() && departure.is_some(),
+            "mirror {mirror}: {:?}",
+            pilot.telemetry()
+        );
+        assert!(claimed.unwrap() < boarded.unwrap() && boarded.unwrap() < departure.unwrap().tick);
+        assert_eq!(pilot.telemetry().completed_recoveries, 0);
+        let audit = state.terrain_diagnostics();
+        assert!(audit.issues.is_empty() && audit.max_speed < 500.0);
+        assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+    }
+}

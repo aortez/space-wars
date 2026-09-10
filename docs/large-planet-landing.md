@@ -1,5 +1,8 @@
 # Landing on generated material planets
 
+Follow-up: [parked ship return](parked-ship-return.md) addresses the unsettled
+return case identified below. These recorded results remain the `cc5b030` baseline.
+
 This follows the [generated arena validation](generated-material-arena.md).
 The bounded goal is reliable landing, exit and capture in the seed-0/P2 quiet
 cases that previously made no completed trip within three minutes. The existing

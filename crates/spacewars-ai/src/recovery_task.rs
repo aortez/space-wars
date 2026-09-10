@@ -55,7 +55,7 @@ impl RecoveryGoal {
             Self::Claim => "claiming recovery ground",
             Self::Rebuild => "rebuilding ship",
             Self::FindBuildSpace => "finding rebuild space",
-            Self::Board => "boarding replacement",
+            Self::Board => "boarding assigned ship",
             Self::Complete => "ship recovered",
             Self::Blocked => "recovery blocked",
         }
@@ -159,7 +159,7 @@ impl RecoverShipTask {
         Self {
             context,
             telemetry: RecoveryTelemetry {
-                task: "recover_ship_v7",
+                task: "recover_ship_v8",
                 status: TaskStatus::Running,
                 goal: RecoveryGoal::LandPod,
                 reason: None,
@@ -684,7 +684,9 @@ impl RecoverShipTask {
         }
         // A recovered hatch cancels the hold and resumes ordinary boarding.
         if p.transfer == TransferResult::Ready
-            || p.hatch.is_some() && p.landing.planet == Some(p.planet.index)
+            || p.hatch.is_some()
+                && p.landing.phase == LandingPhase::Landed
+                && p.landing.planet == Some(p.planet.index)
         {
             self.return_fallback_since = None;
             self.ground_task = None;
@@ -719,8 +721,8 @@ impl RecoverShipTask {
                         .planet
                         .is_some_and(|planet| planet != p.planet.index)
             }
-            Some(ShipReturnFailure::NoGroundedHatch) => {
-                p.hatch.is_none()
+            Some(ShipReturnFailure::NoGroundedHatch | ShipReturnFailure::UnsettledShip) => {
+                (p.hatch.is_none() || p.transfer == TransferResult::ShipNotSettled)
                     && p.landing.planet == Some(p.planet.index)
                     && p.landing.descent_speed.abs() < 1.0
                     && p.landing.lateral_speed.abs() < 1.0

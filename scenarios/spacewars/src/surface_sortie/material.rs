@@ -166,21 +166,28 @@ impl SurfaceSortieState {
                 return [None; 2];
             };
             let frame = motion::SurfaceFrame::read(&self.world.physics, pilot.planet);
-            self.world
-                .physics
-                .landing_support_contacts(
+            let up = (body.position - frame.position).normalized();
+            let contacts = if pilot.landing.phase == LandingPhase::Landed
+                && self.world.ships[pilot.vehicle.0].form == ShipForm::Ship
+            {
+                self.world.physics.parked_landing_support_contacts(
                     pilot.vehicle.0,
                     pilot.planet,
-                    (body.position - frame.position).normalized(),
+                    up,
                 )
-                .map(|contact| {
-                    contact.and_then(|contact| {
-                        terrain.field.local_to_cell(
-                            (contact.position - contact.normal * 0.08 - frame.position)
-                                .rotate_radians(-frame.angle),
-                        )
-                    })
+            } else {
+                self.world
+                    .physics
+                    .landing_support_contacts(pilot.vehicle.0, pilot.planet, up)
+            };
+            contacts.map(|contact| {
+                contact.and_then(|contact| {
+                    terrain.field.local_to_cell(
+                        (contact.position - contact.normal * 0.08 - frame.position)
+                            .rotate_radians(-frame.angle),
+                    )
                 })
+            })
         })
     }
 

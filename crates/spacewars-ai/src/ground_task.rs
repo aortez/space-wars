@@ -4,7 +4,7 @@ use crate::jetpack_crossing::{CrossingTelemetry, JetpackCrossingPilot};
 use engine_core::Vec2;
 use scenario_spacewars::surface_sortie::jetpack::CrossingPlan;
 use scenario_spacewars::surface_sortie::{
-    LandingPhase, PilotLocation, SurfaceSortieAction,
+    LandingPhase, PilotLocation, SurfaceSortieAction, TransferResult,
     ground_navigation::{
         GROUND_NEIGHBOR_SPAN, GROUND_SAMPLES, GroundEdgeKind, GroundMap, GroundRouteDiagnostics,
         HATCH_APPROACH_RANGE,
@@ -31,6 +31,7 @@ pub enum GroundDestination {
 pub enum ShipReturnFailure {
     OtherPlanet,
     NoGroundedHatch,
+    UnsettledShip,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -117,13 +118,14 @@ pub struct GroundNavigationTask {
     crawl_step: Option<(u64, u64, CrawlStep)>,
     claim_relocation: claim::ClaimRelocation,
     hatch_missing_since: Option<u64>,
+    hatch_unsettled_since: Option<u64>,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v8",
+                policy: "ground_navigation_v9",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -166,6 +168,7 @@ impl GroundNavigationTask {
             crawl_step: None,
             claim_relocation: claim::ClaimRelocation::default(),
             hatch_missing_since: None,
+            hatch_unsettled_since: None,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -181,6 +184,7 @@ impl GroundNavigationTask {
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
         self.hatch_missing_since = None;
+        self.hatch_unsettled_since = None;
         self.telemetry.return_failure = None;
         self.claim_relocation = claim::ClaimRelocation::default();
         self.telemetry.claim_target = None;
@@ -422,9 +426,32 @@ impl GroundNavigationTask {
             GroundDestination::Hatch => HATCH_APPROACH_RANGE,
             GroundDestination::Rebuild { .. } => 1.4,
         };
+        if self.telemetry.destination == GroundDestination::Hatch {
+            if p.transfer != TransferResult::ShipNotSettled {
+                self.hatch_unsettled_since = None;
+            } else if actor.position.distance_to(target) < range
+                && p.supported_planet == Some(p.planet.index)
+            {
+                self.hatch_unsettled_since.get_or_insert(p.tick);
+            }
+            if self
+                .hatch_unsettled_since
+                .is_some_and(|since| p.tick.saturating_sub(since) > 15 * 60)
+            {
+                self.telemetry.return_failure = Some(ShipReturnFailure::UnsettledShip);
+                self.block("assigned ship did not settle at the hatch");
+                return action;
+            }
+        }
         if actor.position.distance_to(target) < range {
             self.telemetry.goal = if self.telemetry.claim_target.is_some() {
                 GroundGoal::Settle
+            } else if self.telemetry.destination == GroundDestination::Hatch
+                && p.transfer == TransferResult::ShipNotSettled
+            {
+                // Reaching the hatch is progress once; waiting beside an
+                // unboardable ship must not continually renew the host budget.
+                GroundGoal::WaitForShip
             } else if p.supported_planet == Some(p.planet.index) {
                 self.telemetry.last_progress_tick = p.tick;
                 GroundGoal::Arrived

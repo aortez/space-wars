@@ -707,3 +707,111 @@ fn material_escape_pod_can_land_and_disembark() {
     assert!(state.vehicle_available(0), "{:?}", state.observation(0));
     assert_eq!(state.observation(0).recovery.unwrap().rebuilds, 1);
 }
+
+#[test]
+fn corner_contacts_only_preserve_an_earned_landing_with_two_live_feet() {
+    let mut state = SurfaceSortieScenario::init_material_arena_trial(0, true, 0.0);
+    step(&mut state, &[]);
+    let planet = 2;
+    let frame = motion::SurfaceFrame::read(&state.world.physics, planet);
+    // A physical corner pose from the seed-0 mirrored Pi return replay. This
+    // unit fixture supplies prior landing state separately to test hysteresis;
+    // the mission regression flies the approach and earns landing normally.
+    let center = frame.position + Vec2::new(-100.61465, -21.234776).rotate_radians(frame.angle);
+    let angle = frame.angle + 1.8736967;
+    let body = state.world.physics.ship_body(0);
+    assert!(
+        state
+            .world
+            .physics
+            .world
+            .set_pose(body, center, angle, true)
+    );
+    assert!(
+        state
+            .world
+            .physics
+            .world
+            .set_velocity(body, Vec2::ZERO, 0.0, true)
+    );
+    let ship = &mut state.world.ships[0];
+    ship.position = center - SHIP_PIVOT;
+    ship.rotation_radians = angle;
+    ship.direction = Vec2::Y.rotate_radians(angle);
+    ship.velocity = Vec2::ZERO;
+    ship.omega = 0.0;
+    state.world.physics.world.step(DT.as_secs_f32());
+    let frame = motion::SurfaceFrame::read(&state.world.physics, planet);
+    let center = state.world.physics.world.motion(body).unwrap().position;
+    let up = (center - frame.position).normalized();
+    let strict = state.world.physics.landing_support_contacts(0, planet, up);
+    let parked = state
+        .world
+        .physics
+        .parked_landing_support_contacts(0, planet, up);
+    assert_eq!(strict.iter().flatten().count(), 1, "{strict:?}");
+    assert_eq!(parked.iter().flatten().count(), 2, "{parked:?}");
+    assert!(
+        state
+            .world
+            .physics
+            .parked_landing_support_contacts(0, 0, up)
+            .iter()
+            .all(Option::is_none)
+    );
+    assert!(
+        state
+            .world
+            .physics
+            .parked_landing_support_contacts(0, planet, -up)
+            .iter()
+            .all(Option::is_none)
+    );
+    let update = |landing: &mut LandingTelemetry, state: &SurfaceSortieState| {
+        landing.update(
+            &state.world.physics,
+            0,
+            planet,
+            &state.world.planets[planet],
+            &state.world.ships[0],
+            DT.as_secs_f32(),
+        );
+    };
+    let mut arriving = LandingTelemetry::default();
+    update(&mut arriving, &state);
+    assert_ne!(arriving.phase, LandingPhase::Landed);
+    assert!(!arriving.corner_support);
+    let earned = LandingTelemetry {
+        planet: Some(planet),
+        phase: LandingPhase::Landed,
+        settled_seconds: 0.25,
+        ..Default::default()
+    };
+    let mut landing = earned;
+    update(&mut landing, &state);
+    assert_eq!(landing.phase, LandingPhase::Landed);
+    assert!(landing.corner_support);
+    let mut foreign = earned;
+    foreign.planet = Some(0);
+    update(&mut foreign, &state);
+    assert_ne!(foreign.phase, LandingPhase::Landed);
+    for takeoff in [true, false] {
+        state.world.ships[0].thrust = if takeoff { 1.0 } else { 0.0 };
+        state.world.ships[0].wings_closed = !takeoff;
+        let mut landing = earned;
+        update(&mut landing, &state);
+        assert_ne!(landing.phase, LandingPhase::Landed);
+    }
+    state.world.ships[0].wings_closed = false;
+    // Losing an actual support collider invalidates the parked pair at once.
+    let planet_body = state.world.physics.planet_body(planet);
+    assert!(state.world.physics.world.replace_colliders(
+        planet_body,
+        parked[1].unwrap().collider.role,
+        &[],
+    ));
+    let mut landing = earned;
+    update(&mut landing, &state);
+    assert_ne!(landing.phase, LandingPhase::Landed);
+    assert!(!landing.corner_support);
+}

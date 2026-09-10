@@ -1,5 +1,9 @@
 # Surface gameplay and destructible terrain integration
 
+Latest reliability slice: [parked ship return](../parked-ship-return.md) preserves
+earned two-foot contact on material corners and bounds waiting at an unsettled
+hatch. It retains the original boarding and physical recovery actions.
+
 Latest reliability slice: [landing on generated material planets](../large-planet-landing.md)
 adds committed touchdown, distinct-site retries and shared hatch prediction.
 The reports separate landing/capture from later boarding and pressured missions.

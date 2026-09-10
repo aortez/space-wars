@@ -47,6 +47,8 @@ pub struct LandingTelemetry {
     pub lateral_speed: f32,
     pub relative_spin: f32,
     pub supported_feet: usize,
+    /// An earned landing retains two live feet across a voxel-corner normal change.
+    pub corner_support: bool,
     pub assist_strength: f32,
     pub settled_seconds: f32,
 }
@@ -124,6 +126,26 @@ impl LandingTelemetry {
         dt: f32,
     ) {
         let mut next = Self::measure(physics, index, planet_index, planet);
+        if self.phase == LandingPhase::Landed
+            && self.planet == next.planet
+            && !ship.dead
+            && ship.form == ShipForm::Ship
+            && physics.material_planets.contains(&planet_index)
+            && let Some(body) = physics.world.motion(physics.ship_body(index))
+        {
+            let surface = motion::SurfaceFrame::read(physics, planet_index);
+            let strict_feet = next.supported_feet;
+            next.supported_feet = physics
+                .parked_landing_support_contacts(
+                    index,
+                    planet_index,
+                    (body.position - surface.position).normalized(),
+                )
+                .into_iter()
+                .flatten()
+                .count();
+            next.corner_support = next.supported_feet == 2 && strict_feet < 2;
+        }
         next.assist_strength *= 1.0 - flight::sweep(ship);
         let wings_open = !ship.wings_closed && flight::sweep(ship) <= 0.001;
         let settled = !ship.dead

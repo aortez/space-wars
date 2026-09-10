@@ -1,5 +1,9 @@
 # AI for Spacewars on destructible ground
 
+Latest reliability slice: [parked ship return](../parked-ship-return.md) fixes
+corner-contact landing recognition and adds bounded visible-hatch waits in
+`ground_navigation_v9` and `recover_ship_v8`.
+
 The human-controlled material Expedition loop has passed Pi playtesting.
 The user's completion target is integration into ordinary Spacewars, including
 working AI. Merging is deferred until that gameplay milestone is ready.

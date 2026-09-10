@@ -710,6 +710,40 @@ impl SpacewarsPhysics {
         planet: usize,
         up: Vec2,
     ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
+        self.landing_contacts_with_alignment(index, planet, up, 0.7)
+    }
+
+    /// Keep an earned landing across small normal changes at round-foot/voxel
+    /// corners. Both feet still need current retained contact, and their mean
+    /// outward support must meet the original touchdown alignment.
+    pub(super) fn parked_landing_support_contacts(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+    ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
+        let strict = self.landing_support_contacts(index, planet, up);
+        if strict.iter().all(Option::is_some) {
+            return strict;
+        }
+        let corners = self.landing_contacts_with_alignment(index, planet, up, 0.5);
+        let contacts = std::array::from_fn(|part| strict[part].or(corners[part]));
+        if let [Some(left), Some(right)] = contacts
+            && (left.normal + right.normal).dot(up) >= 1.4
+        {
+            contacts
+        } else {
+            strict
+        }
+    }
+
+    fn landing_contacts_with_alignment(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+        min_alignment: f32,
+    ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
         let body = self.ship_body(index);
         std::array::from_fn(|part| {
             self.world
@@ -725,7 +759,7 @@ impl SpacewarsPhysics {
                         .unwrap();
                     is_planet_surface_support(contact.collider, planet)
                         && contact.separation <= 0.04
-                        && contact.normal.dot(up) >= 0.7
+                        && contact.normal.dot(up) >= min_alignment
                         && (velocity - contact.velocity).dot(contact.normal) <= 1.0
                 })
         })

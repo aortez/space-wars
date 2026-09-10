@@ -1011,10 +1011,64 @@ fn physical_return_boards_and_departs_with_replacement_only_when_needed() {
         let expected = u64::from(trial != ReturnTrial::Reachable);
         assert_eq!(
             (r.ships_lost, r.pod_ejections, r.rebuilds),
-            (expected, 0, expected)
+            (expected, 0, expected),
+            "{trial:?}"
         );
         let audit = state.terrain_diagnostics();
         assert!(audit.issues.is_empty());
         assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+    }
+}
+
+#[test]
+fn a_present_hatch_cannot_cancel_replacement_until_the_ship_actually_settles() {
+    use scenario_spacewars::surface_sortie::TransferResult;
+    for moving in [false, true] {
+        let (mut task, mut o) = ship_on_other_planet();
+        let p = &mut o.flight.pilot;
+        p.landing.planet = Some(p.planet.index);
+        p.landing.phase = LandingPhase::Settling;
+        p.landing.supported_feet = 1;
+        p.landing.lateral_speed = if moving { 5.0 } else { 0.0 };
+        p.transfer = TransferResult::ShipNotSettled;
+        task.step(&o);
+        assert_eq!(task.telemetry().scuttle_attempts, 0);
+        o.flight.pilot.tick += 901;
+        let action = task.step(&o).controls;
+        assert_eq!(
+            action.primary_held && action.interact_held && action.brake_held,
+            !moving
+        );
+        if moving {
+            o.flight.pilot.tick += 901;
+            task.step(&o);
+            assert_eq!(task.telemetry().status, TaskStatus::Blocked);
+            assert_eq!(task.telemetry().scuttle_attempts, 0);
+        } else {
+            let mut copy = task.clone();
+            o.flight.pilot.tick += 1;
+            assert_eq!(task.step(&o), copy.step(&o));
+            assert!(
+                task.step(&o).controls.brake_held,
+                "visible but unsettled hatch must not cancel"
+            );
+            o.flight.pilot.tick += 1;
+            o.flight.pilot.supported_planet = None;
+            assert_eq!(task.step(&o), FlightIntent::default());
+            o.flight.pilot.tick += 1;
+            o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+            o.flight.pilot.landing.phase = LandingPhase::Landed;
+            o.flight.pilot.landing.supported_feet = 2;
+            o.flight.pilot.transfer = TransferResult::Ready;
+            assert_eq!(
+                task.step(&o),
+                FlightIntent::default(),
+                "release cancelled chord"
+            );
+            o.flight.pilot.tick += 1;
+            let action = task.step(&o).controls;
+            assert!(action.interact_held && !action.primary_held && !action.brake_held);
+            assert!(task.telemetry().scuttled_tick.is_none());
+        }
     }
 }
