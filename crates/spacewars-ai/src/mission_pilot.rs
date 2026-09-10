@@ -19,7 +19,7 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v3";
+pub const MISSION_POLICY: &str = "material_mission_v4";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -35,6 +35,7 @@ pub enum MissionGoal {
     AvoidSun,
     Blocked,
 }
+
 impl MissionGoal {
     pub fn label(self) -> &'static str {
         match self {
@@ -108,6 +109,7 @@ pub struct MaterialMissionPilot {
     last_frame: Option<usize>,
     pwm: f32,
     escaping_sun: bool,
+    solar_detour: Option<(usize, f32)>,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
 }
@@ -145,6 +147,7 @@ impl MaterialMissionPilot {
             last_frame: None,
             pwm: 0.0,
             escaping_sun: false,
+            solar_detour: None,
             previous_tick: None,
             previous_intent: CombatIntent::default(),
         }
@@ -215,6 +218,7 @@ impl MaterialMissionPilot {
         self.telemetry.replans += 1;
         self.telemetry.target = None;
         self.capture = None;
+        self.solar_detour = None;
         self.goal(MissionGoal::Select, tick);
     }
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
@@ -282,6 +286,12 @@ impl MaterialMissionPilot {
             .clamp(0.0, 2.0);
             let closest = (radial + p.ship.velocity * closest_time).length();
             if closest < sun.radius + 32.0 {
+                if !self.escaping_sun
+                    && let Some(capture) = &mut self.capture
+                {
+                    capture.reject_solar_approach(p.tick);
+                    self.telemetry.capture = Some(capture.telemetry().clone());
+                }
                 self.escaping_sun = true;
             } else if radial.length() > sun.radius + 48.0 && p.ship.velocity.dot(up) >= 0.0 {
                 self.escaping_sun = false;
@@ -430,6 +440,7 @@ impl MaterialMissionPilot {
             && p.queries_ready
         {
             self.capture = Some(TacticalCapturePilot::new(self.context, self.breaks));
+            self.solar_detour = None;
             self.event(p.tick, "arrived", None);
             self.goal(MissionGoal::Capture, p.tick);
             // Neutral handoff; the next observation surveys local landing sites.
@@ -449,7 +460,8 @@ impl MaterialMissionPilot {
                 + (p.ship.position - target.motion.position).normalized() * (target.radius + 85.0);
             let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
-            target.motion.velocity + delta.normalized() * (delta.length() * 0.7).min(55.0)
+            self.detour_velocity(o, target.motion.velocity)
+                + delta.normalized() * (delta.length() * 0.7).min(55.0)
         };
         self.guide(o, desired)
     }
@@ -508,8 +520,22 @@ impl MaterialMissionPilot {
         let delta = waypoint - p.ship.position;
         self.guide(
             o,
-            opponent.motion.velocity + delta.normalized() * (delta.length() * 0.7).min(55.0),
+            self.detour_velocity(o, opponent.motion.velocity)
+                + delta.normalized() * (delta.length() * 0.7).min(55.0),
         )
+    }
+    fn detour_velocity(&self, o: &MissionObservationV1, destination_velocity: Vec2) -> Vec2 {
+        if let Some((index, _)) = self.solar_detour
+            && self
+                .telemetry
+                .avoidance
+                .is_some_and(|a| a.obstacle == MissionObstacleId::Planet(index))
+            && let Some(planet) = o.planets.iter().find(|p| p.index == index)
+        {
+            planet.motion.velocity
+        } else {
+            destination_velocity
+        }
     }
     fn route_waypoint(
         &mut self,
@@ -543,12 +569,38 @@ impl MaterialMissionPilot {
                 let radial = (p.ship.position - position).normalized();
                 let toward = (entry - position).normalized();
                 let angle = (radial.x * toward.y - radial.y * toward.x).atan2(radial.dot(toward));
-                let turn = if angle.abs() < 0.01 {
+                let mut turn = if angle.abs() < 0.01 {
                     0.5
                 } else {
                     angle.clamp(-0.5, 0.5)
                 };
-                let waypoint = position + radial.rotate_radians(turn) * (radius + 105.0);
+                if let MissionObstacleId::Planet(index) = id
+                    && let Some((previous, side)) = self.solar_detour
+                    && previous == index
+                {
+                    turn = side * 0.5;
+                }
+                let mut waypoint = position + radial.rotate_radians(turn) * (radius + 105.0);
+                if matches!(id, MissionObstacleId::Planet(_))
+                    && let Some(sun) = o.sun
+                {
+                    let clearance = |point| {
+                        crate::landing_safety::distance_to_segment(
+                            sun.position,
+                            p.ship.position,
+                            point,
+                        )
+                    };
+                    let opposite = position + radial.rotate_radians(-turn) * (radius + 105.0);
+                    if clearance(waypoint) < sun.radius + 36.0
+                        && clearance(opposite) > clearance(waypoint)
+                    {
+                        waypoint = opposite;
+                        if let MissionObstacleId::Planet(index) = id {
+                            self.solar_detour = Some((index, -turn.signum()));
+                        }
+                    }
+                }
                 self.telemetry.avoidance = Some(MissionAvoidance {
                     obstacle: id,
                     waypoint,
@@ -556,6 +608,7 @@ impl MaterialMissionPilot {
                 return waypoint;
             }
         }
+        self.solar_detour = None;
         entry
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
@@ -607,5 +660,60 @@ impl MaterialMissionPilot {
             },
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod solar_route_tests {
+    use super::*;
+    use engine_common::Scenario;
+    use scenario_spacewars::{
+        PlayerId,
+        surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle},
+    };
+    use std::time::Duration;
+
+    #[test]
+    fn solar_detour_stays_on_the_clear_side_and_tracks_the_obstructing_planet() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        o.sun = Some(MissionObstacle {
+            position: Vec2::ZERO,
+            radius: 198.0,
+        });
+        o.planets.truncate(1);
+        o.planets[0].motion.position = Vec2::new(320.0, 0.0);
+        o.planets[0].motion.velocity = Vec2::new(4.0, 3.0);
+        o.planets[0].radius = 60.0;
+        let center = o.planets[0].motion.position;
+        o.local.combat.recovery.flight.pilot.ship.position =
+            center + Vec2::X.rotate_radians(130_f32.to_radians()) * 120.0;
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut brain = MaterialMissionPilot::new(context, CombatBreakSettings::default());
+        let first = brain.route_waypoint(&o, center - Vec2::X * 20.0, Some(1));
+        assert_eq!(brain.solar_detour, Some((0, -1.0)));
+        assert!(
+            crate::landing_safety::distance_to_segment(
+                Vec2::ZERO,
+                o.local.combat.recovery.flight.pilot.ship.position,
+                first
+            ) > 234.0
+        );
+        let next = brain.route_waypoint(&o, center + Vec2::X * 20.0, Some(1));
+        assert_eq!(first, next);
+        assert_eq!(
+            brain.detour_velocity(&o, Vec2::X * -50.0),
+            Vec2::new(4.0, 3.0)
+        );
+        o.local.combat.recovery.flight.pilot.ship.position = center + Vec2::X * 200.0;
+        let clear = o.local.combat.recovery.flight.pilot.ship.position + Vec2::X * 100.0;
+        assert_eq!(brain.route_waypoint(&o, clear, Some(1)), clear);
+        assert_eq!(brain.solar_detour, None);
+        brain.reset(context);
+        assert_eq!(brain.solar_detour, None);
     }
 }

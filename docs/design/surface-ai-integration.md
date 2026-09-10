@@ -153,3 +153,8 @@ escape and enemy flag routing still require local path/mining decisions.
 
 The latest claim-footing recovery slice is documented in
 [claim footing recovery](../claim-footing-recovery.md).
+
+Generated multi-planet capture and post-capture pursuit now compose these tasks.
+The current solar-aware approach and departure policy is documented in
+[solar landing](../solar-landing.md). Match completion/elimination and promotion
+into ordinary Spacewars remain subsequent work.

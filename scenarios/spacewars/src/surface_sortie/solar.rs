@@ -4,6 +4,14 @@ use super::*;
 pub(super) const CORONA_WIDTH: f32 = 24.0;
 const MAX_DAMAGE_FRACTION_PER_SECOND: f32 = 0.20;
 
+/// Read-only geometry for flight planning; it grants no surface permissions.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct SolarHazard {
+    pub position: Vec2,
+    pub radius: f32,
+    pub heat_radius: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct SolarExposure {
     /// Linear falloff across the corona, measured at the full ship's pivot.
@@ -26,6 +34,20 @@ fn exposure(sun: SunState, ship: &ShipState) -> SolarExposure {
 }
 
 impl SurfaceSortieState {
+    pub fn solar_hazard(&self) -> Option<SolarHazard> {
+        let sun = self.world.sun?;
+        Some(SolarHazard {
+            position: sun.position,
+            radius: sun.radius,
+            heat_radius: sun.radius
+                + if self.combat_enabled() {
+                    CORONA_WIDTH
+                } else {
+                    0.0
+                },
+        })
+    }
+
     pub fn solar_exposure(&self, player: usize) -> Option<SolarExposure> {
         let pilot = self.pilots.get(player)?;
         pilot.combat.as_ref()?;

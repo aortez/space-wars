@@ -90,6 +90,9 @@ pub struct TacticalSortieObservationV1 {
     pub version: u32,
     pub combat: CombatObservationV2,
     pub cover: Vec<LandingCover>,
+    pub sun: Option<SolarHazard>,
+    /// Prescribed circular motion about the sun, absent for linear fixtures.
+    pub planet_orbit_omega: Option<f32>,
 }
 
 impl SurfaceSortieScenario {
@@ -196,6 +199,16 @@ impl SurfaceSortieState {
             version: 1,
             combat,
             cover,
+            sun: self.solar_hazard(),
+            planet_orbit_omega: self.world.sun.and_then(|_| {
+                matches!(
+                    self.motion_preset,
+                    SurfaceMotionPreset::Orbit
+                        | SurfaceMotionPreset::Generated
+                        | SurfaceMotionPreset::GeneratedSurfaceV1
+                )
+                .then_some(self.world.planets[self.motion_planet_index(player)].orbit_omega)
+            }),
         }
     }
 

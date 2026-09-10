@@ -1,5 +1,6 @@
 //! Cover-aware approach and departure around the existing physical surface loop.
 //! This pilot consumes measured material cover and emits ordinary controls only.
+pub use crate::landing_safety::SolarLandingPlan;
 use crate::{
     BrainReset,
     combat_pilot::{CombatIntent, RulePilotV4},
@@ -56,6 +57,8 @@ pub struct TacticalTelemetry {
     pub failure: Option<&'static str>,
     pub replans: u32,
     pub cover_replans: u32,
+    pub solar_replans: u32,
+    pub solar: Option<SolarLandingPlan>,
     pub invalidations: u32,
     pub exposed_ticks: u64,
     pub covered_ticks: u64,
@@ -70,6 +73,7 @@ pub struct TacticalSortiePilot {
     telemetry: TacticalTelemetry,
     site: Option<PilotLandingSite>,
     side: f32,
+    long_approach: bool,
     pwm: f32,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
@@ -79,6 +83,7 @@ pub struct TacticalSortiePilot {
     site_unavailable_since: Option<u64>,
     cover_lost_since: Option<u64>,
     rejected_sites: Vec<(LandingSiteId, u64)>,
+    solar_rejected: Vec<(LandingSiteId, u64)>,
     clearing_ground: bool,
 }
 impl TacticalSortiePilot {
@@ -97,6 +102,8 @@ impl TacticalSortiePilot {
                 failure: None,
                 replans: 0,
                 cover_replans: 0,
+                solar_replans: 0,
+                solar: None,
                 invalidations: 0,
                 exposed_ticks: 0,
                 covered_ticks: 0,
@@ -106,6 +113,7 @@ impl TacticalSortiePilot {
             landing,
             site: None,
             side: 1.0,
+            long_approach: false,
             pwm: 0.0,
             previous_tick: None,
             previous_intent: CombatIntent::default(),
@@ -115,6 +123,7 @@ impl TacticalSortiePilot {
             site_unavailable_since: None,
             cover_lost_since: None,
             rejected_sites: Vec::new(),
+            solar_rejected: Vec::new(),
             clearing_ground: false,
         }
     }
@@ -193,6 +202,8 @@ impl TacticalSortiePilot {
     fn replan(&mut self, tick: u64) {
         self.telemetry.replans += 1;
         self.site = None;
+        self.long_approach = false;
+        self.telemetry.solar = None;
         self.approach_progress = None;
         self.site_unavailable_since = None;
         self.cover_lost_since = None;
@@ -212,6 +223,19 @@ impl TacticalSortiePilot {
         self.replan(tick);
         if self.commit_descent {
             self.telemetry.cover_replans += 1;
+        }
+    }
+    /// An interrupted approach must not resume its rejected solar corridor.
+    /// Claims and boarding milestones survive escapes during departure.
+    pub(crate) fn reject_solar_approach(&mut self, tick: u64) {
+        if !self.commit_descent || self.landing.telemetry().claimed_tick.is_some() {
+            return;
+        }
+        if let Some(site) = self.site {
+            self.solar_rejected.push((site.id, tick + 30 * 60));
+            self.replan(tick);
+            self.telemetry.site = None;
+            self.telemetry.solar_replans += 1;
         }
     }
     fn choose(&mut self, o: &TacticalSortieObservationV1) -> CombatIntent {
@@ -246,8 +270,10 @@ impl TacticalSortiePilot {
         }
         let start = *self.telemetry.started_tick.get_or_insert(p.tick);
         if p.tick.saturating_sub(start) > 150 * 60
-            || self.telemetry.replans - self.telemetry.cover_replans >= 4
+            || self.telemetry.replans - self.telemetry.cover_replans - self.telemetry.solar_replans
+                >= 4
             || self.telemetry.cover_replans >= 8
+            || self.telemetry.solar_replans >= 8
         {
             self.telemetry.failed_tick = Some(p.tick);
             self.telemetry.failure = Some("capture approach exhausted its time or retry budget");
@@ -301,6 +327,9 @@ impl TacticalSortiePilot {
                 } else {
                     1.0
                 };
+            }
+            if self.commit_descent {
+                self.side = crate::landing_safety::departure_side(o, self.side);
             }
             let clear = altitude > 60.0 && relative.length() > 18.0 && !exposed;
             if clear {
@@ -374,17 +403,32 @@ impl TacticalSortiePilot {
             }
         }
         if self.site.is_none() {
-            if let Some(site) = p
+            self.solar_rejected.retain(|(_, until)| p.tick < *until);
+            let commit_descent = self.commit_descent;
+            if let Some((site, side, solar, _)) = p
                 .sites
                 .iter()
                 .filter(|site| !self.rejected_sites.contains(&(site.id, site.revision)))
-                .min_by(|a, b| {
-                    let score = |site: &PilotLandingSite| {
+                .filter(|site| !self.solar_rejected.iter().any(|(id, _)| *id == site.id))
+                .flat_map(|site| {
+                    let direction = (site.vehicle_position - p.planet.motion.position).normalized();
+                    let short = angle_between(up, direction);
+                    let preferred = if short < 0.0 { -1.0 } else { 1.0 };
+                    [preferred, -preferred].into_iter().filter_map(move |side| {
+                        if side != preferred && (!commit_descent || o.sun.is_none()) {
+                            return None;
+                        }
+                        let solar = commit_descent
+                            .then(|| crate::landing_safety::assess(o, *site, side, true))
+                            .flatten();
+                        if solar.is_some_and(|plan| !plan.safe()) {
+                            return None;
+                        }
                         let cover = o.cover.iter().find(|s| s.site == site.id);
                         // Avoid a long cover detour when this ship is already
                         // unexposed. Such detours can leave a moving planet's
                         // approach frame during an otherwise local retry.
-                        let penalty = if self.commit_descent && !exposed {
+                        let penalty = if commit_descent && !exposed {
                             0.0
                         } else {
                             cover.map_or(400.0, |s| {
@@ -395,25 +439,35 @@ impl TacticalSortiePilot {
                                 }
                             })
                         };
-                        let direction =
-                            (site.vehicle_position - p.planet.motion.position).normalized();
-                        angle_between(up, direction).abs() * (p.planet.radius + 60.0) + penalty
-                    };
-                    score(a).total_cmp(&score(b))
+                        let angle = if solar.is_some() {
+                            crate::landing_safety::directed_angle(short, side)
+                        } else {
+                            short
+                        };
+                        Some((
+                            *site,
+                            side,
+                            solar,
+                            angle.abs() * (p.planet.radius + 60.0) + penalty,
+                        ))
+                    })
                 })
-                .copied()
+                .min_by(|a, b| a.3.total_cmp(&b.3))
             {
                 self.site = Some(site);
+                self.telemetry.solar = solar;
                 self.landing = if self.commit_descent {
                     RulePilotV1::with_committed_descent(self.context, site)
                 } else {
                     RulePilotV1::with_site(self.context, site)
                 };
-                self.side = angle_between(
+                self.side = side;
+                let short = angle_between(
                     up,
                     (site.vehicle_position - p.planet.motion.position).normalized(),
-                )
-                .signum();
+                );
+                self.long_approach =
+                    solar.is_some() && short.abs() >= 0.2 && short.signum() != side;
                 self.goal(TacticalGoal::SeekCover, p.tick);
             } else {
                 // A completed edit may temporarily leave no valid site. Climb
@@ -423,7 +477,15 @@ impl TacticalSortiePilot {
         }
         let site = self.site.unwrap();
         let site_up = (site.vehicle_position - p.planet.motion.position).normalized();
-        let angle = angle_between(up, site_up);
+        let short = angle_between(up, site_up);
+        if short.abs() < 0.2 {
+            self.long_approach = false;
+        }
+        let angle = if self.long_approach {
+            crate::landing_safety::directed_angle(short, self.side)
+        } else {
+            short
+        };
         let height = (p.ship.position - site.vehicle_position).dot(site.normal);
         let side_error =
             (site.vehicle_position - p.ship.position).dot(Vec2::new(site.normal.y, -site.normal.x));
@@ -634,6 +696,40 @@ mod tests {
                 Some(if exposed { far.id } else { near.id })
             );
         }
+    }
+    #[test]
+    fn solar_escape_rejects_the_interrupted_site_temporarily_and_preserves_departures() {
+        let mut o = observation();
+        let site = o.combat.recovery.flight.pilot.sites[0];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        pilot.site = Some(site);
+        pilot.reject_solar_approach(1);
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick = 2;
+        p.controls_armed = true;
+        p.sites = vec![site];
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), None);
+        assert_eq!(pilot.telemetry().solar_replans, 1);
+        assert_eq!(pilot.telemetry().invalidations, 0);
+        o.combat.recovery.flight.pilot.tick = 30 * 60 + 1;
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), Some(site.id));
+
+        // A real claim recorded by the landing controller must survive an
+        // emergency during boarding/departure; it is not a fresh approach.
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.location = PilotLocation::OnFoot;
+        p.planet.claim.as_mut().unwrap().owner = Some(p.owner);
+        pilot.intent(&o);
+        assert!(pilot.telemetry().landing.claimed_tick.is_some());
+        let before = pilot.telemetry().clone();
+        pilot.reject_solar_approach(2000);
+        assert_eq!(pilot.telemetry(), &before);
+        pilot.reset(context());
+        assert!(pilot.solar_rejected.is_empty());
     }
     #[test]
     fn landing_retry_lifts_clear_and_rejects_the_unchanged_failed_site() {

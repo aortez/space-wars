@@ -378,6 +378,70 @@ fn physical_mission_captures_then_finds_and_hits_the_opponent() {
 }
 
 #[test]
+fn inner_planet_solar_approach_completes_a_real_capture_and_departure() {
+    use scenario_spacewars::surface_sortie::{PilotLocation, TransferResult};
+    let mut state = SurfaceSortieScenario::init_material_arena_trial(7, false, 0.0);
+    let mut brain = MaterialMissionPilot::new(
+        BrainReset {
+            actor: PlayerId::PLAYER_2,
+            episode_seed: 7,
+        },
+        CombatBreakSettings::default(),
+    );
+    let initial = state.terrain_diagnostics().occupied_cells;
+    let mut claimed = None;
+    let mut boarded = None;
+    let mut departed = None;
+    let mut approach_escapes = 0;
+    for tick in 0..180 * 60 {
+        let o = state.mission_observation(1, brain.site_request());
+        let p = &o.local.combat.recovery.flight.pilot;
+        if p.planet.index == 0
+            && p.location == PilotLocation::OnFoot
+            && p.planet
+                .claim
+                .as_ref()
+                .is_some_and(|c| c.owner == Some(p.owner))
+        {
+            claimed.get_or_insert(tick);
+        }
+        if claimed.is_some() && p.last_transfer == TransferResult::Boarded {
+            boarded.get_or_insert(tick);
+        }
+        assert_eq!(p.recovery.as_ref().unwrap().ships_lost, 0);
+        assert_eq!(state.solar_exposure(1).unwrap().intensity, 0.0);
+        let mut intent = brain.intent(&o);
+        intent.weapons = Default::default();
+        if brain.telemetry().goal == MissionGoal::AvoidSun && brain.telemetry().capture.is_some() {
+            approach_escapes += 1;
+        }
+        SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_2), DT);
+        if let Some(event) = brain
+            .telemetry()
+            .events
+            .iter()
+            .find(|e| e.kind == "departed" && e.planet == Some(0))
+        {
+            departed = Some(event.tick);
+            break;
+        }
+    }
+    assert!(
+        claimed.is_some() && boarded.is_some() && departed.is_some(),
+        "{:?}",
+        brain.telemetry()
+    );
+    assert!(claimed.unwrap() < boarded.unwrap() && boarded.unwrap() < departed.unwrap());
+    assert_eq!(
+        approach_escapes, 0,
+        "the landing plan must not rely on repeated solar escapes"
+    );
+    let audit = state.terrain_diagnostics();
+    assert!(audit.issues.is_empty() && audit.max_speed < 500.0);
+    assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+}
+
+#[test]
 fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
     for (seed, seat, required) in [(0, 0, 1), (2, 1, 3), (3, 1, 3), (7, 0, 3)] {
         let owner = PlayerId::from_index(seat).unwrap();

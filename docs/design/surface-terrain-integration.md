@@ -221,3 +221,7 @@ the other branch's image.
 
 The latest claim-footing recovery slice is documented in
 [claim footing recovery](../claim-footing-recovery.md).
+
+The generated arena now includes a solid sun, heat, post-capture pursuit and
+[solar-aware landing/departure](../solar-landing.md). Match completion and
+ordinary Spacewars integration remain separate from this checkpoint.

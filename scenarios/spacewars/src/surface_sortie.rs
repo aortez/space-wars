@@ -43,7 +43,7 @@ pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPr
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 pub use profiles::GeneratedSurfaceProfile;
 pub use recovery::{SurfaceRecoveryObservation, SurfaceRecoveryStatus};
-pub use solar::SolarExposure;
+pub use solar::{SolarExposure, SolarHazard};
 #[cfg(test)]
 mod tests;
 
