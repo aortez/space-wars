@@ -1354,6 +1354,38 @@ impl PhysicsWorld {
         direction: Vec2,
         distance: f32,
     ) -> Option<f32> {
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        self.collider_translation_clearance_from_pose(id, collider.position(), direction, distance)
+    }
+
+    /// Sweep the real collider shape from a proposed pose without moving it.
+    /// Exclusions and collision groups match `collider_translation_clearance`.
+    pub fn collider_translation_clearance_at(
+        &self,
+        id: ColliderId,
+        position: Vec2,
+        angle: f32,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return None;
+        }
+        self.collider_translation_clearance_from_pose(
+            id,
+            &Pose::new(to_rapier(position), angle),
+            direction,
+            distance,
+        )
+    }
+
+    fn collider_translation_clearance_from_pose(
+        &self,
+        id: ColliderId,
+        pose: &Pose,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
         if !finite_vec2(direction)
             || direction.length_squared() <= f32::EPSILON
             || !distance.is_finite()
@@ -1366,7 +1398,7 @@ impl PhysicsWorld {
             decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
         };
         let hit = self.raw.cast_shape(
-            collider.position(),
+            pose,
             to_rapier(direction.normalized()),
             collider.shape(),
             rapier2d::parry::query::ShapeCastOptions {
@@ -2135,6 +2167,90 @@ mod tests {
         let intersection = world.sensor_intersections()[0];
         assert!(intersection.collider_a < intersection.collider_b);
         assert!([intersection.collider_a, intersection.collider_b].contains(&sensor_id));
+    }
+
+    #[test]
+    fn proposed_collider_sweep_preserves_state_and_respects_rotation_and_sensors() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (entity, body, capsule) = ball_ids(1);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: Vec2::new(-4.0, 0.0),
+                ..Default::default()
+            },
+            &[ColliderSpec::capsule(capsule, 0.6, 0.3)]
+        ));
+        let (_, wall, wall_collider) = ball_ids(2);
+        assert!(world.insert_body(
+            wall,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..Default::default()
+            },
+            &[ColliderSpec::cuboid(wall_collider, 0.2, 4.0)]
+        ));
+        let (_, sensor_body, sensor_id) = ball_ids(3);
+        let mut sensor = ColliderSpec::cuboid(sensor_id, 0.2, 4.0);
+        sensor.sensor = true;
+        assert!(world.insert_body(
+            sensor_body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: Vec2::new(-1.0, 0.0),
+                ..Default::default()
+            },
+            &[sensor]
+        ));
+        world.step(1.0 / 60.0);
+        let before = world.snapshot_bytes().unwrap();
+        let probe = |angle| {
+            world
+                .collider_translation_clearance_at(
+                    capsule,
+                    Vec2::new(-2.0, 0.0),
+                    angle,
+                    Vec2::X,
+                    3.0,
+                )
+                .unwrap()
+        };
+        assert!((probe(0.0) - 1.5).abs() < 0.001);
+        assert!((probe(std::f32::consts::FRAC_PI_2) - 0.9).abs() < 0.001);
+        assert_eq!(
+            world.collider_translation_clearance(capsule, Vec2::X, 1.0),
+            Some(1.0)
+        );
+        assert_eq!(
+            world.collider_translation_clearance_at(
+                capsule,
+                Vec2::new(-2.0, 0.0),
+                0.0,
+                -Vec2::X,
+                3.0,
+            ),
+            Some(3.0),
+            "the retained actor does not block its proposed pose"
+        );
+        assert!(
+            world
+                .collider_translation_clearance_at(
+                    capsule,
+                    Vec2::new(f32::NAN, 0.0),
+                    0.0,
+                    Vec2::X,
+                    1.0,
+                )
+                .is_none()
+        );
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        world.remove_entity(entity);
+        assert!(
+            world
+                .collider_translation_clearance_at(capsule, Vec2::ZERO, 0.0, Vec2::X, 1.0,)
+                .is_none()
+        );
     }
 
     #[test]

@@ -140,3 +140,6 @@ Combining them with material travel, landing, claims and recovery remains the
 integration direction. Weapons/dogfighting, random hazards and contested
 single-planet behavior precede generated multi-planet matches. Deep-crater
 escape and enemy flag routing still require local path/mining decisions.
+
+The latest get-up traversal slice is documented in
+[ground get-up recovery](../ground-getup-recovery.md).

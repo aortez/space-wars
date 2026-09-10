@@ -72,6 +72,7 @@ fn main() {
     let mut asteroid_events = Vec::new();
     let mut failures = Vec::new();
     let mut last = [String::new(), String::new()];
+    let mut last_posture = [None, None];
     let mut strike_tick = None;
     for tick in 0..seconds * 60 {
         if strike && strike_tick.is_none() && pilots[seat].telemetry().completed_sorties > 0 {
@@ -97,8 +98,10 @@ fn main() {
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 actions.extend(intent.encode(owner));
                 let label = pilots[i].label();
+                let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
+                let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
                 if let Some(trace) = &mut trace
-                    && (tick % 60 == 0 || label != last[i])
+                    && (tick % 60 == 0 || label != last[i] || posture_key != last_posture[i])
                 {
                     serde_json::to_writer(
                         &mut *trace,
@@ -106,11 +109,26 @@ fn main() {
                             "version": 1, "tick": tick, "seat": i,
                             "observation": o, "actions": intent.encode(owner),
                             "mission": pilots[i].telemetry(),
+                            "posture": posture.map(|s| json!({
+                                "balance": format!("{:?}", s.balance),
+                                "get_up_result": format!("{:?}", s.get_up_result),
+                                "get_up_attempts": s.get_up_attempts,
+                                "recovery_progress": s.recovery_progress,
+                                "settled_seconds": s.settled_seconds,
+                                "knockdowns": s.knockdowns, "recoveries": s.recoveries,
+                                "support": s.support.map(|contact| json!({
+                                    "collider": format!("{:?}", contact.collider),
+                                    "position": contact.position, "normal": contact.normal,
+                                    "velocity": contact.velocity, "spin": contact.angular_velocity,
+                                    "separation": contact.separation,
+                                })),
+                            })),
                         }),
                     )
                     .unwrap();
                     writeln!(trace).unwrap();
                 }
+                last_posture[i] = posture_key;
                 if label != last[i] {
                     events.push(json!({"tick":tick,"seat":i,"label":label,"telemetry":pilots[i].telemetry()}));
                     eprintln!("{:.2}s P{} {label}", tick as f64 / 60.0, i + 1);

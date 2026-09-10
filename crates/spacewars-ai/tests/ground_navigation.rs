@@ -73,9 +73,200 @@ fn fixture() -> (BrainReset, RecoveryTaskObservationV1) {
 }
 fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
     o.flight.pilot.tick = tick;
+    if let Some(posture) = &mut o.posture {
+        posture.tick = tick;
+    }
     if let Some(map) = &mut o.ground {
         map.tick = tick;
     }
+}
+
+fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
+    use scenario_spacewars::surface_sortie::ground_posture::{
+        CrawlStep, GroundPostureObservation, SpacelingBalance, SpacelingGetUpResult,
+    };
+    let p = &mut o.flight.pilot;
+    p.balanced = false;
+    o.posture = Some(GroundPostureObservation {
+        version: 1,
+        owner: p.owner,
+        planet: p.planet.index,
+        revision: p.planet.revision,
+        tick: p.tick,
+        balance: SpacelingBalance::Recovering,
+        get_up_result: SpacelingGetUpResult::Blocked,
+        get_up_attempts: 1,
+        stable: true,
+        crawl: [
+            Some(CrawlStep {
+                direction: -1.0,
+                position: Vec2::new(-0.6, 60.9),
+            }),
+            None,
+        ],
+    });
+}
+
+#[test]
+fn blocked_get_up_backs_out_then_resurveys_before_resuming_the_hatch_route() {
+    use scenario_spacewars::surface_sortie::ground_posture::SpacelingGetUpResult;
+    let (context, mut o) = fixture();
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    blocked_posture(&mut o);
+    advance(&mut o, 1);
+    let unchanged = o.clone();
+    let crawl = task.step(&o);
+    assert_eq!(
+        crawl.horizontal, -1.0,
+        "only the route away from the hatch is clear"
+    );
+    assert!(!crawl.interact_held);
+    assert_eq!(task.telemetry().goal, GroundGoal::Crawl);
+    assert_eq!(task.telemetry().get_up_repositions, 1);
+    assert_eq!(
+        task.step(&o),
+        crawl,
+        "repeated observations keep the button edge"
+    );
+    assert_eq!(o, unchanged);
+    let mut replay = task.clone();
+    o.flight.pilot.actor.as_mut().unwrap().position.x = -0.4;
+    o.posture.as_mut().unwrap().get_up_result = SpacelingGetUpResult::Started;
+    advance(&mut o, 62);
+    let lifting = task.step(&o);
+    assert_eq!(lifting, replay.step(&o));
+    assert_eq!(
+        lifting.horizontal, 0.0,
+        "let the ordinary get-up lift finish"
+    );
+    o.flight.pilot.balanced = true;
+    advance(&mut o, 90);
+    task.step(&o);
+    assert!(
+        task.telemetry().replans >= 2,
+        "standing requires a new measured route"
+    );
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().crawl_direction.is_none());
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(5.0, 60.9);
+    advance(&mut o, 91);
+    assert!(!task.step(&o).interact_held);
+    assert_eq!(
+        task.telemetry().goal,
+        GroundGoal::Arrived,
+        "actual hatch range ends traversal"
+    );
+}
+
+#[test]
+fn crawl_waits_for_settled_recovery_and_has_a_deadline_even_if_clearance_disappears() {
+    use scenario_spacewars::surface_sortie::ground_posture::{
+        SpacelingBalance, SpacelingGetUpResult,
+    };
+    for fault in 0..4 {
+        let (context, mut o) = fixture();
+        blocked_posture(&mut o);
+        let posture = o.posture.as_mut().unwrap();
+        match fault {
+            0 => posture.stable = false,
+            1 => posture.balance = SpacelingBalance::KnockedDown,
+            2 => posture.get_up_result = SpacelingGetUpResult::Unsettled,
+            _ => posture.crawl = [None, None],
+        }
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        assert_eq!(task.step(&o).horizontal, 0.0, "fault={fault}");
+        assert_eq!(task.telemetry().get_up_repositions, 0);
+    }
+    let (context, mut o) = fixture();
+    blocked_posture(&mut o);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    assert_eq!(task.step(&o).horizontal, -1.0);
+    o.posture.as_mut().unwrap().crawl = [None, None];
+    advance(&mut o, 8 * 60 + 1);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(
+        task.telemetry().reason,
+        Some("unable to crawl clear for standing")
+    );
+    task.reset(context);
+    assert_eq!(task.telemetry().get_up_repositions, 0);
+}
+
+#[test]
+fn crawl_rejects_stale_identity_and_unbounded_or_invalid_corridors() {
+    for fault in 0..8 {
+        let (context, mut o) = fixture();
+        blocked_posture(&mut o);
+        let posture = o.posture.as_mut().unwrap();
+        match fault {
+            0 => posture.tick += 1,
+            1 => posture.owner = PlayerId::PLAYER_2,
+            2 => posture.planet += 1,
+            3 => posture.revision += 1,
+            4 => posture.version += 1,
+            5 => posture.crawl[0].as_mut().unwrap().direction = 2.0,
+            6 => posture.crawl[0].as_mut().unwrap().position.x = f32::NAN,
+            _ => posture.crawl[0].as_mut().unwrap().position.x = -10.0,
+        }
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        assert_eq!(
+            task.step(&o),
+            SurfaceSortieAction::default(),
+            "fault={fault}"
+        );
+        assert_eq!(task.telemetry().goal, GroundGoal::Blocked, "fault={fault}");
+    }
+}
+
+#[test]
+fn a_measured_crawl_finishes_despite_pose_jitter_but_loses_eligibility_on_world_changes() {
+    for change in 0..4 {
+        let (context, mut o) = fixture();
+        blocked_posture(&mut o);
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        assert_eq!(task.step(&o).horizontal, -1.0);
+        o.posture.as_mut().unwrap().crawl = [None, None];
+        advance(&mut o, 2);
+        assert_eq!(
+            task.step(&o).horizontal,
+            -1.0,
+            "finish the measured short move"
+        );
+        advance(&mut o, 3);
+        match change {
+            0 => o.flight.pilot.supported_planet = None,
+            1 => o.flight.pilot.queries_ready = false,
+            2 => {
+                o.flight.pilot.planet.revision += 1;
+                o.posture.as_mut().unwrap().revision += 1;
+            }
+            _ => advance(&mut o, 60),
+        }
+        assert_eq!(task.step(&o).horizontal, 0.0, "change={change}");
+    }
+}
+
+#[test]
+fn an_overhead_waypoint_needs_a_jump_even_inside_the_horizontal_dead_zone() {
+    let (context, mut o) = fixture();
+    let map = o.ground.as_mut().unwrap();
+    map.nodes[1].position = Vec2::new(0.1, 62.0);
+    map.edges[0].kind = GroundEdgeKind::Jump;
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    advance(&mut o, 1);
+    task.step(&o);
+    advance(&mut o, 48);
+    let action = task.step(&o);
+    assert!(
+        action.primary_held,
+        "the higher step requires ordinary jump input"
+    );
+    assert!(action.horizontal.abs() < 0.1);
+    assert_eq!(task.telemetry().goal, GroundGoal::Jump);
+    advance(&mut o, 49);
+    assert!(!task.step(&o).primary_held, "no held or repeated jump edge");
 }
 
 fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {

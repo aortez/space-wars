@@ -9,11 +9,13 @@ use scenario_spacewars::surface_sortie::{
         GROUND_NEIGHBOR_SPAN, GROUND_SAMPLES, GroundEdgeKind, GroundMap, GroundRouteDiagnostics,
         HATCH_APPROACH_RANGE,
     },
+    ground_posture::{CRAWL_DISTANCE, CrawlStep, SpacelingBalance, SpacelingGetUpResult},
     recovery_sensors::RecoveryTaskObservationV1,
 };
 use serde::Serialize;
 
 mod jetpack;
+mod posture;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -29,6 +31,7 @@ pub enum GroundGoal {
     Walk,
     Jump,
     GetUp,
+    Crawl,
     Recharge,
     JetpackLift,
     JetpackCross,
@@ -45,6 +48,7 @@ impl GroundGoal {
             Self::Walk => "walking along the ground route",
             Self::Jump => "jumping a ground obstacle",
             Self::GetUp => "getting up on the route",
+            Self::Crawl => "crawling clear to stand up",
             Self::Recharge => "recharging for the ground route",
             Self::JetpackLift => "jetpack: climbing over an obstacle",
             Self::JetpackCross => "jetpack: crossing toward the objective",
@@ -77,6 +81,9 @@ pub struct GroundTelemetry {
     pub flight_interruptions: u32,
     pub partial_routes: u32,
     pub displacements: u32,
+    pub get_up_repositions: u32,
+    pub crawl_direction: Option<f32>,
+    pub crawl_target: Option<Vec2>,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -94,13 +101,16 @@ pub struct GroundNavigationTask {
     crossing_task: Option<JetpackCrossingPilot>,
     settling_after_interrupt: bool,
     settling_after_displacement: bool,
+    crawl_started: Option<u64>,
+    crawl_origin: Option<Vec2>,
+    crawl_step: Option<(u64, u64, CrawlStep)>,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v5",
+                policy: "ground_navigation_v6",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -119,6 +129,9 @@ impl GroundNavigationTask {
                 flight_interruptions: 0,
                 partial_routes: 0,
                 displacements: 0,
+                get_up_repositions: 0,
+                crawl_direction: None,
+                crawl_target: None,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -132,6 +145,9 @@ impl GroundNavigationTask {
             crossing_task: None,
             settling_after_interrupt: false,
             settling_after_displacement: false,
+            crawl_started: None,
+            crawl_origin: None,
+            crawl_step: None,
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -199,9 +215,23 @@ impl GroundNavigationTask {
             return action;
         };
         if !p.queries_ready {
+            self.crawl_step = None;
             self.telemetry.goal = GroundGoal::Survey;
             if p.tick.saturating_sub(start) > 90 * 60 {
                 self.block("ground traversal exceeded ninety seconds");
+            }
+            return action;
+        }
+        if self.crawl_started.is_some() && !p.balanced && p.supported_planet != Some(p.planet.index)
+        {
+            self.crawl_step = None;
+            self.telemetry.crawl_target = None;
+            self.telemetry.goal = GroundGoal::Settle;
+            if self
+                .crawl_started
+                .is_some_and(|since| p.tick - since > 8 * 60)
+            {
+                self.block("unable to crawl clear for standing");
             }
             return action;
         }
@@ -290,17 +320,22 @@ impl GroundNavigationTask {
                 self.block("ground traversal exceeded ninety seconds");
                 return action;
             }
-            self.telemetry.goal = GroundGoal::GetUp;
-            action.primary_held =
-                !self.was_jumping && self.jump_tick.is_none_or(|t| p.tick - t > 60);
-            if action.primary_held {
-                self.jump_tick = Some(p.tick);
-            }
-            return action;
+            return self.recover_posture(o, target_local);
         }
-        if self.telemetry.goal == GroundGoal::GetUp && p.balanced {
+        if p.balanced
+            && (matches!(self.telemetry.goal, GroundGoal::GetUp | GroundGoal::Crawl)
+                || self.crawl_started.is_some())
+        {
             self.telemetry.last_progress_tick = p.tick;
             self.best_distance = f32::INFINITY;
+            if self.crawl_started.take().is_some() {
+                self.clear_route();
+                self.map = None;
+            }
+            self.crawl_origin = None;
+            self.crawl_step = None;
+            self.telemetry.crawl_direction = None;
+            self.telemetry.crawl_target = None;
         }
         let Some(target) = target else {
             self.telemetry.goal = if self.telemetry.destination == GroundDestination::Flag {
@@ -502,6 +537,9 @@ impl GroundNavigationTask {
                     && e.kind == GroundEdgeKind::Jump
             });
         let stuck = p.tick.saturating_sub(self.telemetry.last_progress_tick) > 45;
+        // A step almost directly above the actor has little horizontal error.
+        // It still needs a physical jump after ordinary walking stops advancing.
+        let overhead_step = stuck && (next - actor.position).dot(p.actor_up) > 0.2;
         action.horizontal = (error * 1.8 / 5.0).clamp(-1.0, 1.0);
         self.telemetry.goal = if p.supported_planet.is_some() {
             GroundGoal::Walk
@@ -510,7 +548,7 @@ impl GroundNavigationTask {
         };
         if p.supported_planet == Some(p.planet.index)
             && (jump_edge && error.abs() > 0.9 || stuck)
-            && error.abs() > 0.25
+            && (error.abs() > 0.25 || overhead_step)
             && !self.was_jumping
             && self.jump_tick.is_none_or(|t| p.tick - t > 36)
         {

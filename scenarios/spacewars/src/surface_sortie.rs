@@ -14,6 +14,7 @@ pub mod combat;
 pub mod compatibility;
 pub mod flight;
 pub mod ground_navigation;
+pub mod ground_posture;
 pub mod impact;
 pub mod jetpack;
 mod landing;

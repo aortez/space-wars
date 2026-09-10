@@ -55,7 +55,8 @@ impl Default for SpacelingBalanceSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SpacelingBalance {
     #[default]
     Balanced,
@@ -65,7 +66,8 @@ pub enum SpacelingBalance {
 
 /// Outcome of the most recent explicit get-up request, for player feedback and
 /// diagnostics. Ordinary jumps do not change this result or the attempt count.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 #[repr(u8)]
 pub enum SpacelingGetUpResult {
     #[default]
@@ -261,6 +263,10 @@ impl SpacelingAssembly {
 
     pub fn body(&self) -> BodyId {
         self.body
+    }
+
+    pub fn collider(&self) -> ColliderId {
+        self.collider
     }
 
     /// Call once before each world step. The caller applies the supplied gravity
