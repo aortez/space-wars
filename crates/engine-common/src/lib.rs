@@ -10,8 +10,10 @@ use serde::{
     de::{IgnoredAny, MapAccess, SeqAccess, Visitor},
 };
 
+mod clock_message;
 pub mod render;
 
+pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
 pub use render::*;
 
 pub const DEFAULT_CONTROL_SOCKET: &str = "/tmp/spacewars-control.sock";
@@ -220,6 +222,61 @@ pub struct ClockSettings {
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
+    pub marquee_preset: ClockMarqueePreset,
+    pub marquee_message: ClockMarqueeMessage,
+}
+
+/// Bounded recipes, not separate scheduler events. The choice is captured when
+/// Marquee starts; changing it does not interrupt an animation already playing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockMarqueePreset {
+    ClockChase = 0,
+    #[default]
+    ClockWave = 1,
+    ClockSpin = 2,
+    DigitSpin = 3,
+    TextScroll = 4,
+    TextRibbon = 5,
+    TextSpin = 6,
+}
+
+impl ClockMarqueePreset {
+    pub const ALL: [Self; 7] = [
+        Self::ClockChase,
+        Self::ClockWave,
+        Self::ClockSpin,
+        Self::DigitSpin,
+        Self::TextScroll,
+        Self::TextRibbon,
+        Self::TextSpin,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ClockChase => "Clock chase",
+            Self::ClockWave => "Clock wave",
+            Self::ClockSpin => "Clock spin",
+            Self::DigitSpin => "Digit spin",
+            Self::TextScroll => "Text scroll",
+            Self::TextRibbon => "Text ribbon",
+            Self::TextSpin => "Text spin",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMarqueeState {
+    pub preset: ClockMarqueePreset,
+    pub content: String,
+    pub cell_count: usize,
+    pub group_count: usize,
+    pub progress_milli: u32,
+    pub scrolling: bool,
+    pub waving: bool,
+    pub rotation_target: Option<String>,
+    pub lighting: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,16 +286,26 @@ pub enum ClockEventKind {
     Falling = 0,
     ColorCycle = 1,
     Meltdown = 2,
+    Duck = 3,
+    Marquee = 4,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 3] = [Self::Falling, Self::ColorCycle, Self::Meltdown];
+    pub const ALL: [Self; 5] = [
+        Self::Falling,
+        Self::ColorCycle,
+        Self::Meltdown,
+        Self::Duck,
+        Self::Marquee,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Falling => "falling",
             Self::ColorCycle => "color-cycle",
             Self::Meltdown => "meltdown",
+            Self::Duck => "duck",
+            Self::Marquee => "marquee",
         }
     }
 
@@ -247,6 +314,8 @@ impl ClockEventKind {
             Self::Falling => "Falling",
             Self::ColorCycle => "Color Cycle",
             Self::Meltdown => "Meltdown",
+            Self::Duck => "Duck",
+            Self::Marquee => "Marquee",
         }
     }
 }
@@ -258,6 +327,8 @@ pub struct ClockEvents {
     pub falling: bool,
     pub color_cycle: bool,
     pub meltdown: bool,
+    pub duck: bool,
+    pub marquee: bool,
 }
 
 impl Default for ClockEvents {
@@ -266,6 +337,8 @@ impl Default for ClockEvents {
             falling: true,
             color_cycle: true,
             meltdown: true,
+            duck: true,
+            marquee: true,
         }
     }
 }
@@ -276,6 +349,8 @@ impl ClockEvents {
             ClockEventKind::Falling => self.falling,
             ClockEventKind::ColorCycle => self.color_cycle,
             ClockEventKind::Meltdown => self.meltdown,
+            ClockEventKind::Duck => self.duck,
+            ClockEventKind::Marquee => self.marquee,
         }
     }
 }
@@ -292,6 +367,29 @@ pub struct ClockMeltdownState {
     pub drained_microunits: u64,
     /// Residue removed by the bounded reform phase, not counted as drainage.
     pub reclaimed_microunits: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckOutcome {
+    Exited,
+    Fell,
+    TimedOut,
+}
+
+/// Temporary course/controller telemetry. Position is in thousandths of render
+/// world units; the duck and its physics are absent during opening/resetting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckState {
+    pub left_to_right: bool,
+    pub position_milli: Option<[i32; 2]>,
+    pub grounded: bool,
+    pub jumps: u32,
+    pub cleared_obstacles: usize,
+    pub obstacle_count: usize,
+    pub entrance_open_milli: u32,
+    pub exit_open_milli: u32,
+    pub outcome: Option<ClockDuckOutcome>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

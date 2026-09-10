@@ -1,12 +1,13 @@
 //! Public Clock controls. Animation ticks deliberately do not change UI revision.
 use crate::{ControlClient, ControlClientError, ControlFailure, ControlFailureCode, ProtocolError};
-pub use engine_common::ClockEventKind;
+pub use engine_common::{ClockEventKind, ClockMarqueeMessage};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 4;
+pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 7;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -39,11 +40,16 @@ pub struct ClockState {
     pub body_count: usize,
     pub collider_count: usize,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
+    pub duck: Option<engine_common::ClockDuckState>,
+    pub marquee: Option<engine_common::ClockMarqueeState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
     pub can_trigger: bool,
     pub trigger_pending: bool,
+    pub settings_pending: bool,
+    /// The settings are effective for this session, but persistence failed.
+    pub settings_error: Option<String>,
 }
 
 impl ClockState {
@@ -73,6 +79,36 @@ impl ClockTriggerRequest {
             event,
             expected_scenario_revision: state.scenario_revision,
             expected_event_id: state.event_id,
+        }
+    }
+    pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
+        let request: Self = serde_json::from_str(json)?;
+        validate_version(request.schema_version)?;
+        Ok(request)
+    }
+    pub fn to_json(&self) -> Result<String, ProtocolError> {
+        validate_version(self.schema_version)?;
+        Ok(serde_json::to_string(self)?)
+    }
+}
+
+/// Change only the saved marquee message, leaving all other Clock settings and
+/// the active animation untouched. Requires a paused Clock and a fresh message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMessageRequest {
+    pub schema_version: u32,
+    pub message: ClockMarqueeMessage,
+    pub expected_scenario_revision: u64,
+    pub expected_message: ClockMarqueeMessage,
+}
+
+impl ClockMessageRequest {
+    pub fn new(state: &ClockState, message: ClockMarqueeMessage) -> Self {
+        Self {
+            schema_version: CLOCK_STATE_SCHEMA_VERSION,
+            message,
+            expected_scenario_revision: state.scenario_revision,
+            expected_message: state.settings.marquee_message,
         }
     }
     pub fn from_json(json: &str) -> Result<Self, ProtocolError> {
@@ -146,6 +182,43 @@ impl ControlClient {
         )?)?)
     }
 
+    /// Acknowledges a queued settings change. Use wait_for_clock_message to
+    /// confirm application and persistence at the next host boundary.
+    pub fn clock_message_before(
+        &self,
+        request: &ClockMessageRequest,
+        deadline: Instant,
+    ) -> Result<ClockState, ControlClientError> {
+        Ok(ClockState::from_json(&self.request_before(
+            &format!("{CLOCK_MESSAGE_COMMAND}\n{}\n", request.to_json()?),
+            deadline,
+        )?)?)
+    }
+
+    pub fn wait_for_clock_message(
+        &self,
+        request: &ClockMessageRequest,
+        timeout: Duration,
+    ) -> Result<ClockState, ControlClientError> {
+        let state = wait_for_clock_with(
+            request.expected_scenario_revision,
+            "marquee message to be applied",
+            |state| message_applied(request, state),
+            timeout,
+            Instant::now,
+            |deadline| self.clock_state_before(deadline),
+            std::thread::sleep,
+        )?;
+        if let Some(error) = &state.settings_error {
+            return Err(clock_failure(
+                ControlFailureCode::ActionUnavailable,
+                error.clone(),
+                Some(state),
+            ));
+        }
+        Ok(state)
+    }
+
     /// Wait for a matching state. A timeout includes the last successful reply,
     /// or no state if the deadline elapsed before any reply was received.
     pub fn wait_for_clock_state(
@@ -168,6 +241,30 @@ impl ControlClient {
 fn wait_for_clock_state_with(
     predicate: &ClockStatePredicate,
     timeout: Duration,
+    now: impl FnMut() -> Instant,
+    request: impl FnMut(Instant) -> Result<ClockState, ControlClientError>,
+    sleep: impl FnMut(Duration),
+) -> Result<ClockState, ControlClientError> {
+    wait_for_clock_with(
+        predicate.scenario_revision,
+        &format!("{predicate:?}"),
+        |state| predicate.matches(state),
+        timeout,
+        now,
+        request,
+        sleep,
+    )
+}
+
+fn message_applied(request: &ClockMessageRequest, state: &ClockState) -> bool {
+    !state.settings_pending && state.settings.marquee_message == request.message
+}
+
+fn wait_for_clock_with(
+    scenario_revision: u64,
+    description: &str,
+    matches: impl Fn(&ClockState) -> bool,
+    timeout: Duration,
     mut now: impl FnMut() -> Instant,
     mut request: impl FnMut(Instant) -> Result<ClockState, ControlClientError>,
     mut sleep: impl FnMut(Duration),
@@ -182,14 +279,14 @@ fn wait_for_clock_state_with(
     let mut last = None;
     loop {
         match request(deadline) {
-            Ok(state) if state.scenario_revision != predicate.scenario_revision => {
+            Ok(state) if state.scenario_revision != scenario_revision => {
                 return Err(clock_failure(
                     ControlFailureCode::StaleRevision,
                     "Clock instance changed while waiting".into(),
                     Some(state),
                 ));
             }
-            Ok(state) if predicate.matches(&state) => return Ok(state),
+            Ok(state) if matches(&state) => return Ok(state),
             Ok(state) => last = Some(state),
             Err(ControlClientError::DeadlineElapsed) => break,
             Err(ControlClientError::Io(error))
@@ -210,7 +307,7 @@ fn wait_for_clock_state_with(
     }
     Err(clock_failure(
         ControlFailureCode::Timeout,
-        format!("Timed out waiting for Clock {predicate:?}"),
+        format!("Timed out waiting for Clock {description}"),
         last,
     ))
 }
@@ -249,11 +346,55 @@ mod tests {
             body_count: 0,
             collider_count: 0,
             meltdown: None,
+            duck: None,
+            marquee: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
             trigger_pending: false,
+            settings_pending: false,
+            settings_error: None,
         }
+    }
+
+    #[test]
+    fn message_protocol_validates_text_versions_and_required_guards() {
+        let state = clock_state();
+        let request = ClockMessageRequest::new(&state, "hello, pi!".parse().unwrap());
+        let json = request.to_json().unwrap();
+        assert!(json.contains("HELLO, PI!"));
+        assert_eq!(ClockMessageRequest::from_json(&json).unwrap(), request);
+        for invalid in ["", "   ", "a\nb", "é", &"A".repeat(33)] {
+            let mut value = serde_json::to_value(&request).unwrap();
+            value["message"] = invalid.into();
+            assert!(ClockMessageRequest::from_json(&value.to_string()).is_err());
+        }
+        for field in [
+            "schema_version",
+            "expected_scenario_revision",
+            "expected_message",
+            "message",
+        ] {
+            let mut value = serde_json::to_value(&request).unwrap();
+            value.as_object_mut().unwrap().remove(field);
+            assert!(ClockMessageRequest::from_json(&value.to_string()).is_err());
+        }
+        let mut stale = request;
+        stale.schema_version -= 1;
+        assert!(stale.to_json().is_err());
+        assert!(ClockMessageRequest::from_json(&serde_json::to_string(&stale).unwrap()).is_err());
+    }
+
+    #[test]
+    fn message_wait_checks_the_applied_value_not_just_queue_acknowledgement() {
+        let mut state = clock_state();
+        let request = ClockMessageRequest::new(&state, "HELLO!".parse().unwrap());
+        assert!(!message_applied(&request, &state));
+        state.settings.marquee_message = request.message;
+        state.settings_pending = true;
+        assert!(!message_applied(&request, &state));
+        state.settings_pending = false;
+        assert!(message_applied(&request, &state));
     }
 
     #[test]
@@ -337,6 +478,8 @@ mod tests {
             r#"{"schema_version":1,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":2,"event":"unknown","expected_scenario_revision":7,"expected_event_id":3}"#,
             r#"{"schema_version":3,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
+            r#"{"schema_version":4,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
+            r#"{"schema_version":5,"event":"falling","expected_scenario_revision":7,"expected_event_id":3}"#,
         ] {
             assert!(ClockTriggerRequest::from_json(json).is_err());
         }
@@ -363,6 +506,63 @@ mod tests {
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
+    }
+
+    #[test]
+    fn duck_diagnostics_and_named_trigger_round_trip() {
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::Duck);
+        state.phase = Some("resetting".into());
+        state.duck = Some(engine_common::ClockDuckState {
+            left_to_right: false,
+            position_milli: None,
+            grounded: false,
+            jumps: 3,
+            cleared_obstacles: 3,
+            obstacle_count: 3,
+            entrance_open_milli: 0,
+            exit_open_milli: 700,
+            outcome: Some(engine_common::ClockDuckOutcome::Exited),
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Duck);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+    }
+
+    #[test]
+    fn marquee_diagnostics_settings_and_named_trigger_round_trip() {
+        for preset in engine_common::ClockMarqueePreset::ALL {
+            let mut state = clock_state();
+            state.settings.marquee_preset = preset;
+            state.event_kind = Some(ClockEventKind::Marquee);
+            state.phase = Some("presenting".into());
+            state.marquee = Some(engine_common::ClockMarqueeState {
+                preset,
+                content: "SPACE WARS".into(),
+                cell_count: 150,
+                group_count: 10,
+                progress_milli: 400,
+                scrolling: true,
+                waving: true,
+                rotation_target: None,
+                lighting: "sweep".into(),
+            });
+            assert_eq!(
+                ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+                state
+            );
+            let request = ClockTriggerRequest::new(&state, ClockEventKind::Marquee);
+            assert_eq!(
+                ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+                request
+            );
+        }
     }
 
     fn after(state: &ClockState) -> ClockStatePredicate {

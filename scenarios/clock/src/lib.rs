@@ -8,6 +8,7 @@ mod layout;
 #[cfg(test)]
 mod live_tests;
 mod physics;
+mod presentation;
 mod render;
 
 use std::time::Duration;
@@ -18,9 +19,12 @@ pub use digits::{
 };
 
 use engine_common::{
-    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockSettings, ClockTimeFormat,
-    Observation, RenderFrame, Scenario, StepResult, TickModel,
+    Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockMarqueeMessage,
+    ClockMarqueePreset, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
+    StepResult, TickModel,
 };
+pub use events::duck::DUCK_TICKS;
+pub use events::marquee::MARQUEE_TICKS;
 pub use events::meltdown::{DRAINING_TICKS, MAX_MELTDOWN_CELLS, MELTING_TICKS, WATER_COLUMNS};
 use events::{ActiveEvent, EventContext, EventSchedule};
 pub use events::{
@@ -29,7 +33,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 1;
+pub const CLOCK_ACTION_VERSION: u16 = 3;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -39,6 +43,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
+const MAX_CONFIGURE_BYTES: usize = 6 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -96,8 +101,12 @@ impl ClockAction {
         payload.push(
             u8::from(settings.events.falling)
                 | (u8::from(settings.events.color_cycle) << 1)
-                | (u8::from(settings.events.meltdown) << 2),
+                | (u8::from(settings.events.meltdown) << 2)
+                | (u8::from(settings.events.duck) << 3)
+                | (u8::from(settings.events.marquee) << 4),
         );
+        payload.push(settings.marquee_preset as u8);
+        payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
 
@@ -140,7 +149,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 5) if payload[4] <= 7 => {
+            (CLOCK_ACTION_CONFIGURE, 7..=MAX_CONFIGURE_BYTES) if payload[4] <= 31 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -157,7 +166,11 @@ impl ClockAction {
                         falling: payload[4] & 1 != 0,
                         color_cycle: payload[4] & 2 != 0,
                         meltdown: payload[4] & 4 != 0,
+                        duck: payload[4] & 8 != 0,
+                        marquee: payload[4] & 16 != 0,
                     },
+                    marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
+                    marquee_message: std::str::from_utf8(&payload[6..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -171,6 +184,8 @@ pub struct ClockConfig {
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
+    pub marquee_preset: ClockMarqueePreset,
+    pub marquee_message: ClockMarqueeMessage,
 }
 
 impl Default for ClockConfig {
@@ -180,6 +195,8 @@ impl Default for ClockConfig {
             time_format: ClockTimeFormat::TwentyFourHour,
             event_profile: ClockEventProfile::default(),
             events: ClockEvents::default(),
+            marquee_preset: ClockMarqueePreset::default(),
+            marquee_message: ClockMarqueeMessage::default(),
         }
     }
 }
@@ -191,6 +208,8 @@ impl ClockConfig {
             time_format: self.time_format,
             event_profile: self.event_profile,
             events: self.events,
+            marquee_preset: self.marquee_preset,
+            marquee_message: self.marquee_message,
         }
     }
 }
@@ -210,6 +229,8 @@ impl ClockState {
             time_format: self.config.time_format,
             event_profile: self.config.event_profile,
             events: self.config.events,
+            marquee_preset: self.config.marquee_preset,
+            marquee_message: self.config.marquee_message,
         }
     }
 
@@ -219,6 +240,8 @@ impl ClockState {
         self.config.time_format = settings.time_format;
         self.config.event_profile = settings.event_profile;
         self.config.events = settings.events;
+        self.config.marquee_preset = settings.marquee_preset;
+        self.config.marquee_message = settings.marquee_message;
         if let Some(reading) = self.reading {
             self.apply_reading(reading);
         }
@@ -310,6 +333,19 @@ impl ClockState {
             _ => None,
         }
     }
+
+    pub fn duck_state(&self) -> Option<engine_common::ClockDuckState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Duck(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+    pub fn marquee_state(&self) -> Option<engine_common::ClockMarqueeState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Marquee(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
     pub fn can_trigger_event(&self) -> bool {
         self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
     }
@@ -340,6 +376,8 @@ impl ClockState {
                 layout,
             },
             seed,
+            self.config.marquee_preset,
+            self.config.marquee_message,
         ));
     }
 
@@ -372,6 +410,9 @@ impl ClockState {
     fn apply_reading(&mut self, reading: ClockReading) {
         self.reading = Some(reading);
         self.display = digits::snapshot(reading, self.config.time_format);
+        if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
+            event.synchronize(self.display);
+        }
         if !self
             .active_event
             .as_ref()
@@ -468,14 +509,14 @@ mod tests {
         assert_eq!(
             ClockAction::decode(&Action::scenario(
                 CLOCK_ACTION_SET_READING,
-                vec![1, 0, 24, 0, 0],
+                vec![2, 0, 24, 0, 0],
             )),
             None
         );
         assert_eq!(
             ClockAction::decode(&Action::scenario(
                 CLOCK_ACTION_SET_READING,
-                vec![2, 0, 19, 42, 7],
+                vec![1, 0, 19, 42, 7],
             )),
             None
         );

@@ -10,6 +10,8 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 falling: true,
                 color_cycle: false,
                 meltdown: false,
+                duck: false,
+                marquee: false,
             },
             ..ClockConfig::default()
         },
@@ -377,7 +379,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
     ClockScenario::step(&mut a, std::slice::from_ref(&reading), Duration::ZERO);
     ClockScenario::step(&mut b, &[reading], Duration::ZERO);
     let mut seen = [false; ClockEventKind::ALL.len()];
-    for _ in 0..90 * 60 {
+    for _ in 0..300 * 60 {
         ticks(&mut a, 1);
         ticks(&mut b, 1);
         assert_eq!(
@@ -397,6 +399,8 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         assert_eq!(a.segments(), b.segments());
         assert_eq!(a.palette(), b.palette());
         assert_eq!(a.meltdown_state(), b.meltdown_state());
+        assert_eq!(a.duck_state(), b.duck_state());
+        assert_eq!(a.marquee_state(), b.marquee_state());
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }

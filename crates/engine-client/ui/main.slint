@@ -151,6 +151,7 @@ component ChoiceRow inherits Rectangle {
     in property <string> value;
     in property <bool> selected: false;
     in property <bool> enabled: true;
+    in property <float> label-fraction: 0.40;
     callback previous();
     callback next();
 
@@ -161,7 +162,7 @@ component ChoiceRow inherits Rectangle {
 
     Text {
         x: 14px;
-        width: parent.width * 0.38;
+        width: parent.width * (root.label-fraction - 0.02);
         height: parent.height;
         text: root.label;
         color: #c7d0dc;
@@ -170,7 +171,7 @@ component ChoiceRow inherits Rectangle {
     }
 
     MenuButton {
-        x: parent.width * 0.40;
+        x: parent.width * root.label-fraction;
         enabled: root.enabled;
         y: 2px;
         width: 52px;
@@ -182,8 +183,8 @@ component ChoiceRow inherits Rectangle {
     }
 
     Text {
-        x: parent.width * 0.40 + 60px;
-        width: parent.width * 0.60 - 120px;
+        x: parent.width * root.label-fraction + 60px;
+        width: parent.width * (1.0 - root.label-fraction) - 120px;
         height: parent.height;
         text: root.value;
         color: #ffffff;
@@ -304,6 +305,11 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-falling-enabled: true;
     in-out property <bool> launcher-clock-color-cycle-enabled: true;
     in-out property <bool> launcher-clock-meltdown-enabled: true;
+    in-out property <bool> launcher-clock-duck-enabled: true;
+    in-out property <bool> launcher-clock-marquee-enabled: true;
+    in-out property <string> launcher-clock-marquee-preset: "Clock wave";
+    // Settings/CLI only for now; retained when other menu settings are saved.
+    in-out property <string> launcher-clock-marquee-message: "SPACE WARS";
     in-out property <string> launcher-nes-rom-id: "";
     in-out property <string> launcher-nes-rom-name: "No cartridges found";
     in-out property <string> launcher-nes-rom-status: "Copy a .nes file into the ROM library.";
@@ -831,8 +837,9 @@ export component MainWindow inherits Window {
                 activated => { root.ingame-clock-open(); }
             }
 
-            Rectangle {
-                visible: root.ingame-clock-visible;
+            // A conditional item tree keeps these controls out of the large
+            // root initializer. Values/focus remain in MainWindow across opens.
+            if root.ingame-clock-visible: Rectangle {
                 x: 24px;
                 y: 62px;
                 width: parent.width - 48px;
@@ -865,7 +872,7 @@ export component MainWindow inherits Window {
                 MenuButton {
                     x: 0px;
                     y: 112px;
-                    width: (parent.width - 20px) / 3;
+                    width: (parent.width - 30px) / 4;
                     height: 48px;
                     text: "Falling\n" + (root.launcher-clock-falling-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 2;
@@ -873,9 +880,9 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(2, 1); }
                 }
                 MenuButton {
-                    x: (parent.width + 10px) / 3;
+                    x: (parent.width + 10px) / 4;
                     y: 112px;
-                    width: (parent.width - 20px) / 3;
+                    width: (parent.width - 30px) / 4;
                     height: 48px;
                     text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 3;
@@ -883,14 +890,24 @@ export component MainWindow inherits Window {
                     activated => { root.ingame-clock-adjust(3, 1); }
                 }
                 MenuButton {
-                    x: 2 * (parent.width + 10px) / 3;
+                    x: 2 * (parent.width + 10px) / 4;
                     y: 112px;
-                    width: (parent.width - 20px) / 3;
+                    width: (parent.width - 30px) / 4;
                     height: 48px;
                     text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 7;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(7, 1); }
+                }
+                MenuButton {
+                    x: 3 * (parent.width + 10px) / 4;
+                    y: 112px;
+                    width: (parent.width - 30px) / 4;
+                    height: 48px;
+                    text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 8;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(8, 1); }
                 }
                 ChoiceRow {
                     y: 168px;
@@ -903,14 +920,37 @@ export component MainWindow inherits Window {
                     previous => { root.ingame-clock-adjust(4, -1); }
                     next => { root.ingame-clock-adjust(4, 1); }
                 }
-                Text {
+                MenuButton {
+                    x: 0px;
                     y: 224px;
+                    width: 104px;
+                    height: 48px;
+                    text: "Marquee\n" + (root.launcher-clock-marquee-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 9;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(9, 1); }
+                }
+                ChoiceRow {
+                    x: 112px;
+                    y: 224px;
+                    width: parent.width - 112px;
+                    height: 48px;
+                    label: "Recipe";
+                    label-fraction: 0.25;
+                    value: root.launcher-clock-marquee-preset;
+                    selected: root.ingame-clock-focus-index == 10;
+                    enabled: !root.clock-controls-pending;
+                    previous => { root.ingame-clock-adjust(10, -1); }
+                    next => { root.ingame-clock-adjust(10, 1); }
+                }
+                Text {
+                    y: 276px;
                     width: parent.width;
-                    height: 50px;
-                    text: root.clock-controls-pending ? "Applying…" : root.clock-settings-error != "" ? root.clock-settings-error : "Changes are saved; current animation can finish. Preview replaces it, even if the event is Off.";
+                    height: 20px;
+                    text: root.clock-controls-pending ? "Applying…" : root.clock-settings-error != "" ? root.clock-settings-error : "Saved. Preview replaces the current event, even if Off.";
                     color: root.clock-settings-error != "" ? #ffb0a0 : #80d8ff;
                     font-size: 13px;
-                    wrap: word-wrap;
+                    overflow: elide;
                 }
                 MenuButton {
                     x: 0px;
@@ -1506,7 +1546,7 @@ export component MainWindow inherits Window {
                         visible: root.launcher-scenario == "clock";
                         x: 0px;
                         y: 208px;
-                        width: parent.width;
+                        width: (parent.width - 12px) / 2;
                         height: 48px;
                         label: "Meltdown";
                         value: root.launcher-clock-meltdown-enabled ? "On" : "Off";
@@ -1519,6 +1559,51 @@ export component MainWindow inherits Window {
                             root.launcher-settings-focus-index = 6;
                             root.ui-action(3);
                         }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: parent.width / 2 + 6px;
+                        y: 208px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Duck";
+                        value: root.launcher-clock-duck-enabled ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 7;
+                        previous => {
+                            root.launcher-settings-focus-index = 7;
+                            root.ui-action(2);
+                        }
+                        next => {
+                            root.launcher-settings-focus-index = 7;
+                            root.ui-action(3);
+                        }
+                    }
+
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: 0px;
+                        y: 260px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Marquee";
+                        value: root.launcher-clock-marquee-enabled ? "On" : "Off";
+                        selected: root.launcher-settings-focus-index == 8;
+                        previous => { root.launcher-settings-focus-index = 8; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 8; root.ui-action(3); }
+                    }
+                    ChoiceRow {
+                        visible: root.launcher-scenario == "clock";
+                        x: parent.width / 2 + 6px;
+                        y: 260px;
+                        width: (parent.width - 12px) / 2;
+                        height: 48px;
+                        label: "Recipe";
+                        label-fraction: 0.25;
+                        value: root.launcher-clock-marquee-preset;
+                        selected: root.launcher-settings-focus-index == 9;
+                        previous => { root.launcher-settings-focus-index = 9; root.ui-action(2); }
+                        next => { root.launcher-settings-focus-index = 9; root.ui-action(3); }
                     }
 
                     ChoiceRow {
@@ -1588,11 +1673,11 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 150px;
                         height: 44px;
                         text: "Back";
-                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "spacewars" || root.launcher-scenario == "clock" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
+                        selected: root.launcher-settings-focus-index == (root.launcher-scenario == "clock" ? 10 : root.launcher-scenario == "spacewars" ? 7 : root.launcher-scenario == "pizza" ? 4 : root.launcher-scenario == "falling" ? 0 : root.launcher-scenario == "nes" ? 1 : root.launcher-scenario == "surface-expedition" ? 3 : 2);
                         activated => {
                             root.launcher-settings-visible = false;
                         }
@@ -1600,7 +1685,7 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: parent.width - 180px;
-                        y: root.launcher-scenario == "clock" ? 270px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
+                        y: root.launcher-scenario == "clock" ? 314px : root.launcher-scenario == "spacewars" || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
                         text: "Start Game";

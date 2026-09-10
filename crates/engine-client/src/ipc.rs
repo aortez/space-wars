@@ -18,10 +18,11 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    CLOCK_STATE_COMMAND, CLOCK_TRIGGER_COMMAND, ClockState, ClockTriggerRequest, ControlFailure,
-    ControlFailureCode, HOST_PAUSE_COMMAND, HostPauseRequest, ProtocolError, RuntimeStatus,
-    UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction,
-    UiActivateRequest, UiControl, UiPressRequest, UiScreen, UiState, parse_runtime_status,
+    CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_TRIGGER_COMMAND, ClockMessageRequest,
+    ClockState, ClockTriggerRequest, ControlFailure, ControlFailureCode, HOST_PAUSE_COMMAND,
+    HostPauseRequest, ProtocolError, RuntimeStatus, UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND,
+    UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction, UiActivateRequest, UiControl,
+    UiPressRequest, UiScreen, UiState, parse_runtime_status,
 };
 
 #[cfg(unix)]
@@ -48,6 +49,7 @@ enum ControlCommand {
     HostPause(HostPauseRequest),
     ClockState,
     ClockTrigger(ClockTriggerRequest),
+    ClockMessage(ClockMessageRequest),
     HostBenchmark,
 }
 
@@ -56,6 +58,12 @@ enum ControlCommand {
 enum CommandParseError {
     Legacy(String),
     Structured(Box<ControlFailure>),
+}
+
+#[cfg(unix)]
+enum ClockMutation {
+    Trigger(ClockTriggerRequest),
+    Message(ClockMessageRequest),
 }
 
 #[cfg(unix)]
@@ -329,6 +337,19 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
                 .map(ControlCommand::ClockTrigger)
                 .map_err(|error| invalid_mutation_request(error.to_string()))
         }
+        Some(CLOCK_MESSAGE_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("clock message requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "clock message accepts exactly one JSON request line",
+                ));
+            }
+            ClockMessageRequest::from_json(payload)
+                .map(ControlCommand::ClockMessage)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some("host benchmark") => {
             if lines.next().is_some() {
                 return Err(CommandParseError::Legacy("too many command lines".into()));
@@ -368,7 +389,14 @@ fn handle_request(
         ),
         ControlCommand::ClockTrigger(trigger) => handle_clock_request(
             window,
-            Some(trigger),
+            Some(ClockMutation::Trigger(trigger)),
+            request.response,
+            ui_state_tracker,
+            scenario_controls,
+        ),
+        ControlCommand::ClockMessage(message) => handle_clock_request(
+            window,
+            Some(ClockMutation::Message(message)),
             request.response,
             ui_state_tracker,
             scenario_controls,
@@ -431,7 +459,7 @@ fn handle_request(
 #[cfg(unix)]
 fn handle_clock_request(
     window: &MainWindow,
-    trigger: Option<ClockTriggerRequest>,
+    mutation: Option<ClockMutation>,
     response: ResponseWriter,
     tracker: &mut UiStateTracker,
     controls: &host::SharedScenarioControls,
@@ -444,7 +472,7 @@ fn handle_clock_request(
         }
     };
     let mut controls = controls.borrow_mut();
-    let clock = controls.clock_state();
+    let clock = clock_snapshot(window, &controls);
     if ui.active_scenario.as_deref() != Some("clock") || ui.screen.is_launcher() {
         response.control_failure(ControlFailure::new(
             ControlFailureCode::ControlUnavailable,
@@ -462,12 +490,25 @@ fn handle_clock_request(
         ));
         return;
     };
-    if let Some(trigger) = trigger {
-        if let Err(failure) = validate_clock_trigger(&trigger, &ui, &clock) {
+    if let Some(mutation) = mutation {
+        let validation = match &mutation {
+            ClockMutation::Trigger(trigger) => validate_clock_trigger(trigger, &ui, &clock),
+            ClockMutation::Message(message) => validate_clock_message(message, &ui, &clock),
+        };
+        if let Err(failure) = validation {
             response.control_failure(*failure);
             return;
         }
-        if !controls.request_clock_event(trigger.event) {
+        let accepted = match mutation {
+            ClockMutation::Trigger(trigger) => controls.request_clock_event(trigger.event),
+            ClockMutation::Message(message) => {
+                controls.request_clock_settings(engine_common::ClockSettings {
+                    marquee_message: message.message,
+                    ..clock.settings
+                })
+            }
+        };
+        if !accepted {
             response.control_failure(ControlFailure::new(
                 ControlFailureCode::ActionUnavailable,
                 "Another host control is pending",
@@ -476,10 +517,47 @@ fn handle_clock_request(
             return;
         }
     }
-    match controls.clock_state().unwrap().to_json() {
+    match clock_snapshot(window, &controls).unwrap().to_json() {
         Ok(json) => response.ok(json),
         Err(error) => response.error(error.to_string()),
     }
+}
+
+#[cfg(unix)]
+fn clock_snapshot(window: &MainWindow, controls: &host::ScenarioControls) -> Option<ClockState> {
+    controls.clock_state().map(|mut state| {
+        state.settings_error = non_empty(window.get_clock_settings_error().as_str());
+        state
+    })
+}
+
+#[cfg(unix)]
+fn validate_clock_message(
+    request: &ClockMessageRequest,
+    ui: &UiState,
+    clock: &ClockState,
+) -> Result<(), Box<ControlFailure>> {
+    let failure = if request.expected_scenario_revision != clock.scenario_revision
+        || request.expected_message != clock.settings.marquee_message
+    {
+        Some((
+            ControlFailureCode::StaleRevision,
+            "Clock instance or message changed",
+        ))
+    } else if !ui.paused || !clock.paused {
+        Some((
+            ControlFailureCode::WrongScreen,
+            "Pause Clock before changing its marquee message",
+        ))
+    } else {
+        None
+    };
+    if let Some((code, message)) = failure {
+        let mut failure = ControlFailure::new(code, message, Some(ui.clone()));
+        failure.current_clock_state = Some(clock.clone());
+        return Err(Box::new(failure));
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -788,6 +866,9 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_falling_enabled: window.get_launcher_clock_falling_enabled(),
             clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
             clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
+            clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
+            clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
+            clock_marquee_preset: window.get_launcher_clock_marquee_preset().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );
@@ -872,6 +953,7 @@ mod tests {
             | ControlCommand::HostPause(_)
             | ControlCommand::ClockState
             | ControlCommand::ClockTrigger(_)
+            | ControlCommand::ClockMessage(_)
             | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
@@ -913,11 +995,23 @@ mod tests {
             "clock trigger\n{}\n",
             "clock trigger\n{}\nextra\n",
             "clock trigger\n{\"schema_version\":2,\"expected_scenario_revision\":9,\"expected_event_id\":2}\n",
+            "clock message\n",
+            "clock message\n{}\n",
+            "clock message\n{}\nextra\n",
         ] {
             assert!(
                 matches!(parse_command(body), Err(CommandParseError::Structured(failure)) if failure.code == ControlFailureCode::InvalidRequest)
             );
         }
+        let request = ClockMessageRequest {
+            schema_version: spacewars_control::CLOCK_STATE_SCHEMA_VERSION,
+            message: "HELLO!".parse().unwrap(),
+            expected_scenario_revision: 9,
+            expected_message: engine_common::ClockMarqueeMessage::default(),
+        };
+        assert!(
+            matches!(parse_command(&format!("clock message\n{}\n", request.to_json().unwrap())), Ok(ControlCommand::ClockMessage(parsed)) if parsed == request)
+        );
     }
 
     #[test]

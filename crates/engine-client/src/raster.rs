@@ -1304,63 +1304,54 @@ fn fill_convex_polygon(
         return;
     }
 
-    for index in 1..points.len() - 1 {
-        fill_triangle(
-            pixels,
-            width,
-            height,
-            clip,
-            points[0],
-            points[index],
-            points[index + 1],
-            color,
-        );
-    }
-}
-
-fn fill_triangle(
-    pixels: &mut [Rgb8Pixel],
-    width: u32,
-    height: u32,
-    clip: PixelClip,
-    a: PixelPoint,
-    b: PixelPoint,
-    c: PixelPoint,
-    color: RenderColor,
-) {
     let raster_color = raster_color(color);
-    let min_y = a.y.min(b.y).min(c.y).floor() as i32;
-    let max_y = a.y.max(b.y).max(c.y).ceil() as i32;
-    let Some(draw_clip) = PixelClip::new(width, height, clip.min_x, clip.max_x, min_y, max_y)
-    else {
+    let min_y = points
+        .iter()
+        .map(|p| p.y)
+        .fold(f32::INFINITY, f32::min)
+        .floor() as i32;
+    let max_y = points
+        .iter()
+        .map(|p| p.y)
+        .fold(f32::NEG_INFINITY, f32::max)
+        .ceil() as i32;
+    let Some(draw_clip) = PixelClip::new(
+        width,
+        height,
+        clip.min_x,
+        clip.max_x,
+        min_y.max(clip.min_y),
+        max_y.min(clip.max_y),
+    ) else {
         return;
     };
-    let edges = [(a, b), (b, c), (c, a)];
 
+    // Scan the convex boundary once, instead of a triangle fan. Shared fan
+    // edges used to blend twice, making bright diagonal seams at partial alpha.
+    // One span per row also avoids repeated work and needs no scratch allocation.
     for y in draw_clip.min_y..=draw_clip.max_y {
         let scan_y = y as f32 + 0.5;
-        let mut intersections = [0.0_f32; 3];
-        let mut count = 0;
-
-        for (start, end) in edges {
+        let mut left = f32::INFINITY;
+        let mut right = f32::NEG_INFINITY;
+        let mut start = points[points.len() - 1];
+        for &end in points {
             if (start.y <= scan_y && end.y > scan_y) || (end.y <= scan_y && start.y > scan_y) {
                 let t = (scan_y - start.y) / (end.y - start.y);
-                intersections[count] = start.x + (end.x - start.x) * t;
-                count += 1;
+                let x = start.x + (end.x - start.x) * t;
+                left = left.min(x);
+                right = right.max(x);
             }
+            start = end;
         }
-
-        if count >= 2 {
-            let left = intersections[0].min(intersections[1]).floor() as i32;
-            let right = intersections[0].max(intersections[1]).ceil() as i32;
+        if left <= right {
             fill_span(
                 pixels,
                 width,
                 height,
                 draw_clip,
                 y,
-                left,
-                right,
+                left.floor() as i32,
+                right.ceil() as i32,
                 raster_color,
                 SpanFillMode::Normal,
             );
@@ -1685,6 +1676,43 @@ mod tests {
                 .iter()
                 .any(|pixel| pixel.r > BACKGROUND.r && pixel.g < BACKGROUND.g)
         );
+    }
+
+    #[test]
+    fn translucent_convex_polygon_blends_each_pixel_once_and_respects_its_clip() {
+        let black = Rgb8Pixel { r: 0, g: 0, b: 0 };
+        let mut pixels = vec![black; 64];
+        let clip = PixelClip::new(8, 8, 0, 7, 2, 5).unwrap();
+        fill_convex_polygon(
+            &mut pixels,
+            8,
+            8,
+            clip,
+            &[
+                PixelPoint { x: 1.0, y: 1.0 },
+                PixelPoint { x: 7.0, y: 1.0 },
+                PixelPoint { x: 7.0, y: 7.0 },
+                PixelPoint { x: 1.0, y: 7.0 },
+            ],
+            RenderColor {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.5,
+            },
+        );
+        for y in 2..=5 {
+            for x in 2..=6 {
+                assert_eq!(
+                    pixels[y * 8 + x],
+                    Rgb8Pixel { r: 128, g: 0, b: 0 },
+                    "pixel ({x},{y}) was blended more than once"
+                );
+            }
+        }
+        for y in [0, 1, 6, 7] {
+            assert!(pixels[y * 8..y * 8 + 8].iter().all(|p| *p == black));
+        }
     }
 
     #[test]

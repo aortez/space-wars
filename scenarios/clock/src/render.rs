@@ -8,6 +8,9 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod duck;
+mod marquee;
+
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
 const INACTIVE_CELL_LAYER: i32 = 2;
@@ -31,9 +34,39 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
     render_floor(&mut frame, layout);
+    if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
+        let opacity = 1.0 - event.playback().strength;
+        if opacity > 0.0 {
+            render_segments(&mut frame, state, layout);
+            render_colon(&mut frame, state, layout);
+            render_meridiem(&mut frame, state, layout);
+            // Fade only newly generated face primitives, never physical state
+            // or arena/background. No offscreen image or extra frame allocation.
+            for layer in &mut frame.layers {
+                if layer.z < INACTIVE_CELL_LAYER {
+                    continue;
+                }
+                for primitive in &mut layer.primitives {
+                    if let RenderPrimitive::Polygon(polygon) = primitive {
+                        if let Some(fill) = &mut polygon.fill {
+                            fill.color.a *= opacity;
+                        }
+                        if let Some(stroke) = &mut polygon.stroke {
+                            stroke.color.a *= opacity;
+                        }
+                    }
+                }
+            }
+        }
+        marquee::render(&mut frame, event, layout);
+        return frame;
+    }
     render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         render_meltdown(&mut frame, event, layout);
+    }
+    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+        duck::render(&mut frame, event);
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);

@@ -36,7 +36,7 @@ The initial workflows verify:
   a fresh Clock scenario revision.
 
 Clock event workflows additionally verify Off/Calm/Demo controls, individual
-Falling/Color Cycle/Meltdown switches, the public event catalog, named manual previews
+Falling/Color Cycle/Meltdown/Duck switches, the public event catalog, named manual previews
 (including disabled events), and automatic mixed-event selection. They check
 bounded body/collider counts, physics cleanup, recovery to the latest 12-hour
 time, and pause/resume during each event kind. Color Cycle must preserve live
@@ -55,7 +55,7 @@ scripted replies and virtual time: no-reply and last-reply timeouts, shared
 deadlines and bounded retry sleeps, successful matches, and error propagation.
 
 The live Clock-controls workflow enters `pause.clock` through the on-face
-control, changes and persists all five settings without replacing the paused
+control, changes and persists settings without replacing the paused
 event, replaces Falling with a Color Cycle preview and vice versa, navigates
 the controller-style menu grid, rejects stale UI guards, and checks both
 restart/relaunch and the saved settings file. Captures include the live settings
@@ -67,11 +67,41 @@ timer through keyboard pause and Q-to-launcher, verifying input is released
 before the launcher callback re-borrows it.
 
 The Meltdown workflow observes actual airborne cells and pooled/drained volume
-through Clock schema 4, pauses both melting and drainage, changes enablement
+through the versioned Clock state API, pauses both melting and drainage, changes enablement
 without resetting material, and previews the disabled event through live
 controls. It checks reform cleanup, idle, restart and relaunch, and captures
 each visible phase. Seeded multi-aspect conservation and repeated-event cleanup
 remain deterministic core tests; UI waits use bounded state predicates.
+
+The Duck workflow observes running/jumping and successful exit/reset through the
+real client. It checks the five-body/five-collider bound, successful clearance of
+all three obstacles, phase-aware pause, disabled preview, four-switch controller
+navigation, and cleanup/persistence after restart and relaunch. Captures include
+both settings pages, running, reset, and the restored arena. Seeded multi-aspect
+courses, door openness, grounded-only jumps, and deliberately failed/blocked runs
+are deterministic core tests. Brief door phases are checked at exact simulation
+ticks instead of requiring a loaded UI runner to catch sub-second animations.
+
+The Marquee workflow checks its launcher recipe/switch, disabled-event trigger,
+scrolling ribbon diagnostics, pause, D-pad navigation, latched recipe changes,
+replacement with per-letter spin, completion, and settings persistence across
+restart/relaunch. Captures include both settings pages, ribbon, spin, and the
+restored face. Exact motion, clipping, all seven recipes, and multi-aspect raster
+checks run without a display. A raster regression checks that translucent
+polygons blend each pixel once and respect their viewport clip. Clock's live
+control page is a conditional Slint item tree, keeping its initialization out
+of the large root constructor and within ordinary debug-test thread stack limits.
+
+The same Marquee workflow changes its message through the guarded public API:
+the current ribbon keeps its original text, a subsequent letter-spin preview
+uses the new text, other menu changes retain it, and restart/relaunch and the
+saved file agree. A separate message workflow rejects invalid text, stale
+instance/message guards, unpaused and inactive Clock edits. It forces a settings
+save failure with an owned directory at the test's destination, verifies the
+applied-but-unsaved error, restores the path, and retries the same value to
+verify a real successful save. Unit tests cover settings migration/recovery,
+CLI validation, compact action bounds, and agreement between the shared text
+validator and every ASCII entry in the bitmap font.
 
 Spaceling Lab's workflow selects the scenario, renders it through both vector and
 raster paths, and verifies pause, restart, return, and relaunch with fresh
