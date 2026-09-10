@@ -34,6 +34,7 @@ fn main() {
     let frames = arg("--frames", "false") == "true";
     let trace = arg("--trace", "false") == "true";
     let require_route = arg("--require-route", "false") == "true";
+    let require_claim_recovery = arg("--require-claim-recovery", "false") == "true";
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     assert!(seat < 2 && (1..=180).contains(&seconds));
@@ -74,6 +75,8 @@ fn main() {
     let mut last = [String::new(), String::new()];
     let mut last_posture = [None, None];
     let mut strike_tick = None;
+    let mut pending_claim_footing = [None; 2];
+    let mut claim_footing_recoveries = Vec::new();
     for tick in 0..seconds * 60 {
         if strike && strike_tick.is_none() && pilots[seat].telemetry().completed_sorties > 0 {
             assert!(state.spawn_recovery_hazard(
@@ -96,6 +99,32 @@ fn main() {
                     intent.weapons = Default::default();
                 }
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
+                let p = &o.local.combat.recovery.flight.pilot;
+                let telemetry = pilots[i].telemetry();
+                let ground = telemetry
+                    .capture
+                    .as_ref()
+                    .and_then(|c| c.ground.as_ref())
+                    .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
+                if ground.is_some_and(|g| g.claim_target.is_some()) {
+                    pending_claim_footing[i].get_or_insert((p.planet.index, tick));
+                }
+                if let Some((planet, began)) = pending_claim_footing[i] {
+                    if planet != p.planet.index {
+                        pending_claim_footing[i] = None;
+                    } else if p
+                        .planet
+                        .claim
+                        .as_ref()
+                        .is_some_and(|c| c.owner == Some(owner))
+                    {
+                        claim_footing_recoveries.push(json!({
+                            "seat": i, "planet": planet, "relocated_tick": began, "claimed_tick": tick,
+                            "claim": p.planet.claim,
+                        }));
+                        pending_claim_footing[i] = None;
+                    }
+                }
                 actions.extend(intent.encode(owner));
                 let label = pilots[i].label();
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
@@ -191,7 +220,8 @@ fn main() {
         "physics_ok":failures.is_empty(),"audit_failures":failures,"distinct_departures":completed,
         "missions":pilots.each_ref().map(|p|p.telemetry()),"interceptor":interceptor.telemetry(),"strike_tick":strike_tick,
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
-        "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events});
+        "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
+        "claim_footing_recoveries":claim_footing_recoveries});
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
@@ -204,5 +234,13 @@ fn main() {
     assert!(report["physics_ok"] == true, "physical audit failed");
     if require_route {
         assert_eq!(completed.len(), 2, "both planet sorties must complete");
+    }
+    if require_claim_recovery {
+        assert!(
+            claim_footing_recoveries
+                .iter()
+                .any(|event| event["seat"] == seat),
+            "subject must relocate from invalid claim footing and finish raising its flag"
+        );
     }
 }

@@ -804,3 +804,170 @@ fn route_diagnostics_distinguish_missing_footing_from_disconnected_ground() {
     assert_eq!(failed.reachable_nodes, 2);
     assert_eq!(failed.closest_reachable_distance, Some(4.0));
 }
+
+fn invalid_claim(o: &mut RecoveryTaskObservationV1) {
+    use scenario_spacewars::surface_sortie::{
+        PlanetClaimStatus, claim_footing::ClaimFootingSurvey,
+    };
+    let p = &mut o.flight.pilot;
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = None;
+    claim.flag = None;
+    claim.status = PlanetClaimStatus::NeedSupport;
+    let node = &o.ground.as_ref().unwrap().nodes[1];
+    o.claim_footing = Some(ClaimFootingSurvey {
+        version: 1,
+        owner: p.owner,
+        planet: p.planet.index,
+        revision: p.planet.revision,
+        tick: p.tick,
+        positions: vec![node.position + node.position.normalized() * 0.9],
+    });
+}
+
+#[test]
+fn missing_flag_anchor_relocates_but_only_real_claim_progress_finishes_it() {
+    use scenario_spacewars::surface_sortie::PlanetClaimStatus;
+    let (context, mut o) = fixture();
+    invalid_claim(&mut o);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+    advance(&mut o, 30);
+    o.claim_footing.as_mut().unwrap().tick = 30;
+    task.step(&o);
+    assert_eq!(task.telemetry().claim_relocations, 1);
+    let mut copy = task.clone();
+    advance(&mut o, 31);
+    let walk = task.step(&o);
+    assert!(walk.horizontal > 0.0);
+    assert_eq!(walk, copy.step(&o));
+    assert_eq!(walk, task.step(&o));
+    o.flight.pilot.actor.as_mut().unwrap().position = task.telemetry().claim_target.unwrap();
+    advance(&mut o, 32);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(
+        task.telemetry().goal,
+        GroundGoal::Settle,
+        "a planned endpoint is not proof of a claim"
+    );
+    o.flight.pilot.planet.claim.as_mut().unwrap().status = PlanetClaimStatus::Raising;
+    advance(&mut o, 33);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().claim_target.is_none());
+}
+
+#[test]
+fn claim_relocation_waits_for_real_support_and_invalidates_destroyed_proposals() {
+    let (context, mut o) = fixture();
+    invalid_claim(&mut o);
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+    o.flight.pilot.supported_planet = None;
+    task.step(&o);
+    advance(&mut o, 90);
+    task.step(&o);
+    assert_eq!(task.telemetry().claim_relocations, 0);
+    o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
+    advance(&mut o, 91);
+    task.step(&o);
+    advance(&mut o, 121);
+    o.claim_footing.as_mut().unwrap().tick = 121;
+    task.step(&o);
+    assert!(task.telemetry().claim_target.is_some());
+    o.flight.pilot.queries_ready = false;
+    advance(&mut o, 122);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    o.flight.pilot.queries_ready = true;
+    o.flight.pilot.planet.revision += 1;
+    o.ground = None;
+    o.claim_footing = None;
+    advance(&mut o, 123);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert!(task.telemetry().claim_target.is_none());
+    advance(&mut o, 121 + 12 * 60 + 1);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+}
+
+#[test]
+fn claim_footing_rejects_stale_or_unmeasured_proposals_and_leaves_contests_alone() {
+    use scenario_spacewars::surface_sortie::PlanetClaimStatus;
+    for fault in 0..5 {
+        let (context, mut o) = fixture();
+        invalid_claim(&mut o);
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+        task.step(&o);
+        advance(&mut o, 30);
+        let s = o.claim_footing.as_mut().unwrap();
+        s.tick = 30;
+        match fault {
+            0 => s.owner = PlayerId::PLAYER_2,
+            1 => s.revision += 1,
+            2 => s.tick = 0,
+            3 => s.positions[0].x = f32::NAN,
+            _ => s.positions[0].x += 0.1,
+        }
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+    }
+    for status in [
+        PlanetClaimStatus::Ready,
+        PlanetClaimStatus::Raising,
+        PlanetClaimStatus::Contested,
+    ] {
+        let (context, mut o) = fixture();
+        invalid_claim(&mut o);
+        o.flight.pilot.planet.claim.as_mut().unwrap().status = status;
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+        task.step(&o);
+        advance(&mut o, 120);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().claim_relocations, 0);
+    }
+}
+
+#[test]
+fn claim_relocation_exhausts_four_proposals_and_airborne_wait_keeps_task_deadline() {
+    let (context, mut o) = fixture();
+    invalid_claim(&mut o);
+    let positions: Vec<_> = o
+        .ground
+        .as_ref()
+        .unwrap()
+        .nodes
+        .iter()
+        .map(|n| n.position + n.position.normalized() * 0.9)
+        .collect();
+    o.claim_footing.as_mut().unwrap().positions = positions.clone();
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
+    task.step(&o);
+    advance(&mut o, 30);
+    o.claim_footing.as_mut().unwrap().tick = 30;
+    task.step(&o);
+    for attempt in 0..4 {
+        assert_eq!(task.telemetry().claim_relocations, attempt + 1);
+        o.flight.pilot.actor.as_mut().unwrap().position = task.telemetry().claim_target.unwrap();
+        let tick = 31 + u64::from(attempt) * 121;
+        advance(&mut o, tick);
+        o.claim_footing.as_mut().unwrap().tick = tick;
+        task.step(&o);
+        advance(&mut o, tick + 120);
+        o.claim_footing.as_mut().unwrap().tick = tick + 120;
+        task.step(&o);
+    }
+    assert_eq!(
+        task.telemetry().reason,
+        Some("four claim footing proposals failed actual support checks")
+    );
+    task.reset(context);
+    advance(&mut o, 1000);
+    o.flight.pilot.supported_planet = None;
+    task.step(&o);
+    advance(&mut o, 1000 + 90 * 60 + 1);
+    task.step(&o);
+    assert_eq!(
+        task.telemetry().reason,
+        Some("ground traversal exceeded ninety seconds")
+    );
+}

@@ -10,6 +10,7 @@ use engine_rapier::{
 
 pub mod asteroids;
 mod claim;
+pub mod claim_footing;
 pub mod combat;
 pub mod compatibility;
 pub mod flight;

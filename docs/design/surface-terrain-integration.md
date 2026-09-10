@@ -201,5 +201,5 @@ with the surface task. Only one task builds/deploys at a time. Record the source
 checkpoint and exact image/binary used so a later playtest cannot silently run
 the other branch's image.
 
-The latest get-up traversal slice is documented in
-[ground get-up recovery](../ground-getup-recovery.md).
+The latest claim-footing recovery slice is documented in
+[claim footing recovery](../claim-footing-recovery.md).

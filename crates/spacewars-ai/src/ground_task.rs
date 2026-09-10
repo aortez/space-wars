@@ -14,6 +14,7 @@ use scenario_spacewars::surface_sortie::{
 };
 use serde::Serialize;
 
+mod claim;
 mod jetpack;
 mod posture;
 
@@ -84,6 +85,8 @@ pub struct GroundTelemetry {
     pub get_up_repositions: u32,
     pub crawl_direction: Option<f32>,
     pub crawl_target: Option<Vec2>,
+    pub claim_relocations: u32,
+    pub claim_target: Option<Vec2>,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
@@ -104,13 +107,14 @@ pub struct GroundNavigationTask {
     crawl_started: Option<u64>,
     crawl_origin: Option<Vec2>,
     crawl_step: Option<(u64, u64, CrawlStep)>,
+    claim_relocation: claim::ClaimRelocation,
 }
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             context,
             telemetry: GroundTelemetry {
-                policy: "ground_navigation_v6",
+                policy: "ground_navigation_v7",
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -132,6 +136,8 @@ impl GroundNavigationTask {
                 get_up_repositions: 0,
                 crawl_direction: None,
                 crawl_target: None,
+                claim_relocations: 0,
+                claim_target: None,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -148,6 +154,7 @@ impl GroundNavigationTask {
             crawl_started: None,
             crawl_origin: None,
             crawl_step: None,
+            claim_relocation: claim::ClaimRelocation::default(),
         }
     }
     pub fn telemetry(&self) -> &GroundTelemetry {
@@ -162,6 +169,8 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.claim_relocation = claim::ClaimRelocation::default();
+        self.telemetry.claim_target = None;
         self.telemetry.target = None;
         self.clear_route();
     }
@@ -250,7 +259,7 @@ impl GroundNavigationTask {
             self.settling_after_interrupt = false;
             self.telemetry.last_progress_tick = p.tick;
         }
-        let target = match self.telemetry.destination {
+        let mut target = match self.telemetry.destination {
             GroundDestination::Flag => p
                 .planet
                 .claim
@@ -269,7 +278,7 @@ impl GroundNavigationTask {
         };
         let local =
             |point: Vec2| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
-        let target_local = target.map(local);
+        let mut target_local = target.map(local);
         let foot = local(actor.position - p.actor_up * 0.9);
         if let Some(map) = &self.map
             && !self.telemetry.path.is_empty()
@@ -303,18 +312,6 @@ impl GroundNavigationTask {
             self.settling_after_displacement = false;
             self.telemetry.last_progress_tick = p.tick;
         }
-        if self
-            .telemetry
-            .target
-            .zip(target_local)
-            .is_some_and(|(a, b)| a.distance_to(b) > 0.5)
-            || self.telemetry.target.is_some() != target_local.is_some()
-        {
-            self.clear_route();
-            self.missing_since = None;
-            self.telemetry.last_progress_tick = p.tick;
-            self.telemetry.target = target_local;
-        }
         if !p.balanced && p.supported_planet == Some(p.planet.index) {
             if p.tick.saturating_sub(start) > 90 * 60 {
                 self.block("ground traversal exceeded ninety seconds");
@@ -337,6 +334,28 @@ impl GroundNavigationTask {
             self.telemetry.crawl_direction = None;
             self.telemetry.crawl_target = None;
         }
+        if !self.update_map(o) {
+            return action;
+        }
+        if self.telemetry.destination == GroundDestination::Flag {
+            let Some(chosen) = self.claim_target(o, target, foot) else {
+                return action;
+            };
+            target = chosen;
+            target_local = target.map(local);
+        }
+        if self
+            .telemetry
+            .target
+            .zip(target_local)
+            .is_some_and(|(a, b)| a.distance_to(b) > 0.5)
+            || self.telemetry.target.is_some() != target_local.is_some()
+        {
+            self.clear_route();
+            self.missing_since = None;
+            self.telemetry.last_progress_tick = p.tick;
+            self.telemetry.target = target_local;
+        }
         let Some(target) = target else {
             self.telemetry.goal = if self.telemetry.destination == GroundDestination::Flag {
                 GroundGoal::Arrived
@@ -351,6 +370,7 @@ impl GroundNavigationTask {
             return action;
         };
         let range = match self.telemetry.destination {
+            GroundDestination::Flag if self.telemetry.claim_target.is_some() => 0.45,
             GroundDestination::Flag => p
                 .planet
                 .claim
@@ -360,7 +380,9 @@ impl GroundNavigationTask {
             GroundDestination::Rebuild { .. } => 1.4,
         };
         if actor.position.distance_to(target) < range {
-            self.telemetry.goal = if p.supported_planet == Some(p.planet.index) {
+            self.telemetry.goal = if self.telemetry.claim_target.is_some() {
+                GroundGoal::Settle
+            } else if p.supported_planet == Some(p.planet.index) {
                 self.telemetry.last_progress_tick = p.tick;
                 GroundGoal::Arrived
             } else {
@@ -377,73 +399,6 @@ impl GroundNavigationTask {
         if p.tick.saturating_sub(start) > 90 * 60 {
             self.block("ground traversal exceeded ninety seconds");
             return action;
-        }
-        if self
-            .map
-            .as_ref()
-            .is_some_and(|m| m.planet != p.planet.index || m.revision != p.planet.revision)
-        {
-            self.telemetry.invalidations += 1;
-            self.clear_route();
-            self.map = None;
-        }
-        if let Some(map) = &o.ground {
-            if map.version != 1
-                || map.actor != p.owner
-                || map.planet != p.planet.index
-                || map.revision != p.planet.revision
-                || map.nodes.len() > GROUND_SAMPLES
-                || map.edges.len() > GROUND_SAMPLES * GROUND_NEIGHBOR_SPAN * 2
-            {
-                self.block("ground map identity/version or bounds mismatch");
-                return action;
-            }
-            let mut ids = [false; GROUND_SAMPLES];
-            let invalid_nodes = map.nodes.iter().any(|n| {
-                let id = usize::from(n.id);
-                if id >= GROUND_SAMPLES
-                    || ids[id]
-                    || !n.position.x.is_finite()
-                    || !n.position.y.is_finite()
-                    || !n.normal.x.is_finite()
-                    || !n.normal.y.is_finite()
-                {
-                    return true;
-                }
-                ids[id] = true;
-                false
-            });
-            if map.tick != p.tick
-                || invalid_nodes
-                || map.edges.iter().any(|e| {
-                    usize::from(e.from) >= GROUND_SAMPLES
-                        || usize::from(e.to) >= GROUND_SAMPLES
-                        || !ids[usize::from(e.from)]
-                        || !ids[usize::from(e.to)]
-                        || !e.length.is_finite()
-                        || e.length <= 0.0
-                        || e.kind == GroundEdgeKind::Jetpack
-                })
-            {
-                self.block("invalid ground map geometry");
-                return action;
-            }
-            if self
-                .telemetry
-                .path
-                .windows(2)
-                .skip(self.telemetry.waypoint.saturating_sub(1))
-                .any(|pair| {
-                    !map.edges
-                        .iter()
-                        .any(|e| e.from == pair[0] && e.to == pair[1])
-                })
-            {
-                self.telemetry.invalidations += 1;
-                self.clear_route();
-            }
-            self.map = Some(map.clone());
-            self.telemetry.revision = Some(map.revision);
         }
         let Some(map) = &self.map else {
             self.telemetry.goal = GroundGoal::Survey;
@@ -558,5 +513,76 @@ impl GroundNavigationTask {
             self.telemetry.goal = GroundGoal::Jump;
         }
         action
+    }
+    fn update_map(&mut self, o: &RecoveryTaskObservationV1) -> bool {
+        let p = &o.flight.pilot;
+        if self
+            .map
+            .as_ref()
+            .is_some_and(|m| m.planet != p.planet.index || m.revision != p.planet.revision)
+        {
+            self.telemetry.invalidations += 1;
+            self.clear_route();
+            self.map = None;
+        }
+        if let Some(map) = &o.ground {
+            if map.version != 1
+                || map.actor != p.owner
+                || map.planet != p.planet.index
+                || map.revision != p.planet.revision
+                || map.nodes.len() > GROUND_SAMPLES
+                || map.edges.len() > GROUND_SAMPLES * GROUND_NEIGHBOR_SPAN * 2
+            {
+                self.block("ground map identity/version or bounds mismatch");
+                return false;
+            }
+            let mut ids = [false; GROUND_SAMPLES];
+            let invalid_nodes = map.nodes.iter().any(|n| {
+                let id = usize::from(n.id);
+                if id >= GROUND_SAMPLES
+                    || ids[id]
+                    || !n.position.x.is_finite()
+                    || !n.position.y.is_finite()
+                    || !n.normal.x.is_finite()
+                    || !n.normal.y.is_finite()
+                {
+                    return true;
+                }
+                ids[id] = true;
+                false
+            });
+            if map.tick != p.tick
+                || invalid_nodes
+                || map.edges.iter().any(|e| {
+                    usize::from(e.from) >= GROUND_SAMPLES
+                        || usize::from(e.to) >= GROUND_SAMPLES
+                        || !ids[usize::from(e.from)]
+                        || !ids[usize::from(e.to)]
+                        || !e.length.is_finite()
+                        || e.length <= 0.0
+                        || e.kind == GroundEdgeKind::Jetpack
+                })
+            {
+                self.block("invalid ground map geometry");
+                return false;
+            }
+            if self
+                .telemetry
+                .path
+                .windows(2)
+                .skip(self.telemetry.waypoint.saturating_sub(1))
+                .any(|pair| {
+                    !map.edges
+                        .iter()
+                        .any(|e| e.from == pair[0] && e.to == pair[1])
+                })
+            {
+                self.telemetry.invalidations += 1;
+                self.clear_route();
+            }
+            self.map = Some(map.clone());
+            self.telemetry.revision = Some(map.revision);
+        }
+        true
     }
 }
