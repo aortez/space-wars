@@ -12,11 +12,14 @@ use super::{
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
+pub(super) mod benchmark;
+
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
     launcher_visible: true,
     capabilities: ScenarioCapabilities {
         benchmark: false,
+        headless_benchmark: true,
         pointer_input: false,
         player_zoom: false,
         game_over: false,
@@ -31,6 +34,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 pub(crate) struct ClockClientScenario {
     pub(crate) state: ClockState,
     last_emitted_reading: Cell<Option<ClockReading>>,
+    benchmark: Option<benchmark::Driver>,
 }
 
 impl ClockClientScenario {
@@ -47,9 +51,17 @@ fn create(
     seed: u64,
     settings: &Settings,
     viewport: Viewport,
-    _mode: ScenarioStartMode,
+    mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    if let ScenarioStartMode::Benchmark(config) = mode {
+        let (state, driver) = benchmark::Driver::new(config.clock, seed, viewport.aspect_ratio());
+        return Ok(Box::new(ClockClientScenario {
+            state,
+            last_emitted_reading: Cell::new(None),
+            benchmark: Some(driver),
+        }));
+    }
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: viewport.aspect_ratio(),
@@ -70,6 +82,7 @@ fn create(
     Ok(Box::new(ClockClientScenario {
         state,
         last_emitted_reading: Cell::new(Some(reading)),
+        benchmark: None,
     }))
 }
 
@@ -83,11 +96,31 @@ impl ClientScenario for ClockClientScenario {
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if let Some(driver) = &mut self.benchmark {
+            let scripted = if dt.is_zero() {
+                Vec::new()
+            } else {
+                driver.next_actions()
+            };
+            return ClockScenario::step(&mut self.state, &scripted, dt);
+        }
         ClockScenario::step(&mut self.state, actions, dt)
     }
 
     fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+        if self.benchmark.is_some() {
+            return Vec::new();
+        }
         self.actions_for_reading(local_clock_reading())
+    }
+
+    fn benchmark_counts(&self) -> Option<super::BenchmarkCounts> {
+        Some(super::BenchmarkCounts {
+            bodies: self.state.body_count(),
+            colliders: self.state.collider_count(),
+            clock_event_active: self.state.event_kind().is_some(),
+            ..Default::default()
+        })
     }
 
     fn render_frames(&self, _renderer: RenderBackend, _viewport: Viewport) -> Vec<RenderFrame> {
@@ -277,6 +310,7 @@ mod tests {
             let mut scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(Some(from)),
+                benchmark: None,
             };
             let actions = scenario.actions_for_reading(to);
             scenario.step(&actions, Duration::from_nanos(16_666_667));
@@ -396,6 +430,7 @@ mod tests {
                 let mut scenario = ClockClientScenario {
                     state,
                     last_emitted_reading: Cell::new(None),
+                    benchmark: None,
                 };
                 let mut renderer = crate::raster::RasterRenderer::new();
                 let mut previous_frame = None;
@@ -497,6 +532,7 @@ mod tests {
             let mut scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(None),
+                benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();
             for tick in 0..=scenario_clock::DUCK_TICKS {
@@ -591,6 +627,7 @@ mod tests {
             let mut scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(None),
+                benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();
             for tick in 0..=510 {

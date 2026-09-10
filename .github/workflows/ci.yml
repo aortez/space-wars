@@ -47,7 +47,7 @@ jobs:
       - run: npm --prefix yocto test
         env:
           SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
-      - run: shellcheck update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh
+      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh
       - name: Report sandbox configuration and kernel denials
         if: failure()
         run: |

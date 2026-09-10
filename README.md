@@ -24,7 +24,7 @@ The local launcher currently has twelve entries across eight scenario families:
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
   Off, Calm, or Demo in Settings and enable Falling, Color Cycle, Meltdown, Duck,
-  and Marquee individually.
+  Marquee, and Digit Slide individually.
   Events share a deterministic, non-overlapping schedule; Color Cycle changes
   the readable face palette without physics. Meltdown turns individual cells into
   a bounded pool that drains through the floor before the face reforms.
@@ -32,11 +32,14 @@ The local launcher currently has twelve entries across eight scenario families:
   using one dynamic body and guaranteed arena cleanup.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
+  Digit Slide rolls changed digits on minute boundaries without physics.
   Save custom text through `clock message` in the CLI or the Clock settings file.
   **Pause → Clock Controls** (or the
   on-face touch button) changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
-  timing, the event catalog, and synchronized preview controls.
+  timing, the event catalog, and synchronized preview controls; the
+  [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
+  benchmarks and live host timings.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating

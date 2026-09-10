@@ -34,8 +34,11 @@ use crate::nes_realtime::{
 use crate::raster;
 use crate::render::{self, Viewport};
 
+mod profiling;
+
 const TIMER_INTERVAL: Duration = Duration::from_millis(16);
 const MAX_FIXED_STEPS_PER_TICK: usize = 5;
+#[cfg(test)]
 const BENCHMARK_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 static NEXT_SCENARIO_REVISION: AtomicU64 = AtomicU64::new(1);
 
@@ -196,6 +199,8 @@ pub struct BenchmarkOptions {
     pub scenario: String,
     pub seed: u64,
     pub seconds: u64,
+    pub warmup_seconds: u64,
+    pub viewport: Viewport,
     pub report_path: Option<PathBuf>,
     pub renderer: RenderBackend,
     pub raster_scale: f32,
@@ -639,6 +644,7 @@ pub fn start_scenario_loop(
         }
 
         let mut input = input.borrow_mut();
+        let step_started = Instant::now();
         let step_result = step_scenario(
             &mut scenario,
             &scenario_name,
@@ -656,6 +662,7 @@ pub fn start_scenario_loop(
             viewport,
             &input_projections,
         );
+        let step_cpu = step_started.elapsed();
         if step_result.return_to_launcher {
             // The launcher callback clears shared input; release the loop's
             // borrow before re-entering UI code (e.g. the keyboard Q shortcut).
@@ -724,6 +731,9 @@ pub fn start_scenario_loop(
             step_result.updates
         };
         let performance_sample_completed = performance.record_frame(now, updates);
+        if paused != last_diagnostics_paused {
+            performance.cpu_profile.clear();
+        }
         let diagnostics_revision = input.runtime_diagnostics_revision();
         let game_over = scenario.is_game_over();
         if performance_sample_completed
@@ -782,10 +792,14 @@ pub fn start_scenario_loop(
                 }
             }
         } else {
+            let scene_started = Instant::now();
             let frames = scenario.render_frames(renderer, viewport);
+            let primitives = raster::primitive_count(&frames);
             input_projections =
                 render::frame_projections(&frames, viewport, scenario.frame_layout());
             projection_viewport = viewport;
+            let scene_cpu = scene_started.elapsed();
+            let prepare_started = Instant::now();
             present_frames(
                 &window,
                 frames,
@@ -794,6 +808,20 @@ pub fn start_scenario_loop(
                 raster_scale,
                 &mut raster_renderer,
             );
+            if !paused {
+                let internal = if renderer == RenderBackend::Raster {
+                    scaled_viewport(viewport, raster_scale)
+                } else { viewport };
+                performance.cpu_profile.record(profiling::FrameSample {
+                    interval: elapsed,
+                    step: step_cpu,
+                    scene: scene_cpu,
+                    prepare: prepare_started.elapsed(),
+                    total: now.elapsed(),
+                    updates,
+                }, [viewport.width as u32, viewport.height as u32,
+                    internal.width.ceil() as u32, internal.height.ceil() as u32], primitives);
+            }
         }
     });
 
@@ -1288,6 +1316,7 @@ fn set_ingame_menu(window: &MainWindow, paused: bool) {
 
 #[derive(Debug, Clone)]
 struct PerformanceStats {
+    cpu_profile: profiling::CpuProfile,
     target_label: String,
     sample_started: Instant,
     frames_in_sample: u32,
@@ -1301,6 +1330,7 @@ struct PerformanceStats {
 impl PerformanceStats {
     fn new(tick_model: TickModel, now: Instant) -> Self {
         Self {
+            cpu_profile: profiling::CpuProfile::default(),
             target_label: performance_target_label(tick_model),
             sample_started: now,
             frames_in_sample: 0,
@@ -1343,12 +1373,13 @@ impl PerformanceStats {
 
     fn diagnostics_text(&self) -> String {
         format!(
-            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}",
+            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}{}",
             self.target_label,
             measured_diagnostics_label(self.measured_fps),
             measured_diagnostics_label(self.measured_ups),
             self.frames_total,
             self.updates_total,
+            self.cpu_profile.diagnostics(),
         )
     }
 }
@@ -1517,15 +1548,36 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
         &options.scenario,
         options.seed,
         &options.settings,
-        BENCHMARK_VIEWPORT,
+        options.viewport,
         ScenarioStartMode::Benchmark(options.configuration),
-    )
-    .expect("validated benchmark scenario should construct");
+    )?;
     let tick_model = scenario.tick_model();
     let fixed_dt = fixed_step_duration(tick_model).unwrap_or(Duration::from_secs_f64(1.0 / 60.0));
     let mut input = ClientInput::default();
     let mut raster_renderer = raster::RasterRenderer::new();
-    let mut report_file = match options.report_path {
+    for _ in 0..options.warmup_seconds {
+        let mut sample = BenchmarkSample::default();
+        for _ in 0..60 {
+            benchmark_frame(
+                &mut scenario,
+                &mut input,
+                &options,
+                fixed_dt,
+                &mut raster_renderer,
+                &mut sample,
+            );
+        }
+    }
+    // Warm allocations/code paths, but always measure the same seeded tick range.
+    scenario = HostedScenario::new(
+        &options.scenario,
+        options.seed,
+        &options.settings,
+        options.viewport,
+        ScenarioStartMode::Benchmark(options.configuration),
+    )?;
+    input.clear();
+    let mut report_file = match &options.report_path {
         Some(path) => Some(File::create(path)?),
         None => None,
     };
@@ -1542,45 +1594,14 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
         let sample_started = Instant::now();
 
         for _ in 0..60 {
-            let frame_started = Instant::now();
-
-            let step_started = Instant::now();
-            let actions = scenario.actions(&mut input, true, &[]);
-            scenario.step(&actions, fixed_dt);
-            let step_time = step_started.elapsed();
-            sample.step_time += step_time;
-            sample.step_samples.push(step_time);
-            let scenario_metrics = scenario.benchmark_step_metrics();
-            sample.max_lifecycle_time = sample
-                .max_lifecycle_time
-                .max(scenario_metrics.lifecycle_time);
-            sample.scenario_metrics += scenario_metrics;
-            let counts = scenario.benchmark_counts();
-            sample.max_candidate_pairs = sample.max_candidate_pairs.max(counts.candidate_pairs);
-            sample.max_contact_pairs = sample.max_contact_pairs.max(counts.contact_pairs);
-            sample.max_contacts = sample.max_contacts.max(counts.contacts);
-
-            let render_started = Instant::now();
-            let frames = scenario.render_frames(options.renderer, BENCHMARK_VIEWPORT);
-            sample.render_time += render_started.elapsed();
-
-            let present_started = Instant::now();
-            let presentation = present_frames_for_benchmark(
-                &frames,
-                scenario.frame_layout(),
-                options.renderer,
-                options.raster_scale,
+            benchmark_frame(
+                &mut scenario,
+                &mut input,
+                &options,
+                fixed_dt,
                 &mut raster_renderer,
+                &mut sample,
             );
-            sample.scene_items = presentation.scene_items;
-            sample.raster_timings += presentation.raster_timings;
-            sample.present_time += present_started.elapsed();
-
-            sample.frames += 1;
-            sample.updates += 1;
-            let total_time = frame_started.elapsed();
-            sample.max_total_time = sample.max_total_time.max(total_time);
-            sample.total_samples.push(total_time);
         }
 
         sample.wall_time = sample_started.elapsed();
@@ -1592,13 +1613,67 @@ pub fn run_benchmark(options: BenchmarkOptions) -> Result<(), Box<dyn std::error
             sample,
             scenario.benchmark_counts(),
         );
-        write_benchmark_row(&mut stdout, &row)?;
+        write_benchmark_row(&mut stdout, &row, &options)?;
         if let Some(file) = &mut report_file {
-            write_benchmark_row(file, &row)?;
+            write_benchmark_row(file, &row, &options)?;
         }
     }
 
     Ok(())
+}
+
+fn benchmark_frame(
+    scenario: &mut HostedScenario,
+    input: &mut ClientInput,
+    options: &BenchmarkOptions,
+    fixed_dt: Duration,
+    raster_renderer: &mut raster::RasterRenderer,
+    sample: &mut BenchmarkSample,
+) {
+    let frame_started = Instant::now();
+
+    let step_started = Instant::now();
+    let actions = scenario.actions(input, true, &[]);
+    scenario.step(&actions, fixed_dt);
+    let step_time = step_started.elapsed();
+    sample.step_time += step_time;
+    sample.step_samples.push(step_time);
+    let scenario_metrics = scenario.benchmark_step_metrics();
+    sample.max_lifecycle_time = sample
+        .max_lifecycle_time
+        .max(scenario_metrics.lifecycle_time);
+    sample.scenario_metrics += scenario_metrics;
+    let counts = scenario.benchmark_counts();
+    sample.max_candidate_pairs = sample.max_candidate_pairs.max(counts.candidate_pairs);
+    sample.max_contact_pairs = sample.max_contact_pairs.max(counts.contact_pairs);
+    sample.max_contacts = sample.max_contacts.max(counts.contacts);
+    sample.max_bodies = sample.max_bodies.max(counts.bodies);
+    sample.max_colliders = sample.max_colliders.max(counts.colliders);
+    sample.event_active_frames += u32::from(counts.clock_event_active);
+
+    let render_started = Instant::now();
+    let frames = scenario.render_frames(options.renderer, options.viewport);
+    sample.render_time += render_started.elapsed();
+
+    let present_started = Instant::now();
+    let presentation = present_frames_for_benchmark(
+        &frames,
+        scenario.frame_layout(),
+        options.renderer,
+        options.raster_scale,
+        raster_renderer,
+        options.viewport,
+    );
+    sample.scene_items = presentation.scene_items;
+    sample.max_scene_items = sample.max_scene_items.max(presentation.scene_items);
+    sample.raster_timings += presentation.raster_timings;
+    sample.present_time += present_started.elapsed();
+
+    sample.frames += 1;
+    sample.updates += 1;
+    let total_time = frame_started.elapsed();
+    sample.max_total_time = sample.max_total_time.max(total_time);
+    sample.total_samples.push(total_time);
 }
 
 fn present_frames_for_benchmark(
@@ -1607,14 +1682,12 @@ fn present_frames_for_benchmark(
     renderer: RenderBackend,
     raster_scale: f32,
     raster_renderer: &mut raster::RasterRenderer,
+    viewport: Viewport,
 ) -> PresentationStats {
     match renderer {
         RenderBackend::Vector => {
-            let presentation = render::scene_presentation_from_frames_with_layout(
-                frames,
-                BENCHMARK_VIEWPORT,
-                layout,
-            );
+            let presentation =
+                render::scene_presentation_from_frames_with_layout(frames, viewport, layout);
             let scene_item_count = presentation.scene_item_count();
             black_box(presentation);
             PresentationStats {
@@ -1626,7 +1699,7 @@ fn present_frames_for_benchmark(
             let primitive_count = raster::primitive_count(frames);
             let result = raster_renderer.image_from_frames_with_layout_timed(
                 frames,
-                scaled_viewport(BENCHMARK_VIEWPORT, raster_scale),
+                scaled_viewport(viewport, raster_scale),
                 layout,
                 raster::RasterOptions::for_scale(raster_scale),
             );
@@ -1655,6 +1728,10 @@ fn scaled_viewport(viewport: Viewport, raster_scale: f32) -> Viewport {
 
 #[derive(Debug, Default)]
 struct BenchmarkSample {
+    max_bodies: usize,
+    max_colliders: usize,
+    max_scene_items: usize,
+    event_active_frames: u32,
     frames: u32,
     updates: u32,
     scene_items: usize,
@@ -1675,6 +1752,10 @@ struct BenchmarkSample {
 
 #[derive(Debug)]
 struct BenchmarkRow {
+    max_bodies: usize,
+    max_colliders: usize,
+    max_scene_items: usize,
+    event_active_frames: u32,
     scenario: String,
     renderer: &'static str,
     raster_scale: f32,
@@ -1768,9 +1849,13 @@ impl BenchmarkRow {
         counts: BenchmarkCounts,
     ) -> Self {
         let frames = sample.frames.max(1);
-        let measured_time = sample.step_time + sample.render_time + sample.present_time;
+        let measured_time = sample.total_samples.iter().copied().sum();
         Self {
             scenario: scenario.into(),
+            max_bodies: sample.max_bodies,
+            max_colliders: sample.max_colliders,
+            max_scene_items: sample.max_scene_items,
+            event_active_frames: sample.event_active_frames,
             renderer: renderer.label(),
             raster_scale,
             second,
@@ -1898,13 +1983,50 @@ impl BenchmarkRow {
 }
 
 fn write_benchmark_header(mut writer: impl Write) -> io::Result<()> {
+    write!(
+        writer,
+        "benchmark_version,seed,viewport_width,viewport_height,internal_width,internal_height,warmup_seconds,clock_case,clock_recipe,max_bodies,max_colliders,max_scene_items,event_active_frames,"
+    )?;
     writeln!(
         writer,
         "scenario,renderer,raster_scale,second,frames,updates,throughput_fps,scene_items,asteroids,fragments,shells,particles,balls,gravity_sources,gravity_targets,gravity_nodes,gravity_exact_interactions,gravity_approximations,gravity_applied_sources,active_bodies,sleeping_bodies,candidate_pairs,max_candidate_pairs,contact_pairs,max_contact_pairs,solver_contacts,max_solver_contacts,added,removed,avg_step_ms,p50_step_ms,p95_step_ms,p99_step_ms,max_step_ms,avg_workload_ms,avg_lifecycle_ms,max_lifecycle_ms,avg_gravity_ms,avg_gravity_validation_ms,avg_gravity_build_ms,avg_gravity_aggregation_ms,avg_gravity_traversal_ms,avg_collision_ms,avg_physics_ms,avg_snapshot_ms,avg_rapier_step_ms,avg_rapier_update_ms,avg_rapier_user_changes_ms,avg_rapier_kinematic_interpolation_ms,avg_rapier_collision_detection_ms,avg_rapier_broad_phase_ms,avg_rapier_final_broad_phase_ms,avg_rapier_narrow_phase_ms,avg_rapier_island_ms,avg_rapier_island_constraints_ms,avg_rapier_solver_ms,avg_rapier_ccd_ms,avg_render_ms,avg_present_ms,avg_raster_clear_ms,avg_raster_player_ms,avg_raster_player_starfield_ms,avg_raster_player_bodies_ms,avg_raster_player_world_ms,avg_raster_player_sun_planets_ms,avg_raster_player_spaceports_ms,avg_raster_player_effects_ms,avg_raster_player_ships_ms,avg_raster_player_debris_ms,avg_raster_player_particles_ms,avg_raster_player_other_ms,avg_raster_other_frames_ms,avg_raster_overview_refresh_ms,avg_raster_overview_blit_ms,avg_raster_overview_live_ms,avg_raster_image_ms,avg_total_ms,p50_total_ms,p95_total_ms,p99_total_ms,max_total_ms"
     )
 }
 
-fn write_benchmark_row(mut writer: impl Write, row: &BenchmarkRow) -> io::Result<()> {
+fn write_benchmark_row(
+    mut writer: impl Write,
+    row: &BenchmarkRow,
+    options: &BenchmarkOptions,
+) -> io::Result<()> {
+    let internal = if options.renderer == RenderBackend::Raster {
+        scaled_viewport(options.viewport, options.raster_scale)
+    } else {
+        options.viewport
+    };
+    write!(
+        writer,
+        "2,{},{},{},{},{},{},{},{},{},{},{},{},",
+        options.seed,
+        options.viewport.width,
+        options.viewport.height,
+        internal.width.ceil() as u32,
+        internal.height.ceil() as u32,
+        options.warmup_seconds,
+        if options.scenario == "clock" {
+            options.configuration.clock.case.as_str()
+        } else {
+            ""
+        },
+        if options.scenario == "clock" {
+            options.configuration.clock.marquee_preset.as_str()
+        } else {
+            ""
+        },
+        row.max_bodies,
+        row.max_colliders,
+        row.max_scene_items,
+        row.event_active_frames
+    )?;
     let fields = [
         row.scenario.clone(),
         row.renderer.into(),

@@ -15,6 +15,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     launcher_visible: true,
     capabilities: ScenarioCapabilities {
         benchmark: true,
+        headless_benchmark: true,
         pointer_input: true,
         player_zoom: false,
         game_over: false,

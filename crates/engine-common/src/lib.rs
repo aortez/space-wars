@@ -256,6 +256,18 @@ pub enum ClockMarqueePreset {
 }
 
 impl ClockMarqueePreset {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ClockChase => "clock-chase",
+            Self::ClockWave => "clock-wave",
+            Self::ClockSpin => "clock-spin",
+            Self::DigitSpin => "digit-spin",
+            Self::TextScroll => "text-scroll",
+            Self::TextRibbon => "text-ribbon",
+            Self::TextSpin => "text-spin",
+        }
+    }
+
     pub const ALL: [Self; 7] = [
         Self::ClockChase,
         Self::ClockWave,

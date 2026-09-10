@@ -384,6 +384,9 @@ tick. A raw `clock trigger` request must include schema version 8, `event`
 
 ## Verification
 
+For repeatable event/renderer benchmarks and live host CPU-stage diagnostics,
+see the [Clock performance lab](clock-performance-lab.md).
+
 ```sh
 cargo test --locked -p scenario-clock -p spacewars-control -p spacewars-cli
 SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \

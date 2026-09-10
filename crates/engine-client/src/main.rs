@@ -94,16 +94,36 @@ struct Args {
     debug_triangles: usize,
 
     /// Start the selected scenario's visual benchmark workload in the UI.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "benchmark_headless")]
     benchmark: bool,
 
     /// Run the selected scenario's benchmark without a window and print CSV rows.
     #[arg(long)]
     benchmark_headless: bool,
 
-    /// Number of seconds to run --benchmark-headless.
-    #[arg(long, default_value_t = 30)]
+    /// Simulated seconds for --benchmark-headless (60 steps/frames per row).
+    #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=3600))]
     benchmark_seconds: u64,
+
+    /// Warm the headless pipeline, then reset the seeded workload before measuring.
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u64).range(0..=120))]
+    benchmark_warmup_seconds: u64,
+
+    /// Logical headless viewport width, before raster scaling.
+    #[arg(long, default_value_t = 1280, value_parser = clap::value_parser!(u32).range(64..=4096))]
+    benchmark_width: u32,
+
+    /// Logical headless viewport height, before raster scaling.
+    #[arg(long, default_value_t = 720, value_parser = clap::value_parser!(u32).range(64..=4096))]
+    benchmark_height: u32,
+
+    /// Deterministic Clock fixture. Only used by headless Clock benchmarks.
+    #[arg(long, value_enum, default_value = "idle")]
+    clock_benchmark_case: client_scenarios::ClockBenchmarkCase,
+
+    /// Fixed Marquee recipe for the Clock fixture, independent of saved settings.
+    #[arg(long, default_value = "clock-wave", value_parser = parse_clock_benchmark_recipe)]
+    clock_benchmark_recipe: engine_common::ClockMarqueePreset,
 
     /// Optional CSV file path for --benchmark-headless output.
     #[arg(long)]
@@ -252,8 +272,26 @@ impl Args {
                 workload: self.pizza_benchmark_workload.into(),
                 ball_count: self.pizza_benchmark_balls.min(MAX_BENCHMARK_BALLS),
             },
+            clock: client_scenarios::ClockBenchmarkConfig {
+                case: self.clock_benchmark_case,
+                marquee_preset: self.clock_benchmark_recipe,
+            },
         }
     }
+}
+
+fn parse_clock_benchmark_recipe(value: &str) -> Result<engine_common::ClockMarqueePreset, String> {
+    engine_common::ClockMarqueePreset::ALL
+        .into_iter()
+        .find(|preset| preset.as_str() == value)
+        .ok_or_else(|| {
+            format!(
+                "Unknown Clock recipe {value:?}; choose {}",
+                engine_common::ClockMarqueePreset::ALL
+                    .map(|p| p.as_str())
+                    .join(", ")
+            )
+        })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -299,8 +337,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         host::validate_scenario(effective_launch.scenario.as_str())?;
     }
     if args.uses_benchmark()
-        && !host::scenario_registration(effective_launch.scenario.as_str())
-            .is_some_and(|registration| registration.capabilities.benchmark)
+        && !host::scenario_registration(effective_launch.scenario.as_str()).is_some_and(
+            |registration| {
+                if args.benchmark_headless {
+                    registration.capabilities.headless_benchmark
+                } else {
+                    registration.capabilities.benchmark
+                }
+            },
+        )
     {
         return Err(format!(
             "scenario {:?} does not support benchmark mode",
@@ -339,6 +384,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             scenario: effective_launch.scenario.clone(),
             seed: effective_launch.seed,
             seconds: args.benchmark_seconds,
+            warmup_seconds: args.benchmark_warmup_seconds,
+            viewport: render::Viewport::new(
+                args.benchmark_width as f32,
+                args.benchmark_height as f32,
+            ),
             report_path: args.benchmark_report.clone(),
             renderer: effective_launch.renderer,
             raster_scale: effective_launch.raster_scale,
@@ -2180,6 +2230,11 @@ mod tests {
             benchmark: false,
             benchmark_headless: false,
             benchmark_seconds: 30,
+            benchmark_warmup_seconds: 2,
+            benchmark_width: 1280,
+            benchmark_height: 720,
+            clock_benchmark_case: client_scenarios::ClockBenchmarkCase::Idle,
+            clock_benchmark_recipe: engine_common::ClockMarqueePreset::ClockWave,
             benchmark_report: None,
             pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
             pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,
