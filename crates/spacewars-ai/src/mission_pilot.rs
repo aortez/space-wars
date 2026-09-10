@@ -19,7 +19,7 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v5";
+pub const MISSION_POLICY: &str = "material_mission_v6";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -110,6 +110,7 @@ pub struct MaterialMissionPilot {
     pwm: f32,
     escaping_sun: bool,
     pursuit_climb: Option<usize>,
+    departure_obstacle: Option<usize>,
     solar_detour: Option<(usize, f32)>,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
@@ -149,6 +150,7 @@ impl MaterialMissionPilot {
             pwm: 0.0,
             escaping_sun: false,
             pursuit_climb: None,
+            departure_obstacle: None,
             solar_detour: None,
             previous_tick: None,
             previous_intent: CombatIntent::default(),
@@ -222,6 +224,7 @@ impl MaterialMissionPilot {
         self.capture = None;
         self.solar_detour = None;
         self.pursuit_climb = None;
+        self.departure_obstacle = None;
         self.goal(MissionGoal::Select, tick);
     }
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
@@ -412,6 +415,7 @@ impl MaterialMissionPilot {
                 self.event(p.tick, "departed", None);
                 self.telemetry.target = None;
                 self.capture = None;
+                self.departure_obstacle = None;
                 self.goal(MissionGoal::Select, p.tick);
                 return CombatIntent::default();
             }
@@ -419,7 +423,9 @@ impl MaterialMissionPilot {
                 self.reconsider(p.tick, reason, true);
                 return CombatIntent::default();
             }
-            if p.planet.index != target.index && p.location != PilotLocation::OnFoot {
+            if (p.planet.index != target.index || self.departure_obstacle.is_some())
+                && p.location != PilotLocation::OnFoot
+            {
                 if let Some(boarded) = t.landing.boarded_tick
                     && t.landing.claimed_tick.is_some()
                 {
@@ -430,8 +436,35 @@ impl MaterialMissionPilot {
                         self.reconsider(p.tick, "departure did not clear its planet", true);
                         return CombatIntent::default();
                     }
-                    let near = &p.planet;
+                    // Keep world guidance after the nearest frame switches
+                    // back, or local departure can send us into the gap again.
+                    let obstacle = *self.departure_obstacle.get_or_insert(p.planet.index);
+                    let near = o
+                        .planets
+                        .iter()
+                        .find(|planet| planet.index == obstacle)
+                        .unwrap_or(&p.planet);
                     let near_up = (p.ship.position - near.motion.position).normalized();
+                    if near.index != target.index
+                        && p.ship.position.distance_to(near.motion.position) < near.radius + 90.0
+                    {
+                        let target_up = (p.ship.position - target.motion.position).normalized();
+                        // Move outward from both bodies. Directly between them,
+                        // preserve tangential motion to escape opposing normals.
+                        let sum = near_up + target_up;
+                        let velocity = (near.motion.velocity + target.motion.velocity) * 0.5;
+                        let tangent = Vec2::new(-target_up.y, target_up.x);
+                        let direction = if sum.length_squared() > 0.01 {
+                            sum.normalized()
+                        } else if (p.ship.velocity - velocity).dot(tangent) < 0.0 {
+                            -tangent
+                        } else {
+                            tangent
+                        };
+                        self.goal(MissionGoal::Capture, p.tick);
+                        self.telemetry.reason = Some("clearing both nearby planets");
+                        return self.guide(o, velocity + direction * 25.0);
+                    }
                     let falling = (-(p.ship.velocity - near.motion.velocity).dot(near_up)).max(0.0);
                     let planet = if p.ship.position.distance_to(near.motion.position)
                         < near.radius + 70.0 + falling * falling / 50.0

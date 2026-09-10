@@ -19,6 +19,7 @@ pub mod ground_posture;
 pub mod impact;
 pub mod jetpack;
 mod landing;
+mod landing_diagnostics;
 mod material;
 pub mod mission;
 mod motion;

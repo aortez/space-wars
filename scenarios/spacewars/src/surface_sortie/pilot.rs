@@ -1,6 +1,7 @@
 //! Read-only, bounded sensors for a pilot controller. No Rapier handles cross
 //! this boundary, and observations never advance physics or flush its queries.
 use super::*;
+use engine_rapier::world::RayHit;
 
 pub const PILOT_OBSERVATION_VERSION: u32 = 1;
 pub const LANDING_SITE_COUNT: u8 = 64;
@@ -22,6 +23,8 @@ pub struct PilotMotion {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct PilotLandingSite {
+    /// The hatch stays usable across small combined slide/tilt corrections.
+    pub hatch_has_settling_margin: bool,
     pub id: LandingSiteId,
     pub revision: u64,
     pub local_position: Vec2,
@@ -221,6 +224,19 @@ impl SurfaceSortieState {
         }
         let position = left.point.midpoint(right_hit.point);
         let vehicle_position = position + normal * if pod { 0.85 } else { 5.45 };
+        // Rays can miss a step under the hull between the feet. Allow modest
+        // sideways drift and settling depth when checking the complete hull.
+        if !pod
+            && ![-0.75, 0.0, 0.75].into_iter().all(|offset| {
+                self.world.physics.surface_hull_fits_at(
+                    self.pilots[player].vehicle.0,
+                    vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2,
+                    rotation_for_direction(normal),
+                )
+            })
+        {
+            return None;
+        }
         // Other pilots' vehicles occupy space even though they cannot be
         // mistaken for material ground by the footing rays.
         if self.pilots.iter().enumerate().any(|(index, pilot)| {
@@ -253,39 +269,59 @@ impl SurfaceSortieState {
                 }
             }
         }
-        let hatch_up = if pod {
-            up
-        } else {
-            (vehicle_position - frame.position).normalized()
+        let spec = Self::spec();
+        let hatch_clear = |hatch: RayHit, radial: Vec2| {
+            hatch.normal.dot(radial) >= 0.65
+                && [hatch.normal, radial].into_iter().all(|axis| {
+                    self.world.physics.world.capsule_is_clear(
+                        hatch.point + axis * (spec.half_height() + 0.12),
+                        rotation_for_direction(axis),
+                        spec.half_segment,
+                        spec.radius + 0.04,
+                        spec.collision_groups,
+                    )
+                })
         };
+        let mut hatch_has_settling_margin = false;
         let hatch = if pod {
             let origin = vehicle_position + Vec2::new(normal.y, -normal.x) * 2.8;
-            ground(origin, -normal, 5.0)?
+            let hatch = ground(origin, -normal, 5.0)?;
+            hatch_clear(hatch, up).then_some(hatch)?
         } else {
-            // Survey the same radial hatch rays used by the real transfer
-            // gate. A ray along the estimated foot plane can invent an exit
-            // that the settled ship cannot actually use on cell steps.
-            self.material_access_at(
-                id.planet,
-                ShipForm::Ship,
-                vehicle_position,
-                rotation_for_direction(normal),
-            )?
+            // Use the real exit pose and leave room to stand radially upright.
+            // Require room for lateral drift, then report whether a combined
+            // slide and tilt is also safe. A bot may need to retry a one-foot
+            // stop when rotating here would close the hatch.
+            let hatch_at = |position: Vec2, angle: f32| {
+                self.material_access_at(
+                    id.planet,
+                    ShipForm::Ship,
+                    position,
+                    angle,
+                    Some(pilot_physics_id(self.pilots[player].owner)),
+                )
+                .filter(|hit| hatch_clear(*hit, (position - frame.position).normalized()))
+            };
+            let angle = rotation_for_direction(normal);
+            for offset in [-0.75, 0.75] {
+                hatch_at(
+                    vehicle_position + Vec2::new(normal.y, -normal.x) * offset,
+                    angle,
+                )?;
+            }
+            hatch_has_settling_margin = [-0.75, 0.0, 0.75].into_iter().all(|offset| {
+                [-0.1, 0.0, 0.1].into_iter().all(|turn| {
+                    hatch_at(
+                        vehicle_position + Vec2::new(normal.y, -normal.x) * offset,
+                        angle + turn,
+                    )
+                    .is_some()
+                })
+            });
+            hatch_at(vehicle_position, angle)?
         };
-        if hatch.normal.dot(hatch_up) < 0.65 {
-            return None;
-        }
-        let spec = Self::spec();
-        if !self.world.physics.world.capsule_is_clear(
-            hatch.point + hatch_up * (spec.half_height() + 0.12),
-            rotation_for_direction(hatch_up),
-            spec.half_segment,
-            spec.radius + 0.04,
-            spec.collision_groups,
-        ) {
-            return None;
-        }
         Some(PilotLandingSite {
+            hatch_has_settling_margin,
             id,
             revision: terrain.field.revision(),
             local_position: (position - frame.position).rotate_radians(-frame.angle),

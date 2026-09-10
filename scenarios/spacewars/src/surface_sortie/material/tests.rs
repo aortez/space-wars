@@ -1,4 +1,7 @@
 use super::*;
+use engine_rapier::world::{
+    BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
+};
 use engine_terrain::{CellCoord, MaterialId};
 
 const DT: Duration = Duration::from_nanos(16_666_667);
@@ -268,6 +271,52 @@ fn hatch_uses_neighboring_footing_beside_a_narrow_cut() {
     idle(&mut state, 60);
     assert!(state.observation(0).grounded);
     assert_eq!(state.observation(0).pilot_support_planet, Some(0));
+}
+
+#[test]
+fn hatch_prefers_a_clear_neighbor_when_the_central_floor_is_obstructed() {
+    let mut state = parked(1);
+    let before = state.material_access(0).unwrap();
+    let spec = SurfaceSortieState::spec();
+    let obstacle = PhysicsId::new(45_000);
+    let mut collider = ColliderSpec::ball(ColliderId::new(obstacle, ColliderRole::PRIMARY, 0), 0.2);
+    // This blocks the exiting capsule without impersonating material ground.
+    collider.collision_groups = physics::spaceling_collision_groups();
+    assert!(state.world.physics.world.insert_body(
+        PhysicsBodyId::new(obstacle, BodyRole::PRIMARY),
+        BodySpec {
+            kind: engine_rapier::world::BodyKind::Fixed,
+            position: before.point + before.normal * (spec.half_height() + 0.12),
+            ..BodySpec::default()
+        },
+        &[collider]
+    ));
+    idle(&mut state, 1);
+    let body = state
+        .world
+        .physics
+        .world
+        .motion(state.world.physics.ship_body(0))
+        .unwrap();
+    let first = state
+        .material_access_candidates_at(0, ShipForm::Ship, body.position, body.angle)
+        .next()
+        .expect("central floor still exists");
+    assert!(first.point.distance_to(before.point) < 0.1);
+    assert!(!state.world.physics.world.capsule_is_clear(
+        first.point + first.normal * (spec.half_height() + 0.12),
+        rotation_for_direction(first.normal),
+        spec.half_segment,
+        spec.radius + 0.04,
+        spec.collision_groups,
+    ));
+    let after = state.material_access(0).expect("clear neighboring exit");
+    assert!((0.8..1.5).contains(&after.point.distance_to(first.point)));
+    assert_eq!(state.pilots[0].landing.phase, LandingPhase::Landed);
+    let bodies = state.world.physics.world.body_count();
+    transfer(&mut state, 0);
+    assert_eq!(state.location(0), PilotLocation::OnFoot);
+    assert_eq!(state.world.physics.world.body_count(), bodies + 1);
 }
 
 #[test]

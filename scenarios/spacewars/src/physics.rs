@@ -674,6 +674,31 @@ impl SpacewarsPhysics {
         is_planet_surface_support(hit.collider, planet).then_some(hit)
     }
 
+    /// Raw hull (0) and foot (1, 2) contacts for bounded diagnostics.
+    pub(super) fn surface_vehicle_contacts(
+        &self,
+        index: usize,
+        part: usize,
+    ) -> impl Iterator<Item = engine_rapier::world::SurfaceContact> + '_ {
+        assert!(part < 3);
+        let (role, part) = if part == 0 {
+            (SHIP_HULL_ROLE, 0)
+        } else {
+            (LANDING_FOOT_ROLE, (part - 1) as u16)
+        };
+        self.world
+            .surface_contacts(collider_id(ship_entity(index), role, part))
+    }
+
+    pub(super) fn surface_hull_fits_at(&self, index: usize, position: Vec2, angle: f32) -> bool {
+        !self.material_queries_dirty
+            && self.world.collider_fits_at(
+                collider_id(ship_entity(index), SHIP_HULL_ROLE, 0),
+                position,
+                angle,
+            ) == Some(true)
+    }
+
     /// Solver-backed rear-foot support within contact slop, not hull or port overlap.
     pub(super) fn landing_feet_supported(&self, index: usize, planet: usize, up: Vec2) -> usize {
         self.landing_support_contacts(index, planet, up)

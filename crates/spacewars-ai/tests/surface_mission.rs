@@ -32,6 +32,13 @@ fn world_observation_is_read_only_and_destination_never_changes_physical_support
     let a = state.mission_observation(0, request);
     let b = state.mission_observation(0, request);
     assert_eq!(a, b);
+    let audit = state.terrain_diagnostics();
+    let diagnostic = state.landing_diagnostics(0, None);
+    assert_eq!(diagnostic, state.landing_diagnostics(0, None));
+    assert_eq!(
+        serde_json::to_value(state.terrain_diagnostics()).unwrap(),
+        serde_json::to_value(audit).unwrap()
+    );
     assert_eq!(state.observation(0), before);
     assert_eq!(a.planets.len(), 2);
     assert_eq!(a.local.combat.recovery.flight.pilot.planet.index, 0);
@@ -501,7 +508,7 @@ fn inner_planet_solar_approach_completes_a_real_capture_and_departure() {
 
 #[test]
 fn generated_orbiting_ground_supports_real_claims_boarding_and_departure() {
-    for (seed, seat, required) in [(0, 0, 1), (2, 1, 3), (3, 1, 3), (7, 0, 3)] {
+    for (seed, seat, required) in [(0, 0, 3), (1, 1, 3), (2, 1, 3), (3, 1, 3), (7, 0, 3)] {
         let owner = PlayerId::from_index(seat).unwrap();
         let mut state = SurfaceSortieScenario::init_material_arena(seed);
         let mut brain = MaterialMissionPilot::new(

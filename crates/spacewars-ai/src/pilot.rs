@@ -55,6 +55,7 @@ pub struct PilotTelemetry {
     pub site_revision: Option<u64>,
     pub invalidations: u32,
     pub landing_retries: u32,
+    pub touchdown_adjustments: u32,
     pub blocked_reason: Option<&'static str>,
     pub goal_since: u64,
     pub last_progress_tick: u64,
@@ -86,6 +87,8 @@ pub struct RulePilotV1 {
     rejected_sites: Vec<LandingSiteId>,
     climbing: bool,
     commit_descent: bool,
+    one_foot_since: Option<u64>,
+    settling_normal: Option<Vec2>,
     claim_progress: (PlanetClaimPhase, f32),
 }
 
@@ -103,7 +106,7 @@ impl RulePilotV1 {
     pub(crate) fn with_committed_descent(context: BrainReset, site: PilotLandingSite) -> Self {
         let mut pilot = Self::with_site(context, site);
         pilot.commit_descent = true;
-        pilot.telemetry.policy = "material_landing_v2";
+        pilot.telemetry.policy = "material_landing_v3";
         pilot
     }
 
@@ -117,6 +120,7 @@ impl RulePilotV1 {
                 site_revision: None,
                 invalidations: 0,
                 landing_retries: 0,
+                touchdown_adjustments: 0,
                 blocked_reason: None,
                 goal_since: 0,
                 last_progress_tick: 0,
@@ -136,6 +140,8 @@ impl RulePilotV1 {
             rejected_sites: Vec::new(),
             climbing: false,
             commit_descent: false,
+            one_foot_since: None,
+            settling_normal: None,
             claim_progress: (PlanetClaimPhase::Idle, 0.0),
         }
     }
@@ -169,6 +175,8 @@ impl RulePilotV1 {
         self.telemetry.site_revision = None;
         self.telemetry.landing_retries += 1;
         self.climbing = true;
+        self.one_foot_since = None;
+        self.settling_normal = None;
         self.goal(PilotGoal::Reposition, tick);
     }
 
@@ -365,7 +373,42 @@ impl RulePilotV1 {
                 self.retry_landing(o.tick);
                 return action;
             }
-            action.horizontal = heading(o, site.normal);
+            // A fixed target normal can leave one real foot on a step and the
+            // other above it. After half a second at rest, close half the
+            // measured gap with ordinary rate control. Three small corrections
+            // bound this attempt; the existing fresh-site retry still applies.
+            if self.commit_descent && self.telemetry.touchdown_adjustments < 3 {
+                let feet = o.landing.foot_clearances;
+                let one_foot = o.landing.supported_feet == 1
+                    && o.landing.descent_speed.abs() < 0.3
+                    && o.landing.lateral_speed.abs() < 0.3
+                    && feet.into_iter().all(|height| (-0.2..1.5).contains(&height));
+                if one_foot {
+                    let since = *self.one_foot_since.get_or_insert(o.tick);
+                    if o.tick.saturating_sub(since) >= 30 {
+                        if !site.hatch_has_settling_margin {
+                            self.retry_landing(o.tick);
+                            return action;
+                        }
+                        let correction =
+                            (((feet[0] - feet[1]) / 6.0).atan() * 0.5).clamp(-0.1, 0.1);
+                        let normal = Vec2::Y.rotate_radians(o.ship.angle + correction);
+                        let radial = (o.ship.position - o.planet.motion.position).normalized();
+                        if normal.dot(radial) > 18.0_f32.to_radians().cos() {
+                            self.settling_normal =
+                                Some(normal.rotate_radians(-o.planet.motion.angle));
+                            self.telemetry.touchdown_adjustments += 1;
+                            self.one_foot_since = None;
+                        }
+                    }
+                } else {
+                    self.one_foot_since = None;
+                }
+            }
+            let normal = self.settling_normal.map_or(site.normal, |normal| {
+                normal.rotate_radians(o.planet.motion.angle)
+            });
+            action.horizontal = heading(o, normal);
             return action;
         }
         // Stay high enough to align above both feet before giving the normal
@@ -428,7 +471,7 @@ impl PilotBrain for RulePilotV1 {
         *self = Self::new(context);
         self.commit_descent = commit_descent;
         if commit_descent {
-            self.telemetry.policy = "material_landing_v2";
+            self.telemetry.policy = "material_landing_v3";
         }
     }
     fn site_request(&self) -> Option<LandingSiteId> {
@@ -463,6 +506,76 @@ mod tests {
     use engine_common::Scenario;
     use scenario_spacewars::surface_sortie::SurfaceSortieScenario;
     use std::time::Duration;
+
+    #[test]
+    fn a_stationary_one_foot_touchdown_gets_bounded_rotation_without_transfer() {
+        let context = BrainReset {
+            actor: scenario_spacewars::PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.pilot_observation(0, None);
+        o.sites[0].hatch_has_settling_margin = true;
+        let site = o.sites[0];
+        o.controls_armed = true;
+        o.ship.position = site.vehicle_position;
+        o.ship.velocity = o.planet.velocity_at(o.ship.position);
+        o.ship.angle = (-site.normal.x).atan2(site.normal.y);
+        o.ship.spin = o.planet.motion.spin;
+        o.landing.phase = LandingPhase::Settling;
+        o.landing.supported_feet = 1;
+        o.landing.foot_clearances = [0.9, 0.0];
+        o.landing.descent_speed = 0.0;
+        o.landing.lateral_speed = 0.0;
+        o.transfer = TransferResult::ShipNotSettled;
+        let mut pilot = RulePilotV1::with_committed_descent(context, site);
+        for elapsed in 0..150 {
+            o.tick += 1;
+            let action = pilot.intent(&o);
+            assert!(!action.interact_held && !action.primary_held && !action.brake_held);
+            assert!(pilot.telemetry().landed_tick.is_none());
+            if elapsed < 30 {
+                assert_eq!(pilot.telemetry().touchdown_adjustments, 0);
+            } else {
+                assert!(action.horizontal < -0.01, "lower the raised left foot");
+            }
+            let telemetry = pilot.telemetry().clone();
+            assert_eq!(pilot.intent(&o), action);
+            assert_eq!(pilot.telemetry(), &telemetry);
+        }
+        assert_eq!(pilot.telemetry().touchdown_adjustments, 3);
+        let mut copy = pilot.clone();
+        o.tick += 1;
+        assert_eq!(pilot.intent(&o), copy.intent(&o));
+        pilot.reset(context);
+        assert_eq!(pilot.telemetry().touchdown_adjustments, 0);
+        assert!(pilot.settling_normal.is_none());
+
+        for fault in 0..7 {
+            let mut bad = o.clone();
+            match fault {
+                0 => bad.landing.supported_feet = 0,
+                1 => bad.landing.supported_feet = 2,
+                2 => bad.landing.descent_speed = 2.0,
+                3 => bad.landing.lateral_speed = 2.0,
+                4 => bad.landing.foot_clearances[0] = 26.0,
+                5 => bad.queries_ready = false,
+                _ => bad.sites[0].hatch_has_settling_margin = false,
+            }
+            let mut pilot = RulePilotV1::with_committed_descent(context, site);
+            for _ in 0..90 {
+                bad.tick += 1;
+                pilot.intent(&bad);
+            }
+            assert_eq!(pilot.telemetry().touchdown_adjustments, 0, "fault {fault}");
+            if fault == 6 {
+                assert_eq!(pilot.telemetry().landing_retries, 1);
+                assert_eq!(pilot.telemetry().goal, PilotGoal::Reposition);
+                assert!(pilot.telemetry().landed_tick.is_none());
+            }
+        }
+    }
 
     #[test]
     fn committed_touchdown_aligns_without_hovering_or_granting_landing() {
@@ -500,7 +613,7 @@ mod tests {
         assert_eq!(pilot.intent(&o), cloned.intent(&o));
         assert_eq!(pilot.telemetry().goal, PilotGoal::Reposition);
         pilot.reset(context);
-        assert_eq!(pilot.telemetry().policy, "material_landing_v2");
+        assert_eq!(pilot.telemetry().policy, "material_landing_v3");
         assert_eq!(pilot.site_request(), None);
         assert!(pilot.commit_descent);
 

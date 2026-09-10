@@ -268,7 +268,13 @@ impl SurfaceSortieState {
                 let settled = floor + normal * 5.45;
                 let angle = rotation_for_direction(normal);
                 let hatch = self
-                    .material_access_at(planet, ShipForm::Ship, settled, angle)
+                    .material_access_at(
+                        planet,
+                        ShipForm::Ship,
+                        settled,
+                        angle,
+                        Some(pilot_physics_id(self.pilots[player].owner)),
+                    )
                     .ok_or(RebuildRejection::NoHatchFooting)?
                     .point;
                 let avoiding = map.avoiding(self.pilots[player].gravity.length(), |position| {

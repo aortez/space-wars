@@ -1,6 +1,10 @@
 # Surface gameplay and destructible terrain integration
 
-The [mission reliability pass](../mission-reliability.md) preserves physical
+The [usable landing pass](../usable-landings.md) strengthens hull and hatch
+surveys and chooses a clear neighboring exit through the shared transfer logic.
+The bot uses bounded rotation to finish one-foot touchdowns through ordinary controls.
+
+The preceding [mission reliability pass](../mission-reliability.md) preserves physical
 capture/departure milestones and separates pursuit measurements from capture
 time. Match completion and promotion into ordinary Spacewars remain later work.
 
@@ -100,6 +104,16 @@ pod, empty ship loss preserves its on-foot pilot, and eight supported, stationar
 seconds on an owned planet rebuild the assigned ship. The replacement must
 settle before boarding. The combined journey is land, exit, claim, excavate,
 lose support, recover, rebuild, board, and depart.
+
+Finished-match survival rule, confirmed by the user on 2026-09-10: a living
+spaceling or escape pod keeps the player in the game even with no full ship
+and no owned planets. They may claim or reclaim a planet and rebuild through
+the ordinary mechanics. Losing the last flag during recovery must preserve
+that opportunity. Match integration must therefore replace the legacy
+no-ship/no-planets elimination rule; terminal pilot defeat and any respawn
+rules remain to be designed. See the
+[continuation investigation](../continuation-investigation.md) for the planned
+work and acceptance cases.
 
 The first acceptance scene combines one destructible planet with the shared
 one/two-player surface loop. Generated-world expansion follows validation of

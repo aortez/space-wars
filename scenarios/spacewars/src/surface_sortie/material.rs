@@ -247,7 +247,13 @@ impl SurfaceSortieState {
             .physics
             .world
             .motion(self.world.physics.ship_body(pilot.vehicle.0))?;
-        self.material_access_at(pilot.planet, ship.form, body.position, body.angle)
+        self.material_access_at(
+            pilot.planet,
+            ship.form,
+            body.position,
+            body.angle,
+            Some(pilot_physics_id(pilot.owner)),
+        )
     }
 
     pub(super) fn material_access_at(
@@ -256,7 +262,37 @@ impl SurfaceSortieState {
         form: ShipForm,
         position: Vec2,
         angle: f32,
+        exclude_actor: Option<PhysicsId>,
     ) -> Option<RayHit> {
+        let spec = Self::spec();
+        let clear = self.world.physics.world.capsule_clearance_test(
+            spec.half_segment,
+            spec.radius + 0.04,
+            spec.collision_groups,
+            exclude_actor,
+        );
+        let mut first = None;
+        for hit in self.material_access_candidates_at(planet, form, position, angle) {
+            first.get_or_insert(hit);
+            if clear(
+                hit.point + hit.normal * (spec.half_height() + 0.12),
+                rotation_for_direction(hit.normal),
+            ) {
+                return Some(hit);
+            }
+        }
+        // Keep the nearby floor observable when every capsule pose is blocked;
+        // the authoritative transfer gate must still reject the actual exit.
+        first
+    }
+
+    pub(super) fn material_access_candidates_at(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+    ) -> impl Iterator<Item = RayHit> + '_ {
         let local = if form == ShipForm::Ship {
             Vec2::new(8.0, -5.0)
         } else {
@@ -268,7 +304,7 @@ impl SurfaceSortieState {
         let right = Vec2::new(up.y, -up.x);
         // The hatch can straddle a cell edge. Search one cell to either side
         // for nearby footing without extending its reach down a deep shaft.
-        [0.0, -1.0, 1.0].into_iter().find_map(|offset| {
+        [0.0, -1.0, 1.0].into_iter().filter_map(move |offset| {
             let hit = self.world.physics.material_ground_ray(
                 planet,
                 hatch + right * offset + up * 2.0,

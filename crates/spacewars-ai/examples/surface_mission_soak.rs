@@ -204,6 +204,7 @@ fn main() {
                             "version": 1, "tick": tick, "seat": i,
                             "observation": o, "actions": intent.encode(owner),
                             "mission": pilots[i].telemetry(),
+                            "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
                             "posture": posture.map(|s| json!({
                                 "balance": format!("{:?}", s.balance),
                                 "get_up_result": format!("{:?}", s.get_up_result),

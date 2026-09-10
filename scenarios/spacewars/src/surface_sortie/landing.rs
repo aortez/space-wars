@@ -41,6 +41,8 @@ pub struct LandingTelemetry {
     pub planet: Option<usize>,
     pub phase: LandingPhase,
     pub altitude: f32,
+    /// Radial clearance beneath each rear foot; rays do not prove contact.
+    pub foot_clearances: [f32; 2],
     pub angle_degrees: f32,
     /// Positive is moving toward the ground; measured in the surface frame.
     pub descent_speed: f32,
@@ -78,25 +80,18 @@ impl LandingTelemetry {
             .acos()
             .to_degrees();
         let (feet, foot_radius) = physics.landing_geometry(index);
-        let altitude = feet
-            .into_iter()
-            .map(|foot| {
-                if physics.material_planets.contains(&planet_index) {
-                    let point = motion.position + foot.rotate_radians(motion.angle);
-                    return physics
-                        .material_ground_ray(
-                            planet_index,
-                            point + up * 0.1,
-                            -up,
-                            ASSIST_HEIGHT + 1.0,
-                        )
-                        .map_or(ASSIST_HEIGHT + 1.0, |hit| hit.distance - 0.1 - foot_radius);
-                }
-                (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
-                    - planet.radius * BODY_BOUNDS_RADIUS_SCALE
-                    - foot_radius
-            })
-            .fold(f32::INFINITY, f32::min);
+        let foot_clearances = feet.map(|foot| {
+            if physics.material_planets.contains(&planet_index) {
+                let point = motion.position + foot.rotate_radians(motion.angle);
+                return physics
+                    .material_ground_ray(planet_index, point + up * 0.1, -up, ASSIST_HEIGHT + 1.0)
+                    .map_or(ASSIST_HEIGHT + 1.0, |hit| hit.distance - 0.1 - foot_radius);
+            }
+            (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
+                - planet.radius * BODY_BOUNDS_RADIUS_SCALE
+                - foot_radius
+        });
+        let altitude = foot_clearances.into_iter().fold(f32::INFINITY, f32::min);
         let near =
             ((ASSIST_HEIGHT - altitude) / (ASSIST_HEIGHT - FULL_ASSIST_HEIGHT)).clamp(0.0, 1.0);
         let aligned =
@@ -106,6 +101,7 @@ impl LandingTelemetry {
         Self {
             planet: Some(planet_index),
             altitude,
+            foot_clearances,
             angle_degrees,
             descent_speed: -relative.dot(up),
             lateral_speed: relative.dot(right),

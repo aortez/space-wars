@@ -1,6 +1,10 @@
 # AI for Spacewars on destructible ground
 
-The current [mission reliability pass](../mission-reliability.md) adds bounded
+The current [usable landing pass](../usable-landings.md) checks hull and hatch
+clearance across touchdown offsets, corrects stationary one-foot approaches,
+and keeps departure guidance stable between nearby planets.
+
+The preceding [mission reliability pass](../mission-reliability.md) adds bounded
 circling retries, preserves departure across approach-frame changes, and
 measures capture and pursuit separately. Match outcomes and ordinary Spacewars
 integration remain the following gameplay milestones.
@@ -12,6 +16,13 @@ corner-contact landing recognition and adds bounded visible-hatch waits in
 The human-controlled material Expedition loop has passed Pi playtesting.
 The user's completion target is integration into ordinary Spacewars, including
 working AI. Merging is deferred until that gameplay milestone is ready.
+
+The user confirmed on 2026-09-10 that a surviving spaceling or escape pod
+remains in a finished match after losing its full ship and every planet.
+The mission bot must retain the opportunity to claim/reclaim and rebuild;
+loss of those assets alone cannot mark its player eliminated. The
+[continuation investigation](../continuation-investigation.md) records this
+rule and the remaining landing, objective selection and match lifecycle work.
 
 Latest reliability slice: [landing on generated material planets](../large-planet-landing.md)
 uses committed touchdown and nearby retries when unexposed, with landing surveys
