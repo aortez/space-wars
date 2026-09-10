@@ -82,5 +82,98 @@ Artifacts and reproduction scripts:
 /home/oldman/.codex/visualizations/2026/09/06/01a078c0-7d43-7490-9599-f9ce4705c9b8/ship-return-recovery-20260909/
 ```
 
-Final validation and installed-image identity will be recorded after the source
-checkpoint is built, tested and deployed.
+## Validation at `8283fe1`
+
+The release workspace suite passed 1,082 tests, with zero failures and 24
+existing ignored tests. The example suites passed eight more: **1,090 passed
+tests** in total, including eight new decision/physical regression tests.
+Formatting passed. Clippy completed with advisory warnings in unchanged code;
+the two style advisories from the preceding claim-footing slice were resolved.
+The frozen ordinary-game baselines matched all six `navigation-v1` and twelve
+`strategy-v1` episodes.
+
+Each platform ran 52 missions, 36 impact trials and 24 return trials for three
+simulated minutes each: **224 runs / 11.2 simulated hours**. All physical audits
+passed. All 72 impact trials recovered and departed, and all 48 dedicated return
+trials boarded and departed.
+
+| Return condition | Desktop | Pi | Departure time from trial start |
+| --- | ---: | ---: | ---: |
+| Reachable assigned ship | 8/8 | 8/8 | 5.65–6.07 seconds |
+| Tipped ship without grounded hatch | 8/8 | 8/8 | 32.37–32.52 seconds |
+| Ship landed on another planet | 8/8 | 8/8 | 17.35–17.50 seconds |
+
+The reachable controls preserved all sixteen original ships. Each of the other
+32 trials completed exactly one replacement. These times include physically
+settling and raising the initial flag before starting the return task.
+
+| Mission outcome | Desktop before → after | Pi before → after |
+| --- | ---: | ---: |
+| Quiet: capture and depart both planets | 12/12 → 12/12 | 12/12 → 12/12 |
+| Deliberate ship loss: recover a replacement | 8/8 → 8/8 | 8/8 → 8/8 |
+| Deliberate loss: also finish both capture sorties | 5/8 → 5/8 | 6/8 → 6/8 |
+| Combat/asteroids: finish both capture sorties | 17/32 → 17/32 | 15/32 → 15/32 |
+| Completed recovery events during combat/asteroids | 9 → 10 | 7 → 7 |
+| Final blocked mission subjects | 1 → 0 | 0 → 0 |
+
+Three desktop report trajectories change: the two designated subjects of the
+seed-7 mirrored duel world, and P1 in the seed-42 mirrored intercept. All 52 Pi
+mission trajectories retain every per-second motion hash from `92c72fa`.
+The new dedicated return fixtures establish the Pi behavior independently.
+
+Both final desktop diagnostic replays match all 180 motion hashes of their
+respective final matrix runs. The wedged-ship replay preserves the preceding
+build's motion through second 178. It starts scuttling at tick 10504 (175.07
+seconds), observes the completed loss at tick 10685 (178.08), and begins moving
+to reclaim hostile ground. It is still recovering at 180 seconds; this case
+does not establish a completed replacement within the original mission window.
+
+The foreign-planet replay preserves the old motion through second 83, rejects
+the impossible ground route at tick 5007 (83.45 seconds), then completes
+rebuilding and boarding at tick 6671 (111.18). It resumes the mission, captures
+planet 0 and departs at tick 9073 (151.22). Reports count this as one recovery
+and one completed capture sortie.
+
+The final Pi replay also enables `--require-claim-recovery true`. It matches
+all 180 final matrix hashes and preserves the earlier regression fix: measured
+claim relocation at tick 9450, followed by real ownership at tick 9777 (162.95
+seconds). The three-minute cutoff still leaves that spaceling returning to its
+ship. A completed claim is recorded separately from completed departures.
+
+The Pi's largest per-case p95 measurements were 0.307 ms for sensors, 0.019 ms
+for policy and 0.419 ms for physics. Recorded maxima were 17.115, 2.106 and
+11.106 ms respectively. These headless measurements are separate from live
+rendering. The Pi gameplay host was paused during the batch; desktop jobs
+overlapped compilation and are not a controlled performance comparison.
+
+The source checkpoint preceded the final runner and Yocto builds. Yocto
+completed all 6,608 tasks (21 rerun). The archived image and extracted client
+are identified by:
+
+```text
+source commit: 8283fe1eb77cdaead9b799eed247faeb488400c5
+image SHA256:  1cc3424dd9abebc7841d84320b3477201c1b1c54da4552cb3df5a082b3cf8e59
+client SHA256: 94c5f07fa8dbddae7606c30a003ae1994eb4f933f2bab700a8f0b4aec83b9523
+Pi mission:   4fb868c9c712ee81f86cadc667ebe4e25b0f666c222c63bd5cb002ac8dad43e1
+Pi return:    0facba83fb1be775fcb15ff9226960f4bae02cc1f91fab86542f6f8622756a42
+```
+
+## Deployment and live playtest
+
+The image was installed on `spacewars.local`, which booted slot A (`/dev/sda2`).
+The installed client hash matches the extracted image binary. The kiosk was
+active and running with zero restarts and a zero exit status.
+
+A live two-planet duel ran for three wall-clock minutes with 3-second Mixed
+asteroid arrivals and raster scale 2. Captures at 30/75/120/180 seconds recorded
+60.1/59.2/58.7/58.5 FPS, with zero kiosk restarts. Both bots captured their first
+planets and travelled onward. At 180 seconds, P1 was landing from a jetpack
+crossing to resume its ground route; P2 patrolled with both planets owned.
+This checks the installed combined loop and rendering. The targeted return
+recoveries are established separately by the physical runner fixtures.
+
+The Pi was then returned to a fresh, paused `spacewars-terrain-travel` round:
+P1 human, P2 mission bot, 8-second Mixed arrivals. Start or B resumes. Screenshots,
+UI state/history, actual capture times and service diagnostics are archived
+with the headless reports. This results update is documentation only; the
+installed implementation remains `8283fe1`. Merging remains deferred.
