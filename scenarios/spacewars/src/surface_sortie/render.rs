@@ -76,6 +76,7 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
     let height = camera.height;
     let mut frame = RenderFrame::new(camera);
     if let Some(sun) = state.world.sun {
+        draw_corona(&mut frame, state, sun, -22);
         circle(
             &mut frame,
             -21,
@@ -354,6 +355,7 @@ pub(super) fn minimap(
         }),
     );
     if let Some(sun) = state.world.sun {
+        draw_corona(&mut map, state, sun, -20);
         circle(
             &mut map,
             -19,
@@ -743,6 +745,28 @@ fn circle(frame: &mut RenderFrame, layer: i32, center: Vec2, radius: f32, color:
     );
 }
 
+fn draw_corona(frame: &mut RenderFrame, state: &SurfaceSortieState, sun: SunState, layer: i32) {
+    if !state.combat_enabled() {
+        return;
+    }
+    circle(
+        frame,
+        layer,
+        sun.position,
+        sun.radius + solar::CORONA_WIDTH,
+        RenderColor::rgba(1.0, 0.28, 0.04, 0.24),
+    );
+    frame.push_primitive(
+        layer,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(sun.position),
+            radius: sun.radius + solar::CORONA_WIDTH,
+            fill: None,
+            stroke: Some(Stroke::new(RenderColor::rgba(1.0, 0.38, 0.08, 0.7), 1.0)),
+        }),
+    );
+}
+
 fn line(frame: &mut RenderFrame, layer: i32, a: Vec2, b: Vec2, color: RenderColor, width: f32) {
     frame.push_primitive(
         layer,
@@ -1047,6 +1071,15 @@ fn draw_player_hud(
                 ship.life / ship.life_max * 100.0
             )
         }
+    } else {
+        vehicle_status
+    };
+    let vehicle_status = if let Some(heat) = observation.solar.filter(|h| h.intensity > 0.0) {
+        format!(
+            "SOLAR HEAT / hull {:.0}% / -{:.0}%/s",
+            ship.life / ship.life_max * 100.0,
+            heat.damage_percent_per_second
+        )
     } else {
         vehicle_status
     };

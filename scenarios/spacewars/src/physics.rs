@@ -76,6 +76,8 @@ const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_SPACELING: u32 = 1 << 11;
 const GROUP_MATERIAL: u32 = 1 << 12;
+// Surface actors exclude legacy circular planet colliders, but still hit the sun.
+const GROUP_SUN: u32 = 1 << 13;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
 // GROUP_BODY also includes dynamic terrain fragments. Celestial and boundary
 // filters must accept that group as well as ordinary ships, debris, and rovers.
@@ -87,6 +89,7 @@ pub(super) fn spaceling_collision_groups() -> CollisionGroups {
         GROUP_SPACELING,
         GROUP_ROVER_SURFACE
             | GROUP_MATERIAL
+            | GROUP_SUN
             | GROUP_ALL_SHIPS
             | GROUP_DEBRIS
             | GROUP_WORLD
@@ -602,7 +605,8 @@ impl SpacewarsPhysics {
         let mut groups = ship_collision_groups(ship, false);
         groups.filter = (groups.filter & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
             | GROUP_ROVER_SURFACE
-            | GROUP_MATERIAL;
+            | GROUP_MATERIAL
+            | GROUP_SUN;
         self.world.capsule_clearance_test_excluding(
             0.0,
             radius,
@@ -1203,8 +1207,10 @@ impl SpacewarsPhysics {
         collider.density = 0.0;
         collider.friction = 0.0;
         collider.restitution = PLANET_ELASTICITY;
-        collider.collision_groups =
-            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY);
+        collider.collision_groups = CollisionGroups::new(
+            GROUP_BODY | GROUP_SUN,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_SPACELING,
+        );
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -1585,7 +1591,8 @@ fn surface_ship_colliders(
     hull.collision_groups.filter = (hull.collision_groups.filter
         & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
         | GROUP_ROVER_SURFACE
-        | GROUP_MATERIAL;
+        | GROUP_MATERIAL
+        | GROUP_SUN;
     hull.solver_groups = hull.collision_groups;
     let groups = hull.collision_groups;
     if ship.form == ShipForm::Ship || pod_landing {

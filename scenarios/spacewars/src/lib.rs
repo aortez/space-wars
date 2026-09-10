@@ -1479,6 +1479,7 @@ impl SpacewarsScenario {
             pressure.record_contacts(state, &contacts);
         }
         resolve_physics_collisions(state, &contacts, &accepted_ports);
+        surface_sortie::solar::apply_damage(state, surface_pilots, dt);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
         surface_sortie::combat::record_hits(state, surface_pilots);

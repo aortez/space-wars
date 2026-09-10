@@ -10,6 +10,7 @@ mod motion_tests;
 mod multiplayer_tests;
 mod outpost_tests;
 mod recovery_tests;
+mod solar_tests;
 mod travel_tests;
 
 fn tick(state: &mut SurfaceSortieState, input: SurfaceSortieAction) {

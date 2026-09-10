@@ -1,7 +1,7 @@
 //! A world-level coordinator around the existing physical surface tasks.
 use crate::{
     BrainReset,
-    combat_pilot::{CombatIntent, RulePilotV4},
+    combat_pilot::{CombatIntent, CombatPilotTelemetry, RulePilotV4},
     flight_pilot::FlightIntent,
     recovery_task::{RecoverShipTask, RecoveryTelemetry, TaskStatus},
     shortest_heading_error,
@@ -10,7 +10,7 @@ use crate::{
 use engine_common::CombatBreakSettings;
 use engine_core::Vec2;
 use scenario_spacewars::{
-    ShipForm,
+    PlayerId, ShipForm,
     surface_sortie::{
         PilotLocation, SurfaceSortieAction,
         mission::MissionObservationV1,
@@ -19,7 +19,7 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v2";
+pub const MISSION_POLICY: &str = "material_mission_v3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +30,9 @@ pub enum MissionGoal {
     Capture,
     Recover,
     Patrol,
+    Hunt,
+    Watch,
+    AvoidSun,
     Blocked,
 }
 impl MissionGoal {
@@ -40,7 +43,10 @@ impl MissionGoal {
             Self::Transfer => "travelling to planet",
             Self::Capture => "landing and capture",
             Self::Recover => "recovering ship",
-            Self::Patrol => "patrol / planets secured",
+            Self::Patrol => "waiting to resume capture",
+            Self::Hunt => "hunting opponent",
+            Self::Watch => "following opponent / awaiting ship",
+            Self::AvoidSun => "escaping solar heat",
             Self::Blocked => "mission blocked",
         }
     }
@@ -69,6 +75,8 @@ pub struct MissionTelemetry {
     pub capture: Option<CaptureTelemetry>,
     pub recovery: Option<RecoveryTelemetry>,
     pub avoidance: Option<MissionAvoidance>,
+    pub opponent: Option<PlayerId>,
+    pub combat: Option<CombatPilotTelemetry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -99,6 +107,7 @@ pub struct MaterialMissionPilot {
     seen_losses: u64,
     last_frame: Option<usize>,
     pwm: f32,
+    escaping_sun: bool,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
 }
@@ -122,6 +131,8 @@ impl MaterialMissionPilot {
                 capture: None,
                 recovery: None,
                 avoidance: None,
+                opponent: None,
+                combat: None,
             },
             capture: None,
             recovery: None,
@@ -133,6 +144,7 @@ impl MaterialMissionPilot {
             seen_losses: 0,
             last_frame: None,
             pwm: 0.0,
+            escaping_sun: false,
             previous_tick: None,
             previous_intent: CombatIntent::default(),
         }
@@ -153,6 +165,8 @@ impl MaterialMissionPilot {
                 .recovery
                 .as_ref()
                 .map_or(self.telemetry.goal.label(), |r| r.label())
+        } else if let Some(combat) = &self.telemetry.combat {
+            combat.goal
         } else {
             self.telemetry.reason.unwrap_or(self.telemetry.goal.label())
         };
@@ -234,6 +248,9 @@ impl MaterialMissionPilot {
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
         self.telemetry.avoidance = None;
+        self.telemetry.opponent = None;
+        self.telemetry.combat = None;
+        self.telemetry.reason = None;
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         let losses = p.recovery.as_ref().map_or(0, |r| r.ships_lost);
@@ -250,6 +267,34 @@ impl MaterialMissionPilot {
             self.recovery = Some(RecoverShipTask::new(self.context));
         }
         self.seen_losses = losses;
+        if p.controls_armed
+            && p.ship_available
+            && p.location != PilotLocation::OnFoot
+            && let Some(sun) = o.sun
+        {
+            let radial = p.ship.position - sun.position;
+            let up = radial.normalized();
+            // A fast tangential pass can be safe even beside the inner planet.
+            // Predict closest approach instead of treating all nearby flight as
+            // an inward fall, and finish one escape before resuming the task.
+            let closest_time = (-radial.dot(p.ship.velocity)
+                / p.ship.velocity.length_squared().max(0.01))
+            .clamp(0.0, 2.0);
+            let closest = (radial + p.ship.velocity * closest_time).length();
+            if closest < sun.radius + 32.0 {
+                self.escaping_sun = true;
+            } else if radial.length() > sun.radius + 48.0 && p.ship.velocity.dot(up) >= 0.0 {
+                self.escaping_sun = false;
+            }
+            if self.escaping_sun {
+                self.goal(MissionGoal::AvoidSun, p.tick);
+                self.telemetry.avoidance = Some(MissionAvoidance {
+                    obstacle: MissionObstacleId::Sun,
+                    waypoint: sun.position + up * (sun.radius + 110.0),
+                });
+                return self.guide(o, up * 25.0);
+            }
+        }
         if let Some(recovery) = &mut self.recovery {
             let flight = recovery.step(&c.recovery);
             let status = recovery.telemetry().status;
@@ -326,11 +371,12 @@ impl MaterialMissionPilot {
                 self.best_distance = f32::INFINITY;
                 self.event(p.tick, "selected", None);
             } else {
-                self.goal(MissionGoal::Patrol, p.tick);
                 if o.planets.iter().any(|planet| !owned(planet)) {
+                    self.goal(MissionGoal::Patrol, p.tick);
                     self.telemetry.reason = Some("waiting before another landing attempt");
+                    return self.patrol.intent(c);
                 }
-                return self.patrol.intent(c);
+                return self.hunt(o);
             }
         }
         let target = o
@@ -401,50 +447,116 @@ impl MaterialMissionPilot {
             self.goal(MissionGoal::Transfer, p.tick);
             let entry = target.motion.position
                 + (p.ship.position - target.motion.position).normalized() * (target.radius + 85.0);
-            let mut waypoint = entry;
-            for (id, position, radius) in o
-                .planets
-                .iter()
-                .filter(|planet| planet.index != target.index)
-                .map(|planet| {
-                    (
-                        MissionObstacleId::Planet(planet.index),
-                        planet.motion.position,
-                        planet.radius,
-                    )
-                })
-                .chain(
-                    o.sun
-                        .map(|sun| (MissionObstacleId::Sun, sun.position, sun.radius)),
-                )
-            {
-                let delta = entry - p.ship.position;
-                let along = ((position - p.ship.position).dot(delta)
-                    / delta.length_squared().max(0.01))
-                .clamp(0.0, 1.0);
-                let clearance = position.distance_to(p.ship.position + delta * along);
-                if clearance < radius + 65.0 {
-                    let radial = (p.ship.position - position).normalized();
-                    let toward = (entry - position).normalized();
-                    let angle =
-                        (radial.x * toward.y - radial.y * toward.x).atan2(radial.dot(toward));
-                    let turn = if angle.abs() < 0.01 {
-                        0.5
-                    } else {
-                        angle.clamp(-0.5, 0.5)
-                    };
-                    waypoint = position + radial.rotate_radians(turn) * (radius + 105.0);
-                    self.telemetry.avoidance = Some(MissionAvoidance {
-                        obstacle: id,
-                        waypoint,
-                    });
-                    break;
-                }
-            }
+            let waypoint = self.route_waypoint(o, entry, Some(target.index));
             let delta = waypoint - p.ship.position;
             target.motion.velocity + delta.normalized() * (delta.length() * 0.7).min(55.0)
         };
         self.guide(o, desired)
+    }
+    fn hunt(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        let c = &o.local.combat;
+        let p = &c.recovery.flight.pilot;
+        let Some(opponent) = o.opponent else {
+            self.goal(MissionGoal::Watch, p.tick);
+            self.telemetry.reason = Some("waiting for opponent");
+            return self.patrol.intent(c);
+        };
+        self.telemetry.opponent = Some(opponent.owner);
+        self.goal(
+            if c.target.is_some() {
+                MissionGoal::Hunt
+            } else {
+                MissionGoal::Watch
+            },
+            p.tick,
+        );
+        let up = (p.ship.position - p.planet.motion.position).normalized();
+        let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
+        let relative = p.ship.velocity - p.planet.motion.velocity;
+        let falling = (-relative.dot(up)).max(0.0);
+        if altitude < 70.0 + falling * falling / 50.0 {
+            return self.guide(o, p.planet.motion.velocity + up * 18.0);
+        }
+        if let Some(target) = c.target
+            && !target.ground_occluded
+            && target.motion.position.distance_to(p.ship.position) < 250.0
+        {
+            let intent = self.patrol.intent(c);
+            self.telemetry.combat = Some(self.patrol.telemetry().clone());
+            return intent;
+        }
+        // Approach the opponent's actual world position, including their
+        // recovery location. Bounds reserve flight room; they never authorize fire.
+        let mut entry = opponent.motion.position + opponent.motion.velocity;
+        for (position, radius) in o
+            .planets
+            .iter()
+            .map(|planet| (planet.motion.position, planet.radius))
+            .chain(o.sun.map(|sun| (sun.position, sun.radius)))
+        {
+            if entry.distance_to(position) < radius + 110.0 {
+                let radial = entry - position;
+                let up = if radial.length() > 0.01 {
+                    radial.normalized()
+                } else {
+                    (p.ship.position - position).normalized()
+                };
+                entry = position + up * (radius + 110.0);
+            }
+        }
+        let waypoint = self.route_waypoint(o, entry, None);
+        let delta = waypoint - p.ship.position;
+        self.guide(
+            o,
+            opponent.motion.velocity + delta.normalized() * (delta.length() * 0.7).min(55.0),
+        )
+    }
+    fn route_waypoint(
+        &mut self,
+        o: &MissionObservationV1,
+        entry: Vec2,
+        destination: Option<usize>,
+    ) -> Vec2 {
+        let p = &o.local.combat.recovery.flight.pilot;
+        for (id, position, radius) in o
+            .planets
+            .iter()
+            .filter(|planet| Some(planet.index) != destination)
+            .map(|planet| {
+                (
+                    MissionObstacleId::Planet(planet.index),
+                    planet.motion.position,
+                    planet.radius,
+                )
+            })
+            .chain(
+                o.sun
+                    .map(|sun| (MissionObstacleId::Sun, sun.position, sun.radius)),
+            )
+        {
+            let delta = entry - p.ship.position;
+            let along = ((position - p.ship.position).dot(delta)
+                / delta.length_squared().max(0.01))
+            .clamp(0.0, 1.0);
+            let clearance = position.distance_to(p.ship.position + delta * along);
+            if clearance < radius + 65.0 {
+                let radial = (p.ship.position - position).normalized();
+                let toward = (entry - position).normalized();
+                let angle = (radial.x * toward.y - radial.y * toward.x).atan2(radial.dot(toward));
+                let turn = if angle.abs() < 0.01 {
+                    0.5
+                } else {
+                    angle.clamp(-0.5, 0.5)
+                };
+                let waypoint = position + radial.rotate_radians(turn) * (radius + 105.0);
+                self.telemetry.avoidance = Some(MissionAvoidance {
+                    obstacle: id,
+                    waypoint,
+                });
+                return waypoint;
+            }
+        }
+        entry
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
         let f = &o.local.combat.recovery.flight;

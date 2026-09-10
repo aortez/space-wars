@@ -1,5 +1,8 @@
 # Generated material arena
 
+Follow-up: [solar collisions, heat and post-capture pursuit](solar-hunt.md)
+fixes the sun's actor collision mask and adds world-level pursuit after capture.
+
 For the subsequent landing fixes and their separate measurements, see
 [landing on generated material planets](large-planet-landing.md). The validation
 below records the original `abd29ec` arena checkpoint.

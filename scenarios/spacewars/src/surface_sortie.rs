@@ -31,6 +31,7 @@ mod recovery;
 pub mod recovery_sensors;
 mod render;
 pub mod return_trial;
+pub(crate) mod solar;
 mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,
@@ -42,6 +43,7 @@ pub use motion::{SurfaceMotionMetrics, SurfaceMotionObservation, SurfaceMotionPr
 pub use outpost::{CaptureStatus, OutpostId, OutpostObservation, RepairStatus};
 pub use profiles::GeneratedSurfaceProfile;
 pub use recovery::{SurfaceRecoveryObservation, SurfaceRecoveryStatus};
+pub use solar::SolarExposure;
 #[cfg(test)]
 mod tests;
 
@@ -277,6 +279,7 @@ pub struct SurfaceSortieObservation {
     pub jumps: u64,
     pub ship_position: Vec2,
     pub ship_health: f32,
+    pub solar: Option<SolarExposure>,
     pub ship_available: bool,
     pub vehicle_form: ShipForm,
     pub recovery: Option<SurfaceRecoveryObservation>,
@@ -339,6 +342,7 @@ impl SurfaceSortieState {
             jumps: snapshot.map_or(0, |s| s.jumps),
             ship_position: ship.position,
             ship_health: ship.life,
+            solar: self.solar_exposure(player),
             ship_available: self.vehicle_available(player),
             vehicle_form: ship.form,
             recovery: self.pilots[player]

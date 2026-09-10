@@ -82,6 +82,7 @@ pub struct SurfaceDamageObservation {
     pub last_damage_percent: f32,
     pub last_ship_lost: bool,
     pub last_source: Option<&'static str>,
+    pub last_solar_damage_tick: Option<u64>,
     /// Physical debris contacts also count when a pod takes no health damage.
     pub debris_contacts: u64,
     pub last_contact_tick: Option<u64>,
@@ -374,6 +375,8 @@ impl SurfaceSortieState {
                 .and_then(|c| c.telemetry.last_hit_source);
             d.last_source = Some(if let Some(weapon) = weapon {
                 weapon
+            } else if d.last_solar_damage_tick == Some(self.world.tick) {
+                "solar heat"
             } else if asteroid {
                 "asteroid"
             } else if surface {

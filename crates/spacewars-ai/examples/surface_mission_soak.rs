@@ -4,7 +4,11 @@ use engine_common::{
 };
 use scenario_spacewars::{PlayerId, surface_sortie::SurfaceSortieScenario};
 use serde_json::json;
-use spacewars_ai::{BrainReset, combat_pilot::RulePilotV4, mission_pilot::MaterialMissionPilot};
+use spacewars_ai::{
+    BrainReset,
+    combat_pilot::RulePilotV4,
+    mission_pilot::{MaterialMissionPilot, MissionGoal},
+};
 use std::{
     collections::BTreeSet,
     fs,
@@ -34,12 +38,14 @@ fn main() {
     let frames = arg("--frames", "false") == "true";
     let trace = arg("--trace", "false") == "true";
     let require_route = arg("--require-route", "false") == "true";
+    let require_hunt = arg("--require-hunt", "false") == "true";
     let require_claim_recovery = arg("--require-claim-recovery", "false") == "true";
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     let world_kind = arg("--world", "fixed");
     assert!(seat < 2 && (1..=180).contains(&seconds));
-    assert!(["quiet", "intercept", "duel"].contains(&mode.as_str()));
+    assert!(["quiet", "intercept", "duel", "hunt"].contains(&mode.as_str()));
+    assert!(!require_hunt || mode == "hunt");
     assert!(["fixed", "generated"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
@@ -103,7 +109,9 @@ fn main() {
                 sensors.push(clock.elapsed().as_secs_f64() * 1000.0);
                 let clock = Instant::now();
                 let mut intent = pilots[i].intent(&o);
-                if mode == "quiet" {
+                if mode == "quiet"
+                    || mode == "hunt" && pilots[i].telemetry().goal != MissionGoal::Hunt
+                {
                     intent.weapons = Default::default();
                 }
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -202,7 +210,10 @@ fn main() {
             let observations = std::array::from_fn::<_, 2, _>(|i| {
                 state.pilot_observation(i, pilots[i].site_request())
             });
-            samples.push(json!({"second":(tick+1)/60,"pilots":observations,"missions":pilots.each_ref().map(|p|p.telemetry()),"planets":state.mission_observation(seat, None).planets,"audit":audit}));
+            samples.push(json!({"second":(tick+1)/60,"pilots":observations,"missions":pilots.each_ref().map(|p|p.telemetry()),"planets":state.mission_observation(seat, None).planets,"audit":audit,
+                "combat": [state.combat_telemetry(0), state.combat_telemetry(1)],
+                "damage": [state.damage_observation(0), state.damage_observation(1)],
+                "solar": [state.solar_exposure(0), state.solar_exposure(1)]}));
             if frames && ((tick + 1) / 60 == 1 || (tick + 1) % 1800 == 0) {
                 for i in 0..2 {
                     fs::write(
@@ -242,6 +253,13 @@ fn main() {
         json!({"physics_ok":report["physics_ok"],"distinct_departures":completed,"steps":report["steps"],"sensors":report["sensors"]})
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
+    if require_hunt {
+        let combat = state.combat_telemetry(seat);
+        assert!(
+            combat.cannon_hits > 0 || combat.laser_hit_ticks > 0,
+            "subject must secure all planets, pursue and land a real weapon hit"
+        );
+    }
     if require_route {
         assert_eq!(
             completed.len(),

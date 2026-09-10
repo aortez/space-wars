@@ -186,7 +186,7 @@ fn sun_and_intervening_owned_planet_are_flight_obstacles_not_destinations() {
         p.ship.position = Vec2::new(500.0, 500.0);
         p.ship.velocity = Vec2::ZERO;
         p.controls_armed = true;
-        let position = Vec2::new(560.0, 500.0);
+        let position = Vec2::new(590.0, 500.0);
         if sun {
             o.sun = Some(MissionObstacle {
                 position,
@@ -216,6 +216,164 @@ fn sun_and_intervening_owned_planet_are_flight_obstacles_not_destinations() {
             }
         );
         assert!((avoidance.waypoint.y - 500.0).abs() > 10.0);
+    }
+}
+
+#[test]
+fn secured_planets_trigger_pursuit_combat_recovery_tracking_and_recapture() {
+    use engine_core::Vec2;
+    use scenario_spacewars::surface_sortie::mission::MissionObstacle;
+    use spacewars_ai::mission_pilot::MissionObstacleId;
+    let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+    let mut o = state.mission_observation(0, None);
+    for planet in &mut o.planets {
+        planet.claim.as_mut().unwrap().owner = Some(context(0).actor);
+    }
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.ship.position = Vec2::new(500.0, 900.0);
+    p.ship.velocity = Vec2::ZERO;
+    p.controls_armed = true;
+    o.opponent.as_mut().unwrap().motion.position = Vec2::new(1000.0, 900.0);
+    o.local.combat.target.as_mut().unwrap().motion = o.opponent.unwrap().motion;
+    o.sun = Some(MissionObstacle {
+        position: Vec2::new(750.0, 900.0),
+        radius: 50.0,
+    });
+    let before = o.clone();
+    let intent = brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Hunt);
+    assert_eq!(brain.telemetry().opponent, Some(PlayerId::PLAYER_2));
+    assert_eq!(brain.telemetry().target, None);
+    assert_eq!(
+        brain.telemetry().avoidance.unwrap().obstacle,
+        MissionObstacleId::Sun
+    );
+    assert!(!intent.weapons.laser && !intent.weapons.cannon);
+    assert_eq!(o, before);
+    let telemetry = brain.telemetry().clone();
+    assert_eq!(brain.intent(&o), intent);
+    assert_eq!(brain.telemetry(), &telemetry);
+    let mut copy = brain.clone();
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    assert_eq!(brain.intent(&o), copy.intent(&o));
+    assert_eq!(brain.telemetry(), copy.telemetry());
+    // Visible occupied ship in range uses the shared weapons and break policy.
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    o.sun = None;
+    o.opponent.as_mut().unwrap().motion.position = Vec2::new(500.0, 1020.0);
+    let target = o.local.combat.target.as_mut().unwrap();
+    target.motion = o.opponent.unwrap().motion;
+    target.visible = true;
+    target.ground_occluded = false;
+    brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Hunt);
+    assert_eq!(
+        brain.telemetry().combat.as_ref().unwrap().goal,
+        "engage ship"
+    );
+    // An on-foot pilot or pod remains a navigation target, never a firing target.
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    o.local.combat.target = None;
+    let intent = brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Watch);
+    assert!(!intent.weapons.laser && !intent.weapons.cannon);
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    o.planets[1].claim.as_mut().unwrap().owner = None;
+    brain.intent(&o);
+    assert_eq!(brain.telemetry().target, Some(1));
+    assert_eq!(brain.telemetry().opponent, None);
+    assert_ne!(brain.telemetry().goal, MissionGoal::Hunt);
+}
+
+#[test]
+fn solar_escape_takes_priority_over_hunting_and_does_not_fire() {
+    use engine_core::Vec2;
+    use scenario_spacewars::surface_sortie::mission::MissionObstacle;
+    let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+    let mut o = state.mission_observation(0, None);
+    for planet in &mut o.planets {
+        planet.claim.as_mut().unwrap().owner = Some(context(0).actor);
+    }
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.ship.position = Vec2::new(500.0, 900.0);
+    p.ship.velocity = Vec2::new(0.0, -10.0);
+    p.controls_armed = true;
+    o.sun = Some(MissionObstacle {
+        position: Vec2::new(500.0, 830.0),
+        radius: 50.0,
+    });
+    let intent = brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::AvoidSun);
+    assert!(
+        brain.telemetry().avoidance.unwrap().waypoint.y
+            > o.local.combat.recovery.flight.pilot.ship.position.y
+    );
+    assert!(!intent.weapons.laser && !intent.weapons.cannon);
+    let telemetry = brain.telemetry().clone();
+    assert_eq!(brain.intent(&o), intent);
+    assert_eq!(brain.telemetry(), &telemetry);
+    let mut copy = brain.clone();
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    assert_eq!(brain.intent(&o), copy.intent(&o));
+    assert_eq!(brain.telemetry(), copy.telemetry());
+    // Finish the escape, then permit a nearby tangential pass safely outside heat.
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.ship.position = Vec2::new(500.0, 950.0);
+    p.ship.velocity = Vec2::Y * 10.0;
+    brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Hunt);
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.ship.position = Vec2::new(500.0, 925.0);
+    p.ship.velocity = Vec2::X * 55.0;
+    brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Hunt);
+}
+
+#[test]
+fn physical_mission_captures_then_finds_and_hits_the_opponent() {
+    for (seed, seat, mirror) in [(0, 0, false), (7, 0, true)] {
+        let actor = PlayerId::from_index(seat).unwrap();
+        let mut state = SurfaceSortieScenario::init_material_arena_trial(seed, mirror, 0.0);
+        let mut brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor,
+                episode_seed: seed,
+            },
+            CombatBreakSettings::default(),
+        );
+        let mut hunted = false;
+        for _ in 0..180 * 60 {
+            let o = state.mission_observation(seat, brain.site_request());
+            let mut intent = brain.intent(&o);
+            if brain.telemetry().goal != MissionGoal::Hunt {
+                intent.weapons = Default::default();
+            } else {
+                assert!(
+                    o.planets
+                        .iter()
+                        .all(|p| p.claim.as_ref().unwrap().owner == Some(actor))
+                );
+                hunted = true;
+            }
+            SurfaceSortieScenario::step(&mut state, &intent.encode(actor), DT);
+            let hits = state.combat_telemetry(seat);
+            if hits.cannon_hits > 0 || hits.laser_hit_ticks > 0 {
+                break;
+            }
+        }
+        let hits = state.combat_telemetry(seat);
+        assert!(
+            hunted && (hits.cannon_hits > 0 || hits.laser_hit_ticks > 0),
+            "seed {seed} seat {seat} mirror {mirror}: {:?} hits {hits:?}",
+            brain.telemetry()
+        );
+        assert!(state.terrain_diagnostics().issues.is_empty());
     }
 }
 

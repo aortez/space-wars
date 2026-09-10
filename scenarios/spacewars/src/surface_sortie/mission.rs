@@ -13,6 +13,15 @@ pub struct MissionObservationV1 {
     pub planets: Vec<PilotPlanetObservation>,
     /// A flight obstacle only; it never becomes a landing or claim destination.
     pub sun: Option<MissionObstacle>,
+    /// Actual opponent motion, including during on-foot or pod recovery.
+    /// Weapon eligibility remains in the local combat observation.
+    pub opponent: Option<MissionOpponent>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MissionOpponent {
+    pub owner: PlayerId,
+    pub motion: PilotMotion,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -228,6 +237,29 @@ impl SurfaceSortieState {
             sun: self.world.sun.map(|sun| MissionObstacle {
                 position: sun.position,
                 radius: sun.radius * BODY_BOUNDS_RADIUS_SCALE,
+            }),
+            opponent: self.pilots.iter().find_map(|other| {
+                if other.owner == self.pilots[player].owner {
+                    return None;
+                }
+                let body = if let Some(body) = &other.body {
+                    body.body()
+                } else {
+                    if self.world.ships[other.vehicle.0].dead {
+                        return None;
+                    }
+                    self.world.physics.ship_body(other.vehicle.0)
+                };
+                let motion = self.world.physics.world.motion(body)?;
+                Some(MissionOpponent {
+                    owner: other.owner,
+                    motion: PilotMotion {
+                        position: motion.position,
+                        velocity: motion.linear_velocity,
+                        angle: motion.angle,
+                        spin: motion.angular_velocity,
+                    },
+                })
             }),
         }
     }

@@ -1,5 +1,9 @@
 # Surface gameplay and destructible terrain integration
 
+Latest gameplay slice: [solar collisions and post-capture pursuit](../solar-hunt.md)
+fixes surface actors passing through the sun, adds heat, and sends the mission
+bot after its opponent once all planets are secured.
+
 Latest reliability slice: [parked ship return](../parked-ship-return.md) preserves
 earned two-foot contact on material corners and bounds waiting at an unsettled
 hatch. It retains the original boarding and physical recovery actions.
