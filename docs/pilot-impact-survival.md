@@ -1,8 +1,9 @@
 # Pilot impact survival
 
 This continues [match pacing](match-pacing.md) on `surface-terrain-integration`.
-The baseline is `905fed3` (runtime `86a56df`). It addresses missile knockback and
-one demonstrated jetpack steering error. Ordinary Spacewars promotion and
+The baseline is `905fed3` (runtime `86a56df`); this runtime is `7650fa9`.
+It addresses missile knockback and one demonstrated jetpack steering error.
+Ordinary Spacewars promotion and
 merging remain separate milestones.
 
 ## Collision response, not delayed braking
@@ -141,7 +142,15 @@ regression; the larger matrix is not an all-landings success claim. Resolving
 the retained case belongs with the parked pod-landing investigation, rather
 than restoring excessive projectile inertia to reproduce its former trajectory.
 
-Validation and device installation are recorded below when completed.
+All 1,151 workspace tests and ten example tests pass. The ten explicit rendered
+terrain UI workflows pass, together with formatting, Clippy (existing warnings),
+and the six navigation/twelve strategy baseline episodes. A valid off-planet
+combat screenshot initially failed the generic filled-terrain pixel threshold.
+The two free-flight combat workflows now accept their minimap/body scene pixels
+while still requiring the HUD; both affected workflows passed after that test
+correction. The original screenshot and failure are retained. Production
+rendering is unchanged by the test correction.
+
 The generated-world regression now checks capture, pursuit, actual weapon
 contact and ship-loss survival without requiring that particular encounter to
 finish in three minutes. The terminal client test uses a recorded lethal laser
@@ -160,6 +169,10 @@ counts and timing. `baseline-*-probes` retains the unchanged runtime diagnoses;
 the candidate matrix. Binary manifests retain source hashes and build recipes.
 `braking-comparison.json` and `braking-distance.png` show the tick-level brake
 comparison. The initial failing terminal-UI regression log is retained separately.
+All thirty remote Pi reports were copied and checksum-verified. The complete
+manifest contains 81 reports including the diagnostic/control experiments and
+retained landing regression. Four final-runner replays reproduce the candidate
+round records and final physical audits exactly (two desktop and two Pi).
 
 ## Reproduce and investigate further
 
@@ -195,3 +208,40 @@ and compare ordinary controls before changing damage thresholds. Keep the
 broader [landing investigation guide](landing-investigation-guide.md) parked
 independently. The next integration milestone is still promoting the combined
 loop into ordinary Spacewars, followed by representative match playtesting.
+
+## Verified Pi installation and display check
+
+Runtime `7650fa9` was installed on `spacewars.local` through the A/B updater.
+The Pi booted slot B (`/dev/sda3`); the installed client checksum matches the
+client extracted from the archived image. The kiosk remained active with zero
+service restarts.
+
+```text
+image  2fa4688d43dd4c7e0f17c457e445a69311362dadcd13282c10ffd5054e97d1d1
+client dc1c8c572216d7699cfa852de4858c218dd3065e2abd24e9486c7eb6a8462f86
+```
+
+The rendered arena duel used Mixed asteroids every three seconds and raster
+scale 2 on the actual 800×480 display. All four screenshots were inspected.
+Capture completion times include screenshot/transfer overhead and any delay
+before requesting the capture; they are not relabeled as exact simulation times.
+
+| Nominal capture | Actual completion | FPS | UPS | Updates |
+| --- | --- | --- | --- | --- |
+| 45s | 45.87s | 49.2 | 60.1 | 2725 |
+| 90s | 90.90s | 57.1 | 60.0 | 5389 |
+| 135s | 151.05s | 53.7 | 59.7 | 9025 |
+| 180s | 180.88s | 47.4 | 60.2 | 10839 |
+
+The third capture shows P2 alive on foot at 100 health after losing its ship
+and landing its pod. At the final capture P2 remains alive on foot at 82 health;
+P1 is still attempting a landing. The round remains active. This is evidence
+of continued survival and recovery, not a completed match or proof that the
+remaining landing stalls are solved. Display FPS remains below the 60-Hz target
+in these views, while simulation updates stay around 60/s.
+
+The device was then reset to a fresh paused human-P1/bot-P2 arena, with Mixed
+asteroids every eight seconds for controller playtesting. `pi-ready.png` and
+`pi-ready-state.json` retain the final handoff. The final screenshot was inspected:
+both pilots and ships have full health, and Start resumes the match. The later
+UI-test/report checkpoint does not change the deployed runtime.

@@ -108,7 +108,22 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 TRANSITION_TIMEOUT,
             );
             assert!(!state.benchmark_active);
-            wait_for_terrain_frame(harness, &format!("{scenario}-{renderer}.png"));
+            // A flying combat camera can legitimately leave the planet off
+            // screen, especially after a ship loss. Its minimap and bodies
+            // still provide scene pixels; a large filled planet is optional.
+            let minimum_scene_pixels = if matches!(
+                scenario,
+                "spacewars-terrain-combat" | "spacewars-terrain-duel"
+            ) {
+                1_500
+            } else {
+                20_000
+            };
+            wait_for_terrain_frame(
+                harness,
+                &format!("{scenario}-{renderer}.png"),
+                minimum_scene_pixels,
+            );
             let first_instance = state.scenario_revision;
             let pause = harness.pause_guarded(&state);
             state = harness.wait_for(
@@ -155,13 +170,17 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
     });
 }
 
-fn wait_for_terrain_frame(harness: &mut FunctionalHarness, name: &str) {
+fn wait_for_terrain_frame(
+    harness: &mut FunctionalHarness,
+    name: &str,
+    minimum_scene_pixels: usize,
+) {
     // UI state can be published before the matching frame is presented.
     let deadline = Instant::now() + TRANSITION_TIMEOUT;
     loop {
         let path = harness.capture_screenshot(name);
         let (terrain_pixels, text_pixels) = terrain_pixel_counts(&path);
-        if terrain_pixels > 20_000 && text_pixels > 150 {
+        if terrain_pixels > minimum_scene_pixels && text_pixels > 150 {
             return;
         }
         assert!(
