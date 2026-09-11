@@ -13,6 +13,15 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
             ("rule bot", "human", "raster"),
         ] {
             state = harness.activate_guarded("launcher.settings", &state);
+            assert_eq!(
+                state
+                    .controls
+                    .iter()
+                    .find(|c| c.id == "launcher.settings.start")
+                    .unwrap()
+                    .label,
+                "Play World"
+            );
             assert!(!control_ids(&state).contains(&"launcher.settings.spacewars.preset.next"));
             assert!(!control_ids(&state).contains(&"launcher.settings.combat.mission.next"));
             for (control, expected) in [

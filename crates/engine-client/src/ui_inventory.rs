@@ -534,7 +534,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
     controls.push(UiControl::new("launcher.settings.back", "Back", true));
     controls.push(UiControl::new(
         "launcher.settings.start",
-        "Start Game",
+        if context.selected_scenario == "spacewars" {
+            "Play World"
+        } else {
+            "Start Game"
+        },
         context.launch_available,
     ));
 
@@ -561,7 +565,11 @@ fn launcher_controls_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.controls.touch-test", "Touch Test", true),
             UiControl::new(
                 "launcher.controls.start",
-                "Start Game",
+                if context.selected_scenario == "spacewars" {
+                    "Play World"
+                } else {
+                    "Start Game"
+                },
                 context.launch_available,
             ),
         ],
