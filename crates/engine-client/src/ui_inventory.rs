@@ -6,6 +6,7 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 pub(crate) struct ScreenVisibility {
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
+    pub(crate) device_info: bool,
     pub(crate) launcher: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
@@ -22,7 +23,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound {
+        if visibility.sound && visibility.device_info {
+            UiScreen::LauncherInfo
+        } else if visibility.sound {
             UiScreen::LauncherSound
         } else if visibility.launcher_controls {
             UiScreen::LauncherControls
@@ -33,6 +36,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound && visibility.device_info {
+        UiScreen::PauseInfo
     } else if visibility.ingame_menu && visibility.sound {
         UiScreen::PauseSound
     } else if visibility.ingame_menu && visibility.ingame_clock {
@@ -48,6 +53,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) device_info_controls: Vec<UiControl>,
     pub(crate) launcher_busy_stage: String,
     pub(crate) launcher_busy_elapsed: String,
     pub(crate) sound_focus_index: i32,
@@ -122,6 +128,12 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::LauncherMain => launcher_main_inventory(context),
         UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
+        UiScreen::LauncherInfo | UiScreen::PauseInfo => UiInventory {
+            selected_control: Some("info.back".into()),
+            controls: context.device_info_controls.clone(),
+            actions: UiAction::ALL.to_vec(),
+            error: None,
+        },
         UiScreen::LauncherSettings => launcher_settings_inventory(context),
         UiScreen::LauncherControls => launcher_controls_inventory(context),
         UiScreen::LauncherTouchTest => UiInventory {
@@ -235,9 +247,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.scenario.next", "›", true)
                 .with_value(context.selected_scenario.clone()),
             if material_match {
-                world_control("launcher.start", "Play World", "Start Game", context)
+                world_control("launcher.start", "Play", "Play", context)
             } else {
-                UiControl::new("launcher.start", "Start Game", context.launch_available)
+                UiControl::new("launcher.start", "Play", context.launch_available)
             },
             UiControl::new("launcher.settings", "Scenario Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
@@ -256,11 +268,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
         error: context.launcher_error.clone(),
     };
     if material_match {
-        inventory.controls.push(UiControl::new(
-            "launcher.new-match",
-            "New Match · New World",
-            true,
-        ));
+        inventory
+            .controls
+            .push(UiControl::new("launcher.new-match", "Play New World", true));
         if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
@@ -684,11 +694,12 @@ fn push_choice(controls: &mut Vec<UiControl>, id: &str, value: &str) {
 
 fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     let mut controls = Vec::new();
-    push_choice(
-        &mut controls,
-        "sound.volume",
-        &format!("{}%", context.sound_volume_percent),
-    );
+    for (id, label) in [("sound.volume.previous", "-"), ("sound.volume.next", "+")] {
+        controls.push(
+            UiControl::new(id, label, true)
+                .with_value(format!("{}%", context.sound_volume_percent)),
+        );
+    }
     controls.push(
         UiControl::new("sound.mute", "Mute", true).with_value(if context.sound_muted {
             "on"
@@ -705,11 +716,13 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
             },
         ),
     );
+    controls.push(UiControl::new("settings.device-info", "Device Info", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
         "sound.mute",
         "settings.fps-counter",
+        "settings.device-info",
         "sound.back",
     ];
     if context.settings_save_error.is_some() {
@@ -965,6 +978,26 @@ mod tests {
 
     #[test]
     fn classification_uses_visible_layer_order() {
+        for (launcher, expected) in [(true, UiScreen::LauncherInfo), (false, UiScreen::PauseInfo)] {
+            assert_eq!(
+                classify_screen(ScreenVisibility {
+                    launcher,
+                    sound: true,
+                    device_info: true,
+                    ingame_menu: !launcher,
+                    ..Default::default()
+                }),
+                expected
+            );
+        }
+        assert_eq!(
+            classify_screen(ScreenVisibility {
+                device_info: true,
+                ..Default::default()
+            }),
+            UiScreen::Gameplay,
+            "a stale child flag alone must not hide gameplay"
+        );
         assert_eq!(
             classify_screen(ScreenVisibility {
                 launcher_busy: true,
@@ -979,6 +1012,7 @@ mod tests {
             classify_screen(ScreenVisibility {
                 launcher_busy: false,
                 sound: false,
+                device_info: false,
                 launcher: true,
                 launcher_controls: true,
                 launcher_settings: true,

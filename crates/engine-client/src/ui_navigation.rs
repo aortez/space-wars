@@ -10,25 +10,26 @@ pub(crate) fn moved_selection(current: i32, item_count: i32, delta: i32) -> i32 
 }
 
 pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
-    // Scenario, [Start, Settings], [Controls, Sound, Quit]. Keep old IDs stable.
+    // Scenario, Play, [Settings, Controls, App Settings], Quit footer.
+    // Keep old control indices stable even though their layout has changed.
     let current = current.clamp(0, 5);
     match action {
-        UiAction::Up => [3, 0, 0, 1, 2, 1][current as usize],
-        UiAction::Down => [1, 3, 4, 0, 0, 0][current as usize],
-        UiAction::Left => [0, 2, 1, 4, 5, 3][current as usize],
-        UiAction::Right => [0, 2, 1, 5, 3, 4][current as usize],
+        UiAction::Up => [4, 0, 1, 1, 2, 1][current as usize],
+        UiAction::Down => [1, 2, 4, 4, 0, 4][current as usize],
+        UiAction::Left => [0, 1, 5, 2, 4, 3][current as usize],
+        UiAction::Right => [0, 1, 3, 5, 4, 2][current as usize],
         _ => current,
     }
 }
 
-/// World actions occupy the first row; Settings, Controls, Sound and Quit the second.
+/// The same layout adds Play New World beside Play; Quit stays in the footer.
 pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> i32 {
     let current = current.clamp(0, 6) as usize;
     match action {
-        UiAction::Up => [2, 0, 1, 1, 6, 6, 0][current],
-        UiAction::Down => [1, 2, 0, 0, 0, 0, 4][current],
-        UiAction::Left => [0, 6, 4, 2, 5, 3, 1][current],
-        UiAction::Right => [0, 6, 3, 5, 2, 4, 1][current],
+        UiAction::Up => [4, 0, 1, 1, 2, 6, 0][current],
+        UiAction::Down => [1, 2, 4, 4, 0, 4, 5][current],
+        UiAction::Left => [0, 6, 5, 2, 4, 3, 1][current],
+        UiAction::Right => [0, 6, 3, 5, 4, 2, 1][current],
         _ => current as i32,
     }
 }
@@ -120,11 +121,18 @@ mod tests {
     #[test]
     fn launcher_navigation_matches_the_visible_grid() {
         assert_eq!(moved_launcher_selection(0, UiAction::Down), 1);
-        assert_eq!(moved_launcher_selection(1, UiAction::Right), 2);
+        assert_eq!(moved_launcher_selection(1, UiAction::Down), 2);
+        assert_eq!(moved_launcher_selection(2, UiAction::Right), 3);
+        assert_eq!(moved_launcher_selection(3, UiAction::Right), 5);
+        assert_eq!(moved_launcher_selection(5, UiAction::Right), 2);
         assert_eq!(moved_launcher_selection(2, UiAction::Down), 4);
-        assert_eq!(moved_launcher_selection(4, UiAction::Left), 5);
+        assert_eq!(moved_launcher_selection(4, UiAction::Down), 0);
         assert_eq!(moved_launcher_selection(5, UiAction::Left), 3);
-        assert_eq!(moved_launcher_selection(3, UiAction::Down), 0);
+        assert_eq!(moved_match_launcher_selection(1, UiAction::Right), 6);
+        assert_eq!(moved_match_launcher_selection(6, UiAction::Down), 5);
+        assert_eq!(moved_match_launcher_selection(5, UiAction::Down), 4);
+        assert_eq!(moved_match_launcher_selection(4, UiAction::Up), 2);
+        assert_eq!(moved_match_launcher_selection(6, UiAction::Left), 1);
     }
 
     #[test]

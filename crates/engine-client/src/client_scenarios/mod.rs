@@ -202,6 +202,27 @@ type ScenarioFactory = fn(
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError>;
 
 impl ScenarioRegistration {
+    /// Presentation only: saved scenario IDs and control API values stay stable.
+    pub fn display_name(&self) -> String {
+        if self.id == "nes" {
+            return "NES Library".into();
+        }
+        self.id
+            .split('-')
+            .map(|word| match word {
+                "spacewars" => "Space-Wars".into(),
+                "ai" => "AI".into(),
+                _ => {
+                    let mut chars = word.chars();
+                    chars.next().map_or_else(String::new, |first| {
+                        first.to_uppercase().to_string() + chars.as_str()
+                    })
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+
     #[cfg(test)]
     pub fn create(
         &'static self,
@@ -429,6 +450,21 @@ pub fn launcher_registrations() -> impl Iterator<Item = &'static ScenarioRegistr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn launcher_labels_are_friendly_without_changing_scenario_ids() {
+        for (id, title) in [
+            ("spacewars", "Space-Wars"),
+            ("spacewars-classic", "Space-Wars Classic"),
+            ("nes", "NES Library"),
+            ("rover-lab", "Rover Lab"),
+            ("spacewars-terrain-ai", "Space-Wars Terrain AI"),
+        ] {
+            let registration = registration(id).unwrap();
+            assert_eq!(registration.id, id);
+            assert_eq!(registration.display_name(), title);
+        }
+    }
 
     fn missing_asset_factory(
         _seed: u64,

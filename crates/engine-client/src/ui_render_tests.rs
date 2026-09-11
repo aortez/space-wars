@@ -34,11 +34,17 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_scenario_error_text("".into());
     ui.set_touch_test_visible(false);
     ui.set_sound_visible(false);
+    ui.set_settings_save_error("".into());
+    ui.set_settings_save_pending(false);
+    ui.set_sound_focus_index(0);
+    ui.set_device_info_visible(false);
     ui.set_performance_overlay_enabled(false);
     ui.set_performance_overlay_text("".into());
     ui.set_launcher_busy(false);
     ui.set_spacewars_ui_visible(false);
     ui.set_launcher_scenario("clock".into());
+    ui.set_launcher_scenario_title("Clock".into());
+    ui.set_launcher_focus_index(0);
 }
 
 #[test]
@@ -60,6 +66,24 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ui.set_clock_event_labels(Rc::new(slint::VecModel::from(vec!["Falling".into()])).into());
         ui.set_scenario_controls_help("Move with the joystick. A selects. B goes back.".into());
         ui.set_sound_volume_percent(5);
+        ui.set_device_info_ready(true);
+        ui.set_device_info_rows(slint::ModelRc::new(slint::VecModel::from(vec![
+            crate::DeviceInfoRow {
+                id: "info.hostname".into(),
+                label: "Device · Hostname".into(),
+                value: "sw-picade-2".into(),
+            },
+            crate::DeviceInfoRow {
+                id: "info.addresses".into(),
+                label: "Network · Local addresses".into(),
+                value: "wlan0: 192.168.1.142\nwlan0: fe80::1234:5678:abcd:ef12".into(),
+            },
+            crate::DeviceInfoRow {
+                id: "info.controllers".into(),
+                label: "Controllers · Current player assignments".into(),
+                value: "Space-Wars Picade · Player 1\nMicrosoft X-Box 360 pad · Player 2".into(),
+            },
+        ])));
         ui.set_p1_name("Player 1".into());
         ui.set_p1_status("Ship Health: 80%".into());
         ui.set_p1_status_fraction(0.8);
@@ -88,6 +112,22 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
         }),
         ("launcher", |ui| ui.set_launcher_visible(true)),
+        ("launcher-confirmed", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_focus_index(1);
+        }),
+        ("launcher-spacewars", |ui| {
+            ui.set_launcher_scenario("spacewars".into());
+            ui.set_launcher_scenario_title("Space-Wars".into());
+            ui.set_launcher_seed_text(u64::MAX.to_string().into());
+            ui.set_launcher_p2_controller("rule bot".into());
+            ui.set_launcher_visible(true);
+        }),
+        ("launcher-long-title", |ui| {
+            ui.set_launcher_scenario("spacewars-terrain-travel-duel".into());
+            ui.set_launcher_scenario_title("Space-Wars Terrain Travel Duel".into());
+            ui.set_launcher_visible(true);
+        }),
         ("launcher-settings", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_settings_visible(true);
@@ -105,6 +145,17 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
         }),
+        ("launcher-info", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_device_info_visible(true);
+        }),
+        ("launcher-sound-save-error", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_settings_save_error("Storage is not writable".into());
+            ui.set_sound_focus_index(5);
+        }),
         ("busy", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_busy(true);
@@ -121,6 +172,11 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ("pause-sound", |ui| {
             ui.set_ingame_menu_visible(true);
             ui.set_sound_visible(true);
+        }),
+        ("pause-info", |ui| {
+            ui.set_ingame_menu_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_device_info_visible(true);
         }),
         ("disconnected", |ui| {
             ui.set_controller_disconnected_visible(true)
@@ -142,7 +198,7 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
     ];
     // Keep both trees alive across transitions and a resize. The first buffer
     // preserves old pixels; the reference repaints the entire window every time.
-    for (width, height) in [(800, 480), (480, 800)] {
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         for window in windows.iter() {
             window.set_size(PhysicalSize::new(width, height));
         }

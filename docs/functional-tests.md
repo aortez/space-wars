@@ -56,6 +56,13 @@ tests use explicit channel gates, not storage-speed expectations, to verify
 ordered, coalesced saves and that an old completion cannot acknowledge a newer
 pending snapshot.
 
+The Device Info workflow opens the same read-only panel from launcher and pause,
+waits for a completed sample, scrolls through the public API, and verifies that
+Back restores the parent selection without resuming or replacing the scenario.
+Start explicitly resumes. Navigation guards the screen rather than a transient
+telemetry revision; CPU/network sampling must not introduce timing-sensitive
+test failures. Render tests include the Info panel at 800×480 and 480×800.
+
 Short negative Clock waits check that a paused event does not advance; they
 are not response-latency requirements. A timeout may have no snapshot if no
 reply arrived before its deadline. The UI workflows compare any returned

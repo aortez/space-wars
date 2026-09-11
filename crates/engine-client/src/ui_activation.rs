@@ -13,6 +13,7 @@ enum ActivationFocus {
     PauseMain(i32),
     PauseSound,
     Sound(i32),
+    DeviceInfo,
     PauseControls,
     PauseClock(i32),
     GameOver(i32),
@@ -44,8 +45,10 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::LauncherControls(index) => {
             window.set_launcher_controls_focus_index(index);
         }
-        ActivationFocus::TouchTest | ActivationFocus::PauseControls | ActivationFocus::Gameplay => {
-        }
+        ActivationFocus::TouchTest
+        | ActivationFocus::PauseControls
+        | ActivationFocus::Gameplay
+        | ActivationFocus::DeviceInfo => {}
         ActivationFocus::PauseMain(index) => window.set_ingame_menu_focus_index(index),
         ActivationFocus::PauseSound => window.set_ingame_menu_focus_index(
             4 + i32::from(
@@ -95,8 +98,21 @@ fn activation_target(
         "sound.volume.next" => sound(0, UiAction::Right),
         "sound.mute" => sound(1, UiAction::Confirm),
         "settings.fps-counter" => sound(2, UiAction::Confirm),
-        "sound.back" => sound(3, UiAction::Confirm),
-        "sound.retry" => sound(4, UiAction::Confirm),
+        "settings.device-info" => sound(3, UiAction::Confirm),
+        "sound.back" => sound(4, UiAction::Confirm),
+        "sound.retry" => sound(5, UiAction::Confirm),
+        "info.back" => ActivationTarget {
+            focus: ActivationFocus::DeviceInfo,
+            action: UiAction::Back,
+        },
+        "info.scroll-up" => ActivationTarget {
+            focus: ActivationFocus::DeviceInfo,
+            action: UiAction::Up,
+        },
+        "info.scroll-down" => ActivationTarget {
+            focus: ActivationFocus::DeviceInfo,
+            action: UiAction::Down,
+        },
         "launcher.settings.back" => launcher_settings(None, UiAction::Back),
         "launcher.settings.start" => launcher_settings(None, UiAction::Start),
         "launcher.controls.back" => launcher_controls(0),

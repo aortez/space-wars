@@ -864,6 +864,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let screen = classify_screen(ScreenVisibility {
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
+        device_info: window.get_device_info_visible(),
         launcher: window.get_launcher_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
@@ -878,6 +879,12 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            device_info_controls: if matches!(screen, UiScreen::LauncherInfo | UiScreen::PauseInfo)
+            {
+                crate::device_info::inventory(window)
+            } else {
+                Vec::new()
+            },
             launcher_busy_stage: window.get_launcher_busy_stage().to_string(),
             launcher_busy_elapsed: window.get_launcher_busy_elapsed().to_string(),
             sound_focus_index: window.get_sound_focus_index(),
