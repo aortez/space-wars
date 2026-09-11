@@ -1,5 +1,9 @@
 # Landing near the capture objective
 
+The deferred failures have a [resumption guide](landing-investigation-guide.md)
+with exact cases, commands, evidence paths, rejected hypotheses and regression
+checks. Work is moving to complete material matches.
+
 This slice builds on [usable landings](usable-landings.md). It selects a landing
 with a measured round trip to an existing enemy flag and gives a cramped
 spaceling a bounded way to resume recovery. Ordinary-match outcomes and promotion

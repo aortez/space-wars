@@ -4,7 +4,8 @@ Historical investigation on 2026-09-10 against implementation `5a090b1`,
 documented at `25fbe2b`. The findings below describe that checkpoint. The first
 implementation chunk is now covered by [usable landings](usable-landings.md);
 [objective landing selection](objective-landings.md) now has a bounded first implementation.
-Prospective jetpack access, damaged approaches and the match lifecycle remain work.
+Prospective jetpack access and damaged approaches are [parked with reproduction
+notes](landing-investigation-guide.md). The current priority is the match lifecycle.
 The source review and archived desktop/Pi traces add detail to the
 [mission reliability results](mission-reliability.md).
 
@@ -131,9 +132,10 @@ play even after losing their full ship and every owned planet. They can claim
 or reclaim ground and rebuild through the ordinary mechanics. Asset loss
 alone must not declare defeat.
 
-The next design must specify how a surviving pilot can finally be defeated:
-damage/death rules, any respawn entitlement, and simultaneous
-elimination. The current combat sensor targets only occupied full ships;
+The user also confirmed that spaceling death ends that player's round, even
+when they still own a planet. There is no flag-based respawn. The first match
+slice must define pilot damage and simultaneous elimination around that rule.
+The current combat sensor targets only occupied full ships;
 mission observation can follow pods and spacelings, but the bot waits for an
 aerial target. Survivor combat therefore needs explicit target eligibility,
 damage, AI behavior and recovery transitions, as well as a winner screen.
@@ -148,7 +150,7 @@ Acceptance must include occupied ship loss with no owned planets, empty ship
 loss with a living external spaceling, and destruction of the last owned flag
 during recovery. Each survivor remains active and can claim/reclaim, rebuild,
 board and rejoin combat using ordinary actions. Terminal-defeat tests depend
-on the remaining pilot damage/death design.
+on the pilot damage model; owned flags cannot reverse a pilot's death.
 
 The final promotion makes this material lifecycle the ordinary playable
 Spacewars path, retaining the focused labs and historical evaluation baselines.
