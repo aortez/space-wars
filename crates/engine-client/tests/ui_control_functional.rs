@@ -26,6 +26,9 @@ const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
 #[path = "ui_control_functional/clock.rs"]
 mod clock;
 
+#[path = "ui_control_functional/sound.rs"]
+mod sound;
+
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 
@@ -52,6 +55,7 @@ fn launcher_navigation_uses_the_public_control_api() {
             UiAction::Down,
             UiAction::Left,
             UiAction::Left,
+            UiAction::Left,
             UiAction::Down,
         ] {
             state = harness.press_guarded(action, &state);
@@ -64,6 +68,7 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.quit".into(),
                 "launcher.scenario".into(),
                 "launcher.settings".into(),
+                "launcher.sound".into(),
                 "launcher.start".into(),
                 "launcher.new-match".into(),
             ])
@@ -216,7 +221,14 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
         harness.capture_screenshot("clock-launcher.png");
 
         let launch_revision = state.revision;
-        harness.activate_guarded("launcher.start", &state);
+        let opening = harness.activate_guarded("launcher.start", &state);
+        assert_eq!(opening.screen, UiScreen::LauncherBusy);
+        assert!(opening.active_scenario.is_none());
+        assert!(opening.actions.is_empty());
+        assert_eq!(
+            control_value(&opening, "launcher.busy.stage"),
+            Some("preparing")
+        );
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
@@ -251,6 +263,7 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
                 "pause.controls",
                 "pause.return-to-launcher",
                 "pause.clock",
+                "pause.sound",
             ]
         );
 
@@ -342,6 +355,7 @@ fn launcher_can_run_the_classic_spacewars_menu_lifecycle() {
                 "pause.benchmark",
                 "pause.controls",
                 "pause.return-to-launcher",
+                "pause.sound",
             ]
         );
         harness.capture_screenshot("pause.png");
@@ -1081,6 +1095,7 @@ fn assert_launcher_main(state: &UiState) {
             "launcher.start",
             "launcher.settings",
             "launcher.controls",
+            "launcher.sound",
             "launcher.quit",
             "launcher.new-match",
         ]

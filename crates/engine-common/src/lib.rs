@@ -10,8 +10,10 @@ use serde::{
     de::{IgnoredAny, MapAccess, SeqAccess, Visitor},
 };
 
+mod clock_message;
 pub mod render;
 
+pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
 pub use render::*;
 
 pub const DEFAULT_CONTROL_SOCKET: &str = "/tmp/spacewars-control.sock";
@@ -245,7 +247,7 @@ impl Default for VideoSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AudioSettings {
     pub master_volume: f32,
@@ -255,8 +257,21 @@ pub struct AudioSettings {
 impl Default for AudioSettings {
     fn default() -> Self {
         Self {
-            master_volume: 0.8,
+            master_volume: 0.25,
             muted: false,
+        }
+    }
+}
+
+impl AudioSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            master_volume: if self.master_volume.is_finite() {
+                self.master_volume.clamp(0.0, 1.0)
+            } else {
+                Self::default().master_volume
+            },
+            ..self
         }
     }
 }
@@ -289,6 +304,99 @@ pub struct ClockSettings {
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
+    pub marquee_preset: ClockMarqueePreset,
+    pub marquee_message: ClockMarqueeMessage,
+}
+
+/// Bounded recipes, not separate scheduler events. The choice is captured when
+/// Marquee starts; changing it does not interrupt an animation already playing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockMarqueePreset {
+    ClockChase = 0,
+    #[default]
+    ClockWave = 1,
+    ClockSpin = 2,
+    DigitSpin = 3,
+    TextScroll = 4,
+    TextRibbon = 5,
+    TextSpin = 6,
+}
+
+impl ClockMarqueePreset {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ClockChase => "clock-chase",
+            Self::ClockWave => "clock-wave",
+            Self::ClockSpin => "clock-spin",
+            Self::DigitSpin => "digit-spin",
+            Self::TextScroll => "text-scroll",
+            Self::TextRibbon => "text-ribbon",
+            Self::TextSpin => "text-spin",
+        }
+    }
+
+    pub const ALL: [Self; 7] = [
+        Self::ClockChase,
+        Self::ClockWave,
+        Self::ClockSpin,
+        Self::DigitSpin,
+        Self::TextScroll,
+        Self::TextRibbon,
+        Self::TextSpin,
+    ];
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::ClockChase => "Clock chase",
+            Self::ClockWave => "Clock wave",
+            Self::ClockSpin => "Clock spin",
+            Self::DigitSpin => "Digit spin",
+            Self::TextScroll => "Text scroll",
+            Self::TextRibbon => "Text ribbon",
+            Self::TextSpin => "Text spin",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMarqueeState {
+    pub preset: ClockMarqueePreset,
+    pub content: String,
+    pub cell_count: usize,
+    pub group_count: usize,
+    pub progress_milli: u32,
+    pub scrolling: bool,
+    pub waving: bool,
+    pub rotation_target: Option<String>,
+    pub lighting: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockEventTrigger {
+    Periodic,
+    TimeChange,
+}
+
+impl ClockEventTrigger {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Periodic => "periodic",
+            Self::TimeChange => "time-change",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDigitSlideState {
+    pub from_digits: [Option<u8>; 4],
+    pub to_digits: [Option<u8>; 4],
+    pub changed_slots: [bool; 4],
+    pub progress_milli: u32,
+    /// Manual previews roll the current digits, without fabricating a reading.
+    pub preview: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -297,15 +405,30 @@ pub struct ClockSettings {
 pub enum ClockEventKind {
     Falling = 0,
     ColorCycle = 1,
+    Meltdown = 2,
+    Duck = 3,
+    Marquee = 4,
+    DigitSlide = 5,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 2] = [Self::Falling, Self::ColorCycle];
+    pub const ALL: [Self; 6] = [
+        Self::Falling,
+        Self::ColorCycle,
+        Self::Meltdown,
+        Self::Duck,
+        Self::Marquee,
+        Self::DigitSlide,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Falling => "falling",
             Self::ColorCycle => "color-cycle",
+            Self::Meltdown => "meltdown",
+            Self::Duck => "duck",
+            Self::Marquee => "marquee",
+            Self::DigitSlide => "digit-slide",
         }
     }
 
@@ -313,6 +436,10 @@ impl ClockEventKind {
         match self {
             Self::Falling => "Falling",
             Self::ColorCycle => "Color Cycle",
+            Self::Meltdown => "Meltdown",
+            Self::Duck => "Duck",
+            Self::Marquee => "Marquee",
+            Self::DigitSlide => "Digit Slide",
         }
     }
 }
@@ -323,6 +450,10 @@ impl ClockEventKind {
 pub struct ClockEvents {
     pub falling: bool,
     pub color_cycle: bool,
+    pub meltdown: bool,
+    pub duck: bool,
+    pub marquee: bool,
+    pub digit_slide: bool,
 }
 
 impl Default for ClockEvents {
@@ -330,6 +461,10 @@ impl Default for ClockEvents {
         Self {
             falling: true,
             color_cycle: true,
+            meltdown: true,
+            duck: true,
+            marquee: true,
+            digit_slide: true,
         }
     }
 }
@@ -339,8 +474,49 @@ impl ClockEvents {
         match kind {
             ClockEventKind::Falling => self.falling,
             ClockEventKind::ColorCycle => self.color_cycle,
+            ClockEventKind::Meltdown => self.meltdown,
+            ClockEventKind::Duck => self.duck,
+            ClockEventKind::Marquee => self.marquee,
+            ClockEventKind::DigitSlide => self.digit_slide,
         }
     }
+}
+
+/// Bounded Clock-local material, not Rapier bodies. One original square is
+/// 1,000,000 volume units. Rounding each aggregate can differ by one unit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockMeltdownState {
+    pub initial_cells: usize,
+    pub waiting_cells: usize,
+    pub airborne_cells: usize,
+    pub water_columns: usize,
+    pub pooled_microunits: u64,
+    pub drained_microunits: u64,
+    /// Residue removed by the bounded reform phase, not counted as drainage.
+    pub reclaimed_microunits: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckOutcome {
+    Exited,
+    Fell,
+    TimedOut,
+}
+
+/// Temporary course/controller telemetry. Position is in thousandths of render
+/// world units; the duck and its physics are absent during opening/resetting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckState {
+    pub left_to_right: bool,
+    pub position_milli: Option<[i32; 2]>,
+    pub grounded: bool,
+    pub jumps: u32,
+    pub cleared_obstacles: usize,
+    pub obstacle_count: usize,
+    pub entrance_open_milli: u32,
+    pub exit_open_milli: u32,
+    pub outcome: Option<ClockDuckOutcome>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

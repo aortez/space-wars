@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 mod client;
 mod clock;
 pub use clock::{
-    CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND, ClockEventInfo,
-    ClockEventKind, ClockState, ClockStatePredicate, ClockTriggerRequest,
+    CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND,
+    ClockEventInfo, ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState,
+    ClockStatePredicate, ClockTriggerRequest,
 };
 
 pub use client::{ControlClient, ControlClientError, UiStatePredicate};
@@ -22,8 +23,12 @@ pub const NO_ACTIVE_SCENARIO_DIAGNOSTICS: &str = "No active scenario diagnostics
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UiScreen {
+    #[serde(rename = "launcher.busy")]
+    LauncherBusy,
     #[serde(rename = "launcher.main")]
     LauncherMain,
+    #[serde(rename = "launcher.sound")]
+    LauncherSound,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
     #[serde(rename = "launcher.controls")]
@@ -34,6 +39,8 @@ pub enum UiScreen {
     Gameplay,
     #[serde(rename = "pause.main")]
     PauseMain,
+    #[serde(rename = "pause.sound")]
+    PauseSound,
     #[serde(rename = "pause.controls")]
     PauseControls,
     #[serde(rename = "pause.clock")]
@@ -45,12 +52,15 @@ pub enum UiScreen {
 impl UiScreen {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::LauncherBusy => "launcher.busy",
             Self::LauncherMain => "launcher.main",
+            Self::LauncherSound => "launcher.sound",
             Self::LauncherSettings => "launcher.settings",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
             Self::Gameplay => "gameplay",
             Self::PauseMain => "pause.main",
+            Self::PauseSound => "pause.sound",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
             Self::GameOver => "game-over",
@@ -60,7 +70,9 @@ impl UiScreen {
     pub const fn is_launcher(self) -> bool {
         matches!(
             self,
-            Self::LauncherMain
+            Self::LauncherBusy
+                | Self::LauncherMain
+                | Self::LauncherSound
                 | Self::LauncherSettings
                 | Self::LauncherControls
                 | Self::LauncherTouchTest
@@ -413,7 +425,9 @@ impl RuntimeStatus {
 }
 
 pub fn parse_runtime_status(status: &str) -> Result<RuntimeStatus, ProtocolError> {
-    if status.trim() == NO_ACTIVE_SCENARIO_DIAGNOSTICS {
+    // Launcher diagnostics may follow the inactive header (including while
+    // an asynchronous benchmark launch is being polled).
+    if status.trim().lines().next() == Some(NO_ACTIVE_SCENARIO_DIAGNOSTICS) {
         return Ok(RuntimeStatus::inactive());
     }
 
@@ -538,12 +552,15 @@ mod tests {
     #[test]
     fn screen_names_are_stable_and_round_trip() {
         let cases = [
+            (UiScreen::LauncherBusy, "launcher.busy"),
             (UiScreen::LauncherMain, "launcher.main"),
+            (UiScreen::LauncherSound, "launcher.sound"),
             (UiScreen::LauncherSettings, "launcher.settings"),
             (UiScreen::LauncherControls, "launcher.controls"),
             (UiScreen::LauncherTouchTest, "launcher.touch-test"),
             (UiScreen::Gameplay, "gameplay"),
             (UiScreen::PauseMain, "pause.main"),
+            (UiScreen::PauseSound, "pause.sound"),
             (UiScreen::PauseControls, "pause.controls"),
             (UiScreen::PauseClock, "pause.clock"),
             (UiScreen::GameOver, "game-over"),
@@ -706,6 +723,15 @@ mod tests {
             parse_runtime_status(NO_ACTIVE_SCENARIO_DIAGNOSTICS).unwrap(),
             RuntimeStatus::inactive()
         );
+        for outcome in ["busy", "complete", "failed"] {
+            let status = format!(
+                "{NO_ACTIVE_SCENARIO_DIAGNOSTICS}\nlaunch_state={outcome}\nlaunch_scenario=pizza\nlaunch_save_ms=13512"
+            );
+            assert_eq!(
+                parse_runtime_status(&status).unwrap(),
+                RuntimeStatus::inactive()
+            );
+        }
     }
 
     #[test]

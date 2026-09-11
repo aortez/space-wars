@@ -18,6 +18,49 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  yocto-tools:
+    name: Pi hardware profiles and update safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install device-tree and isolated updater test tools
+        run: sudo apt-get update && sudo apt-get install --yes device-tree-compiler bubblewrap apparmor
+      - name: Allow Bubblewrap user namespaces on the CI runner
+        run: sudo apparmor_parser --replace --skip-cache .github/ci/bwrap.apparmor
+      - name: Verify unprivileged installer sandbox
+        run: |
+          id
+          test "$(id -u)" -ne 0
+          bwrap --version
+          sysctl kernel.apparmor_restrict_unprivileged_userns
+          # Evaluate the IDs inside the sandbox, not on the host.
+          # shellcheck disable=SC2016
+          timeout 10 bwrap \
+            --ro-bind / / \
+            --unshare-user --uid 0 --gid 0 --unshare-pid --unshare-net \
+            --proc /proc --dev /dev --tmpfs /run --chdir / \
+            -- /bin/sh -ec 'test "$(id -u)" -eq 0; test "$(id -g)" -eq 0'
+      - run: npm --prefix yocto test
+        env:
+          SPACEWARS_REQUIRE_UPDATE_SANDBOX: 1
+      - run: shellcheck benchmark-clock.sh update.sh yocto/meta-spacewars/recipes-spacewars/spacewars-hardware/files/spacewars-hardware.sh yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh
+      - name: Report sandbox configuration and kernel denials
+        if: failure()
+        run: |
+          uname -a
+          id
+          bwrap --version || true
+          sysctl kernel.apparmor_restrict_unprivileged_userns \
+            kernel.apparmor_restrict_unprivileged_unconfined \
+            kernel.unprivileged_userns_clone user.max_user_namespaces || true
+          sudo aa-status || true
+          sudo journalctl --kernel --since '-5 minutes' --no-pager \
+            --grep='apparmor|bwrap|userns' || true
+
   nes-core:
     name: NES core, golden tests, and benchmark
     runs-on: ubuntu-latest

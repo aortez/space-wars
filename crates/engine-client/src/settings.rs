@@ -141,7 +141,8 @@ fn load_settings_from_bytes(path: &Path, bytes: &[u8]) -> Result<LoadedSettings,
     };
 
     match toml::from_str::<Settings>(text) {
-        Ok(settings) => {
+        Ok(mut settings) => {
+            settings.audio = settings.audio.normalized();
             let normalized = serialize_settings(&settings)?;
             let status = if normalized.as_bytes() == bytes {
                 LoadStatus::Existing
@@ -260,6 +261,55 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn clock_message_defaults_migrates_and_round_trips_without_resetting_other_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(
+            &path,
+            "[clock]\nmarquee_preset = \"text-ribbon\"\n[clock.events]\nmarquee = false\n",
+        )
+        .unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.settings.clock.marquee_message.as_str(), "SPACE WARS");
+        assert_eq!(
+            loaded.settings.clock.marquee_preset,
+            engine_common::ClockMarqueePreset::TextRibbon
+        );
+        assert!(!loaded.settings.clock.events.marquee);
+        loaded.settings.clock.marquee_message = "Hi, it's 12:34!".parse().unwrap();
+        save_settings(&loaded.settings, &path).unwrap();
+        let reloaded = load_settings(&path).unwrap();
+        assert_eq!(reloaded.settings.clock, loaded.settings.clock);
+        assert_eq!(reloaded.status, LoadStatus::Existing);
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("marquee_message = \"HI, IT'S 12:34!\"")
+        );
+    }
+
+    #[test]
+    fn malformed_clock_message_is_backed_up_not_silently_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        for text in ["", "   ", "é", "A_B", &"A".repeat(33)] {
+            let original = format!("[clock]\nmarquee_message = {text:?}\n");
+            fs::write(&path, &original).unwrap();
+            let loaded = load_settings(&path).unwrap();
+            let LoadStatus::RecoveredMalformed {
+                backup_path,
+                reason,
+            } = loaded.status
+            else {
+                panic!()
+            };
+            assert!(reason.contains("Clock message"));
+            assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
+            assert_eq!(loaded.settings.clock.marquee_message.as_str(), "SPACE WARS");
+        }
+    }
+
+    #[test]
     fn previous_settings_default_to_one_expedition_player_and_both_counts_round_trip() {
         use engine_common::SurfaceExpeditionPlayers;
 
@@ -310,6 +360,10 @@ mod tests {
             loaded.settings.clock.events = engine_common::ClockEvents {
                 falling: false,
                 color_cycle: true,
+                meltdown: false,
+                duck: false,
+                marquee: false,
+                digit_slide: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -317,6 +371,67 @@ mod tests {
                 loaded.settings.clock
             );
         }
+    }
+
+    #[test]
+    fn older_event_switches_keep_their_values_when_meltdown_defaults_on() {
+        let settings: Settings =
+            toml::from_str("[clock.events]\nfalling = false\ncolor_cycle = false\n").unwrap();
+        assert!(!settings.clock.events.falling);
+        assert!(!settings.clock.events.color_cycle);
+        assert!(settings.clock.events.meltdown);
+        assert!(settings.clock.events.duck);
+    }
+
+    #[test]
+    fn pre_marquee_settings_keep_existing_switches_and_recipes_round_trip() {
+        let mut settings:Settings=toml::from_str("[clock]\nevent_profile='off'\n[clock.events]\nfalling=false\ncolor_cycle=true\nmeltdown=false\nduck=false\n").unwrap();
+        assert!(settings.clock.events.marquee);
+        assert!(!settings.clock.events.duck);
+        assert!(!settings.clock.events.falling);
+        assert_eq!(
+            settings.clock.marquee_preset,
+            engine_common::ClockMarqueePreset::ClockWave
+        );
+        for preset in engine_common::ClockMarqueePreset::ALL {
+            settings.clock.marquee_preset = preset;
+            let decoded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(decoded.clock, settings.clock);
+        }
+    }
+
+    #[test]
+    fn digit_slide_defaults_on_without_changing_existing_clock_choices() {
+        let mut settings: Settings = toml::from_str("[clock]\ntime_format='12-hour'\nevent_profile='off'\nmarquee_preset='text-ribbon'\nmarquee_message='HELLO'\n[clock.events]\nfalling=false\ncolor_cycle=true\nmeltdown=false\nduck=false\nmarquee=false\n").unwrap();
+        assert!(settings.clock.events.digit_slide);
+        assert!(!settings.clock.events.marquee);
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
+        assert_eq!(
+            settings.clock.time_format,
+            engine_common::ClockTimeFormat::TwelveHour
+        );
+        assert_eq!(settings.clock.marquee_message.as_str(), "HELLO");
+        for enabled in [true, false] {
+            settings.clock.events.digit_slide = enabled;
+            let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(restored.clock, settings.clock);
+        }
+    }
+
+    #[test]
+    fn pre_duck_settings_preserve_all_existing_switches() {
+        let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\n[clock.events]\nfalling = false\ncolor_cycle = true\nmeltdown = false\n").unwrap();
+        assert!(settings.clock.events.duck);
+        assert!(!settings.clock.events.falling);
+        assert!(settings.clock.events.color_cycle);
+        assert!(!settings.clock.events.meltdown);
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
     }
 
     #[test]
@@ -353,7 +468,7 @@ mod tests {
         assert_eq!(loaded.settings.video.width, 1920);
         assert_eq!(loaded.settings.video.height, 720);
         assert!(!loaded.settings.video.fullscreen);
-        assert_eq!(loaded.settings.audio.master_volume, 0.8);
+        assert_eq!(loaded.settings.audio.master_volume, 0.25);
         assert_eq!(loaded.settings.launch.scenario, "spacewars");
         assert_eq!(loaded.settings.spacewars, SpacewarsSettings::default());
         assert_eq!(loaded.settings.runtime.log_level, "info");
@@ -369,6 +484,30 @@ mod tests {
         assert!(migrated.contains("[spacewars]"));
         assert!(migrated.contains("[clock]"));
         assert!(migrated.contains("[runtime]"));
+    }
+
+    #[test]
+    fn audio_load_preserves_saved_levels_and_normalizes_invalid_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        for (raw, expected) in [
+            ("0.8", 0.8),
+            ("0.0", 0.0),
+            ("-1.0", 0.0),
+            ("3.0", 1.0),
+            ("nan", 0.25),
+            ("inf", 0.25),
+        ] {
+            let text = format!("[audio]\nmaster_volume = {raw}\nmuted = true\n");
+            let loaded = load_settings_from_bytes(&path, text.as_bytes()).unwrap();
+            assert_eq!(loaded.settings.audio.master_volume, expected, "{raw}");
+            assert!(loaded.settings.audio.muted);
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.audio,
+                loaded.settings.audio
+            );
+        }
     }
 
     #[test]

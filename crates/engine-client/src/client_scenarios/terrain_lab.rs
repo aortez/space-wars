@@ -17,6 +17,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "terrain-lab",
     launcher_visible: true,
     capabilities: ScenarioCapabilities {
+        headless_benchmark: false,
         pointer_input: true,
         benchmark: false,
         player_zoom: true,

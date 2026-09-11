@@ -5,9 +5,10 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } fro
 import { tmpdir } from 'os';
 import { basename, isAbsolute, join, resolve } from 'path';
 import { pathToFileURL } from 'url';
-import { defaultBuildDir, YOCTO_DIR } from './paths.mjs';
+import { defaultImageDir, preferredImages, YOCTO_DIR } from './paths.mjs';
+import { readBootIdentity, setHardwareProfile, validateProfile } from './hardware.mjs';
 
-const DEFAULT_IMAGE_DIR = join(defaultBuildDir(), 'tmp/deploy/images/raspberrypi5');
+const DEFAULT_IMAGE_DIR = defaultImageDir();
 const CONFIG_FILE = join(YOCTO_DIR, '.flash-config.json');
 const WIFI_CREDS_FILE = join(YOCTO_DIR, 'wifi-creds.local');
 const DEFAULT_HOSTNAME = 'spacewars';
@@ -15,10 +16,7 @@ const DEFAULT_USER = 'spacewars';
 const DEFAULT_UID = 1000;
 const DATA_FREE_PERCENT = 10;
 const IMAGE_SUFFIX = '.wic.gz';
-const PREFERRED_IMAGES = [
-  'spacewars-image-raspberrypi5.rootfs.wic.gz',
-  'spacewars-image.rootfs.wic.gz',
-];
+const PREFERRED_IMAGES = preferredImages('wic.gz');
 const SSH_HOST_KEY_PATTERN = /^ssh_host_.*_key(\.pub)?$/;
 
 function usage() {
@@ -31,6 +29,7 @@ Usage:
 Options:
   --device <dev>       Flash directly to device, still with confirmation
   --image <path>       Use a specific .wic.gz image
+  --profile <name>     Required: hdmi, hyperpixel, or picade
   --hostname <name>    Write /boot/hostname.txt after flashing [default: spacewars]
   --ssh-key <path>     Public SSH key to inject
   --interactive        Force interactive prompts instead of saved config
@@ -41,8 +40,8 @@ Options:
 
 Examples:
   npm run flash -- --list
-  npm run flash -- --dry-run --device /dev/sdb
-  npm run flash -- --device /dev/sdb
+  npm run flash -- --dry-run --profile picade --hostname picade --device <verified-device>
+  npm run flash -- --profile picade --hostname picade --device <verified-device>
 
 Wi-Fi:
   Create yocto/wifi-creds.local to inject Wi-Fi credentials on flash:
@@ -117,7 +116,7 @@ function findDefaultSshKey() {
   return null;
 }
 
-async function ensureSshKeyConfig(utils, sshKeyArg, forceReconfigure) {
+async function ensureSshKeyConfig(utils, sshKeyArg, forceReconfigure, dryRun) {
   const existing = utils.loadConfig(CONFIG_FILE);
 
   if (sshKeyArg) {
@@ -126,12 +125,13 @@ async function ensureSshKeyConfig(utils, sshKeyArg, forceReconfigure) {
       throw new Error(`SSH key not found: ${sshKeyPath}`);
     }
     const config = { ...(existing ?? {}), ssh_key_path: sshKeyPath };
-    utils.saveConfig(CONFIG_FILE, config);
+    if (!dryRun) utils.saveConfig(CONFIG_FILE, config);
     utils.info(`Using SSH key from CLI: ${basename(sshKeyPath)}`);
     return config;
   }
 
   if (forceReconfigure) {
+    if (dryRun) throw new Error('Cannot reconfigure saved settings in --dry-run mode.');
     return await utils.configureSSHKey(CONFIG_FILE);
   }
 
@@ -143,13 +143,14 @@ async function ensureSshKeyConfig(utils, sshKeyArg, forceReconfigure) {
   const defaultKey = findDefaultSshKey();
   if (defaultKey) {
     const config = { ssh_key_path: defaultKey };
-    utils.saveConfig(CONFIG_FILE, config);
+    if (!dryRun) utils.saveConfig(CONFIG_FILE, config);
     utils.info(`Using SSH key: ${basename(defaultKey)}`);
-    utils.info(`Config saved to: ${basename(CONFIG_FILE)}`);
+    if (!dryRun) utils.info(`Config saved to: ${basename(CONFIG_FILE)}`);
     return config;
   }
 
   utils.info('No SSH key configured yet.');
+  if (dryRun) throw new Error('Pass --ssh-key <public-key> to preview flashing without saved settings.');
   return await utils.configureSSHKey(CONFIG_FILE);
 }
 
@@ -386,6 +387,7 @@ async function main() {
   const specifiedImage = argValue(args, '--image');
   const specifiedHostname = argValue(args, '--hostname');
   const specifiedSshKey = argValue(args, '--ssh-key');
+  const profile = listOnly ? null : validateProfile(argValue(args, '--profile'));
 
   const utils = await loadPiBase();
 
@@ -396,14 +398,23 @@ async function main() {
   }
   utils.log('');
 
-  const config = await ensureSshKeyConfig(utils, specifiedSshKey, reconfigure);
+  if (listOnly) {
+    utils.displayDevices(utils.getBlockDevices());
+    return;
+  }
+
+  const config = await ensureSshKeyConfig(utils, specifiedSshKey, reconfigure, dryRun);
   const image = findImage(utils, specifiedImage);
   if (!image) {
     throw new Error('No image found. Run "npm run build" first, or pass --image <path>.');
   }
+  // Reject older Pi 5 images before any backup, mount or destructive write.
+  const bootIdentity = readBootIdentity(image.path);
 
   utils.log('');
   utils.info(`Image: ${image.name}`);
+  utils.info(`Hardware profile: ${profile}`);
+  utils.info(`Boot assets: ${bootIdentity.substring(0, 16)}...`);
   utils.info(`Size: ${utils.formatBytes(image.stat.size)}`);
   utils.info(`Built: ${image.stat.mtime.toLocaleString()}`);
   if (getBmapPath(image.path)) {
@@ -417,10 +428,6 @@ async function main() {
   }
 
   utils.displayDevices(devices);
-  if (listOnly) {
-    return;
-  }
-
   const { targetDevice, selectedDeviceInfo } = await selectTargetDevice(
     utils,
     devices,
@@ -448,7 +455,7 @@ async function main() {
   const hostname = await chooseHostname(
     utils,
     config,
-    specifiedHostname,
+    specifiedHostname ?? (profile === 'picade' ? 'picade' : null),
     interactive,
     specifiedDevice,
     dryRun,
@@ -474,6 +481,7 @@ async function main() {
     utils.growDataPartition(targetDevice, DATA_FREE_PERCENT, dryRun);
     await utils.injectSSHKey(targetDevice, config.ssh_key_path, DEFAULT_USER, DEFAULT_UID, dryRun);
     await utils.setHostname(targetDevice, hostname, dryRun);
+    setHardwareProfile(utils, targetDevice, profile, bootIdentity, dryRun);
 
     if (wifiCredentials) {
       await utils.injectWifiCredentials(

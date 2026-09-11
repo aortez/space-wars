@@ -9,6 +9,10 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
             events: ClockEvents {
                 falling: true,
                 color_cycle: false,
+                meltdown: false,
+                duck: false,
+                marquee: false,
+                digit_slide: false,
             },
             ..ClockConfig::default()
         },
@@ -257,7 +261,8 @@ fn every_event_obeys_the_same_lifecycle_and_cleanup_contract() {
         assert_eq!(state.lifecycle(), EventLifecycle::Active);
         assert_eq!(state.event_kind(), Some(kind));
         assert_eq!((state.event_id(), state.phase_tick()), (1, 0));
-        ticks(&mut state, 60);
+        let partial = 60.min(definition.duration_ticks / 2);
+        ticks(&mut state, partial);
         let frozen = ClockScenario::render_frame(&state);
         let tick = state.simulation_tick();
         ClockScenario::step(&mut state, std::slice::from_ref(&trigger), Duration::ZERO);
@@ -268,7 +273,7 @@ fn every_event_obeys_the_same_lifecycle_and_cleanup_contract() {
         // Time correction during any event must not restore stale digits/color.
         let reading = ClockAction::set_reading(ClockReading::new(0, 1, 0).unwrap());
         ClockScenario::step(&mut state, std::slice::from_ref(&reading), Duration::ZERO);
-        ticks(&mut state, definition.duration_ticks - 60);
+        ticks(&mut state, definition.duration_ticks - partial);
         assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
         assert_eq!(state.event_kind(), None);
         assert_eq!(state.event_phase(), None);
@@ -289,7 +294,7 @@ fn every_event_obeys_the_same_lifecycle_and_cleanup_contract() {
         // Manual previews bypass automatic enablement and per-event cooldowns.
         ClockScenario::step(&mut state, &[trigger], Duration::ZERO);
         assert_eq!(state.event_id(), 2);
-        ticks(&mut state, 60);
+        ticks(&mut state, partial);
         state.set_aspect_ratio(state.aspect_ratio());
         assert_eq!(state.event_kind(), Some(kind));
         state.set_aspect_ratio(0.75);
@@ -375,8 +380,8 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
     let reading = ClockAction::set_reading(ClockReading::new(23, 58, 0).unwrap());
     ClockScenario::step(&mut a, std::slice::from_ref(&reading), Duration::ZERO);
     ClockScenario::step(&mut b, &[reading], Duration::ZERO);
-    let mut seen = [false; 2];
-    for _ in 0..90 * 60 {
+    let mut seen = [false; ClockEventKind::ALL.len()];
+    for _ in 0..300 * 60 {
         ticks(&mut a, 1);
         ticks(&mut b, 1);
         assert_eq!(
@@ -395,9 +400,17 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         );
         assert_eq!(a.segments(), b.segments());
         assert_eq!(a.palette(), b.palette());
+        assert_eq!(a.meltdown_state(), b.meltdown_state());
+        assert_eq!(a.duck_state(), b.duck_state());
+        assert_eq!(a.marquee_state(), b.marquee_state());
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }
     }
-    assert_eq!(seen, [true, true]);
+    for definition in EVENT_CATALOG {
+        assert_eq!(
+            seen[definition.kind as usize],
+            definition.trigger == engine_common::ClockEventTrigger::Periodic
+        );
+    }
 }

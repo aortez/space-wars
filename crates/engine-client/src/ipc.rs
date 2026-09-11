@@ -18,10 +18,11 @@ use slint::Timer;
 use slint::{ComponentHandle, Rgba8Pixel, SharedPixelBuffer, TimerMode};
 #[cfg(unix)]
 use spacewars_control::{
-    CLOCK_STATE_COMMAND, CLOCK_TRIGGER_COMMAND, ClockState, ClockTriggerRequest, ControlFailure,
-    ControlFailureCode, HOST_PAUSE_COMMAND, HostPauseRequest, ProtocolError, RuntimeStatus,
-    UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND, UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction,
-    UiActivateRequest, UiControl, UiPressRequest, UiScreen, UiState, parse_runtime_status,
+    CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_TRIGGER_COMMAND, ClockMessageRequest,
+    ClockState, ClockTriggerRequest, ControlFailure, ControlFailureCode, HOST_PAUSE_COMMAND,
+    HostPauseRequest, ProtocolError, RuntimeStatus, UI_ACTIVATE_COMMAND, UI_PRESS_COMMAND,
+    UI_STATE_COMMAND, UI_STATE_SCHEMA_VERSION, UiAction, UiActivateRequest, UiControl,
+    UiPressRequest, UiScreen, UiState, parse_runtime_status,
 };
 
 #[cfg(unix)]
@@ -48,6 +49,7 @@ enum ControlCommand {
     HostPause(HostPauseRequest),
     ClockState,
     ClockTrigger(ClockTriggerRequest),
+    ClockMessage(ClockMessageRequest),
     HostBenchmark,
 }
 
@@ -56,6 +58,12 @@ enum ControlCommand {
 enum CommandParseError {
     Legacy(String),
     Structured(Box<ControlFailure>),
+}
+
+#[cfg(unix)]
+enum ClockMutation {
+    Trigger(ClockTriggerRequest),
+    Message(ClockMessageRequest),
 }
 
 #[cfg(unix)]
@@ -329,6 +337,19 @@ fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
                 .map(ControlCommand::ClockTrigger)
                 .map_err(|error| invalid_mutation_request(error.to_string()))
         }
+        Some(CLOCK_MESSAGE_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("clock message requires a JSON request on the second line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "clock message accepts exactly one JSON request line",
+                ));
+            }
+            ClockMessageRequest::from_json(payload)
+                .map(ControlCommand::ClockMessage)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some("host benchmark") => {
             if lines.next().is_some() {
                 return Err(CommandParseError::Legacy("too many command lines".into()));
@@ -368,7 +389,14 @@ fn handle_request(
         ),
         ControlCommand::ClockTrigger(trigger) => handle_clock_request(
             window,
-            Some(trigger),
+            Some(ClockMutation::Trigger(trigger)),
+            request.response,
+            ui_state_tracker,
+            scenario_controls,
+        ),
+        ControlCommand::ClockMessage(message) => handle_clock_request(
+            window,
+            Some(ClockMutation::Message(message)),
             request.response,
             ui_state_tracker,
             scenario_controls,
@@ -379,7 +407,21 @@ fn handle_request(
                 .ok(format!("screenshot saved to {}", output.display())),
             Err(err) => request.response.error(err.to_string()),
         },
-        ControlCommand::Status => request.response.ok(window.get_runtime_diagnostics()),
+        ControlCommand::Status => {
+            let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            let launch = window.get_launcher_diagnostics();
+            if !launch.is_empty() {
+                diagnostics.push('\n');
+                diagnostics.push_str(launch.as_str());
+            }
+            diagnostics.push_str(&format!(
+                "\nmaster_volume_percent={}\nmaster_muted={}\nsettings_save_pending={}",
+                window.get_sound_volume_percent(),
+                window.get_sound_muted(),
+                window.get_settings_save_pending()
+            ));
+            request.response.ok(diagnostics);
+        }
         ControlCommand::UiState => {
             match ui_state(window, ui_state_tracker).and_then(|state| state.to_json()) {
                 Ok(json) => request.response.ok(json),
@@ -402,13 +444,17 @@ fn handle_request(
             );
         }
         ControlCommand::HostBenchmark => {
-            if !window.get_scenario_benchmark_available() {
+            if window.get_launcher_busy() {
+                request.response.error("a launch is already in progress");
+            } else if !window.get_scenario_benchmark_available() {
                 request
                     .response
                     .error("the selected scenario does not support benchmark mode");
             } else if window.get_launcher_visible() {
                 window.invoke_launcher_start_benchmark();
-                if window.get_launcher_visible() {
+                if window.get_launcher_busy() {
+                    request.response.ok("benchmark requested");
+                } else if window.get_launcher_visible() {
                     let detail = window.get_launcher_error_text();
                     if detail.is_empty() {
                         request
@@ -431,7 +477,7 @@ fn handle_request(
 #[cfg(unix)]
 fn handle_clock_request(
     window: &MainWindow,
-    trigger: Option<ClockTriggerRequest>,
+    mutation: Option<ClockMutation>,
     response: ResponseWriter,
     tracker: &mut UiStateTracker,
     controls: &host::SharedScenarioControls,
@@ -444,7 +490,7 @@ fn handle_clock_request(
         }
     };
     let mut controls = controls.borrow_mut();
-    let clock = controls.clock_state();
+    let clock = clock_snapshot(window, &controls);
     if ui.active_scenario.as_deref() != Some("clock") || ui.screen.is_launcher() {
         response.control_failure(ControlFailure::new(
             ControlFailureCode::ControlUnavailable,
@@ -462,12 +508,25 @@ fn handle_clock_request(
         ));
         return;
     };
-    if let Some(trigger) = trigger {
-        if let Err(failure) = validate_clock_trigger(&trigger, &ui, &clock) {
+    if let Some(mutation) = mutation {
+        let validation = match &mutation {
+            ClockMutation::Trigger(trigger) => validate_clock_trigger(trigger, &ui, &clock),
+            ClockMutation::Message(message) => validate_clock_message(message, &ui, &clock),
+        };
+        if let Err(failure) = validation {
             response.control_failure(*failure);
             return;
         }
-        if !controls.request_clock_event(trigger.event) {
+        let accepted = match mutation {
+            ClockMutation::Trigger(trigger) => controls.request_clock_event(trigger.event),
+            ClockMutation::Message(message) => {
+                controls.request_clock_settings(engine_common::ClockSettings {
+                    marquee_message: message.message,
+                    ..clock.settings
+                })
+            }
+        };
+        if !accepted {
             response.control_failure(ControlFailure::new(
                 ControlFailureCode::ActionUnavailable,
                 "Another host control is pending",
@@ -476,10 +535,50 @@ fn handle_clock_request(
             return;
         }
     }
-    match controls.clock_state().unwrap().to_json() {
+    match clock_snapshot(window, &controls).unwrap().to_json() {
         Ok(json) => response.ok(json),
         Err(error) => response.error(error.to_string()),
     }
+}
+
+#[cfg(unix)]
+fn clock_snapshot(window: &MainWindow, controls: &host::ScenarioControls) -> Option<ClockState> {
+    controls.clock_state().map(|mut state| {
+        // Message acknowledgements include durable persistence, even though
+        // storage now runs independently of the simulation/UI thread.
+        state.settings_pending |= window.get_settings_save_pending();
+        state.settings_error = non_empty(window.get_clock_settings_error().as_str());
+        state
+    })
+}
+
+#[cfg(unix)]
+fn validate_clock_message(
+    request: &ClockMessageRequest,
+    ui: &UiState,
+    clock: &ClockState,
+) -> Result<(), Box<ControlFailure>> {
+    let failure = if request.expected_scenario_revision != clock.scenario_revision
+        || request.expected_message != clock.settings.marquee_message
+    {
+        Some((
+            ControlFailureCode::StaleRevision,
+            "Clock instance or message changed",
+        ))
+    } else if !ui.paused || !clock.paused {
+        Some((
+            ControlFailureCode::WrongScreen,
+            "Pause Clock before changing its marquee message",
+        ))
+    } else {
+        None
+    };
+    if let Some((code, message)) = failure {
+        let mut failure = ControlFailure::new(code, message, Some(ui.clone()));
+        failure.current_clock_state = Some(clock.clone());
+        return Err(Box::new(failure));
+    }
+    Ok(())
 }
 
 #[cfg(unix)]
@@ -742,6 +841,8 @@ fn validate_ui_preconditions(
 #[cfg(unix)]
 fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState, ProtocolError> {
     let screen = classify_screen(ScreenVisibility {
+        launcher_busy: window.get_launcher_busy(),
+        sound: window.get_sound_visible(),
         launcher: window.get_launcher_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
@@ -756,6 +857,13 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            launcher_busy_stage: window.get_launcher_busy_stage().to_string(),
+            launcher_busy_elapsed: window.get_launcher_busy_elapsed().to_string(),
+            sound_focus_index: window.get_sound_focus_index(),
+            sound_volume_percent: window.get_sound_volume_percent(),
+            sound_muted: window.get_sound_muted(),
+            settings_save_pending: window.get_settings_save_pending(),
+            settings_save_error: non_empty(window.get_settings_save_error().as_str()),
             selected_scenario: selected_scenario.clone(),
             world_seed: window.get_launcher_seed_text().to_string(),
             launcher_focus_index: window.get_launcher_focus_index(),
@@ -794,6 +902,11 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
             clock_falling_enabled: window.get_launcher_clock_falling_enabled(),
             clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
+            clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
+            clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
+            clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
+            clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
+            clock_marquee_preset: window.get_launcher_clock_marquee_preset().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },
     );
@@ -865,6 +978,100 @@ mod tests {
     use super::*;
 
     #[test]
+    fn busy_screen_exposes_read_only_progress_and_rejects_launch_actions() {
+        use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
+        use slint::platform::{Platform, PlatformError, WindowAdapter};
+        use std::rc::Rc;
+
+        struct TestPlatform;
+        impl Platform for TestPlatform {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
+                Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+            }
+        }
+        slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+        let window = MainWindow::new().unwrap();
+        window.set_launcher_visible(true);
+        window.set_launcher_settings_visible(true);
+        window.set_launcher_busy(true);
+        window.set_launcher_scenario("pizza".into());
+        window.set_launcher_busy_stage("saving_settings".into());
+        window.set_launcher_busy_elapsed("12.4 s".into());
+        window.set_launcher_diagnostics("launch_state=busy\nlaunch_save_ms=0".into());
+        // A previous instance must not appear active behind the busy launcher.
+        window.set_runtime_diagnostics(
+            "scenario=clock\nscenario_revision=4\npaused=true\nbenchmark_active=false".into(),
+        );
+        let controls = host::new_scenario_controls();
+        let mut tracker = UiStateTracker::default();
+        let mut request = |command| {
+            let (mut reader, stream) = std::os::unix::net::UnixStream::pair().unwrap();
+            reader
+                .set_read_timeout(Some(Duration::from_secs(1)))
+                .unwrap();
+            handle_request(
+                &window,
+                ControlRequest {
+                    command,
+                    response: ResponseWriter { stream },
+                },
+                &mut tracker,
+                &controls,
+            );
+            let mut reply = String::new();
+            reader.read_to_string(&mut reply).unwrap();
+            reply
+        };
+        let reply = request(ControlCommand::UiState);
+        let state = UiState::from_json(reply.trim().strip_prefix("ok ").unwrap()).unwrap();
+        assert_eq!(state.screen, UiScreen::LauncherBusy);
+        assert_eq!(state.selected_scenario, "pizza");
+        assert!(state.active_scenario.is_none());
+        assert!(state.scenario_revision.is_none());
+        assert!(state.actions.is_empty());
+        assert_eq!(state.controls[0].value.as_deref(), Some("saving_settings"));
+        assert_eq!(state.controls[1].value.as_deref(), Some("12.4 s"));
+        assert!(request(ControlCommand::Status).contains("launch_state=busy"));
+        for (command, expected) in [
+            (
+                ControlCommand::UiPress(UiPressRequest::new(UiAction::Start)),
+                ControlFailureCode::ActionUnavailable,
+            ),
+            (
+                ControlCommand::UiActivate(UiActivateRequest::new("launcher.start")),
+                ControlFailureCode::ControlUnavailable,
+            ),
+            (
+                ControlCommand::UiActivate(UiActivateRequest::new("launcher.busy.stage")),
+                ControlFailureCode::ControlDisabled,
+            ),
+        ] {
+            let reply = request(command);
+            let failure =
+                ControlFailure::from_json(reply.trim().strip_prefix("error ").unwrap()).unwrap();
+            assert_eq!(failure.code, expected);
+            assert_eq!(failure.current_state, Some(state.clone()));
+        }
+        assert_eq!(
+            request(ControlCommand::HostBenchmark),
+            "error a launch is already in progress\n"
+        );
+        // Status retains the previous launch timings after the overlay closes.
+        window.set_launcher_busy(false);
+        window.set_launcher_diagnostics("launch_state=complete\nlaunch_save_ms=13512".into());
+        assert!(request(ControlCommand::Status).contains("launch_save_ms=13512"));
+        // Benchmark callers must receive an acknowledgement, not a launch
+        // failure merely because the menu is still visible during preparation.
+        window.set_scenario_benchmark_available(true);
+        let weak = window.as_weak();
+        window.on_launcher_start_benchmark(move || weak.upgrade().unwrap().set_launcher_busy(true));
+        assert_eq!(
+            request(ControlCommand::HostBenchmark),
+            "ok benchmark requested\n"
+        );
+    }
+
+    #[test]
     fn parse_screenshot_command() {
         let command = parse_command("screenshot\n/tmp/shot.png\n").unwrap();
         match command {
@@ -878,6 +1085,7 @@ mod tests {
             | ControlCommand::HostPause(_)
             | ControlCommand::ClockState
             | ControlCommand::ClockTrigger(_)
+            | ControlCommand::ClockMessage(_)
             | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
@@ -919,11 +1127,23 @@ mod tests {
             "clock trigger\n{}\n",
             "clock trigger\n{}\nextra\n",
             "clock trigger\n{\"schema_version\":2,\"expected_scenario_revision\":9,\"expected_event_id\":2}\n",
+            "clock message\n",
+            "clock message\n{}\n",
+            "clock message\n{}\nextra\n",
         ] {
             assert!(
                 matches!(parse_command(body), Err(CommandParseError::Structured(failure)) if failure.code == ControlFailureCode::InvalidRequest)
             );
         }
+        let request = ClockMessageRequest {
+            schema_version: spacewars_control::CLOCK_STATE_SCHEMA_VERSION,
+            message: "HELLO!".parse().unwrap(),
+            expected_scenario_revision: 9,
+            expected_message: engine_common::ClockMarqueeMessage::default(),
+        };
+        assert!(
+            matches!(parse_command(&format!("clock message\n{}\n", request.to_json().unwrap())), Ok(ControlCommand::ClockMessage(parsed)) if parsed == request)
+        );
     }
 
     #[test]

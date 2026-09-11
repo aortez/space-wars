@@ -8,6 +8,10 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod digit_slide;
+mod duck;
+mod marquee;
+
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
 const INACTIVE_CELL_LAYER: i32 = 2;
@@ -31,7 +35,40 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
     render_floor(&mut frame, layout);
+    if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
+        let opacity = 1.0 - event.playback().strength;
+        if opacity > 0.0 {
+            render_segments(&mut frame, state, layout);
+            render_colon(&mut frame, state, layout);
+            render_meridiem(&mut frame, state, layout);
+            // Fade only newly generated face primitives, never physical state
+            // or arena/background. No offscreen image or extra frame allocation.
+            for layer in &mut frame.layers {
+                if layer.z < INACTIVE_CELL_LAYER {
+                    continue;
+                }
+                for primitive in &mut layer.primitives {
+                    if let RenderPrimitive::Polygon(polygon) = primitive {
+                        if let Some(fill) = &mut polygon.fill {
+                            fill.color.a *= opacity;
+                        }
+                        if let Some(stroke) = &mut polygon.stroke {
+                            stroke.color.a *= opacity;
+                        }
+                    }
+                }
+            }
+        }
+        marquee::render(&mut frame, event, layout);
+        return frame;
+    }
     render_segments(&mut frame, state, layout);
+    if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
+        render_meltdown(&mut frame, event, layout);
+    }
+    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+        duck::render(&mut frame, event);
+    }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
     frame
@@ -77,6 +114,10 @@ fn render_floor(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    if let Some(crate::events::ActiveEvent::DigitSlide(event)) = &state.active_event {
+        digit_slide::render(frame, event, layout, state.palette());
+        return;
+    }
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
@@ -84,6 +125,7 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         let anchor = layout.segment_center(segment.id);
         let (position, angle, brightness) = match segment.representation {
             SegmentRepresentation::Anchored => (anchor, 0.0, f32::from(segment.lit)),
+            SegmentRepresentation::Disintegrated => (anchor, 0.0, 0.0),
             SegmentRepresentation::Rigid { position, angle } => (position, angle, 1.0),
             SegmentRepresentation::Reforming {
                 position,
@@ -113,6 +155,75 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                     );
                 }
             }
+        }
+    }
+}
+
+fn render_meltdown(
+    frame: &mut RenderFrame,
+    event: &crate::events::meltdown::MeltdownEvent,
+    layout: Layout,
+) {
+    use crate::events::meltdown::MeltdownEvent;
+    let water_color = RenderColor::rgb(0.08, 0.55, 0.85);
+    let edge_color = RenderColor::rgb(0.36, 0.91, 1.0);
+    for cell in &event.cells {
+        render_square(
+            frame,
+            cell.position,
+            layout.pitch,
+            cell.angle,
+            1.0,
+            DigitPalette::default(),
+        );
+    }
+    let width = MeltdownEvent::column_width(layout);
+    let cell_area = (layout.pitch * 0.8).powi(2);
+    for (index, volume) in event.water.iter().enumerate() {
+        let height = *volume as f32 * cell_area / width;
+        if height < 0.25 {
+            continue;
+        }
+        let left = MeltdownEvent::column_left(layout, index);
+        let top = layout.floor_y + height;
+        frame.push_primitive(
+            ACTIVE_CELL_LAYER,
+            rectangle(
+                RenderPoint::new(left, layout.floor_y),
+                RenderPoint::new(left + width, top),
+                water_color,
+                None,
+            ),
+        );
+        frame.push_primitive(
+            ACTIVE_CELL_LAYER,
+            rectangle(
+                RenderPoint::new(left, top - height.min(1.8)),
+                RenderPoint::new(left + width, top),
+                edge_color,
+                None,
+            ),
+        );
+    }
+    // Bounded visual stream; it represents already-accounted drained volume.
+    // No extra particles are spawned and no water is reintroduced to the pool.
+    if event.stream > 0.005 {
+        let lip = layout.drain_half_width();
+        let thickness = layout.pitch * 0.35 * event.stream.sqrt();
+        for side in [-1.0, 1.0] {
+            let x = side * (lip - thickness * 0.5);
+            frame.push_primitive(
+                ACTIVE_CELL_LAYER,
+                rectangle(
+                    RenderPoint::new(x - thickness * 0.5, layout.bounds_min.y),
+                    RenderPoint::new(x + thickness * 0.5, layout.floor_y),
+                    RenderColor {
+                        a: event.stream.sqrt(),
+                        ..water_color
+                    },
+                    None,
+                ),
+            );
         }
     }
 }

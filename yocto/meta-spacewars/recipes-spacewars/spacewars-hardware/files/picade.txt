@@ -1,0 +1,17 @@
+# Picade X HAT USB-C on Pi 4; HDMI mode comes from the display's EDID.
+# Do not apply this HAT's GPIO assignments to a HyperPixel display.
+[pi4]
+dtparam=audio=off
+dtoverlay=picade,noactled
+# The packaged overlay exposes the joystick as ABS_HAT0X/Y (-1, 0, +1).
+# Standard evdev gamepad buttons use the existing gilrs input path.
+dtparam=button1=304
+dtparam=button2=305
+dtparam=button3=308
+dtparam=button4=307
+dtparam=button5=310
+dtparam=button6=311
+dtparam=coin=314
+dtparam=start=315
+# Keep the utility Enter/Escape keys and KEY_POWER at their upstream defaults.
+[all]

@@ -1,7 +1,6 @@
 //! Live Clock menu operations. Touch, keyboard, gamepad and guarded UI control
 //! all enter here; the host applies changes at a simulation boundary.
 
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
@@ -9,7 +8,7 @@ use engine_common::{ClockEventKind, ClockEventProfile, ClockSettings, ClockTimeF
 use slint::ComponentHandle;
 use spacewars_control::UiAction;
 
-use crate::{MainWindow, host, settings, ui_navigation};
+use crate::{MainWindow, host, ui_navigation};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_time_format(
@@ -20,13 +19,19 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     );
     window.set_launcher_clock_falling_enabled(settings.events.falling);
     window.set_launcher_clock_color_cycle_enabled(settings.events.color_cycle);
+    window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
+    window.set_launcher_clock_duck_enabled(settings.events.duck);
+    window.set_launcher_clock_marquee_enabled(settings.events.marquee);
+    window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
+    window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
+    window.set_launcher_clock_marquee_message(settings.marquee_message.as_str().into());
 }
 
 pub(crate) fn install(
     window: &MainWindow,
     controls: host::SharedScenarioControls,
     settings: Arc<RwLock<Settings>>,
-    settings_path: PathBuf,
+    writer: crate::settings_writer::SettingsWriter,
 ) {
     window.set_clock_event_labels(slint::ModelRc::new(slint::VecModel::from(
         ClockEventKind::ALL
@@ -99,17 +104,15 @@ pub(crate) fn install(
         let Ok(clock) = crate::clock_setup_from_window(&window) else {
             return;
         };
-        let mut settings = settings.write().unwrap();
-        settings.clock = clock;
-        match settings::save_settings(&settings, &settings_path) {
-            Ok(()) => window.set_clock_settings_error("".into()),
-            Err(error) => {
-                tracing::error!(%error, "could not save live Clock settings.");
-                window.set_clock_settings_error(
-                    "Applied for this session; could not save settings.".into(),
-                );
-            }
-        }
+        let snapshot = {
+            let mut settings = settings.write().unwrap();
+            settings.clock = clock;
+            settings.clone()
+        };
+        writer.save(snapshot);
+        window.set_settings_save_pending(true);
+        window.set_settings_save_error("".into());
+        window.set_clock_settings_error("".into());
     });
 }
 
@@ -135,6 +138,19 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         }
         2 => settings.events.falling = !settings.events.falling,
         3 => settings.events.color_cycle = !settings.events.color_cycle,
+        7 => settings.events.meltdown = !settings.events.meltdown,
+        8 => settings.events.duck = !settings.events.duck,
+        9 => settings.events.marquee = !settings.events.marquee,
+        11 => settings.events.digit_slide = !settings.events.digit_slide,
+        10 => {
+            let presets = engine_common::ClockMarqueePreset::ALL;
+            let index = presets
+                .iter()
+                .position(|preset| *preset == settings.marquee_preset)?;
+            settings.marquee_preset =
+                presets[ui_navigation::moved_selection(index as i32, presets.len() as i32, delta)
+                    as usize];
+        }
         _ => return None,
     }
     Some(settings)
@@ -158,7 +174,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6) {
+            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));
@@ -169,7 +185,9 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 => window.invoke_ingame_clock_adjust(index, 1),
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=11) => {
+            window.invoke_ingame_clock_adjust(index, 1)
+        }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
         UiAction::Confirm | UiAction::Back | UiAction::Controls => {
             window.set_ingame_clock_visible(false)

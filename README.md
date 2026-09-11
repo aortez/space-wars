@@ -29,12 +29,23 @@ The local launcher includes the following scenarios and presets:
   seven-segment square cells. The deterministic scenario receives versioned
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
-  Off, Calm, or Demo in Settings and enable Falling and Color Cycle individually.
+  Off, Calm, or Demo in Settings and enable Falling, Color Cycle, Meltdown, Duck,
+  Marquee, and Digit Slide individually.
   Events share a deterministic, non-overlapping schedule; Color Cycle changes
-  the readable face palette without physics. **Pause → Clock Controls** (or the
+  the readable face palette without physics. Meltdown turns individual cells into
+  a bounded pool that drains through the floor before the face reforms.
+  Duck runs and jumps a tiny seeded obstacle course beneath the readable clock,
+  using one dynamic body and guaranteed arena cleanup.
+  Marquee combines chasing lights, scrolling, waves, and whole-content or
+  per-letter spins using clock digits or short bitmap text, without physics.
+  Digit Slide rolls changed digits on minute boundaries without physics.
+  Save custom text through `clock message` in the CLI or the Clock settings file.
+  **Pause → Clock Controls** (or the
   on-face touch button) changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
-  timing, the event catalog, and synchronized preview controls.
+  timing, the event catalog, and synchronized preview controls; the
+  [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
+  benchmarks and live host timings.
 - **Rover Lab** — a Rapier 2D feasibility scenario for a three-body rover with
   independently driven pin-slot suspension wheels on a rotating circular planet.
 - **Spaceling Lab** — a single-body character walking and jumping on a rotating
@@ -138,6 +149,13 @@ To run your own cartridge directly:
 cargo run -p engine-client -- --rom /path/to/game.nes
 ```
 
+**Sound** in the launcher or pause menu controls master volume and mute for all
+audio-producing scenarios. Left/right (or the touch arrows) adjusts volume in
+1% steps up to 20%, then 5% steps; A/Enter toggles the selected mute control. B/Esc returns to the previous
+menu without resuming a paused game. Changes apply live and save in the
+background. New settings default to 25%; existing saved levels are preserved.
+A failed save leaves the controls usable and offers **Retry Save**.
+
 For launcher selection, copy `.nes` files into the `roms` directory beside
 `settings.toml` (normally `~/.config/spacewars/roms` on Linux), then reopen the
 launcher. `--config-dir /path/to/config` makes the library location explicit.
@@ -239,6 +257,14 @@ revision.
 Returning to the launcher clears active-scenario state while preserving the
 launcher selection. The existing `status` command remains the detailed
 performance and scenario diagnostics interface.
+
+Starting a scenario first returns `launcher.busy`: the menu shows the current
+launch stage, an animated activity indicator, and elapsed time. Settings saves
+and NES cartridge loading run off the UI thread. Input is temporarily disabled
+to prevent duplicate launches; automation should wait for `gameplay` or a
+launcher error instead of assuming the start request completed the launch.
+`ui state` exposes `launcher.busy.stage` and `launcher.busy.elapsed`, and `status`
+retains the last launch's outcome and `launch_*_ms` timings after it finishes.
 
 Route the same actions used by keyboards and gamepads through the visible menu:
 
@@ -497,7 +523,9 @@ opens the host pause menu.
 
 ## Raspberry Pi / kiosk launch
 
-The Pi image launches the scenario selector fullscreen:
+The shared Pi 4/5 image launches the scenario selector fullscreen. Per-device
+profiles support HDMI, the existing HyperPixel kiosk, and a Pi 4 Picade X HAT
+cabinet. See [Picade bring-up and hardware profiles](docs/picade.md).
 
 ```sh
 engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
@@ -517,7 +545,7 @@ See [`docs/pi-kiosk.md`](docs/pi-kiosk.md) for the current Pi runbook and
 example systemd service. The Yocto image scaffold is under [`yocto/`](yocto/).
 
 Once an OTA-capable image has been flashed, build and deploy an update from the
-repository root:
+repository root (the boot assets must match the rootfs image's `.boot-id` sidecar):
 
 ```sh
 ./update.sh
@@ -527,6 +555,14 @@ This updates `spacewars@spacewars.local` by default, reboots into the newly
 written A/B slot, and verifies that `spacewars-kiosk.service` is active. Use
 `./update.sh --skip-build` to deploy the existing image or `./update.sh --help`
 for target, user, image, SSH key, dry-run, and confirmation options.
+Use `--target picade.local` for the cabinet. Migrating an old Pi 5 image to the
+unified machine requires a full USB image flash, not a rootfs-only OTA update.
+
+For application-only iteration, use `./update.sh --fast --target picade.local`.
+It builds and transfers just the matching client/CLI pair, then restarts the
+application without flashing or rebooting. One normal update is needed first
+to install the restricted helper. See [fast updates](docs/pi-kiosk.md#fast-application-updates)
+for compatibility checks and recovery details.
 
 ## History
 

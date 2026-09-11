@@ -11,6 +11,8 @@ enum ActivationFocus {
     LauncherControls(i32),
     TouchTest,
     PauseMain(i32),
+    PauseSound,
+    Sound(i32),
     PauseControls,
     PauseClock(i32),
     GameOver(i32),
@@ -45,6 +47,16 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::TouchTest | ActivationFocus::PauseControls | ActivationFocus::Gameplay => {
         }
         ActivationFocus::PauseMain(index) => window.set_ingame_menu_focus_index(index),
+        ActivationFocus::PauseSound => window.set_ingame_menu_focus_index(
+            4 + i32::from(
+                window.get_scenario_benchmark_available()
+                    || matches!(
+                        window.get_launcher_scenario().as_str(),
+                        "clock" | "spacewars"
+                    ),
+            ),
+        ),
+        ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
         ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
@@ -70,10 +82,20 @@ fn activation_target(
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
         "launcher.start" => launcher(1, UiAction::Confirm),
-        "launcher.new-match" => launcher(5, UiAction::Confirm),
+        "launcher.new-match" => launcher(6, UiAction::Confirm),
         "launcher.settings" => launcher(2, UiAction::Confirm),
         "launcher.controls" => launcher(3, UiAction::Confirm),
         "launcher.quit" => launcher(4, UiAction::Confirm),
+        "launcher.sound" => launcher(5, UiAction::Confirm),
+        "pause.sound" => ActivationTarget {
+            focus: ActivationFocus::PauseSound,
+            action: UiAction::Confirm,
+        },
+        "sound.volume.previous" => sound(0, UiAction::Left),
+        "sound.volume.next" => sound(0, UiAction::Right),
+        "sound.mute" => sound(1, UiAction::Confirm),
+        "sound.back" => sound(2, UiAction::Confirm),
+        "sound.retry" => sound(3, UiAction::Confirm),
         "launcher.settings.back" => launcher_settings(None, UiAction::Back),
         "launcher.settings.start" => launcher_settings(None, UiAction::Start),
         "launcher.controls.back" => launcher_controls(0),
@@ -95,6 +117,12 @@ fn activation_target(
         "pause.clock.event-profile.next" => pause_clock(1, UiAction::Right),
         "pause.clock.falling" => pause_clock(2, UiAction::Confirm),
         "pause.clock.color-cycle" => pause_clock(3, UiAction::Confirm),
+        "pause.clock.meltdown" => pause_clock(7, UiAction::Confirm),
+        "pause.clock.duck" => pause_clock(8, UiAction::Confirm),
+        "pause.clock.marquee" => pause_clock(9, UiAction::Confirm),
+        "pause.clock.digit-slide" => pause_clock(11, UiAction::Confirm),
+        "pause.clock.marquee-preset.previous" => pause_clock(10, UiAction::Left),
+        "pause.clock.marquee-preset.next" => pause_clock(10, UiAction::Right),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -140,19 +168,23 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.travel.asteroid-strength"
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
-        | "launcher.settings.clock.event-profile" => 3,
+        | "launcher.settings.clock.digit-slide" => 3,
         "launcher.settings.spacewars.asteroids"
         | "launcher.settings.match.break-interval"
-        | "launcher.settings.clock.falling"
-        | "launcher.settings.combat.mission" => 4,
+        | "launcher.settings.combat.mission"
+        | "launcher.settings.clock.event-profile" => 4,
         "launcher.settings.spacewars.player-health"
         | "launcher.settings.match.break-duration"
-        | "launcher.settings.clock.color-cycle"
-        | "launcher.settings.combat.asteroid-interval" => 5,
+        | "launcher.settings.combat.asteroid-interval"
+        | "launcher.settings.clock.falling" => 5,
         "launcher.settings.spacewars.player-2"
         | "launcher.settings.combat.asteroid-strength"
-        | "launcher.settings.match.asteroid-interval" => 6,
-        "launcher.settings.match.asteroid-strength" => 7,
+        | "launcher.settings.match.asteroid-interval"
+        | "launcher.settings.clock.color-cycle" => 6,
+        "launcher.settings.match.asteroid-strength" | "launcher.settings.clock.meltdown" => 7,
+        "launcher.settings.clock.duck" => 8,
+        "launcher.settings.clock.marquee" => 9,
+        "launcher.settings.clock.marquee-preset" => 10,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))
@@ -161,6 +193,13 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
 const fn launcher(index: i32, action: UiAction) -> ActivationTarget {
     ActivationTarget {
         focus: ActivationFocus::Launcher(index),
+        action,
+    }
+}
+
+const fn sound(index: i32, action: UiAction) -> ActivationTarget {
+    ActivationTarget {
+        focus: ActivationFocus::Sound(index),
         action,
     }
 }

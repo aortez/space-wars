@@ -22,6 +22,8 @@ mod spacewars;
 mod surface_sortie;
 mod terrain_lab;
 
+pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
+
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
 #[cfg(test)]
@@ -46,6 +48,7 @@ impl RenderBackend {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BenchmarkConfiguration {
     pub pizza: PizzaBenchmarkConfig,
+    pub clock: ClockBenchmarkConfig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +72,9 @@ impl ScenarioStartMode {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BenchmarkCounts {
+    pub bodies: usize,
+    pub colliders: usize,
+    pub clock_event_active: bool,
     pub asteroids: usize,
     pub fragments: usize,
     pub shells: usize,
@@ -147,6 +153,8 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ScenarioCapabilities {
     pub benchmark: bool,
+    /// Headless fixtures may be available without exposing a visual bench menu.
+    pub headless_benchmark: bool,
     pub pointer_input: bool,
     pub player_zoom: bool,
     pub game_over: bool,
@@ -213,7 +221,9 @@ impl ScenarioRegistration {
         mode: ScenarioStartMode,
         asset: &ScenarioAsset,
     ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-        if mode.is_benchmark() && !self.capabilities.benchmark {
+        if mode.is_benchmark()
+            && !(self.capabilities.benchmark || self.capabilities.headless_benchmark)
+        {
             return Err(ScenarioCreateError::BenchmarkUnsupported { name: self.id });
         }
         (self.create)(seed, settings, viewport, mode, asset)
@@ -252,6 +262,10 @@ pub trait ClientScenario {
     fn publish_realtime_actions(&self, _actions: &[Action], _observed_at: Instant) {}
 
     fn set_realtime_paused(&self, _paused: bool) {}
+
+    /// Host-wide output preferences, independent of deterministic simulation.
+    /// Sound-producing adapters must apply these to their playback endpoints.
+    fn set_audio_settings(&self, _settings: engine_common::AudioSettings) {}
 
     fn shutdown_realtime(&mut self) {}
 
@@ -434,6 +448,7 @@ mod tests {
         launcher_visible: false,
         capabilities: ScenarioCapabilities {
             benchmark: false,
+            headless_benchmark: false,
             pointer_input: false,
             player_zoom: false,
             game_over: false,

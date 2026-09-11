@@ -117,7 +117,7 @@ impl GamepadPump {
             }
         }
         self.observe_mode(window);
-        self.sample_gamepads();
+        self.sample_gamepads(window);
         self.refresh_connection_ui(window);
     }
 
@@ -185,7 +185,7 @@ impl GamepadPump {
         }
 
         self.observe_mode(window);
-        self.sample_gamepads();
+        self.sample_gamepads(window);
         if is_ui_mode(window) {
             self.update_ui_navigation(window);
         } else {
@@ -200,7 +200,7 @@ impl GamepadPump {
         gamepad_id: GamepadId,
         event: EventType,
     ) {
-        if !self.mode_handoff.accepts_input(seat) {
+        if window.get_launcher_busy() || !self.mode_handoff.accepts_input(seat) {
             return;
         }
         let EventType::ButtonPressed(button, _) = event else {
@@ -252,7 +252,10 @@ impl GamepadPump {
         }
     }
 
-    fn sample_gamepads(&mut self) {
+    fn sample_gamepads(&mut self, window: &MainWindow) {
+        if window.get_launcher_busy() {
+            self.mode_handoff.block_all();
+        }
         let snapshots = self
             .gilrs
             .gamepads()
@@ -502,18 +505,21 @@ fn is_ui_mode(window: &MainWindow) -> bool {
 }
 
 fn is_game_mode(window: &MainWindow) -> bool {
-    !is_ui_mode(window)
+    InputMode::from_window(window) == InputMode::Gameplay
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InputMode {
+    Busy,
     Ui,
     Gameplay,
 }
 
 impl InputMode {
     fn from_window(window: &MainWindow) -> Self {
-        if window.get_launcher_visible()
+        if window.get_launcher_busy() {
+            Self::Busy
+        } else if window.get_launcher_visible()
             || window.get_ingame_menu_visible()
             || window.get_game_over_visible()
         {
@@ -930,5 +936,29 @@ mod tests {
             ..GamepadSeatInput::default()
         };
         assert!(handoff.filter(0, next_press).south);
+    }
+
+    #[test]
+    fn leaving_busy_requires_a_fresh_release_before_gameplay_or_menu_input() {
+        for destination in [InputMode::Gameplay, InputMode::Ui] {
+            let mut handoff = ModeHandoff::default();
+            handoff.observe(InputMode::Busy);
+            handoff.filter(0, GamepadSeatInput::default());
+            let held = GamepadSeatInput {
+                connected: true,
+                south: true,
+                dpad_down: true,
+                ..GamepadSeatInput::default()
+            };
+            // Busy polling never forwards controls, even after a neutral sample.
+            handoff.block_all();
+            assert!(is_neutral(&handoff.filter(0, held.clone())));
+            assert!(handoff.observe(destination));
+            assert!(is_neutral(&handoff.filter(0, held.clone())));
+            assert!(!handoff.accepts_input(0));
+            handoff.filter(0, GamepadSeatInput::default());
+            assert!(handoff.accepts_input(0));
+            assert_eq!(handoff.filter(0, held.clone()), held);
+        }
     }
 }

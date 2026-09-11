@@ -12,6 +12,7 @@ mod input;
 mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
+mod launcher;
 mod match_world;
 mod native_video;
 mod nes_audio;
@@ -20,6 +21,8 @@ mod nes_roms;
 mod raster;
 mod render;
 mod settings;
+mod settings_writer;
+mod sound_controls;
 mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;
@@ -92,16 +95,36 @@ struct Args {
     debug_triangles: usize,
 
     /// Start the selected scenario's visual benchmark workload in the UI.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "benchmark_headless")]
     benchmark: bool,
 
     /// Run the selected scenario's benchmark without a window and print CSV rows.
     #[arg(long)]
     benchmark_headless: bool,
 
-    /// Number of seconds to run --benchmark-headless.
-    #[arg(long, default_value_t = 30)]
+    /// Simulated seconds for --benchmark-headless (60 steps/frames per row).
+    #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=3600))]
     benchmark_seconds: u64,
+
+    /// Warm the headless pipeline, then reset the seeded workload before measuring.
+    #[arg(long, default_value_t = 2, value_parser = clap::value_parser!(u64).range(0..=120))]
+    benchmark_warmup_seconds: u64,
+
+    /// Logical headless viewport width, before raster scaling.
+    #[arg(long, default_value_t = 1280, value_parser = clap::value_parser!(u32).range(64..=4096))]
+    benchmark_width: u32,
+
+    /// Logical headless viewport height, before raster scaling.
+    #[arg(long, default_value_t = 720, value_parser = clap::value_parser!(u32).range(64..=4096))]
+    benchmark_height: u32,
+
+    /// Deterministic Clock fixture. Only used by headless Clock benchmarks.
+    #[arg(long, value_enum, default_value = "idle")]
+    clock_benchmark_case: client_scenarios::ClockBenchmarkCase,
+
+    /// Fixed Marquee recipe for the Clock fixture, independent of saved settings.
+    #[arg(long, default_value = "clock-wave", value_parser = parse_clock_benchmark_recipe)]
+    clock_benchmark_recipe: engine_common::ClockMarqueePreset,
 
     /// Optional CSV file path for --benchmark-headless output.
     #[arg(long)]
@@ -250,8 +273,26 @@ impl Args {
                 workload: self.pizza_benchmark_workload.into(),
                 ball_count: self.pizza_benchmark_balls.min(MAX_BENCHMARK_BALLS),
             },
+            clock: client_scenarios::ClockBenchmarkConfig {
+                case: self.clock_benchmark_case,
+                marquee_preset: self.clock_benchmark_recipe,
+            },
         }
     }
+}
+
+fn parse_clock_benchmark_recipe(value: &str) -> Result<engine_common::ClockMarqueePreset, String> {
+    engine_common::ClockMarqueePreset::ALL
+        .into_iter()
+        .find(|preset| preset.as_str() == value)
+        .ok_or_else(|| {
+            format!(
+                "Unknown Clock recipe {value:?}; choose {}",
+                engine_common::ClockMarqueePreset::ALL
+                    .map(|p| p.as_str())
+                    .join(", ")
+            )
+        })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -297,8 +338,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         host::validate_scenario(effective_launch.scenario.as_str())?;
     }
     if args.uses_benchmark()
-        && !host::scenario_registration(effective_launch.scenario.as_str())
-            .is_some_and(|registration| registration.capabilities.benchmark)
+        && !host::scenario_registration(effective_launch.scenario.as_str()).is_some_and(
+            |registration| {
+                if args.benchmark_headless {
+                    registration.capabilities.headless_benchmark
+                } else {
+                    registration.capabilities.benchmark
+                }
+            },
+        )
     {
         return Err(format!(
             "scenario {:?} does not support benchmark mode",
@@ -337,6 +385,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             scenario: effective_launch.scenario.clone(),
             seed: effective_launch.seed,
             seconds: args.benchmark_seconds,
+            warmup_seconds: args.benchmark_warmup_seconds,
+            viewport: render::Viewport::new(
+                args.benchmark_width as f32,
+                args.benchmark_height as f32,
+            ),
             report_path: args.benchmark_report.clone(),
             renderer: effective_launch.renderer,
             raster_scale: effective_launch.raster_scale,
@@ -352,6 +405,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
+    let _settings_status = settings_writer::install_status(&window, settings_writer.clone());
     let scenario_controls = host::new_scenario_controls();
     let _control_server = ipc::start_control_server(
         &window,
@@ -367,8 +422,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Rc::clone(&input),
         Arc::clone(&settings),
-        settings_path.clone(),
         Rc::clone(&rom_catalog),
+        settings_writer.clone(),
     );
     install_ingame_menu_callbacks(
         &window,
@@ -376,7 +431,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Rc::clone(&input),
         Arc::clone(&settings),
-        settings_path.clone(),
+        settings_writer.clone(),
         Rc::clone(&rom_catalog),
     );
     install_ui_navigation(&window);
@@ -385,7 +440,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &window,
         Rc::clone(&scenario_controls),
         Arc::clone(&settings),
-        settings_path.clone(),
+        settings_writer.clone(),
+    );
+    sound_controls::install(
+        &window,
+        Rc::clone(&scenario_controls),
+        Arc::clone(&settings),
+        settings_writer.clone(),
     );
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
@@ -443,6 +504,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     window.run()?;
+    // The window is closed: finish queued preference changes before a normal
+    // application exit, without making the visible UI wait on storage.
+    if settings_writer.status().pending {
+        let snapshot = settings.read().unwrap().clone();
+        settings_writer.save_blocking(snapshot)?;
+    }
     Ok(())
 }
 
@@ -566,6 +633,7 @@ fn show_launcher(
     settings: &Settings,
     rom_catalog: &SharedNesRomCatalog,
 ) {
+    window.set_sound_visible(false);
     // Release any scenario-specific native-video presenter retained by the
     // generated callback before exposing the launcher again.
     window.on_native_video_ready(|| {});
@@ -658,6 +726,12 @@ fn show_launcher(
     )));
     window.set_launcher_clock_falling_enabled(settings.clock.events.falling);
     window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
+    window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
+    window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
+    window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
+    window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
+    window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
+    window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
     refresh_nes_rom_library(window, settings, rom_catalog);
     window.set_launcher_error_text(SharedString::from(""));
     window.set_launcher_focus_index(0);
@@ -816,66 +890,30 @@ fn install_launcher_callbacks(
     scenario_controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
-    settings_path: PathBuf,
     rom_catalog: SharedNesRomCatalog,
+    settings_writer: settings_writer::SettingsWriter,
 ) {
-    let weak = window.as_weak();
-    let game_timer = Rc::clone(&render_timer);
-    let game_controls = Rc::clone(&scenario_controls);
-    let game_input = Rc::clone(&input);
-    let game_settings = Arc::clone(&settings);
-    let game_settings_path = settings_path.clone();
-    let game_rom_catalog = Rc::clone(&rom_catalog);
+    let launcher = launcher::Launcher::new(
+        window,
+        render_timer,
+        scenario_controls,
+        input,
+        settings,
+        Rc::clone(&rom_catalog),
+        settings_writer,
+    );
+    let game_launcher = Rc::clone(&launcher);
     window.on_launcher_start_game(move || {
-        handle_launcher_start(
-            &weak,
-            &game_timer,
-            &game_controls,
-            &game_input,
-            &game_settings,
-            &game_settings_path,
-            &game_rom_catalog,
-            LauncherStart::SelectedWorld,
-        );
+        game_launcher.start(launcher::StartMode::SelectedWorld);
     });
 
-    let weak = window.as_weak();
-    let game_timer = Rc::clone(&render_timer);
-    let game_controls = Rc::clone(&scenario_controls);
-    let game_input = Rc::clone(&input);
-    let game_settings = Arc::clone(&settings);
-    let game_settings_path = settings_path.clone();
-    let game_rom_catalog = Rc::clone(&rom_catalog);
+    let new_world_launcher = Rc::clone(&launcher);
     window.on_launcher_new_match(move || {
-        handle_launcher_start(
-            &weak,
-            &game_timer,
-            &game_controls,
-            &game_input,
-            &game_settings,
-            &game_settings_path,
-            &game_rom_catalog,
-            LauncherStart::NewMatch,
-        );
+        new_world_launcher.start(launcher::StartMode::NewMatch);
     });
 
-    let weak = window.as_weak();
-    let benchmark_timer = Rc::clone(&render_timer);
-    let benchmark_controls = Rc::clone(&scenario_controls);
-    let benchmark_input = Rc::clone(&input);
-    let benchmark_settings = Arc::clone(&settings);
-    let benchmark_rom_catalog = Rc::clone(&rom_catalog);
     window.on_launcher_start_benchmark(move || {
-        handle_launcher_start(
-            &weak,
-            &benchmark_timer,
-            &benchmark_controls,
-            &benchmark_input,
-            &benchmark_settings,
-            &settings_path,
-            &benchmark_rom_catalog,
-            LauncherStart::Benchmark,
-        );
+        launcher.start(launcher::StartMode::Benchmark);
     });
 
     let weak = window.as_weak();
@@ -932,7 +970,7 @@ fn install_ingame_menu_callbacks(
     scenario_controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
-    settings_path: PathBuf,
+    settings_writer: settings_writer::SettingsWriter,
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
@@ -963,11 +1001,9 @@ fn install_ingame_menu_callbacks(
         settings.launch.renderer =
             renderer_setting(renderer_from_label(window.get_launcher_renderer().as_str()).unwrap());
         settings.launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
-        if let Err(error) = settings::save_settings(&settings, &settings_path) {
-            window.set_scenario_error_text(SharedString::from(format!(
-                "The new match is ready, but its world seed could not be saved: {error}"
-            )));
-        }
+        let snapshot = settings.clone();
+        drop(settings);
+        let _ = settings_writer.save(snapshot);
     });
 
     let controls = Rc::clone(&scenario_controls);
@@ -1025,6 +1061,9 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
+        if window.get_launcher_busy() {
+            return;
+        }
         // Repeat may move selection, but must never repeatedly toggle a setting,
         // restart, or pause/resume as the user holds a key across a transition.
         let adjusts_setting = matches!(code, 2 | 3)
@@ -1064,7 +1103,12 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
-    if window.get_touch_test_visible() {
+    if window.get_launcher_busy() {
+        return;
+    }
+    if window.get_sound_visible() {
+        sound_controls::handle_action(window, action);
+    } else if window.get_touch_test_visible() {
         if matches!(action, UiAction::Back | UiAction::Controls) {
             window.set_touch_test_visible(false);
         }
@@ -1174,7 +1218,8 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             2 => window.set_launcher_settings_visible(true),
             3 => window.set_launcher_controls_visible(true),
             4 => window.invoke_launcher_quit(),
-            5 if window.get_launcher_scenario() == "spacewars" => {
+            5 => window.invoke_sound_open(),
+            6 if window.get_launcher_scenario() == "spacewars" => {
                 window.invoke_launcher_new_match()
             }
             _ => {}
@@ -1256,6 +1301,16 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
                 clock_controls::open(window);
             } else if selected == 4 && window.get_launcher_scenario() == "spacewars" {
                 window.invoke_ingame_new_match();
+            } else if selected
+                == 4 + i32::from(
+                    benchmark_offset == 1
+                        || matches!(
+                            window.get_launcher_scenario().as_str(),
+                            "clock" | "spacewars"
+                        ),
+                )
+            {
+                window.invoke_sound_open();
             }
         }
         UiAction::Back | UiAction::Start => window.invoke_ingame_resume(),
@@ -1295,7 +1350,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 5,
-        "clock" => 7,
+        "clock" => 12,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition" | "spacewars-terrain" => 4,
@@ -1513,17 +1568,45 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
-    if focus == 4 {
-        window.set_launcher_clock_falling_enabled(!window.get_launcher_clock_falling_enabled());
+    if focus == 3 {
+        window.set_launcher_clock_digit_slide_enabled(
+            !window.get_launcher_clock_digit_slide_enabled(),
+        );
+        return;
+    }
+    if focus == 9 {
+        window.set_launcher_clock_marquee_enabled(!window.get_launcher_clock_marquee_enabled());
+        return;
+    }
+    if focus == 10 {
+        let labels = engine_common::ClockMarqueePreset::ALL.map(|preset| preset.label());
+        let next = cycle_label(
+            window.get_launcher_clock_marquee_preset().as_str(),
+            &labels,
+            delta,
+        );
+        window.set_launcher_clock_marquee_preset(next.into());
+        return;
+    }
+    if focus == 8 {
+        window.set_launcher_clock_duck_enabled(!window.get_launcher_clock_duck_enabled());
+        return;
+    }
+    if focus == 7 {
+        window.set_launcher_clock_meltdown_enabled(!window.get_launcher_clock_meltdown_enabled());
         return;
     }
     if focus == 5 {
+        window.set_launcher_clock_falling_enabled(!window.get_launcher_clock_falling_enabled());
+        return;
+    }
+    if focus == 6 {
         window.set_launcher_clock_color_cycle_enabled(
             !window.get_launcher_clock_color_cycle_enabled(),
         );
         return;
     }
-    if focus == 3 {
+    if focus == 4 {
         let next = cycle_label(
             window.get_launcher_clock_event_profile().as_str(),
             &["Off", "Calm", "Demo"],
@@ -1657,103 +1740,12 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
     window.set_launcher_error_text(SharedString::from(""));
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum LauncherStart {
-    SelectedWorld,
-    NewMatch,
-    Benchmark,
-}
-
-fn handle_launcher_start(
-    weak_window: &slint::Weak<MainWindow>,
-    render_timer: &Rc<RefCell<Option<Timer>>>,
-    scenario_controls: &host::SharedScenarioControls,
-    input: &input::SharedInput,
-    settings: &Arc<RwLock<Settings>>,
-    settings_path: &Path,
-    rom_catalog: &SharedNesRomCatalog,
-    mode: LauncherStart,
-) {
-    let Some(window) = weak_window.upgrade() else {
-        return;
-    };
-    window.set_launcher_error_text(SharedString::from(""));
-
-    let current_settings = settings.read().unwrap().clone();
-    let mut selections = match launcher_selections_from_window(&window, &current_settings) {
-        Ok(selections) => selections,
-        Err(message) => {
-            window.set_launcher_error_text(SharedString::from(message));
-            return;
-        }
-    };
-    if mode == LauncherStart::NewMatch {
-        if selections.launch.scenario != "spacewars" {
-            return;
-        }
-        selections.launch.seed = match_world::fresh_seed(selections.launch.seed);
-    }
-    let start_benchmark = mode == LauncherStart::Benchmark;
-    if start_benchmark
-        && !host::scenario_registration(selections.launch.scenario.as_str())
-            .is_some_and(|registration| registration.capabilities.benchmark)
-    {
-        window.set_launcher_error_text(SharedString::from(
-            "The selected scenario does not support benchmark mode.",
-        ));
-        return;
-    }
-    if let Err(err) = persist_launcher_settings(settings, settings_path, &selections) {
-        window.set_launcher_error_text(SharedString::from(format!(
-            "Could not save settings: {err}"
-        )));
-        return;
-    }
-    let scenario_settings = settings.read().unwrap().clone();
-    let asset = match resolve_launch_asset(
-        &selections.launch,
-        None,
-        &scenario_settings,
-        &rom_catalog.borrow(),
-    ) {
-        Ok(asset) => asset,
-        Err(message) => {
-            window.set_launcher_error_text(SharedString::from(message));
-            return;
-        }
-    };
-
-    match start_scenario_from_launch(
-        &window,
-        &selections.launch,
-        start_benchmark,
-        host::BenchmarkConfiguration::default(),
-        Rc::clone(scenario_controls),
-        Rc::clone(input),
-        scenario_settings,
-        asset,
-    ) {
-        Ok(timer) => {
-            let mut timer_slot = render_timer.borrow_mut();
-            if let Some(old_timer) = timer_slot.take() {
-                old_timer.stop();
-            }
-            scenario_controls.borrow_mut().clear();
-            *timer_slot = Some(timer);
-            hide_launcher_surfaces(&window);
-        }
-        Err(err) => {
-            clear_runtime_diagnostics(&window);
-            window.set_launcher_error_text(SharedString::from(err.to_string()));
-        }
-    }
-}
-
 fn clear_runtime_diagnostics(window: &MainWindow) {
     window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
 }
 
 fn hide_launcher_surfaces(window: &MainWindow) {
+    window.set_sound_visible(false);
     window.set_launcher_visible(false);
     window.set_launcher_settings_visible(false);
     window.set_launcher_controls_visible(false);
@@ -1776,12 +1768,7 @@ struct LauncherSelections {
     material_combat: engine_common::MaterialCombatSettings,
 }
 
-fn persist_launcher_settings(
-    settings: &Arc<RwLock<Settings>>,
-    settings_path: &Path,
-    selections: &LauncherSelections,
-) -> Result<bool, settings::SettingsError> {
-    let mut settings = settings.write().unwrap();
+fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelections) -> bool {
     let launch = &selections.launch;
     let renderer = renderer_setting(launch.renderer);
     let raster_scale = normalize_raster_scale(launch.raster_scale);
@@ -1840,12 +1827,7 @@ fn persist_launcher_settings(
         changed = true;
     }
 
-    if changed {
-        settings::save_settings(&settings, settings_path)?;
-        tracing::info!(path = %settings_path.display(), "saved launcher settings.");
-    }
-
-    Ok(changed)
+    changed
 }
 
 fn launch_from_settings(settings: &Settings) -> EffectiveLaunch {
@@ -2145,7 +2127,20 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
         events: engine_common::ClockEvents {
             falling: window.get_launcher_clock_falling_enabled(),
             color_cycle: window.get_launcher_clock_color_cycle_enabled(),
+            meltdown: window.get_launcher_clock_meltdown_enabled(),
+            duck: window.get_launcher_clock_duck_enabled(),
+            marquee: window.get_launcher_clock_marquee_enabled(),
+            digit_slide: window.get_launcher_clock_digit_slide_enabled(),
         },
+        marquee_preset: engine_common::ClockMarqueePreset::ALL
+            .into_iter()
+            .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
+            .ok_or("Unknown Clock marquee recipe")?,
+        marquee_message: window
+            .get_launcher_clock_marquee_message()
+            .as_str()
+            .parse()
+            .map_err(|error: engine_common::ClockMessageError| error.to_string())?,
     })
 }
 
@@ -2517,6 +2512,11 @@ mod tests {
             benchmark: false,
             benchmark_headless: false,
             benchmark_seconds: 30,
+            benchmark_warmup_seconds: 2,
+            benchmark_width: 1280,
+            benchmark_height: 720,
+            clock_benchmark_case: client_scenarios::ClockBenchmarkCase::Idle,
+            clock_benchmark_recipe: engine_common::ClockMarqueePreset::ClockWave,
             benchmark_report: None,
             pizza_benchmark_balls: scenario_pizza::DEFAULT_BENCHMARK_BALLS,
             pizza_benchmark_backend: PizzaBenchmarkBackendArg::Rapier,
@@ -2917,7 +2917,7 @@ mod tests {
     }
 
     #[test]
-    fn persist_launcher_settings_updates_defaults_setup_and_last_scenario() {
+    fn launcher_selections_update_defaults_setup_and_last_scenario() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
@@ -2949,7 +2949,13 @@ mod tests {
                 events: engine_common::ClockEvents {
                     falling: false,
                     color_cycle: true,
+                    meltdown: false,
+                    duck: false,
+                    marquee: false,
+                    digit_slide: false,
                 },
+                marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
+                marquee_message: "CUSTOM TEXT".parse().unwrap(),
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,
@@ -2968,8 +2974,15 @@ mod tests {
             },
         };
 
-        assert!(persist_launcher_settings(&settings, &path, &selections).unwrap());
-        assert!(!persist_launcher_settings(&settings, &path, &selections).unwrap());
+        assert!(apply_launcher_selections(
+            &mut settings.write().unwrap(),
+            &selections
+        ));
+        assert!(!apply_launcher_selections(
+            &mut settings.write().unwrap(),
+            &selections
+        ));
+        settings::save_settings(&settings.read().unwrap(), &path).unwrap();
 
         let stored = settings.read().unwrap();
         assert_eq!(stored.launch.scenario, "spacewars");

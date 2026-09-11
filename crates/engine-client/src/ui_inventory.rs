@@ -4,6 +4,8 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ScreenVisibility {
+    pub(crate) launcher_busy: bool,
+    pub(crate) sound: bool,
     pub(crate) launcher: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
@@ -15,10 +17,14 @@ pub(crate) struct ScreenVisibility {
 }
 
 pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
-    if visibility.touch_test {
+    if visibility.launcher_busy {
+        UiScreen::LauncherBusy
+    } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.launcher_controls {
+        if visibility.sound {
+            UiScreen::LauncherSound
+        } else if visibility.launcher_controls {
             UiScreen::LauncherControls
         } else if visibility.launcher_settings {
             UiScreen::LauncherSettings
@@ -27,6 +33,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound {
+        UiScreen::PauseSound
     } else if visibility.ingame_menu && visibility.ingame_clock {
         UiScreen::PauseClock
     } else if visibility.ingame_controls {
@@ -40,6 +48,13 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) launcher_busy_stage: String,
+    pub(crate) launcher_busy_elapsed: String,
+    pub(crate) sound_focus_index: i32,
+    pub(crate) sound_volume_percent: i32,
+    pub(crate) sound_muted: bool,
+    pub(crate) settings_save_pending: bool,
+    pub(crate) settings_save_error: Option<String>,
     pub(crate) selected_scenario: String,
     pub(crate) world_seed: String,
     pub(crate) launcher_focus_index: i32,
@@ -75,6 +90,11 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_event_profile: String,
     pub(crate) clock_falling_enabled: bool,
     pub(crate) clock_color_cycle_enabled: bool,
+    pub(crate) clock_meltdown_enabled: bool,
+    pub(crate) clock_duck_enabled: bool,
+    pub(crate) clock_marquee_enabled: bool,
+    pub(crate) clock_digit_slide_enabled: bool,
+    pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
 }
 
@@ -88,7 +108,19 @@ pub(crate) struct UiInventory {
 
 pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContext) -> UiInventory {
     match screen {
+        UiScreen::LauncherBusy => UiInventory {
+            selected_control: None,
+            controls: vec![
+                UiControl::new("launcher.busy.stage", "Launch stage", false)
+                    .with_value(context.launcher_busy_stage.clone()),
+                UiControl::new("launcher.busy.elapsed", "Elapsed", false)
+                    .with_value(context.launcher_busy_elapsed.clone()),
+            ],
+            actions: Vec::new(),
+            error: None,
+        },
         UiScreen::LauncherMain => launcher_main_inventory(context),
+        UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
         UiScreen::LauncherSettings => launcher_settings_inventory(context),
         UiScreen::LauncherControls => launcher_controls_inventory(context),
         UiScreen::LauncherTouchTest => UiInventory {
@@ -192,6 +224,7 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings",
                 "launcher.controls",
                 "launcher.quit",
+                "launcher.sound",
             ],
             context.launcher_focus_index,
         ),
@@ -207,6 +240,7 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             },
             UiControl::new("launcher.settings", "Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
+            UiControl::new("launcher.sound", "Sound", true),
             UiControl::new("launcher.quit", "Quit", true),
         ],
         actions: vec![
@@ -226,7 +260,7 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             "New Match · New World",
             true,
         ));
-        if context.launcher_focus_index == 5 {
+        if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
     }
@@ -467,16 +501,39 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.clock.color-cycle",
                     context.clock_color_cycle_enabled,
                 ),
+                (
+                    "launcher.settings.clock.meltdown",
+                    context.clock_meltdown_enabled,
+                ),
+                ("launcher.settings.clock.duck", context.clock_duck_enabled),
+                (
+                    "launcher.settings.clock.marquee",
+                    context.clock_marquee_enabled,
+                ),
+                (
+                    "launcher.settings.clock.digit-slide",
+                    context.clock_digit_slide_enabled,
+                ),
             ] {
                 push_choice(&mut controls, id, if enabled { "On" } else { "Off" });
             }
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.marquee-preset",
+                &context.clock_marquee_preset,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
                 "launcher.settings.clock.time-format",
+                "launcher.settings.clock.digit-slide",
                 "launcher.settings.clock.event-profile",
                 "launcher.settings.clock.falling",
                 "launcher.settings.clock.color-cycle",
+                "launcher.settings.clock.meltdown",
+                "launcher.settings.clock.duck",
+                "launcher.settings.clock.marquee",
+                "launcher.settings.clock.marquee-preset",
                 "launcher.settings.back",
             ]
         }
@@ -608,6 +665,9 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
         controls.push(UiControl::new("pause.clock", "Clock Controls", true));
     }
 
+    ids.push("pause.sound");
+    controls.push(UiControl::new("pause.sound", "Sound", true));
+
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
         controls,
@@ -619,6 +679,45 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
 fn push_choice(controls: &mut Vec<UiControl>, id: &str, value: &str) {
     controls.push(UiControl::new(format!("{id}.previous"), "‹", true).with_value(value));
     controls.push(UiControl::new(format!("{id}.next"), "›", true).with_value(value));
+}
+
+fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
+    let mut controls = Vec::new();
+    push_choice(
+        &mut controls,
+        "sound.volume",
+        &format!("{}%", context.sound_volume_percent),
+    );
+    controls.push(
+        UiControl::new("sound.mute", "Mute", true).with_value(if context.sound_muted {
+            "on"
+        } else {
+            "off"
+        }),
+    );
+    controls.push(UiControl::new("sound.back", "Back", true));
+    let mut ids = vec!["sound.volume", "sound.mute", "sound.back"];
+    if context.settings_save_error.is_some() {
+        ids.push("sound.retry");
+        controls.push(UiControl::new("sound.retry", "Retry Save", true));
+    }
+    controls.push(
+        UiControl::new("sound.save-status", "Settings save", false).with_value(
+            if context.settings_save_pending {
+                "saving"
+            } else if context.settings_save_error.is_some() {
+                "error"
+            } else {
+                "saved"
+            },
+        ),
+    );
+    UiInventory {
+        selected_control: selected_from_index(&ids, context.sound_focus_index),
+        controls,
+        actions: UiAction::ALL.to_vec(),
+        error: context.settings_save_error.clone(),
+    }
 }
 
 fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
@@ -656,12 +755,51 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         "pause.clock.preview-event",
         &context.clock_preview,
     );
+    controls.push(
+        UiControl::new("pause.clock.meltdown", "Meltdown", true).with_value(
+            if context.clock_meltdown_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
     controls.push(UiControl::new("pause.clock.back", "Back", true));
+    controls.push(UiControl::new("pause.clock.duck", "Duck", true).with_value(
+        if context.clock_duck_enabled {
+            "On"
+        } else {
+            "Off"
+        },
+    ));
+    controls.push(
+        UiControl::new("pause.clock.marquee", "Marquee", true).with_value(
+            if context.clock_marquee_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
+    push_choice(
+        &mut controls,
+        "pause.clock.marquee-preset",
+        &context.clock_marquee_preset,
+    );
     controls.push(UiControl::new(
         "pause.clock.preview",
         "Preview & Resume",
         true,
     ));
+    controls.push(
+        UiControl::new("pause.clock.digit-slide", "Digit Slide", true).with_value(
+            if context.clock_digit_slide_enabled {
+                "On"
+            } else {
+                "Off"
+            },
+        ),
+    );
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
@@ -675,6 +813,11 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.preview-event",
                 "pause.clock.back",
                 "pause.clock.preview",
+                "pause.clock.meltdown",
+                "pause.clock.duck",
+                "pause.clock.marquee",
+                "pause.clock.marquee-preset",
+                "pause.clock.digit-slide",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -723,6 +866,11 @@ mod tests {
             clock_event_profile: "Calm".into(),
             clock_falling_enabled: true,
             clock_color_cycle_enabled: true,
+            clock_meltdown_enabled: true,
+            clock_duck_enabled: true,
+            clock_marquee_enabled: true,
+            clock_digit_slide_enabled: true,
+            clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
         }
@@ -804,6 +952,18 @@ mod tests {
     fn classification_uses_visible_layer_order() {
         assert_eq!(
             classify_screen(ScreenVisibility {
+                launcher_busy: true,
+                launcher: true,
+                launcher_settings: true,
+                touch_test: true,
+                ..Default::default()
+            }),
+            UiScreen::LauncherBusy
+        );
+        assert_eq!(
+            classify_screen(ScreenVisibility {
+                launcher_busy: false,
+                sound: false,
                 launcher: true,
                 launcher_controls: true,
                 launcher_settings: true,
@@ -837,6 +997,22 @@ mod tests {
     }
 
     #[test]
+    fn busy_inventory_reports_progress_without_exposing_menu_actions() {
+        let mut context = context("pizza");
+        context.launcher_busy_stage = "saving_settings".into();
+        context.launcher_busy_elapsed = "12.4 s".into();
+        let inventory = inventory_for_screen(UiScreen::LauncherBusy, &context);
+        assert!(inventory.actions.is_empty());
+        assert!(inventory.selected_control.is_none());
+        assert!(inventory.controls.iter().all(|control| !control.enabled));
+        assert_eq!(
+            inventory.controls[0].value.as_deref(),
+            Some("saving_settings")
+        );
+        assert_eq!(inventory.controls[1].value.as_deref(), Some("12.4 s"));
+    }
+
+    #[test]
     fn launcher_main_reports_actions_selection_readiness_and_error() {
         let mut context = context("nes");
         context.launcher_focus_index = 0;
@@ -857,6 +1033,7 @@ mod tests {
                 "launcher.start",
                 "launcher.settings",
                 "launcher.controls",
+                "launcher.sound",
                 "launcher.quit",
             ]
         );
@@ -875,7 +1052,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 14, "launcher.settings.clock.color-cycle"),
+            ("clock", 24, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
@@ -893,7 +1070,7 @@ mod tests {
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
                 "pizza" => 3,
-                "clock" => 5,
+                "clock" => 8,
                 "rover-lab" => 1,
                 "falling" => 0,
                 "nes" => 0,
@@ -1064,11 +1241,13 @@ mod tests {
             for screen in [
                 UiScreen::LauncherMain,
                 UiScreen::LauncherSettings,
+                UiScreen::LauncherSound,
                 UiScreen::LauncherControls,
                 UiScreen::LauncherTouchTest,
                 UiScreen::Gameplay,
                 UiScreen::PauseMain,
                 UiScreen::PauseClock,
+                UiScreen::PauseSound,
             ] {
                 assert_inventory_is_activatable(screen, &context);
             }
@@ -1098,7 +1277,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 10);
+        assert_eq!(inventory.controls.len(), 16);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

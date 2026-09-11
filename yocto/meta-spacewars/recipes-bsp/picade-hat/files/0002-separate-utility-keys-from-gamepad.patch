@@ -1,0 +1,121 @@
+From: Space-Wars contributors
+Subject: [PATCH] Separate utility keys from gamepad controls
+
+libinput rejects a joystick/gamepad even when it advertises a few KEY_*
+controls and ID_INPUT_KEYBOARD. Put Enter, Escape and Power on their own
+gpio-keys device so the keyboard backend can see them. Give each device
+its own disjoint pinctrl group and retain all parameter label references.
+Game buttons default to the profile's standard evdev gamepad codes.
+
+Upstream-Status: Inappropriate [Space-Wars controller profile]
+---
+
+diff --git a/picade.dts b/picade.dts
+index 231e814..e3e8b06 100644
+--- a/picade.dts
++++ b/picade.dts
+@@ -8,9 +8,14 @@
+ 		target = <&gpio>;
+ 		__overlay__ {
+ 			picade_pins: picade_pins {
+-				brcm,pins =     <17 5 6 8 9 10 11 12 16 20 22 23 24 25 27>;
+-				brcm,function = <0  0 0 0 0 0  0  0  0  0  0  0  0  0  0>;
+-				brcm,pull =     <2  2 2 2 2 2  2  2  2  2  2  2  2  2  2>;
++				brcm,pins =     <5 6 8 9 10 11 12 16 20 23 24 25>;
++				brcm,function = <0 0 0 0  0  0  0  0  0  0  0  0>;
++				brcm,pull =     <2 2 2 2  2  2  2  2  2  2  2  2>;
++			};
++			picade_key_pins: picade_key_pins {
++				brcm,pins = <17 22 27>;
++				brcm,function = <0 0 0>;
++				brcm,pull = <2 2 2>;
+ 			};
+ 			power_ctrl_pins: power_ctrl_pins {
+ 				brcm,pins = <4>;
+@@ -83,40 +88,61 @@
+ 
+ 				button1: button1 {
+ 					label = "Button 1";
+-					linux,code = <29>;
++					linux,code = <304>; /* BTN_SOUTH */
+ 					gpios = <&gpio 5 1>;
+ 				};
+ 
+ 				button2: button2 {
+ 					label = "Button 2";
+-					linux,code = <56>;
++					linux,code = <305>; /* BTN_EAST */
+ 					gpios = <&gpio 11 1>;
+ 				};
+ 
+ 				button3: button3 {
+ 					label = "Button 3";
+-					linux,code = <57>;
++					linux,code = <308>; /* BTN_WEST */
+ 					gpios = <&gpio 8 1>;
+ 				};
+ 
+ 				button4: button4 {
+ 					label = "Button 4";
+-					linux,code = <42>;
++					linux,code = <307>; /* BTN_NORTH */
+ 					gpios = <&gpio 25 1>;
+ 				};
+ 
+ 				button5: button5 {
+ 					label = "Button 5";
+-					linux,code = <44>;
++					linux,code = <310>; /* BTN_TL */
+ 					gpios = <&gpio 9 1>;
+ 				};
+ 
+ 				button6: button6 {
+ 					label = "Button 6";
+-					linux,code = <45>;
++					linux,code = <311>; /* BTN_TR */
+ 					gpios = <&gpio 10 1>;
+ 				};
+ 
++				coin: coin {
++					label = "Coin";
++					linux,code = <314>; /* BTN_SELECT */
++					gpios = <&gpio 23 1>;
++				};
++
++				start: start {
++					label = "Start";
++					linux,code = <315>; /* BTN_START */
++					gpios = <&gpio 24 1>;
++				};
++			};
++
++			/* libinput ignores gamepads, including any KEY_* on them. */
++			picade_keys: picade_keys {
++				compatible = "gpio-keys";
++				label = "Space-Wars Picade Keys";
++				pinctrl-names = "default";
++				pinctrl-0 = <&picade_key_pins>;
++				status = "okay";
++
+ 				enter: enter {
+ 					label = "Enter";
+ 					linux,code = <28>;
+@@ -129,18 +155,6 @@
+ 					gpios = <&gpio 22 1>;
+ 				};
+ 
+-				coin: coin {
+-					label = "Coin";
+-					linux,code = <23>;
+-					gpios = <&gpio 23 1>;
+-				};
+-
+-				start: start {
+-					label = "Start";
+-					linux,code = <24>;
+-					gpios = <&gpio 24 1>;
+-				};
+-
+ 				power: power {	
+ 					label = "Power";
+ 					linux,code = <116>; // KEY_POWER

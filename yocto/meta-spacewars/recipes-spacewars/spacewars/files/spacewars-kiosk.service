@@ -1,8 +1,8 @@
 [Unit]
 Description=Space-Wars kiosk
-Requires=spacewars-data-init.service
+Requires=spacewars-data-init.service spacewars-hardware.service
 Wants=spacewars-seatd.service
-After=spacewars-data-init.service spacewars-seatd.service systemd-user-sessions.service
+After=spacewars-data-init.service spacewars-hardware.service spacewars-seatd.service systemd-user-sessions.service
 
 [Service]
 Type=simple
@@ -10,10 +10,10 @@ User=spacewars
 Group=spacewars
 SupplementaryGroups=input video audio
 Environment=SPACEWARS_CONFIG_DIR=/var/lib/spacewars
-Environment=ALSA_CARD=Audio
 Environment=SLINT_BACKEND=linuxkms-software
-Environment=SLINT_DRM_OUTPUT=DPI-1
-Environment=SLINT_KMS_ROTATION=90
+EnvironmentFile=/run/spacewars-hardware/hardware.env
+# Optional per-device overrides; the shared boot partition survives A/B updates.
+EnvironmentFile=-/boot/spacewars-kiosk.env
 WorkingDirectory=/data/spacewars
 ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
 Restart=on-failure

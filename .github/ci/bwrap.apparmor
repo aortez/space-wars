@@ -1,0 +1,11 @@
+# CI-only namespace permission for the isolated installer tests on Ubuntu 24.04.
+# Loaded into the disposable runner, never installed on a workstation or Pi.
+# This grants bwrap (and its sandboxed commands) access to user namespaces;
+# filesystem isolation remains the responsibility of the test's bwrap arguments.
+# The system-wide AppArmor user-namespace restriction is left unchanged.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+}
