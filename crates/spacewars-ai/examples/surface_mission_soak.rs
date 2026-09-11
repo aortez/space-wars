@@ -224,7 +224,10 @@ fn main() {
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
                 let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
                 if let Some(trace) = &mut trace
-                    && (tick % 60 == 0 || label != last[i] || posture_key != last_posture[i])
+                    && (tick % 60 == 0
+                        || label != last[i]
+                        || posture_key != last_posture[i]
+                        || o.local.landing_objective.is_some())
                 {
                     serde_json::to_writer(
                         &mut *trace,
@@ -345,6 +348,8 @@ fn main() {
         "match_rules":match_rules,"round":state.match_observation(),
         "termination":if state.match_outcome().is_some(){"round_finished"}else{"budget_exhausted"},
         "elapsed_ticks":elapsed_ticks,"metrics":metrics,"final_combat":final_combat,"final_audit":final_audit,
+        "final_pilots":std::array::from_fn::<_, 2, _>(|i| state.pilot_observation(i, pilots[i].site_request())),
+        "final_planets":state.mission_observation(seat, None).planets,
         "pilot_damage_events":pilot_damage_events,
         "combat_breaks":breaks,
         "pursuit_trial":(mode=="pursuit").then(|| json!({"prepare_limit_seconds":prepare_seconds,

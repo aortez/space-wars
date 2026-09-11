@@ -137,5 +137,6 @@ installation record, UI history, `pi-world-sequence.json` and final handoff
 settings are retained alongside the screenshots.
 
 The [parked landing investigations](landing-investigation-guide.md) remain
-open. World size stays at the established three-planet profile. Merging is
-still deferred.
+open. World size stays at the established three-planet profile. The subsequent
+[fresh-world survey](fresh-world-survey.md) records broader match behavior and
+the assessment before merging. Merging is still deferred.

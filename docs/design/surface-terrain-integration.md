@@ -3,8 +3,16 @@
 The [normal Spacewars match](../spacewars-match.md) now uses the generated
 three-planet material loop. Each player can independently be human or a mission
 bot. The former game and benchmark remain under `spacewars-classic`; the
-historical lab registrations remain available. The sections below retain the
-integration history. Merging remains deferred pending the integrated playtest.
+historical lab registrations remain available. New worlds, same-world rematches,
+pilot-death outcomes and survival through asset loss are integrated.
+The [fresh-world survey](../fresh-world-survey.md) records sixteen new desktop
+rounds, four selected Pi checks and the remaining AI limitations. It recommends
+this as the first playable default, with landing-access and recovery follow-ups.
+Merging remains deferred for review.
+
+The sections below retain the integration history. Statements that normal
+match lifecycle or promotion are still ahead describe those earlier checkpoints;
+they are completed in the current branch.
 
 The latest [pilot impact survival pass](../pilot-impact-survival.md) calibrates
 supplied missile/wreckage inertia and corrects jetpack steering against moving

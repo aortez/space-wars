@@ -163,3 +163,11 @@ Resume this work when complete matches repeatedly stall on defended/damaged
 planets, or when prospective jetpack access becomes necessary for the next
 mechanic. Preserve the successful ordinary loop while addressing a reproduced
 failure; exhaustive landing perfection is not a prerequisite for match work.
+
+The [fresh-world survey](fresh-world-survey.md) adds a focused ordinary-match
+reproduction: seed `3121799525250095703`, asteroids Off, P2 surveys an unchanged
+enemy objective for 88.73 seconds with no accepted walking/jumping round trip.
+It finally defers Planet 0 at tick 10679 on both desktop and Pi. Start with
+bounded no-route deferral before expanding the prospective route model. That
+report also separates real pod/ground progress from stalls and preserves an
+unsupported airborne recovery failure in seed `9908999338443660350`.

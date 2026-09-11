@@ -1,5 +1,16 @@
 # AI for Spacewars on destructible ground
 
+The shared mission bot now drives either or both seats in ordinary `spacewars`,
+including capture, combat, recovery, pilot-death results and fresh-world/rematch
+resets. The [fresh-world survey](../fresh-world-survey.md) is the current readiness
+assessment and records new reproductions for long failed landing surveys and
+recovery vulnerability. FPS work belongs to the separate investigation.
+
+The sections below retain the implementation history. Their forward-looking
+references to normal-game promotion and match outcomes describe older
+checkpoints, not missing work in the current branch. Landing access and
+airborne recovery remain open.
+
 The current [objective landing pass](../objective-landings.md) measures a walking
 and jumping round trip to enemy flags before choosing a landing, and adds
 bounded recovery for cramped returns under the parked hull. Prospective jetpack

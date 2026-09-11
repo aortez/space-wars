@@ -7,7 +7,9 @@ The default is two humans. Choices persist through restart and relaunch.
 
 The subsequent [world-selection flow](match-worlds.md) adds New Match for a
 fresh seed, Rematch for the current world, and visible seeds in the menus.
-The checkpoint results below retain the original promotion evidence.
+The [fresh-world survey](fresh-world-survey.md) is the current assessment before
+merging: sixteen new desktop matches, selected Pi reproductions, and documented
+AI follow-ups. The checkpoint results below retain the original promotion evidence.
 
 This is the same simulation, mission policy and world profile as the material
 arena, with one physics step and gravity solve. This promotion changes the
@@ -197,4 +199,5 @@ or the retained pod-landing regression and hard-touchdown findings in
 [pilot impact survival](pilot-impact-survival.md). The previous Pi display
 captures also remain below 60 FPS in some views. Larger worlds, broader damaged
 ground navigation and further balance/performance tuning remain follow-ups.
-Merging remains deferred pending the integrated controller playtest.
+See the [current survey](fresh-world-survey.md) for the subsequent readiness
+assessment. Merging remains deferred for review; FPS work is owned separately.
