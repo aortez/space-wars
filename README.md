@@ -9,12 +9,18 @@ Below is a zoomed out view of a CTF game mode.
 
 ## Status
 
-The local launcher currently has twelve entries across eight scenario families:
+The local launcher includes the following scenarios and presets:
 
-- **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
-  asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
-  and laser queries share the canonical Rapier mechanics world; gameplay still
-  owns gravity fields, damage, capture, rebuilding, and effects.
+- **Spacewars** — a complete round on three generated destructible planets:
+  natural landing, on-foot flags, mining, combat, escape pods and rebuilding.
+  Each player can be human or a mission bot, including bot versus bot. A living
+  pilot can recover after losing every ship and flag; pilot death ends the round.
+  See [Spacewars match](docs/spacewars-match.md) for controls and settings.
+  The [fresh-world survey](docs/fresh-world-survey.md) records current match
+  reliability and the remaining AI follow-ups before merging.
+- **Spacewars Classic** — the previous berth-based game and historical visual
+  benchmark, under `spacewars-classic`. Its world presets, legacy bot and
+  no-ship/no-planets defeat rules remain available for comparison.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation.
   Rapier owns rigid-body motion and contacts while the scenario supplies mutual
   gravity and gameplay damage. Click empty space to make a ball, or grab and
@@ -55,7 +61,7 @@ The local launcher currently has twelve entries across eight scenario families:
   [headless compatibility matrix](docs/surface-compatibility.md) measure the
   gravity/motion gaps before ordinary-game integration. **surface-sortie-world**
   tries an explicit Surface V1 gravity/spin/orbit profile on those generated
-  layouts. Ordinary Spacewars and the shared controllers remain unchanged.
+  layouts. These historical diagnostic presets remain available independently.
   **surface-expedition** enables planet-to-planet travel and flag-based planet
   claiming: land, disembark and wait 3 seconds; enemy flags must first be lowered
   up close. After ship loss, land and exit the escape pod (or continue with the
@@ -64,6 +70,20 @@ The local launcher currently has twelve entries across eight scenario families:
   Outposts/repair remain in the older lab fixtures. Choose **Settings →
   Players: 1 or 2** for solo or split-screen play using the same scenario. See
   [Surface Expedition](docs/surface-expedition.md).
+- **Terrain Lab** — an editable material planet with a walking spaceling. Switch
+  between a precision laser, drill, and excavator to collect rock and ore, preview
+  each cut, and zoom in to mine individual cells. Cut pieces free to make moving,
+  collidable fragments that retain their ore and can be mined again. Hold the debug modifier to carve
+  craters and tunnels, inspect chunk colliders, and watch ray queries and physical
+  support follow the remaining terrain. See [Terrain Lab](docs/terrain-lab.md).
+- **Spacewars Terrain** — the Expedition loop on destructible ground: land, exit,
+  claim with a surface flag, mine material, and rebuild after ship loss. Destroyed
+  flag footing makes the planet neutral. See [Spacewars Terrain](docs/spacewars-terrain.md).
+  The [terrain endurance test bed](docs/terrain-endurance.md) runs seeded workloads
+  up to three minutes each and produces an offline report with world snapshots.
+  **spacewars-terrain-combat** adds a human-versus-bot dogfight with the shared
+  laser/cannon and physical ship recovery. **spacewars-terrain-duel** lets both
+  bots run the same loop. See [Material combat](docs/material-combat-ai.md).
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.
@@ -118,6 +138,7 @@ cargo run -p engine-client -- --scenario rover-lab
 cargo run -p engine-client -- --scenario spaceling-lab
 cargo run -p engine-client -- --scenario surface-sortie
 cargo run -p engine-client -- --scenario surface-sortie-orbit
+cargo run -p engine-client -- --scenario terrain-lab
 cargo run -p engine-client -- --scenario spacewars
 cargo run -p engine-client -- --scenario falling
 ```
@@ -179,15 +200,21 @@ jump, and `R` to restart. Gamepad `B` or keyboard `X` applies an off-center
 test shove: the spaceling tumbles, settles, and recovers on physical support.
 Holding jump/shove does not repeat it; jump is not buffered during knockdown.
 
-To try the first Spacewars AI opponent, open Spacewars settings in the launcher
-and change **Player 2** from **human** to **rule bot**. **Small Duel** is the
-clearest combat test bed. In worlds with planets, the bot selects uncaptured
-spaceports, matches their orbital and wrapper motion, captures them, and
-departs for another target; an escape pod instead seeks an owned port for
-rebuilding. Pods treat the moving staging rings as geometric waypoints rather
-than trying to hover at ship-only velocity tolerances, and reacquire an owned
-port if contact is lost before the rebuild completes. The ordinary two-human
-setup remains the default.
+In **Spacewars → Settings**, set **Player 1** and **Player 2** independently to
+**human** or **rule bot**. Bots use the same landing, on-foot capture, weapons,
+jetpack and recovery actions as humans. Both choices persist through Rematch
+and relaunching. The default remains two human players; choose two bots to watch
+a match. Bot combat breaks and asteroid arrivals/strength are configurable.
+
+**New Match** generates a fresh world with the same player and gameplay settings.
+**Rematch** resets the current world, and **Play World** starts the seed shown
+in the launcher. Seeds are visible in the launcher, pause and result menus and
+persist after New Match. See [new worlds and rematches](docs/match-worlds.md)
+for controller behavior and reproducing a world with `--seed`.
+
+The previous port-seeking AI and **Small Duel** preset are available in
+**spacewars-classic**. Historical benchmark commands should select that scenario;
+`--benchmark` without an explicit scenario also selects Classic.
 
 On Unix, query the running client through its control socket:
 
@@ -313,7 +340,7 @@ spacewars-cli host pause --timeout 3s
 ```
 
 The command observes the current UI revision, submits a guarded host request,
-and polls with the same overall deadline. From Spacewars, the visible Benchmark
+and polls with the same overall deadline. From Spacewars Classic, the visible Benchmark
 menu item can then be activated by ID:
 
 ```sh
@@ -327,7 +354,7 @@ their next action:
 ```sh
 spacewars-cli host pause --timeout 3s
 spacewars-cli ui activate pause.restart --expect-screen pause.main
-spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+spacewars-cli ui wait --screen gameplay --scenario spacewars-classic --timeout 3s
 
 spacewars-cli host pause --timeout 3s
 spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main

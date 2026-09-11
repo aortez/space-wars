@@ -236,6 +236,7 @@ impl Scenario for SpacelingLabScenario {
                     * reference_radius,
                 response_scale: 0.0,
                 source_policy: GravitySourcePolicy::Direct,
+                source_shape: engine_gravity::GravitySourceShape::Point,
             },
             GravityParticipant::target(GravityId::new(2), position, 1.0),
         ];
@@ -308,7 +309,7 @@ impl Scenario for SpacelingLabScenario {
 
     fn observe(state: &Self::State) -> Observation {
         let spaceling = state.spaceling_snapshot();
-        let mut payload = vec![2]; // Observation version: balance/recovery and lab shove.
+        let mut payload = vec![3]; // Observation version: explicit get-up diagnostics.
         for value in [
             state.tick,
             spaceling.jumps,
@@ -317,6 +318,7 @@ impl Scenario for SpacelingLabScenario {
             state.shoves,
             spaceling.knockdowns,
             spaceling.recoveries,
+            spaceling.get_up_attempts,
         ] {
             payload.extend_from_slice(&value.to_le_bytes());
         }
@@ -341,6 +343,7 @@ impl Scenario for SpacelingLabScenario {
         }
         payload.push(u8::from(state.control.jump_held));
         payload.push(u8::from(state.shove_held));
+        payload.push(spaceling.get_up_result as u8);
         payload.push(match spaceling.balance {
             engine_rapier::spaceling::SpacelingBalance::Balanced => 0,
             engine_rapier::spaceling::SpacelingBalance::KnockedDown => 1,

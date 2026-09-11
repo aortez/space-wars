@@ -8,6 +8,8 @@ const FLOOR: PhysicsId = PhysicsId::new(1);
 const SPACELING: PhysicsId = PhysicsId::new(2);
 
 mod balance;
+mod get_up;
+mod jetpack;
 
 fn tick(
     world: &mut PhysicsWorld,

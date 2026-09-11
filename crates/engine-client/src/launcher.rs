@@ -17,6 +17,13 @@ const POLL_INTERVAL: Duration = Duration::from_millis(16);
 type SaveSettings = Arc<dyn Fn(&Settings) -> Result<(), String> + Send + Sync>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StartMode {
+    SelectedWorld,
+    NewMatch,
+    Benchmark,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Stage {
     Preparing,
     Saving,
@@ -125,7 +132,7 @@ impl Launcher {
         })
     }
 
-    pub(crate) fn start(self: &Rc<Self>, benchmark: bool) {
+    pub(crate) fn start(self: &Rc<Self>, mode: StartMode) {
         let Some(window) = self.window.upgrade() else {
             return;
         };
@@ -134,13 +141,20 @@ impl Launcher {
         }
         window.set_launcher_error_text("".into());
         let mut candidate = self.settings.read().unwrap().clone();
-        let selections = match crate::launcher_selections_from_window(&window, &candidate) {
+        let mut selections = match crate::launcher_selections_from_window(&window, &candidate) {
             Ok(selections) => selections,
             Err(error) => {
                 window.set_launcher_error_text(error.into());
                 return;
             }
         };
+        if mode == StartMode::NewMatch {
+            if selections.launch.scenario != "spacewars" {
+                return;
+            }
+            selections.launch.seed = crate::match_world::fresh_seed(selections.launch.seed);
+        }
+        let benchmark = mode == StartMode::Benchmark;
         if benchmark
             && !host::scenario_registration(&selections.launch.scenario)
                 .is_some_and(|registration| registration.capabilities.benchmark)
@@ -395,7 +409,7 @@ mod tests {
             );
             Rc::get_mut(&mut launcher).unwrap().writer = writer;
             let start = Rc::clone(&launcher);
-            window.on_launcher_start_game(move || start.start(false));
+            window.on_launcher_start_game(move || start.start(StartMode::SelectedWorld));
             let harness = Self {
                 window,
                 launcher,
@@ -463,7 +477,7 @@ mod tests {
         assert!(harness.launcher.settings.try_write().is_ok());
 
         window.invoke_launcher_start_game();
-        harness.launcher.start(true);
+        harness.launcher.start(StartMode::Benchmark);
         window.invoke_ui_action(0); // Up: would change the focused menu row.
         window.invoke_keyboard_action(1, false); // Down.
         for text in [Key::DownArrow, Key::Return, Key::Escape] {
@@ -624,6 +638,68 @@ mod tests {
                 .get_launcher_diagnostics()
                 .contains("launch_save_ms=0")
         );
+    }
+
+    #[test]
+    fn new_world_save_failure_preserves_the_seed_and_retry_publishes_the_saved_world() {
+        let snapshots = Arc::new(Mutex::new(Vec::<Settings>::new()));
+        let saved = Arc::clone(&snapshots);
+        let harness = Harness::new(Arc::new(move |settings| {
+            let mut saved = saved.lock().unwrap();
+            saved.push(settings.clone());
+            if saved.len() == 1 {
+                Err("test new-world save failure".into())
+            } else {
+                Ok(())
+            }
+        }));
+        harness.window.set_launcher_scenario("spacewars".into());
+        let original_seed = harness.launcher.settings.read().unwrap().launch.seed;
+
+        harness.launcher.start(StartMode::NewMatch);
+        harness.launcher.start(StartMode::NewMatch);
+        harness.wait_for(|| !harness.window.get_launcher_busy());
+        assert!(harness.window.get_launcher_visible());
+        assert!(harness.launcher.render_timer.borrow().is_none());
+        assert_eq!(snapshots.lock().unwrap().len(), 1);
+        assert_ne!(snapshots.lock().unwrap()[0].launch.seed, original_seed);
+        assert_eq!(
+            harness.launcher.settings.read().unwrap().launch.seed,
+            original_seed
+        );
+        assert_eq!(
+            harness.window.get_launcher_seed_text(),
+            original_seed.to_string()
+        );
+
+        harness.launcher.start(StartMode::NewMatch);
+        harness.wait_for(|| !harness.window.get_launcher_busy());
+        assert!(!harness.window.get_launcher_visible());
+        assert!(harness.window.get_launcher_error_text().is_empty());
+        let new_seed = harness.launcher.settings.read().unwrap().launch.seed;
+        assert_ne!(new_seed, original_seed);
+        assert_eq!(snapshots.lock().unwrap().len(), 2);
+        assert_eq!(snapshots.lock().unwrap()[1].launch.seed, new_seed);
+        assert_eq!(
+            harness.window.get_launcher_seed_text(),
+            new_seed.to_string()
+        );
+
+        harness
+            .launcher
+            .render_timer
+            .borrow_mut()
+            .take()
+            .unwrap()
+            .stop();
+        harness.show_menu();
+        harness.launcher.start(StartMode::SelectedWorld);
+        harness.wait_for(|| !harness.window.get_launcher_busy());
+        assert_eq!(
+            harness.window.get_launcher_seed_text(),
+            new_seed.to_string()
+        );
+        assert_eq!(snapshots.lock().unwrap().len(), 2);
     }
 
     #[test]

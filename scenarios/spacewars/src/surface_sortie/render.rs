@@ -29,7 +29,39 @@ fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
             44.0,
         )
     } else {
-        (ship.position, 100.0)
+        let target = state
+            .combat_enabled()
+            .then(|| {
+                state.pilots.iter().enumerate().find_map(|(seat, pilot)| {
+                    let target = &state.world.ships[pilot.vehicle.0];
+                    (seat != player
+                        && pilot.body.is_none()
+                        && !target.dead
+                        && target.form == ShipForm::Ship
+                        && target.position.distance_to(ship.position) < 260.0)
+                        .then_some(target.position)
+                })
+            })
+            .flatten();
+        if let Some(target) = target {
+            let separation = target - ship.position;
+            (
+                (ship.position + target) * 0.5,
+                (180.0_f32
+                    .max(separation.x.abs() / 0.6)
+                    .max(separation.y.abs() / 0.35))
+                .min(440.0),
+            )
+        } else {
+            (
+                ship.position,
+                if state.combat_enabled() && ship.form == ShipForm::Ship {
+                    260.0
+                } else {
+                    100.0
+                },
+            )
+        }
     };
     Camera2::new(render_point(center), height)
 }
@@ -44,6 +76,7 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
     let height = camera.height;
     let mut frame = RenderFrame::new(camera);
     if let Some(sun) = state.world.sun {
+        draw_corona(&mut frame, state, sun, -22);
         circle(
             &mut frame,
             -21,
@@ -52,15 +85,26 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
             RenderColor::rgb(1.0, 0.85, 0.25),
         );
     }
-    for planet in &state.world.planets {
+    for (planet_index, planet) in state.world.planets.iter().enumerate() {
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
-        circle(
-            &mut frame,
-            -20,
-            planet.position,
-            radius,
-            RenderColor::rgb(0.09, 0.16, 0.23),
-        );
+        if let Some(material) = state.world.terrain.planets.get(&planet_index) {
+            let motion = motion::SurfaceFrame::read(&state.world.physics, planet_index);
+            terrain::render_body(
+                &mut frame,
+                &material.field,
+                &material.geometry,
+                motion.position,
+                motion.angle,
+            );
+        } else {
+            circle(
+                &mut frame,
+                -20,
+                planet.position,
+                radius,
+                RenderColor::rgb(0.09, 0.16, 0.23),
+            );
+        }
         if let Some(owner) = planet.owner_id {
             frame.push_primitive(
                 -17,
@@ -75,7 +119,7 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
                 }),
             );
         }
-        for index in 0..72 {
+        for index in 0..if state.has_material_ground() { 0 } else { 72 } {
             let up = Vec2::from_radians(
                 planet.wrapper_angle + index as f32 * std::f32::consts::TAU / 72.0,
             );
@@ -86,6 +130,29 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
                 planet.position + up * (radius - 0.08),
                 RenderColor::rgb(0.28, 0.51, 0.6),
                 1.0,
+            );
+        }
+    }
+    for fragment in state.world.terrain.fragments.values() {
+        if let Some(body) = state.world.physics.world.motion(fragment.assembly.body()) {
+            terrain::render_body(
+                &mut frame,
+                &fragment.terrain,
+                &fragment.geometry,
+                body.position,
+                body.angle,
+            );
+        }
+    }
+    if let Some(mining) = &observation.mining {
+        if let Some((start, end)) = mining.beam {
+            line(
+                &mut frame,
+                8,
+                start,
+                end,
+                if mining.held { AMBER } else { CYAN },
+                if mining.held { 2.0 } else { 0.7 },
             );
         }
     }
@@ -288,6 +355,7 @@ pub(super) fn minimap(
         }),
     );
     if let Some(sun) = state.world.sun {
+        draw_corona(&mut map, state, sun, -20);
         circle(
             &mut map,
             -19,
@@ -677,6 +745,28 @@ fn circle(frame: &mut RenderFrame, layer: i32, center: Vec2, radius: f32, color:
     );
 }
 
+fn draw_corona(frame: &mut RenderFrame, state: &SurfaceSortieState, sun: SunState, layer: i32) {
+    if !state.combat_enabled() {
+        return;
+    }
+    circle(
+        frame,
+        layer,
+        sun.position,
+        sun.radius + solar::CORONA_WIDTH,
+        RenderColor::rgba(1.0, 0.28, 0.04, 0.24),
+    );
+    frame.push_primitive(
+        layer,
+        RenderPrimitive::Circle(RenderCircle {
+            center: render_point(sun.position),
+            radius: sun.radius + solar::CORONA_WIDTH,
+            fill: None,
+            stroke: Some(Stroke::new(RenderColor::rgba(1.0, 0.38, 0.08, 0.7), 1.0)),
+        }),
+    );
+}
+
 fn line(frame: &mut RenderFrame, layer: i32, a: Vec2, b: Vec2, color: RenderColor, width: f32) {
     frame.push_primitive(
         layer,
@@ -726,6 +816,7 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
     }
     if !ship.dead {
         render_ship(frame, ship);
+        render_laser(frame, ship);
     }
     if !ship.dead && (ship.form == ShipForm::Ship || state.pilots[player].recovery.is_some()) {
         let (feet, radius) = physics::surface_landing_geometry(ship.form);
@@ -764,6 +855,22 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
             state.pilots[player].gait_phase,
             pilot_color(state, player),
         );
+        if let Some(pack) = state.pilots[player]
+            .body
+            .as_ref()
+            .and_then(|body| body.jetpack())
+        {
+            let position = snapshot.motion.position;
+            let right = Vec2::new(snapshot.up.y, -snapshot.up.x);
+            for side in [-1.0, 1.0] {
+                let nozzle = position + right * side * 0.28 - snapshot.up * 0.2;
+                circle(frame, 5, nozzle, 0.15, CYAN);
+                if pack.active {
+                    line(frame, 4, nozzle, nozzle - snapshot.up * 1.3, ORANGE, 3.0);
+                    line(frame, 5, nozzle, nozzle - snapshot.up * 0.65, LIGHT, 1.5);
+                }
+            }
+        }
         if let Some(support) = snapshot.support {
             line(
                 frame,
@@ -799,7 +906,9 @@ fn draw_player_hud(
             }),
         );
     }
-    let mode = if observation.location == PilotLocation::OnFoot {
+    let mode = if observation.pilot_vitals.is_some_and(|v| !v.alive()) {
+        "DEAD"
+    } else if observation.location == PilotLocation::OnFoot {
         "ON FOOT"
     } else if ship.form == ShipForm::EscapePod {
         "POD"
@@ -868,9 +977,35 @@ fn draw_player_hud(
             observation.landing.phase.label()
         )
     };
+    let vehicle_status = if state.has_material_ground() && ship.form == ShipForm::Ship && !ship.dead
+    {
+        let flight = state.flight_observation(player);
+        format!(
+            "{:.0}% {} {:.0}u/s / {}",
+            ship.life / ship.life_max * 100.0,
+            flight.label(),
+            flight.relative_speed,
+            observation.landing.phase.label()
+        )
+    } else {
+        vehicle_status
+    };
+    let righting = state.pilots[player].pod_righting_observation(
+        &state.world.physics,
+        ship,
+        &observation.landing,
+    );
     let recovery_message = recovery
         .filter(|r| r.scuttle_progress > 0.0 || !observation.ship_available)
         .map(|r| {
+            if let Some(lift) = righting {
+                if lift.remaining_seconds > 0.0 {
+                    return "Pod recovery lift / turn upright".to_owned();
+                }
+                if lift.eligible {
+                    return "Tipped pod / brake + thrust to lift".to_owned();
+                }
+            }
             if r.scuttle_progress > 0.0 {
                 format!(
                     "Scuttle {:.0}% / release to cancel",
@@ -880,10 +1015,12 @@ fn draw_player_hud(
                 format!(
                     "Rebuild {:.0}% / {}",
                     r.rebuild_progress * 100.0,
-                    if r.status == SurfaceRecoveryStatus::ClearanceBlocked {
-                        "space blocked"
-                    } else {
-                        "stand still"
+                    match r.status {
+                        SurfaceRecoveryStatus::ClearanceBlocked =>
+                            "space blocked; move along surface",
+                        SurfaceRecoveryStatus::HatchBlocked =>
+                            "hatch access blocked; move along surface",
+                        _ => "stand still",
                     }
                 )
             } else if r.status == SurfaceRecoveryStatus::LandPod
@@ -898,21 +1035,100 @@ fn draw_player_hud(
                 r.status.label().to_owned()
             }
         });
-    let lines = [
-        (
-            0.445,
+    let damage = state.damage_observation(player);
+    let supply = (mode == "ABOARD").then(|| ship.weapon_supply()).flatten();
+    let progress = supply.map_or(progress, |s| {
+        let status = if s.laser_recharging {
+            "laser charging".to_owned()
+        } else if let Some(progress) = s.reload_progress {
+            format!(
+                "reload {:.1}s",
+                (1.0 - progress) * weapons::ROUND_RELOAD_SECONDS
+            )
+        } else if s.rounds_loaded < weapons::ROUND_CAPACITY as u8 {
+            "reload needs 25%".to_owned()
+        } else {
+            "rounds ready".to_owned()
+        };
+        format!("Energy {:.0}% / {status}", s.energy_percent)
+    });
+    let progress = state.pilots[player]
+        .body
+        .as_ref()
+        .and_then(|body| body.jetpack())
+        .map_or(progress, |pack| {
+            format!("Jetpack {:.0}% / hold A for lift", pack.charge * 100.0)
+        });
+    let vehicle_status = if damage
+        .last_damage_tick
+        .is_some_and(|tick| observation.tick.saturating_sub(tick) < 180)
+    {
+        if damage.last_ship_lost {
+            format!("{} / ship lost", damage.last_source.unwrap_or("Impact"))
+        } else {
+            format!(
+                "{} -{:.0}% / ship {:.0}%",
+                damage.last_source.unwrap_or("Impact"),
+                damage.last_damage_percent,
+                ship.life / ship.life_max * 100.0
+            )
+        }
+    } else {
+        vehicle_status
+    };
+    let vehicle_status = if let Some(heat) = observation.solar.filter(|h| h.intensity > 0.0) {
+        format!(
+            "SOLAR HEAT / hull {:.0}% / -{:.0}%/s",
+            ship.life / ship.life_max * 100.0,
+            heat.damage_percent_per_second
+        )
+    } else {
+        vehicle_status
+    };
+    let pilot_status = observation.pilot_vitals.map_or_else(
+        || {
             format!(
                 "P{}  {mode}  /  planet {}",
                 player + 1,
                 observation.motion.planet
-            ),
-            color,
-        ),
+            )
+        },
+        |v| format!("P{}  {mode}  /  pilot {:.0}%", player + 1, v.health),
+    );
+    let vehicle_status = if let Some(v) = observation
+        .pilot_vitals
+        .filter(|v| v.protected_until_tick > observation.tick)
+    {
+        format!(
+            "Ejection protection {:.1}s",
+            (v.protected_until_tick - observation.tick) as f32 / 60.0
+        )
+    } else {
+        vehicle_status
+    };
+    let lines = [
+        (0.445, pilot_status, color),
         (0.385, vehicle_status, LIGHT),
-        (0.325, "A: thrust/jump  B: board/exit".to_owned(), LIGHT),
+        (
+            0.325,
+            if state.has_material_ground() && mode == "ABOARD" {
+                "A: thrust  RB: cruise  B: exit"
+            } else {
+                "A: thrust/jump  B: board/exit"
+            }
+            .to_owned(),
+            LIGHT,
+        ),
         (
             -0.29,
-            if !observation.controls_armed {
+            if let Some(outcome) = state.match_outcome() {
+                match outcome {
+                    match_rules::MatchOutcome::Winner(owner) => {
+                        format!("Round over / P{} wins", owner.index() + 1)
+                    }
+                    match_rules::MatchOutcome::Draw => "Draw / both pilots lost".to_owned(),
+                }
+            } else if !observation.controls_armed {
                 "Release controls to continue".to_owned()
             } else if let Some(message) = recovery_message {
                 message
@@ -942,7 +1158,27 @@ fn draw_player_hud(
         ),
         (-0.345, objective, LIGHT),
         (-0.405, progress, AMBER),
-        (-0.46, detail, color),
+        (
+            -0.46,
+            observation.mining.as_ref().map_or(detail, |mining| {
+                if matches!(observation.location, PilotLocation::Aboard(_)) {
+                    if state.combat_enabled() {
+                        return "RT: laser  X: missiles  RB: cruise".to_owned();
+                    }
+                    return "X: asteroid / RB+X: heavy".to_owned();
+                }
+                format!(
+                    "Cut {} / removed {} / RT: mine Y: size",
+                    if mining.radius == 0 {
+                        "1 cell".to_owned()
+                    } else {
+                        format!("r{}", mining.radius)
+                    },
+                    mining.removed_cells
+                )
+            }),
+            color,
+        ),
     ];
     for (y, label, color) in lines {
         text(
@@ -952,5 +1188,40 @@ fn draw_player_hud(
             color,
             13.0,
         );
+    }
+    if let Some(supply) = supply {
+        let start = center + Vec2::new(-0.24, -0.434) * height;
+        let end = center + Vec2::new(0.24, -0.434) * height;
+        line(
+            frame,
+            20,
+            start,
+            end,
+            RenderColor::rgb(0.16, 0.22, 0.28),
+            height * 0.006,
+        );
+        line(
+            frame,
+            20,
+            start,
+            start + (end - start) * supply.energy_percent / 100.0,
+            if supply.energy_percent < weapons::ROUND_ENERGY_COST {
+                AMBER
+            } else {
+                CYAN
+            },
+            height * 0.006,
+        );
+        for quarter in 1..4 {
+            let at = start + (end - start) * quarter as f32 / 4.0;
+            line(
+                frame,
+                20,
+                at - Vec2::Y * height * 0.005,
+                at + Vec2::Y * height * 0.005,
+                LIGHT,
+                height * 0.0015,
+            );
+        }
     }
 }

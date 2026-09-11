@@ -35,6 +35,15 @@ mod performance;
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 
+#[path = "ui_control_functional/terrain_lab.rs"]
+mod terrain_lab;
+
+#[path = "ui_control_functional/spacewars_terrain.rs"]
+mod spacewars_terrain;
+
+#[path = "ui_control_functional/spacewars_match.rs"]
+mod spacewars_match;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
@@ -49,8 +58,8 @@ fn launcher_navigation_uses_the_public_control_api() {
             UiAction::Down,
             UiAction::Left,
             UiAction::Left,
-            UiAction::Up,
-            UiAction::Up,
+            UiAction::Left,
+            UiAction::Down,
         ] {
             state = harness.press_guarded(action, &state);
             reached.insert(selected_control(&state));
@@ -64,6 +73,7 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings".into(),
                 "launcher.sound".into(),
                 "launcher.start".into(),
+                "launcher.new-match".into(),
             ])
         );
         assert_eq!(selected_control(&state), "launcher.scenario");
@@ -77,16 +87,18 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings.renderer.next",
                 "launcher.settings.raster-scale.previous",
                 "launcher.settings.raster-scale.next",
-                "launcher.settings.spacewars.preset.previous",
-                "launcher.settings.spacewars.preset.next",
-                "launcher.settings.spacewars.planets.previous",
-                "launcher.settings.spacewars.planets.next",
-                "launcher.settings.spacewars.asteroids.previous",
-                "launcher.settings.spacewars.asteroids.next",
-                "launcher.settings.spacewars.player-health.previous",
-                "launcher.settings.spacewars.player-health.next",
-                "launcher.settings.spacewars.player-2.previous",
-                "launcher.settings.spacewars.player-2.next",
+                "launcher.settings.match.player-1.previous",
+                "launcher.settings.match.player-1.next",
+                "launcher.settings.match.player-2.previous",
+                "launcher.settings.match.player-2.next",
+                "launcher.settings.match.break-interval.previous",
+                "launcher.settings.match.break-interval.next",
+                "launcher.settings.match.break-duration.previous",
+                "launcher.settings.match.break-duration.next",
+                "launcher.settings.match.asteroid-interval.previous",
+                "launcher.settings.match.asteroid-interval.next",
+                "launcher.settings.match.asteroid-strength.previous",
+                "launcher.settings.match.asteroid-strength.next",
                 "launcher.settings.back",
                 "launcher.settings.start",
             ]
@@ -293,10 +305,11 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn launcher_can_run_the_spacewars_menu_lifecycle() {
-    run_functional_test("launcher-spacewars-menu-lifecycle", |harness| {
+fn launcher_can_run_the_classic_spacewars_menu_lifecycle() {
+    run_functional_test("launcher-classic-spacewars-menu-lifecycle", |harness| {
         let mut state = harness.wait_until_ready();
         assert_launcher_main(&state);
+        state = harness.activate_until_scenario("spacewars-classic", state);
 
         let unavailable = harness.expect_pause_failure(&state);
         assert_eq!(unavailable.code, ControlFailureCode::WrongScreen);
@@ -309,14 +322,14 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(launcher_revision),
             },
             TRANSITION_TIMEOUT,
         );
         assert_eq!(state.screen, UiScreen::Gameplay);
-        assert_eq!(state.active_scenario.as_deref(), Some("spacewars"));
-        assert_eq!(state.selected_scenario, "spacewars");
+        assert_eq!(state.active_scenario.as_deref(), Some("spacewars-classic"));
+        assert_eq!(state.selected_scenario, "spacewars-classic");
         let gameplay_scenario_revision = state
             .scenario_revision
             .expect("gameplay must report a scenario revision");
@@ -330,7 +343,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -354,7 +367,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(benchmark_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -371,7 +384,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -383,7 +396,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(restart_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -402,7 +415,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -420,7 +433,8 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
             },
             TRANSITION_TIMEOUT,
         );
-        assert_launcher_main(&state);
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert_eq!(state.selected_scenario, "spacewars-classic");
         assert_eq!(state.scenario_revision, None);
         assert!(!state.paused);
         assert!(!state.benchmark_active);
@@ -432,7 +446,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(returned_launcher_revision),
             },
             TRANSITION_TIMEOUT,
@@ -450,7 +464,24 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
 }
 
 fn run_functional_test(name: &'static str, workflow: impl FnOnce(&mut FunctionalHarness)) {
-    let mut harness = FunctionalHarness::spawn(name)
+    run_functional_test_with_backend(name, "winit-software", workflow);
+}
+
+fn run_functional_test_with_backend(
+    name: &'static str,
+    backend: &'static str,
+    workflow: impl FnOnce(&mut FunctionalHarness),
+) {
+    run_functional_test_with_seed(name, backend, 4242, workflow);
+}
+
+fn run_functional_test_with_seed(
+    name: &'static str,
+    backend: &'static str,
+    seed: u64,
+    workflow: impl FnOnce(&mut FunctionalHarness),
+) {
+    let mut harness = FunctionalHarness::spawn(name, backend, seed)
         .unwrap_or_else(|error| panic!("could not start {name}: {error}"));
     let result = catch_unwind(AssertUnwindSafe(|| workflow(&mut harness)));
     if let Err(payload) = result {
@@ -473,7 +504,7 @@ struct FunctionalHarness {
 }
 
 impl FunctionalHarness {
-    fn spawn(test_name: &'static str) -> Result<Self, String> {
+    fn spawn(test_name: &'static str, backend: &'static str, seed: u64) -> Result<Self, String> {
         let artifact_root = workspace_root().join("target/functional-test-artifacts");
         fs::create_dir_all(&artifact_root).map_err(|error| {
             format!(
@@ -508,7 +539,7 @@ impl FunctionalHarness {
             "--config-dir".to_string(),
             config_directory.display().to_string(),
             "--seed".into(),
-            "4242".into(),
+            seed.to_string(),
             "--renderer".into(),
             "raster".into(),
             "--raster-scale".into(),
@@ -519,7 +550,7 @@ impl FunctionalHarness {
             .args(&arguments)
             .current_dir(workspace_root())
             .env("RUST_LOG", "info")
-            .env("SLINT_BACKEND", "winit-software")
+            .env("SLINT_BACKEND", backend)
             .env("SPACEWARS_CONTROL_SOCKET", &socket_path)
             .env_remove("WAYLAND_DISPLAY")
             .stdin(Stdio::null())
@@ -778,51 +809,62 @@ impl FunctionalHarness {
 
     fn capture_screenshot(&mut self, name: &str) -> PathBuf {
         let path = self.run_path().join(name);
-        let response = self.screenshot_request(&path, TRANSITION_TIMEOUT);
-        match response {
-            Ok(message) => {
-                self.history.push(json!({
-                    "elapsed_ms": self.elapsed_ms(),
-                    "command": format!("screenshot {}", path.display()),
-                    "outcome": "ok",
-                    "response": message,
-                }));
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        loop {
+            let response = self.screenshot_request(&path, TRANSITION_TIMEOUT);
+            match response {
+                Ok(message) => {
+                    self.history.push(json!({
+                        "elapsed_ms": self.elapsed_ms(),
+                        "command": format!("screenshot {}", path.display()),
+                        "outcome": "ok",
+                        "response": message,
+                    }));
+                }
+                Err(error) => {
+                    self.record_error_message(
+                        &format!("screenshot {}", path.display()),
+                        &error.to_string(),
+                        error.failure(),
+                    );
+                    panic!("screenshot capture failed: {error}");
+                }
             }
-            Err(error) => {
-                self.record_error_message(
-                    &format!("screenshot {}", path.display()),
-                    &error.to_string(),
-                    error.failure(),
-                );
-                panic!("screenshot capture failed: {error}");
+            let bytes = fs::read(&path).unwrap_or_else(|error| {
+                panic!("could not read screenshot {}: {error}", path.display())
+            });
+            let mut reader = png::Decoder::new(bytes.as_slice())
+                .read_info()
+                .unwrap_or_else(|error| panic!("invalid PNG {}: {error}", path.display()));
+            let mut pixels = vec![0; reader.output_buffer_size()];
+            let info = reader
+                .next_frame(&mut pixels)
+                .unwrap_or_else(|error| panic!("could not decode {}: {error}", path.display()));
+            assert!(info.width > 0 && info.height > 0);
+            assert_eq!(info.color_type, png::ColorType::Rgba);
+            assert_eq!(info.bit_depth, png::BitDepth::Eight);
+            let pixels = &pixels[..info.buffer_size()];
+            let first_rgb = &pixels[..3];
+            let opaque = pixels.chunks_exact(4).all(|pixel| pixel[3] == 255);
+            // The control socket can become ready before the first Slint draw.
+            // Keep the opacity assertion, but wait for that initial frame to exist.
+            if !opaque && Instant::now() < deadline {
+                self.history.push(json!({"elapsed_ms": self.elapsed_ms(), "command": "wait for opaque screenshot frame"}));
+                thread::sleep(POLL_INTERVAL);
+                continue;
             }
+            assert!(
+                opaque,
+                "{} contains transparent screenshot pixels",
+                path.display()
+            );
+            assert!(
+                pixels.chunks_exact(4).any(|pixel| &pixel[..3] != first_rgb),
+                "{} is a blank, single-color screenshot",
+                path.display()
+            );
+            return path;
         }
-        let bytes = fs::read(&path).unwrap_or_else(|error| {
-            panic!("could not read screenshot {}: {error}", path.display())
-        });
-        let mut reader = png::Decoder::new(bytes.as_slice())
-            .read_info()
-            .unwrap_or_else(|error| panic!("invalid PNG {}: {error}", path.display()));
-        let mut pixels = vec![0; reader.output_buffer_size()];
-        let info = reader
-            .next_frame(&mut pixels)
-            .unwrap_or_else(|error| panic!("could not decode {}: {error}", path.display()));
-        assert!(info.width > 0 && info.height > 0);
-        assert_eq!(info.color_type, png::ColorType::Rgba);
-        assert_eq!(info.bit_depth, png::BitDepth::Eight);
-        let pixels = &pixels[..info.buffer_size()];
-        let first_rgb = &pixels[..3];
-        assert!(
-            pixels.chunks_exact(4).all(|pixel| pixel[3] == 255),
-            "{} contains transparent screenshot pixels",
-            path.display()
-        );
-        assert!(
-            pixels.chunks_exact(4).any(|pixel| &pixel[..3] != first_rgb),
-            "{} is a blank, single-color screenshot",
-            path.display()
-        );
-        path
     }
 
     fn require_state_result(
@@ -1058,6 +1100,7 @@ fn assert_launcher_main(state: &UiState) {
             "launcher.controls",
             "launcher.sound",
             "launcher.quit",
+            "launcher.new-match",
         ]
     );
     assert_eq!(

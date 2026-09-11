@@ -26,8 +26,11 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
-    let Some(target) = activation_target(control_id, window.get_scenario_benchmark_available())
-    else {
+    let Some(target) = activation_target(
+        control_id,
+        window.get_scenario_benchmark_available(),
+        window.get_launcher_scenario() == "spacewars",
+    ) else {
         return false;
     };
 
@@ -47,7 +50,10 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
         ActivationFocus::PauseSound => window.set_ingame_menu_focus_index(
             4 + i32::from(
                 window.get_scenario_benchmark_available()
-                    || window.get_launcher_scenario() == "clock",
+                    || matches!(
+                        window.get_launcher_scenario().as_str(),
+                        "clock" | "spacewars"
+                    ),
             ),
         ),
         ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
@@ -60,10 +66,14 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
 
 #[cfg(test)]
 pub(crate) fn supports(control_id: &str, benchmark_available: bool) -> bool {
-    activation_target(control_id, benchmark_available).is_some()
+    activation_target(control_id, benchmark_available, false).is_some()
 }
 
-fn activation_target(control_id: &str, benchmark_available: bool) -> Option<ActivationTarget> {
+fn activation_target(
+    control_id: &str,
+    benchmark_available: bool,
+    material_match: bool,
+) -> Option<ActivationTarget> {
     let target = match control_id {
         "gameplay.clock-controls" => ActivationTarget {
             focus: ActivationFocus::Gameplay,
@@ -72,6 +82,7 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
         "launcher.start" => launcher(1, UiAction::Confirm),
+        "launcher.new-match" => launcher(6, UiAction::Confirm),
         "launcher.settings" => launcher(2, UiAction::Confirm),
         "launcher.controls" => launcher(3, UiAction::Confirm),
         "launcher.quit" => launcher(4, UiAction::Confirm),
@@ -97,6 +108,7 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         },
         "pause.resume" => pause_main(0),
         "pause.restart" => pause_main(1),
+        "pause.new-match" => pause_main(4),
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
         "pause.clock" => pause_main(4),
@@ -126,7 +138,8 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
             action: UiAction::Start,
         },
         "game-over.play-again" => game_over(0),
-        "game-over.return-to-launcher" => game_over(1),
+        "game-over.new-match" => game_over(1),
+        "game-over.return-to-launcher" => game_over(if material_match { 2 } else { 1 }),
         _ => return launcher_setting_target(control_id),
     };
     Some(target)
@@ -145,16 +158,31 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.renderer" | "launcher.settings.nes.cartridge" => 0,
         "launcher.settings.raster-scale" => 1,
         "launcher.settings.spacewars.preset"
+        | "launcher.settings.match.player-1"
+        | "launcher.settings.travel.asteroid-interval"
+        | "launcher.settings.combat.break-interval"
         | "launcher.settings.expedition.players"
         | "launcher.settings.pizza.desired-balls"
         | "launcher.settings.clock.time-format" => 2,
         "launcher.settings.spacewars.planets"
+        | "launcher.settings.match.player-2"
+        | "launcher.settings.travel.asteroid-strength"
+        | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.digit-slide" => 3,
-        "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.event-profile" => 4,
-        "launcher.settings.spacewars.player-health" | "launcher.settings.clock.falling" => 5,
-        "launcher.settings.spacewars.player-2" | "launcher.settings.clock.color-cycle" => 6,
-        "launcher.settings.clock.meltdown" => 7,
+        "launcher.settings.spacewars.asteroids"
+        | "launcher.settings.match.break-interval"
+        | "launcher.settings.combat.mission"
+        | "launcher.settings.clock.event-profile" => 4,
+        "launcher.settings.spacewars.player-health"
+        | "launcher.settings.match.break-duration"
+        | "launcher.settings.combat.asteroid-interval"
+        | "launcher.settings.clock.falling" => 5,
+        "launcher.settings.spacewars.player-2"
+        | "launcher.settings.combat.asteroid-strength"
+        | "launcher.settings.match.asteroid-interval"
+        | "launcher.settings.clock.color-cycle" => 6,
+        "launcher.settings.match.asteroid-strength" | "launcher.settings.clock.meltdown" => 7,
         "launcher.settings.clock.duck" => 8,
         "launcher.settings.clock.marquee" => 9,
         "launcher.settings.clock.marquee-preset" => 10,
@@ -219,19 +247,19 @@ mod tests {
     #[test]
     fn pause_targets_account_for_the_optional_benchmark() {
         assert_eq!(
-            activation_target("pause.controls", true),
+            activation_target("pause.controls", true, false),
             Some(pause_main(3))
         );
         assert_eq!(
-            activation_target("pause.controls", false),
+            activation_target("pause.controls", false, false),
             Some(pause_main(2))
         );
         assert_eq!(
-            activation_target("pause.return-to-launcher", true),
+            activation_target("pause.return-to-launcher", true, false),
             Some(pause_main(4))
         );
         assert_eq!(
-            activation_target("pause.return-to-launcher", false),
+            activation_target("pause.return-to-launcher", false, false),
             Some(pause_main(3))
         );
     }
@@ -239,15 +267,19 @@ mod tests {
     #[test]
     fn settings_targets_select_the_visible_row_and_direction() {
         assert_eq!(
-            activation_target("launcher.settings.spacewars.player-health.previous", false),
+            activation_target(
+                "launcher.settings.spacewars.player-health.previous",
+                false,
+                false
+            ),
             Some(launcher_settings(Some(5), UiAction::Left))
         );
         assert_eq!(
-            activation_target("launcher.settings.pizza.spawn-rate.next", false),
+            activation_target("launcher.settings.pizza.spawn-rate.next", false, false),
             Some(launcher_settings(Some(3), UiAction::Right))
         );
         assert_eq!(
-            activation_target("launcher.settings.unknown.next", false),
+            activation_target("launcher.settings.unknown.next", false, false),
             None
         );
     }

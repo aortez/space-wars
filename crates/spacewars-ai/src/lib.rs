@@ -8,6 +8,18 @@
 
 #![forbid(unsafe_code)]
 
+pub mod combat_pilot;
+pub mod flight_pilot;
+pub mod ground_task;
+pub mod jetpack_crossing;
+mod landing_safety;
+pub mod mission_pilot;
+pub mod pilot;
+pub mod recovery_pilot;
+pub mod recovery_task;
+pub mod tactical_capture;
+pub mod tactical_sortie;
+
 use core::f32::consts::PI;
 
 use engine_core::Vec2;
@@ -18,6 +30,51 @@ use scenario_spacewars::{
 use serde::Serialize;
 
 const TARGET_EPSILON: f32 = 1.0e-5;
+
+/// The existing Spacewars pursuit, projectile lead and firing windows, shared
+/// with material combat. Hosts still own navigation and physical steering.
+pub struct CombatSolution {
+    pub aim: Vec2,
+    pub distance: f32,
+    pub heading_error: f32,
+    pub intent: ShipIntent,
+}
+pub fn combat_solution(
+    position: Vec2,
+    velocity: Vec2,
+    spin: f32,
+    laser_available: bool,
+    cannon_ready: bool,
+    config: &RuleShipBrainConfig,
+) -> CombatSolution {
+    let distance = position.length();
+    let aim = intercept_position(position, velocity, 300.0, 1.0);
+    let heading = guide_heading(aim, spin);
+    let closing_speed = -velocity.dot(position.normalized());
+    let should_brake = distance < config.arrival_distance && closing_speed > 20.0;
+    let should_advance =
+        !should_brake && distance > config.arrival_distance && heading.error_radians.abs() < 0.65;
+    let fast_pursuit =
+        distance > config.fast_pursuit_distance && heading.error_radians.abs() < 0.12;
+    let weapon_aligned = heading.error_radians.abs() < 0.08;
+    CombatSolution {
+        aim,
+        distance,
+        heading_error: heading.error_radians,
+        intent: ShipIntent {
+            turn: heading.turn,
+            thrust: if should_advance { 1.0 } else { 0.0 },
+            brake: if should_brake { 1.0 } else { 0.0 },
+            wings_closed: fast_pursuit,
+            laser: laser_available && weapon_aligned && distance <= config.laser_range,
+            cannon: cannon_ready
+                && weapon_aligned
+                && distance >= config.cannon_min_range
+                && distance <= config.cannon_max_range,
+        }
+        .normalized(),
+    }
+}
 
 /// Stable identity for a concrete ship-brain implementation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -2255,19 +2312,14 @@ impl RuleShipBrainV5 {
             self.set_telemetry(observation, BrainTelemetry::default());
             return ShipIntent::default();
         };
-        let distance = opponent.local_position.length();
-        let aim_position =
-            intercept_position(opponent.local_position, opponent.local_velocity, 300.0, 1.0);
-        let heading = guide_heading(aim_position, observation.own_ship.angular_velocity);
-        let line_to_target = opponent.local_position.normalized();
-        let closing_speed = -opponent.local_velocity.dot(line_to_target);
-        let should_brake = distance < self.config.arrival_distance && closing_speed > 20.0;
-        let should_advance = !should_brake
-            && distance > self.config.arrival_distance
-            && heading.error_radians.abs() < 0.65;
-        let fast_pursuit =
-            distance > self.config.fast_pursuit_distance && heading.error_radians.abs() < 0.12;
-        let weapon_aligned = heading.error_radians.abs() < 0.08;
+        let solution = combat_solution(
+            opponent.local_position,
+            opponent.local_velocity,
+            observation.own_ship.angular_velocity,
+            observation.own_ship.laser_available,
+            observation.own_ship.cannon_ready,
+            &self.config,
+        );
 
         self.set_telemetry(
             observation,
@@ -2275,26 +2327,13 @@ impl RuleShipBrainV5 {
                 goal,
                 target: Some(opponent.id),
                 target_planet: defended_planet,
-                target_distance: distance,
-                heading_error: heading.error_radians,
+                target_distance: solution.distance,
+                heading_error: solution.heading_error,
                 relative_speed: opponent.local_velocity.length(),
                 ..BrainTelemetry::default()
             },
         );
-        ShipIntent {
-            turn: heading.turn,
-            thrust: if should_advance { 1.0 } else { 0.0 },
-            brake: if should_brake { 1.0 } else { 0.0 },
-            wings_closed: fast_pursuit,
-            laser: observation.own_ship.laser_available
-                && weapon_aligned
-                && distance <= self.config.laser_range,
-            cannon: observation.own_ship.cannon_ready
-                && weapon_aligned
-                && distance >= self.config.cannon_min_range
-                && distance <= self.config.cannon_max_range,
-        }
-        .normalized()
+        solution.intent
     }
 }
 

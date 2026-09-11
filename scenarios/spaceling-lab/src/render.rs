@@ -156,7 +156,7 @@ pub(super) fn frame(state: &SpacelingLabState) -> RenderFrame {
     text(
         &mut frame,
         center + Vec2::new(0.0, 9.6),
-        "D-pad / A,D / arrows: walk    A / Space: jump",
+        "D-pad / A,D / arrows: walk    A / Space: jump or get up",
         LIGHT,
         14.0,
     );

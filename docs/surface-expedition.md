@@ -1,5 +1,10 @@
 # Surface Expedition
 
+For the combined destructible-ground acceptance scene, choose
+**spacewars-terrain** and see [Spacewars Terrain](spacewars-terrain.md).
+It shares Expedition's pilots, claims and recovery, with aimed mining and
+ownership loss when a flag's supporting material is destroyed or detached.
+
 An opt-in, one- or two-player planet-to-planet loop on the experimental Surface
 V1 world. Choose **surface-expedition** in the launcher, or run:
 

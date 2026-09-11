@@ -20,6 +20,7 @@ mod rover_lab;
 mod spaceling_lab;
 mod spacewars;
 mod surface_sortie;
+mod terrain_lab;
 
 pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
 
@@ -117,7 +118,6 @@ pub struct BenchmarkStepMetrics {
     pub rapier_island_time: Duration,
     pub rapier_island_constraints_time: Duration,
     pub rapier_solver_time: Duration,
-    pub rapier_ccd_time: Duration,
     pub added: usize,
     pub removed: usize,
 }
@@ -145,7 +145,6 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
         self.rapier_island_time += rhs.rapier_island_time;
         self.rapier_island_constraints_time += rhs.rapier_island_constraints_time;
         self.rapier_solver_time += rhs.rapier_solver_time;
-        self.rapier_ccd_time += rhs.rapier_ccd_time;
         self.added += rhs.added;
         self.removed += rhs.removed;
     }
@@ -291,6 +290,11 @@ pub trait ClientScenario {
         false
     }
 
+    /// Result text for scenarios that do not use the legacy center panel.
+    fn game_over_message(&self) -> Option<String> {
+        None
+    }
+
     fn runtime_error(&self) -> Option<String> {
         None
     }
@@ -386,12 +390,24 @@ static SCENARIOS: &[ScenarioRegistration] = &[
     pizza::REGISTRATION,
     rover_lab::REGISTRATION,
     spaceling_lab::REGISTRATION,
+    terrain_lab::REGISTRATION,
+    surface_sortie::MATCH_REGISTRATION,
     spacewars::REGISTRATION,
     surface_sortie::REGISTRATION,
     surface_sortie::ORBIT_REGISTRATION,
     surface_sortie::GENERATED_REGISTRATION,
     surface_sortie::WORLD_REGISTRATION,
     surface_sortie::EXPEDITION_REGISTRATION,
+    spacewars::TERRAIN_REGISTRATION,
+    surface_sortie::PILOT_REGISTRATION,
+    surface_sortie::RECOVERY_REGISTRATION,
+    surface_sortie::JETPACK_REGISTRATION,
+    surface_sortie::COMBAT_REGISTRATION,
+    surface_sortie::DUEL_REGISTRATION,
+    surface_sortie::TRAVEL_REGISTRATION,
+    surface_sortie::TRAVEL_DUEL_REGISTRATION,
+    surface_sortie::ARENA_REGISTRATION,
+    surface_sortie::ARENA_DUEL_REGISTRATION,
 ];
 
 pub fn registrations() -> &'static [ScenarioRegistration] {
@@ -458,12 +474,24 @@ mod tests {
                 "pizza",
                 "rover-lab",
                 "spaceling-lab",
+                "terrain-lab",
                 "spacewars",
+                "spacewars-classic",
                 "surface-sortie",
                 "surface-sortie-orbit",
                 "surface-sortie-generated",
                 "surface-sortie-world",
-                "surface-expedition"
+                "surface-expedition",
+                "spacewars-terrain",
+                "spacewars-terrain-ai",
+                "spacewars-terrain-recovery",
+                "spacewars-terrain-jetpack",
+                "spacewars-terrain-combat",
+                "spacewars-terrain-duel",
+                "spacewars-terrain-travel",
+                "spacewars-terrain-travel-duel",
+                "spacewars-terrain-arena",
+                "spacewars-terrain-arena-duel"
             ]
         );
     }

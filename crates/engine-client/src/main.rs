@@ -1,7 +1,7 @@
 //! Scenario client: Slint UI, input, rendering, settings, and scenario host.
 //!
 //! The compile-time registry hosts Clock, Falling, NES Library, Pizza, Rover
-//! Lab, and Spacewars from the launcher, with Null retained as a hidden test
+//! Lab, Spaceling Lab, Terrain Lab, and Spacewars, with Null retained as a hidden test
 //! scenario.
 
 mod client_scenarios;
@@ -13,6 +13,7 @@ mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
 mod launcher;
+mod match_world;
 mod native_video;
 mod nes_audio;
 mod nes_realtime;
@@ -446,6 +447,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Rc::clone(&input),
         Arc::clone(&settings),
+        settings_writer.clone(),
         Rc::clone(&rom_catalog),
     );
     install_ui_navigation(&window);
@@ -531,7 +533,7 @@ fn effective_launch_options(args: &Args, settings: &Settings) -> EffectiveLaunch
     let scenario = if args.rom.is_some() {
         "nes".into()
     } else if args.uses_benchmark() && args.scenario.is_none() {
-        "spacewars".into()
+        "spacewars-classic".into()
     } else {
         args.scenario
             .clone()
@@ -679,6 +681,36 @@ fn show_launcher(
     window.set_launcher_expedition_players(SharedString::from(
         settings.surface_expedition.players.count().to_string(),
     ));
+    window.set_launcher_combat_mission(SharedString::from(
+        match settings.material_combat.mission {
+            engine_common::MaterialCombatMission::Dogfight => "Dogfight",
+            engine_common::MaterialCombatMission::Capture => "Capture",
+        },
+    ));
+    let asteroids = settings.material_combat.asteroids.normalized();
+    window.set_launcher_combat_asteroid_interval(SharedString::from(
+        if asteroids.interval_seconds == 0 {
+            "Off".to_owned()
+        } else {
+            asteroids.interval_seconds.to_string()
+        },
+    ));
+    window.set_launcher_combat_asteroid_strength(SharedString::from(match asteroids.severity {
+        engine_common::MaterialAsteroidSeverity::Light => "Light",
+        engine_common::MaterialAsteroidSeverity::Mixed => "Mixed",
+        engine_common::MaterialAsteroidSeverity::Heavy => "Heavy",
+    }));
+    let breaks = settings.combat_breaks.normalized();
+    window.set_launcher_combat_break_interval(SharedString::from(
+        if breaks.interval_seconds == 0 {
+            "Off".to_owned()
+        } else {
+            breaks.interval_seconds.to_string()
+        },
+    ));
+    window.set_launcher_combat_break_duration(SharedString::from(
+        breaks.duration_seconds.to_string(),
+    ));
     let setup = settings.spacewars.normalized();
     window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
     window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
@@ -690,6 +722,9 @@ fn show_launcher(
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p1_controller(SharedString::from(spacewars_controller_label(
+        setup.player_1_controller,
+    )));
     window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
         setup.player_2_controller,
     )));
@@ -885,11 +920,16 @@ fn install_launcher_callbacks(
     );
     let game_launcher = Rc::clone(&launcher);
     window.on_launcher_start_game(move || {
-        game_launcher.start(false);
+        game_launcher.start(launcher::StartMode::SelectedWorld);
+    });
+
+    let new_world_launcher = Rc::clone(&launcher);
+    window.on_launcher_new_match(move || {
+        new_world_launcher.start(launcher::StartMode::NewMatch);
     });
 
     window.on_launcher_start_benchmark(move || {
-        launcher.start(true);
+        launcher.start(launcher::StartMode::Benchmark);
     });
 
     let weak = window.as_weak();
@@ -946,6 +986,7 @@ fn install_ingame_menu_callbacks(
     scenario_controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
+    settings_writer: settings_writer::SettingsWriter,
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
@@ -956,6 +997,29 @@ fn install_ingame_menu_callbacks(
     let controls = Rc::clone(&scenario_controls);
     window.on_ingame_restart(move || {
         controls.borrow_mut().request_restart();
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_new_match(move || {
+        controls.borrow_mut().request_new_match();
+    });
+
+    let weak = window.as_weak();
+    let world_settings = Arc::clone(&settings);
+    window.on_match_world_changed(move || {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let mut settings = world_settings.write().unwrap();
+        settings.launch.scenario = "spacewars".into();
+        settings.last_scenario = Some("spacewars".into());
+        settings.launch.seed = window.get_launcher_seed_text().parse().unwrap();
+        settings.launch.renderer =
+            renderer_setting(renderer_from_label(window.get_launcher_renderer().as_str()).unwrap());
+        settings.launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+        let snapshot = settings.clone();
+        drop(settings);
+        let _ = settings_writer.save(snapshot);
     });
 
     let controls = Rc::clone(&scenario_controls);
@@ -1136,15 +1200,19 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
         return;
     }
 
+    let move_selection = if window.get_launcher_scenario() == "spacewars" {
+        ui_navigation::moved_match_launcher_selection
+    } else {
+        ui_navigation::moved_launcher_selection
+    };
     match action {
-        UiAction::Up | UiAction::Down => window.set_launcher_focus_index(
-            ui_navigation::moved_launcher_selection(window.get_launcher_focus_index(), action),
-        ),
+        UiAction::Up | UiAction::Down => window
+            .set_launcher_focus_index(move_selection(window.get_launcher_focus_index(), action)),
         UiAction::Left => {
             if window.get_launcher_focus_index() == 0 {
                 cycle_launcher_scenario(window, -1);
             } else {
-                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                window.set_launcher_focus_index(move_selection(
                     window.get_launcher_focus_index(),
                     action,
                 ));
@@ -1154,7 +1222,7 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             if window.get_launcher_focus_index() == 0 {
                 cycle_launcher_scenario(window, 1);
             } else {
-                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                window.set_launcher_focus_index(move_selection(
                     window.get_launcher_focus_index(),
                     action,
                 ));
@@ -1167,6 +1235,9 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             3 => window.set_launcher_controls_visible(true),
             4 => window.invoke_launcher_quit(),
             5 => window.invoke_sound_open(),
+            6 if window.get_launcher_scenario() == "spacewars" => {
+                window.invoke_launcher_new_match()
+            }
             _ => {}
         },
         // Back never exits the root kiosk screen. Quit is an explicit menu item.
@@ -1177,16 +1248,20 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
 }
 
 fn handle_game_over_ui_action(window: &MainWindow, action: UiAction) {
+    let material_match = window.get_launcher_scenario() == "spacewars";
+    let item_count = if material_match { 3 } else { 2 };
     match action {
         UiAction::Up | UiAction::Left => window.set_game_over_focus_index(
-            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, -1),
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), item_count, -1),
         ),
         UiAction::Down | UiAction::Right => window.set_game_over_focus_index(
-            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, 1),
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), item_count, 1),
         ),
         UiAction::Confirm => {
             if window.get_game_over_focus_index() == 0 {
                 window.invoke_ingame_restart();
+            } else if material_match && window.get_game_over_focus_index() == 1 {
+                window.invoke_ingame_new_match();
             } else {
                 window.invoke_ingame_return_launcher();
             }
@@ -1218,7 +1293,11 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
             window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
                 window.get_ingame_menu_focus_index(),
-                benchmark_offset == 1 || window.get_launcher_scenario() == "clock",
+                benchmark_offset == 1
+                    || matches!(
+                        window.get_launcher_scenario().as_str(),
+                        "clock" | "spacewars"
+                    ),
                 action,
             ));
         }
@@ -1236,8 +1315,16 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
                 window.invoke_ingame_return_launcher();
             } else if selected == 4 && window.get_launcher_scenario() == "clock" {
                 clock_controls::open(window);
+            } else if selected == 4 && window.get_launcher_scenario() == "spacewars" {
+                window.invoke_ingame_new_match();
             } else if selected
-                == 4 + i32::from(benchmark_offset == 1 || window.get_launcher_scenario() == "clock")
+                == 4 + i32::from(
+                    benchmark_offset == 1
+                        || matches!(
+                            window.get_launcher_scenario().as_str(),
+                            "clock" | "spacewars"
+                        ),
+                )
             {
                 window.invoke_sound_open();
             }
@@ -1271,12 +1358,18 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 8,
+        "spacewars" => 9,
+        "spacewars-classic" => 8,
         "pizza" => 5,
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => 5,
         "clock" => 12,
         "falling" => 1,
         "nes" => 2,
-        "surface-expedition" => 4,
+        "surface-expedition" | "spacewars-terrain" => 4,
         _ => 3,
     }
 }
@@ -1312,7 +1405,7 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
     }
 
     match window.get_launcher_scenario().as_str() {
-        "surface-expedition" if focus == 2 => {
+        "surface-expedition" | "spacewars-terrain" if focus == 2 => {
             let next = cycle_label(
                 window.get_launcher_expedition_players().as_str(),
                 &["1", "2"],
@@ -1320,9 +1413,90 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
             );
             window.set_launcher_expedition_players(SharedString::from(next));
         }
-        "spacewars" => adjust_spacewars_launcher_setting(window, focus, delta),
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => match focus {
+            2 => window.set_launcher_combat_break_interval(SharedString::from(cycle_label(
+                window.get_launcher_combat_break_interval().as_str(),
+                &["Off", "8", "15", "30"],
+                delta,
+            ))),
+            3 => window.set_launcher_combat_break_duration(SharedString::from(cycle_label(
+                window.get_launcher_combat_break_duration().as_str(),
+                &["2", "4", "6", "8"],
+                delta,
+            ))),
+            4 => window.set_launcher_combat_mission(SharedString::from(cycle_label(
+                window.get_launcher_combat_mission().as_str(),
+                &["Dogfight", "Capture"],
+                delta,
+            ))),
+            5 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_interval().as_str(),
+                &["Off", "8", "3", "1"],
+                delta,
+            ))),
+            6 => window.set_launcher_combat_asteroid_strength(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_strength().as_str(),
+                &["Light", "Mixed", "Heavy"],
+                delta,
+            ))),
+            _ => {}
+        },
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => match focus {
+            2 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_interval().as_str(),
+                &["Off", "8", "3", "1"],
+                delta,
+            ))),
+            3 => window.set_launcher_combat_asteroid_strength(SharedString::from(cycle_label(
+                window.get_launcher_combat_asteroid_strength().as_str(),
+                &["Light", "Mixed", "Heavy"],
+                delta,
+            ))),
+            _ => {}
+        },
+        "spacewars" => adjust_material_match_launcher_setting(window, focus, delta),
+        "spacewars-classic" => adjust_spacewars_launcher_setting(window, focus, delta),
         "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
         "clock" => adjust_clock_launcher_setting(window, focus, delta),
+        _ => {}
+    }
+}
+
+fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    match focus {
+        2 => window.set_launcher_p1_controller(SharedString::from(cycle_label(
+            window.get_launcher_p1_controller().as_str(),
+            &["human", "rule bot"],
+            delta,
+        ))),
+        3 => window.set_launcher_p2_controller(SharedString::from(cycle_label(
+            window.get_launcher_p2_controller().as_str(),
+            &["human", "rule bot"],
+            delta,
+        ))),
+        4 => window.set_launcher_combat_break_interval(SharedString::from(cycle_label(
+            window.get_launcher_combat_break_interval().as_str(),
+            &["Off", "8", "15", "30"],
+            delta,
+        ))),
+        5 => window.set_launcher_combat_break_duration(SharedString::from(cycle_label(
+            window.get_launcher_combat_break_duration().as_str(),
+            &["2", "4", "6", "8"],
+            delta,
+        ))),
+        6 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
+            window.get_launcher_combat_asteroid_interval().as_str(),
+            &["Off", "8", "3", "1"],
+            delta,
+        ))),
+        7 => window.set_launcher_combat_asteroid_strength(SharedString::from(cycle_label(
+            window.get_launcher_combat_asteroid_strength().as_str(),
+            &["Light", "Mixed", "Heavy"],
+            delta,
+        ))),
         _ => {}
     }
 }
@@ -1495,7 +1669,13 @@ fn handle_return_to_launcher(
     input.borrow_mut().clear();
     input.borrow_mut().reset_spacewars_controls();
     let settings = settings.read().unwrap();
-    let launch = launch_from_settings(&settings);
+    let mut launch = launch_from_settings(&settings);
+    if window.get_launcher_scenario() == "spacewars" {
+        launch.scenario = "spacewars".into();
+        launch.seed = window.get_launcher_seed_text().parse().unwrap();
+        launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
+        launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+    }
     show_launcher(&window, &launch, &settings, rom_catalog);
 }
 
@@ -1508,6 +1688,13 @@ fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
     let preset = window.get_launcher_spacewars_preset();
     match spacewars_preset_from_label(preset.as_str()) {
         Ok(Some(mut setup)) => {
+            match spacewars_controller_from_label(window.get_launcher_p1_controller().as_str()) {
+                Ok(controller) => setup.player_1_controller = controller,
+                Err(message) => {
+                    window.set_launcher_error_text(SharedString::from(message));
+                    return;
+                }
+            }
             match spacewars_controller_from_label(window.get_launcher_p2_controller().as_str()) {
                 Ok(controller) => setup.player_2_controller = controller,
                 Err(message) => {
@@ -1594,6 +1781,8 @@ struct LauncherSelections {
     spacewars: SpacewarsSettings,
     pizza: PizzaSettings,
     surface_expedition: engine_common::SurfaceExpeditionSettings,
+    combat_breaks: engine_common::CombatBreakSettings,
+    material_combat: engine_common::MaterialCombatSettings,
 }
 
 fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelections) -> bool {
@@ -1640,6 +1829,14 @@ fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelec
     }
     if settings.surface_expedition != selections.surface_expedition {
         settings.surface_expedition = selections.surface_expedition;
+        changed = true;
+    }
+    if settings.material_combat != selections.material_combat {
+        settings.material_combat = selections.material_combat;
+        changed = true;
+    }
+    if settings.combat_breaks != selections.combat_breaks.normalized() {
+        settings.combat_breaks = selections.combat_breaks.normalized();
         changed = true;
     }
     if settings.pizza != pizza {
@@ -1697,6 +1894,9 @@ fn set_spacewars_setup_fields(window: &MainWindow, setup: &SpacewarsSettings) {
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p1_controller(SharedString::from(spacewars_controller_label(
+        setup.player_1_controller,
+    )));
     window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
         setup.player_2_controller,
     )));
@@ -1722,6 +1922,7 @@ fn spacewars_preset_from_label(label: &str) -> Result<Option<SpacewarsSettings>,
 fn preset_label_for_setup(setup: &SpacewarsSettings) -> &'static str {
     let mut setup = setup.normalized();
     // Controller selection is orthogonal to the world/gameplay preset.
+    setup.player_1_controller = SpacewarsController::Human;
     setup.player_2_controller = SpacewarsController::Human;
     if setup == original_spacewars_preset() {
         PRESET_ORIGINAL
@@ -1779,11 +1980,23 @@ fn launcher_selections_from_window(
 ) -> Result<LauncherSelections, String> {
     let launch = launch_options_from_window(window)?;
     let (clock, spacewars, pizza) = match launch.scenario.as_str() {
-        "spacewars" => (
+        "spacewars-classic" => (
             current_settings.clock,
             spacewars_setup_from_window(window)?,
             current_settings.pizza.clone(),
         ),
+        "spacewars" => {
+            let mut setup = current_settings.spacewars.clone();
+            setup.player_1_controller =
+                spacewars_controller_from_label(window.get_launcher_p1_controller().as_str())?;
+            setup.player_2_controller =
+                spacewars_controller_from_label(window.get_launcher_p2_controller().as_str())?;
+            (
+                current_settings.clock,
+                setup,
+                current_settings.pizza.clone(),
+            )
+        }
         "pizza" => (
             current_settings.clock,
             current_settings.spacewars.clone(),
@@ -1806,7 +2019,10 @@ fn launcher_selections_from_window(
     } else {
         current_settings.nes.selected_rom_id.clone()
     };
-    let surface_expedition = if launch.scenario == "surface-expedition" {
+    let surface_expedition = if matches!(
+        launch.scenario.as_str(),
+        "surface-expedition" | "spacewars-terrain"
+    ) {
         engine_common::SurfaceExpeditionSettings {
             players: match window.get_launcher_expedition_players().as_str() {
                 "1" => engine_common::SurfaceExpeditionPlayers::One,
@@ -1817,7 +2033,64 @@ fn launcher_selections_from_window(
     } else {
         current_settings.surface_expedition
     };
+    let combat_breaks = if matches!(
+        launch.scenario.as_str(),
+        "spacewars" | "spacewars-terrain-combat" | "spacewars-terrain-duel"
+    ) {
+        engine_common::CombatBreakSettings {
+            interval_seconds: match window.get_launcher_combat_break_interval().as_str() {
+                "Off" => 0,
+                value => value
+                    .parse()
+                    .map_err(|_| "Combat break interval must be seconds or Off.".to_owned())?,
+            },
+            duration_seconds: window
+                .get_launcher_combat_break_duration()
+                .parse()
+                .map_err(|_| "Combat break duration must be seconds.".to_owned())?,
+        }
+        .normalized()
+    } else {
+        current_settings.combat_breaks
+    };
+    let material_combat = if matches!(
+        launch.scenario.as_str(),
+        "spacewars"
+            | "spacewars-terrain-combat"
+            | "spacewars-terrain-duel"
+            | "spacewars-terrain-travel"
+            | "spacewars-terrain-travel-duel"
+            | "spacewars-terrain-arena"
+            | "spacewars-terrain-arena-duel"
+    ) {
+        engine_common::MaterialCombatSettings {
+            asteroids: engine_common::MaterialAsteroidSettings {
+                interval_seconds: match window.get_launcher_combat_asteroid_interval().as_str() {
+                    "Off" => 0,
+                    value => value
+                        .parse()
+                        .map_err(|_| "Asteroid interval must be seconds or Off.".to_owned())?,
+                },
+                severity: match window.get_launcher_combat_asteroid_strength().as_str() {
+                    "Light" => engine_common::MaterialAsteroidSeverity::Light,
+                    "Mixed" => engine_common::MaterialAsteroidSeverity::Mixed,
+                    "Heavy" => engine_common::MaterialAsteroidSeverity::Heavy,
+                    _ => return Err("Unknown asteroid strength.".to_owned()),
+                },
+            }
+            .normalized(),
+            mission: match window.get_launcher_combat_mission().as_str() {
+                "Dogfight" => engine_common::MaterialCombatMission::Dogfight,
+                "Capture" => engine_common::MaterialCombatMission::Capture,
+                _ => return Err("Unknown combat mission.".to_owned()),
+            },
+        }
+    } else {
+        current_settings.material_combat
+    };
     Ok(LauncherSelections {
+        material_combat,
+        combat_breaks,
         surface_expedition,
         launch,
         nes_rom_id,
@@ -1846,6 +2119,8 @@ fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings,
         window.get_launcher_p1_zoom_text().as_str(),
         window.get_launcher_p2_zoom_text().as_str(),
     )?;
+    setup.player_1_controller =
+        spacewars_controller_from_label(window.get_launcher_p1_controller().as_str())?;
     setup.player_2_controller =
         spacewars_controller_from_label(window.get_launcher_p2_controller().as_str())?;
     Ok(setup.normalized())
@@ -1958,6 +2233,7 @@ fn spacewars_setup_from_values(
             MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
             MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
         )?,
+        player_1_controller: SpacewarsController::Human,
         player_2_controller: SpacewarsController::Human,
     };
 
@@ -2089,7 +2365,7 @@ fn start_scenario_from_launch(
     controls.borrow_mut().clear();
     window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
     apply_scenario_metadata(window, launch.scenario.as_str());
-    host::start_scenario_loop(
+    let timer = host::start_scenario_loop(
         window,
         launch.scenario.as_str(),
         launch.seed,
@@ -2103,7 +2379,13 @@ fn start_scenario_from_launch(
             settings,
             asset,
         },
-    )
+    )?;
+    window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
+    window.set_launcher_renderer(SharedString::from(renderer_label(launch.renderer)));
+    window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
+        launch.raster_scale,
+    )));
+    Ok(timer)
 }
 
 fn renderer_from_label(label: &str) -> Result<host::RenderBackend, String> {
@@ -2361,7 +2643,7 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_without_cli_scenario_uses_spacewars() {
+    fn benchmark_without_cli_scenario_uses_classic_spacewars() {
         let mut settings = Settings::default();
         settings.launch.scenario = "null".into();
         let mut args = base_args();
@@ -2369,7 +2651,7 @@ mod tests {
 
         let launch = effective_launch_options(&args, &settings);
 
-        assert_eq!(launch.scenario, "spacewars");
+        assert_eq!(launch.scenario, "spacewars-classic");
     }
 
     #[test]
@@ -2658,6 +2940,17 @@ mod tests {
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
         let selections = LauncherSelections {
+            material_combat: engine_common::MaterialCombatSettings {
+                mission: engine_common::MaterialCombatMission::Capture,
+                asteroids: engine_common::MaterialAsteroidSettings {
+                    interval_seconds: 3,
+                    severity: engine_common::MaterialAsteroidSeverity::Heavy,
+                },
+            },
+            combat_breaks: engine_common::CombatBreakSettings {
+                interval_seconds: 8,
+                duration_seconds: 6,
+            },
             surface_expedition: engine_common::SurfaceExpeditionSettings {
                 players: engine_common::SurfaceExpeditionPlayers::Two,
             },
@@ -2690,6 +2983,7 @@ mod tests {
                 player_health_percent: 250,
                 player_1_view_height: 420.0,
                 player_2_view_height: 640.0,
+                player_1_controller: SpacewarsController::RuleBot,
                 player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
@@ -2729,6 +3023,11 @@ mod tests {
         assert_eq!(
             reloaded.settings.surface_expedition,
             selections.surface_expedition
+        );
+        assert_eq!(reloaded.settings.combat_breaks, selections.combat_breaks);
+        assert_eq!(
+            reloaded.settings.material_combat,
+            selections.material_combat
         );
         assert_eq!(reloaded.settings.pizza, selections.pizza);
         assert_eq!(reloaded.settings.clock, selections.clock);
@@ -2776,6 +3075,7 @@ mod tests {
             player_health_percent: 250,
             player_1_view_height: 420.0,
             player_2_view_height: 640.0,
+            player_1_controller: SpacewarsController::Human,
             player_2_controller: SpacewarsController::RuleBot,
         };
 

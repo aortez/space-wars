@@ -442,15 +442,19 @@ fn snapshot(gamepad: &Gamepad<'_>) -> GamepadSeatInput {
         name: gamepad.name().to_owned(),
         left_stick_x,
         left_stick_y,
+        right_stick_x: gamepad.value(Axis::RightStickX),
+        right_stick_y: gamepad.value(Axis::RightStickY),
         left_trigger: button_value(gamepad, Button::LeftTrigger2),
         right_trigger: button_value(gamepad, Button::RightTrigger2),
         dpad_up: gamepad.is_pressed(Button::DPadUp) || axis_dpad.up,
         dpad_down: gamepad.is_pressed(Button::DPadDown) || axis_dpad.down,
         dpad_left: gamepad.is_pressed(Button::DPadLeft) || axis_dpad.left,
         dpad_right: gamepad.is_pressed(Button::DPadRight) || axis_dpad.right,
+        left_bumper: gamepad.is_pressed(Button::LeftTrigger),
         right_bumper: gamepad.is_pressed(Button::RightTrigger),
         south: gamepad.is_pressed(Button::South),
         east: gamepad.is_pressed(Button::East),
+        north: gamepad.is_pressed(Button::North),
         west: gamepad.is_pressed(Button::West),
         start: gamepad.is_pressed(Button::Start),
         select: gamepad.is_pressed(Button::Select),
@@ -576,15 +580,19 @@ impl ModeHandoff {
 fn is_neutral(gamepad: &GamepadSeatInput) -> bool {
     input::shape_stick(gamepad.left_stick_x) == 0.0
         && input::shape_stick(gamepad.left_stick_y) == 0.0
+        && input::shape_stick(gamepad.right_stick_x) == 0.0
+        && input::shape_stick(gamepad.right_stick_y) == 0.0
         && input::shape_trigger(gamepad.left_trigger) == 0.0
         && input::shape_trigger(gamepad.right_trigger) == 0.0
         && !gamepad.dpad_up
         && !gamepad.dpad_down
         && !gamepad.dpad_left
         && !gamepad.dpad_right
+        && !gamepad.left_bumper
         && !gamepad.right_bumper
         && !gamepad.south
         && !gamepad.east
+        && !gamepad.north
         && !gamepad.west
         && !gamepad.start
         && !gamepad.select

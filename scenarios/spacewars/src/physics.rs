@@ -15,10 +15,10 @@ use engine_rapier::{
 use super::{
     BODY_BOUNDS_RADIUS_SCALE, BodyId, CANNON_SHELL_RADIUS, DEFAULT_ELASTICITY, DebrisKind,
     DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
-    RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING,
-    SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE, ShipForm, ShipState,
-    SunState, planet_surface_velocity, rotate_points, spaceport_docking_anchor,
-    spaceport_local_points,
+    PlayerId, RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT,
+    SHIP_RIGHT_WING, SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE,
+    SPACEWARS_PLAYER_COUNT, ShipForm, ShipState, SunState, planet_surface_velocity, rotate_points,
+    spaceport_docking_anchor, spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
@@ -54,7 +54,10 @@ pub(super) fn is_planet_surface_support(collider: ColliderId, planet: usize) -> 
 
 /// Decode contact identity directly; support lookup must not scan the world.
 pub(super) fn planet_surface_support_index(collider: ColliderId) -> Option<usize> {
-    if collider.role == ROVER_SURFACE_ROLE || collider.role == OUTPOST_TERMINAL_ROLE {
+    if collider.role == ROVER_SURFACE_ROLE
+        || collider.role == OUTPOST_TERMINAL_ROLE
+        || collider.role.value() >= terrain_spec().first_chunk_role
+    {
         planet_index(collider.entity)
     } else {
         None
@@ -72,14 +75,25 @@ const GROUP_SPACEPORT_SENSOR: u32 = 1 << 8;
 const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_SPACELING: u32 = 1 << 11;
+const GROUP_MATERIAL: u32 = 1 << 12;
+// Surface actors exclude legacy circular planet colliders, but still hit the sun.
+const GROUP_SUN: u32 = 1 << 13;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;
+// GROUP_BODY also includes dynamic terrain fragments. Celestial and boundary
+// filters must accept that group as well as ordinary ships, debris, and rovers.
 const GROUP_ALL_SOLIDS: u32 =
     GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_WORLD | GROUP_ROVER | GROUP_SPACELING;
 
 pub(super) fn spaceling_collision_groups() -> CollisionGroups {
     CollisionGroups::new(
         GROUP_SPACELING,
-        GROUP_ROVER_SURFACE | GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_WORLD | GROUP_SPACELING,
+        GROUP_ROVER_SURFACE
+            | GROUP_MATERIAL
+            | GROUP_SUN
+            | GROUP_ALL_SHIPS
+            | GROUP_DEBRIS
+            | GROUP_WORLD
+            | GROUP_SPACELING,
     )
 }
 
@@ -89,6 +103,15 @@ const WORLD_SURFACE_SEGMENTS: usize = 192;
 // surface berth cannot introduce a new planet overlap.
 const DOCKED_SHIP_COLLIDER_RADIUS: f32 = 2.5;
 const CONTACT_REARM_TICKS: u64 = 6;
+
+pub(super) fn terrain_spec() -> engine_rapier::terrain::TerrainSpec {
+    engine_rapier::terrain::TerrainSpec {
+        friction: 0.9,
+        restitution: 0.1,
+        collision_groups: CollisionGroups::new(GROUP_BODY | GROUP_MATERIAL, GROUP_ALL_SOLIDS),
+        ..Default::default()
+    }
+}
 
 pub(super) fn spacewars_rover_spec() -> RoverSpec {
     RoverSpec {
@@ -121,7 +144,9 @@ pub(super) fn spacewars_rover_spawn_pose(planet: &PlanetState) -> RoverSpawnPose
 pub(super) enum MechanicalEntity {
     World,
     Body(BodyId),
+    TerrainFragment(u64),
     Ship(usize),
+    Spaceling(usize),
     Rover(u64),
     Debris(u64),
 }
@@ -184,6 +209,12 @@ struct RoverPhysicsEntry {
 #[derive(Debug, Clone)]
 pub(super) struct SpacewarsPhysics {
     pub(super) world: PhysicsWorld,
+    pub(super) terrain_fragments: BTreeSet<u64>,
+    pub(super) material_planets: BTreeSet<usize>,
+    // Newly replaced/inserted terrain is indexed by the next ordinary step.
+    // Until then no spatial query may authorize a transfer or placement.
+    pub(super) material_queries_dirty: bool,
+    disabled_spaceports: BTreeSet<usize>,
     sun_radius: Option<u32>,
     ship_keys: [Option<ShipColliderKey>; 2],
     docked_planets: [Option<usize>; 2],
@@ -226,6 +257,10 @@ impl SpacewarsPhysics {
                 max_ccd_substeps: 4,
                 collect_events: true,
             }),
+            terrain_fragments: BTreeSet::new(),
+            material_planets: BTreeSet::new(),
+            material_queries_dirty: false,
+            disabled_spaceports: BTreeSet::new(),
             sun_radius: None,
             ship_keys: [None, None],
             docked_planets: [None, None],
@@ -411,7 +446,11 @@ impl SpacewarsPhysics {
 
     pub fn step(&mut self, dt_seconds: f32) -> PhysicsStepMetrics {
         self.capture_pre_step_motions();
-        self.world.step(dt_seconds)
+        let metrics = self.world.step(dt_seconds);
+        if dt_seconds.is_finite() && dt_seconds > 0.0 {
+            self.material_queries_dirty = false;
+        }
+        metrics
     }
 
     pub fn ship_is_constrained(&self, index: usize) -> bool {
@@ -495,6 +534,34 @@ impl SpacewarsPhysics {
             constrained: false,
         });
         self.docked_planets[index] = None;
+        if let (Some(previous), Some(next_key)) = (self.ship_keys[index], next)
+            && previous.form == ShipForm::Ship
+            && next_key.form == ShipForm::Ship
+            && previous.wing_theta != next_key.wing_theta
+        {
+            // Folding changes only the hull. Keep the body and rear feet, and
+            // preserve origin velocity when the new silhouette moves the COM.
+            synchronize_ship_to_physics(&mut self.world, index, ship);
+            let body = self.ship_body(index);
+            let motion = self.world.motion(body).expect("existing surface ship");
+            let origin_velocity = self.world.velocity_at_point(body, motion.position).unwrap();
+            let colliders = surface_ship_colliders(ship_entity(index), ship, self.surface_recovery);
+            assert!(
+                self.world
+                    .replace_colliders(body, SHIP_HULL_ROLE, &colliders[..1])
+            );
+            assert!(self.world.refresh_mass_properties(body));
+            let offset = self.world.center_of_mass(body).unwrap() - motion.position;
+            self.world.set_velocity(
+                body,
+                origin_velocity + Vec2::new(-offset.y, offset.x) * motion.angular_velocity,
+                motion.angular_velocity,
+                true,
+            );
+            self.ship_keys[index] = next;
+            self.material_queries_dirty = true;
+            return lifecycle;
+        }
         if self.ship_keys[index] != next {
             lifecycle.removed += usize::from(self.world.remove_entity(ship_entity(index)));
             self.ship_keys[index] = None;
@@ -530,42 +597,202 @@ impl SpacewarsPhysics {
         ship: &ShipState,
         center: Vec2,
         radius: f32,
+        replacing: usize,
+        actor: PhysicsId,
     ) -> bool {
+        if self.material_queries_dirty {
+            return false;
+        }
         let mut groups = ship_collision_groups(ship, false);
-        groups.filter =
-            (groups.filter & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR)) | GROUP_ROVER_SURFACE;
-        self.world
-            .capsule_is_clear(center, 0.0, 0.0, radius, groups)
+        groups.filter = (groups.filter & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
+            | GROUP_ROVER_SURFACE
+            | GROUP_MATERIAL
+            | GROUP_SUN;
+        self.world.capsule_clearance_test_excluding(
+            0.0,
+            radius,
+            groups,
+            vec![ship_entity(replacing), actor],
+        )(center, 0.0)
+    }
+
+    pub(super) fn replacement_capsule_clearance(
+        &self,
+        player: usize,
+        ship: &ShipState,
+        half_segment: f32,
+        radius: f32,
+    ) -> impl Fn(Vec2, f32, Vec2, f32) -> bool + use<> {
+        PhysicsWorld::capsule_assembly_clearance_test(
+            &surface_ship_colliders(ship_entity(player), ship, true),
+            half_segment,
+            radius,
+            spaceling_collision_groups(),
+        )
+    }
+
+    pub(super) fn surface_vehicle_entity(&self, index: usize) -> PhysicsId {
+        ship_entity(index)
+    }
+
+    pub(super) fn surface_vehicle_outline(
+        &self,
+        index: usize,
+        ship: &ShipState,
+    ) -> Option<Vec<Vec2>> {
+        let body = self.world.motion(self.ship_body(index))?;
+        Some(
+            ship_collision_hull(ship)
+                .into_iter()
+                .map(|point| body.position + point.rotate_radians(body.angle))
+                .collect(),
+        )
     }
 
     pub(super) fn planet_body(&self, index: usize) -> PhysicsBodyId {
         primary_body(planet_entity(index))
     }
 
+    pub(super) fn material_ground_ray(
+        &self,
+        planet: usize,
+        origin: Vec2,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<engine_rapier::world::RayHit> {
+        if self.material_queries_dirty {
+            return None;
+        }
+        let hit = self.world.cast_ray(
+            origin,
+            direction,
+            RayCastOptions {
+                max_distance: distance,
+                collision_groups: CollisionGroups::new(GROUP_SPACELING, GROUP_MATERIAL),
+                ..RayCastOptions::default()
+            },
+        )?;
+        is_planet_surface_support(hit.collider, planet).then_some(hit)
+    }
+
+    /// Raw hull (0) and foot (1, 2) contacts for bounded diagnostics.
+    pub(super) fn surface_vehicle_contacts(
+        &self,
+        index: usize,
+        part: usize,
+    ) -> impl Iterator<Item = engine_rapier::world::SurfaceContact> + '_ {
+        assert!(part < 3);
+        let (role, part) = if part == 0 {
+            (SHIP_HULL_ROLE, 0)
+        } else {
+            (LANDING_FOOT_ROLE, (part - 1) as u16)
+        };
+        self.world
+            .surface_contacts(collider_id(ship_entity(index), role, part))
+    }
+
+    pub(super) fn surface_hull_fits_at(&self, index: usize, position: Vec2, angle: f32) -> bool {
+        !self.material_queries_dirty
+            && self.world.collider_fits_at(
+                collider_id(ship_entity(index), SHIP_HULL_ROLE, 0),
+                position,
+                angle,
+            ) == Some(true)
+    }
+
     /// Solver-backed rear-foot support within contact slop, not hull or port overlap.
     pub(super) fn landing_feet_supported(&self, index: usize, planet: usize, up: Vec2) -> usize {
-        let body = self.ship_body(index);
-        (0..LANDING_FEET.len())
-            .filter(|&part| {
+        self.landing_support_contacts(index, planet, up)
+            .into_iter()
+            .flatten()
+            .count()
+    }
+
+    /// Retained planetary contact at any part of a surface vehicle. A tipped
+    /// pod may rest on its hull with neither landing foot supporting it.
+    pub(super) fn surface_vehicle_ground_contact(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+    ) -> bool {
+        !self.material_queries_dirty
+            && [
+                (SHIP_HULL_ROLE, 0),
+                (LANDING_FOOT_ROLE, 0),
+                (LANDING_FOOT_ROLE, 1),
+            ]
+            .into_iter()
+            .any(|(role, part)| {
                 self.world
-                    .surface_contacts(collider_id(
-                        ship_entity(index),
-                        LANDING_FOOT_ROLE,
-                        part as u16,
-                    ))
+                    .surface_contacts(collider_id(ship_entity(index), role, part))
                     .any(|contact| {
-                        let velocity = self
-                            .world
-                            .velocity_at_point(body, contact.position)
-                            .unwrap();
-                        contact.collider.entity == planet_entity(planet)
-                            && contact.collider.role == ROVER_SURFACE_ROLE
+                        is_planet_surface_support(contact.collider, planet)
                             && contact.separation <= 0.04
-                            && contact.normal.dot(up) >= 0.7
-                            && (velocity - contact.velocity).dot(contact.normal) <= 1.0
+                            && contact.normal.dot(up) >= 0.4
                     })
             })
-            .count()
+    }
+
+    pub(super) fn landing_support_contacts(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+    ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
+        self.landing_contacts_with_alignment(index, planet, up, 0.7)
+    }
+
+    /// Keep an earned landing across small normal changes at round-foot/voxel
+    /// corners. Both feet still need current retained contact, and their mean
+    /// outward support must meet the original touchdown alignment.
+    pub(super) fn parked_landing_support_contacts(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+    ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
+        let strict = self.landing_support_contacts(index, planet, up);
+        if strict.iter().all(Option::is_some) {
+            return strict;
+        }
+        let corners = self.landing_contacts_with_alignment(index, planet, up, 0.5);
+        let contacts = std::array::from_fn(|part| strict[part].or(corners[part]));
+        if let [Some(left), Some(right)] = contacts
+            && (left.normal + right.normal).dot(up) >= 1.4
+        {
+            contacts
+        } else {
+            strict
+        }
+    }
+
+    fn landing_contacts_with_alignment(
+        &self,
+        index: usize,
+        planet: usize,
+        up: Vec2,
+        min_alignment: f32,
+    ) -> [Option<engine_rapier::world::SurfaceContact>; 2] {
+        let body = self.ship_body(index);
+        std::array::from_fn(|part| {
+            self.world
+                .surface_contacts(collider_id(
+                    ship_entity(index),
+                    LANDING_FOOT_ROLE,
+                    part as u16,
+                ))
+                .find(|contact| {
+                    let velocity = self
+                        .world
+                        .velocity_at_point(body, contact.position)
+                        .unwrap();
+                    is_planet_surface_support(contact.collider, planet)
+                        && contact.separation <= 0.04
+                        && contact.normal.dot(up) >= min_alignment
+                        && (velocity - contact.velocity).dot(contact.normal) <= 1.0
+                })
+        })
     }
 
     fn capture_pre_step_motions(&mut self) {
@@ -598,6 +825,20 @@ impl SpacewarsPhysics {
                 );
             }
         }
+        for id in &self.terrain_fragments {
+            capture(
+                MechanicalEntity::TerrainFragment(*id),
+                primary_body(PhysicsId::new(*id)),
+            );
+        }
+        for player in 0..SPACEWARS_PLAYER_COUNT {
+            capture(
+                MechanicalEntity::Spaceling(player),
+                primary_body(super::surface_sortie::pilot_physics_id(
+                    PlayerId::from_index(player).unwrap(),
+                )),
+            );
+        }
         for id in self.debris_keys.keys().copied() {
             capture(
                 MechanicalEntity::Debris(id),
@@ -605,6 +846,10 @@ impl SpacewarsPhysics {
             );
         }
         self.pre_step_motions = motions;
+    }
+
+    pub(super) fn pre_step_motion(&self, entity: MechanicalEntity) -> Option<BodyMotion> {
+        self.pre_step_motions.get(&entity).copied()
     }
 
     fn contact_closing_speed(
@@ -634,7 +879,12 @@ impl SpacewarsPhysics {
     pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
         let entity = match entity {
             MechanicalEntity::Ship(index) => ship_entity(index),
-            MechanicalEntity::Debris(id) => PhysicsId::new(id),
+            MechanicalEntity::Spaceling(index) => {
+                super::surface_sortie::pilot_physics_id(PlayerId::from_index(index).unwrap())
+            }
+            MechanicalEntity::Debris(id) | MechanicalEntity::TerrainFragment(id) => {
+                PhysicsId::new(id)
+            }
             MechanicalEntity::World | MechanicalEntity::Body(_) | MechanicalEntity::Rover(_) => {
                 return false;
             }
@@ -871,7 +1121,9 @@ impl SpacewarsPhysics {
             let Some(planet) = planet_index(port.entity) else {
                 continue;
             };
-            contacts.entry((ship, planet)).or_insert(false);
+            if !self.disabled_spaceports.contains(&planet) {
+                contacts.entry((ship, planet)).or_insert(false);
+            }
         }
         for (ship, planet) in self.docked_planets.iter().copied().enumerate() {
             if let Some(planet) = planet {
@@ -908,6 +1160,12 @@ impl SpacewarsPhysics {
         })
     }
 
+    pub(super) fn allocate_debris_id(&mut self) -> u64 {
+        let id = self.next_debris_entity;
+        self.next_debris_entity += 1;
+        id
+    }
+
     fn reconcile_debris(
         &mut self,
         tick: u64,
@@ -917,8 +1175,7 @@ impl SpacewarsPhysics {
         let mut active = BTreeSet::new();
         for item in debris.iter_mut().filter(|item| !item.dead) {
             if item.physics_id == 0 || !active.insert(item.physics_id) {
-                item.physics_id = self.next_debris_entity;
-                self.next_debris_entity += 1;
+                item.physics_id = self.allocate_debris_id();
                 active.insert(item.physics_id);
             }
 
@@ -968,7 +1225,7 @@ impl SpacewarsPhysics {
         collider.friction = 0.0;
         collider.collision_groups = CollisionGroups::new(
             GROUP_WORLD,
-            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER | GROUP_SPACELING,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_ROVER | GROUP_BODY | GROUP_SPACELING,
         );
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
@@ -991,8 +1248,10 @@ impl SpacewarsPhysics {
         collider.density = 0.0;
         collider.friction = 0.0;
         collider.restitution = PLANET_ELASTICITY;
-        collider.collision_groups =
-            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
+        collider.collision_groups = CollisionGroups::new(
+            GROUP_BODY | GROUP_SUN,
+            GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY | GROUP_SPACELING,
+        );
         collider.solver_groups = collider.collision_groups;
         let inserted = self.world.insert_body(
             primary_body(entity),
@@ -1008,9 +1267,43 @@ impl SpacewarsPhysics {
         inserted
     }
 
+    pub fn add_spaceport_sensor(&mut self, index: usize, planet: &PlanetState) {
+        let entity = planet_entity(index);
+        let mut sensor = ColliderSpec::convex_polygon(
+            spaceport_sensor_id(index),
+            spaceport_local_points(planet.radius),
+        );
+        sensor.density = 0.0;
+        sensor.sensor = true;
+        sensor.collision_groups = CollisionGroups::new(GROUP_SPACEPORT_SENSOR, GROUP_ALL_SHIPS);
+        sensor.solver_groups = CollisionGroups::NONE;
+        assert!(self.world.replace_colliders(
+            primary_body(entity),
+            SPACEPORT_SENSOR_ROLE,
+            &[sensor]
+        ));
+    }
+
+    pub fn disable_spaceport(&mut self, index: usize) {
+        if !self.disabled_spaceports.insert(index) {
+            return;
+        }
+        assert!(self.world.replace_colliders(
+            primary_body(planet_entity(index)),
+            SPACEPORT_SENSOR_ROLE,
+            &[]
+        ));
+        for held in &mut self.docked_planets {
+            if *held == Some(index) {
+                *held = None;
+            }
+        }
+    }
+
     fn insert_planet(&mut self, index: usize, planet: &PlanetState) -> bool {
         let entity = planet_entity(index);
-        let body_groups = CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS);
+        let body_groups =
+            CollisionGroups::new(GROUP_BODY, GROUP_ALL_SHIPS | GROUP_DEBRIS | GROUP_BODY);
         let mut colliders = planet_solid_colliders(entity, planet.radius, body_groups);
         // Ordinary ships use the elastic surface. Surface vehicles and
         // spacelings opt into traction instead; never both coincident surfaces.
@@ -1154,7 +1447,7 @@ impl SpacewarsPhysics {
             },
             &[collider],
         );
-        debug_assert!(inserted);
+        assert!(inserted, "could not insert debris: {debris:?}");
         inserted
     }
 }
@@ -1338,7 +1631,9 @@ fn surface_ship_colliders(
     hull.restitution = 0.0;
     hull.collision_groups.filter = (hull.collision_groups.filter
         & !(GROUP_BODY | GROUP_SPACEPORT_SENSOR))
-        | GROUP_ROVER_SURFACE;
+        | GROUP_ROVER_SURFACE
+        | GROUP_MATERIAL
+        | GROUP_SUN;
     hull.solver_groups = hull.collision_groups;
     let groups = hull.collision_groups;
     if ship.form == ShipForm::Ship || pod_landing {
@@ -1489,12 +1784,16 @@ fn debris_signature(debris: &DebrisState) -> u64 {
     hash
 }
 
-fn primary_body(entity: PhysicsId) -> PhysicsBodyId {
+pub(super) fn primary_body(entity: PhysicsId) -> PhysicsBodyId {
     PhysicsBodyId::new(entity, BodyRole::PRIMARY)
 }
 
 fn collider_id(entity: PhysicsId, role: ColliderRole, part: u16) -> ColliderId {
     ColliderId::new(entity, role, part)
+}
+
+pub(super) fn spaceport_sensor_id(index: usize) -> ColliderId {
+    collider_id(planet_entity(index), SPACEPORT_SENSOR_ROLE, 0)
 }
 
 fn world_entity() -> PhysicsId {
@@ -1505,7 +1804,7 @@ fn sun_entity() -> PhysicsId {
     PhysicsId::new(SUN_ENTITY_VALUE)
 }
 
-fn planet_entity(index: usize) -> PhysicsId {
+pub(super) fn planet_entity(index: usize) -> PhysicsId {
     PhysicsId::new(PLANET_ENTITY_BASE + index as u64)
 }
 
@@ -1518,7 +1817,7 @@ fn rover_entity(id: u64) -> PhysicsId {
     PhysicsId::new(ROVER_ENTITY_BASE + id)
 }
 
-fn planet_index(entity: PhysicsId) -> Option<usize> {
+pub(super) fn planet_index(entity: PhysicsId) -> Option<usize> {
     let value = entity.value();
     (PLANET_ENTITY_BASE..SHIP_ENTITY_BASE)
         .contains(&value)
@@ -1549,8 +1848,14 @@ fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
         value if (SHIP_ENTITY_BASE..SHIP_ENTITY_BASE + 2).contains(&value) => {
             Some(MechanicalEntity::Ship((value - SHIP_ENTITY_BASE) as usize))
         }
+        value if (40_000..40_000 + SPACEWARS_PLAYER_COUNT as u64).contains(&value) => {
+            Some(MechanicalEntity::Spaceling((value - 40_000) as usize))
+        }
         value if (ROVER_ENTITY_BASE..DEBRIS_ENTITY_BASE).contains(&value) => {
             Some(MechanicalEntity::Rover(value - ROVER_ENTITY_BASE))
+        }
+        value if value >= super::terrain::FRAGMENT_ID_BASE => {
+            Some(MechanicalEntity::TerrainFragment(value))
         }
         value if value >= DEBRIS_ENTITY_BASE => Some(MechanicalEntity::Debris(value)),
         _ => None,

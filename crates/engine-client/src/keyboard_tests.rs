@@ -255,6 +255,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
+    key(&window, Key::RightArrow);
     assert_eq!(window.get_launcher_focus_index(), 5);
     key(&window, Key::Return);
     assert!(window.get_sound_visible());

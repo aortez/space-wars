@@ -71,6 +71,17 @@ fn surface_expedition_two_players_settings_and_lifecycle() {
     );
 }
 
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn material_expedition_two_players_settings_and_lifecycle() {
+    lab_lifecycle_with_players(
+        "spacewars-terrain",
+        "material-expedition-two-players",
+        assert_raster_pair_visible,
+        2,
+    );
+}
+
 fn lab_lifecycle(scenario: &str, test_name: &'static str, assert_visible: fn(&Path)) {
     lab_lifecycle_with_players(scenario, test_name, assert_visible, 1);
 }
@@ -86,7 +97,7 @@ fn lab_lifecycle_with_players(
         let mut state = harness.activate_until_scenario(scenario, ready);
         for renderer in ["vector", "raster"] {
             state = harness.activate_guarded("launcher.settings", &state);
-            if scenario == "surface-expedition" {
+            if matches!(scenario, "surface-expedition" | "spacewars-terrain") {
                 let expected = players.to_string();
                 if control_value(&state, "launcher.settings.expedition.players.next")
                     != Some(expected.as_str())
@@ -164,7 +175,7 @@ fn lab_lifecycle_with_players(
                 TRANSITION_TIMEOUT,
             );
             assert_eq!(state.selected_scenario, scenario);
-            if scenario == "surface-expedition" {
+            if matches!(scenario, "surface-expedition" | "spacewars-terrain") {
                 state = harness.activate_guarded("launcher.settings", &state);
                 assert_eq!(
                     control_value(&state, "launcher.settings.expedition.players.next"),

@@ -57,6 +57,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) settings_save_pending: bool,
     pub(crate) settings_save_error: Option<String>,
     pub(crate) selected_scenario: String,
+    pub(crate) world_seed: String,
     pub(crate) launcher_focus_index: i32,
     pub(crate) launcher_settings_focus_index: i32,
     pub(crate) launcher_controls_focus_index: i32,
@@ -72,11 +73,17 @@ pub(crate) struct UiInventoryContext {
     pub(crate) scenario_error: Option<String>,
     pub(crate) renderer: String,
     pub(crate) raster_scale: String,
+    pub(crate) combat_break_interval: String,
+    pub(crate) combat_break_duration: String,
+    pub(crate) combat_mission: String,
+    pub(crate) combat_asteroid_interval: String,
+    pub(crate) combat_asteroid_strength: String,
     pub(crate) expedition_players: String,
     pub(crate) spacewars_preset: String,
     pub(crate) spacewars_planets: String,
     pub(crate) spacewars_asteroids: String,
     pub(crate) spacewars_player_health: String,
+    pub(crate) spacewars_player_1: String,
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
@@ -157,31 +164,60 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             ],
             error: context.scenario_error.clone(),
         },
-        UiScreen::GameOver => UiInventory {
-            selected_control: selected_from_index(
-                &["game-over.play-again", "game-over.return-to-launcher"],
-                context.game_over_focus_index,
-            ),
-            controls: vec![
-                UiControl::new("game-over.play-again", "Play Again", true),
-                UiControl::new("game-over.return-to-launcher", "Launcher", true),
-            ],
-            actions: vec![
-                UiAction::Up,
-                UiAction::Down,
-                UiAction::Left,
-                UiAction::Right,
-                UiAction::Confirm,
-                UiAction::Back,
-                UiAction::Start,
-            ],
-            error: context.scenario_error.clone(),
-        },
+        UiScreen::GameOver => game_over_inventory(context),
+    }
+}
+
+fn world_control(
+    id: &str,
+    match_label: &str,
+    other_label: &str,
+    context: &UiInventoryContext,
+) -> UiControl {
+    if context.selected_scenario == "spacewars" {
+        UiControl::new(id, match_label, true).with_value(context.world_seed.clone())
+    } else {
+        UiControl::new(id, other_label, true)
+    }
+}
+
+fn game_over_inventory(context: &UiInventoryContext) -> UiInventory {
+    let mut ids = vec!["game-over.play-again"];
+    let mut controls = vec![world_control(
+        "game-over.play-again",
+        "Rematch",
+        "Play Again",
+        context,
+    )];
+    if context.selected_scenario == "spacewars" {
+        ids.push("game-over.new-match");
+        controls.push(UiControl::new("game-over.new-match", "New Match", true));
+    }
+    ids.push("game-over.return-to-launcher");
+    controls.push(UiControl::new(
+        "game-over.return-to-launcher",
+        "Launcher",
+        true,
+    ));
+    UiInventory {
+        selected_control: selected_from_index(&ids, context.game_over_focus_index),
+        controls,
+        actions: vec![
+            UiAction::Up,
+            UiAction::Down,
+            UiAction::Left,
+            UiAction::Right,
+            UiAction::Confirm,
+            UiAction::Back,
+            UiAction::Start,
+        ],
+        error: context.scenario_error.clone(),
     }
 }
 
 fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
-    UiInventory {
+    let material_match = context.selected_scenario == "spacewars";
+    let mut inventory = UiInventory {
         selected_control: selected_from_index(
             &[
                 "launcher.scenario",
@@ -198,7 +234,11 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
                 .with_value(context.selected_scenario.clone()),
             UiControl::new("launcher.scenario.next", "›", true)
                 .with_value(context.selected_scenario.clone()),
-            UiControl::new("launcher.start", "Start Game", context.launch_available),
+            if material_match {
+                world_control("launcher.start", "Play World", "Start Game", context)
+            } else {
+                UiControl::new("launcher.start", "Start Game", context.launch_available)
+            },
             UiControl::new("launcher.settings", "Scenario Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
             UiControl::new("launcher.sound", "App Settings", true),
@@ -214,13 +254,70 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiAction::Controls,
         ],
         error: context.launcher_error.clone(),
+    };
+    if material_match {
+        inventory.controls.push(UiControl::new(
+            "launcher.new-match",
+            "New Match · New World",
+            true,
+        ));
+        if context.launcher_focus_index == 6 {
+            inventory.selected_control = Some("launcher.new-match".into());
+        }
     }
+    inventory
 }
 
 fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
     let mut controls = Vec::new();
     let selected_ids: &[&str] = match context.selected_scenario.as_str() {
         "spacewars" => {
+            for (id, value) in [
+                ("launcher.settings.renderer", context.renderer.clone()),
+                (
+                    "launcher.settings.raster-scale",
+                    format!("{}×", context.raster_scale),
+                ),
+                (
+                    "launcher.settings.match.player-1",
+                    context.spacewars_player_1.clone(),
+                ),
+                (
+                    "launcher.settings.match.player-2",
+                    context.spacewars_player_2.clone(),
+                ),
+                (
+                    "launcher.settings.match.break-interval",
+                    context.combat_break_interval.clone(),
+                ),
+                (
+                    "launcher.settings.match.break-duration",
+                    context.combat_break_duration.clone(),
+                ),
+                (
+                    "launcher.settings.match.asteroid-interval",
+                    context.combat_asteroid_interval.clone(),
+                ),
+                (
+                    "launcher.settings.match.asteroid-strength",
+                    context.combat_asteroid_strength.clone(),
+                ),
+            ] {
+                push_choice(&mut controls, id, &value);
+            }
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.match.player-1",
+                "launcher.settings.match.player-2",
+                "launcher.settings.match.break-interval",
+                "launcher.settings.match.break-duration",
+                "launcher.settings.match.asteroid-interval",
+                "launcher.settings.match.asteroid-strength",
+                "launcher.settings.back",
+            ]
+        }
+        "spacewars-classic" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -264,6 +361,85 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.spacewars.asteroids",
                 "launcher.settings.spacewars.player-health",
                 "launcher.settings.spacewars.player-2",
+                "launcher.settings.back",
+            ]
+        }
+        "spacewars-terrain-combat" | "spacewars-terrain-duel" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.break-interval",
+                &context.combat_break_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.break-duration",
+                &context.combat_break_duration,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.mission",
+                &context.combat_mission,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.asteroid-interval",
+                &context.combat_asteroid_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.combat.asteroid-strength",
+                &context.combat_asteroid_strength,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.combat.break-interval",
+                "launcher.settings.combat.break-duration",
+                "launcher.settings.combat.mission",
+                "launcher.settings.combat.asteroid-interval",
+                "launcher.settings.combat.asteroid-strength",
+                "launcher.settings.back",
+            ]
+        }
+        "spacewars-terrain-travel"
+        | "spacewars-terrain-travel-duel"
+        | "spacewars-terrain-arena"
+        | "spacewars-terrain-arena-duel" => {
+            push_choice(
+                &mut controls,
+                "launcher.settings.renderer",
+                &context.renderer,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.raster-scale",
+                &format!("{}×", context.raster_scale),
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.asteroid-interval",
+                &context.combat_asteroid_interval,
+            );
+            push_choice(
+                &mut controls,
+                "launcher.settings.travel.asteroid-strength",
+                &context.combat_asteroid_strength,
+            );
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.travel.asteroid-interval",
+                "launcher.settings.travel.asteroid-strength",
                 "launcher.settings.back",
             ]
         }
@@ -362,7 +538,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
-        "surface-expedition" => {
+        "surface-expedition" | "spacewars-terrain" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -416,7 +592,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
     controls.push(UiControl::new("launcher.settings.back", "Back", true));
     controls.push(UiControl::new(
         "launcher.settings.start",
-        "Start Game",
+        if context.selected_scenario == "spacewars" {
+            "Play World"
+        } else {
+            "Start Game"
+        },
         context.launch_available,
     ));
 
@@ -443,7 +623,11 @@ fn launcher_controls_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.controls.touch-test", "Touch Test", true),
             UiControl::new(
                 "launcher.controls.start",
-                "Start Game",
+                if context.selected_scenario == "spacewars" {
+                    "Play World"
+                } else {
+                    "Start Game"
+                },
                 context.launch_available,
             ),
         ],
@@ -456,7 +640,7 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
     let mut ids = vec!["pause.resume", "pause.restart"];
     let mut controls = vec![
         UiControl::new("pause.resume", "Resume", true),
-        UiControl::new("pause.restart", "Restart Round", true),
+        world_control("pause.restart", "Rematch", "Restart Round", context),
     ];
     if context.benchmark_available {
         ids.push("pause.benchmark");
@@ -467,6 +651,15 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
         UiControl::new("pause.controls", "Controls", true),
         UiControl::new("pause.return-to-launcher", "Return to Launcher", true),
     ]);
+
+    if context.selected_scenario == "spacewars" {
+        ids.push("pause.new-match");
+        controls.push(UiControl::new(
+            "pause.new-match",
+            "New Match · New World",
+            true,
+        ));
+    }
 
     if context.selected_scenario == "clock" {
         ids.push("pause.clock");
@@ -673,10 +866,14 @@ mod tests {
             launch_available: true,
             renderer: "raster".into(),
             raster_scale: "2.0".into(),
+            combat_break_interval: "15".into(),
+            combat_break_duration: "4".into(),
+            combat_mission: "Dogfight".into(),
             spacewars_preset: "Small Duel".into(),
             spacewars_planets: "on".into(),
             spacewars_asteroids: "off".into(),
             spacewars_player_health: "125".into(),
+            spacewars_player_1: "human".into(),
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
@@ -863,7 +1060,12 @@ mod tests {
     #[test]
     fn settings_inventory_matches_each_scenario() {
         let cases = [
-            ("spacewars", 16, "launcher.settings.spacewars.player-2"),
+            ("spacewars", 18, "launcher.settings.match.player-2"),
+            (
+                "spacewars-classic",
+                16,
+                "launcher.settings.spacewars.player-2",
+            ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
             ("clock", 24, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
@@ -879,8 +1081,9 @@ mod tests {
         for (scenario, control_count, selected) in cases {
             let mut context = context(scenario);
             context.launcher_settings_focus_index = match scenario {
-                "surface-expedition" => 2,
-                "spacewars" => 6,
+                "surface-expedition" | "spacewars-terrain" => 2,
+                "spacewars" => 3,
+                "spacewars-classic" => 6,
                 "pizza" => 3,
                 "clock" => 8,
                 "rover-lab" => 1,
@@ -901,7 +1104,8 @@ mod tests {
 
     #[test]
     fn settings_choices_expose_the_visible_value() {
-        let inventory = inventory_for_screen(UiScreen::LauncherSettings, &context("spacewars"));
+        let inventory =
+            inventory_for_screen(UiScreen::LauncherSettings, &context("spacewars-classic"));
         let value = |id: &str| {
             inventory
                 .controls
@@ -941,7 +1145,7 @@ mod tests {
 
     #[test]
     fn static_screens_report_their_visible_controls() {
-        let mut context = context("spacewars");
+        let mut context = context("spacewars-classic");
         context.launcher_controls_focus_index = 1;
         context.game_over_focus_index = 1;
 
@@ -1034,7 +1238,20 @@ mod tests {
 
     #[test]
     fn every_enabled_control_has_a_semantic_activation_mapping() {
-        for scenario in ["spacewars", "pizza", "clock", "rover-lab", "falling", "nes"] {
+        for scenario in [
+            "spacewars",
+            "pizza",
+            "clock",
+            "rover-lab",
+            "falling",
+            "nes",
+            "spacewars-terrain-combat",
+            "spacewars-terrain-duel",
+            "spacewars-terrain-travel",
+            "spacewars-terrain-travel-duel",
+            "spacewars-terrain-arena",
+            "spacewars-terrain-arena-duel",
+        ] {
             let context = context(scenario);
             for screen in [
                 UiScreen::LauncherMain,

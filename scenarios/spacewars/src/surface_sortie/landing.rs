@@ -13,9 +13,6 @@ const DESCENT_SPEED: f32 = 2.0;
 const MAX_DESCENT_ACCELERATION: f32 = 30.0;
 const MAX_LATERAL_ACCELERATION: f32 = 12.0;
 pub(super) const THRUST_ACCELERATION: f32 = 45.0;
-const BRAKE_ACCELERATION: f32 = 40.0;
-const TURN_SPEED: f32 = 1.8;
-const TURN_ACCELERATION: f32 = 6.0;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -44,12 +41,16 @@ pub struct LandingTelemetry {
     pub planet: Option<usize>,
     pub phase: LandingPhase,
     pub altitude: f32,
+    /// Radial clearance beneath each rear foot; rays do not prove contact.
+    pub foot_clearances: [f32; 2],
     pub angle_degrees: f32,
     /// Positive is moving toward the ground; measured in the surface frame.
     pub descent_speed: f32,
     pub lateral_speed: f32,
     pub relative_spin: f32,
     pub supported_feet: usize,
+    /// An earned landing retains two live feet across a voxel-corner normal change.
+    pub corner_support: bool,
     pub assist_strength: f32,
     pub settled_seconds: f32,
 }
@@ -79,14 +80,18 @@ impl LandingTelemetry {
             .acos()
             .to_degrees();
         let (feet, foot_radius) = physics.landing_geometry(index);
-        let altitude = feet
-            .into_iter()
-            .map(|foot| {
-                (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
-                    - planet.radius * BODY_BOUNDS_RADIUS_SCALE
-                    - foot_radius
-            })
-            .fold(f32::INFINITY, f32::min);
+        let foot_clearances = feet.map(|foot| {
+            if physics.material_planets.contains(&planet_index) {
+                let point = motion.position + foot.rotate_radians(motion.angle);
+                return physics
+                    .material_ground_ray(planet_index, point + up * 0.1, -up, ASSIST_HEIGHT + 1.0)
+                    .map_or(ASSIST_HEIGHT + 1.0, |hit| hit.distance - 0.1 - foot_radius);
+            }
+            (motion.position + foot.rotate_radians(motion.angle)).distance_to(surface.position)
+                - planet.radius * BODY_BOUNDS_RADIUS_SCALE
+                - foot_radius
+        });
+        let altitude = foot_clearances.into_iter().fold(f32::INFINITY, f32::min);
         let near =
             ((ASSIST_HEIGHT - altitude) / (ASSIST_HEIGHT - FULL_ASSIST_HEIGHT)).clamp(0.0, 1.0);
         let aligned =
@@ -96,6 +101,7 @@ impl LandingTelemetry {
         Self {
             planet: Some(planet_index),
             altitude,
+            foot_clearances,
             angle_degrees,
             descent_speed: -relative.dot(up),
             lateral_speed: relative.dot(right),
@@ -116,7 +122,30 @@ impl LandingTelemetry {
         dt: f32,
     ) {
         let mut next = Self::measure(physics, index, planet_index, planet);
+        if self.phase == LandingPhase::Landed
+            && self.planet == next.planet
+            && !ship.dead
+            && ship.form == ShipForm::Ship
+            && physics.material_planets.contains(&planet_index)
+            && let Some(body) = physics.world.motion(physics.ship_body(index))
+        {
+            let surface = motion::SurfaceFrame::read(physics, planet_index);
+            let strict_feet = next.supported_feet;
+            next.supported_feet = physics
+                .parked_landing_support_contacts(
+                    index,
+                    planet_index,
+                    (body.position - surface.position).normalized(),
+                )
+                .into_iter()
+                .flatten()
+                .count();
+            next.corner_support = next.supported_feet == 2 && strict_feet < 2;
+        }
+        next.assist_strength *= 1.0 - flight::sweep(ship);
+        let wings_open = !ship.wings_closed && flight::sweep(ship) <= 0.001;
         let settled = !ship.dead
+            && wings_open
             && ship.thrust == 0.0
             && next.supported_feet == 2
             && next.angle_degrees < LANDED_ANGLE
@@ -135,7 +164,7 @@ impl LandingTelemetry {
         };
         next.phase = if next.settled_seconds >= SETTLE_SECONDS {
             LandingPhase::Landed
-        } else if next.supported_feet > 0 && next.angle_degrees < LANDED_ANGLE {
+        } else if wings_open && next.supported_feet > 0 && next.angle_degrees < LANDED_ANGLE {
             LandingPhase::Settling
         } else if next.assist_strength > 0.0 && ship.thrust == 0.0 {
             LandingPhase::Assisted
@@ -168,20 +197,38 @@ impl SurfacePilot {
             return;
         };
         let surface = motion::SurfaceFrame::read(physics, self.planet);
-        let landing = LandingTelemetry::measure(physics, self.vehicle.0, self.planet, planet);
+        let mut landing = LandingTelemetry::measure(physics, self.vehicle.0, self.planet, planet);
+        let flight_enabled = self.flight_enabled && ship.form == ShipForm::Ship;
+        let sweep = if flight_enabled {
+            flight::sweep(ship)
+        } else {
+            0.0
+        };
+        let limits = flight::FlightControlLimits::for_sweep(sweep);
+        landing.assist_strength *= 1.0 - sweep;
         let up = (motion.position - surface.position).normalized();
         let right = Vec2::new(up.y, -up.x);
-        let mut acceleration =
-            Vec2::Y.rotate_radians(motion.angle) * (ship.thrust * THRUST_ACCELERATION);
+        let forward = Vec2::Y.rotate_radians(motion.angle);
+        let relative = physics
+            .world
+            .velocity_at_point(body, motion.position)
+            .unwrap()
+            - motion::point_velocity(surface, motion.position);
+        let thrust = ship.thrust;
+        let governor = if flight_enabled {
+            limits.thrust_fraction(relative.dot(forward))
+        } else {
+            1.0
+        };
+        let thrust_direction = if self.pod_righting_lift(physics, ship, &landing, dt) {
+            up
+        } else {
+            forward
+        };
+        let mut acceleration = thrust_direction * (thrust * limits.thrust_acceleration * governor);
         if ship.brake > 0.0 {
-            let relative = physics
-                .world
-                .velocity_at_point(body, motion.position)
-                .unwrap()
-                - motion::point_velocity(surface, motion.position);
-            let braking = relative * -4.0;
-            acceleration += braking.normalized() * braking.length().min(BRAKE_ACCELERATION);
-        } else if ship.thrust == 0.0 {
+            acceleration += limits.braking(relative);
+        } else if thrust == 0.0 {
             acceleration += right
                 * (-landing.lateral_speed * 3.0)
                     .clamp(-MAX_LATERAL_ACCELERATION, MAX_LATERAL_ACCELERATION)
@@ -201,7 +248,7 @@ impl SurfacePilot {
 
         // Rate control, never automatic orientation. The pilot must point the
         // nose outward. Stronger damping near touchdown removes unwanted spin.
-        let desired_spin = -ship.turn * TURN_SPEED
+        let desired_spin = -ship.turn * limits.turn_speed
             + if landing.assist_strength > 0.0 {
                 surface.angular_velocity
             } else {
@@ -213,8 +260,8 @@ impl SurfacePilot {
             0.25 + 0.75 * landing.assist_strength
         };
         let spin_delta = (desired_spin - motion.angular_velocity).clamp(
-            -TURN_ACCELERATION * strength * dt,
-            TURN_ACCELERATION * strength * dt,
+            -limits.turn_acceleration * strength * dt,
+            limits.turn_acceleration * strength * dt,
         );
         let velocity = physics
             .world

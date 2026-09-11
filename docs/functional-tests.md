@@ -178,6 +178,13 @@ logical dimensions, and restoration of all four software output rotations.
 
 ## Run locally
 
+Terrain Lab's lifecycle test checks visible material and title pixels in both
+application renderers, as well as launch, pause, restart, and return to launcher.
+It uses Slint's `winit-femtovg` backend because Slint 1.13's software backend does
+not implement `Path` drawing. This backend also presents the application's
+software raster image and text overlay. Xvfb hosts that test with Mesa/OpenGL;
+the other functional tests retain their existing Slint software backend.
+
 On Debian or Ubuntu, install the virtual display tools once:
 
 ```sh

@@ -76,15 +76,19 @@ pub(crate) struct GamepadSeatInput {
     pub name: String,
     pub left_stick_x: f32,
     pub left_stick_y: f32,
+    pub right_stick_x: f32,
+    pub right_stick_y: f32,
     pub left_trigger: f32,
     pub right_trigger: f32,
     pub dpad_up: bool,
     pub dpad_down: bool,
     pub dpad_left: bool,
     pub dpad_right: bool,
+    pub left_bumper: bool,
     pub right_bumper: bool,
     pub south: bool,
     pub east: bool,
+    pub north: bool,
     pub west: bool,
     pub start: bool,
     pub select: bool,
@@ -124,6 +128,14 @@ pub(crate) struct ScreenPointerEvent {
     pub phase: PointerPhase,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct TerrainGamepadTools {
+    pub tunnel: bool,
+    pub debug: bool,
+    pub cycle_tool: bool,
+    pub cycle_view: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum GameKey {
     Reset,
@@ -140,6 +152,9 @@ pub(crate) enum GameKey {
     NesA,
     NesSelect,
     NesStart,
+    TerrainDrill,
+    TerrainTool,
+    TerrainView,
     P1Wing,
     P1Thrust,
     P1Brake,
@@ -306,6 +321,108 @@ impl ClientInput {
             .borrow()
             .seat(player)
             .is_some_and(|pad| pad.connected && pad.dpad_down)
+    }
+
+    pub(crate) fn surface_wings_held(&self, player: usize) -> bool {
+        self.is_pressed(if player == 0 {
+            GameKey::P1Wing
+        } else {
+            GameKey::P2Wing
+        }) || self
+            .gamepads
+            .borrow()
+            .seat(player)
+            .is_some_and(|pad| pad.connected && pad.right_bumper)
+    }
+
+    pub(crate) fn surface_impact_held(&self, player: usize) -> bool {
+        self.is_pressed(if player == 0 {
+            GameKey::P1Cannon // K
+        } else {
+            GameKey::P2ZoomOut // Home; Delete already aliases thrust/jump.
+        }) || self
+            .gamepads
+            .borrow()
+            .seat(player)
+            .is_some_and(|pad| pad.connected && pad.west)
+    }
+
+    pub(crate) fn spacewars_terrain_gamepad_tools(&self) -> (bool, bool) {
+        self.gamepads
+            .borrow()
+            .seat(0)
+            .filter(|pad| pad.connected)
+            .map_or((false, false), |pad| (pad.north, pad.left_bumper))
+    }
+
+    pub(crate) fn surface_mining_input(&self, player: usize) -> (Vec2, bool, bool) {
+        let (mut aim, mut held, mut cycle) = self
+            .gamepads
+            .borrow()
+            .seat(player)
+            .filter(|pad| pad.connected)
+            .map_or((Vec2::ZERO, false, false), |pad| {
+                (
+                    Vec2::new(
+                        shape_stick(pad.right_stick_x),
+                        shape_stick(pad.right_stick_y),
+                    ),
+                    pad.left_bumper || shape_trigger(pad.right_trigger) > 0.0,
+                    pad.north,
+                )
+            });
+        if player == 0 {
+            let axis = |positive, negative| {
+                f32::from(self.is_pressed(positive)) - f32::from(self.is_pressed(negative))
+            };
+            let keyboard = Vec2::new(
+                axis(GameKey::NesRight, GameKey::NesLeft),
+                axis(GameKey::NesUp, GameKey::NesDown),
+            );
+            if keyboard != Vec2::ZERO {
+                aim = keyboard;
+            }
+            held |= self.is_pressed(GameKey::TerrainDrill);
+            cycle |= self.is_pressed(GameKey::TerrainTool);
+        } else {
+            held |= self.is_pressed(GameKey::P2Cannon);
+            cycle |= self.is_pressed(GameKey::P2Wing);
+        }
+        (aim, held, cycle)
+    }
+
+    pub(crate) fn terrain_gamepad_tools(&self) -> TerrainGamepadTools {
+        let gamepads = self.gamepads.borrow();
+        gamepads.seat(0).filter(|pad| pad.connected).map_or_else(
+            TerrainGamepadTools::default,
+            |pad| TerrainGamepadTools {
+                tunnel: pad.west,
+                debug: shape_trigger(pad.left_trigger) > 0.0,
+                cycle_tool: pad.north,
+                cycle_view: pad.right_bumper,
+            },
+        )
+    }
+
+    pub(crate) fn terrain_gamepad_mining(&self) -> (Vec2, bool, f32) {
+        let gamepads = self.gamepads.borrow();
+        gamepads
+            .seat(0)
+            .filter(|pad| pad.connected)
+            .map_or((Vec2::ZERO, false, 0.0), |pad| {
+                (
+                    Vec2::new(
+                        shape_stick(pad.right_stick_x),
+                        shape_stick(pad.right_stick_y),
+                    ),
+                    pad.left_bumper || shape_trigger(pad.right_trigger) > 0.0,
+                    match (pad.dpad_up, pad.dpad_down) {
+                        (true, false) => 1.0,
+                        (false, true) => -1.0,
+                        _ => 0.0,
+                    },
+                )
+            })
     }
 
     pub(crate) fn nes_controller_buttons(&self, player: usize) -> ControllerButtons {
@@ -1636,6 +1753,9 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyZ => Some(GameKey::NesA),
         KeyCode::Tab => Some(GameKey::NesSelect),
         KeyCode::Enter => Some(GameKey::NesStart),
+        KeyCode::KeyE => Some(GameKey::TerrainDrill),
+        KeyCode::KeyT => Some(GameKey::TerrainTool),
+        KeyCode::KeyV => Some(GameKey::TerrainView),
         KeyCode::KeyJ => Some(GameKey::P1Wing),
         KeyCode::KeyW => Some(GameKey::P1Thrust),
         KeyCode::KeyS => Some(GameKey::P1Brake),
@@ -1731,6 +1851,7 @@ mod tests {
     fn focus_loss_releases_controls_without_requesting_a_host_pause() {
         let mut input = ClientInput::default();
         input.press(GameKey::NesA);
+        input.press(GameKey::TerrainDrill);
         input.push_pointer_event(ScreenPointerEvent {
             position: RenderPoint::new(10.0, 20.0),
             phase: PointerPhase::Press,
@@ -1740,6 +1861,11 @@ mod tests {
         input.handle_focus_loss();
 
         assert_eq!(input.nes_controller_buttons(0), ControllerButtons::NONE);
+        assert!(!input.is_pressed(GameKey::TerrainDrill));
+        assert_eq!(
+            game_key_from_key_code(KeyCode::KeyE),
+            Some(GameKey::TerrainDrill)
+        );
         assert!(input.has_pointer_cancellation());
         assert!(!input.take_force_pause_requested());
     }

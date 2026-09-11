@@ -401,12 +401,26 @@ fn handle_request(
             ui_state_tracker,
             scenario_controls,
         ),
-        ControlCommand::Screenshot { output } => match write_window_screenshot(window, &output) {
-            Ok(()) => request
-                .response
-                .ok(format!("screenshot saved to {}", output.display())),
-            Err(err) => request.response.error(err.to_string()),
-        },
+        ControlCommand::Screenshot { output } => {
+            // FemtoVG reads the existing framebuffer. Let an idle window draw
+            // before capturing it, including immediately after process startup.
+            window.window().request_redraw();
+            let weak = window.as_weak();
+            Timer::single_shot(Duration::from_millis(50), move || {
+                let Some(window) = weak.upgrade() else {
+                    request
+                        .response
+                        .error("window closed before screenshot capture");
+                    return;
+                };
+                match write_window_screenshot(&window, &output) {
+                    Ok(()) => request
+                        .response
+                        .ok(format!("screenshot saved to {}", output.display())),
+                    Err(err) => request.response.error(err.to_string()),
+                }
+            });
+        }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
             diagnostics.push_str(&format!(
@@ -873,6 +887,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             settings_save_pending: window.get_settings_save_pending(),
             settings_save_error: non_empty(window.get_settings_save_error().as_str()),
             selected_scenario: selected_scenario.clone(),
+            world_seed: window.get_launcher_seed_text().to_string(),
             launcher_focus_index: window.get_launcher_focus_index(),
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),
@@ -891,10 +906,16 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             scenario_error: non_empty(window.get_scenario_error_text().as_str()),
             renderer: window.get_launcher_renderer().to_string(),
             raster_scale: window.get_launcher_raster_scale_text().to_string(),
+            combat_break_interval: window.get_launcher_combat_break_interval().to_string(),
+            combat_break_duration: window.get_launcher_combat_break_duration().to_string(),
+            combat_mission: window.get_launcher_combat_mission().to_string(),
+            combat_asteroid_interval: window.get_launcher_combat_asteroid_interval().to_string(),
+            combat_asteroid_strength: window.get_launcher_combat_asteroid_strength().to_string(),
             spacewars_preset: window.get_launcher_spacewars_preset().to_string(),
             spacewars_planets: window.get_launcher_use_planets().to_string(),
             spacewars_asteroids: window.get_launcher_asteroids_enabled().to_string(),
             spacewars_player_health: window.get_launcher_player_health_text().to_string(),
+            spacewars_player_1: window.get_launcher_p1_controller().to_string(),
             spacewars_player_2: window.get_launcher_p2_controller().to_string(),
             pizza_desired_balls: window.get_launcher_pizza_desired_balls_text().to_string(),
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),

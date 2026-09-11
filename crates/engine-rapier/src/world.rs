@@ -5,7 +5,7 @@
 //! motion or normalized contact data after each step.
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -383,6 +383,9 @@ pub struct ContactPoint {
 pub struct SurfaceContact {
     pub collider: ColliderId,
     pub position: Vec2,
+    /// Point and outward normal in the supporting body's local frame. Unlike
+    /// the solver's world point, this remains attached after body integration.
+    pub local_surface: ContactPoint,
     /// Points out of the supporting surface toward the querying collider.
     pub normal: Vec2,
     pub velocity: Vec2,
@@ -399,6 +402,10 @@ pub struct ContactEvent {
     pub collider_a: ColliderId,
     pub collider_b: ColliderId,
     pub point: Option<Vec2>,
+    /// Surface point and outward normal in each parent body's local frame.
+    /// These remain attached to the hit surfaces after motion or CCD substeps.
+    pub local_contact_a: Option<ContactPoint>,
+    pub local_contact_b: Option<ContactPoint>,
     /// Normal and impulse point from `collider_a` toward `collider_b`.
     pub normal: Vec2,
     pub impulse: Vec2,
@@ -506,7 +513,8 @@ pub struct PhysicsStepMetrics {
     pub island_time: Duration,
     pub island_constraints_time: Duration,
     pub solver_time: Duration,
-    pub ccd_time: Duration,
+    /// None when the physics backend does not provide complete CCD timing.
+    pub ccd_time: Option<Duration>,
     pub active_bodies: usize,
     pub sleeping_bodies: usize,
     pub candidate_pairs: usize,
@@ -689,6 +697,11 @@ impl PhysicsWorld {
         self.colliders.len()
     }
 
+    /// Stable identities for inspecting derived geometry without exposing Rapier.
+    pub fn collider_ids(&self) -> impl ExactSizeIterator<Item = ColliderId> + '_ {
+        self.colliders.iter().map(|entry| entry.id)
+    }
+
     pub fn contains_entity(&self, id: PhysicsId) -> bool {
         self.entities.contains_key(&id)
     }
@@ -753,6 +766,61 @@ impl PhysicsWorld {
         true
     }
 
+    /// Atomically validate and replace one collider role on an existing body.
+    /// Call at the lifecycle boundary, outside contact iteration. Motion, joints,
+    /// sensors in other roles, and unrelated bodies retain their identities.
+    /// Step the world before querying the new geometry through the broad phase.
+    pub fn replace_colliders(
+        &mut self,
+        parent: BodyId,
+        role: ColliderRole,
+        specs: &[ColliderSpec],
+    ) -> bool {
+        let Some(parent_handle) = self.body_handle(parent) else {
+            return false;
+        };
+        let mut ids = BTreeSet::new();
+        let mut builders = Vec::with_capacity(specs.len());
+        for spec in specs {
+            if spec.id.entity != parent.entity || spec.id.role != role || !ids.insert(spec.id) {
+                return false;
+            }
+            let Some(collider) = build_collider(spec, self.collect_events) else {
+                return false;
+            };
+            builders.push((spec.id, collider));
+        }
+        let old: Vec<_> = self
+            .colliders
+            .iter()
+            .filter(|entry| entry.id.entity == parent.entity && entry.id.role == role)
+            .copied()
+            .collect();
+        if old.iter().any(|entry| entry.parent != parent) {
+            return false;
+        }
+        builders.sort_by_key(|(id, _)| *id);
+        let removed: BTreeSet<_> = old.iter().map(|entry| entry.id).collect();
+        for entry in old {
+            self.raw.remove_collider(entry.handle);
+            self.remove_collider_mapping(entry.id);
+        }
+        if let Some(entity) = self.entities.get_mut(&parent.entity) {
+            entity.colliders.retain(|id| !removed.contains(id));
+        }
+        self.contact_events.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        self.sensor_intersections.retain(|event| {
+            !removed.contains(&event.collider_a) && !removed.contains(&event.collider_b)
+        });
+        for (id, collider) in builders {
+            let handle = self.raw.insert_collider(collider, Some(parent_handle));
+            self.register_collider(id, parent, handle);
+        }
+        true
+    }
+
     pub fn remove_entity(&mut self, entity: PhysicsId) -> bool {
         let Some(record) = self.entities.get(&entity).cloned() else {
             return false;
@@ -800,6 +868,21 @@ impl PhysicsWorld {
     pub fn body_mass(&self, id: BodyId) -> Option<f32> {
         let handle = self.body_handle(id)?;
         self.raw.bodies.get(handle).map(RigidBody::mass)
+    }
+
+    pub fn center_of_mass(&self, id: BodyId) -> Option<Vec2> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(from_rapier(body.center_of_mass()))
+    }
+
+    /// Make edited collider mass, inertia, and center of mass available before
+    /// the next step. The caller chooses how velocity should change after a cut.
+    pub fn refresh_mass_properties(&mut self, id: BodyId) -> bool {
+        let Some(handle) = self.body_handle(id) else {
+            return false;
+        };
+        self.raw.bodies[handle].recompute_mass_properties_from_colliders(&self.raw.colliders);
+        true
     }
 
     pub fn set_body_kind(&mut self, id: BodyId, kind: BodyKind, wake_up: bool) -> bool {
@@ -1004,7 +1087,9 @@ impl PhysicsWorld {
             island_time: counters.stages.island_construction_time.time(),
             island_constraints_time: counters.stages.island_constraints_collection_time.time(),
             solver_time: counters.stages.solver_time.time(),
-            ccd_time: counters.stages.ccd_time.time(),
+            // Rapier 0.34 does not time all CCD paths; its aggregate counter
+            // remains zero. A partial TOI timer is not a total CCD measurement.
+            ccd_time: None,
             active_bodies: self.raw.islands.active_bodies().count(),
             sleeping_bodies: self
                 .bodies
@@ -1069,9 +1154,21 @@ impl PhysicsWorld {
                             .filter_map(move |contact| {
                                 let other = other?;
                                 let body = self.raw.bodies.get(other.parent()?)?;
+                                let point = manifold.points.get(contact.contact_id[0] as usize)?;
+                                let (subshape, position, normal) = if direction < 0.0 {
+                                    (manifold.subshape_pos2, point.local_p2, manifold.local_n2)
+                                } else {
+                                    (manifold.subshape_pos1, point.local_p1, manifold.local_n1)
+                                };
+                                let pose = other.position_wrt_parent().copied().unwrap_or_default()
+                                    * subshape.unwrap_or_default();
                                 Some(SurfaceContact {
                                     collider: decode_collider(other.user_data)?,
                                     position: from_rapier(contact.point),
+                                    local_surface: ContactPoint {
+                                        position: from_rapier(pose * position),
+                                        normal: from_rapier(pose.rotation * normal),
+                                    },
                                     normal: from_rapier(manifold.data.normal) * direction,
                                     velocity: from_rapier(body.velocity_at_point(contact.point)),
                                     angular_velocity: body.angvel(),
@@ -1095,28 +1192,122 @@ impl PhysicsWorld {
         radius: f32,
         groups: CollisionGroups,
     ) -> bool {
-        if !finite_vec2(position)
-            || !angle.is_finite()
-            || !half_segment.is_finite()
-            || half_segment < 0.0
-            || !radius.is_finite()
-            || radius <= 0.0
-        {
-            return false;
+        self.capsule_is_clear_except(position, angle, half_segment, radius, groups, None)
+    }
+
+    /// Clearance for an existing actor's route. Its own collider is excluded;
+    /// all other solid obstacles retain the ordinary collision-group filter.
+    pub fn capsule_is_clear_except(
+        &self,
+        position: Vec2,
+        angle: f32,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        exclude_entity: Option<PhysicsId>,
+    ) -> bool {
+        self.capsule_clearance_test(half_segment, radius, groups, exclude_entity)(position, angle)
+    }
+
+    /// Prepare a read-only predicate for many placements in this completed world.
+    /// Reuse the query shape instead of allocating one per route sample. Holding
+    /// the predicate borrows the world, preventing a step during the survey.
+    pub fn capsule_clearance_test(
+        &self,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        exclude_entity: Option<PhysicsId>,
+    ) -> impl Fn(Vec2, f32) -> bool + '_ {
+        self.capsule_clearance_test_excluding(
+            half_segment,
+            radius,
+            groups,
+            exclude_entity.into_iter().collect(),
+        )
+    }
+
+    /// A replacement preview may exclude the actor and the assembly being
+    /// replaced. Callers must keep all other solid obstacles in the query.
+    pub fn capsule_clearance_test_excluding(
+        &self,
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+        excluded: Vec<PhysicsId>,
+    ) -> impl Fn(Vec2, f32) -> bool + '_ {
+        let capsule =
+            (half_segment.is_finite() && half_segment >= 0.0 && radius.is_finite() && radius > 0.0)
+                .then(|| ColliderBuilder::capsule_y(half_segment, radius).build());
+        move |position, angle| {
+            let Some(capsule) = &capsule else {
+                return false;
+            };
+            if !finite_vec2(position) || !angle.is_finite() {
+                return false;
+            }
+            let predicate = |_: ColliderHandle, collider: &Collider| {
+                decode_collider(collider.user_data).is_none_or(|id| !excluded.contains(&id.entity))
+            };
+            self.raw
+                .intersect_shape(
+                    Pose::new(to_rapier(position), angle),
+                    capsule.shape(),
+                    QueryFilter {
+                        flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                        groups: Some(groups.to_rapier()),
+                        predicate: Some(&predicate),
+                        ..QueryFilter::default()
+                    },
+                )
+                .next()
+                .is_none()
         }
-        let capsule = ColliderBuilder::capsule_y(half_segment, radius).build();
-        self.raw
-            .intersect_shape(
-                Pose::new(to_rapier(position), angle),
-                capsule.shape(),
-                QueryFilter {
-                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
-                    groups: Some(groups.to_rapier()),
-                    ..QueryFilter::default()
-                },
-            )
-            .next()
-            .is_none()
+    }
+
+    /// Read-only capsule tests against a proposed assembly at an explicit pose.
+    /// Uses the same collider geometry as insertion without allocating bodies,
+    /// changing the spatial index, or advancing a speculative physics world.
+    pub fn capsule_assembly_clearance_test(
+        colliders: &[ColliderSpec],
+        half_segment: f32,
+        radius: f32,
+        groups: CollisionGroups,
+    ) -> impl Fn(Vec2, f32, Vec2, f32) -> bool + use<> {
+        let capsule =
+            (half_segment.is_finite() && half_segment >= 0.0 && radius.is_finite() && radius > 0.0)
+                .then(|| ColliderBuilder::capsule_y(half_segment, radius).build());
+        let shapes: Option<Vec<_>> = colliders
+            .iter()
+            .filter(|c| {
+                !c.sensor
+                    && groups.memberships & c.collision_groups.filter != 0
+                    && groups.filter & c.collision_groups.memberships != 0
+            })
+            .map(|c| build_collider(c, false))
+            .collect();
+        move |point, angle, assembly_position, assembly_angle| {
+            let (Some(capsule), Some(shapes)) = (&capsule, &shapes) else {
+                return false;
+            };
+            if !finite_vec2(point)
+                || !angle.is_finite()
+                || !finite_vec2(assembly_position)
+                || !assembly_angle.is_finite()
+            {
+                return false;
+            }
+            let pose = Pose::new(to_rapier(point), angle);
+            let assembly = Pose::new(to_rapier(assembly_position), assembly_angle);
+            shapes.iter().all(|shape| {
+                rapier2d::parry::query::intersection_test(
+                    &pose,
+                    capsule.shape(),
+                    &(assembly * shape.position()),
+                    shape.shape(),
+                ) == Ok(false)
+            })
+        }
     }
 
     pub fn cast_ray(
@@ -1161,6 +1352,110 @@ impl PhysicsWorld {
             normal: from_rapier(intersection.normal),
             distance: intersection.time_of_impact,
         })
+    }
+
+    pub fn collider_body(&self, id: ColliderId) -> Option<BodyId> {
+        self.colliders
+            .get(*self.collider_indices.get(&id)?)
+            .map(|entry| entry.parent)
+    }
+
+    /// Sweep an existing collider along a world direction, excluding its entity
+    /// and sensors. Returns available travel, or None for invalid input. As with
+    /// ray queries, call against the last completed physics step.
+    pub fn collider_translation_clearance(
+        &self,
+        id: ColliderId,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        self.collider_translation_clearance_from_pose(id, collider.position(), direction, distance)
+    }
+
+    /// Sweep the real collider shape from a proposed pose without moving it.
+    /// Exclusions and collision groups match `collider_translation_clearance`.
+    pub fn collider_translation_clearance_at(
+        &self,
+        id: ColliderId,
+        position: Vec2,
+        angle: f32,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return None;
+        }
+        self.collider_translation_clearance_from_pose(
+            id,
+            &Pose::new(to_rapier(position), angle),
+            direction,
+            distance,
+        )
+    }
+
+    fn collider_translation_clearance_from_pose(
+        &self,
+        id: ColliderId,
+        pose: &Pose,
+        direction: Vec2,
+        distance: f32,
+    ) -> Option<f32> {
+        if !finite_vec2(direction)
+            || direction.length_squared() <= f32::EPSILON
+            || !distance.is_finite()
+            || distance < 0.0
+        {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        let hit = self.raw.cast_shape(
+            pose,
+            to_rapier(direction.normalized()),
+            collider.shape(),
+            rapier2d::parry::query::ShapeCastOptions {
+                max_time_of_impact: distance,
+                stop_at_penetration: false,
+                ..Default::default()
+            },
+            QueryFilter {
+                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                groups: Some(collider.collision_groups()),
+                predicate: Some(&predicate),
+                ..Default::default()
+            },
+        );
+        Some(hit.map_or(distance, |(_, hit)| hit.time_of_impact))
+    }
+
+    /// Check the complete collider shape at a proposed world pose without moving
+    /// it. The query ignores its own entity and sensors, and respects its groups.
+    pub fn collider_fits_at(&self, id: ColliderId, position: Vec2, angle: f32) -> Option<bool> {
+        if !finite_vec2(position) || !angle.is_finite() {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let predicate = |_: ColliderHandle, other: &Collider| {
+            decode_collider(other.user_data).is_none_or(|other| other.entity != id.entity)
+        };
+        Some(
+            self.raw
+                .intersect_shape(
+                    Pose::new(to_rapier(position), angle),
+                    collider.shape(),
+                    QueryFilter {
+                        flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                        groups: Some(collider.collision_groups()),
+                        predicate: Some(&predicate),
+                        ..Default::default()
+                    },
+                )
+                .next()
+                .is_none(),
+        )
     }
 
     /// Serialize authoritative Rapier state and all stable handle mappings.
@@ -1466,8 +1761,48 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
     let (magnitude, strongest_normal) = pair.max_impulse();
     let mut normal = from_rapier(strongest_normal);
     let mut impulse = from_rapier(pair.total_impulse());
+    let local_contacts = pair
+        .manifolds
+        .iter()
+        .filter(|manifold| !manifold.data.solver_contacts.is_empty())
+        .max_by(|a, b| {
+            let a = a.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            let b = b.points.iter().map(|p| p.data.impulse).sum::<f32>();
+            a.total_cmp(&b)
+        })
+        .and_then(|manifold| {
+            let contact = manifold
+                .data
+                .solver_contacts
+                .iter()
+                .filter_map(|solver| manifold.points.get(solver.contact_id[0] as usize))
+                .max_by(|a, b| a.data.impulse.total_cmp(&b.data.impulse))?;
+            let pose_a = collider_a
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos1.unwrap_or_default();
+            let pose_b = collider_b
+                .position_wrt_parent()
+                .copied()
+                .unwrap_or_default()
+                * manifold.subshape_pos2.unwrap_or_default();
+            Some((
+                ContactPoint {
+                    position: from_rapier(pose_a * contact.local_p1),
+                    normal: from_rapier(pose_a.rotation * manifold.local_n1),
+                },
+                ContactPoint {
+                    position: from_rapier(pose_b * contact.local_p2),
+                    normal: from_rapier(pose_b.rotation * manifold.local_n2),
+                },
+            ))
+        });
+    let (mut local_contact_a, mut local_contact_b) =
+        local_contacts.map_or((None, None), |(a, b)| (Some(a), Some(b)));
     if id_b < id_a {
         std::mem::swap(&mut id_a, &mut id_b);
+        std::mem::swap(&mut local_contact_a, &mut local_contact_b);
         normal = -normal;
         impulse = -impulse;
     }
@@ -1486,6 +1821,8 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
         collider_a: id_a,
         collider_b: id_b,
         point,
+        local_contact_a,
+        local_contact_b,
         normal,
         impulse,
         impulse_magnitude: magnitude,
@@ -1848,6 +2185,90 @@ mod tests {
     }
 
     #[test]
+    fn proposed_collider_sweep_preserves_state_and_respects_rotation_and_sensors() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (entity, body, capsule) = ball_ids(1);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: Vec2::new(-4.0, 0.0),
+                ..Default::default()
+            },
+            &[ColliderSpec::capsule(capsule, 0.6, 0.3)]
+        ));
+        let (_, wall, wall_collider) = ball_ids(2);
+        assert!(world.insert_body(
+            wall,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..Default::default()
+            },
+            &[ColliderSpec::cuboid(wall_collider, 0.2, 4.0)]
+        ));
+        let (_, sensor_body, sensor_id) = ball_ids(3);
+        let mut sensor = ColliderSpec::cuboid(sensor_id, 0.2, 4.0);
+        sensor.sensor = true;
+        assert!(world.insert_body(
+            sensor_body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: Vec2::new(-1.0, 0.0),
+                ..Default::default()
+            },
+            &[sensor]
+        ));
+        world.step(1.0 / 60.0);
+        let before = world.snapshot_bytes().unwrap();
+        let probe = |angle| {
+            world
+                .collider_translation_clearance_at(
+                    capsule,
+                    Vec2::new(-2.0, 0.0),
+                    angle,
+                    Vec2::X,
+                    3.0,
+                )
+                .unwrap()
+        };
+        assert!((probe(0.0) - 1.5).abs() < 0.001);
+        assert!((probe(std::f32::consts::FRAC_PI_2) - 0.9).abs() < 0.001);
+        assert_eq!(
+            world.collider_translation_clearance(capsule, Vec2::X, 1.0),
+            Some(1.0)
+        );
+        assert_eq!(
+            world.collider_translation_clearance_at(
+                capsule,
+                Vec2::new(-2.0, 0.0),
+                0.0,
+                -Vec2::X,
+                3.0,
+            ),
+            Some(3.0),
+            "the retained actor does not block its proposed pose"
+        );
+        assert!(
+            world
+                .collider_translation_clearance_at(
+                    capsule,
+                    Vec2::new(f32::NAN, 0.0),
+                    0.0,
+                    Vec2::X,
+                    1.0,
+                )
+                .is_none()
+        );
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        world.remove_entity(entity);
+        assert!(
+            world
+                .collider_translation_clearance_at(capsule, Vec2::ZERO, 0.0, Vec2::X, 1.0,)
+                .is_none()
+        );
+    }
+
+    #[test]
     fn capsule_clearance_respects_solids_groups_rotation_and_invalid_input() {
         let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
         let (_, body, collider) = ball_ids(10);
@@ -1887,6 +2308,80 @@ mod tests {
         ));
         world.step(1.0 / 60.0);
         assert!(world.capsule_is_clear(Vec2::ZERO, 0.0, 0.6, 0.3, CollisionGroups::ALL));
+    }
+
+    #[test]
+    fn route_clearance_excludes_only_the_requested_actor() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        insert_ball(&mut world, 4, Vec2::ZERO);
+        insert_ball(&mut world, 7, Vec2::new(4.0, 0.0));
+        world.step(1.0 / 60.0);
+        let clear = |position, excluded| {
+            world.capsule_is_clear_except(position, 0.0, 0.6, 0.3, CollisionGroups::ALL, excluded)
+        };
+        assert!(!clear(Vec2::ZERO, None));
+        assert!(clear(Vec2::ZERO, Some(PhysicsId::new(4))));
+        assert!(!clear(Vec2::ZERO, Some(PhysicsId::new(7))));
+        assert!(!clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(4))));
+        assert!(clear(Vec2::new(4.0, 0.0), Some(PhysicsId::new(7))));
+    }
+
+    #[test]
+    fn proposed_assembly_capsule_checks_match_inserted_rotated_geometry() {
+        let id = PhysicsId::new(900);
+        let mut hull = ColliderSpec::convex_polygon(
+            ColliderId::new(id, ColliderRole::PRIMARY, 0),
+            vec![
+                Vec2::new(-2.0, -1.0),
+                Vec2::new(2.0, -1.0),
+                Vec2::new(0.0, 3.0),
+            ],
+        );
+        hull.local_angle = 0.2;
+        let mut foot = ColliderSpec::ball(ColliderId::new(id, ColliderRole::PRIMARY, 1), 0.4);
+        foot.local_position = Vec2::new(1.5, -1.5);
+        let colliders = [hull, foot];
+        let clear = PhysicsWorld::capsule_assembly_clearance_test(
+            &colliders,
+            0.6,
+            0.3,
+            CollisionGroups::ALL,
+        );
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let position = Vec2::new(12.0, -5.0);
+        let angle = 0.7;
+        assert!(world.insert_body(
+            BodyId::new(id, BodyRole::PRIMARY),
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position,
+                angle,
+                ..Default::default()
+            },
+            &colliders
+        ));
+        world.step(1.0 / 60.0);
+        let before = world.snapshot_bytes().unwrap();
+        for x in -5..=5 {
+            for y in -4..=5 {
+                let point = position + Vec2::new(x as f32, y as f32) * 0.7;
+                for axis in [0.0, 1.2] {
+                    assert_eq!(
+                        clear(point, axis, position, angle),
+                        world.capsule_is_clear(point, axis, 0.6, 0.3, CollisionGroups::ALL)
+                    );
+                }
+            }
+        }
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        assert!(!clear(position, f32::NAN, position, angle));
+        let invalid = PhysicsWorld::capsule_assembly_clearance_test(
+            &colliders,
+            0.6,
+            -1.0,
+            CollisionGroups::ALL,
+        );
+        assert!(!invalid(Vec2::ZERO, 0.0, position, angle));
     }
 
     #[test]
@@ -1967,5 +2462,53 @@ mod tests {
         world.step(1.0 / 60.0);
 
         assert!(world.motion(dynamic).unwrap().linear_velocity.x > 0.0);
+    }
+
+    #[test]
+    fn surface_contact_anchor_stays_on_the_support_after_integration() {
+        for reverse in [false, true] {
+            let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+            let (_, floor, floor_collider) = ball_ids(if reverse { 2 } else { 1 });
+            let (_, actor, actor_collider) = ball_ids(if reverse { 1 } else { 2 });
+            let insert_floor = |world: &mut PhysicsWorld| {
+                world.insert_body(
+                    floor,
+                    BodySpec {
+                        kind: BodyKind::KinematicPosition,
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::cuboid(floor_collider, 5.0, 0.5)],
+                )
+            };
+            let insert_actor = |world: &mut PhysicsWorld| {
+                world.insert_body(
+                    actor,
+                    BodySpec {
+                        position: Vec2::new(0.0, 0.98),
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::ball(actor_collider, 0.5)],
+                )
+            };
+            if reverse {
+                assert!(insert_actor(&mut world));
+                assert!(insert_floor(&mut world));
+            } else {
+                assert!(insert_floor(&mut world));
+                assert!(insert_actor(&mut world));
+            }
+            world.set_next_kinematic_pose(floor, Vec2::new(0.2, 0.3), 0.03);
+            world.step(1.0 / 60.0);
+            let before = world.snapshot_bytes().unwrap();
+            let contact = world.surface_contacts(actor_collider).next().unwrap();
+            assert_eq!(contact.collider, floor_collider);
+            assert!((contact.local_surface.position.y - 0.5).abs() < 1e-5);
+            assert!(contact.local_surface.normal.distance_to(Vec2::Y) < 1e-5);
+            let motion = world.motion(floor).unwrap();
+            let current =
+                motion.position + contact.local_surface.position.rotate_radians(motion.angle);
+            assert!(current.distance_to(contact.position) > 0.1);
+            assert_eq!(world.snapshot_bytes().unwrap(), before);
+        }
     }
 }

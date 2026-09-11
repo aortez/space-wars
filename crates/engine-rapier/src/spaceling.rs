@@ -7,6 +7,9 @@ use crate::world::{
     CollisionGroups, PhysicsId, PhysicsWorld, SurfaceContact,
 };
 
+pub mod jetpack;
+mod recovery;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpacelingSpec {
     pub collision_groups: CollisionGroups,
@@ -52,12 +55,29 @@ impl Default for SpacelingBalanceSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SpacelingBalance {
     #[default]
     Balanced,
     KnockedDown,
     Recovering,
+}
+
+/// Outcome of the most recent explicit get-up request, for player feedback and
+/// diagnostics. Ordinary jumps do not change this result or the attempt count.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+#[repr(u8)]
+pub enum SpacelingGetUpResult {
+    #[default]
+    NotRequested,
+    Started,
+    Succeeded,
+    NoGravity,
+    NoSupport,
+    Unsettled,
+    Blocked,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -137,31 +157,44 @@ pub struct SpacelingSnapshot {
     pub knockdowns: u64,
     pub recoveries: u64,
     pub last_knockdown: Option<SpacelingDisturbance>,
+    pub get_up_attempts: u64,
+    pub get_up_result: SpacelingGetUpResult,
 }
 
 impl SpacelingSnapshot {
     pub fn grounded(self) -> bool {
         self.support.is_some()
     }
+
+    pub fn needs_get_up(self) -> bool {
+        self.balance != SpacelingBalance::Balanced
+            || angle_error(self.up, self.motion.angle).abs() > std::f32::consts::FRAC_PI_4
+    }
 }
 
 /// One dynamic body and collider. Cached controller intent never integrates pose.
+#[derive(Clone)]
 pub struct SpacelingAssembly {
     body: BodyId,
     collider: ColliderId,
     spec: SpacelingSpec,
     up: Vec2,
     jump_was_held: bool,
+    pending_get_up: bool,
     jumps: u64,
     balance: SpacelingBalance,
     settled_seconds: f32,
     recovery_seconds: f32,
     unsupported_seconds: f32,
-    recovery_support: Option<ColliderId>,
+    recovery_support: Option<BodyId>,
+    get_up_assist: Option<recovery::GetUpAssist>,
+    get_up_attempts: u64,
+    get_up_result: SpacelingGetUpResult,
     expected_velocity: Option<Vec2>,
     knockdowns: u64,
     recoveries: u64,
     last_knockdown: Option<SpacelingDisturbance>,
+    jetpack: Option<jetpack::Jetpack>,
 }
 
 impl SpacelingAssembly {
@@ -210,21 +243,30 @@ impl SpacelingAssembly {
             spec,
             up: Vec2::new(0.0, 1.0).rotate_radians(angle),
             jump_was_held: false,
+            pending_get_up: false,
             jumps: 0,
             balance: SpacelingBalance::Balanced,
             settled_seconds: 0.0,
             recovery_seconds: 0.0,
             unsupported_seconds: 0.0,
             recovery_support: None,
+            get_up_assist: None,
+            get_up_attempts: 0,
+            get_up_result: SpacelingGetUpResult::NotRequested,
             expected_velocity: None,
             knockdowns: 0,
             recoveries: 0,
             last_knockdown: None,
+            jetpack: None,
         })
     }
 
     pub fn body(&self) -> BodyId {
         self.body
+    }
+
+    pub fn collider(&self) -> ColliderId {
+        self.collider
     }
 
     /// Call once before each world step. The caller applies the supplied gravity
@@ -239,6 +281,21 @@ impl SpacelingAssembly {
         control: SpacelingControl,
         gravity: Vec2,
         dt: f32,
+    ) -> bool {
+        self.apply_control_with_queries(physics, control, gravity, dt, true)
+    }
+
+    /// Structural edits can temporarily invalidate swept-clearance queries.
+    /// Keep real button edges; defer a fresh get-up while it remains held.
+    /// Releasing before queries become current cancels the pending request.
+    /// Ordinary jumps do not use a spatial query and retain their normal gate.
+    pub fn apply_control_with_queries(
+        &mut self,
+        physics: &mut PhysicsWorld,
+        control: SpacelingControl,
+        gravity: Vec2,
+        dt: f32,
+        queries_ready: bool,
     ) -> bool {
         if !dt.is_finite() || dt <= 0.0 {
             return false;
@@ -256,17 +313,45 @@ impl SpacelingAssembly {
             return false;
         };
         let motion = snapshot.motion;
-        self.update_balance(physics, &snapshot, has_gravity, dt);
-        // Consume held jump even while disabled; recovery must not buffer it.
+        let severe = self.update_balance(physics, &snapshot, has_gravity, dt);
+        if let Some(pack) = &mut self.jetpack {
+            pack.active = false;
+            if snapshot.grounded() && !control.jump_held {
+                pack.armed = false;
+                pack.reference_velocity = snapshot.support.unwrap().velocity;
+                if self.balance == SpacelingBalance::Balanced && snapshot.relative_speed.abs() < 1.0
+                {
+                    pack.charge = (pack.charge + dt / jetpack::RECHARGE_SECONDS).min(1.0);
+                }
+            }
+        }
+        // A fresh press requests getting up while prone; a held request never
+        // turns into an ordinary jump or repeated lift after recovery.
         let jump_pressed = control.jump_held && !self.jump_was_held;
         self.jump_was_held = control.jump_held;
+        let get_up_pressed = jump_pressed && snapshot.needs_get_up();
+        if get_up_pressed && let Some(pack) = &mut self.jetpack {
+            pack.armed = false;
+        }
+        if !control.jump_held {
+            self.pending_get_up = false;
+        }
+        self.pending_get_up |= get_up_pressed;
+        if queries_ready && self.pending_get_up {
+            self.pending_get_up = false;
+            if snapshot.needs_get_up() {
+                self.try_get_up(physics, &snapshot, has_gravity, severe);
+            }
+        }
         if self.balance == SpacelingBalance::KnockedDown || !has_gravity {
             self.expected_velocity = Some(motion.linear_velocity + gravity * dt);
             return false;
         }
 
         let recovering = self.balance == SpacelingBalance::Recovering;
-        let strength = if recovering {
+        let strength = if self.get_up_assist.is_some() {
+            1.0
+        } else if recovering {
             (self.recovery_seconds / self.spec.balance.recovery_seconds).clamp(0.1, 1.0)
         } else if snapshot.grounded() {
             1.0
@@ -282,8 +367,10 @@ impl SpacelingAssembly {
             );
         physics.set_velocity(self.body, motion.linear_velocity, rate, true);
 
-        let walk = if !recovering && control.walk.is_finite() {
-            control.walk.clamp(-1.0, 1.0)
+        let walk = if control.walk.is_finite() {
+            // Slow supported movement lets a prone body work clear of a ledge
+            // or low roof while its recovery rotation remains collision-bound.
+            control.walk.clamp(-1.0, 1.0) * if recovering { 0.25 } else { 1.0 }
         } else {
             0.0
         };
@@ -292,15 +379,40 @@ impl SpacelingAssembly {
         let acceleration = if snapshot.grounded() {
             self.spec.ground_acceleration * if recovering { strength } else { 1.0 }
         } else {
-            self.spec.air_acceleration
+            if self
+                .jetpack
+                .as_ref()
+                .is_some_and(|pack| pack.armed && pack.charge > 0.0)
+            {
+                jetpack::AIR_ACCELERATION
+            } else {
+                self.spec.air_acceleration
+            }
         };
-        // Releasing movement in free flight does not provide invisible braking.
-        if snapshot.grounded() || walk != 0.0 {
-            let delta = (walk * self.spec.walk_speed - snapshot.relative_speed)
-                .clamp(-acceleration * dt, acceleration * dt);
+        // Airborne braking requires an armed, charged jetpack.
+        let powered_steering = !snapshot.grounded()
+            && self
+                .jetpack
+                .as_ref()
+                .is_some_and(|pack| pack.armed && pack.charge > 0.0);
+        if snapshot.grounded() || (!recovering && (walk != 0.0 || powered_steering)) {
+            let speed = if powered_steering {
+                jetpack::AIR_SPEED
+            } else {
+                self.spec.walk_speed
+            };
+            let relative_speed = if powered_steering {
+                (motion.linear_velocity - self.jetpack.as_ref().unwrap().reference_velocity)
+                    .dot(tangent)
+            } else {
+                snapshot.relative_speed
+            };
+            let delta =
+                (walk * speed - relative_speed).clamp(-acceleration * dt, acceleration * dt);
             physics.apply_velocity_delta(self.body, tangent * delta, true);
         }
-        let jump = jump_pressed && !recovering && snapshot.grounded();
+        self.drive_get_up(physics, gravity, dt);
+        let jump = jump_pressed && !get_up_pressed && !recovering && snapshot.grounded();
         if jump {
             let support_velocity = snapshot.support.unwrap().velocity;
             let outward_speed = (motion.linear_velocity - support_velocity).dot(self.up);
@@ -310,6 +422,29 @@ impl SpacelingAssembly {
                 true,
             );
             self.jumps += 1;
+        }
+        if let Some(pack) = &mut self.jetpack {
+            if jump {
+                pack.armed = true;
+                pack.reference_velocity = snapshot.support.unwrap().velocity;
+            } else if jump_pressed && !snapshot.grounded() && !snapshot.needs_get_up() {
+                pack.armed = true;
+            }
+            if !snapshot.grounded() && !recovering && pack.armed && control.jump_held {
+                let velocity = physics.motion(self.body).unwrap().linear_velocity;
+                let ascent = (velocity - pack.reference_velocity).dot(self.up);
+                // A thrust limit, not a velocity clamp: impacts retain their momentum.
+                let impulse = (jetpack::RISE_SPEED + gravity.length() * dt - ascent)
+                    .clamp(0.0, jetpack::THRUST * dt)
+                    .min(pack.charge * jetpack::THRUST * jetpack::BURN_SECONDS);
+                if impulse > 0.0 {
+                    physics.apply_velocity_delta(self.body, self.up * impulse, true);
+                    let burn = impulse / jetpack::THRUST;
+                    pack.charge = (pack.charge - burn / jetpack::BURN_SECONDS).max(0.0);
+                    pack.burn_seconds += burn;
+                    pack.active = true;
+                }
+            }
         }
         self.expected_velocity = physics
             .motion(self.body)
@@ -323,7 +458,7 @@ impl SpacelingAssembly {
         snapshot: &SpacelingSnapshot,
         has_gravity: bool,
         dt: f32,
-    ) {
+    ) -> bool {
         let support_spin = snapshot
             .support
             .map_or(0.0, |support| support.angular_velocity);
@@ -334,6 +469,9 @@ impl SpacelingAssembly {
         let severe = shock >= self.spec.balance.knockdown_velocity_change
             || spin >= self.spec.balance.knockdown_angular_speed;
         if severe && self.balance != SpacelingBalance::KnockedDown {
+            if self.get_up_assist.is_some() {
+                self.get_up_result = SpacelingGetUpResult::Unsettled;
+            }
             self.set_balance(physics, SpacelingBalance::KnockedDown);
             self.knockdowns += 1;
             self.last_knockdown = Some(SpacelingDisturbance {
@@ -351,8 +489,10 @@ impl SpacelingAssembly {
         match self.balance {
             SpacelingBalance::Balanced => {}
             SpacelingBalance::KnockedDown => {
-                let support = snapshot.support.map(|contact| contact.collider);
-                if !stable || support != self.recovery_support {
+                let support = snapshot
+                    .support
+                    .and_then(|contact| physics.collider_body(contact.collider));
+                if !stable {
                     self.settled_seconds = 0.0;
                 }
                 self.recovery_support = support;
@@ -364,34 +504,48 @@ impl SpacelingAssembly {
                 }
             }
             SpacelingBalance::Recovering => {
-                let support = snapshot.support.map(|contact| contact.collider);
+                let support = snapshot
+                    .support
+                    .and_then(|contact| physics.collider_body(contact.collider));
                 if support.is_none() {
                     self.unsupported_seconds += dt;
                 } else {
                     self.unsupported_seconds = 0.0;
+                    self.recovery_support = support;
                 }
                 let support_removed = self
                     .recovery_support
-                    .is_none_or(|collider| physics.collider_handle(collider).is_none());
+                    .is_none_or(|body| !physics.contains_body(body));
                 if !has_gravity
                     || support_removed
-                    || (support.is_some() && support != self.recovery_support)
-                    || self.unsupported_seconds > self.spec.balance.support_grace_seconds
+                    || (self.get_up_assist.is_none()
+                        && self.unsupported_seconds > self.spec.balance.support_grace_seconds)
                 {
+                    if self.get_up_assist.is_some() {
+                        self.get_up_result = if has_gravity {
+                            SpacelingGetUpResult::NoSupport
+                        } else {
+                            SpacelingGetUpResult::NoGravity
+                        };
+                    }
                     self.set_balance(physics, SpacelingBalance::KnockedDown);
-                } else if support.is_some() {
+                } else if support.is_some() || self.get_up_assist.is_some() {
                     self.recovery_seconds += dt;
-                    if self.recovery_seconds >= self.spec.balance.recovery_seconds
-                        && stable
+                    if (self.get_up_assist.is_some()
+                        || (self.recovery_seconds >= self.spec.balance.recovery_seconds && stable))
                         && angle_error(self.up, snapshot.motion.angle).abs() < 0.15
                         && spin < 0.8
                     {
+                        if self.get_up_assist.is_some() {
+                            self.get_up_result = SpacelingGetUpResult::Succeeded;
+                        }
                         self.set_balance(physics, SpacelingBalance::Balanced);
                         self.recoveries += 1;
                     }
                 }
             }
         }
+        severe
     }
 
     fn set_balance(&mut self, physics: &mut PhysicsWorld, balance: SpacelingBalance) {
@@ -399,6 +553,7 @@ impl SpacelingAssembly {
         self.recovery_seconds = 0.0;
         self.unsupported_seconds = 0.0;
         self.settled_seconds = 0.0;
+        self.get_up_assist = None;
         if balance != SpacelingBalance::Recovering {
             self.recovery_support = None;
         }
@@ -475,6 +630,8 @@ impl SpacelingAssembly {
             knockdowns: self.knockdowns,
             recoveries: self.recoveries,
             last_knockdown: self.last_knockdown,
+            get_up_attempts: self.get_up_attempts,
+            get_up_result: self.get_up_result,
         })
     }
 }

@@ -552,6 +552,46 @@ mod tests {
     }
 
     #[test]
+    fn combat_breaks_default_in_old_settings_and_roundtrip_off_and_custom_values() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[launch]\nseed = 42\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert_eq!(
+            loaded.settings.combat_breaks,
+            engine_common::CombatBreakSettings::default()
+        );
+        for interval in [0, 8, 30] {
+            loaded.settings.combat_breaks = engine_common::CombatBreakSettings {
+                interval_seconds: interval,
+                duration_seconds: 6,
+            };
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.combat_breaks,
+                loaded.settings.combat_breaks
+            );
+        }
+    }
+
+    #[test]
+    fn legacy_player_selection_defaults_p1_to_human_and_new_bot_choices_roundtrip() {
+        use engine_common::SpacewarsController::{Human, RuleBot};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[spacewars]\nplayer_2_controller = \"rule-bot\"\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap().settings;
+        assert_eq!(loaded.spacewars.player_1_controller, Human);
+        assert_eq!(loaded.spacewars.player_2_controller, RuleBot);
+        loaded.spacewars.player_1_controller = RuleBot;
+        save_settings(&loaded, &path).unwrap();
+        assert_eq!(
+            load_settings(&path).unwrap().settings.spacewars,
+            loaded.spacewars
+        );
+    }
+
+    #[test]
     fn save_then_load_roundtrips() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested/settings.toml");

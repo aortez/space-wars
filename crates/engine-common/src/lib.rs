@@ -129,9 +129,78 @@ pub struct Settings {
     pub nes: NesSettings,
     pub spacewars: SpacewarsSettings,
     pub surface_expedition: SurfaceExpeditionSettings,
+    pub combat_breaks: CombatBreakSettings,
+    pub material_combat: MaterialCombatSettings,
     pub pizza: PizzaSettings,
     pub runtime: RuntimeSettings,
     pub last_scenario: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MaterialCombatSettings {
+    pub mission: MaterialCombatMission,
+    pub asteroids: MaterialAsteroidSettings,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MaterialAsteroidSettings {
+    /// Mean time between arrivals; zero disables the environmental stream.
+    pub interval_seconds: u32,
+    pub severity: MaterialAsteroidSeverity,
+}
+impl MaterialAsteroidSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            interval_seconds: self.interval_seconds.min(60),
+            ..self
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaterialAsteroidSeverity {
+    Light,
+    #[default]
+    Mixed,
+    Heavy,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MaterialCombatMission {
+    #[default]
+    Dogfight,
+    Capture,
+}
+
+/// Optional pacing experiment for the material combat pilots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CombatBreakSettings {
+    /// Mean engaged flight time between breaks; zero disables breaks.
+    pub interval_seconds: u32,
+    pub duration_seconds: u32,
+}
+
+impl Default for CombatBreakSettings {
+    fn default() -> Self {
+        Self {
+            interval_seconds: 15,
+            duration_seconds: 4,
+        }
+    }
+}
+
+impl CombatBreakSettings {
+    pub fn normalized(self) -> Self {
+        Self {
+            interval_seconds: self.interval_seconds.min(120),
+            duration_seconds: self.duration_seconds.clamp(1, 15),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -904,6 +973,8 @@ pub struct SpacewarsSettings {
     #[serde(default = "default_spacewars_player_view_height")]
     pub player_2_view_height: f32,
     #[serde(default)]
+    pub player_1_controller: SpacewarsController,
+    #[serde(default)]
     pub player_2_controller: SpacewarsController,
 }
 
@@ -917,6 +988,7 @@ impl Default for SpacewarsSettings {
             player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
             player_1_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
             player_2_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            player_1_controller: SpacewarsController::Human,
             player_2_controller: SpacewarsController::Human,
         }
     }
@@ -939,6 +1011,7 @@ impl SpacewarsSettings {
             ),
             player_1_view_height: normalize_spacewars_player_view_height(self.player_1_view_height),
             player_2_view_height: normalize_spacewars_player_view_height(self.player_2_view_height),
+            player_1_controller: self.player_1_controller,
             player_2_controller: self.player_2_controller,
         }
     }

@@ -25,7 +25,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Spaceling Lab: d-pad or left stick left/right walks; A jumps; B applies a test shove. Release A/B before repeating. Keyboard: A/D or arrows walk, Space jumps, X shoves. Start or Esc pauses; R restarts. Strong impacts disable control until physical support permits recovery. Cyan shows support; orange shows gravity.",
+    controls_help: "Spaceling Lab: d-pad or left stick left/right walks; bottom face jumps or gets up; B applies a test shove. Release A/B before repeating. Keyboard: A/D or arrows walk, Space jumps or gets up, X shoves. Start or Esc pauses; R restarts. Strong impacts cause knockdown. Tap jump to get up once supported; movement during recovery crawls at reduced speed. Cyan shows support; orange shows gravity.",
     create,
 };
 
