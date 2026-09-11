@@ -17,6 +17,7 @@ use calloop::EventLoop;
 use i_slint_core::platform::PlatformError;
 
 use crate::fullscreenwindowadapter::FullscreenWindowAdapter;
+use crate::profiling::{Scope, Stage};
 use crate::BackendBuilder;
 
 #[cfg(not(any(target_family = "windows", target_vendor = "apple", target_arch = "wasm32")))]
@@ -248,18 +249,27 @@ impl i_slint_core::platform::Platform for Backend {
         quit_loop.store(false, std::sync::atomic::Ordering::Release);
 
         while !quit_loop.load(std::sync::atomic::Ordering::Acquire) {
-            i_slint_core::platform::update_timers_and_animations();
+            let _loop_profile = Scope::new(Stage::Loop);
+            {
+                let _timers = Scope::new(Stage::Timers);
+                i_slint_core::platform::update_timers_and_animations();
+            }
 
             // Only after updating the animation tick, invoke callbacks from invoke_from_event_loop(). They
             // might set animated properties, which requires an up-to-date start time.
-            for callback in callbacks_to_invoke_per_iteration.take().into_iter() {
-                callback();
+            {
+                let _callbacks = Scope::new(Stage::Callbacks);
+                for callback in callbacks_to_invoke_per_iteration.take().into_iter() {
+                    callback();
+                }
             }
 
             if let Some(adapter) = self.window.borrow().as_ref() {
+                let _render = Scope::new(Stage::Render);
                 adapter.clone().render_if_needed(mouse_position_property.as_ref())?;
             };
 
+            let _dispatch = Scope::new(Stage::Dispatch);
             let next_timeout = i_slint_core::platform::duration_until_next_timer_update();
             event_loop
                 .dispatch(next_timeout, &mut loop_data)

@@ -6,16 +6,22 @@
 use i_slint_core::api::PhysicalSize as PhysicalWindowSize;
 use i_slint_core::platform::PlatformError;
 pub use i_slint_core::software_renderer::SoftwareRenderer;
-use i_slint_core::software_renderer::{PremultipliedRgbaColor, RepaintBufferType, TargetPixel};
+use i_slint_core::software_renderer::{PremultipliedRgbaColor, TargetPixel};
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::display::RenderingRotation;
+use crate::profiling::{self, Counter};
+
+mod buffer;
+use buffer::{BufferMode, OutputBuffer, TextureMode};
 
 pub struct SoftwareRendererAdapter {
     renderer: SoftwareRenderer,
     display: Arc<dyn crate::display::swdisplay::SoftwareBufferDisplay>,
     presenter: Arc<dyn crate::display::Presenter>,
     size: PhysicalWindowSize,
+    output_buffer: RefCell<OutputBuffer>,
 }
 
 const SOFTWARE_RENDER_SUPPORTED_DRM_FOURCC_FORMATS: &[drm::buffer::DrmFourcc] = &[
@@ -113,15 +119,22 @@ impl SoftwareRendererAdapter {
 
         let (width, height) = display.size();
         let size = i_slint_core::api::PhysicalSize::new(width, height);
+        profiling::activate((width, height));
+        let mode = BufferMode::parse(std::env::var("SPACEWARS_KMS_BUFFER").ok().as_deref())?;
+        let texture_mode =
+            TextureMode::parse(std::env::var("SPACEWARS_KMS_TEXTURE").ok().as_deref())?;
+        profiling::render_target(mode.name(), 0);
+        profiling::texture_mode(texture_mode.name());
 
         let renderer = Box::new(Self {
             renderer: SoftwareRenderer::new(),
             display: display.clone(),
             presenter: display.as_presenter(),
             size,
+            output_buffer: RefCell::new(OutputBuffer::new(mode, texture_mode)),
         });
 
-        eprintln!("Using Software renderer");
+        eprintln!("Using Software renderer ({} buffer)", mode.name());
 
         Ok(renderer)
     }
@@ -138,12 +151,6 @@ impl crate::fullscreenwindowadapter::FullscreenRenderer for SoftwareRendererAdap
         _draw_mouse_cursor_callback: &dyn Fn(&mut dyn i_slint_core::item_rendering::ItemRenderer),
     ) -> Result<(), PlatformError> {
         self.display.map_back_buffer(&mut |pixels, age, format| {
-            self.renderer.set_repaint_buffer_type(match age {
-                1 => RepaintBufferType::ReusedBuffer,
-                2 => RepaintBufferType::SwappedBuffers,
-                _ => RepaintBufferType::NewBuffer,
-            });
-
             self.renderer.set_rendering_rotation(match rotation {
                 RenderingRotation::NoRotation => {
                     i_slint_core::software_renderer::RenderingRotation::NoRotation
@@ -159,24 +166,28 @@ impl crate::fullscreenwindowadapter::FullscreenRenderer for SoftwareRendererAdap
                 }
             });
 
-            match format {
-                drm::buffer::DrmFourcc::Xrgb8888 | drm::buffer::DrmFourcc::Argb8888 => {
-                    let buffer: &mut [DumbBufferPixelXrgb888] =
-                        bytemuck::cast_slice_mut(pixels.as_mut());
-                    self.renderer.render(buffer, self.size.width as usize);
-                }
-                drm::buffer::DrmFourcc::Rgb565 => {
-                    let buffer: &mut [i_slint_core::software_renderer::Rgb565Pixel] =
-                        bytemuck::cast_slice_mut(pixels.as_mut());
-                    self.renderer.render(buffer, self.size.width as usize);
-                }
-                _ => {
-                    return Err(format!(
-                        "Unsupported frame buffer format {format} used with software renderer"
-                    )
-                    .into())
-                }
-            }
+            let dirty_region = self.output_buffer.borrow_mut().render(
+                &self.renderer,
+                pixels,
+                self.size.width as usize,
+                age,
+                format,
+            )?;
+            profiling::count(Counter::Draws);
+            profiling::buffer(
+                age,
+                pixels.len(),
+                match format {
+                    drm::buffer::DrmFourcc::Xrgb8888 => "XRGB8888",
+                    drm::buffer::DrmFourcc::Argb8888 => "ARGB8888",
+                    drm::buffer::DrmFourcc::Rgb565 => "RGB565",
+                    _ => "unknown",
+                },
+                dirty_region
+                    .iter()
+                    .map(|(_, size)| u64::from(size.width) * u64::from(size.height))
+                    .sum(),
+            );
 
             Ok(())
         })?;

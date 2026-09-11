@@ -173,6 +173,59 @@ fn click(window: &MainWindow, x: f32, y: f32) {
 }
 
 #[test]
+fn recreated_launcher_buttons_do_not_retain_pressed_state_or_lose_shortcuts() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    let input = Rc::new(RefCell::new(input::ClientInput::default()));
+    install_ui_navigation(&window);
+    install_keyboard_navigation(&window, Rc::clone(&input));
+    let starts = Rc::new(Cell::new(0));
+    let started = Rc::clone(&starts);
+    window.on_launcher_start_game(move || started.set(started.get() + 1));
+    window.show().unwrap();
+
+    for cycle in 0..3 {
+        window.set_launcher_visible(true);
+        window.set_launcher_focus_index(0);
+        slint::platform::update_timers_and_animations();
+        let position = slint::LogicalPosition::new(220.0, 278.0);
+        window.window().dispatch_event(WindowEvent::PointerPressed {
+            position,
+            button: slint::platform::PointerEventButton::Left,
+        });
+        // Remove the menu while its Start button has a pointer grab. A later
+        // release must not activate the old button or latch the recreated one.
+        window.set_launcher_visible(false);
+        slint::platform::update_timers_and_animations();
+        // This headless adapter has no render loop. Commit the conditional
+        // tree removal before testing input against the newly displayed tree.
+        window.window().take_snapshot().unwrap();
+        window
+            .window()
+            .dispatch_event(WindowEvent::PointerReleased {
+                position,
+                button: slint::platform::PointerEventButton::Left,
+            });
+        assert_eq!(starts.get(), cycle * 2);
+
+        window.set_launcher_visible(true);
+        click(&window, 220.0, 278.0);
+        assert_eq!(starts.get(), cycle * 2 + 1);
+        window.set_launcher_focus_index(0);
+        key(&window, Key::DownArrow);
+        assert_eq!(window.get_launcher_focus_index(), 1);
+        key(&window, Key::Return);
+        assert_eq!(starts.get(), cycle * 2 + 2);
+        window.set_launcher_visible(false);
+        key(&window, "p");
+        assert!(input.borrow_mut().take_pause_requested());
+    }
+}
+
+#[test]
 fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
     let window = MainWindow::new().unwrap();

@@ -401,14 +401,30 @@ fn handle_request(
             ui_state_tracker,
             scenario_controls,
         ),
-        ControlCommand::Screenshot { output } => match write_window_screenshot(window, &output) {
-            Ok(()) => request
-                .response
-                .ok(format!("screenshot saved to {}", output.display())),
-            Err(err) => request.response.error(err.to_string()),
-        },
+        ControlCommand::Screenshot { output } => {
+            // FemtoVG reads the existing framebuffer. Let an idle window draw
+            // before capturing it, including immediately after process startup.
+            window.window().request_redraw();
+            let weak = window.as_weak();
+            Timer::single_shot(Duration::from_millis(50), move || {
+                let Some(window) = weak.upgrade() else {
+                    request
+                        .response
+                        .error("window closed before screenshot capture");
+                    return;
+                };
+                match write_window_screenshot(&window, &output) {
+                    Ok(()) => request
+                        .response
+                        .ok(format!("screenshot saved to {}", output.display())),
+                    Err(err) => request.response.error(err.to_string()),
+                }
+            });
+        }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+            diagnostics.push_str(&i_slint_backend_linuxkms::profiling::diagnostics());
             let launch = window.get_launcher_diagnostics();
             if !launch.is_empty() {
                 diagnostics.push('\n');

@@ -5,6 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::rc::Rc;
 
+use crate::profiling::{self, Counter};
 use crate::DeviceOpener;
 use drm::buffer::Buffer;
 use drm::control::Device;
@@ -209,6 +210,7 @@ impl DrmOutput {
             self.drm_device
                 .page_flip(self.crtc, framebuffer_handle, drm::control::PageFlipFlags::EVENT, None)
                 .map_err(|e| format!("Error presenting framebuffer on screen: {e}"))?;
+            profiling::count(Counter::FlipSubmissions);
 
             *self.page_flip_state.borrow_mut() =
                 PageFlipState::WaitingForPageFlip { _buffer_to_keep_alive_until_flip: last_buffer };
@@ -223,6 +225,7 @@ impl DrmOutput {
                 )
                 .map_err(|e| format!("Error presenting framebuffer on screen: {e}"))?;
             *self.page_flip_state.borrow_mut() = PageFlipState::InitialBufferPosted;
+            profiling::count(Counter::Modesets);
         }
 
         Ok(())
@@ -240,6 +243,7 @@ impl DrmOutput {
 
         loop {
             let Ok(mut event_it) = self.drm_device.receive_events() else {
+                profiling::count(Counter::FlipReadErrors);
                 return;
             };
 
@@ -247,6 +251,7 @@ impl DrmOutput {
                 if let PageFlipState::WaitingForPageFlip { .. } =
                     self.page_flip_state.replace(PageFlipState::ReadyForNextBuffer)
                 {
+                    profiling::count(Counter::FlipCompletions);
                     return;
                 }
             }

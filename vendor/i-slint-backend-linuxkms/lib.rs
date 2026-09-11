@@ -21,6 +21,9 @@ mod drmoutput;
 mod display;
 
 #[cfg(target_os = "linux")]
+pub mod profiling;
+
+#[cfg(target_os = "linux")]
 mod renderer {
     use i_slint_core::platform::PlatformError;
 

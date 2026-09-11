@@ -98,7 +98,7 @@ jobs:
           name: ui-functional-test-artifacts
           path: target/functional-test-artifacts
           if-no-files-found: ignore
-      - name: Test vendored LinuxKMS touch transforms
+      - name: Test vendored LinuxKMS input and software rendering
         run: cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software --lib
 
   spacewars-ai-regression:

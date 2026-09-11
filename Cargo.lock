@@ -1480,6 +1480,8 @@ dependencies = [
  "engine-core",
  "engine-nes",
  "gilrs",
+ "i-slint-backend-linuxkms",
+ "i-slint-core",
  "png 0.17.16",
  "scenario-clock",
  "scenario-falling",

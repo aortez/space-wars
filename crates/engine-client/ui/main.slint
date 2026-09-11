@@ -534,16 +534,14 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
-        visible: root.spacewars-ui-visible;
+    if root.spacewars-ui-visible: Rectangle {
         x: root.width / 2 - 1px;
         width: 2px;
         height: root.height;
         background: #59627388;
     }
 
-    PlayerStatusPanel {
-        visible: root.spacewars-ui-visible;
+    if root.spacewars-ui-visible: PlayerStatusPanel {
         x: 16px;
         y: 16px;
         width: root.width * 0.31;
@@ -554,8 +552,7 @@ export component MainWindow inherits Window {
         player-color: root.p1-color;
     }
 
-    PlayerStatusPanel {
-        visible: root.spacewars-ui-visible;
+    if root.spacewars-ui-visible: PlayerStatusPanel {
         x: root.width - self.width - 16px;
         y: 16px;
         width: root.width * 0.31;
@@ -567,8 +564,7 @@ export component MainWindow inherits Window {
         align-right: true;
     }
 
-    Rectangle {
-        visible: root.spacewars-ui-visible;
+    if root.spacewars-ui-visible: Rectangle {
         x: root.width * 0.37;
         y: root.height - self.height - 14px;
         width: root.width * 0.26;
@@ -673,8 +669,9 @@ export component MainWindow inherits Window {
         }
     }
 
-    MenuButton {
-        visible: root.launcher-scenario == "clock" && !root.launcher-visible && !root.ingame-menu-visible;
+    // Inactive panels must leave the item tree: visible:false still incurs
+    // software-renderer dirty-region/bounds work. Persistent state stays in root.
+    if root.launcher-scenario == "clock" && !root.launcher-visible && !root.ingame-menu-visible: MenuButton {
         x: parent.width - 178px;
         y: 12px;
         width: 166px;
@@ -683,8 +680,7 @@ export component MainWindow inherits Window {
         activated => { root.ingame-clock-open(); }
     }
 
-    Rectangle {
-        visible: root.ingame-menu-visible;
+    if root.ingame-menu-visible: Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514cc;
@@ -814,8 +810,7 @@ export component MainWindow inherits Window {
                 }
             }
 
-            Rectangle {
-                visible: root.ingame-controls-visible;
+            if root.ingame-controls-visible: Rectangle {
                 x: 24px;
                 y: 62px;
                 width: parent.width - 48px;
@@ -1058,8 +1053,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
-        visible: root.game-over-visible && !root.launcher-visible;
+    if root.game-over-visible && !root.launcher-visible: Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514c8;
@@ -1159,6 +1153,7 @@ export component MainWindow inherits Window {
         }
     }
 
+    // Keep keyboard focus/shortcuts alive even while the launcher tree is absent.
     launcher-shortcuts := FocusScope {
         width: parent.width;
         height: parent.height;
@@ -1221,8 +1216,7 @@ export component MainWindow inherits Window {
         }
 
 
-        Rectangle {
-            visible: root.launcher-visible;
+        if root.launcher-visible: Rectangle {
             width: parent.width;
             height: parent.height;
             background: #050514f4;
@@ -1265,8 +1259,7 @@ export component MainWindow inherits Window {
                     horizontal-alignment: right;
                 }
 
-                Rectangle {
-                    visible: !root.launcher-controls-visible && !root.launcher-settings-visible;
+                if !root.launcher-controls-visible && !root.launcher-settings-visible: Rectangle {
                     x: 24px;
                     y: 72px;
                     width: parent.width - 48px;
@@ -1432,8 +1425,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                Rectangle {
-                    visible: root.launcher-settings-visible;
+                if root.launcher-settings-visible: Rectangle {
                     x: 24px;
                     y: 72px;
                     width: parent.width - 48px;
@@ -1931,8 +1923,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                Rectangle {
-                    visible: root.launcher-controls-visible;
+                if root.launcher-controls-visible: Rectangle {
                     x: 24px;
                     y: 72px;
                     width: parent.width - 48px;
@@ -2018,8 +2009,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
-        visible: root.controller-disconnected-visible && !root.launcher-visible;
+    if root.controller-disconnected-visible && !root.launcher-visible: Rectangle {
         x: (parent.width - self.width) / 2;
         y: 20px;
         width: root.width < 552px ? root.width - 32px : 520px;
@@ -2041,8 +2031,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
-        visible: root.scenario-error-text != "" && !root.launcher-visible;
+    if root.scenario-error-text != "" && !root.launcher-visible: Rectangle {
         x: root.width * 0.15;
         y: root.controller-disconnected-visible ? 72px : 16px;
         width: root.width * 0.70;
@@ -2065,8 +2054,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    Rectangle {
-        visible: root.touch-test-visible;
+    if root.touch-test-visible: Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514;
