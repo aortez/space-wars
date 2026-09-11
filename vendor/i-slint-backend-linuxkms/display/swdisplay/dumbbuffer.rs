@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 
 use crate::drmoutput::DrmOutput;
+use crate::profiling::{Scope, Stage};
 use drm::control::Device;
 use i_slint_core::platform::PlatformError;
 
@@ -77,11 +78,18 @@ impl super::SoftwareBufferDisplay for DumbBufferDisplay {
         let mut back_buffer = self.back_buffer.borrow_mut();
         let age = back_buffer.age;
         let format = back_buffer.format;
-        self.drm_output
-            .drm_device
-            .map_dumb_buffer(&mut back_buffer.buffer_handle)
-            .map_err(|e| PlatformError::Other(format!("Error mapping dumb buffer: {e}").into()))
-            .and_then(|mut buffer| callback(buffer.as_mut(), age, format))
+        let mut buffer = {
+            let _map = Scope::new(Stage::Map);
+            self.drm_output.drm_device.map_dumb_buffer(&mut back_buffer.buffer_handle).map_err(
+                |e| PlatformError::Other(format!("Error mapping dumb buffer: {e}").into()),
+            )?
+        };
+        let result = callback(buffer.as_mut(), age, format);
+        {
+            let _unmap = Scope::new(Stage::Unmap);
+            drop(buffer);
+        }
+        result
     }
 
     fn as_presenter(self: Arc<Self>) -> Arc<dyn crate::display::Presenter> {
@@ -91,8 +99,12 @@ impl super::SoftwareBufferDisplay for DumbBufferDisplay {
 
 impl crate::display::Presenter for DumbBufferDisplay {
     fn present(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.drm_output.wait_for_page_flip();
+        {
+            let _wait = Scope::new(Stage::FlipWait);
+            self.drm_output.wait_for_page_flip();
+        }
 
+        let _submit = Scope::new(Stage::Submit);
         self.back_buffer.swap(&self.front_buffer);
         self.front_buffer.swap(&self.in_flight_buffer);
 

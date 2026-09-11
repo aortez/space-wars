@@ -17,6 +17,7 @@ mod native_video;
 mod nes_audio;
 mod nes_realtime;
 mod nes_roms;
+mod presentation_probe;
 mod raster;
 mod render;
 mod settings;
@@ -25,6 +26,8 @@ mod sound_controls;
 mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;
+#[cfg(test)]
+mod ui_render_tests;
 
 use std::cell::RefCell;
 use std::env;
@@ -69,6 +72,9 @@ type SharedNesRomCatalog = Rc<RefCell<nes_roms::NesRomCatalog>>;
 #[derive(Parser, Debug)]
 #[command(name = "engine-client", about = "Spacewars scenario host")]
 struct Args {
+    #[command(flatten)]
+    presentation: presentation_probe::Options,
+
     /// Scenario to load.
     #[arg(long)]
     scenario: Option<String>,
@@ -304,6 +310,16 @@ struct EffectiveLaunch {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+
+    // This experiment must not load/write settings, open a control socket,
+    // initialize audio/input, or create a desktop/KMS display connection.
+    if args.presentation.benchmark_presentation {
+        return presentation_probe::run(
+            &args.presentation,
+            args.benchmark_width,
+            args.benchmark_height,
+        );
+    }
 
     let settings_path = settings_path_from_args(&args)?;
     let loaded_settings = settings::load_settings(&settings_path)?;
@@ -2221,6 +2237,7 @@ mod tests {
 
     fn base_args() -> Args {
         Args {
+            presentation: presentation_probe::Options::default(),
             scenario: None,
             rom: None,
             seed: None,

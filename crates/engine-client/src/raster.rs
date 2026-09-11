@@ -33,6 +33,7 @@ const STARFIELD_CACHE_MIN_PRIMITIVES: usize = 128;
 const STARFIELD_CACHE_CELL_SIZE: f32 = 64.0;
 const STARFIELD_CACHE_MAX_ENTRIES: usize = 64;
 const BACKGROUND: Rgb8Pixel = Rgb8Pixel { r: 5, g: 5, b: 20 };
+const RGB_FILL_BLOCK_PIXELS: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RasterOptions {
@@ -196,13 +197,26 @@ impl RasterRenderer {
             let starfield_cache = &mut self.starfield_cache;
             let pixels = self.buffers[buffer_index].make_mut_slice();
             let started = Instant::now();
-            clear_pixels(pixels);
+            let frame_viewport = Viewport::new(width as f32, height as f32);
+            let background = if frames.len() == 1 {
+                opaque_frame_background(&frames[0], frame_viewport)
+            } else {
+                None
+            };
+            fill_rgb_pixels(pixels, background.map_or(BACKGROUND, |(_, color)| color));
             timings.clear += started.elapsed();
             let mut canvas = Canvas::new(width, height, pixels);
 
             if frames.len() == 1 {
                 let started = Instant::now();
-                canvas.draw_frame(&frames[0], Viewport::new(width as f32, height as f32));
+                if let Some((background, _)) = background {
+                    // The clear already painted this first, full-frame primitive.
+                    canvas.draw_frame_filtered(&frames[0], frame_viewport, |_, primitive| {
+                        !std::ptr::eq(primitive, background)
+                    });
+                } else {
+                    canvas.draw_frame(&frames[0], frame_viewport);
+                }
                 timings.other_frames += started.elapsed();
             } else if layout == FrameLayout::SpacewarsLocalPlay && frames.len() >= 4 {
                 draw_spacewars_layout(
@@ -1165,7 +1179,74 @@ fn span_fill_mode_for_layer(layer_z: i32, color: RenderColor) -> SpanFillMode {
 }
 
 fn clear_pixels(pixels: &mut [Rgb8Pixel]) {
-    pixels.fill(BACKGROUND);
+    fill_rgb_pixels(pixels, BACKGROUND);
+}
+
+fn fill_rgb_pixels(pixels: &mut [Rgb8Pixel], color: Rgb8Pixel) {
+    // Rust's slice fill of three-byte RGB pixels currently compiles to scalar
+    // byte/halfword stores on both x86-64 and aarch64, even in release builds.
+    // Copying a small repeated pattern lets the compiler/libc use wide stores,
+    // without giving up Slint's opaque RGB image path or allocating per fill.
+    if pixels.len() <= RGB_FILL_BLOCK_PIXELS {
+        pixels.fill(color);
+        return;
+    }
+    let block = [color; RGB_FILL_BLOCK_PIXELS];
+    for chunk in pixels.chunks_mut(block.len()) {
+        chunk.copy_from_slice(&block[..chunk.len()]);
+    }
+}
+
+/// Fold a leading opaque background into the clear, only when its projected
+/// rectangle covers every pixel. Keep this conservative: no strokes, partial
+/// backgrounds, or multi-viewport frames. Layer storage need not be sorted.
+fn opaque_frame_background(
+    frame: &RenderFrame,
+    viewport: Viewport,
+) -> Option<(&RenderPrimitive, Rgb8Pixel)> {
+    let layer = frame
+        .layers
+        .iter()
+        .filter(|layer| !layer.primitives.is_empty())
+        .min_by_key(|layer| layer.z)?;
+    let primitive = layer.primitives.first()?;
+    let RenderPrimitive::Polygon(polygon) = primitive else {
+        return None;
+    };
+    let color = raster_color(polygon.fill?.color);
+    if !color.opaque || polygon.stroke.is_some() {
+        return None;
+    }
+    let [a, b, c, d] = polygon.points.as_slice() else {
+        return None;
+    };
+    let [a, b, c, d] = [a, b, c, d].map(|point| project(frame.camera, *point, viewport));
+    if ![a, b, c, d]
+        .iter()
+        .all(|point| point.x.is_finite() && point.y.is_finite())
+        || !((a.x == b.x && b.y == c.y && c.x == d.x && d.y == a.y)
+            || (a.y == b.y && b.x == c.x && c.y == d.y && d.x == a.x))
+    {
+        return None;
+    }
+    let min_x = a.x.min(c.x);
+    let max_x = a.x.max(c.x);
+    let min_y = a.y.min(c.y);
+    let max_y = a.y.max(c.y);
+    // Match the scan converter: inclusive floor/ceil x spans; y samples at
+    // pixel centers, including the top edge but excluding the bottom edge.
+    if min_x < max_x
+        && min_y < max_y
+        && min_x.floor() <= 0.0
+        && max_x.ceil() >= viewport.width - 1.0
+        && min_y <= 0.5
+        && max_y > viewport.height - 0.5
+        && primitive_visible(frame.camera, viewport, primitive)
+    {
+        Some((primitive, rgb_pixel(color.pixel)))
+    } else {
+        None
+    }
 }
 
 fn fill_circle_pixels(
@@ -1469,13 +1550,13 @@ fn fill_rect(
         let start = y as usize * width as usize + clip.min_x as usize;
         let end = y as usize * width as usize + clip.max_x as usize + 1;
         if color.opaque {
-            pixels[start..end].fill(rgb_pixel(color.pixel));
+            fill_rgb_pixels(&mut pixels[start..end], rgb_pixel(color.pixel));
         } else {
             match fill_mode {
                 SpanFillMode::BackgroundFastPath { blended_background }
                     if pixels[start..end].iter().all(|pixel| *pixel == BACKGROUND) =>
                 {
-                    pixels[start..end].fill(blended_background);
+                    fill_rgb_pixels(&mut pixels[start..end], blended_background);
                 }
                 _ => {
                     for pixel in &mut pixels[start..end] {
@@ -1511,13 +1592,13 @@ fn fill_span(
     let start = y as usize * width as usize + left as usize;
     let end = y as usize * width as usize + right as usize + 1;
     if color.opaque {
-        pixels[start..end].fill(rgb_pixel(color.pixel));
+        fill_rgb_pixels(&mut pixels[start..end], rgb_pixel(color.pixel));
     } else {
         match fill_mode {
             SpanFillMode::BackgroundFastPath { blended_background }
                 if pixels[start..end].iter().all(|pixel| *pixel == BACKGROUND) =>
             {
-                pixels[start..end].fill(blended_background);
+                fill_rgb_pixels(&mut pixels[start..end], blended_background);
             }
             _ => {
                 for pixel in &mut pixels[start..end] {
@@ -1582,8 +1663,232 @@ fn blend_channel(source: u8, destination: u8, alpha: u32, inverse_alpha: u32) ->
 mod tests {
     use super::*;
     use engine_common::{
-        Camera2, Fill, RenderCircle, RenderFrame, RenderLine, RenderPrimitive, Stroke,
+        Camera2, ClockEventKind, ClockEventProfile, Fill, RenderCircle, RenderFrame, RenderLine,
+        RenderPrimitive, Scenario, Stroke,
     };
+
+    #[test]
+    fn bulk_rgb_fill_matches_slice_fill_including_short_spans_and_tails() {
+        for length in (0..=RGB_FILL_BLOCK_PIXELS * 3 + 1).chain([2048, 4097, 65_537]) {
+            for color in [
+                BACKGROUND,
+                Rgb8Pixel { r: 0, g: 0, b: 0 },
+                Rgb8Pixel {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                },
+                Rgb8Pixel {
+                    r: 13,
+                    g: 127,
+                    b: 230,
+                },
+            ] {
+                // Offset spans also exercise unaligned starts and preserve guards.
+                for offset in 0..4 {
+                    let mut expected = vec![BACKGROUND; length + 6];
+                    let mut actual = expected.clone();
+                    expected[offset..offset + length].fill(color);
+                    fill_rgb_pixels(&mut actual[offset..offset + length], color);
+                    assert_eq!(actual, expected, "length={length}, offset={offset}");
+                }
+            }
+        }
+    }
+
+    fn rectangle_frame(viewport: Viewport, bounds: [f32; 4], color: RenderColor) -> RenderFrame {
+        let [left, top, right, bottom] = bounds;
+        let point =
+            |x: f32, y: f32| RenderPoint::new(x - viewport.width * 0.5, viewport.height * 0.5 - y);
+        let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, viewport.height));
+        frame.push_primitive(
+            0,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points: vec![
+                    point(left, top),
+                    point(right, top),
+                    point(right, bottom),
+                    point(left, bottom),
+                ],
+                fill: Some(Fill::new(color)),
+                stroke: None,
+            }),
+        );
+        frame
+    }
+
+    // Original clear-then-draw path, without background folding. Fill equivalence
+    // is checked independently above, so this also catches buffer-reuse trails.
+    fn reference_single_frame(frame: &RenderFrame, viewport: Viewport) -> Vec<Rgb8Pixel> {
+        let width = viewport.width as u32;
+        let height = viewport.height as u32;
+        let mut pixels = vec![BACKGROUND; width as usize * height as usize];
+        Canvas::new(width, height, &mut pixels).draw_frame(frame, viewport);
+        pixels
+    }
+
+    fn assert_frame_matches_reference(
+        renderer: &mut RasterRenderer,
+        frame: RenderFrame,
+        viewport: Viewport,
+    ) {
+        let expected = reference_single_frame(&frame, viewport);
+        let image = renderer.image_from_frames_with_layout(
+            &[frame],
+            viewport,
+            FrameLayout::EqualHorizontal,
+            RasterOptions::default(),
+        );
+        assert_eq!(image.to_rgb8().unwrap().as_slice(), expected);
+    }
+
+    #[test]
+    fn background_folding_matches_scan_coverage_in_either_winding() {
+        let viewport = Viewport::new(64.0, 64.0);
+        let mut renderer = RasterRenderer::new();
+        for (bounds, covers) in [
+            ([0.0, 0.0, 64.0, 64.0], true),
+            ([-8.0, -8.0, 72.0, 72.0], true),
+            ([0.75, 0.5, 62.25, 63.75], true),
+            ([1.0, 0.0, 64.0, 64.0], false),
+            ([0.0, 0.75, 64.0, 64.0], false),
+            ([0.0, 0.0, 62.0, 64.0], false),
+            ([0.0, 0.0, 64.0, 63.5], false),
+            ([32.0, 0.0, 32.0, 64.0], false),
+            ([0.0, 32.0, 64.0, 32.0], false),
+        ] {
+            for reversed in [false, true] {
+                for rotation in 0..4 {
+                    let mut frame = rectangle_frame(viewport, bounds, RenderColor::GREEN);
+                    let RenderPrimitive::Polygon(polygon) = &mut frame.layers[0].primitives[0]
+                    else {
+                        unreachable!()
+                    };
+                    if reversed {
+                        polygon.points.reverse();
+                    }
+                    polygon.points.rotate_left(rotation);
+                    assert_eq!(
+                        opaque_frame_background(&frame, viewport).is_some(),
+                        covers,
+                        "{bounds:?}"
+                    );
+                    assert_frame_matches_reference(&mut renderer, frame, viewport);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn background_folding_rejects_transparency_strokes_and_non_rectangles() {
+        let viewport = Viewport::new(64.0, 64.0);
+        let mut renderer = RasterRenderer::new();
+        for kind in 0..7 {
+            let mut frame = rectangle_frame(viewport, [-8.0, -8.0, 72.0, 72.0], RenderColor::RED);
+            let RenderPrimitive::Polygon(polygon) = &mut frame.layers[0].primitives[0] else {
+                unreachable!()
+            };
+            match kind {
+                0 => polygon.fill.as_mut().unwrap().color.a = 0.5,
+                1 => polygon.fill = None,
+                2 => polygon.stroke = Some(Stroke::new(RenderColor::GREEN, 2.0)),
+                3 => polygon.points[0].x += 1.0,
+                4 => polygon.points.swap(1, 2), // Bow tie, not a rectangle.
+                5 => {
+                    polygon.points.pop();
+                }
+                _ => polygon.points[0].x = f32::NAN,
+            }
+            assert!(
+                opaque_frame_background(&frame, viewport).is_none(),
+                "kind={kind}"
+            );
+            assert_frame_matches_reference(&mut renderer, frame, viewport);
+        }
+    }
+
+    #[test]
+    fn background_folding_respects_layer_order_and_resets_reused_buffers() {
+        let viewport = Viewport::new(64.0, 64.0);
+        let mut renderer = RasterRenderer::new();
+        for _ in 0..BUFFER_COUNT + 1 {
+            let mut frame = rectangle_frame(viewport, [0.0, 0.0, 64.0, 64.0], RenderColor::RED);
+            frame.layers[0].z = 3;
+            let mut overlay =
+                rectangle_frame(viewport, [9.0, 17.0, 32.0, 40.0], RenderColor::GREEN);
+            overlay.layers[0].z = 7;
+            frame.layers.insert(0, overlay.layers.remove(0));
+            frame.layers.insert(
+                0,
+                RenderLayer {
+                    z: -5,
+                    primitives: vec![],
+                },
+            );
+            assert!(opaque_frame_background(&frame, viewport).is_some());
+            assert_frame_matches_reference(&mut renderer, frame.clone(), viewport);
+            // At equal z the earlier stored partial rectangle must draw first.
+            frame.layers[1].z = 3;
+            assert!(opaque_frame_background(&frame, viewport).is_none());
+            assert_frame_matches_reference(&mut renderer, frame, viewport);
+            let empty = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 64.0));
+            assert_frame_matches_reference(&mut renderer, empty, viewport);
+            let partial = rectangle_frame(viewport, [8.0, 8.0, 16.0, 16.0], RenderColor::GREEN);
+            assert_frame_matches_reference(&mut renderer, partial, viewport);
+        }
+    }
+
+    #[test]
+    fn all_clock_effects_match_original_background_rendering() {
+        use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
+
+        let mut renderer = RasterRenderer::new();
+        // Include non-integral aspect/scaling and portrait buffers, with resize
+        // and repeated image-buffer reuse across active and recovered effects.
+        for (width, height) in [(160, 120), (213, 121), (96, 144)] {
+            let viewport = Viewport::new(width as f32, height as f32);
+            for event in ClockEventKind::ALL {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: viewport.aspect_ratio(),
+                        event_profile: ClockEventProfile::Off,
+                        ..Default::default()
+                    },
+                    7,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::set_reading(
+                        ClockReading::new(8, 8, 8).unwrap(),
+                    )],
+                    Duration::ZERO,
+                );
+                let idle = ClockScenario::render_frame(&state);
+                assert!(opaque_frame_background(&idle, viewport).is_some());
+                assert_frame_matches_reference(&mut renderer, idle, viewport);
+                let duration = scenario_clock::EVENT_CATALOG[event as usize].duration_ticks;
+                for tick in 0..=duration + scenario_clock::COOLDOWN_TICKS {
+                    let actions = if tick == 0 {
+                        vec![ClockAction::preview_event(event)]
+                    } else {
+                        vec![]
+                    };
+                    ClockScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
+                    if tick % 31 == 0
+                        || tick == duration
+                        || tick == duration + scenario_clock::COOLDOWN_TICKS
+                    {
+                        let frame = ClockScenario::render_frame(&state);
+                        assert!(
+                            opaque_frame_background(&frame, viewport).is_some(),
+                            "event={event:?}, tick={tick}"
+                        );
+                        assert_frame_matches_reference(&mut renderer, frame, viewport);
+                    }
+                }
+            }
+        }
+    }
 
     fn reference_blit_circle_with_opacity(
         destination: &mut [Rgb8Pixel],

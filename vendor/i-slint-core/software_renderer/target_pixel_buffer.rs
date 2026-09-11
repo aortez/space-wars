@@ -212,6 +212,12 @@ pub trait TargetPixelBuffer {
     /// Returns the number of lines the buffer has. This is typically the height in pixels.
     fn num_lines(&self) -> usize;
 
+    /// Optional local diagnostic observer for nested render operations. This
+    /// does not change rendering, and returning `None` avoids reading clocks.
+    fn diagnostic_observer(&self) -> Option<super::diagnostics::DrawDiagnosticObserver> {
+        None
+    }
+
     /// Fill the background of the buffer with the given brush.
     fn fill_background(&mut self, _brush: &Brush, _region: &PhysicalRegion) -> bool {
         false

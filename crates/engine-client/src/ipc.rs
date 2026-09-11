@@ -409,6 +409,8 @@ fn handle_request(
         },
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
+            diagnostics.push_str(&i_slint_backend_linuxkms::profiling::diagnostics());
             let launch = window.get_launcher_diagnostics();
             if !launch.is_empty() {
                 diagnostics.push('\n');
