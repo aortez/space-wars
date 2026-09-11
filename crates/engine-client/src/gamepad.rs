@@ -7,8 +7,8 @@ use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs, Mapping};
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
 use spacewars_control::UiAction;
 
-use crate::MainWindow;
 use crate::input::{self, GameKey, GamepadSeatInput, SharedGamepadInput, SharedInput};
+use crate::{MainWindow, UserActivity};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const UI_REPEAT_DELAY: Duration = Duration::from_millis(350);
@@ -153,7 +153,8 @@ impl GamepadPump {
                         self.gamepads.borrow_mut().disconnect_seat(seat);
                         tracing::warn!(gamepad_id = id, player = seat + 1, "gamepad disconnected.");
                         if !window.get_launcher_visible() {
-                            let was_playing = is_game_mode(window);
+                            let was_playing =
+                                is_game_mode(window) && !window.get_autostart_running();
                             if was_playing {
                                 self.input.borrow_mut().press(GameKey::ForcePause);
                             }
@@ -177,6 +178,16 @@ impl GamepadPump {
                     };
                     if is_pad_activity(event_type) {
                         self.ui_driver = Some(seat);
+                    }
+                    let deliberate = match event_type {
+                        EventType::ButtonPressed(..) | EventType::ButtonRepeated(..) => true,
+                        EventType::AxisChanged(_, value, _) => value.abs() >= UI_STICK_THRESHOLD,
+                        EventType::ButtonChanged(_, value, _) => value >= 0.5,
+                        _ => false,
+                    };
+                    if deliberate && window.global::<UserActivity>().invoke_notify() {
+                        self.begin_handoff();
+                        continue;
                     }
                     self.route_button_edge(window, seat, gamepad_id, event_type);
                 }
@@ -264,6 +275,8 @@ impl GamepadPump {
                 Some((seat, snapshot(&gamepad)))
             })
             .collect::<Vec<_>>();
+        let held = snapshots.iter().any(|(_, pad)| autostart_pad_held(pad));
+        window.global::<UserActivity>().set_gamepad_held(held);
         let snapshots = snapshots
             .into_iter()
             .map(|(seat, snapshot)| (seat, self.mode_handoff.filter(seat, snapshot)))
@@ -509,6 +522,27 @@ fn button_value(gamepad: &Gamepad<'_>, button: Button) -> f32 {
         .button_data(button)
         .map(|data| data.value())
         .unwrap_or_else(|| f32::from(gamepad.is_pressed(button)))
+}
+
+fn autostart_pad_held(pad: &GamepadSeatInput) -> bool {
+    pad.left_stick_x.abs() >= UI_STICK_THRESHOLD
+        || pad.left_stick_y.abs() >= UI_STICK_THRESHOLD
+        || pad.right_stick_x.abs() >= UI_STICK_THRESHOLD
+        || pad.right_stick_y.abs() >= UI_STICK_THRESHOLD
+        || pad.left_trigger >= 0.5
+        || pad.right_trigger >= 0.5
+        || pad.dpad_up
+        || pad.dpad_down
+        || pad.dpad_left
+        || pad.dpad_right
+        || pad.left_bumper
+        || pad.right_bumper
+        || pad.south
+        || pad.east
+        || pad.north
+        || pad.west
+        || pad.start
+        || pad.select
 }
 
 fn is_pad_activity(event: EventType) -> bool {

@@ -13,6 +13,7 @@ enum ActivationFocus {
     PauseMain(i32),
     PauseSound,
     Sound(i32),
+    Autostart(i32),
     DeviceInfo,
     PauseControls,
     PauseClock(i32),
@@ -60,6 +61,7 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
             ),
         ),
         ActivationFocus::Sound(index) => window.set_sound_focus_index(index),
+        ActivationFocus::Autostart(index) => window.set_autostart_focus_index(index),
         ActivationFocus::PauseClock(index) => window.set_ingame_clock_focus_index(index),
         ActivationFocus::GameOver(index) => window.set_game_over_focus_index(index),
     }
@@ -99,8 +101,33 @@ fn activation_target(
         "sound.mute" => sound(1, UiAction::Confirm),
         "settings.fps-counter" => sound(2, UiAction::Confirm),
         "settings.device-info" => sound(3, UiAction::Confirm),
-        "sound.back" => sound(4, UiAction::Confirm),
-        "sound.retry" => sound(5, UiAction::Confirm),
+        "settings.autostart" => sound(4, UiAction::Confirm),
+        "sound.back" => sound(5, UiAction::Confirm),
+        "sound.retry" => sound(6, UiAction::Confirm),
+        "autostart.activity.previous" => ActivationTarget {
+            focus: ActivationFocus::Autostart(0),
+            action: UiAction::Left,
+        },
+        "autostart.activity.next" => ActivationTarget {
+            focus: ActivationFocus::Autostart(0),
+            action: UiAction::Right,
+        },
+        "autostart.delay.previous" => ActivationTarget {
+            focus: ActivationFocus::Autostart(1),
+            action: UiAction::Left,
+        },
+        "autostart.delay.next" => ActivationTarget {
+            focus: ActivationFocus::Autostart(1),
+            action: UiAction::Right,
+        },
+        "autostart.start-now" => ActivationTarget {
+            focus: ActivationFocus::Autostart(2),
+            action: UiAction::Confirm,
+        },
+        "autostart.back" => ActivationTarget {
+            focus: ActivationFocus::Autostart(3),
+            action: UiAction::Confirm,
+        },
         "info.back" => ActivationTarget {
             focus: ActivationFocus::DeviceInfo,
             action: UiAction::Back,
@@ -199,7 +226,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.match.asteroid-interval"
         | "launcher.settings.clock.color-cycle" => 6,
         "launcher.settings.match.asteroid-strength" | "launcher.settings.clock.meltdown" => 7,
-        "launcher.settings.clock.duck" => 8,
+        "launcher.settings.clock.duck" | "launcher.settings.match.length" => 8,
         "launcher.settings.clock.marquee" => 9,
         "launcher.settings.clock.marquee-preset" => 10,
         _ => return None,

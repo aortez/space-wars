@@ -65,6 +65,7 @@ struct Timings {
 }
 
 struct PendingLaunch {
+    automatic: bool,
     receiver: mpsc::Receiver<PreparationMessage>,
     launch: EffectiveLaunch,
     settings: Settings,
@@ -166,11 +167,54 @@ impl Launcher {
         }
 
         let save_needed = crate::apply_launcher_selections(&mut candidate, &selections);
-        let launch = selections.launch;
+        self.begin(selections.launch, candidate, benchmark, save_needed, false);
+    }
+
+    pub(crate) fn start_automatic(self: &Rc<Self>, activity: &crate::autostart::Activity) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        if window.get_launcher_busy() || !window.get_launcher_visible() {
+            return;
+        }
+        window.set_launcher_error_text("".into());
+        let mut effective = self.settings.read().unwrap().clone();
+        let mut launch = crate::launch_from_settings(&effective);
+        launch.scenario = activity.scenario.into();
+        if activity.repeat_matches {
+            launch.seed = crate::match_world::fresh_seed(launch.seed);
+            effective.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
+            effective.spacewars.player_2_controller = engine_common::SpacewarsController::RuleBot;
+        }
+        self.begin(launch, effective, false, false, true);
+    }
+
+    pub(crate) fn cancel_automatic(&self) {
+        if self.pending.borrow().as_ref().is_some_and(|p| p.automatic) {
+            self.timer.stop();
+            self.pending.borrow_mut().take();
+            if let Some(window) = self.window.upgrade() {
+                window.set_launcher_busy(false);
+            }
+        }
+    }
+
+    fn begin(
+        self: &Rc<Self>,
+        launch: EffectiveLaunch,
+        candidate: Settings,
+        benchmark: bool,
+        save_needed: bool,
+        automatic: bool,
+    ) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
         let catalog = self.catalog.borrow().clone();
         let (sender, receiver) = mpsc::channel();
         let started_at = Instant::now();
         let pending = PendingLaunch {
+            automatic,
             receiver,
             launch: launch.clone(),
             settings: candidate.clone(),
@@ -258,7 +302,9 @@ impl Launcher {
                     }
                     // A successful save stays committed even if the selected
                     // cartridge subsequently fails to load.
-                    *self.settings.write().unwrap() = pending.settings.clone();
+                    if !pending.automatic {
+                        *self.settings.write().unwrap() = pending.settings.clone();
+                    }
                 }
                 Ok(PreparationMessage::Ready(result, duration)) => {
                     pending.timings.load = duration;

@@ -165,6 +165,13 @@ It is read-only and samples in the background only while open. See
 [Device Info and menu navigation](docs/device-info.md), including the boundary
 for future Wi-Fi setup and controller assignment screens.
 
+**App Settings → Auto-start** can run Clock or repeated two-bot Spacewars
+matches whenever the launcher is idle. Choose a delay; the preference stays
+enabled across restarts until switched Off. Any deliberate input during an
+automatic activity returns to the launcher. **Spacewars → Settings → Match
+length** controls the match's own timer: most planets wins at expiry, with
+equal ownership drawing. See [automatic activities](docs/auto-start.md).
+
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames
 submitted to Slint) and **UPS** (simulation updates, or emulated NES frames).

@@ -31,6 +31,8 @@ pub enum UiScreen {
     LauncherSound,
     #[serde(rename = "launcher.info")]
     LauncherInfo,
+    #[serde(rename = "launcher.autostart")]
+    LauncherAutostart,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
     #[serde(rename = "launcher.controls")]
@@ -45,6 +47,8 @@ pub enum UiScreen {
     PauseSound,
     #[serde(rename = "pause.info")]
     PauseInfo,
+    #[serde(rename = "pause.autostart")]
+    PauseAutostart,
     #[serde(rename = "pause.controls")]
     PauseControls,
     #[serde(rename = "pause.clock")]
@@ -60,6 +64,7 @@ impl UiScreen {
             Self::LauncherMain => "launcher.main",
             Self::LauncherSound => "launcher.sound",
             Self::LauncherInfo => "launcher.info",
+            Self::LauncherAutostart => "launcher.autostart",
             Self::LauncherSettings => "launcher.settings",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
@@ -67,6 +72,7 @@ impl UiScreen {
             Self::PauseMain => "pause.main",
             Self::PauseSound => "pause.sound",
             Self::PauseInfo => "pause.info",
+            Self::PauseAutostart => "pause.autostart",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
             Self::GameOver => "game-over",
@@ -80,6 +86,7 @@ impl UiScreen {
                 | Self::LauncherMain
                 | Self::LauncherSound
                 | Self::LauncherInfo
+                | Self::LauncherAutostart
                 | Self::LauncherSettings
                 | Self::LauncherControls
                 | Self::LauncherTouchTest

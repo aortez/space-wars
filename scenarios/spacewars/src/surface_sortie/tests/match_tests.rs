@@ -1,6 +1,98 @@
 use super::*;
 use match_rules::{MatchOutcome, PILOT_HEALTH, PilotDamageCause};
 
+#[test]
+fn time_limit_uses_current_ownership_and_freezes_living_pilots() {
+    use match_rules::MatchEndReason;
+    let dt = Duration::from_millis(1);
+    for leading in [None, Some(0), Some(1)] {
+        let mut state = round();
+        state.set_match_time_limit(Some(dt * 2));
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        assert_eq!(state.match_outcome(), None);
+        let before = state.match_observation().unwrap();
+        SurfaceSortieScenario::step(&mut state, &[], Duration::ZERO);
+        assert_eq!(state.match_observation().unwrap(), before);
+        for planet in &mut state.world.planets {
+            planet.owner_id = None;
+        }
+        state.world.planets[0].owner_id = leading;
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let expected = leading.map_or(MatchOutcome::Draw, |seat| {
+            MatchOutcome::Winner(PlayerId::from_index(seat).unwrap())
+        });
+        assert_eq!(state.match_outcome(), Some(expected));
+        let observation = state.match_observation().unwrap();
+        assert_eq!(observation.remaining_seconds, Some(0.0));
+        assert_eq!(observation.reason, Some(MatchEndReason::TimeLimit));
+        assert!(observation.pilots.iter().all(|v| v.alive()));
+        assert!(state.world.players.iter().all(|p| !p.eliminated));
+        assert!(state.match_result_message().unwrap().contains("time limit"));
+        let frozen = SurfaceSortieScenario::observe(&state);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_secs(1));
+        assert_eq!(
+            frozen.payload,
+            SurfaceSortieScenario::observe(&state).payload
+        );
+    }
+}
+
+#[test]
+fn time_limit_draws_with_equal_nonzero_ownership_and_a_neutral_planet() {
+    let mut state = SurfaceSortieScenario::init_material_match(42);
+    let dt = Duration::from_millis(1);
+    state.set_match_time_limit(Some(dt));
+    state.world.planets[0].owner_id = Some(0);
+    state.world.planets[1].owner_id = Some(1);
+    state.world.planets[2].owner_id = None;
+    SurfaceSortieScenario::step(&mut state, &[], dt);
+    assert_eq!(state.match_outcome(), Some(MatchOutcome::Draw));
+    assert_eq!(state.match_observation().unwrap().owned_planets, [1, 1]);
+}
+
+#[test]
+fn unlimited_rounds_and_new_rounds_have_independent_clocks() {
+    let mut state = round();
+    state.set_match_time_limit(None);
+    state.advance_match_time(Duration::from_secs(86_400));
+    assert!(!state.finish_round(true));
+    assert_eq!(state.match_clock_label().as_deref(), Some("Time unlimited"));
+    let fresh = round();
+    assert_eq!(fresh.match_observation().unwrap().elapsed_seconds, 0.0);
+    assert_eq!(fresh.match_clock_label().as_deref(), Some("Time 10:00"));
+}
+
+#[test]
+fn final_step_pilot_death_takes_precedence_over_time_limit_and_ownership() {
+    use match_rules::MatchEndReason;
+    for dead in [vec![0], vec![1], vec![0, 1]] {
+        let mut state = solar_round(&dead, false);
+        state.set_match_time_limit(Some(Duration::from_millis(1)));
+        state.world.planets[0].owner_id = Some(dead[0]);
+        for &seat in &dead {
+            state.pilots[seat].vitals.as_mut().unwrap().health = 0.1;
+        }
+        idle(&mut state, 1);
+        let observation = state.match_observation().unwrap();
+        assert_eq!(
+            observation.reason,
+            Some(if dead.len() == 2 {
+                MatchEndReason::SimultaneousDeaths
+            } else {
+                MatchEndReason::PilotDeath
+            })
+        );
+        assert_eq!(
+            observation.outcome,
+            Some(if dead.len() == 2 {
+                MatchOutcome::Draw
+            } else {
+                MatchOutcome::Winner(PlayerId::from_index(1 - dead[0]).unwrap())
+            })
+        );
+    }
+}
+
 fn round() -> SurfaceSortieState {
     let mut state = SurfaceSortieScenario::init_material_combat_flight(42, &[]);
     state.enable_match_rules();
@@ -483,7 +575,7 @@ fn sustained_real_laser_fire_finishes_a_round_against_either_survivor() {
             text.iter()
                 .any(|t| t.contains("DEAD") && t.contains("pilot 0%"))
         );
-        assert!(text.contains(&"Round over / P1 wins"));
+        assert!(text.contains(&"Player 1 wins / opposing pilot lost"));
         assert!(!text.contains(&"Release controls to continue"));
     }
 }

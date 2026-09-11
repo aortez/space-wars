@@ -4,6 +4,7 @@
 //! Lab, Spaceling Lab, Terrain Lab, and Spacewars, with Null retained as a hidden test
 //! scenario.
 
+mod autostart;
 mod client_scenarios;
 mod clock_controls;
 mod device_info;
@@ -433,7 +434,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (input, gamepad_input) = input::new_shared_input();
     input::install_window_input(&window, Rc::clone(&input));
     let render_timer = Rc::new(RefCell::new(None));
-    install_launcher_callbacks(
+    let launcher = install_launcher_callbacks(
         &window,
         Rc::clone(&render_timer),
         Rc::clone(&scenario_controls),
@@ -472,6 +473,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(Path::new("."))
             .to_path_buf(),
     )?;
+    let _autostart = autostart::install(
+        &window,
+        launcher,
+        Arc::clone(&settings),
+        settings_writer.clone(),
+        Rc::clone(&rom_catalog),
+        !launch_directly && !args.uses_debug_render() && !args.uses_benchmark() && !args.touch_test,
+    );
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
 
@@ -719,6 +728,9 @@ fn show_launcher(
     window.set_launcher_combat_break_duration(SharedString::from(
         breaks.duration_seconds.to_string(),
     ));
+    window.set_launcher_match_length(
+        match_world::length_label(settings.spacewars_match.normalized().time_limit_seconds).into(),
+    );
     let setup = settings.spacewars.normalized();
     window.set_launcher_spacewars_preset(SharedString::from(preset_label_for_setup(&setup)));
     window.set_launcher_universe_radius_text(SharedString::from(setup.universe_radius.to_string()));
@@ -918,7 +930,7 @@ fn install_launcher_callbacks(
     settings: Arc<RwLock<Settings>>,
     rom_catalog: SharedNesRomCatalog,
     settings_writer: settings_writer::SettingsWriter,
-) {
+) -> Rc<launcher::Launcher> {
     let launcher = launcher::Launcher::new(
         window,
         render_timer,
@@ -938,8 +950,9 @@ fn install_launcher_callbacks(
         new_world_launcher.start(launcher::StartMode::NewMatch);
     });
 
+    let benchmark_launcher = Rc::clone(&launcher);
     window.on_launcher_start_benchmark(move || {
-        launcher.start(launcher::StartMode::Benchmark);
+        benchmark_launcher.start(launcher::StartMode::Benchmark);
     });
 
     let weak = window.as_weak();
@@ -988,6 +1001,7 @@ fn install_launcher_callbacks(
             tracing::error!(error = %err, "failed to quit event loop.");
         }
     });
+    launcher
 }
 
 fn install_ingame_menu_callbacks(
@@ -1020,6 +1034,9 @@ fn install_ingame_menu_callbacks(
         let Some(window) = weak.upgrade() else {
             return;
         };
+        if window.get_autostart_running() {
+            return;
+        }
         let mut settings = world_settings.write().unwrap();
         settings.launch.scenario = "spacewars".into();
         settings.last_scenario = Some("spacewars".into());
@@ -1129,10 +1146,15 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
 }
 
 fn handle_ui_action(window: &MainWindow, action: UiAction) {
+    if window.global::<UserActivity>().invoke_notify() {
+        return;
+    }
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_device_info_visible() && window.get_sound_visible() {
+    if window.get_autostart_settings_visible() && window.get_sound_visible() {
+        autostart::handle_action(window, action);
+    } else if window.get_device_info_visible() && window.get_sound_visible() {
         device_info::handle_action(window, action);
     } else if window.get_sound_visible() {
         sound_controls::handle_action(window, action);
@@ -1370,7 +1392,7 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 9,
+        "spacewars" => 10,
         "spacewars-classic" => 8,
         "pizza" => 5,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
@@ -1509,6 +1531,14 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
             &["Light", "Mixed", "Heavy"],
             delta,
         ))),
+        8 => window.set_launcher_match_length(
+            cycle_label(
+                window.get_launcher_match_length().as_str(),
+                &["5 min", "10 min", "15 min", "Unlimited"],
+                delta,
+            )
+            .into(),
+        ),
         _ => {}
     }
 }
@@ -1674,6 +1704,10 @@ fn handle_return_to_launcher(
         return;
     };
 
+    if window.get_autostart_running() {
+        window.invoke_autostart_return();
+        return;
+    }
     if let Some(timer) = render_timer.borrow_mut().take() {
         timer.stop();
     }
@@ -1774,6 +1808,7 @@ fn clear_runtime_diagnostics(window: &MainWindow) {
 }
 
 fn hide_launcher_surfaces(window: &MainWindow) {
+    window.set_autostart_settings_visible(false);
     window.set_sound_visible(false);
     window.set_launcher_visible(false);
     window.set_launcher_settings_visible(false);
@@ -1787,6 +1822,7 @@ fn hide_launcher_surfaces(window: &MainWindow) {
 
 #[derive(Debug, Clone, PartialEq)]
 struct LauncherSelections {
+    spacewars_match: engine_common::MatchSettings,
     launch: EffectiveLaunch,
     nes_rom_id: Option<String>,
     clock: ClockSettings,
@@ -1806,6 +1842,10 @@ fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelec
     let clock = selections.clock;
     let nes_rom_id = selections.nes_rom_id.clone();
     let mut changed = false;
+    if settings.spacewars_match != selections.spacewars_match {
+        settings.spacewars_match = selections.spacewars_match;
+        changed = true;
+    }
 
     if settings.launch.scenario != launch.scenario {
         settings.launch.scenario = launch.scenario.clone();
@@ -2100,7 +2140,17 @@ fn launcher_selections_from_window(
     } else {
         current_settings.material_combat
     };
+    let spacewars_match = if launch.scenario == "spacewars" {
+        engine_common::MatchSettings {
+            time_limit_seconds: match_world::parse_length(
+                window.get_launcher_match_length().as_str(),
+            )?,
+        }
+    } else {
+        current_settings.spacewars_match
+    };
     Ok(LauncherSelections {
+        spacewars_match,
         material_combat,
         combat_breaks,
         surface_expedition,
@@ -2952,6 +3002,7 @@ mod tests {
         let path = dir.path().join("settings.toml");
         let settings = Arc::new(RwLock::new(Settings::default()));
         let selections = LauncherSelections {
+            spacewars_match: engine_common::MatchSettings::default(),
             material_combat: engine_common::MaterialCombatSettings {
                 mission: engine_common::MaterialCombatMission::Capture,
                 asteroids: engine_common::MaterialAsteroidSettings {

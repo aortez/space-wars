@@ -430,6 +430,8 @@ fn handle_request(
             ));
             #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
             diagnostics.push_str(&i_slint_backend_linuxkms::profiling::diagnostics());
+            diagnostics.push('\n');
+            diagnostics.push_str(window.get_autostart_diagnostics().as_str());
             let launch = window.get_launcher_diagnostics();
             if !launch.is_empty() {
                 diagnostics.push('\n');
@@ -865,6 +867,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
         device_info: window.get_device_info_visible(),
+        autostart: window.get_autostart_settings_visible(),
         launcher: window.get_launcher_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
         launcher_settings: window.get_launcher_settings_visible(),
@@ -879,6 +882,9 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
     let inventory = inventory_for_screen(
         screen,
         &UiInventoryContext {
+            automatic: window.get_autostart_running(),
+            autostart_controls: crate::autostart::controls(window),
+            autostart_focus: window.get_autostart_focus_index(),
             device_info_controls: if matches!(screen, UiScreen::LauncherInfo | UiScreen::PauseInfo)
             {
                 crate::device_info::inventory(window)
@@ -913,6 +919,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             scenario_error: non_empty(window.get_scenario_error_text().as_str()),
             renderer: window.get_launcher_renderer().to_string(),
             raster_scale: window.get_launcher_raster_scale_text().to_string(),
+            match_length: window.get_launcher_match_length().to_string(),
             combat_break_interval: window.get_launcher_combat_break_interval().to_string(),
             combat_break_duration: window.get_launcher_combat_break_duration().to_string(),
             combat_mission: window.get_launcher_combat_mission().to_string(),

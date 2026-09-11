@@ -31,6 +31,14 @@ persists through transfers and rebuilding; pilot death ends that player's
 round, even with owned planets. Simultaneous deaths draw. **Rematch** starts
 the same seed with fresh health, terrain, ownership and bot state.
 
+**Match length** defaults to ten minutes of gameplay time. Settings offers
+5, 10, or 15 minutes and Unlimited. The HUD shows the remaining time; pausing
+freezes it. At expiry, the player owning more planets wins, and equal ownership
+(including zero each) draws. Count current ownership, not past captures.
+Pilot death on the final step takes precedence over the time-limit result.
+Rematch and New Match reset the clock. This rule applies to human and bot seats
+alike, including [automatically repeated matches](auto-start.md).
+
 | Action | Assigned gamepad | P1 keyboard | P2 keyboard |
 | --- | --- | --- | --- |
 | Turn aboard / walk or steer on foot | Left/right | A/D | Numpad 4/6 |
@@ -58,7 +66,7 @@ hatches, fight and recover using the same action interface as humans.
 
 ## Settings and historical comparisons
 
-Normal Spacewars exposes both player choices, renderer/raster scale, bot combat
+Normal Spacewars exposes match length, both player choices, renderer/raster scale, bot combat
 break interval/duration, and asteroid arrival interval/strength. Breaks leave
 the bot moving and vulnerable with its weapons off. The first promoted match
 keeps three planets and the established health/world profile.

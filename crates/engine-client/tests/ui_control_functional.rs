@@ -44,6 +44,9 @@ mod terrain_lab;
 #[path = "ui_control_functional/spacewars_terrain.rs"]
 mod spacewars_terrain;
 
+#[path = "ui_control_functional/autostart.rs"]
+mod autostart;
+
 #[path = "ui_control_functional/spacewars_match.rs"]
 mod spacewars_match;
 
@@ -117,6 +120,8 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings.match.asteroid-interval.next",
                 "launcher.settings.match.asteroid-strength.previous",
                 "launcher.settings.match.asteroid-strength.next",
+                "launcher.settings.match.length.previous",
+                "launcher.settings.match.length.next",
                 "launcher.settings.back",
                 "launcher.settings.start",
             ]
@@ -523,6 +528,15 @@ struct FunctionalHarness {
 
 impl FunctionalHarness {
     fn spawn(test_name: &'static str, backend: &'static str, seed: u64) -> Result<Self, String> {
+        Self::spawn_configured(test_name, backend, seed, None)
+    }
+
+    fn spawn_configured(
+        test_name: &'static str,
+        backend: &'static str,
+        seed: u64,
+        settings: Option<engine_common::Settings>,
+    ) -> Result<Self, String> {
         let artifact_root = workspace_root().join("target/functional-test-artifacts");
         fs::create_dir_all(&artifact_root).map_err(|error| {
             format!(
@@ -537,6 +551,13 @@ impl FunctionalHarness {
         let config_directory = run_directory.path().join("config");
         fs::create_dir(&config_directory)
             .map_err(|error| format!("could not create isolated config directory: {error}"))?;
+        if let Some(settings) = settings {
+            fs::write(
+                config_directory.join("settings.toml"),
+                toml::to_string_pretty(&settings).unwrap(),
+            )
+            .map_err(|error| error.to_string())?;
+        }
 
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)

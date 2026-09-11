@@ -78,7 +78,7 @@ pub(crate) fn install(
         writer.save(snapshot);
         window.set_settings_save_pending(true);
         window.set_settings_save_error("".into());
-        window.set_sound_focus_index(4);
+        window.set_sound_focus_index(5);
     });
 }
 
@@ -123,9 +123,9 @@ fn adjusted(audio: AudioSettings, index: i32, delta: i32) -> AudioSettings {
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     let index = window.get_sound_focus_index();
     let count = if window.get_settings_save_error().is_empty() {
-        5
-    } else {
         6
+    } else {
+        7
     };
     match action {
         UiAction::Up | UiAction::Down => {
@@ -138,14 +138,15 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
         UiAction::Left | UiAction::Right if index <= 2 => {
             window.invoke_sound_adjust(index, if action == UiAction::Left { -1 } else { 1 })
         }
-        UiAction::Left | UiAction::Right if count == 6 && index >= 4 => {
-            window.set_sound_focus_index(if index == 4 { 5 } else { 4 })
+        UiAction::Left | UiAction::Right if count == 7 && index >= 5 => {
+            window.set_sound_focus_index(if index == 5 { 6 } else { 5 })
         }
         UiAction::Confirm if index == 1 || index == 2 => window.invoke_sound_adjust(index, 0),
         UiAction::Confirm if index == 3 => window.invoke_device_info_open(),
-        UiAction::Confirm if index == 5 && count == 6 => window.invoke_sound_retry(),
+        UiAction::Confirm if index == 4 => window.invoke_autostart_open(),
+        UiAction::Confirm if index == 6 && count == 7 => window.invoke_sound_retry(),
         UiAction::Back | UiAction::Controls | UiAction::Confirm
-            if action != UiAction::Confirm || index == 4 =>
+            if action != UiAction::Confirm || index == 5 =>
         {
             window.set_sound_visible(false)
         }

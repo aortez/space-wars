@@ -1107,6 +1107,7 @@ fn draw_player_hud(
         vehicle_status
     };
     let lines = [
+        (0.49, state.match_clock_label().unwrap_or_default(), LIGHT),
         (0.445, pilot_status, color),
         (0.385, vehicle_status, LIGHT),
         (
@@ -1121,13 +1122,8 @@ fn draw_player_hud(
         ),
         (
             -0.29,
-            if let Some(outcome) = state.match_outcome() {
-                match outcome {
-                    match_rules::MatchOutcome::Winner(owner) => {
-                        format!("Round over / P{} wins", owner.index() + 1)
-                    }
-                    match_rules::MatchOutcome::Draw => "Draw / both pilots lost".to_owned(),
-                }
+            if let Some(message) = state.match_result_message() {
+                message
             } else if !observation.controls_armed {
                 "Release controls to continue".to_owned()
             } else if let Some(message) = recovery_message {

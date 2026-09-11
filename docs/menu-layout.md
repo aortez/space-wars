@@ -1,7 +1,7 @@
 # Launcher and app menu layout
 
-The launcher, App Settings, and Device Info use the same `MenuPage` frame in
-`crates/engine-client/ui/main.slint`. The compact target is the HyperPixel's
+The launcher, App Settings, Device Info, and Auto-start use the same
+`MenuPage` frame in `crates/engine-client/ui/main.slint`. The compact target is the HyperPixel's
 800×480 landscape display; 1024×768 Picade and 480×800 portrait layouts are
 also covered by render tests. The page is centered and capped at 760×520,
 with 48 px or larger action buttons. Larger windows add margins and roomier
@@ -33,6 +33,8 @@ settings rows rather than scaling down text on smaller displays.
 App Settings uses label/value rows: volume adjustment with a level indicator,
 On/Off toggles, and chevrons for subpages. Its body scrolls by touch or mouse
 wheel; controller/keyboard selection reveals the focused row when needed.
+Auto-start is the fifth row, below Device Info; navigating to it reveals the
+row. Its child page shares the same frame and fixed actions.
 Back, save status, and Retry Save stay outside the scroll area. A save failure
 does not prevent adjustment, navigation, or retrying the same settings.
 
@@ -48,7 +50,8 @@ work; see [Device Info and app navigation](device-info.md).
 all three display sizes, including long names, Space-Wars, and save errors.
 Set `SPACEWARS_MENU_TEST_ARTIFACTS` to export PNGs for visual inspection.
 Keyboard/touch tests also force App Settings into a shorter window to verify
-focus reveal and the fixed Back action. The real-process functional suite
-checks launcher navigation, settings persistence/retry, and Info return paths.
+focus reveal, the Auto-start child page, and the fixed Back action. The
+real-process functional suite checks launcher navigation, settings
+persistence/retry, and Info return paths.
 Device screenshots complement these checks; a rendered screenshot alone does
 not verify the physical touchscreen or controller wiring.
