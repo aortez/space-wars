@@ -53,6 +53,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) sound_focus_index: i32,
     pub(crate) sound_volume_percent: i32,
     pub(crate) sound_muted: bool,
+    pub(crate) performance_overlay_enabled: bool,
     pub(crate) settings_save_pending: bool,
     pub(crate) settings_save_error: Option<String>,
     pub(crate) selected_scenario: String,
@@ -238,9 +239,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             } else {
                 UiControl::new("launcher.start", "Start Game", context.launch_available)
             },
-            UiControl::new("launcher.settings", "Settings", true),
+            UiControl::new("launcher.settings", "Scenario Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
-            UiControl::new("launcher.sound", "Sound", true),
+            UiControl::new("launcher.sound", "App Settings", true),
             UiControl::new("launcher.quit", "Quit", true),
         ],
         actions: vec![
@@ -666,7 +667,7 @@ fn pause_main_inventory(context: &UiInventoryContext) -> UiInventory {
     }
 
     ids.push("pause.sound");
-    controls.push(UiControl::new("pause.sound", "Sound", true));
+    controls.push(UiControl::new("pause.sound", "App Settings", true));
 
     UiInventory {
         selected_control: selected_from_index(&ids, context.ingame_menu_focus_index),
@@ -695,8 +696,22 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
             "off"
         }),
     );
+    controls.push(
+        UiControl::new("settings.fps-counter", "FPS Counter", true).with_value(
+            if context.performance_overlay_enabled {
+                "on"
+            } else {
+                "off"
+            },
+        ),
+    );
     controls.push(UiControl::new("sound.back", "Back", true));
-    let mut ids = vec!["sound.volume", "sound.mute", "sound.back"];
+    let mut ids = vec![
+        "sound.volume",
+        "sound.mute",
+        "settings.fps-counter",
+        "sound.back",
+    ];
     if context.settings_save_error.is_some() {
         ids.push("sound.retry");
         controls.push(UiControl::new("sound.retry", "Retry Save", true));

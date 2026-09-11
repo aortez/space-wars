@@ -292,6 +292,8 @@ export component MainWindow inherits Window {
     in-out property <int> sound-focus-index: 0;
     in property <int> sound-volume-percent: 25;
     in property <bool> sound-muted: false;
+    in property <bool> performance-overlay-enabled: false;
+    in property <string> performance-overlay-text: "";
     in property <bool> settings-save-pending: false;
     in property <string> settings-save-error: "";
     in-out property <bool> game-over-visible: false;
@@ -568,7 +570,7 @@ export component MainWindow inherits Window {
         x: root.width * 0.37;
         y: root.height - self.height - 14px;
         width: root.width * 0.26;
-        height: 82px;
+        height: 66px;
         background: #080a12d0;
         border-color: #596273aa;
         border-width: 1px;
@@ -656,16 +658,28 @@ export component MainWindow inherits Window {
             font-size: 11px;
             horizontal-alignment: center;
         }
+    }
 
+    // Read-only and absent while disabled: no input grab or hidden item tree.
+    // Host-submitted frames, not a measurement of physical display scanout.
+    if root.performance-overlay-enabled && root.performance-overlay-text != "" && !root.launcher-visible && !root.launcher-busy: Rectangle {
+        x: 12px;
+        y: root.spacewars-ui-visible ? 78px : 12px;
+        width: Math.min(184px, parent.width - 24px);
+        height: 32px;
+        background: #080a12b8;
+        border-color: #59627388;
+        border-width: 1px;
+        border-radius: 5px;
         Text {
-            x: 8px;
-            y: 62px;
-            width: parent.width - 16px;
-            height: 14px;
-            text: root.spacewars-performance-text;
-            color: #c7d0dc;
-            font-size: 9px;
+            width: parent.width;
+            height: parent.height;
+            text: root.performance-overlay-text;
+            color: #e6edf7;
+            font-size: 14px;
+            overflow: elide;
             horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 
@@ -896,7 +910,7 @@ export component MainWindow inherits Window {
                 y: 212px;
                 width: root.scenario-benchmark-available || root.launcher-scenario == "clock" || root.launcher-material-match ? (parent.width - 58px) / 2 : parent.width - 48px;
                 height: 54px;
-                text: "Sound";
+                text: "App Settings";
                 selected: root.ingame-menu-focus-index == (root.scenario-benchmark-available || root.launcher-scenario == "clock" || root.launcher-material-match ? 5 : 4);
                 activated => {
                     root.ingame-menu-focus-index = root.scenario-benchmark-available || root.launcher-scenario == "clock" || root.launcher-material-match ? 5 : 4;
@@ -1333,7 +1347,7 @@ export component MainWindow inherits Window {
                         y: root.launcher-material-match ? 254px : 154px;
                         width: root.launcher-material-match ? (parent.width - 36px) / 4 : (parent.width - 12px) / 2;
                         height: root.launcher-material-match ? 48px : 64px;
-                        text: "Settings";
+                        text: "Scenario Settings";
                         selected: root.launcher-focus-index == 2;
                         activated => {
                             root.launcher-focus-index = 2;
@@ -1359,7 +1373,7 @@ export component MainWindow inherits Window {
                         y: root.launcher-material-match ? 254px : 228px;
                         width: root.launcher-material-match ? (parent.width - 36px) / 4 : (parent.width - 24px) / 3;
                         height: root.launcher-material-match ? 48px : 56px;
-                        text: "Sound";
+                        text: "App Settings";
                         selected: root.launcher-focus-index == 5;
                         activated => {
                             root.launcher-focus-index = 5;
@@ -2217,7 +2231,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: Math.min(parent.width - 32px, 520px);
-            height: 364px;
+            height: 424px;
             background: #101827;
             border-color: #596273;
             border-width: 1px;
@@ -2225,7 +2239,7 @@ export component MainWindow inherits Window {
 
             Text {
                 x: 24px; y: 18px;
-                text: "Sound";
+                text: "App Settings";
                 color: #ffffff;
                 font-size: 26px;
                 font-weight: 700;
@@ -2246,8 +2260,15 @@ export component MainWindow inherits Window {
                 selected: root.sound-focus-index == 1;
                 activated => { root.sound-adjust(1, 0); }
             }
-            Text {
+            MenuButton {
                 x: 24px; y: 202px;
+                width: parent.width - 48px; height: 54px;
+                text: "FPS Counter: " + (root.performance-overlay-enabled ? "On" : "Off");
+                selected: root.sound-focus-index == 2;
+                activated => { root.sound-adjust(2, 0); }
+            }
+            Text {
+                x: 24px; y: 262px;
                 width: parent.width - 48px; height: 48px;
                 text: root.settings-save-pending ? "Saving settings…" : root.settings-save-error != "" ? "Applied for this session. Could not save settings; retry below." : "Saved · Applies to all scenarios";
                 color: root.settings-save-error != "" ? #ffb0a0 : #80d8ff;
@@ -2257,22 +2278,22 @@ export component MainWindow inherits Window {
                 horizontal-alignment: center;
             }
             MenuButton {
-                x: 24px; y: 262px;
+                x: 24px; y: 322px;
                 width: root.settings-save-error == "" ? parent.width - 48px : (parent.width - 60px) / 2;
                 height: 54px;
                 text: "Back";
-                selected: root.sound-focus-index == 2;
+                selected: root.sound-focus-index == 3;
                 activated => { root.sound-visible = false; }
             }
             if root.settings-save-error != "": MenuButton {
-                x: parent.width / 2 + 6px; y: 262px;
+                x: parent.width / 2 + 6px; y: 322px;
                 width: (parent.width - 60px) / 2; height: 54px;
                 text: "Retry Save";
-                selected: root.sound-focus-index == 3;
+                selected: root.sound-focus-index == 4;
                 activated => { root.sound-retry(); }
             }
             Text {
-                x: 24px; y: 330px;
+                x: 24px; y: 390px;
                 width: parent.width - 48px;
                 text: "Left / Right adjust  ·  A selects  ·  B / Esc back";
                 color: #80d8ff;

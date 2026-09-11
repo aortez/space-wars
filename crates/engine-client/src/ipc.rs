@@ -423,6 +423,11 @@ fn handle_request(
         }
         ControlCommand::Status => {
             let mut diagnostics = window.get_runtime_diagnostics().to_string();
+            diagnostics.push_str(&format!(
+                "\nperformance_overlay_enabled={}\nperformance_overlay_text={}",
+                window.get_performance_overlay_enabled(),
+                window.get_performance_overlay_text(),
+            ));
             #[cfg(all(target_os = "linux", feature = "pi-kiosk"))]
             diagnostics.push_str(&i_slint_backend_linuxkms::profiling::diagnostics());
             let launch = window.get_launcher_diagnostics();
@@ -878,6 +883,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             sound_focus_index: window.get_sound_focus_index(),
             sound_volume_percent: window.get_sound_volume_percent(),
             sound_muted: window.get_sound_muted(),
+            performance_overlay_enabled: window.get_performance_overlay_enabled(),
             settings_save_pending: window.get_settings_save_pending(),
             settings_save_error: non_empty(window.get_settings_save_error().as_str()),
             selected_scenario: selected_scenario.clone(),

@@ -234,6 +234,8 @@ pub struct VideoSettings {
     pub height: u32,
     pub fullscreen: bool,
     pub vsync: bool,
+    /// Show the host's submitted-frame and simulation-update rates in every scenario.
+    pub show_fps: bool,
 }
 
 impl Default for VideoSettings {
@@ -243,6 +245,7 @@ impl Default for VideoSettings {
             height: 720,
             fullscreen: false,
             vsync: true,
+            show_fps: false,
         }
     }
 }

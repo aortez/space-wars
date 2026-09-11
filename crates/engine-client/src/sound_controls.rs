@@ -1,4 +1,5 @@
 //! App-wide output preferences shared by the launcher and paused scenarios.
+//! The UI is labelled App Settings; sound control IDs remain stable for clients.
 
 use std::sync::{Arc, RwLock};
 
@@ -26,9 +27,11 @@ pub(crate) fn install(
     settings: Arc<RwLock<Settings>>,
     writer: SettingsWriter,
 ) {
-    let audio = settings.read().unwrap().audio.normalized();
-    publish(window, audio);
-    controls.borrow_mut().set_audio_settings(audio);
+    let initial = settings.read().unwrap().clone();
+    publish(window, &initial);
+    controls
+        .borrow_mut()
+        .set_audio_settings(initial.audio.normalized());
 
     let weak = window.as_weak();
     window.on_sound_open(move || {
@@ -43,7 +46,7 @@ pub(crate) fn install(
     });
 
     let weak = window.as_weak();
-    let adjust_settings = Arc::clone(&settings);
+    let adjustment_settings = Arc::clone(&settings);
     let adjust_writer = writer.clone();
     window.on_sound_adjust(move |index, delta| {
         let Some(window) = weak.upgrade() else { return };
@@ -52,15 +55,13 @@ pub(crate) fn install(
         }
         window.set_sound_focus_index(index);
         let snapshot = {
-            let mut settings = adjust_settings.write().unwrap();
-            let audio = adjusted(settings.audio, index, delta);
-            if audio == settings.audio {
+            let mut settings = adjustment_settings.write().unwrap();
+            if !adjust_settings(&mut settings, index, delta) {
                 return;
             }
-            settings.audio = audio;
             settings.clone()
         };
-        publish(&window, snapshot.audio);
+        publish(&window, &snapshot);
         controls.borrow_mut().set_audio_settings(snapshot.audio);
         adjust_writer.save(snapshot);
         window.set_settings_save_pending(true);
@@ -77,13 +78,33 @@ pub(crate) fn install(
         writer.save(snapshot);
         window.set_settings_save_pending(true);
         window.set_settings_save_error("".into());
-        window.set_sound_focus_index(2);
+        window.set_sound_focus_index(3);
     });
 }
 
-fn publish(window: &MainWindow, audio: AudioSettings) {
+fn publish(window: &MainWindow, settings: &Settings) {
+    let audio = settings.audio.normalized();
     window.set_sound_volume_percent((audio.master_volume * 100.0).round() as i32);
     window.set_sound_muted(audio.muted);
+    window.set_performance_overlay_enabled(settings.video.show_fps);
+}
+
+fn adjust_settings(settings: &mut Settings, index: i32, delta: i32) -> bool {
+    if index == 2 {
+        let enabled = if delta == 0 {
+            !settings.video.show_fps
+        } else {
+            delta > 0
+        };
+        let changed = enabled != settings.video.show_fps;
+        settings.video.show_fps = enabled;
+        changed
+    } else {
+        let audio = adjusted(settings.audio, index, delta);
+        let changed = audio != settings.audio;
+        settings.audio = audio;
+        changed
+    }
 }
 
 fn adjusted(audio: AudioSettings, index: i32, delta: i32) -> AudioSettings {
@@ -102,9 +123,9 @@ fn adjusted(audio: AudioSettings, index: i32, delta: i32) -> AudioSettings {
 pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     let index = window.get_sound_focus_index();
     let count = if window.get_settings_save_error().is_empty() {
-        3
-    } else {
         4
+    } else {
+        5
     };
     match action {
         UiAction::Up | UiAction::Down => {
@@ -114,16 +135,16 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 if action == UiAction::Up { -1 } else { 1 },
             ))
         }
-        UiAction::Left | UiAction::Right if index <= 1 => {
+        UiAction::Left | UiAction::Right if index <= 2 => {
             window.invoke_sound_adjust(index, if action == UiAction::Left { -1 } else { 1 })
         }
-        UiAction::Left | UiAction::Right if count == 4 => {
-            window.set_sound_focus_index(if index == 2 { 3 } else { 2 })
+        UiAction::Left | UiAction::Right if count == 5 => {
+            window.set_sound_focus_index(if index == 3 { 4 } else { 3 })
         }
-        UiAction::Confirm if index == 1 => window.invoke_sound_adjust(1, 0),
-        UiAction::Confirm if index == 3 && count == 4 => window.invoke_sound_retry(),
+        UiAction::Confirm if index == 1 || index == 2 => window.invoke_sound_adjust(index, 0),
+        UiAction::Confirm if index == 4 && count == 5 => window.invoke_sound_retry(),
         UiAction::Back | UiAction::Controls | UiAction::Confirm
-            if action != UiAction::Confirm || index == 2 =>
+            if action != UiAction::Confirm || index == 3 =>
         {
             window.set_sound_visible(false)
         }
@@ -140,6 +161,28 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fps_counter_is_global_and_adjusting_it_does_not_change_audio() {
+        let mut settings = Settings::default();
+        settings.audio.master_volume = 0.05;
+        settings.audio.muted = true;
+        let audio = settings.audio;
+        assert!(!settings.video.show_fps);
+        assert!(adjust_settings(&mut settings, 2, 0));
+        assert!(settings.video.show_fps);
+        assert!(!adjust_settings(&mut settings, 2, 1));
+        assert!(adjust_settings(&mut settings, 2, -1));
+        assert!(!settings.video.show_fps);
+        assert!(!adjust_settings(&mut settings, 2, -1));
+        assert_eq!(settings.audio, audio);
+        assert!(adjust_settings(&mut settings, 2, 1));
+        assert!(adjust_settings(&mut settings, 0, -1));
+        assert!(
+            settings.video.show_fps,
+            "audio adjustments preserve the overlay"
+        );
+    }
 
     #[test]
     fn volume_steps_clamp_without_unmuting() {

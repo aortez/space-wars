@@ -271,7 +271,18 @@ The command starts through the same lifecycle callbacks as the visible UI,
 then polls until status reports benchmark mode with a new scenario revision.
 Polling has an explicit deadline and does not block the Slint event loop. Each
 new revision resets its frame/update counters; measured FPS/UPS refresh once per
-second. Scenario-specific diagnostics follow those fields when available. The
+second. FPS counts frames submitted to Slint (`fps_source=submitted-frames`),
+not host timer callbacks or physical scanout. UPS counts simulation steps, or
+emulated NES frames for native-video scenarios. Duplicate native-video polls
+do not increase FPS. **App Settings → FPS Counter** toggles the shared floating
+overlay and persists `video.show_fps`; it defaults off. Status also includes
+`performance_overlay_enabled` and `performance_overlay_text`.
+
+The App Settings panel extends the former Sound panel. Existing automation IDs
+(`launcher.sound`, `pause.sound`, `sound.back`, and `sound.retry`) remain stable;
+the new toggle is `settings.fps-counter`.
+
+Scenario-specific diagnostics follow those fields when available. The
 default control socket is `/tmp/spacewars-control.sock`; pass `--socket` or set
 `SPACEWARS_CONTROL_SOCKET` when using a different path.
 

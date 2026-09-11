@@ -261,6 +261,24 @@ mod tests {
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
+    fn fps_counter_defaults_off_and_persists_without_resetting_other_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(&path, "[video]\nwidth = 1024\n[audio]\nmaster_volume = 0.05\n[launch]\nscenario = \"clock\"\n").unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        assert!(!loaded.settings.video.show_fps);
+        assert_eq!(loaded.status, LoadStatus::Migrated);
+        loaded.settings.video.show_fps = true;
+        save_settings(&loaded.settings, &path).unwrap();
+        let reloaded = load_settings(&path).unwrap();
+        assert!(reloaded.settings.video.show_fps);
+        assert_eq!(reloaded.settings.video.width, 1024);
+        assert_eq!(reloaded.settings.audio.master_volume, 0.05);
+        assert_eq!(reloaded.settings.launch.scenario, "clock");
+        assert_eq!(reloaded.status, LoadStatus::Existing);
+    }
+
+    #[test]
     fn clock_message_defaults_migrates_and_round_trips_without_resetting_other_settings() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
