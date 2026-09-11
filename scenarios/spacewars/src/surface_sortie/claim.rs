@@ -56,6 +56,7 @@ struct FlagAnchor {
     position: Vec2,
     normal: Vec2,
     footing: Option<engine_terrain::CellCoord>,
+    surface_revision: u64,
 }
 
 impl FlagAnchor {
@@ -304,7 +305,7 @@ impl SurfaceSortieState {
             let Some(terrain) = self.world.terrain.planets.get(&claim.planet) else {
                 continue;
             };
-            let lost = claim.flag.is_some_and(|flag| {
+            let mut lost = claim.flag.is_some_and(|flag| {
                 !flag.anchor.footing.is_some_and(|cell| {
                     terrain
                         .field
@@ -312,6 +313,26 @@ impl SurfaceSortieState {
                         .is_some_and(|cell| cell.material != engine_terrain::MaterialId::VOID)
                 })
             });
+            if !lost
+                && terrain.geometry.surface() == engine_terrain::TerrainSurface::Contour
+                && let Some(flag) = &mut claim.flag
+                && flag.anchor.surface_revision != terrain.field.revision()
+            {
+                if let Some((position, normal)) = flag.anchor.footing.and_then(|cell| {
+                    terrain.geometry.project_source_surface(
+                        &terrain.field,
+                        cell,
+                        flag.anchor.position,
+                        flag.anchor.normal,
+                    )
+                }) {
+                    flag.anchor.position = position;
+                    flag.anchor.normal = normal;
+                    flag.anchor.surface_revision = terrain.field.revision();
+                } else {
+                    lost = true;
+                }
+            }
             if lost {
                 // Flags are currently the only owned planetary object. Destroying
                 // their material footing neutralizes, never transfers ownership.
@@ -361,8 +382,8 @@ impl SurfaceSortieState {
         let normal = support.local_surface.normal;
         let footing = self.world.terrain.planets.get(&planet).and_then(|terrain| {
             terrain
-                .field
-                .local_to_cell(position - normal * 0.08)
+                .geometry
+                .source_cell(&terrain.field, position - normal * 0.08)
                 .filter(|cell| {
                     terrain
                         .field
@@ -377,6 +398,12 @@ impl SurfaceSortieState {
             position,
             normal,
             footing,
+            surface_revision: self
+                .world
+                .terrain
+                .planets
+                .get(&planet)
+                .map_or(0, |t| t.field.revision()),
         });
         candidate.status = PlanetClaimStatus::Ready;
         candidate

@@ -55,8 +55,8 @@ impl SurfaceSortieState {
             .filter_map(|node| {
                 // Use the same inset and occupancy rule as the real flag anchor.
                 let cell = terrain
-                    .field
-                    .local_to_cell(node.position - node.normal * 0.08)?;
+                    .geometry
+                    .source_cell(&terrain.field, node.position - node.normal * 0.08)?;
                 if terrain.field.cell(cell)?.material == engine_terrain::MaterialId::VOID
                     || flag.is_some_and(|f| node.position.distance_to(local(f.position)) > 2.5)
                 {

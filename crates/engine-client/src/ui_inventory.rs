@@ -588,7 +588,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.back",
             ]
         }
-        "surface-expedition" | "spacewars-terrain" => {
+        "surface-expedition"
+        | "spacewars-terrain"
+        | "spacewars-surface-blocks"
+        | "spacewars-surface-contour" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -1146,6 +1149,16 @@ mod tests {
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
             ("clock", 24, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
+            (
+                "spacewars-surface-blocks",
+                8,
+                "launcher.settings.expedition.players",
+            ),
+            (
+                "spacewars-surface-contour",
+                8,
+                "launcher.settings.expedition.players",
+            ),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
             (
@@ -1158,7 +1171,10 @@ mod tests {
         for (scenario, control_count, selected) in cases {
             let mut context = context(scenario);
             context.launcher_settings_focus_index = match scenario {
-                "surface-expedition" | "spacewars-terrain" => 2,
+                "surface-expedition"
+                | "spacewars-terrain"
+                | "spacewars-surface-blocks"
+                | "spacewars-surface-contour" => 2,
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
                 "pizza" => 3,

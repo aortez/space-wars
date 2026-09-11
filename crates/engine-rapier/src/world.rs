@@ -15,9 +15,9 @@ use rapier2d::prelude::{
     ActiveEvents, BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle, ColliderSet,
     CollisionEvent, ContactPair, EventHandler, GenericJoint, Group, ImpulseJoint,
     ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups,
-    InteractionTestMode, IslandManager, MultibodyJointSet, NarrowPhase, PhysicsPipeline,
-    PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray, RigidBody,
-    RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
+    InteractionTestMode, IslandManager, MassProperties, MultibodyJointSet, NarrowPhase,
+    PhysicsPipeline, PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray,
+    RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
 };
 use serde::{Deserialize, Serialize};
 
@@ -241,6 +241,14 @@ impl Default for CollisionGroups {
     }
 }
 
+/// Mass independent of a collision boundary approximation (2D polar inertia).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ColliderMassProperties {
+    pub center: Vec2,
+    pub mass: f32,
+    pub inertia: f32,
+}
+
 /// One collider attached to the body passed to [`PhysicsWorld::insert_body`]
 /// or [`PhysicsWorld::insert_collider`].
 #[derive(Debug, Clone, PartialEq)]
@@ -250,6 +258,8 @@ pub struct ColliderSpec {
     pub local_position: Vec2,
     pub local_angle: f32,
     pub density: f32,
+    /// Optional material-based mass, in collider-local coordinates. Overrides density.
+    pub mass_properties: Option<ColliderMassProperties>,
     pub friction: f32,
     pub restitution: f32,
     pub sensor: bool,
@@ -275,6 +285,7 @@ impl ColliderSpec {
             local_position: Vec2::ZERO,
             local_angle: 0.0,
             density: 1.0,
+            mass_properties: None,
             friction: 0.5,
             restitution: 0.0,
             sensor: false,
@@ -293,6 +304,7 @@ impl ColliderSpec {
             local_position: Vec2::ZERO,
             local_angle: 0.0,
             density: 1.0,
+            mass_properties: None,
             friction: 0.5,
             restitution: 0.0,
             sensor: false,
@@ -308,6 +320,7 @@ impl ColliderSpec {
             local_position: Vec2::ZERO,
             local_angle: 0.0,
             density: 1.0,
+            mass_properties: None,
             friction: 0.5,
             restitution: 0.0,
             sensor: false,
@@ -323,6 +336,7 @@ impl ColliderSpec {
             local_position: Vec2::ZERO,
             local_angle: 0.0,
             density: 0.0,
+            mass_properties: None,
             friction: 0.5,
             restitution: 0.0,
             sensor: false,
@@ -1743,6 +1757,15 @@ fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider>
         .collision_groups(spec.collision_groups.to_rapier())
         .solver_groups(spec.solver_groups.to_rapier())
         .user_data(encode_collider(spec.id));
+    let builder = if let Some(mass) = spec.mass_properties {
+        builder.mass_properties(MassProperties::new(
+            to_rapier(mass.center),
+            mass.mass,
+            mass.inertia,
+        ))
+    } else {
+        builder
+    };
     let builder = if collect_events {
         builder
             .active_events(ActiveEvents::CONTACT_FORCE_EVENTS)
@@ -1887,6 +1910,13 @@ fn valid_collider_spec(spec: &ColliderSpec) -> bool {
         && spec.local_angle.is_finite()
         && spec.density.is_finite()
         && spec.density >= 0.0
+        && spec.mass_properties.is_none_or(|m| {
+            finite_vec2(m.center)
+                && m.mass.is_finite()
+                && m.mass > 0.0
+                && m.inertia.is_finite()
+                && m.inertia > 0.0
+        })
         && spec.friction.is_finite()
         && spec.friction >= 0.0
         && spec.restitution.is_finite()

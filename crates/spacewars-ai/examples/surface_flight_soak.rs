@@ -32,7 +32,20 @@ fn main() {
         (1..=180).contains(&seconds) && (1..=2).contains(&players) && seat < players && case < 2
     );
     let owner = PlayerId::from_index(seat).unwrap();
-    let mut state = SurfaceSortieScenario::init_material(seed, players);
+    let surface = argument("--surface", "original");
+    let mut state = match surface.as_str() {
+        "original" => SurfaceSortieScenario::init_material(seed, players),
+        "blocks" | "contour" => SurfaceSortieScenario::init_surface_comparison(
+            seed,
+            players,
+            if surface == "contour" {
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Contour
+            } else {
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Blocks
+            },
+        ),
+        _ => panic!("--surface must be original, blocks or contour"),
+    };
     let mut brain = RulePilotV2::with_direction(
         BrainReset {
             actor: owner,
@@ -40,7 +53,8 @@ fn main() {
         },
         if case == 0 { 1.0 } else { -1.0 },
     );
-    let initial = state.terrain_diagnostics().occupied_cells;
+    let initial =
+        state.terrain_diagnostics().occupied_cells + state.terrain_diagnostics().removed_cells;
     let output = PathBuf::from(argument("--out", "/tmp/surface-flight-soak"));
     fs::create_dir_all(&output).unwrap();
     let mut ai_times = Vec::new();
@@ -98,7 +112,7 @@ fn main() {
     step_times.sort_by(f64::total_cmp);
     let complete = brain.telemetry().completed_tick.is_some();
     let summary = json!({
-        "schema": 1, "seed": seed, "players": players, "seat": seat, "case": case, "seconds": seconds,
+        "schema": 1, "surface": surface, "seed": seed, "players": players, "seat": seat, "case": case, "seconds": seconds,
         "complete": complete, "brain": brain.telemetry(), "sampled_peak_speed": peak_speed,
         "max_goal_ticks": max_goal_ticks, "blocked_ticks": blocked_ticks,
         "ai_p95_ms": ai_times[(ai_times.len()-1)*95/100], "ai_max_ms": ai_times.last(),

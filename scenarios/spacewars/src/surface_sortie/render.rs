@@ -175,6 +175,29 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
     for player in 0..state.player_count() {
         draw_actor(&mut frame, state, player);
     }
+    if state.surface_comparison.is_some() {
+        for (&index, terrain) in &state.world.terrain.planets {
+            let motion = motion::SurfaceFrame::read(&state.world.physics, index);
+            terrain::render_wireframe(
+                &mut frame,
+                &terrain.field,
+                &terrain.geometry,
+                motion.position,
+                motion.angle,
+            );
+        }
+        for fragment in state.world.terrain.fragments.values() {
+            if let Some(motion) = state.world.physics.world.motion(fragment.assembly.body()) {
+                terrain::render_wireframe(
+                    &mut frame,
+                    &fragment.terrain,
+                    &fragment.geometry,
+                    motion.position,
+                    motion.angle,
+                );
+            }
+        }
+    }
     if state.player_count() > 1 || observation.planet_claim.is_some() {
         draw_player_hud(&mut frame, state, player, center, height);
         return frame;
@@ -1094,6 +1117,19 @@ fn draw_player_hud(
             )
         },
         |v| format!("P{}  {mode}  /  pilot {:.0}%", player + 1, v.health),
+    );
+    let pilot_status = state.surface_comparison.map_or_else(
+        || pilot_status.clone(),
+        |surface| {
+            format!(
+                "{} / {pilot_status}",
+                if surface == engine_terrain::TerrainSurface::Contour {
+                    "SLOPES"
+                } else {
+                    "STEPS"
+                }
+            )
+        },
     );
     let vehicle_status = if let Some(v) = observation
         .pilot_vitals

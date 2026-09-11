@@ -90,6 +90,12 @@ impl SpacewarsState {
                     body.entity.value()
                 ));
             }
+            if !geometry.is_current(field) {
+                result.issues.push(format!(
+                    "terrain {} has stale surface dependencies",
+                    body.entity.value()
+                ));
+            }
             let mut covered = 0_u64;
             for chunk in geometry.chunks() {
                 if field.chunk_revision(chunk.id) != Some(chunk.revision) {
@@ -99,8 +105,8 @@ impl SpacewarsState {
                         chunk.id.0
                     ));
                 }
-                for (part, rect) in chunk.rectangles.iter().enumerate() {
-                    covered += u64::from(rect.width) * u64::from(rect.height);
+                covered += chunk.material_cells();
+                for part in 0..chunk.shape_count() {
                     expected_colliders.insert(ColliderId::new(
                         body.entity,
                         ColliderRole::new(physics::terrain_spec().first_chunk_role + chunk.id.0),

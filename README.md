@@ -84,6 +84,10 @@ The local launcher includes the following scenarios and presets:
   **spacewars-terrain-combat** adds a human-versus-bot dogfight with the shared
   laser/cannon and physical ship recovery. **spacewars-terrain-duel** lets both
   bots run the same loop. See [Material combat](docs/material-combat-ai.md).
+- **Surface comparison** — `spacewars-surface-blocks` and
+  `spacewars-surface-contour` compare steps and slopes on the same destructible
+  planet, with collision outlines and the real landing, mining and recovery loop.
+  See [Rounder planets](docs/rounder-planets.md) for controls and measured results.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

@@ -89,6 +89,14 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
                 }
                 harness.capture_screenshot(&format!("{scenario}-{renderer}-settings.png"));
             }
+            if scenario.starts_with("spacewars-surface-") {
+                let players = "launcher.settings.expedition.players.next";
+                assert_eq!(control_value(&state, players), Some("1"));
+                state = harness.activate_guarded(players, &state);
+                assert_eq!(control_value(&state, players), Some("2"));
+                state = harness.activate_guarded(players, &state);
+                assert_eq!(control_value(&state, players), Some("1"));
+            }
             if control_value(&state, "launcher.settings.renderer.next") != Some(renderer) {
                 state = harness.activate_guarded("launcher.settings.renderer.next", &state);
             }

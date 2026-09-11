@@ -12,6 +12,7 @@ pub mod asteroids;
 mod claim;
 pub mod claim_footing;
 pub mod combat;
+pub mod comparison;
 pub mod compatibility;
 pub mod flight;
 pub mod ground_navigation;
@@ -151,6 +152,7 @@ impl SurfaceSortieAction {
 
 #[derive(Clone)]
 pub struct SurfaceSortieState {
+    surface_comparison: Option<engine_terrain::TerrainSurface>,
     world: SpacewarsState,
     motion_preset: SurfaceMotionPreset,
     generated_case: Option<compatibility::GeneratedSurfaceCase>,
@@ -269,6 +271,8 @@ pub struct SurfaceSessionObservation {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SurfaceSortieObservation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub surface_comparison: Option<&'static str>,
     pub version: u32,
     pub generated_case: Option<compatibility::GeneratedSurfaceCase>,
     pub travel_enabled: bool,
@@ -330,6 +334,10 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         let snapshot = self.spaceling_snapshot(player);
         SurfaceSortieObservation {
+            surface_comparison: self.surface_comparison.map(|s| match s {
+                engine_terrain::TerrainSurface::Blocks => "blocks",
+                engine_terrain::TerrainSurface::Contour => "contour-v1",
+            }),
             version: if self.has_material_ground() { 11 } else { 10 },
             generated_case: self.generated_case,
             travel_enabled: self.travel_enabled(),
@@ -829,6 +837,7 @@ impl SurfaceSortieScenario {
             })
             .collect();
         SurfaceSortieState {
+            surface_comparison: None,
             world,
             motion_preset,
             generated_case: None,

@@ -86,9 +86,18 @@ impl SurfaceSortieScenario {
     /// Historical terrain stress fixtures and ordinary Spacewars stay available
     /// to their existing runners with their original world parameters.
     pub fn init_material(seed: u64, players: usize) -> SurfaceSortieState {
+        Self::init_material_surface(seed, players, engine_terrain::TerrainSurface::Blocks)
+    }
+
+    pub(super) fn init_material_surface(
+        seed: u64,
+        players: usize,
+        surface: engine_terrain::TerrainSurface,
+    ) -> SurfaceSortieState {
         assert!((1..=SPACEWARS_PLAYER_COUNT).contains(&players));
         let mut state = Self::init(SurfaceMotionPreset::Stationary, seed);
         state.outposts.clear();
+        state.world.terrain.surface = surface;
         state.world.terrain.legacy_services = false;
         state
             .world
@@ -182,7 +191,8 @@ impl SurfaceSortieState {
             };
             contacts.map(|contact| {
                 contact.and_then(|contact| {
-                    terrain.field.local_to_cell(
+                    terrain.geometry.source_cell(
+                        &terrain.field,
                         (contact.position - contact.normal * 0.08 - frame.position)
                             .rotate_radians(-frame.angle),
                     )
@@ -386,7 +396,7 @@ impl SurfaceSortieState {
                 .motion(physics::primary_body(hit.collider.entity))
                 .expect("material body");
             let local = (hit.point - hit.normal * 0.08 - body.position).rotate_radians(-body.angle);
-            let Some(center) = field.local_to_cell(local) else {
+            let Some(center) = field.surface_cell(local, self.world.terrain.surface) else {
                 continue;
             };
             self.world

@@ -1403,7 +1403,10 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "clock" => 12,
         "falling" => 1,
         "nes" => 2,
-        "surface-expedition" | "spacewars-terrain" => 4,
+        "surface-expedition"
+        | "spacewars-terrain"
+        | "spacewars-surface-blocks"
+        | "spacewars-surface-contour" => 4,
         _ => 3,
     }
 }
@@ -1439,7 +1442,12 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
     }
 
     match window.get_launcher_scenario().as_str() {
-        "surface-expedition" | "spacewars-terrain" if focus == 2 => {
+        "surface-expedition"
+        | "spacewars-terrain"
+        | "spacewars-surface-blocks"
+        | "spacewars-surface-contour"
+            if focus == 2 =>
+        {
             let next = cycle_label(
                 window.get_launcher_expedition_players().as_str(),
                 &["1", "2"],
@@ -2073,7 +2081,10 @@ fn launcher_selections_from_window(
     };
     let surface_expedition = if matches!(
         launch.scenario.as_str(),
-        "surface-expedition" | "spacewars-terrain"
+        "surface-expedition"
+            | "spacewars-terrain"
+            | "spacewars-surface-blocks"
+            | "spacewars-surface-contour"
     ) {
         engine_common::SurfaceExpeditionSettings {
             players: match window.get_launcher_expedition_players().as_str() {

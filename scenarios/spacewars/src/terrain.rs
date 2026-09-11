@@ -10,7 +10,7 @@ use engine_rapier::{
 };
 use engine_terrain::{
     Brush, CellCoord, EditMode, Material, MaterialId, Terrain, TerrainEdit, TerrainError,
-    TerrainGeometry,
+    TerrainGeometry, TerrainSurface,
 };
 
 use super::*;
@@ -50,6 +50,7 @@ struct PendingEdit {
 
 #[derive(Debug, Clone)]
 pub(super) struct TerrainState {
+    pub surface: TerrainSurface,
     pub planets: BTreeMap<usize, PlanetTerrain>,
     pub fragments: BTreeMap<u64, TerrainFragment>,
     pending: Vec<PendingEdit>,
@@ -67,6 +68,7 @@ pub(super) struct TerrainState {
 impl Default for TerrainState {
     fn default() -> Self {
         Self {
+            surface: TerrainSurface::Blocks,
             planets: BTreeMap::new(),
             fragments: BTreeMap::new(),
             pending: Vec::new(),
@@ -128,7 +130,7 @@ impl SpacewarsState {
             .get(index)
             .ok_or(TerrainError("unknown planet"))?;
         let field = generate_field(planet.radius, self.seed ^ index as u64)?;
-        let geometry = TerrainGeometry::new(&field);
+        let geometry = TerrainGeometry::with_surface(&field, self.terrain.surface);
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
         let footing =
             [-3.0, 0.0, 3.0].map(|y| field.local_to_cell(Vec2::new(radius - 1.5, y)).unwrap());
@@ -147,7 +149,10 @@ impl SpacewarsState {
             },
             &field,
             &geometry,
-            physics::terrain_spec(),
+            engine_rapier::terrain::TerrainSpec {
+                surface: self.terrain.surface,
+                ..physics::terrain_spec()
+            },
         )
         .expect("generated terrain has valid geometry and an available entity");
         self.physics.material_planets.insert(index);
@@ -322,7 +327,7 @@ pub(super) fn commit(state: &mut SpacewarsState) {
                 .expect("valid fragment cache");
             state.physics.material_queries_dirty |= rebuilt > 0;
             fragment.hash = fragment.terrain.hash();
-            if fragment.geometry.rectangle_count() == 0 {
+            if fragment.geometry.shape_count() == 0 {
                 state.physics.world.remove_entity(id);
                 state.physics.terrain_fragments.remove(&id.value());
                 state.terrain.fragments.remove(&id.value());
@@ -354,7 +359,10 @@ pub(super) fn commit(state: &mut SpacewarsState) {
                 piece,
                 motion,
                 center,
-                physics::terrain_spec(),
+                engine_rapier::terrain::TerrainSpec {
+                    surface: state.terrain.surface,
+                    ..physics::terrain_spec()
+                },
             )
             .expect("valid fragment");
             state.physics.terrain_fragments.insert(id);
@@ -421,7 +429,15 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
             let Some(field) = state.terrain.field(surface) else {
                 continue;
             };
-            let Some(edit) = local.and_then(|contact| cannon_edit(field, contact)) else {
+            let Some(edit) = local.and_then(|contact| {
+                impact_edit(
+                    field,
+                    state.terrain.surface,
+                    contact,
+                    CANNON_RADIUS,
+                    CANNON_WORK,
+                )
+            }) else {
                 continue;
             };
             hits.entry(shell.value()).or_insert((
@@ -445,12 +461,6 @@ pub(super) fn queue_cannon_hits(state: &mut SpacewarsState) {
     }
 }
 
-fn cannon_edit(field: &Terrain, contact: ContactPoint) -> Option<TerrainEdit> {
-    impact_edit(field, contact, CANNON_RADIUS, CANNON_WORK)
-}
-
-/// Environmental impacts use the contact's local surface point, just like
-/// cannon excavation. The stream bounds how many edits it queues per step.
 pub(super) fn queue_asteroid_hit(
     state: &mut SpacewarsState,
     asteroid: u64,
@@ -479,7 +489,8 @@ pub(super) fn queue_asteroid_hit(
                 if debris.value() == asteroid
                     && surface == target
                     && let Some(field) = state.terrain.field(surface)
-                    && let Some(edit) = contact.and_then(|p| impact_edit(field, p, radius, work))
+                    && let Some(edit) = contact
+                        .and_then(|p| impact_edit(field, state.terrain.surface, p, radius, work))
                 {
                     return Some(PendingEdit {
                         body: surface,
@@ -499,11 +510,21 @@ pub(super) fn queue_asteroid_hit(
 
 fn impact_edit(
     field: &Terrain,
+    surface: TerrainSurface,
     contact: ContactPoint,
     radius: u32,
     work: u8,
 ) -> Option<TerrainEdit> {
     let inside = contact.position - contact.normal * 0.001;
+    if surface == TerrainSurface::Contour {
+        return Some(TerrainEdit {
+            brush: Brush::Circle {
+                center: field.surface_cell(inside, surface)?,
+                radius,
+            },
+            mode: EditMode::Damage(work),
+        });
+    }
     let sampled = field.local_to_cell(inside)?;
     let center = (-1..=1)
         .flat_map(|y| (-1..=1).map(move |x| CellCoord::new(sampled.x + x, sampled.y + y)))
@@ -625,6 +646,37 @@ impl SpacewarsScenario {
     }
 }
 
+pub(super) fn render_wireframe(
+    frame: &mut RenderFrame,
+    field: &Terrain,
+    geometry: &TerrainGeometry,
+    position: Vec2,
+    angle: f32,
+) {
+    for chunk in geometry.chunks() {
+        let rectangles = chunk.rectangles.iter().map(|r| {
+            let center = r.local_center(field);
+            let half = r.half_extents(field);
+            [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+                .map(|(x, y)| center + Vec2::new(x * half.x, y * half.y))
+                .to_vec()
+        });
+        for vertices in rectangles.chain(chunk.polygons.iter().map(|p| p.vertices.clone())) {
+            frame.push_primitive(
+                PLANET_LAYER + 1,
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points: vertices
+                        .into_iter()
+                        .map(|p| render_point(position + p.rotate_radians(angle)))
+                        .collect(),
+                    fill: None,
+                    stroke: Some(Stroke::new(RenderColor::rgb(0.04, 0.08, 0.1), 0.5)),
+                }),
+            );
+        }
+    }
+}
+
 pub(super) fn render_body(
     frame: &mut RenderFrame,
     field: &Terrain,
@@ -653,6 +705,25 @@ pub(super) fn render_body(
                 PLANET_LAYER,
                 RenderPrimitive::Polygon(RenderPolygon {
                     points,
+                    fill: Some(Fill::new(color)),
+                    stroke: Some(Stroke::new(color, 0.75)),
+                }),
+            );
+        }
+        for polygon in &chunk.polygons {
+            let color = if polygon.material == ORE {
+                RenderColor::rgb(0.53, 0.49, 0.25)
+            } else {
+                RenderColor::rgb(0.22, 0.36, 0.45)
+            };
+            frame.push_primitive(
+                PLANET_LAYER,
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points: polygon
+                        .vertices
+                        .iter()
+                        .map(|&p| render_point(position + p.rotate_radians(angle)))
+                        .collect(),
                     fill: Some(Fill::new(color)),
                     stroke: Some(Stroke::new(color, 0.75)),
                 }),
@@ -799,6 +870,9 @@ pub(super) fn observation(state: &SpacewarsState) -> Observation {
             EditMode::Remove => [0, 0],
             EditMode::Damage(work) => [1, work],
         });
+    }
+    if terrain.surface == TerrainSurface::Contour {
+        payload.extend(b"contour-v1");
     }
     Observation { payload }
 }
