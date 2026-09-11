@@ -128,12 +128,27 @@ To run your own cartridge directly:
 cargo run -p engine-client -- --rom /path/to/game.nes
 ```
 
-**Sound** in the launcher or pause menu controls master volume and mute for all
-audio-producing scenarios. Left/right (or the touch arrows) adjusts volume in
-1% steps up to 20%, then 5% steps; A/Enter toggles the selected mute control. B/Esc returns to the previous
-menu without resuming a paused game. Changes apply live and save in the
-background. New settings default to 25%; existing saved levels are preserved.
+**App Settings** in the launcher or pause menu controls master volume, mute,
+and the **FPS Counter** across all scenarios. **Scenario Settings** retains the
+selected scenario's renderer and gameplay options. Left/right (or the touch
+arrows) adjusts volume in 1% steps up to 20%, then 5% steps; A/Enter toggles mute
+or the counter. B/Esc returns to the previous menu without resuming a paused
+game. Changes apply live and save in the background. New volume settings default
+to 25%; existing saved levels are preserved.
 A failed save leaves the controls usable and offers **Retry Save**.
+
+The FPS counter is off by default and saved as `video.show_fps`. When enabled,
+a small translucent, non-interactive overlay shows **FPS** (new scenario frames
+submitted to Slint) and **UPS** (simulation updates, or emulated NES frames).
+It works with raster, vector, and native-video scenarios, refreshes once per
+second, shows `Paused`/`Round over` when appropriate, and hides in the launcher.
+It replaces Spacewars' always-visible performance line. Turning it off removes
+the overlay item tree; existing host statistics remain available through
+`spacewars-cli status` without enabling the more detailed renderer profiler.
+These are application submission rates, not physical display refresh/page-flip
+measurements; duplicate native-video polls and frames dropped before submission
+do not inflate the count. See [the presentation lab](docs/presentation-performance-lab.md)
+for the separate KMS measurements.
 
 For launcher selection, copy `.nes` files into the `roms` directory beside
 `settings.toml` (normally `~/.config/spacewars/roms` on Linux), then reopen the

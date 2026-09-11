@@ -1571,6 +1571,7 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
 
 fn clear_runtime_diagnostics(window: &MainWindow) {
     window.set_runtime_diagnostics(SharedString::from(NO_ACTIVE_SCENARIO_DIAGNOSTICS));
+    window.set_performance_overlay_text("".into());
 }
 
 fn hide_launcher_surfaces(window: &MainWindow) {
