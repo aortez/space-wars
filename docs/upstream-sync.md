@@ -98,3 +98,71 @@ first merge. Their simulation and bot source files are unchanged by the second
 merge or the screenshot fix. The complete workspace suite was rerun for the
 new presentation code; after the capture change, the control protocol and
 rendered workflows cover its behavior.
+
+## PR 65 CI follow-up and FPS overlay integration
+
+Main advanced to `bc9599f` (global FPS/UPS overlay) after the PR opened. The
+follow-up merge preserves the material world/rematch controls and the pilot
+round-result message while adopting App Settings, the persistent FPS toggle,
+and upstream's accounting of submitted frames. Its three textual conflicts
+were in the host, UI inventory, and Slint menu. No simulation or bot policy is
+changed by this integration.
+
+The first CI run failed
+`generated_match_captures_engages_and_preserves_pilot_recovery`. Diagnostics
+reproduced the failure under Ubuntu 24.04 / glibc 2.39 with Rust 1.89:
+`claimed=true`, `pursuit=true`, `survived_loss=false`, and no terminal outcome
+at 10,800 ticks. There were two cannon hits and 86 laser-hit ticks, but no ship
+loss. The same Ubuntu-built executable passes on the desktop host with glibc
+2.43. This establishes a runtime-dependent trajectory; it does not identify
+the first numerical divergence or establish cross-platform determinism.
+
+The revised generated-match test still requires a physical capture, pursuit,
+weapon contact, live pilots in unfinished rounds, and the original physics
+and material audits. Ship loss is now an independent physical test, in both
+seats: spawn an approaching heavy asteroid, observe shared collision damage,
+ship breakup and pod ejection, then let the mission bot execute unarmed
+recovery controls while both pilots remain alive and the round stays active.
+Neither health nor ownership nor the match outcome is injected. It verifies
+the recovery transition, not a completed rebuild; existing physical rebuild
+tests and the fresh-world survey retain their separate scopes.
+
+The Linux job's wall-time allowance is now 60 minutes: the first run consumed
+about 21 minutes before its early test failure, and successful execution also
+needs the remaining tests, a cold release UI build, the rendered workflows,
+and vendored LinuxKMS checks. Each long simulation still stops at its original
+simulated-time cap.
+
+Reproduction and validation logs are retained at:
+
+```text
+/home/oldman/.codex/visualizations/2026/09/11/spacewars-pr65-ci/
+```
+
+To investigate the original assumption again, check out `f5a5f5d` separately
+and run:
+
+```sh
+RUST_MIN_STACK=16777216 cargo test --locked -p spacewars-ai \
+  --test surface_mission \
+  generated_match_captures_engages_and_preserves_pilot_recovery -- --exact --nocapture
+```
+
+Record the runtime libraries,
+compiler and all three event flags. `seed42-ubuntu24.log` preserves the
+instrumented failure; `seed42-ubuntu-binary-on-host.log` records the same
+executable's passing host run. The artifact Dockerfile and isolated Cargo
+build directory preserve the Ubuntu reproduction setup.
+
+Local validation after the FPS merge:
+
+- Workspace/all targets: 1,244 passed, 37 opt-in tests ignored. This run predates
+  splitting the recovery assertion into its additional test.
+- Final mission test binary: all 20 passed on both the host and Ubuntu 24.04,
+  including the explicit asteroid/pod/recovery test in both seats.
+- Final client/all targets: 288 passed; 37 opt-in tests ignored.
+- Explicit release UI suite: all 36 passed, including the shared FPS lifecycle
+  and two naturally completed seed-7 rounds. Captured launcher, App Settings,
+  FPS overlay and result screens are retained with their source paths.
+- Formatting, diff checks and client/AI Clippy passed (existing advisory
+  Clippy warnings remain).

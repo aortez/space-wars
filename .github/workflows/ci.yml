@@ -79,7 +79,9 @@ jobs:
   linux-workspace:
     name: Linux workspace
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Includes unoptimized three-minute simulations and a separate cold release
+    # build for the rendered UI suite. Individual simulation caps stay unchanged.
+    timeout-minutes: 60
     env:
       # Unoptimized material-world fixtures exceed the default test-thread stack.
       RUST_MIN_STACK: 16777216

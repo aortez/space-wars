@@ -880,13 +880,12 @@ fn visible_opponent_does_not_cancel_a_committed_capture() {
 }
 
 #[test]
-fn generated_match_captures_engages_and_preserves_pilot_recovery() {
+fn generated_match_captures_and_engages() {
     let mut state = SurfaceSortieScenario::init_material_match(42);
     let initial = state.terrain_diagnostics().occupied_cells;
     let mut brains =
         [0, 1].map(|seat| MaterialMissionPilot::new(context(seat), CombatBreakSettings::default()));
     let mut claimed = false;
-    let mut survived_loss = false;
     let mut pursuit = false;
     for _ in 0..180 * 60 {
         let mut actions = Vec::new();
@@ -898,31 +897,29 @@ fn generated_match_captures_engages_and_preserves_pilot_recovery() {
                 .iter()
                 .any(|p| p.claim.as_ref().is_some_and(|c| c.owner.is_some()));
             pursuit |= brain.telemetry().pursuit.is_some();
-            survived_loss |= o
-                .local
-                .combat
-                .recovery
-                .flight
-                .pilot
-                .recovery
-                .as_ref()
-                .unwrap()
-                .ships_lost
-                > 0
-                && state.match_outcome().is_none();
         }
         SurfaceSortieScenario::step(&mut state, &actions, DT);
         if state.match_outcome().is_some() {
             break;
         }
     }
-    assert!(claimed && survived_loss && pursuit);
-    assert!((0..2).any(|seat| {
-        let c = state.combat_telemetry(seat);
-        c.cannon_hits > 0 || c.laser_hit_ticks > 0
-    }));
-    // This is a survival/pursuit regression, not a three-minute match clock.
-    // Physical terminal outcomes are covered by the lethal-hit round tests.
+    assert!(
+        claimed && pursuit,
+        "seed 42: claimed={claimed}, pursuit={pursuit}, outcome={:?}, combat={:?}, missions={:?}",
+        state.match_outcome(),
+        [0, 1].map(|seat| state.combat_telemetry(seat)),
+        brains.each_ref().map(|brain| brain.telemetry()),
+    );
+    let combat = [0, 1].map(|seat| state.combat_telemetry(seat));
+    assert!(
+        combat
+            .iter()
+            .any(|c| c.cannon_hits > 0 || c.laser_hit_ticks > 0),
+        "seed 42 did not reach weapon contact: {combat:?}"
+    );
+    // A generated duel need not lose a ship or finish within three minutes.
+    // Exercise survival after an explicit physical strike separately below;
+    // lethal-hit round tests cover terminal outcomes.
     if state.match_outcome().is_none() {
         assert!(
             state
@@ -936,4 +933,61 @@ fn generated_match_captures_engages_and_preserves_pilot_recovery() {
     let audit = state.terrain_diagnostics();
     assert!(audit.issues.is_empty() && audit.max_speed < 500.0);
     assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+}
+
+#[test]
+fn match_mission_survives_ship_loss_and_enters_unarmed_recovery() {
+    use scenario_spacewars::surface_sortie::impact::RecoveryHazard;
+
+    for seat in 0..2 {
+        let mut state = SurfaceSortieScenario::init_material_combat_flight(42, &[]);
+        state.enable_match_rules();
+        for _ in 0..180 {
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+        }
+        assert!(state.match_outcome().is_none());
+        assert!(state.spawn_recovery_hazard(seat, RecoveryHazard::HeavyAsteroid, false));
+        let mut lost = false;
+        for _ in 0..120 {
+            // Keep the pilot aboard while the asteroid travels to the ship.
+            SurfaceSortieScenario::step(&mut state, &[], DT);
+            if state.observation(seat).recovery.unwrap().ships_lost > 0 {
+                lost = true;
+                break;
+            }
+        }
+        assert!(
+            lost,
+            "seat {seat}: physical asteroid did not destroy the ship"
+        );
+        assert_eq!(state.damage_observation(seat).last_source, Some("asteroid"));
+        let pilot = state.observation(seat);
+        assert_eq!(pilot.vehicle_form, ShipForm::EscapePod);
+        assert_eq!(pilot.recovery.unwrap().pod_ejections, 1);
+
+        // The living pilot must keep the round active and the mission policy
+        // must issue real recovery controls after the shared damage pipeline.
+        let mut brain = MaterialMissionPilot::new(context(seat), CombatBreakSettings::default());
+        for _ in 0..30 {
+            assert!(
+                state.match_outcome().is_none(),
+                "seat {seat}: ended on ship loss"
+            );
+            assert!(
+                state
+                    .match_observation()
+                    .unwrap()
+                    .pilots
+                    .iter()
+                    .all(|p| p.alive())
+            );
+            let o = state.mission_observation(seat, brain.site_request());
+            let intent = brain.intent(&o);
+            assert_eq!(brain.telemetry().goal, MissionGoal::Recover);
+            assert!(!intent.weapons.laser && !intent.weapons.cannon);
+            SurfaceSortieScenario::step(&mut state, &intent.encode(context(seat).actor), DT);
+        }
+        assert!(state.match_outcome().is_none());
+        assert!(state.terrain_diagnostics().issues.is_empty());
+    }
 }
