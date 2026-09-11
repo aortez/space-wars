@@ -1,4 +1,5 @@
 use engine_common::Scenario;
+use engine_core::Vec2;
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{SurfaceSortieScenario, jetpack::CrossingDirection},
@@ -126,4 +127,59 @@ fn physical_trial_crosses_both_directions_and_preserves_remaining_charge_on_boar
         assert!(aboard.charge.unwrap() > 0.01 && aboard.charge.unwrap() < 0.8);
         assert!((aboard.charge.unwrap() - before_boarding).abs() <= 1.0 / 240.0 + 1e-6);
     }
+}
+
+#[test]
+fn airborne_steering_tracks_moving_ground_in_the_motors_takeoff_frame() {
+    let mut state = SurfaceSortieScenario::init_material_jetpack(42, 1);
+    let mut bot = JetpackCrossingPilot::new(BrainReset {
+        actor: PlayerId::PLAYER_1,
+        episode_seed: 42,
+    });
+    for _ in 0..600 {
+        let o = state.jetpack_crossing_observation(0, bot.direction());
+        let a = bot.step(&o);
+        if bot.telemetry().goal == CrossingGoal::Cross {
+            break;
+        }
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[a.encode(PlayerId::PLAYER_1)],
+            Duration::from_nanos(16_666_667),
+        );
+    }
+    assert_eq!(bot.telemetry().goal, CrossingGoal::Cross);
+    let mut o = state.jetpack_crossing_observation(0, bot.direction());
+    o.pilot.tick += 1;
+    o.surveyed = false;
+    let plan = bot.telemetry().plan.as_ref().unwrap();
+    let position = o.pilot.planet.motion.position
+        + (plan.destination.normalized() * plan.cruise_radius)
+            .rotate_radians(o.pilot.planet.motion.angle);
+    let up = (position - o.pilot.planet.motion.position).normalized();
+    let right = Vec2::new(up.y, -up.x);
+    o.pilot.actor_up = up;
+    o.pilot.actor.as_mut().unwrap().position = position;
+    o.pilot.actor.as_mut().unwrap().velocity = o.pilot.planet.velocity_at(position);
+    // Directly above the destination with no ground-relative drift. The motor
+    // must still compensate for its reference lagging the orbit by four units/s.
+    o.reference_velocity = o.pilot.planet.velocity_at(position) - right * 4.0;
+    let original = o.clone();
+    let mut shifted_bot = bot.clone();
+    let action = bot.step(&o);
+    let motor_target = o.reference_velocity + right * (action.horizontal * o.air_speed);
+    assert!(
+        (motor_target - o.pilot.planet.velocity_at(position))
+            .dot(right)
+            .abs()
+            < 0.01
+    );
+    assert_eq!(o, original, "guidance only observes the motor and terrain");
+    let drift = Vec2::new(90.0, -40.0);
+    o.pilot.planet.motion.velocity += drift;
+    o.pilot.actor.as_mut().unwrap().velocity += drift;
+    o.reference_velocity += drift;
+    let shifted = shifted_bot.step(&o);
+    assert!((action.horizontal - shifted.horizontal).abs() < 1e-5);
+    assert_eq!(action.primary_held, shifted.primary_held);
 }

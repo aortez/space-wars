@@ -66,7 +66,7 @@ impl JetpackCrossingPilot {
         Self {
             context,
             telemetry: CrossingTelemetry {
-                policy: "jetpack_crossing_v2",
+                policy: "jetpack_crossing_v3",
                 goal: CrossingGoal::Exit,
                 reason: None,
                 started_tick: None,
@@ -326,7 +326,12 @@ impl JetpackCrossingPilot {
             // stepped/sloping terrain. Charged lateral steering still brakes.
             a.primary_held = false;
         }
-        a.horizontal = (error * 1.8).clamp(-8.0, 8.0) / o.air_speed;
+        // The motor retains the takeoff velocity, while the destination keeps
+        // orbiting and rotating. Convert the desired ground-relative speed to
+        // that inertial frame instead of silently chasing a moving reference.
+        let frame_speed = (p.planet.velocity_at(actor.position) - o.reference_velocity).dot(right);
+        a.horizontal =
+            (((error * 1.8).clamp(-8.0, 8.0) + frame_speed) / o.air_speed).clamp(-1.0, 1.0);
         if charge <= 0.0 && p.supported_planet.is_none() {
             self.block("jetpack charge exhausted before landing");
         }

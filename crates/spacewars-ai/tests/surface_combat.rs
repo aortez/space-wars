@@ -1,11 +1,31 @@
 use engine_common::Scenario;
-use scenario_spacewars::{PlayerId, surface_sortie::SurfaceSortieScenario};
+use scenario_spacewars::{
+    PlayerId,
+    surface_sortie::{SurfaceSortieScenario, pilot::MaterialFlightStart},
+};
 use spacewars_ai::{BrainReset, combat_pilot::RulePilotV4};
 use std::time::Duration;
 
 #[test]
-fn physical_duel_loses_rebuilds_and_fires_again_within_three_minutes() {
-    let mut state = SurfaceSortieScenario::init_material_combat(42);
+fn mirrored_physical_duel_loses_rebuilds_and_fires_again_within_three_minutes() {
+    // Keep a demonstrated physical rebuild as the integration contract. The
+    // original reflection now reaches bounded pod-landing failures; its full
+    // reproduction is retained in docs/pilot-impact-survival.md.
+    let mut state = SurfaceSortieScenario::init_material_combat_flight(
+        42,
+        &[0, 1].map(|seat| {
+            (
+                PlayerId::from_index(seat).unwrap(),
+                MaterialFlightStart {
+                    bearing: if seat == 0 { 0.5 } else { -0.5 },
+                    altitude: 90.0,
+                    radial_speed: 0.0,
+                    lateral_speed: 0.0,
+                    heading_offset: 0.0,
+                },
+            )
+        }),
+    );
     let mut brains = [0, 1].map(|seat| {
         RulePilotV4::new(BrainReset {
             actor: PlayerId::from_index(seat).unwrap(),

@@ -318,6 +318,60 @@ fn physical_missile_hit_consumes_one_round_and_damages_pilot_once() {
 }
 
 #[test]
+fn supplied_missile_impact_leaves_a_physical_pod_braking_opportunity() {
+    let start = target_round(false);
+    let position = start.impact_motion(1).unwrap().center_of_mass;
+    let mut results = Vec::new();
+    for supplied in [false, true] {
+        let mut state = start.clone();
+        let mut shell = DebrisState::new_shell(
+            0,
+            state.world.tick,
+            position - Vec2::X * 8.0,
+            Vec2::X * 300.0,
+            0.0,
+        );
+        if supplied {
+            shell.inertial_mass = Some(weapons::ROUND_MASS);
+        }
+        state.world.debris.push(shell);
+        let mut peak_speed = 0.0_f32;
+        for _ in 0..600 {
+            SurfaceSortieScenario::step(
+                &mut state,
+                &[SurfaceSortieAction {
+                    brake_held: true,
+                    ..Default::default()
+                }
+                .encode(PlayerId::PLAYER_2)],
+                Duration::from_nanos(16_666_667),
+            );
+            peak_speed = peak_speed.max(state.impact_motion(1).unwrap().velocity.length());
+            if state.match_outcome().is_some() {
+                break;
+            }
+        }
+        results.push((
+            vitals(&state, 1).health,
+            peak_speed,
+            state.impact_motion(1).unwrap().velocity.length(),
+        ));
+        assert_eq!(state.combat_telemetry(0).cannon_hits, 1);
+        assert!(state.terrain_diagnostics().issues.is_empty());
+    }
+    assert_eq!(results[0].0, 0.0, "legacy counterfactual: {results:?}");
+    assert_eq!(results[1].0, 60.0, "supplied missile: {results:?}");
+    assert!(
+        results[1].1 > 20.0 && results[1].1 < results[0].1 * 0.7,
+        "{results:?}"
+    );
+    assert!(
+        results[1].2 < 2.0,
+        "ordinary brake must arrest the actual momentum: {results:?}"
+    );
+}
+
+#[test]
 fn fast_external_pilot_impact_uses_its_pre_solver_velocity() {
     let mut state = round();
     weightless(&mut state);

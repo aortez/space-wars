@@ -557,6 +557,9 @@ pub struct DebrisState {
     pub owner_id: Option<usize>,
     pub spawn_tick: u64,
     rail_launched: bool,
+    /// Explicit projectile inertia, inherited by its breakup pieces. Ordinary
+    /// asteroids and historical shells retain their radius-based mass model.
+    inertial_mass: Option<f32>,
     physics_id: u64,
 }
 
@@ -3564,14 +3567,22 @@ fn debris_breakup_fragments(
     salt: u64,
 ) -> Vec<DebrisState> {
     let primitives = debris_fragment_primitives(debris);
-    breakup_fragments(
+    let mut fragments = breakup_fragments(
         debris.position,
         debris.velocity,
         primitives,
         seed,
         tick,
         0xDEB2_0000 ^ debris_index as u64 ^ salt,
-    )
+    );
+    if let Some(mass) = debris.inertial_mass {
+        // Breaking a light round must not recreate a full asteroid-mass body.
+        let total: f32 = fragments.iter().map(|f| f.mass()).sum();
+        for fragment in &mut fragments {
+            fragment.inertial_mass = Some(mass * fragment.mass() / total);
+        }
+    }
+    fragments
 }
 
 fn rover_breakup_fragments_for_state(
@@ -5003,6 +5014,7 @@ impl DebrisState {
             owner_id: None,
             spawn_tick: 0,
             rail_launched: false,
+            inertial_mass: None,
             physics_id: 0,
         }
     }
@@ -5053,7 +5065,8 @@ impl DebrisState {
     }
 
     pub fn mass(self) -> f32 {
-        debris_mass(self.radius)
+        self.inertial_mass
+            .unwrap_or_else(|| debris_mass(self.radius))
     }
 
     #[cfg(test)]
@@ -5409,6 +5422,9 @@ impl ShipState {
                 -self.direction.angle_radians(),
             );
             shell.rail_launched = mount.is_some();
+            if mount.is_some() {
+                shell.inertial_mass = Some(weapons::ROUND_MASS);
+            }
             self.velocity -= self.direction * recoil;
             self.cannon_cooldown_remaining = CANNON_COOLDOWN_SECS;
             self.queued_cannon_fire = false;

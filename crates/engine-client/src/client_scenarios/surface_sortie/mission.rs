@@ -182,13 +182,21 @@ mod tests {
 
     #[test]
     fn physical_finished_match_supplies_menu_result_freezes_bots_and_restarts_healthy() {
-        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        // A recorded lethal laser encounter exercises the terminal UI. The
+        // former fixture relied on a missile flinging a pod into the boundary.
+        let mut state = SurfaceSortieScenario::init_material_combat(7);
         state.enable_match_rules();
         let mut fighters = [0, 1].map(|seat| {
-            RulePilotV4::new(BrainReset {
-                actor: PlayerId::from_index(seat).unwrap(),
-                episode_seed: 42,
-            })
+            RulePilotV4::with_combat_breaks(
+                BrainReset {
+                    actor: PlayerId::from_index(seat).unwrap(),
+                    episode_seed: 7,
+                },
+                engine_common::CombatBreakSettings {
+                    interval_seconds: 0,
+                    duration_seconds: 4,
+                },
+            )
         });
         for _ in 0..180 * 60 {
             let mut actions = Vec::new();
@@ -215,7 +223,7 @@ mod tests {
         assert!(client.is_game_over());
         assert_eq!(
             client.game_over_message().as_deref(),
-            Some("Player 1 wins / opposing pilot lost")
+            Some("Player 2 wins / opposing pilot lost")
         );
         let before = SurfaceSortieScenario::observe(&client.sortie.state);
         let brains_before = client.pilots.each_ref().map(|p| p.telemetry().clone());

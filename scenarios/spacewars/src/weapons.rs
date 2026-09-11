@@ -8,6 +8,9 @@ pub const LASER_DRAW_PER_SECOND: f32 = 12.0;
 pub const ROUND_ENERGY_COST: f32 = 25.0;
 pub const ROUND_RELOAD_SECONDS: f32 = 2.0;
 pub const ROUND_CAPACITY: usize = 2;
+/// Supplied missiles weigh about 3% of a full ship. Their explosive damage is
+/// independent of launching a survivor at almost the incoming missile speed.
+pub const ROUND_MASS: f32 = 1.0;
 const LASER_RESTART_ENERGY: f32 = 10.0;
 const RELOAD_EPSILON: f32 = 1.0e-5;
 
@@ -282,6 +285,25 @@ mod tests {
                 assert!(ship.update_cannon(DT, 0).is_none());
             }
         }
+    }
+
+    #[test]
+    fn supplied_missile_breakup_preserves_inertia_and_legacy_shells_keep_their_mass() {
+        let mut ship = armed_ship();
+        ship.cannon_firing = true;
+        let missile = ship.update_cannon_with_recoil(DT, 0, 8.0).unwrap();
+        let legacy = DebrisState::new_shell(0, 0, Vec2::ZERO, Vec2::X * 300.0, 0.0);
+        assert_eq!(missile.mass(), ROUND_MASS);
+        assert_eq!(legacy.mass(), debris_mass(CANNON_SHELL_RADIUS));
+        assert!(missile.mass() < legacy.mass() / 10.0);
+        let pieces = debris_breakup_fragments(&missile, 42, 1, 0, 0);
+        assert!(!pieces.is_empty());
+        assert!((pieces.iter().map(|p| p.mass()).sum::<f32>() - missile.mass()).abs() < 1e-6);
+        assert!(
+            pieces
+                .iter()
+                .all(|p| p.mass() > 0.0 && p.damage_scalar == 0.0 && p.velocity.length() > 0.0)
+        );
     }
 
     #[test]

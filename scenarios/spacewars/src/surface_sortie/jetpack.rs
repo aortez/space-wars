@@ -94,6 +94,7 @@ impl CrossingPlan {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JetpackNavigationObservation {
     pub charge: f32,
+    pub reference_velocity: Vec2,
     pub burning: bool,
     pub burn_seconds: f32,
     pub gravity: Vec2,
@@ -112,6 +113,7 @@ impl JetpackNavigationObservation {
             version: 1,
             pilot: pilot.clone(),
             charge: Some(self.charge),
+            reference_velocity: self.reference_velocity,
             burning: self.burning,
             burn_seconds: self.burn_seconds,
             gravity: self.gravity,
@@ -133,6 +135,7 @@ pub struct JetpackCrossingObservation {
     pub version: u32,
     pub pilot: pilot::PilotObservationV1,
     pub charge: Option<f32>,
+    pub reference_velocity: Vec2,
     pub burning: bool,
     pub burn_seconds: f32,
     pub gravity: Vec2,
@@ -172,6 +175,7 @@ impl SurfaceSortieState {
             && (self.world.tick + player as u64 * 15).is_multiple_of(30);
         Some(JetpackNavigationObservation {
             charge,
+            reference_velocity: pack.map_or(Vec2::ZERO, |p| p.reference_velocity),
             burning: pack.is_some_and(|p| p.active),
             burn_seconds: pack.map_or(0.0, |p| p.burn_seconds),
             gravity: pilot.gravity,
@@ -224,6 +228,7 @@ impl SurfaceSortieState {
             charge: pack
                 .map(|p| p.charge)
                 .or(self.pilots[player].jetpack_charge),
+            reference_velocity: pack.map_or(Vec2::ZERO, |p| p.reference_velocity),
             burning: pack.is_some_and(|p| p.active),
             burn_seconds: pack.map_or(0.0, |p| p.burn_seconds),
             gravity: self.pilots[player].gravity,

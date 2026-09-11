@@ -1,5 +1,11 @@
 # Surface gameplay and destructible terrain integration
 
+The latest [pilot impact survival pass](../pilot-impact-survival.md) calibrates
+supplied missile/wreckage inertia and corrects jetpack steering against moving
+ground. The bounded desktop/Pi matrix retains real pilot deaths, recovery and
+unfinished rounds. Promotion into ordinary Spacewars remains the next integration
+milestone; merging is deferred.
+
 The current [objective landing pass](../objective-landings.md) measures a walking
 and jumping round trip to enemy flags before choosing a landing, and adds
 bounded recovery for cramped returns under the parked hull. Prospective jetpack

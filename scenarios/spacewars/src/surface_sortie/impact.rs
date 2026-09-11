@@ -94,6 +94,18 @@ pub(super) struct SurfaceDamageState {
     pub(super) held: [bool; SPACEWARS_PLAYER_COUNT],
 }
 
+/// Read-only motion for impact replays. Velocity is at the centre of mass,
+/// unlike the vehicle-origin velocity in the ordinary landing observation.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct ImpactMotionObservation {
+    pub center_of_mass: Vec2,
+    pub velocity: Vec2,
+    pub spin: f32,
+    pub mass: f32,
+    pub boundary_center: Vec2,
+    pub boundary_radius: f32,
+}
+
 /// Read contact indices before finished projectiles are removed or fragments
 /// change debris order. The outer sortie step runs after that cleanup.
 pub(crate) fn record_contacts(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
@@ -116,6 +128,25 @@ pub(crate) fn record_contacts(world: &SpacewarsState, pilots: &mut [SurfacePilot
     }
 }
 impl SurfaceSortieState {
+    pub fn impact_motion(&self, player: usize) -> Option<ImpactMotionObservation> {
+        let pilot = self.pilots.get(player)?;
+        let body = pilot.body.as_ref().map_or_else(
+            || self.world.physics.ship_body(pilot.vehicle.0),
+            |actor| actor.body(),
+        );
+        let physics = &self.world.physics.world;
+        let motion = physics.motion(body)?;
+        let radius = self.world.config.universe_radius as f32;
+        Some(ImpactMotionObservation {
+            center_of_mass: physics.center_of_mass(body)?,
+            velocity: motion.linear_velocity,
+            spin: motion.angular_velocity,
+            mass: physics.body_mass(body)?,
+            boundary_center: Vec2::splat(radius),
+            boundary_radius: radius,
+        })
+    }
+
     pub fn spawn_recovery_hazard(
         &mut self,
         player: usize,
@@ -162,6 +193,9 @@ impl SurfaceSortieState {
                 -direction.angle_radians(),
             );
             shell.rail_launched = true;
+            if self.pilots[player].combat.is_some() {
+                shell.inertial_mass = Some(weapons::ROUND_MASS);
+            }
             shell
         } else {
             DebrisState::new(

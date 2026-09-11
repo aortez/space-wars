@@ -12,6 +12,8 @@ pub const AIR_ACCELERATION: f32 = 20.0;
 pub struct JetpackSnapshot {
     pub charge: f32,
     pub active: bool,
+    /// Inertial velocity saved at takeoff; airborne steering uses this frame.
+    pub reference_velocity: Vec2,
     /// Full-thrust equivalent time; partial thrust consumes proportionally.
     pub burn_seconds: f32,
 }
@@ -45,6 +47,7 @@ impl SpacelingAssembly {
         self.jetpack.as_ref().map(|pack| JetpackSnapshot {
             charge: pack.charge,
             active: pack.active,
+            reference_velocity: pack.reference_velocity,
             burn_seconds: pack.burn_seconds,
         })
     }

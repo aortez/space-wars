@@ -367,6 +367,7 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
         CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
     };
     o.jetpack = Some(JetpackNavigationObservation {
+        reference_velocity: Vec2::ZERO,
         charge,
         burning: false,
         burn_seconds: 0.0,
