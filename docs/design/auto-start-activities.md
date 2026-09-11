@@ -2,9 +2,9 @@
 
 Status: updated against merged main `07b9dc0` (Device Info and responsive kiosk
 menus, PR #70) on `auto-start-activities`, now checked out directly in
-`/home/data/workspace/space-wars2`. The earlier cabinet validation described
-below used build `8041b952ac4c`; this layout integration has not been deployed
-as part of this update. See [the user guide](../auto-start.md) for controls and settings.
+`/home/data/workspace/space-wars2`. Build `d12853e12f73`, including the layout
+integration, is deployed to both `sw-picade.local` and `sw-picade-2.local`.
+See [the user guide](../auto-start.md) for controls and settings.
 
 ## Goal and first slice
 
@@ -356,5 +356,34 @@ launcher navigation, saved sound settings, manual controller choices, and
 rematches/new worlds. Rendering comparisons cover 800×480, 1024×768, and
 480×800, including Auto-start, save errors, and match settings.
 
-No PR was open for the auto-start branch at this point. The updated branch is
-local; this integration does not publish a PR or redeploy the cabinet.
+No PR was open for the auto-start branch at this point. The updated branch
+remained local; cabinet deployment followed below.
+
+### Both cabinets — responsive-menu build
+
+Deployed application and CLI build `d12853e12f73` to `sw-picade.local` and
+`sw-picade-2.local` using the restricted fast updater, with an application
+restart and no reboot. The second cabinet's actual hostname contains the
+hyphen before `2`; `sw-picade2.local` did not resolve. Both installed runtime
+fingerprints matched the bundle, and both installed binary hashes matched its
+manifest. The cross-build compiled from the primary `space-wars2` checkout.
+
+On each cabinet, Device Info reported the expected revision, the kiosk stayed
+active with zero restarts during verification, and structured UI navigation
+reached the fifth App Settings row and opened Auto-start. Real screenshots
+confirmed the focused row and the Auto-start layout. `sw-picade` reported its
+cabinet controls as Player 1 and the Xbox 360 controller as Player 2;
+`sw-picade-2` reported cabinet controls as Player 1 only.
+
+Every pre-existing saved preference compared equal before and after deployment.
+The settings loader filled missing fields with their documented defaults:
+Auto-start Off, delay 30 seconds, and match limit 600 seconds on both cabinets;
+the older second cabinet also gained explicit default Player 1, combat-break,
+and material-combat fields. Both were left on Auto-start settings with Off and
+a 30-second delay. Physical button testing and full-duration unattended rounds
+remain playtest follow-ups; the desktop lifecycle checks above cover repeat
+rounds and persistence.
+
+Build/deploy logs, the bundle manifest, before/after settings, Device Info,
+service checks, and screenshots are archived locally under
+`/home/oldman/.codex/visualizations/2026/09/11/two-picade-autostart-deploy/`.
