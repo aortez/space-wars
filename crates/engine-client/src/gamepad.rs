@@ -312,6 +312,28 @@ impl GamepadPump {
     }
 
     fn refresh_connection_ui(&self, window: &MainWindow) {
+        let devices = self
+            .gilrs
+            .gamepads()
+            .map(|(id, pad)| {
+                let seat = self
+                    .assignments
+                    .seats
+                    .iter()
+                    .position(|assigned| *assigned == Some(usize::from(id)));
+                format!(
+                    "{} · {}",
+                    pad.name(),
+                    seat.map(|seat| format!("Player {}", seat + 1))
+                        .unwrap_or_else(|| "Unassigned".into())
+                )
+            })
+            .collect::<Vec<_>>();
+        window.set_device_controllers(if devices.is_empty() {
+            "No gamepads connected · Keyboard input available".into()
+        } else {
+            devices.join("\n").into()
+        });
         let connected = &self.assignments.connected;
         let binding = |seat: usize| {
             let player = seat + 1;

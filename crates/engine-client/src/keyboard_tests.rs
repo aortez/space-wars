@@ -246,6 +246,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
         Arc::clone(&settings),
         writer.clone(),
     );
+    device_info::install(&window, directory.path().to_path_buf()).unwrap();
     let resumes = Rc::new(Cell::new(0));
     let resumed = Rc::clone(&resumes);
     window.on_ingame_resume(move || resumed.set(resumed.get() + 1));
@@ -263,14 +264,31 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     key(&window, Key::RightArrow);
     assert_eq!(window.get_sound_volume_percent(), 30);
     // Touch hits the same shared callbacks; no platform-specific key injection.
-    click(&window, 612.0, 122.0);
+    click(&window, 612.0, 98.0);
     assert_eq!(window.get_sound_volume_percent(), 35);
-    click(&window, 400.0, 191.0);
+    click(&window, 400.0, 161.0);
     assert!(window.get_sound_muted());
-    click(&window, 400.0, 257.0);
+    click(&window, 400.0, 221.0);
     assert!(window.get_performance_overlay_enabled());
     key(&window, Key::DownArrow);
     assert_eq!(window.get_sound_focus_index(), 3);
+    let audio_before_info = settings.read().unwrap().audio;
+    key(&window, Key::Return);
+    assert!(window.get_device_info_visible());
+    pump_until(|| window.get_device_info_ready());
+    // The minimal non-Winit test platform has no draw loop. Realize the new
+    // scroll layout before using its bounds, just as a displayed frame does.
+    window.window().take_snapshot().unwrap();
+    pump_until(|| window.get_device_info_scroll_limit() > 0.0);
+    key(&window, Key::DownArrow);
+    assert!(window.get_device_info_scroll_offset() < 0.0);
+    // Touch Back belongs to Info, not the covered launcher or App Settings.
+    click(&window, 250.0, 410.0);
+    assert!(!window.get_device_info_visible());
+    assert!(window.get_sound_visible());
+    assert_eq!(window.get_sound_focus_index(), 3);
+    assert_eq!(settings.read().unwrap().audio, audio_before_info);
+    assert_eq!(resumes.get(), 0);
     key(&window, Key::UpArrow);
     assert_eq!(window.get_sound_focus_index(), 2);
     key(&window, Key::LeftArrow);
@@ -320,7 +338,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     assert_eq!(settings.read().unwrap().audio.master_volume, 0.40);
     assert!(!window.get_settings_save_error().is_empty());
     std::fs::remove_dir(&path).unwrap();
-    window.set_sound_focus_index(4);
+    window.set_sound_focus_index(5);
     window.invoke_ui_action(UiAction::Confirm.code());
     pump_until(|| !window.get_settings_save_pending());
     assert!(window.get_settings_save_error().is_empty());

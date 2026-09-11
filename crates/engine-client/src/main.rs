@@ -6,6 +6,7 @@
 
 mod client_scenarios;
 mod clock_controls;
+mod device_info;
 mod gamepad;
 mod host;
 mod input;
@@ -464,6 +465,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&settings),
         settings_writer.clone(),
     );
+    device_info::install(
+        &window,
+        settings_path
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf(),
+    )?;
     apply_video_settings(&window, &args, &settings.read().unwrap());
     let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
 
@@ -1122,7 +1130,9 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_sound_visible() {
+    if window.get_device_info_visible() && window.get_sound_visible() {
+        device_info::handle_action(window, action);
+    } else if window.get_sound_visible() {
         sound_controls::handle_action(window, action);
     } else if window.get_touch_test_visible() {
         if matches!(action, UiAction::Back | UiAction::Controls) {

@@ -158,6 +158,13 @@ game. Changes apply live and save in the background. New volume settings default
 to 25%; existing saved levels are preserved.
 A failed save leaves the controls usable and offers **Retry Save**.
 
+**App Settings → Device Info** shows the running build, hostname, network
+addresses, CPU/memory/storage information, and connected controller assignments.
+D-pad/arrow keys scroll; A/Enter or B/Esc returns one level to App Settings.
+It is read-only and samples in the background only while open. See
+[Device Info and menu navigation](docs/device-info.md), including the boundary
+for future Wi-Fi setup and controller assignment screens.
+
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames
 submitted to Slint) and **UPS** (simulation updates, or emulated NES frames).

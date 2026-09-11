@@ -1482,6 +1482,7 @@ dependencies = [
  "gilrs",
  "i-slint-backend-linuxkms",
  "i-slint-core",
+ "nix 0.30.1",
  "png 0.17.16",
  "scenario-clock",
  "scenario-falling",
@@ -3305,6 +3306,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]

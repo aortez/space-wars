@@ -34,6 +34,7 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_scenario_error_text("".into());
     ui.set_touch_test_visible(false);
     ui.set_sound_visible(false);
+    ui.set_device_info_visible(false);
     ui.set_performance_overlay_enabled(false);
     ui.set_performance_overlay_text("".into());
     ui.set_launcher_busy(false);
@@ -60,6 +61,24 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ui.set_clock_event_labels(Rc::new(slint::VecModel::from(vec!["Falling".into()])).into());
         ui.set_scenario_controls_help("Move with the joystick. A selects. B goes back.".into());
         ui.set_sound_volume_percent(5);
+        ui.set_device_info_ready(true);
+        ui.set_device_info_rows(slint::ModelRc::new(slint::VecModel::from(vec![
+            crate::DeviceInfoRow {
+                id: "info.hostname".into(),
+                label: "Device · Hostname".into(),
+                value: "sw-picade-2".into(),
+            },
+            crate::DeviceInfoRow {
+                id: "info.addresses".into(),
+                label: "Network · Local addresses".into(),
+                value: "wlan0: 192.168.1.142\nwlan0: fe80::1234:5678:abcd:ef12".into(),
+            },
+            crate::DeviceInfoRow {
+                id: "info.controllers".into(),
+                label: "Controllers · Current player assignments".into(),
+                value: "Space-Wars Picade · Player 1\nMicrosoft X-Box 360 pad · Player 2".into(),
+            },
+        ])));
         ui.set_p1_name("Player 1".into());
         ui.set_p1_status("Ship Health: 80%".into());
         ui.set_p1_status_fraction(0.8);
@@ -105,6 +124,11 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
         }),
+        ("launcher-info", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_device_info_visible(true);
+        }),
         ("busy", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_busy(true);
@@ -121,6 +145,11 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
         ("pause-sound", |ui| {
             ui.set_ingame_menu_visible(true);
             ui.set_sound_visible(true);
+        }),
+        ("pause-info", |ui| {
+            ui.set_ingame_menu_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_device_info_visible(true);
         }),
         ("disconnected", |ui| {
             ui.set_controller_disconnected_visible(true)

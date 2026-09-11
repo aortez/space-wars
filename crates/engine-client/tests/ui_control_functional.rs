@@ -29,6 +29,9 @@ mod clock;
 #[path = "ui_control_functional/sound.rs"]
 mod sound;
 
+#[path = "ui_control_functional/device_info.rs"]
+mod device_info;
+
 #[path = "ui_control_functional/performance.rs"]
 mod performance;
 

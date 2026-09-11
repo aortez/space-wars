@@ -6,6 +6,7 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 pub(crate) struct ScreenVisibility {
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
+    pub(crate) device_info: bool,
     pub(crate) launcher: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
@@ -22,7 +23,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound {
+        if visibility.sound && visibility.device_info {
+            UiScreen::LauncherInfo
+        } else if visibility.sound {
             UiScreen::LauncherSound
         } else if visibility.launcher_controls {
             UiScreen::LauncherControls
@@ -33,6 +36,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound && visibility.device_info {
+        UiScreen::PauseInfo
     } else if visibility.ingame_menu && visibility.sound {
         UiScreen::PauseSound
     } else if visibility.ingame_menu && visibility.ingame_clock {
@@ -48,6 +53,7 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) device_info_controls: Vec<UiControl>,
     pub(crate) launcher_busy_stage: String,
     pub(crate) launcher_busy_elapsed: String,
     pub(crate) sound_focus_index: i32,
@@ -122,6 +128,12 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::LauncherMain => launcher_main_inventory(context),
         UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
+        UiScreen::LauncherInfo | UiScreen::PauseInfo => UiInventory {
+            selected_control: Some("info.back".into()),
+            controls: context.device_info_controls.clone(),
+            actions: UiAction::ALL.to_vec(),
+            error: None,
+        },
         UiScreen::LauncherSettings => launcher_settings_inventory(context),
         UiScreen::LauncherControls => launcher_controls_inventory(context),
         UiScreen::LauncherTouchTest => UiInventory {
@@ -705,11 +717,13 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
             },
         ),
     );
+    controls.push(UiControl::new("settings.device-info", "Device Info", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
         "sound.mute",
         "settings.fps-counter",
+        "settings.device-info",
         "sound.back",
     ];
     if context.settings_save_error.is_some() {
@@ -965,6 +979,26 @@ mod tests {
 
     #[test]
     fn classification_uses_visible_layer_order() {
+        for (launcher, expected) in [(true, UiScreen::LauncherInfo), (false, UiScreen::PauseInfo)] {
+            assert_eq!(
+                classify_screen(ScreenVisibility {
+                    launcher,
+                    sound: true,
+                    device_info: true,
+                    ingame_menu: !launcher,
+                    ..Default::default()
+                }),
+                expected
+            );
+        }
+        assert_eq!(
+            classify_screen(ScreenVisibility {
+                device_info: true,
+                ..Default::default()
+            }),
+            UiScreen::Gameplay,
+            "a stale child flag alone must not hide gameplay"
+        );
         assert_eq!(
             classify_screen(ScreenVisibility {
                 launcher_busy: true,
@@ -979,6 +1013,7 @@ mod tests {
             classify_screen(ScreenVisibility {
                 launcher_busy: false,
                 sound: false,
+                device_info: false,
                 launcher: true,
                 launcher_controls: true,
                 launcher_settings: true,

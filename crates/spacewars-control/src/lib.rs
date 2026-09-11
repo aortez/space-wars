@@ -29,6 +29,8 @@ pub enum UiScreen {
     LauncherMain,
     #[serde(rename = "launcher.sound")]
     LauncherSound,
+    #[serde(rename = "launcher.info")]
+    LauncherInfo,
     #[serde(rename = "launcher.settings")]
     LauncherSettings,
     #[serde(rename = "launcher.controls")]
@@ -41,6 +43,8 @@ pub enum UiScreen {
     PauseMain,
     #[serde(rename = "pause.sound")]
     PauseSound,
+    #[serde(rename = "pause.info")]
+    PauseInfo,
     #[serde(rename = "pause.controls")]
     PauseControls,
     #[serde(rename = "pause.clock")]
@@ -55,12 +59,14 @@ impl UiScreen {
             Self::LauncherBusy => "launcher.busy",
             Self::LauncherMain => "launcher.main",
             Self::LauncherSound => "launcher.sound",
+            Self::LauncherInfo => "launcher.info",
             Self::LauncherSettings => "launcher.settings",
             Self::LauncherControls => "launcher.controls",
             Self::LauncherTouchTest => "launcher.touch-test",
             Self::Gameplay => "gameplay",
             Self::PauseMain => "pause.main",
             Self::PauseSound => "pause.sound",
+            Self::PauseInfo => "pause.info",
             Self::PauseControls => "pause.controls",
             Self::PauseClock => "pause.clock",
             Self::GameOver => "game-over",
@@ -73,6 +79,7 @@ impl UiScreen {
             Self::LauncherBusy
                 | Self::LauncherMain
                 | Self::LauncherSound
+                | Self::LauncherInfo
                 | Self::LauncherSettings
                 | Self::LauncherControls
                 | Self::LauncherTouchTest
@@ -555,12 +562,14 @@ mod tests {
             (UiScreen::LauncherBusy, "launcher.busy"),
             (UiScreen::LauncherMain, "launcher.main"),
             (UiScreen::LauncherSound, "launcher.sound"),
+            (UiScreen::LauncherInfo, "launcher.info"),
             (UiScreen::LauncherSettings, "launcher.settings"),
             (UiScreen::LauncherControls, "launcher.controls"),
             (UiScreen::LauncherTouchTest, "launcher.touch-test"),
             (UiScreen::Gameplay, "gameplay"),
             (UiScreen::PauseMain, "pause.main"),
             (UiScreen::PauseSound, "pause.sound"),
+            (UiScreen::PauseInfo, "pause.info"),
             (UiScreen::PauseControls, "pause.controls"),
             (UiScreen::PauseClock, "pause.clock"),
             (UiScreen::GameOver, "game-over"),

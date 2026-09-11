@@ -1,5 +1,7 @@
 // Root window for the engine-client.
 
+export struct DeviceInfoRow { id: string, label: string, value: string }
+
 export enum PrimitiveKind {
     path,
     text,
@@ -289,6 +291,12 @@ export component MainWindow inherits Window {
     in-out property <bool> clock-controls-pending: false;
     in property <string> clock-settings-error: "";
     in-out property <bool> sound-visible: false;
+    in-out property <bool> device-info-visible: false;
+    in property <bool> device-info-ready: false;
+    in property <[DeviceInfoRow]> device-info-rows;
+    in-out property <length> device-info-scroll-offset: 0px;
+    out property <length> device-info-scroll-limit: 0px;
+    in-out property <string> device-controllers: "Gamepad backend unavailable · Keyboard input available";
     in-out property <int> sound-focus-index: 0;
     in property <int> sound-volume-percent: 25;
     in property <bool> sound-muted: false;
@@ -385,6 +393,12 @@ export component MainWindow inherits Window {
     callback ingame-clock-preview();
     callback clock-settings-applied();
     callback sound-open();
+    callback device-info-open();
+    callback device-info-visibility-changed();
+    callback device-info-scroll(int);
+    device-info-scroll(direction) => {
+        root.device-info-scroll-offset = Math.max(-root.device-info-scroll-limit, Math.min(0px, root.device-info-scroll-offset - direction * 100px));
+    }
     callback sound-adjust(int, int);
     callback sound-retry();
     callback ingame-restart();
@@ -403,7 +417,14 @@ export component MainWindow inherits Window {
     callback keyboard-action(int, bool);
 
     forward-focus: launcher-shortcuts;
-    changed sound-visible => { launcher-shortcuts.focus(); }
+    changed sound-visible => {
+        if !root.sound-visible { root.device-info-visible = false; }
+        launcher-shortcuts.focus();
+    }
+    changed device-info-visible => {
+        root.device-info-visibility-changed();
+        launcher-shortcuts.focus();
+    }
 
     changed launcher-visible => {
         launcher-shortcuts.focus();
@@ -2221,7 +2242,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.sound-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+    if root.sound-visible && !root.device-info-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514e8;
@@ -2231,7 +2252,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: Math.min(parent.width - 32px, 520px);
-            height: 424px;
+            height: Math.min(parent.height - 24px, 490px);
             background: #101827;
             border-color: #596273;
             border-width: 1px;
@@ -2245,8 +2266,8 @@ export component MainWindow inherits Window {
                 font-weight: 700;
             }
             ChoiceRow {
-                x: 24px; y: 64px;
-                width: parent.width - 48px; height: 60px;
+                x: 24px; y: 60px;
+                width: parent.width - 48px; height: 52px;
                 label: "Master volume";
                 value: root.sound-volume-percent + "%";
                 selected: root.sound-focus-index == 0;
@@ -2254,22 +2275,22 @@ export component MainWindow inherits Window {
                 next => { root.sound-adjust(0, 1); }
             }
             MenuButton {
-                x: 24px; y: 136px;
-                width: parent.width - 48px; height: 54px;
+                x: 24px; y: 124px;
+                width: parent.width - 48px; height: 50px;
                 text: root.sound-muted ? "Mute: On" : "Mute: Off";
                 selected: root.sound-focus-index == 1;
                 activated => { root.sound-adjust(1, 0); }
             }
             MenuButton {
-                x: 24px; y: 202px;
-                width: parent.width - 48px; height: 54px;
+                x: 24px; y: 184px;
+                width: parent.width - 48px; height: 50px;
                 text: "FPS Counter: " + (root.performance-overlay-enabled ? "On" : "Off");
                 selected: root.sound-focus-index == 2;
                 activated => { root.sound-adjust(2, 0); }
             }
             Text {
-                x: 24px; y: 262px;
-                width: parent.width - 48px; height: 48px;
+                x: 24px; y: 306px;
+                width: parent.width - 48px; height: 46px;
                 text: root.settings-save-pending ? "Saving settings…" : root.settings-save-error != "" ? "Applied for this session. Could not save settings; retry below." : "Saved · Applies to all scenarios";
                 color: root.settings-save-error != "" ? #ffb0a0 : #80d8ff;
                 font-size: 14px;
@@ -2278,27 +2299,110 @@ export component MainWindow inherits Window {
                 horizontal-alignment: center;
             }
             MenuButton {
-                x: 24px; y: 322px;
-                width: root.settings-save-error == "" ? parent.width - 48px : (parent.width - 60px) / 2;
-                height: 54px;
-                text: "Back";
+                x: 24px; y: 244px;
+                width: parent.width - 48px; height: 50px;
+                text: "Device Info  ›";
                 selected: root.sound-focus-index == 3;
+                activated => { root.device-info-open(); }
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 90px;
+                width: root.settings-save-error == "" ? parent.width - 48px : (parent.width - 60px) / 2;
+                height: 48px;
+                text: "Back";
+                selected: root.sound-focus-index == 4;
                 activated => { root.sound-visible = false; }
             }
             if root.settings-save-error != "": MenuButton {
-                x: parent.width / 2 + 6px; y: 322px;
-                width: (parent.width - 60px) / 2; height: 54px;
+                x: parent.width / 2 + 6px; y: parent.height - 90px;
+                width: (parent.width - 60px) / 2; height: 48px;
                 text: "Retry Save";
-                selected: root.sound-focus-index == 4;
+                selected: root.sound-focus-index == 5;
                 activated => { root.sound-retry(); }
             }
             Text {
-                x: 24px; y: 390px;
+                x: 24px; y: parent.height - 28px;
                 width: parent.width - 48px;
                 text: "Left / Right adjust  ·  A selects  ·  B / Esc back";
                 color: #80d8ff;
                 font-size: 13px;
                 horizontal-alignment: center;
+            }
+        }
+    }
+
+    if root.device-info-visible && root.sound-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+        init => { root.device-info-scroll-limit = info-scroll.scroll-limit; }
+        width: parent.width; height: parent.height;
+        background: #050514e8;
+        TouchArea { width: parent.width; height: parent.height; }
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: Math.min(parent.width - 24px, 760px);
+            height: Math.min(parent.height - 24px, 680px);
+            background: #101827;
+            border-color: #596273; border-width: 1px; border-radius: 8px;
+            Text {
+                x: 24px; y: 16px; text: "Device Info";
+                color: #ffffff; font-size: 26px; font-weight: 700;
+            }
+            Text {
+                x: 24px; y: 52px; width: parent.width - 48px;
+                text: root.device-info-ready ? "Read only · Refreshes every 2 seconds while open" : "Reading device information…";
+                color: #80d8ff; font-size: 14px; overflow: elide;
+            }
+            info-scroll := Flickable {
+                x: 24px; y: 82px;
+                width: parent.width - 48px; height: parent.height - 180px;
+                viewport-width: self.width;
+                viewport-height: info-body.preferred-height;
+                viewport-y <=> root.device-info-scroll-offset;
+                property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
+                changed scroll-limit => {
+                    root.device-info-scroll-limit = self.scroll-limit;
+                    self.viewport-y = Math.max(-self.scroll-limit, Math.min(0px, self.viewport-y));
+                }
+                info-body := VerticalLayout {
+                    width: info-scroll.width - 12px;
+                    padding: 0px; spacing: 16px;
+                    for row in root.device-info-rows: VerticalLayout {
+                        spacing: 4px; padding: 0px;
+                        Text { text: row.label; color: #80d8ff; font-size: 15px; wrap: word-wrap; }
+                        Text { text: row.value; color: #ffffff; font-size: 18px; wrap: word-wrap; }
+                    }
+                }
+            }
+            Rectangle {
+                x: parent.width - 24px; y: 82px; width: 3px;
+                height: info-scroll.height; background: #283a50;
+                Rectangle {
+                    width: parent.width;
+                    height: Math.min(parent.height, Math.max(12px, parent.height * info-scroll.height / Math.max(info-scroll.height, info-scroll.viewport-height)));
+                    y: (parent.height - self.height) * Math.min(1, Math.max(0, -root.device-info-scroll-offset / Math.max(1px, info-scroll.viewport-height - info-scroll.height)));
+                    background: #80d8ff;
+                }
+            }
+            MenuButton {
+                x: 24px; y: parent.height - 82px;
+                width: parent.width - 228px; height: 48px;
+                text: "Back to App Settings"; selected: true;
+                activated => { root.device-info-visible = false; }
+            }
+            MenuButton {
+                x: parent.width - 192px; y: parent.height - 82px;
+                width: 78px; height: 48px; text: "Up";
+                activated => { root.device-info-scroll(-1); }
+            }
+            MenuButton {
+                x: parent.width - 102px; y: parent.height - 82px;
+                width: 78px; height: 48px; text: "Down";
+                activated => { root.device-info-scroll(1); }
+            }
+            Text {
+                x: 24px; y: parent.height - 24px; width: parent.width - 48px;
+                text: "D-pad scrolls · A / B / Esc back";
+                color: #80d8ff; font-size: 13px; horizontal-alignment: center;
             }
         }
     }
