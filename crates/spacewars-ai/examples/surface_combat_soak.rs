@@ -75,6 +75,12 @@ fn main() {
         "break interval must be 0..120 and duration 1..15"
     );
     let save_frames = arg("--frames", "false") == "true";
+    let match_rules = arg("--match", "false") == "true";
+    let require_finish = arg("--require-finish", "false") == "true";
+    assert!(
+        !require_finish || match_rules,
+        "--require-finish needs --match true"
+    );
     let asteroid_settings = MaterialAsteroidSettings {
         interval_seconds: arg("--asteroid-interval", "0").parse().unwrap(),
         severity: match arg("--asteroid-severity", "mixed").as_str() {
@@ -112,6 +118,9 @@ fn main() {
             }
         }),
     );
+    if match_rules {
+        state.enable_match_rules();
+    }
     let mut brains = [0, 1].map(|seat| {
         // Keep the landing subject's policy fixed across pressure comparisons;
         // only its opponent receives the experimental combat pacing.
@@ -171,6 +180,9 @@ fn main() {
         state.combat_observation(1, None),
     ];
     for tick in 0..seconds * 60 {
+        if state.match_outcome().is_some() {
+            break;
+        }
         let start = Instant::now();
         let mut actions = Vec::new();
         let mut subject_phase = None;
@@ -317,6 +329,13 @@ fn main() {
             asteroid_events.push(json!({"tick":tick + 1,"arrivals":environment.arrivals,"impacts":environment.impacts}));
         }
         for seat in 0..2 {
+            if let Some(vitals) = state.observation(seat).pilot_vitals
+                && vitals
+                    .last_damage
+                    .is_some_and(|d| d.tick == u64::from(tick) + 1)
+            {
+                damage_events.push(json!({"tick":tick + 1,"seat":seat,"pilot_damage":vitals.last_damage,"pilot_health":vitals.health}));
+            }
             let damage = state.damage_observation(seat);
             if damage.last_damage_tick == Some(u64::from(tick) + 1) {
                 damage_events.push(json!({"tick":tick + 1,"seat":seat,"damage":damage}));
@@ -412,7 +431,26 @@ fn main() {
     ai.sort_by(f64::total_cmp);
     sensors.sort_by(f64::total_cmp);
     policies.sort_by(f64::total_cmp);
+    let final_audit = state.terrain_diagnostics();
+    if !final_audit.issues.is_empty()
+        || final_audit.occupied_cells + final_audit.removed_cells != initial
+        || final_audit.max_speed >= 500.0
+    {
+        failure.get_or_insert_with(|| "final physical audit failed".to_owned());
+    }
+    if save_frames && state.match_outcome().is_some() {
+        for seat in 0..2 {
+            fs::write(
+                out.join(format!("frame-final-p{}.json", seat + 1)),
+                serde_json::to_vec(&SurfaceSortieScenario::player_frame(&state, seat)).unwrap(),
+            )
+            .unwrap();
+        }
+    }
     let report = json!({"version":5,"capture_combat":tactical.combat_telemetry(),"asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,"continue_after_failure":continue_after_failure,"audit_events":audit_events,"phases":phases,"landing_policy":landing_policy,"initial_state":initial_state,"subject_seat":subject_seat,"subject_health":subject_health,"opponent_fire":opponent_fire,"combat_breaks":break_config,"break_events":break_events,"damage_events":damage_events,"seed":seed,"seconds":seconds,"completed_seconds":steps.len()/60,"failure":failure,"mirror":mirror,"separation":separation,"brains":brains.each_ref().map(|b| b.telemetry()),
+        "match_rules":match_rules,"round":state.match_observation(),"elapsed_ticks":steps.len(),"final_audit":final_audit,
+        "final_players":[state.observation(0),state.observation(1)],
+        "termination":if failure.is_some(){"physics_alarm"}else if state.match_outcome().is_some(){"round_finished"}else{"budget_exhausted"},
         "landing_under_fire":land_after.map(|s| json!({"land_after_seconds":s,"start":landing_start,"telemetry":if use_tactical {json!(tactical.telemetry())} else {json!(landing.telemetry())},"exited_tick":exited_tick,"lost_tick":lost_tick})),
         "weapons":[state.combat_telemetry(0),state.combat_telemetry(1)],"step_p95_ms":steps[steps.len()*95/100],"step_max_ms":steps.last(),"ai_p95_ms":ai[ai.len()*95/100],
         "ai_max_ms":ai.last(),"sensor_p95_ms":sensors[sensors.len()*95/100],"sensor_max_ms":sensors.last(),"policy_p95_ms":policies[policies.len()*95/100],"policy_max_ms":policies.last(),"samples":samples,"events":events,"ground_failures":ground_failures});
@@ -428,5 +466,11 @@ fn main() {
     if let Some(failure) = failure {
         eprintln!("{failure}");
         std::process::exit(1);
+    }
+    if require_finish {
+        assert!(
+            state.match_outcome().is_some(),
+            "round did not finish within the original budget"
+        );
     }
 }

@@ -179,6 +179,82 @@ impl ClientScenario for MaterialMissionClientScenario {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn physical_finished_match_supplies_menu_result_freezes_bots_and_restarts_healthy() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        state.enable_match_rules();
+        let mut fighters = [0, 1].map(|seat| {
+            RulePilotV4::new(BrainReset {
+                actor: PlayerId::from_index(seat).unwrap(),
+                episode_seed: 42,
+            })
+        });
+        for _ in 0..180 * 60 {
+            let mut actions = Vec::new();
+            for (seat, brain) in fighters.iter_mut().enumerate() {
+                let o = state.combat_observation(seat, brain.site_request());
+                actions.extend(brain.intent(&o).encode(PlayerId::from_index(seat).unwrap()));
+            }
+            SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
+            if state.match_outcome().is_some() {
+                break;
+            }
+        }
+        assert!(
+            state.match_outcome().is_some(),
+            "physical match did not finish"
+        );
+        let settings = Settings::default();
+        let mut client = create(42, &settings, true, true);
+        let client = client
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap();
+        client.sortie.state = state;
+        assert!(client.is_game_over());
+        assert_eq!(
+            client.game_over_message().as_deref(),
+            Some("Player 1 wins / opposing pilot lost")
+        );
+        let before = SurfaceSortieScenario::observe(&client.sortie.state);
+        let brains_before = client.pilots.each_ref().map(|p| p.telemetry().clone());
+        client.step(
+            &[SurfaceSortieAction {
+                primary_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1)],
+            Duration::from_secs(1),
+        );
+        assert_eq!(
+            SurfaceSortieScenario::observe(&client.sortie.state).payload,
+            before.payload
+        );
+        assert_eq!(
+            client.pilots.each_ref().map(|p| p.telemetry().clone()),
+            brains_before
+        );
+        let reset = create(42, &settings, true, true);
+        assert!(!reset.is_game_over());
+        assert_eq!(reset.game_over_message(), None);
+        let reset = reset
+            .as_any()
+            .downcast_ref::<MaterialMissionClientScenario>()
+            .unwrap();
+        assert_eq!(reset.sortie.state.observation(0).tick, 0);
+        assert!(
+            reset
+                .sortie
+                .state
+                .match_observation()
+                .unwrap()
+                .pilots
+                .iter()
+                .all(|p| p.alive() && p.health == 100.0)
+        );
+    }
+
     #[test]
     fn mission_hosts_own_bot_inputs_preserve_pause_and_reset_and_render_destinations() {
         for (duel, arena) in [(false, false), (true, false), (false, true), (true, true)] {
