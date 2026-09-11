@@ -858,6 +858,7 @@ fn resolve_launch_asset(
 }
 
 fn apply_scenario_metadata(window: &MainWindow, scenario: &str) {
+    window.set_launcher_scenario_title(scenario.into());
     let Some(registration) = host::scenario_registration(scenario) else {
         window.set_scenario_benchmark_available(false);
         window.set_scenario_player_zoom_available(false);
@@ -866,6 +867,7 @@ fn apply_scenario_metadata(window: &MainWindow, scenario: &str) {
         window.set_scenario_controls_help(SharedString::from(""));
         return;
     };
+    window.set_launcher_scenario_title(registration.display_name().into());
     window.set_scenario_benchmark_available(registration.capabilities.benchmark);
     window.set_scenario_player_zoom_available(registration.capabilities.player_zoom);
     window.set_scenario_captures_gamepad_start(registration.capabilities.captures_gamepad_start);
@@ -1239,7 +1241,7 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             }
         }
         UiAction::Confirm => match window.get_launcher_focus_index() {
-            0 => cycle_launcher_scenario(window, 1),
+            0 => window.set_launcher_focus_index(1),
             1 => window.invoke_launcher_start_game(),
             2 => window.set_launcher_settings_visible(true),
             3 => window.set_launcher_controls_visible(true),

@@ -34,12 +34,17 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_scenario_error_text("".into());
     ui.set_touch_test_visible(false);
     ui.set_sound_visible(false);
+    ui.set_settings_save_error("".into());
+    ui.set_settings_save_pending(false);
+    ui.set_sound_focus_index(0);
     ui.set_device_info_visible(false);
     ui.set_performance_overlay_enabled(false);
     ui.set_performance_overlay_text("".into());
     ui.set_launcher_busy(false);
     ui.set_spacewars_ui_visible(false);
     ui.set_launcher_scenario("clock".into());
+    ui.set_launcher_scenario_title("Clock".into());
+    ui.set_launcher_focus_index(0);
 }
 
 #[test]
@@ -107,6 +112,22 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
         }),
         ("launcher", |ui| ui.set_launcher_visible(true)),
+        ("launcher-confirmed", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_focus_index(1);
+        }),
+        ("launcher-spacewars", |ui| {
+            ui.set_launcher_scenario("spacewars".into());
+            ui.set_launcher_scenario_title("Space-Wars".into());
+            ui.set_launcher_seed_text(u64::MAX.to_string().into());
+            ui.set_launcher_p2_controller("rule bot".into());
+            ui.set_launcher_visible(true);
+        }),
+        ("launcher-long-title", |ui| {
+            ui.set_launcher_scenario("spacewars-terrain-travel-duel".into());
+            ui.set_launcher_scenario_title("Space-Wars Terrain Travel Duel".into());
+            ui.set_launcher_visible(true);
+        }),
         ("launcher-settings", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_settings_visible(true);
@@ -128,6 +149,12 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
             ui.set_device_info_visible(true);
+        }),
+        ("launcher-sound-save-error", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_settings_save_error("Storage is not writable".into());
+            ui.set_sound_focus_index(5);
         }),
         ("busy", |ui| {
             ui.set_launcher_visible(true);
@@ -171,7 +198,7 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
     ];
     // Keep both trees alive across transitions and a resize. The first buffer
     // preserves old pixels; the reference repaints the entire window every time.
-    for (width, height) in [(800, 480), (480, 800)] {
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         for window in windows.iter() {
             window.set_size(PhysicalSize::new(width, height));
         }

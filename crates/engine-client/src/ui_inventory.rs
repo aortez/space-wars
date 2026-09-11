@@ -247,9 +247,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
             UiControl::new("launcher.scenario.next", "›", true)
                 .with_value(context.selected_scenario.clone()),
             if material_match {
-                world_control("launcher.start", "Play World", "Start Game", context)
+                world_control("launcher.start", "Play", "Play", context)
             } else {
-                UiControl::new("launcher.start", "Start Game", context.launch_available)
+                UiControl::new("launcher.start", "Play", context.launch_available)
             },
             UiControl::new("launcher.settings", "Scenario Settings", true),
             UiControl::new("launcher.controls", "Controls", true),
@@ -268,11 +268,9 @@ fn launcher_main_inventory(context: &UiInventoryContext) -> UiInventory {
         error: context.launcher_error.clone(),
     };
     if material_match {
-        inventory.controls.push(UiControl::new(
-            "launcher.new-match",
-            "New Match · New World",
-            true,
-        ));
+        inventory
+            .controls
+            .push(UiControl::new("launcher.new-match", "Play New World", true));
         if context.launcher_focus_index == 6 {
             inventory.selected_control = Some("launcher.new-match".into());
         }
@@ -696,11 +694,12 @@ fn push_choice(controls: &mut Vec<UiControl>, id: &str, value: &str) {
 
 fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     let mut controls = Vec::new();
-    push_choice(
-        &mut controls,
-        "sound.volume",
-        &format!("{}%", context.sound_volume_percent),
-    );
+    for (id, label) in [("sound.volume.previous", "-"), ("sound.volume.next", "+")] {
+        controls.push(
+            UiControl::new(id, label, true)
+                .with_value(format!("{}%", context.sound_volume_percent)),
+        );
+    }
     controls.push(
         UiControl::new("sound.mute", "Mute", true).with_value(if context.sound_muted {
             "on"

@@ -23,6 +23,78 @@ fn key(window: &MainWindow, text: impl Into<SharedString>) {
 }
 
 #[test]
+fn scenario_confirmation_focuses_play_without_changing_the_selection() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    install_ui_navigation(&window);
+    install_keyboard_navigation(
+        &window,
+        Rc::new(RefCell::new(input::ClientInput::default())),
+    );
+    window.set_launcher_scenarios(ModelRc::new(VecModel::from(vec![
+        "spacewars".into(),
+        "clock".into(),
+        "pizza".into(),
+    ])));
+    window.set_launcher_scenario("spacewars".into());
+    window.set_launcher_seed_text("12345".into());
+    window.set_launcher_visible(true);
+    let starts = Rc::new(Cell::new(0));
+    let started = Rc::clone(&starts);
+    window.on_launcher_start_game(move || started.set(started.get() + 1));
+    window.show().unwrap();
+
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_launcher_scenario(), "clock");
+    key(&window, Key::LeftArrow);
+    assert_eq!(window.get_launcher_scenario(), "spacewars");
+    click(&window, 725.0, 125.0);
+    assert_eq!(window.get_launcher_scenario(), "clock");
+    click(&window, 75.0, 125.0);
+    assert_eq!(window.get_launcher_scenario(), "spacewars");
+    assert_eq!(window.get_launcher_focus_index(), 0);
+
+    // Exercise both launcher layouts and the shared controller action as well
+    // as real Slint keyboard dispatch. Confirmation must not start or browse.
+    for scenario in ["spacewars", "clock"] {
+        for keyboard in [true, false] {
+            window.set_launcher_scenario(scenario.into());
+            window.set_launcher_focus_index(0);
+            let before = starts.get();
+            if keyboard {
+                key(&window, Key::Return);
+                window
+                    .window()
+                    .dispatch_event(WindowEvent::KeyPressRepeated {
+                        text: Key::Return.into(),
+                    });
+            } else {
+                window.invoke_ui_action(UiAction::Confirm.code());
+            }
+            assert_eq!(window.get_launcher_focus_index(), 1);
+            assert_eq!(starts.get(), before);
+            assert_eq!(window.get_launcher_scenario(), scenario);
+            assert_eq!(window.get_launcher_seed_text(), "12345");
+
+            if keyboard {
+                key(&window, Key::Return);
+            } else {
+                window.invoke_ui_action(UiAction::Confirm.code());
+            }
+            assert_eq!(starts.get(), before + 1);
+
+            window.set_launcher_focus_index(0);
+            window.invoke_ui_action(UiAction::Start.code());
+            assert_eq!(starts.get(), before + 2);
+            assert_eq!(window.get_launcher_scenario(), scenario);
+        }
+    }
+}
+
+#[test]
 fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts() {
     slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
     let window = MainWindow::new().unwrap();
@@ -264,11 +336,11 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     key(&window, Key::RightArrow);
     assert_eq!(window.get_sound_volume_percent(), 30);
     // Touch hits the same shared callbacks; no platform-specific key injection.
-    click(&window, 612.0, 98.0);
+    click(&window, 710.0, 120.0);
     assert_eq!(window.get_sound_volume_percent(), 35);
-    click(&window, 400.0, 161.0);
+    click(&window, 400.0, 182.0);
     assert!(window.get_sound_muted());
-    click(&window, 400.0, 221.0);
+    click(&window, 400.0, 244.0);
     assert!(window.get_performance_overlay_enabled());
     key(&window, Key::DownArrow);
     assert_eq!(window.get_sound_focus_index(), 3);
@@ -289,6 +361,27 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     assert_eq!(window.get_sound_focus_index(), 3);
     assert_eq!(settings.read().unwrap().audio, audio_before_info);
     assert_eq!(resumes.get(), 0);
+    // A shorter window forces the settings body to scroll. Its focused Device
+    // Info row is revealed after resizing and remains a real touch target.
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 360.0));
+    window.window().take_snapshot().unwrap();
+    click(&window, 400.0, 190.0);
+    assert!(window.get_device_info_visible());
+    key(&window, Key::Escape);
+    assert!(window.get_sound_visible());
+    assert_eq!(window.get_sound_focus_index(), 3);
+    window.window().take_snapshot().unwrap();
+    // Back remains below the scroll area, even when the last row is selected.
+    click(&window, 400.0, 288.0);
+    assert!(!window.get_sound_visible());
+    assert_eq!(resumes.get(), 0);
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    window.invoke_sound_open();
+    window.set_sound_focus_index(3);
     key(&window, Key::UpArrow);
     assert_eq!(window.get_sound_focus_index(), 2);
     key(&window, Key::LeftArrow);

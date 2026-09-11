@@ -3,6 +3,9 @@
 Both **Launcher → App Settings → Device Info** and
 **Pause → App Settings → Device Info** open the same read-only screen.
 
+These screens share the responsive [menu page layout](menu-layout.md), with
+an opaque background and a fixed navigation footer on both kiosk displays.
+
 - D-pad/arrow keys scroll. Touch-drag, mouse wheel, and visible Up/Down buttons
   work too. Back stays on screen even when the content is scrolled.
 - A/Enter activates Back. B/Esc returns exactly one level to App Settings and

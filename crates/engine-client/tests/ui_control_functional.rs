@@ -61,7 +61,7 @@ fn launcher_navigation_uses_the_public_control_api() {
             UiAction::Down,
             UiAction::Left,
             UiAction::Left,
-            UiAction::Left,
+            UiAction::Down,
             UiAction::Down,
         ] {
             state = harness.press_guarded(action, &state);
@@ -80,6 +80,21 @@ fn launcher_navigation_uses_the_public_control_api() {
             ])
         );
         assert_eq!(selected_control(&state), "launcher.scenario");
+
+        let scenario_before = state.selected_scenario.clone();
+        let seed_before = control_value(&state, "launcher.start").map(str::to_owned);
+        state = harness.press_guarded(UiAction::Right, &state);
+        assert_ne!(state.selected_scenario, scenario_before);
+        state = harness.press_guarded(UiAction::Left, &state);
+        assert_eq!(state.selected_scenario, scenario_before);
+        state = harness.press_guarded(UiAction::Confirm, &state);
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert_eq!(selected_control(&state), "launcher.start");
+        assert_eq!(state.selected_scenario, scenario_before);
+        assert_eq!(
+            control_value(&state, "launcher.start"),
+            seed_before.as_deref()
+        );
 
         state = harness.activate_guarded("launcher.settings", &state);
         assert_eq!(state.screen, UiScreen::LauncherSettings);
