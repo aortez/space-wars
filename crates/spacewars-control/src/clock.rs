@@ -526,6 +526,48 @@ mod tests {
             entrance_open_milli: 0,
             exit_open_milli: 700,
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
+            navigation: Some(engine_common::ClockDuckNavigationState {
+                jump_profile: engine_common::ClockDuckJumpProfile::Flowing,
+                course_seed: 42,
+                behavior: engine_common::ClockDuckBehavior::Exiting,
+                facing_right: false,
+                wall_tags: [2, 2],
+                calibrated_jumps: 2,
+                speed_samples: 9,
+                jump_height_milli: Some(35_000),
+                flight_ticks: Some(51),
+                run_speed_milli: Some(160_000),
+                target_obstacle: None,
+                spawned_ticks: 1650,
+                exit_visible: true,
+                body_radius_milli: 8000,
+                planning: Some(engine_common::ClockDuckPlanningState {
+                    surface_count: 5,
+                    support: Some(1),
+                    plan: Some(engine_common::ClockDuckPlanState {
+                        source: 1,
+                        target: 2,
+                        takeoff_milli: [-100_000, -150_000],
+                        landing_milli: [0, -140_000],
+                        flight_ticks: 45,
+                        cruise_speed_milli: 120_000,
+                        running_takeoff: true,
+                        next_target: Some(3),
+                    }),
+                    confirmed_landings: 10,
+                    undershoots: 1,
+                    overshoots: 0,
+                    wrong_surface_landings: 0,
+                    rejected_plans: 1,
+                    rejection: Some(engine_common::ClockDuckRejection::OutOfRange),
+                    acceleration_milli: Some(960_000),
+                    generation_attempts: 2,
+                    fallback_course: false,
+                    running_jumps: 10,
+                    flowing_fallbacks: 1,
+                    moving_landings: 10,
+                }),
+            }),
         });
         assert_eq!(
             ClockState::from_json(&state.to_json().unwrap()).unwrap(),
@@ -535,6 +577,48 @@ mod tests {
         assert_eq!(
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
+        );
+        // The two-profile diagnostics remain additive to the careful planner.
+        let mut careful_payload = serde_json::to_value(&state).unwrap();
+        let navigation = careful_payload["duck"]["navigation"]
+            .as_object_mut()
+            .unwrap();
+        navigation.remove("jump_profile");
+        let planning = navigation["planning"].as_object_mut().unwrap();
+        for field in ["running_jumps", "flowing_fallbacks", "moving_landings"] {
+            planning.remove(field);
+        }
+        let plan = planning["plan"].as_object_mut().unwrap();
+        plan.remove("running_takeoff");
+        plan.remove("next_target");
+        let older = ClockState::from_json(&careful_payload.to_string()).unwrap();
+        let navigation = older.duck.unwrap().navigation.unwrap();
+        assert_eq!(
+            navigation.jump_profile,
+            engine_common::ClockDuckJumpProfile::Careful
+        );
+        let planning = navigation.planning.unwrap();
+        assert_eq!(
+            (
+                planning.running_jumps,
+                planning.flowing_fallbacks,
+                planning.moving_landings
+            ),
+            (0, 0, 0)
+        );
+        assert!(!planning.plan.unwrap().running_takeoff);
+        assert_eq!(planning.plan.unwrap().next_target, None);
+        // Navigation is an additive schema-8 field; older clients/recordings
+        // can still exchange the original Duck diagnostics.
+        let mut old_payload = serde_json::to_value(&state).unwrap();
+        old_payload["duck"]
+            .as_object_mut()
+            .unwrap()
+            .remove("navigation");
+        state.duck.as_mut().unwrap().navigation = None;
+        assert_eq!(
+            ClockState::from_json(&old_payload.to_string()).unwrap(),
+            state
         );
     }
 

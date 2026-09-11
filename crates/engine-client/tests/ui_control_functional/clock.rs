@@ -804,9 +804,16 @@ impl FunctionalHarness {
             event_id: Some(event_id),
             min_phase_tick,
         };
-        let result = self
-            .client
-            .wait_for_clock_state(&predicate, Duration::from_secs(30));
+        // Follow the declared event envelope (Duck now lasts up to 35 s),
+        // with host scheduling margin rather than assuming all events < 30 s.
+        let max_ticks = state
+            .events
+            .iter()
+            .map(|event| event.duration_ticks)
+            .max()
+            .unwrap_or(0);
+        let timeout = Duration::from_secs_f64(max_ticks as f64 / 60.0) + Duration::from_secs(10);
+        let result = self.client.wait_for_clock_state(&predicate, timeout);
         self.require_clock(&format!("clock wait {predicate:?}"), result)
     }
 
@@ -988,7 +995,18 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         // Short door phases are checked at exact simulation ticks in the core
         // tests. A loaded UI runner need not catch a sub-second animation.
         let running = harness.clock_wait(&initial, "running", 1, 140);
-        assert_eq!((running.body_count, running.collider_count), (5, 5));
+        let surfaces = running
+            .duck
+            .unwrap()
+            .navigation
+            .unwrap()
+            .planning
+            .unwrap()
+            .surface_count;
+        assert_eq!(
+            (running.body_count, running.collider_count),
+            (surfaces + 1, surfaces + 1)
+        );
         assert!(running.duck.unwrap().jumps >= 1);
         harness.capture_screenshot("clock-duck-running.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
@@ -1018,7 +1036,40 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert!(!resetting.settings.events.duck);
         let duck = resetting.duck.unwrap();
         assert_eq!(duck.outcome, Some(engine_common::ClockDuckOutcome::Exited));
-        assert_eq!((duck.jumps, duck.cleared_obstacles), (3, 3));
+        assert_eq!(duck.cleared_obstacles, duck.obstacle_count);
+        let navigation = duck.navigation.unwrap();
+        match std::env::var("SPACEWARS_CLOCK_DUCK_PROFILE").as_deref() {
+            Ok("flowing") => assert_eq!(
+                navigation.jump_profile,
+                engine_common::ClockDuckJumpProfile::Flowing
+            ),
+            Ok("careful") => assert_eq!(
+                navigation.jump_profile,
+                engine_common::ClockDuckJumpProfile::Careful
+            ),
+            _ => {} // Mixed selects a concrete personality once per event.
+        }
+        assert_eq!(navigation.calibrated_jumps, 2);
+        assert_eq!(navigation.speed_samples, 9);
+        assert!(navigation.wall_tags.iter().all(|tags| *tags > 0));
+        let planning = navigation.planning.unwrap();
+        if navigation.jump_profile == engine_common::ClockDuckJumpProfile::Flowing {
+            assert!(planning.running_jumps > 0);
+            assert!(planning.moving_landings > 0);
+        } else {
+            assert_eq!(planning.running_jumps, 0);
+        }
+        assert_eq!(duck.jumps, 2 + planning.confirmed_landings);
+        assert!(planning.confirmed_landings >= (planning.surface_count - 1) as u32 * 3);
+        assert_eq!(
+            (
+                planning.undershoots,
+                planning.overshoots,
+                planning.wrong_surface_landings
+            ),
+            (0, 0, 0)
+        );
+        assert!(navigation.exit_visible);
         assert_eq!((resetting.body_count, resetting.collider_count), (0, 0));
         harness.capture_screenshot("clock-duck-resetting.png");
         let idle = harness.clock_wait(&initial, "idle", 2, 0);

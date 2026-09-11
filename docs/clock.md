@@ -7,8 +7,9 @@ reads the system clock. Configure the device's timezone/NTP as described in
 
 Implementation checkpoint for [#19](https://github.com/aortez/space-wars/issues/19):
 the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
-Duck and composed Marquee/saved text (#53). The issue's September 6 resume notes
-predate those deliveries. This slice adds time-change-triggered Digit Slide;
+Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slide.
+The issue's September 6 resume notes predate those deliveries. The current Duck
+upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
 rain/storm, flashlight/glow polish and concurrent events remain future work.
 
 ## Events
@@ -41,7 +42,7 @@ the Off profile still disables every automatic event.
 | `falling` | Digit geometry / rigid bodies | 3.5 s fall + 1.5 s reform | 30 s |
 | `color-cycle` | Appearance only | 6 s | 15 s |
 | `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
-| `duck` | Temporary floor course and a physical runner | 10 s envelope, including doors/reset | 30 s |
+| `duck` | Temporary floor course and a physical wall-tag runner | 35 s envelope, exit appears 20 s after spawn | 30 s |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
 
@@ -91,28 +92,126 @@ boundary accounts for and clears any remaining material rather than reporting
 it as successfully drained. Preview replacement, resize and restart drop the
 whole event-local representation. This does not depend on destructible terrain.
 
-Duck opens a side door, spawns a yellow pixel duck, and runs it across two small
-hurdles and one pit. Seeded variations choose the hurdle heights/positions, pit
-width, and entrance side. The opposite door opens as the duck approaches; after
-it exits, both doors and the temporary course fade away, restoring the ordinary
-floor and center drain. The clock remains anchored and follows live time above.
+Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
+warm-up jumps, measures its sustained running speed along the entrance runway,
+then plays wall-tag across raised platforms and gaps. Seeded variations choose
+two or three platforms, their heights, widths and positions, and the entrance
+side. Each landing becomes the starting point for the next planned jump. The opposite
+door is entirely hidden for 20 simulation seconds after spawn (warm-up included).
+When it appears, the duck finishes its current crossing, turning at the entrance
+if necessary, and leaves through the exit. The course fades away, restoring the
+ordinary floor and center drain; the clock follows live time throughout.
 
-The duck uses **one dynamic round body**, two fixed floor pieces, and two fixed
-hurdles: at most **five bodies and five colliders**, no joints, and no growing
-particle/entity lists. A small horizontal velocity servo runs it forward. Its
-rule controller looks ahead to the next obstacle and applies a jump velocity
-change only while supported by a real upward-facing contact. Gravity and Rapier
-contacts handle the resulting motion; it does not teleport across obstacles.
+The duck uses **one dynamic round body** and one fixed body/collider per landing
+surface, including the entrance and exit runways: normally **five or six bodies
+and colliders**. The course ceiling is seven surfaces plus the duck, with no
+joints or growing particle/entity lists. An acceleration-limited movement controller provides
+standing, walking, running and grounded jumping. Run speed is 1.4 times walk
+speed; the tuned jump height is 50% higher than the original duck's. It slows
+near a safe turnaround line inside each edge and reverses through acceleration,
+not by reflecting velocity or teleporting the body. The sprite faces its chosen
+travel direction independently of the entrance-side course mirroring.
+
+The rule controller measures actual body motion, not the actuator's tuning:
+peak height and flight time from two clean vertical jumps, acceleration during
+the runway run-up, and a rolling median of up to nine steady grounded speed
+samples. Side/ceiling-disturbed jumps are discarded
+and retried; airborne, blocked, accelerating and turnaround motion cannot train
+the run-speed estimate. The median prevents an isolated speed spike from
+becoming a permanent maximum. Warm-up height uses the conservative lower of the
+two observations. Calibration then freezes for this course; those observations
+remain local to this event instance. Braking and airborne steering use the same
+symmetric acceleration-limited actuator as the grounded run-up.
+
+Each Duck event now chooses a **Careful** or **Flowing** personality once at
+creation, with a seeded 50/50 choice. It keeps that personality throughout its
+warm-up, crossings, turnarounds and exit. Repeated visits can have different
+personalities; they do not have to alternate. A separate seeded stream leaves
+course geometry, entrance side and the event schedule unchanged, making both
+the choice and movement replayable. The personalities can evolve separately
+without removing either style.
+
+The **Careful** jumping profile preserves the deliberate stop-and-hop
+motion. Its planner reconstructs a ballistic arc from the measured height and flight
+time, using its descending intersection with the next platform's height. It
+tries at most three inset landing points, checks body clearance along the arc,
+and leaves headroom in jump height, speed and acceleration. The duck approaches
+and brakes at the takeoff point, jumps from real support, and steers/brakes
+toward its target. A landing only succeeds after an actual upward Rapier contact
+with the intended surface inside its safe landing interval. The next plan uses
+that actual support, not the predicted landing time. Short, long and wrong-surface
+landings are counted separately; unreachable plans are refused and retried at
+a bounded rate. Gravity and Rapier contacts handle the resulting motion.
+
+Generation checks every adjacent link in **both directions** against conservative
+capabilities, with at most 16 candidates before using a fixed fallback course.
+This is bounded, course-local planning, not general-purpose pathfinding or
+learning a policy. The ordered route and stationary platforms keep it cheap.
+The old two-hurdle/pit course
+is retained as a regression fixture, not a separate scenario or UI choice.
+
+The **Flowing** jumping profile uses the same body, gravity, jump impulse,
+speed limits, calibration and generated course. It considers three takeoff
+positions and three landing positions, carrying constant horizontal speed through
+flight and touchdown. A two-link lookahead scores the approach/flight time of
+the next jump too, preferring landings that leave a running continuation. There
+are at most 9 + 9×9 candidate arcs per planning decision, with at most 120
+clearance samples per arc. There is no second physics world or per-frame route
+search; the small candidate arrays are stack allocated.
+
+Both takeoff and landing retain room to brake safely. At launch, the planned
+arc is re-anchored to the actual position and checked again; after contact, the
+next decision uses actual support/velocity, not the prediction. If a running
+takeoff is unavailable or invalidated, Flowing falls back to the **unchanged
+Careful hop**. It does not skip platforms or change jump strength. Moving
+platforms, variable-height jumps and longer route searches remain future work.
+
+To compare profiles, use the same `--seed` and preview sequence:
+
+```sh
+# Normal operation: a seeded mix, chosen once per Duck visit.
+cargo run --release -p engine-client -- --scenario clock --seed 42
+
+# Force the original deliberate hop for comparison.
+SPACEWARS_CLOCK_DUCK_PROFILE=careful \
+  cargo run --release -p engine-client -- --scenario clock --seed 42
+
+# Running jumps where the course leaves enough room; careful hops elsewhere.
+SPACEWARS_CLOCK_DUCK_PROFILE=flowing \
+  cargo run --release -p engine-client -- --scenario clock --seed 42
+```
+
+The environment override is read when creating/restarting the Clock scenario;
+`careful` and `flowing` force a personality, while unset, `mixed`, or unknown
+values use the seeded mix. It is not a persistent menu setting. Changing the
+override requires relaunching the process. Standard benchmark mode remains
+pinned to the Careful configuration. The seeded physics comparison below
+exercises both profiles.
 The upright pixel sprite and sliding doors are presentation, not articulated
 physics. Doors are logical backstage entry/exit markers, not trapping colliders.
 
 Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
-still blocked at 9.5 seconds enters reset; successful exits normally occur sooner.
+still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.
+`exiting` starts when the door appears, even if the duck is still heading toward
+the entrance before its final return crossing.
 Reset immediately drops all physics, fades the course over half a second, and
-keeps the last outcome available until the fixed ten-second event envelope ends.
+keeps the last outcome available until the fixed 35-second event envelope ends.
 Resize, restart, or preview replacement also release the whole event. Narrow
 layouts scale the duck and jump height down; wider layouts increase running
 speed and horizontal course spacing while keeping the action below the face.
+
+This implements the calibrated movement, wall-tag, generated courses and
+platform-landing portions of [#69](https://github.com/aortez/space-wars/issues/69).
+For an optional planning overlay, start the client with:
+
+```sh
+SPACEWARS_CLOCK_DUCK_DEBUG=1 cargo run --release -p engine-client -- --scenario clock
+```
+
+Use **Clock Controls → Preview Event → Duck → Preview & Resume**. Cyan marks the planned takeoff,
+purple dots show the estimated body-center arc, and green marks the landing.
+This environment-only diagnostic is off by default, is not saved in settings,
+and does not alter the simulation. Normal benchmarks leave it off.
 
 All durations use fixed 60 Hz simulation ticks, so pause freezes the event and
 its schedule. The strict `clock trigger` command requires unpaused, synchronized,
@@ -166,7 +265,7 @@ or a host-time correction. Resizing during an event restores the current face
 and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Rapier
 exists only during Falling's falling phase or Duck's running/exiting phases:
 at most 28 moving bars plus four arena bodies and 100 colliders for Falling,
-or five bodies/colliders for Duck, with no accumulating debris.
+or eight bodies/colliders at the Duck course ceiling, with no accumulating debris.
 
 ## Extending the event system
 
@@ -345,6 +444,38 @@ render world units, grounded state, jumps, cleared/total obstacles, door opennes
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only
 during Duck; position is null before spawn and after despawn. Outcomes remain
 available during reset, not as a persistent event history.
+Its additive `navigation` object includes the reproducible course seed,
+`jump_profile` (`careful` or `flowing`), behavior
+(`warming-up`, `measuring-run`, `running`, `turning`, `exiting`, `approaching`,
+`jumping`, `landing`, `blocked`), sprite facing,
+left/right wall-tag counts, accepted calibration/sample counts, measured jump
+height/run speed (thousandths of world units or units/second), flight ticks,
+target surface index (`target_obstacle`), body radius, ticks since spawn, and exit visibility. Measurements are
+null until sampled. `left_to_right` remains the **entrance side**; use
+`navigation.facing_right` for the current direction. Cleared obstacles count the
+current crossing's surface transitions; total jumps include warm-up jumps. Navigation fields retain
+the final controller state during reset, not a claim of a still-live body.
+
+`navigation.planning` adds surface count, current physical support (null when
+airborne or despawned), generation attempts/fallback status, measured acceleration,
+confirmed landings, undershoots, overshoots, wrong-surface landings and rejected
+plans. The rejection reason is `too-narrow`, `too-high`, `out-of-range`, or
+`obstructed`. An active plan reports source/target indices, takeoff/landing **feet**
+positions in thousandths of render world units, predicted flight ticks and cruise
+speed. The overlay shifts these feet positions up by the radius to show the body
+center. Plan/counter diagnostics remain available during reset, alongside the
+outcome. This is a bounded snapshot, not an accumulating trace.
+
+`running_jumps` counts executed running takeoffs, `moving_landings` counts
+confirmed landings above 15% of measured run speed, and `flowing_fallbacks`
+counts running-plan refusals/aborts that use the careful planner (separate from
+`fallback_course`, which concerns generation). Plans expose `running_takeoff`
+and optional `next_target`: the latter is a feasible second link at planning
+time, not a commitment to execute it regardless of the actual landing. Older
+payloads without these fields default to Careful, false/null and zero counts.
+
+Older schema-8 payloads without `navigation` still decode; this adds no commands
+or action payload changes. Both text and JSON `clock state` show these diagnostics.
 The optional `marquee` object reports the active recipe, content, cell/group
 counts, progress in thousandths, scrolling/waving flags, rotation target and
 lighting mode. `settings.marquee_preset` and `settings.marquee_message` are the
@@ -483,31 +614,111 @@ The device captures below document the earlier events, not Meltdown.
 
 ### Duck local validation
 
-The workspace/all-target suite passed **875 tests** (16 display-dependent
-workflows ignored); all **six Clock UI workflows** were then run explicitly on
-the local X display and passed. Strict Clippy passed for Clock/common/control/CLI.
+The original Duck workspace/all-target suite passed **875 tests** (16
+display-dependent workflows ignored); all **six Clock UI workflows** were then
+run explicitly on the local X display and passed. Strict Clippy passed for
+Clock/common/control/CLI.
 
-The deterministic course test runs 32 seeds at each of four aspect ratios
-(0.25, 0.75, 800/480, and 4): every run must jump all three obstacles, reach the
-exit, and release every body. Each jump must start from physical support; door
-openness and spawn/despawn are checked at exact simulation ticks. Separate tests
-inject a fall and an unjumpable wall to verify bounded recovery. Pause, time
-changes, resize, repeatability, and replacement by every other event are covered
-too. Raster tests at 800×480,
-480×800, and 1280×720 check visible duck pixels and exact restoration of the
-normal frame, with fewer than 300 draw primitives; the same frames reach vector
+For the calibrated platform-planning upgrade (2026-09-11), the deterministic
+physics sweep covered **1,792 generated courses** across seven aspect ratios:
+**20,202 confirmed landings**, no short/long/wrong-surface landings, no falls or
+timeouts, and no fallback generation. Exits occurred at event ticks 1296–1492
+(21.60–24.87 seconds). The ordinary suite runs 224 of those courses; an explicitly
+ignored stress test covers the other 1,568. These are local tests, not device
+performance measurements or a guarantee for every possible seed.
+
+**124 Clock/common/control/CLI tests** and **289 client tests** passed (the
+two extended stress tests and one existing client test are ignored by default).
+The release Duck UI workflow passed under Xvfb with both profiles (including the
+Flowing overlay), covering diagnostics, pause, preview replacement, exit,
+cleanup, restart and relaunch.
+
+The two-profile comparison uses **448 identical course/seed/aspect combinations
+per profile** (seeds 0–63 across the same seven aspect ratios). All 896 runs
+exited and cleaned up without falls, timeouts or missed landings. Careful's
+5,163 confirmed landings and Flowing's 7,587 total **12,750 physical landings**.
+The course, physics tuning, calibration and exit gate are held constant.
+
+| Metric | Careful | Flowing |
+| --- | ---: | ---: |
+| Mean first-wall arrival, including warm-up | 9.278 s | 8.125 s |
+| Mean nearly-stopped ticks before first wall, after calibration | 13.42 | 2.50 |
+| Running takeoffs / confirmed landings | 0 / 5,163 | 5,886 / 7,587 |
+| Careful fallbacks | 0 | 1,701 |
+
+“Nearly stopped” means grounded below 5% of measured run speed. Flowing arrived
+at the first wall **12.4% sooner**, with **81.4% fewer nearly-stopped ticks**.
+Of its running jumps, 4,160 had a feasible second running link when planned;
+that link is still replanned after actual contact. These are behavior metrics,
+not CPU benchmarks or guarantees for unseen courses. The 20-second exit gate
+means whole-event completion time is not a useful speed score: a faster duck
+instead completes more crossings while it waits.
+
+Additional tests preserve the explicit Careful fixture replay, identical
+calibration across profiles, constant-speed arc endpoints in both directions,
+takeoff revalidation, and recovery from an injected lost-speed takeoff through
+the careful fallback. Rendering and debug-overlay checks exercise both profiles.
+
+A 32-visit mixed-personality replay (20 Careful / 12 Flowing for seed 42) checks
+that both styles appear, each remains
+fixed for its entire event, and an identical seed reproduces every diagnostic
+snapshot. A forced-Careful run alongside it verifies identical course geometry,
+entrance side, event IDs and scheduling deadlines. The client override parser
+also tests forced Careful, forced Flowing and default/mixed behavior.
+The mixed-default live UI workflow also passed under Xvfb using the debug client.
+
+Fixed single-platform, stepped and gap fixtures run at all seven aspect ratios.
+Every confirmed landing must match the planned collider's actual physical
+support. Every course must tag both walls, complete at least three traversals
+of its surface links, exit and release all bodies. Separate fault injection
+verifies short, long and wrong-surface classifications, refusal of impossible
+plans, bounded retries and timeout cleanup. Forced generator exhaustion checks
+the fallback course at every aspect ratio; pause, resize, replacement and
+overlay-on/off simulation equivalence are covered too.
+
+Raster captures were reviewed at 800×480 and 1024×768, including a trajectory
+overlay capture. Automated render checks also cover portrait and verify the
+actual exit-frame pixels before/after the timer.
+
+Formatting, diff checks, the host `pi-kiosk` feature check and strict Clippy with
+`--no-deps` for Clock/common/control/CLI passed. Dependency-inclusive Clippy
+encounters an existing `collapsible_else_if` warning in
+`engine-rapier/src/spaceling.rs`; no unrelated physics code was changed.
+
+The retained hurdle/pit regression test runs **32 seeds at seven aspect ratios**
+(0.25, 0.6, 0.75, 1024/768, 800/480, 1280/720, and 4). Every run must complete its
+calibration, tag both walls, jump all three obstacles on every crossing, exit,
+and release every body. Each jump must start from physical support; door
+visibility/openness and spawn/despawn are checked at exact simulation ticks.
+Separate tests alter the actual actuator speed, jump height and gravity to check
+the estimates, disturb a warm-up flight to verify rejection/retry, reject invalid
+and outlier samples, and inject a fall/unjumpable wall for bounded cleanup.
+Pause, time changes, resize, repeatability, and replacement by every other event
+are covered too. Raster tests at 800×480, 1024×768, 480×800, and 1280×720 check
+visible duck pixels and exact restoration of the normal frame, with fewer than
+300 draw primitives; the same frames reach vector
 presentation. The real-client Duck workflow checks both settings pages, disabled
 previews, controller navigation, phase telemetry, pause, exit, and restart/relaunch.
 It does not need to catch the brief door animations on a busy machine.
 
 ```sh
-cargo test --locked -p scenario-clock events::duck
+cargo test --locked -p scenario-clock events::duck -- --nocapture
+cargo test --locked -p scenario-clock platform_seed_stress -- --ignored --nocapture
+cargo test --locked -p scenario-clock jumping_profiles_compare -- --nocapture
+cargo test --locked -p scenario-clock jumping_profile_stress -- --ignored --nocapture
 SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-captures \
   cargo test --locked -p engine-client duck_course_reaches -- --nocapture
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client duck_planning_overlay -- --nocapture
 ```
 
-**Duck has not been deployed or tested on the Pi.** Ask before deploying; another
-task may be testing there.
+These are scripted real-physics tests, not wall-clock sleeps. `--nocapture` prints
+the seeded matrix's success count and earliest/latest exit ticks. The original
+one-pass implementation fails the new wall-tag regression by opening its exit
+at tick 371 after spawn, before the required 1,200-tick delay.
+
+**This Duck upgrade has not been deployed or tested on the Pi.** Ask before
+deploying; another task may be testing there.
 
 ### Marquee local verification
 

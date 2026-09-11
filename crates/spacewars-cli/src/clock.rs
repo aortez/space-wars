@@ -286,6 +286,63 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 duck.grounded,
                 duck.outcome
             );
+            if let Some(navigation) = duck.navigation {
+                println!(
+                    "Duck controller: {:?} / {:?}, facing {}; wall tags L/R={:?}, target obstacle={:?}, exit visible={}; course seed={}",
+                    navigation.jump_profile,
+                    navigation.behavior,
+                    if navigation.facing_right {
+                        "right"
+                    } else {
+                        "left"
+                    },
+                    navigation.wall_tags,
+                    navigation.target_obstacle,
+                    navigation.exit_visible,
+                    navigation.course_seed
+                );
+                println!(
+                    "Duck measured: {} warm-up jumps, {} speed samples; run={:?} units/s, jump={:?} units, flight={:?} ticks",
+                    navigation.calibrated_jumps,
+                    navigation.speed_samples,
+                    navigation.run_speed_milli.map(|v| v as f32 / 1000.0),
+                    navigation.jump_height_milli.map(|v| v as f32 / 1000.0),
+                    navigation.flight_ticks
+                );
+                if let Some(planning) = navigation.planning {
+                    println!(
+                        "Duck movement: {} running jumps, {} moving landings, {} careful fallbacks",
+                        planning.running_jumps,
+                        planning.moving_landings,
+                        planning.flowing_fallbacks
+                    );
+                    println!(
+                        "Duck landings: {} confirmed, {} short, {} long, {} wrong-surface; support={:?}/{}, rejected={} ({:?}), fallback={}",
+                        planning.confirmed_landings,
+                        planning.undershoots,
+                        planning.overshoots,
+                        planning.wrong_surface_landings,
+                        planning.support,
+                        planning.surface_count,
+                        planning.rejected_plans,
+                        planning.rejection,
+                        planning.fallback_course
+                    );
+                    if let Some(plan) = planning.plan {
+                        println!(
+                            "Duck plan: {} -> {}, takeoff={:?}, landing={:?} (milliunits), flight={} ticks, cruise={:.3} units/s, running={}, next={:?}",
+                            plan.source,
+                            plan.target,
+                            plan.takeoff_milli,
+                            plan.landing_milli,
+                            plan.flight_ticks,
+                            plan.cruise_speed_milli as f32 / 1000.0,
+                            plan.running_takeoff,
+                            plan.next_target
+                        );
+                    }
+                }
+            }
         }
         if let Some(marquee) = &state.marquee {
             println!(

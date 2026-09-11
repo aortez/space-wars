@@ -186,6 +186,9 @@ impl ClockAction {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ClockConfig {
     pub aspect_ratio: f32,
+    pub duck_debug_overlay: bool,
+    /// None chooses a seeded personality once per Duck event.
+    pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
@@ -197,6 +200,8 @@ impl Default for ClockConfig {
     fn default() -> Self {
         Self {
             aspect_ratio: DEFAULT_ASPECT_RATIO,
+            duck_debug_overlay: false,
+            duck_jump_profile: None,
             time_format: ClockTimeFormat::TwentyFourHour,
             event_profile: ClockEventProfile::default(),
             events: ClockEvents::default(),
@@ -210,6 +215,8 @@ impl ClockConfig {
     fn normalized(self) -> Self {
         Self {
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
+            duck_debug_overlay: self.duck_debug_overlay,
+            duck_jump_profile: self.duck_jump_profile,
             time_format: self.time_format,
             event_profile: self.event_profile,
             events: self.events,
@@ -398,6 +405,7 @@ impl ClockState {
             self.config.marquee_preset,
             self.config.marquee_message,
             previous_display,
+            self.config.duck_jump_profile,
         ));
     }
 

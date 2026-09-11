@@ -507,6 +507,98 @@ pub enum ClockDuckOutcome {
     TimedOut,
 }
 
+/// Movement personality, independent of event scheduling and course geometry.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckJumpProfile {
+    #[default]
+    Careful,
+    Flowing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckBehavior {
+    WarmingUp,
+    MeasuringRun,
+    Running,
+    Turning,
+    Exiting,
+    Approaching,
+    Jumping,
+    Landing,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckPlanState {
+    pub source: usize,
+    pub target: usize,
+    pub takeoff_milli: [i32; 2],
+    pub landing_milli: [i32; 2],
+    pub flight_ticks: u32,
+    pub cruise_speed_milli: u32,
+    #[serde(default)]
+    pub running_takeoff: bool,
+    #[serde(default)]
+    pub next_target: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckPlanningState {
+    pub surface_count: usize,
+    pub support: Option<usize>,
+    pub plan: Option<ClockDuckPlanState>,
+    pub confirmed_landings: u32,
+    pub undershoots: u32,
+    pub overshoots: u32,
+    pub wrong_surface_landings: u32,
+    pub rejected_plans: u32,
+    pub rejection: Option<ClockDuckRejection>,
+    pub acceleration_milli: Option<u32>,
+    pub generation_attempts: u32,
+    pub fallback_course: bool,
+    #[serde(default)]
+    pub running_jumps: u32,
+    #[serde(default)]
+    pub flowing_fallbacks: u32,
+    #[serde(default)]
+    pub moving_landings: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckRejection {
+    TooNarrow,
+    TooHigh,
+    OutOfRange,
+    Obstructed,
+}
+
+/// Bounded controller diagnostics; measurements come from actual body motion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckNavigationState {
+    #[serde(default)]
+    pub jump_profile: ClockDuckJumpProfile,
+    pub course_seed: u64,
+    pub behavior: ClockDuckBehavior,
+    pub facing_right: bool,
+    /// Render-space left/right wall tags, independent of the entrance side.
+    pub wall_tags: [u32; 2],
+    pub calibrated_jumps: usize,
+    pub speed_samples: usize,
+    pub jump_height_milli: Option<u32>,
+    pub flight_ticks: Option<u32>,
+    pub run_speed_milli: Option<u32>,
+    pub target_obstacle: Option<usize>,
+    pub spawned_ticks: u64,
+    pub exit_visible: bool,
+    #[serde(default)]
+    pub body_radius_milli: u32,
+    #[serde(default)]
+    pub planning: Option<ClockDuckPlanningState>,
+}
+
 /// Temporary course/controller telemetry. Position is in thousandths of render
 /// world units; the duck and its physics are absent during opening/resetting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -520,6 +612,9 @@ pub struct ClockDuckState {
     pub entrance_open_milli: u32,
     pub exit_open_milli: u32,
     pub outcome: Option<ClockDuckOutcome>,
+    /// Additive diagnostics: old schema-8 payloads may omit this object.
+    #[serde(default)]
+    pub navigation: Option<ClockDuckNavigationState>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

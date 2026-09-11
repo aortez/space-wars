@@ -67,7 +67,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         render_meltdown(&mut frame, event, layout);
     }
     if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
-        duck::render(&mut frame, event);
+        duck::render(&mut frame, event, state.config.duck_debug_overlay);
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);

@@ -11,7 +11,12 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
     for (kind, definition) in ClockEventKind::ALL.into_iter().zip(EVENT_CATALOG.iter()) {
         assert_eq!(definition.kind, kind);
         assert_eq!(EVENT_CATALOG[kind as usize].kind, kind);
-        assert!(definition.duration_ticks > 0 && definition.duration_ticks <= 12 * 60);
+        let max_duration = if definition.kind == ClockEventKind::Duck {
+            35 * 60
+        } else {
+            12 * 60
+        };
+        assert!(definition.duration_ticks > 0 && definition.duration_ticks <= max_duration);
         assert!(definition.cooldown_ticks >= COOLDOWN_TICKS);
     }
 }

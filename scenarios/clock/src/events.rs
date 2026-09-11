@@ -171,12 +171,17 @@ impl ActiveEvent {
         marquee_preset: engine_common::ClockMarqueePreset,
         marquee_message: engine_common::ClockMarqueeMessage,
         previous_display: Option<DisplaySnapshot>,
+        duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     ) -> Self {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
             ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(context, seed))),
-            ClockEventKind::Duck => Self::Duck(Box::new(DuckEvent::new(context.layout, seed))),
+            ClockEventKind::Duck => {
+                let mut event = DuckEvent::new_platforms(context.layout, seed);
+                event.select_jump_profile(duck_jump_profile);
+                Self::Duck(Box::new(event))
+            }
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
                 marquee_preset,
                 marquee_message,
