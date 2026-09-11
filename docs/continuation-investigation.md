@@ -6,6 +6,8 @@ implementation chunk is now covered by [usable landings](usable-landings.md);
 [objective landing selection](objective-landings.md) now has a bounded first implementation.
 Prospective jetpack access and damaged approaches are [parked with reproduction
 notes](landing-investigation-guide.md). The current priority is the match lifecycle.
+Its first implementation and measurements are now recorded in
+[pilot health and finished rounds](material-match-lifecycle.md).
 The source review and archived desktop/Pi traces add detail to the
 [mission reliability results](mission-reliability.md).
 
