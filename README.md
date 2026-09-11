@@ -167,9 +167,15 @@ Holding jump/shove does not repeat it; jump is not buffered during knockdown.
 
 In **Spacewars → Settings**, set **Player 1** and **Player 2** independently to
 **human** or **rule bot**. Bots use the same landing, on-foot capture, weapons,
-jetpack and recovery actions as humans. Both choices persist through Play Again
+jetpack and recovery actions as humans. Both choices persist through Rematch
 and relaunching. The default remains two human players; choose two bots to watch
 a match. Bot combat breaks and asteroid arrivals/strength are configurable.
+
+**New Match** generates a fresh world with the same player and gameplay settings.
+**Rematch** resets the current world, and **Play World** starts the seed shown
+in the launcher. Seeds are visible in the launcher, pause and result menus and
+persist after New Match. See [new worlds and rematches](docs/match-worlds.md)
+for controller behavior and reproducing a world with `--seed`.
 
 The previous port-seeking AI and **Small Duel** preset are available in
 **spacewars-classic**. Historical benchmark commands should select that scenario;

@@ -12,6 +12,7 @@ mod input;
 mod ipc;
 #[cfg(test)]
 mod keyboard_tests;
+mod match_world;
 mod native_video;
 mod nes_audio;
 mod nes_realtime;
@@ -375,6 +376,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Rc::clone(&scenario_controls),
         Rc::clone(&input),
         Arc::clone(&settings),
+        settings_path.clone(),
         Rc::clone(&rom_catalog),
     );
     install_ui_navigation(&window);
@@ -833,7 +835,27 @@ fn install_launcher_callbacks(
             &game_settings,
             &game_settings_path,
             &game_rom_catalog,
-            false,
+            LauncherStart::SelectedWorld,
+        );
+    });
+
+    let weak = window.as_weak();
+    let game_timer = Rc::clone(&render_timer);
+    let game_controls = Rc::clone(&scenario_controls);
+    let game_input = Rc::clone(&input);
+    let game_settings = Arc::clone(&settings);
+    let game_settings_path = settings_path.clone();
+    let game_rom_catalog = Rc::clone(&rom_catalog);
+    window.on_launcher_new_match(move || {
+        handle_launcher_start(
+            &weak,
+            &game_timer,
+            &game_controls,
+            &game_input,
+            &game_settings,
+            &game_settings_path,
+            &game_rom_catalog,
+            LauncherStart::NewMatch,
         );
     });
 
@@ -852,7 +874,7 @@ fn install_launcher_callbacks(
             &benchmark_settings,
             &settings_path,
             &benchmark_rom_catalog,
-            true,
+            LauncherStart::Benchmark,
         );
     });
 
@@ -910,6 +932,7 @@ fn install_ingame_menu_callbacks(
     scenario_controls: host::SharedScenarioControls,
     input: input::SharedInput,
     settings: Arc<RwLock<Settings>>,
+    settings_path: PathBuf,
     rom_catalog: SharedNesRomCatalog,
 ) {
     let controls = Rc::clone(&scenario_controls);
@@ -920,6 +943,31 @@ fn install_ingame_menu_callbacks(
     let controls = Rc::clone(&scenario_controls);
     window.on_ingame_restart(move || {
         controls.borrow_mut().request_restart();
+    });
+
+    let controls = Rc::clone(&scenario_controls);
+    window.on_ingame_new_match(move || {
+        controls.borrow_mut().request_new_match();
+    });
+
+    let weak = window.as_weak();
+    let world_settings = Arc::clone(&settings);
+    window.on_match_world_changed(move || {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let mut settings = world_settings.write().unwrap();
+        settings.launch.scenario = "spacewars".into();
+        settings.last_scenario = Some("spacewars".into());
+        settings.launch.seed = window.get_launcher_seed_text().parse().unwrap();
+        settings.launch.renderer =
+            renderer_setting(renderer_from_label(window.get_launcher_renderer().as_str()).unwrap());
+        settings.launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+        if let Err(error) = settings::save_settings(&settings, &settings_path) {
+            window.set_scenario_error_text(SharedString::from(format!(
+                "The new match is ready, but its world seed could not be saved: {error}"
+            )));
+        }
     });
 
     let controls = Rc::clone(&scenario_controls);
@@ -1092,15 +1140,19 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
         return;
     }
 
+    let move_selection = if window.get_launcher_scenario() == "spacewars" {
+        ui_navigation::moved_match_launcher_selection
+    } else {
+        ui_navigation::moved_launcher_selection
+    };
     match action {
-        UiAction::Up | UiAction::Down => window.set_launcher_focus_index(
-            ui_navigation::moved_launcher_selection(window.get_launcher_focus_index(), action),
-        ),
+        UiAction::Up | UiAction::Down => window
+            .set_launcher_focus_index(move_selection(window.get_launcher_focus_index(), action)),
         UiAction::Left => {
             if window.get_launcher_focus_index() == 0 {
                 cycle_launcher_scenario(window, -1);
             } else {
-                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                window.set_launcher_focus_index(move_selection(
                     window.get_launcher_focus_index(),
                     action,
                 ));
@@ -1110,7 +1162,7 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             if window.get_launcher_focus_index() == 0 {
                 cycle_launcher_scenario(window, 1);
             } else {
-                window.set_launcher_focus_index(ui_navigation::moved_launcher_selection(
+                window.set_launcher_focus_index(move_selection(
                     window.get_launcher_focus_index(),
                     action,
                 ));
@@ -1122,6 +1174,9 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
             2 => window.set_launcher_settings_visible(true),
             3 => window.set_launcher_controls_visible(true),
             4 => window.invoke_launcher_quit(),
+            5 if window.get_launcher_scenario() == "spacewars" => {
+                window.invoke_launcher_new_match()
+            }
             _ => {}
         },
         // Back never exits the root kiosk screen. Quit is an explicit menu item.
@@ -1132,16 +1187,20 @@ fn handle_launcher_ui_action(window: &MainWindow, action: UiAction) {
 }
 
 fn handle_game_over_ui_action(window: &MainWindow, action: UiAction) {
+    let material_match = window.get_launcher_scenario() == "spacewars";
+    let item_count = if material_match { 3 } else { 2 };
     match action {
         UiAction::Up | UiAction::Left => window.set_game_over_focus_index(
-            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, -1),
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), item_count, -1),
         ),
         UiAction::Down | UiAction::Right => window.set_game_over_focus_index(
-            ui_navigation::moved_selection(window.get_game_over_focus_index(), 2, 1),
+            ui_navigation::moved_selection(window.get_game_over_focus_index(), item_count, 1),
         ),
         UiAction::Confirm => {
             if window.get_game_over_focus_index() == 0 {
                 window.invoke_ingame_restart();
+            } else if material_match && window.get_game_over_focus_index() == 1 {
+                window.invoke_ingame_new_match();
             } else {
                 window.invoke_ingame_return_launcher();
             }
@@ -1173,7 +1232,11 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
         UiAction::Up | UiAction::Down | UiAction::Left | UiAction::Right => {
             window.set_ingame_menu_focus_index(ui_navigation::moved_ingame_selection(
                 window.get_ingame_menu_focus_index(),
-                benchmark_offset == 1 || window.get_launcher_scenario() == "clock",
+                benchmark_offset == 1
+                    || matches!(
+                        window.get_launcher_scenario().as_str(),
+                        "clock" | "spacewars"
+                    ),
                 action,
             ));
         }
@@ -1191,6 +1254,8 @@ fn handle_ingame_menu_ui_action(window: &MainWindow, action: UiAction) {
                 window.invoke_ingame_return_launcher();
             } else if selected == 4 && window.get_launcher_scenario() == "clock" {
                 clock_controls::open(window);
+            } else if selected == 4 && window.get_launcher_scenario() == "spacewars" {
+                window.invoke_ingame_new_match();
             }
         }
         UiAction::Back | UiAction::Start => window.invoke_ingame_resume(),
@@ -1505,7 +1570,13 @@ fn handle_return_to_launcher(
     input.borrow_mut().clear();
     input.borrow_mut().reset_spacewars_controls();
     let settings = settings.read().unwrap();
-    let launch = launch_from_settings(&settings);
+    let mut launch = launch_from_settings(&settings);
+    if window.get_launcher_scenario() == "spacewars" {
+        launch.scenario = "spacewars".into();
+        launch.seed = window.get_launcher_seed_text().parse().unwrap();
+        launch.renderer = renderer_from_label(window.get_launcher_renderer().as_str()).unwrap();
+        launch.raster_scale = window.get_launcher_raster_scale_text().parse().unwrap();
+    }
     show_launcher(&window, &launch, &settings, rom_catalog);
 }
 
@@ -1586,6 +1657,13 @@ fn handle_launcher_zoom(weak_window: &slint::Weak<MainWindow>, player: usize, zo
     window.set_launcher_error_text(SharedString::from(""));
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LauncherStart {
+    SelectedWorld,
+    NewMatch,
+    Benchmark,
+}
+
 fn handle_launcher_start(
     weak_window: &slint::Weak<MainWindow>,
     render_timer: &Rc<RefCell<Option<Timer>>>,
@@ -1594,7 +1672,7 @@ fn handle_launcher_start(
     settings: &Arc<RwLock<Settings>>,
     settings_path: &Path,
     rom_catalog: &SharedNesRomCatalog,
-    start_benchmark: bool,
+    mode: LauncherStart,
 ) {
     let Some(window) = weak_window.upgrade() else {
         return;
@@ -1602,13 +1680,20 @@ fn handle_launcher_start(
     window.set_launcher_error_text(SharedString::from(""));
 
     let current_settings = settings.read().unwrap().clone();
-    let selections = match launcher_selections_from_window(&window, &current_settings) {
+    let mut selections = match launcher_selections_from_window(&window, &current_settings) {
         Ok(selections) => selections,
         Err(message) => {
             window.set_launcher_error_text(SharedString::from(message));
             return;
         }
     };
+    if mode == LauncherStart::NewMatch {
+        if selections.launch.scenario != "spacewars" {
+            return;
+        }
+        selections.launch.seed = match_world::fresh_seed(selections.launch.seed);
+    }
+    let start_benchmark = mode == LauncherStart::Benchmark;
     if start_benchmark
         && !host::scenario_registration(selections.launch.scenario.as_str())
             .is_some_and(|registration| registration.capabilities.benchmark)
@@ -2268,7 +2353,7 @@ fn start_scenario_from_launch(
     controls.borrow_mut().clear();
     window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
     apply_scenario_metadata(window, launch.scenario.as_str());
-    host::start_scenario_loop(
+    let timer = host::start_scenario_loop(
         window,
         launch.scenario.as_str(),
         launch.seed,
@@ -2282,7 +2367,13 @@ fn start_scenario_from_launch(
             settings,
             asset,
         },
-    )
+    )?;
+    window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
+    window.set_launcher_renderer(SharedString::from(renderer_label(launch.renderer)));
+    window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
+        launch.raster_scale,
+    )));
+    Ok(timer)
 }
 
 fn renderer_from_label(label: &str) -> Result<host::RenderBackend, String> {

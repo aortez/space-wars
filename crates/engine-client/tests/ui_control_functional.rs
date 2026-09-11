@@ -51,8 +51,8 @@ fn launcher_navigation_uses_the_public_control_api() {
             UiAction::Right,
             UiAction::Down,
             UiAction::Left,
-            UiAction::Up,
-            UiAction::Up,
+            UiAction::Left,
+            UiAction::Down,
         ] {
             state = harness.press_guarded(action, &state);
             reached.insert(selected_control(&state));
@@ -65,6 +65,7 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.scenario".into(),
                 "launcher.settings".into(),
                 "launcher.start".into(),
+                "launcher.new-match".into(),
             ])
         );
         assert_eq!(selected_control(&state), "launcher.scenario");
@@ -1070,6 +1071,7 @@ fn assert_launcher_main(state: &UiState) {
             "launcher.settings",
             "launcher.controls",
             "launcher.quit",
+            "launcher.new-match",
         ]
     );
     assert_eq!(

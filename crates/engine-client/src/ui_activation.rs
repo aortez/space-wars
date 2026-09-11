@@ -24,8 +24,11 @@ struct ActivationTarget {
 }
 
 pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
-    let Some(target) = activation_target(control_id, window.get_scenario_benchmark_available())
-    else {
+    let Some(target) = activation_target(
+        control_id,
+        window.get_scenario_benchmark_available(),
+        window.get_launcher_scenario() == "spacewars",
+    ) else {
         return false;
     };
 
@@ -51,10 +54,14 @@ pub(crate) fn activate(window: &MainWindow, control_id: &str) -> bool {
 
 #[cfg(test)]
 pub(crate) fn supports(control_id: &str, benchmark_available: bool) -> bool {
-    activation_target(control_id, benchmark_available).is_some()
+    activation_target(control_id, benchmark_available, false).is_some()
 }
 
-fn activation_target(control_id: &str, benchmark_available: bool) -> Option<ActivationTarget> {
+fn activation_target(
+    control_id: &str,
+    benchmark_available: bool,
+    material_match: bool,
+) -> Option<ActivationTarget> {
     let target = match control_id {
         "gameplay.clock-controls" => ActivationTarget {
             focus: ActivationFocus::Gameplay,
@@ -63,6 +70,7 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "launcher.scenario.previous" => launcher(0, UiAction::Left),
         "launcher.scenario.next" => launcher(0, UiAction::Right),
         "launcher.start" => launcher(1, UiAction::Confirm),
+        "launcher.new-match" => launcher(5, UiAction::Confirm),
         "launcher.settings" => launcher(2, UiAction::Confirm),
         "launcher.controls" => launcher(3, UiAction::Confirm),
         "launcher.quit" => launcher(4, UiAction::Confirm),
@@ -77,6 +85,7 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         },
         "pause.resume" => pause_main(0),
         "pause.restart" => pause_main(1),
+        "pause.new-match" => pause_main(4),
         "pause.benchmark" => pause_main(2),
         "pause.controls" => pause_main(2 + i32::from(benchmark_available)),
         "pause.clock" => pause_main(4),
@@ -100,7 +109,8 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
             action: UiAction::Start,
         },
         "game-over.play-again" => game_over(0),
-        "game-over.return-to-launcher" => game_over(1),
+        "game-over.new-match" => game_over(1),
+        "game-over.return-to-launcher" => game_over(if material_match { 2 } else { 1 }),
         _ => return launcher_setting_target(control_id),
     };
     Some(target)
@@ -197,19 +207,19 @@ mod tests {
     #[test]
     fn pause_targets_account_for_the_optional_benchmark() {
         assert_eq!(
-            activation_target("pause.controls", true),
+            activation_target("pause.controls", true, false),
             Some(pause_main(3))
         );
         assert_eq!(
-            activation_target("pause.controls", false),
+            activation_target("pause.controls", false, false),
             Some(pause_main(2))
         );
         assert_eq!(
-            activation_target("pause.return-to-launcher", true),
+            activation_target("pause.return-to-launcher", true, false),
             Some(pause_main(4))
         );
         assert_eq!(
-            activation_target("pause.return-to-launcher", false),
+            activation_target("pause.return-to-launcher", false, false),
             Some(pause_main(3))
         );
     }
@@ -217,15 +227,19 @@ mod tests {
     #[test]
     fn settings_targets_select_the_visible_row_and_direction() {
         assert_eq!(
-            activation_target("launcher.settings.spacewars.player-health.previous", false),
+            activation_target(
+                "launcher.settings.spacewars.player-health.previous",
+                false,
+                false
+            ),
             Some(launcher_settings(Some(5), UiAction::Left))
         );
         assert_eq!(
-            activation_target("launcher.settings.pizza.spawn-rate.next", false),
+            activation_target("launcher.settings.pizza.spawn-rate.next", false, false),
             Some(launcher_settings(Some(3), UiAction::Right))
         );
         assert_eq!(
-            activation_target("launcher.settings.unknown.next", false),
+            activation_target("launcher.settings.unknown.next", false, false),
             None
         );
     }

@@ -362,6 +362,9 @@ export component MainWindow inherits Window {
     callback ingame-clock-preview();
     callback clock-settings-applied();
     callback ingame-restart();
+    callback ingame-new-match();
+    callback match-world-changed();
+    callback launcher-new-match();
     callback ingame-return-launcher();
     callback ingame-start-benchmark();
     callback ingame-p1-zoom-in();
@@ -681,6 +684,17 @@ export component MainWindow inherits Window {
             }
 
             Text {
+                visible: root.launcher-material-match && !root.ingame-controls-visible;
+                x: 180px;
+                y: 28px;
+                width: parent.width - 204px;
+                text: "World seed: " + root.launcher-seed-text;
+                color: #9fb4cc;
+                font-size: 13px;
+                horizontal-alignment: right;
+            }
+
+            Text {
                 visible: !root.ingame-controls-visible && !root.ingame-clock-visible;
                 x: 24px;
                 y: 54px;
@@ -711,7 +725,7 @@ export component MainWindow inherits Window {
                 y: 84px;
                 width: (parent.width - 58px) / 2;
                 height: 54px;
-                text: "Restart Round";
+                text: root.launcher-material-match ? "Rematch" : "Restart Round";
                 selected: root.ingame-menu-focus-index == 1;
                 activated => {
                     root.ingame-menu-focus-index = 1;
@@ -758,6 +772,20 @@ export component MainWindow inherits Window {
                 activated => {
                     root.ingame-menu-focus-index = root.scenario-benchmark-available ? 4 : 3;
                     root.ingame-return-launcher();
+                }
+            }
+
+            MenuButton {
+                visible: root.launcher-material-match && !root.ingame-controls-visible;
+                x: 24px;
+                y: 212px;
+                width: parent.width - 48px;
+                height: 54px;
+                text: "New Match · New World";
+                selected: root.ingame-menu-focus-index == 4;
+                activated => {
+                    root.ingame-menu-focus-index = 4;
+                    root.ingame-new-match();
                 }
             }
 
@@ -947,7 +975,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: root.width < 592px ? root.width - 32px : 560px;
-            height: 254px;
+            height: root.launcher-material-match ? 284px : 254px;
             background: #080a12f8;
             border-color: #f6f2a6;
             border-width: 2px;
@@ -979,7 +1007,18 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 112px;
                 width: parent.width - 48px;
-                text: "Tap a choice  ·  A selects  ·  Start plays again  ·  B returns to launcher";
+                text: root.launcher-material-match ? "World seed: " + root.launcher-seed-text : "Tap a choice  ·  A selects  ·  Start plays again  ·  B returns to launcher";
+                color: #80d8ff;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                visible: root.launcher-material-match;
+                x: 24px;
+                y: 140px;
+                width: parent.width - 48px;
+                text: "A selects  ·  Start rematches  ·  B returns to launcher";
                 color: #80d8ff;
                 font-size: 13px;
                 horizontal-alignment: center;
@@ -987,10 +1026,10 @@ export component MainWindow inherits Window {
 
             MenuButton {
                 x: 24px;
-                y: 150px;
-                width: (parent.width - 58px) / 2;
+                y: root.launcher-material-match ? 180px : 150px;
+                width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
                 height: 64px;
-                text: "Play Again";
+                text: root.launcher-material-match ? "Rematch" : "Play Again";
                 selected: root.game-over-focus-index == 0;
                 activated => {
                     root.game-over-focus-index = 0;
@@ -999,14 +1038,28 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                x: parent.width / 2 + 5px;
-                y: 150px;
-                width: (parent.width - 58px) / 2;
+                visible: root.launcher-material-match;
+                x: 24px + (parent.width - 38px) / 3;
+                y: 180px;
+                width: (parent.width - 68px) / 3;
                 height: 64px;
-                text: "Launcher";
+                text: "New Match";
                 selected: root.game-over-focus-index == 1;
                 activated => {
                     root.game-over-focus-index = 1;
+                    root.ingame-new-match();
+                }
+            }
+
+            MenuButton {
+                x: root.launcher-material-match ? 24px + 2 * (parent.width - 38px) / 3 : parent.width / 2 + 5px;
+                y: root.launcher-material-match ? 180px : 150px;
+                width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
+                height: 64px;
+                text: "Launcher";
+                selected: root.game-over-focus-index == (root.launcher-material-match ? 2 : 1);
+                activated => {
+                    root.game-over-focus-index = root.launcher-material-match ? 2 : 1;
                     root.ingame-return-launcher();
                 }
             }
@@ -1177,10 +1230,10 @@ export component MainWindow inherits Window {
 
                     MenuButton {
                         x: 0px;
-                        y: 154px;
+                        y: root.launcher-material-match ? 180px : 154px;
                         width: (parent.width - 12px) / 2;
                         height: 64px;
-                        text: "Start Game";
+                        text: root.launcher-material-match ? "Play World" : "Start Game";
                         selected: root.launcher-focus-index == 1;
                         activated => {
                             root.launcher-focus-index = 1;
@@ -1189,10 +1242,10 @@ export component MainWindow inherits Window {
                     }
 
                     MenuButton {
-                        x: parent.width / 2 + 6px;
-                        y: 154px;
-                        width: (parent.width - 12px) / 2;
-                        height: 64px;
+                        x: root.launcher-material-match ? 0px : parent.width / 2 + 6px;
+                        y: root.launcher-material-match ? 254px : 154px;
+                        width: root.launcher-material-match ? (parent.width - 24px) / 3 : (parent.width - 12px) / 2;
+                        height: root.launcher-material-match ? 48px : 64px;
                         text: "Settings";
                         selected: root.launcher-focus-index == 2;
                         activated => {
@@ -1202,10 +1255,10 @@ export component MainWindow inherits Window {
                     }
 
                     MenuButton {
-                        x: 0px;
-                        y: 228px;
-                        width: (parent.width - 12px) / 2;
-                        height: 56px;
+                        x: root.launcher-material-match ? (parent.width + 12px) / 3 : 0px;
+                        y: root.launcher-material-match ? 254px : 228px;
+                        width: root.launcher-material-match ? (parent.width - 24px) / 3 : (parent.width - 12px) / 2;
+                        height: root.launcher-material-match ? 48px : 56px;
                         text: "Controls";
                         selected: root.launcher-focus-index == 3;
                         activated => {
@@ -1215,10 +1268,10 @@ export component MainWindow inherits Window {
                     }
 
                     MenuButton {
-                        x: parent.width / 2 + 6px;
-                        y: 228px;
-                        width: (parent.width - 12px) / 2;
-                        height: 56px;
+                        x: root.launcher-material-match ? 2 * (parent.width + 12px) / 3 : parent.width / 2 + 6px;
+                        y: root.launcher-material-match ? 254px : 228px;
+                        width: root.launcher-material-match ? (parent.width - 24px) / 3 : (parent.width - 12px) / 2;
+                        height: root.launcher-material-match ? 48px : 56px;
                         text: "Quit";
                         selected: root.launcher-focus-index == 4;
                         activated => {
@@ -1228,8 +1281,32 @@ export component MainWindow inherits Window {
                     }
 
                     Text {
+                        visible: root.launcher-material-match;
                         x: 0px;
-                        y: 296px;
+                        y: 151px;
+                        width: parent.width;
+                        text: "World seed: " + root.launcher-seed-text;
+                        color: #9fb4cc;
+                        font-size: 14px;
+                    }
+
+                    MenuButton {
+                        visible: root.launcher-material-match;
+                        x: parent.width / 2 + 6px;
+                        y: 180px;
+                        width: (parent.width - 12px) / 2;
+                        height: 64px;
+                        text: "New Match · New World";
+                        selected: root.launcher-focus-index == 5;
+                        activated => {
+                            root.launcher-focus-index = 5;
+                            root.launcher-new-match();
+                        }
+                    }
+
+                    Text {
+                        x: 0px;
+                        y: root.launcher-material-match ? 312px : 296px;
                         width: parent.width;
                         text: "Tap buttons directly  ·  D-pad / left stick chooses  ·  A selects";
                         color: #80d8ff;
@@ -1239,7 +1316,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         x: 0px;
-                        y: 322px;
+                        y: root.launcher-material-match ? 334px : 322px;
                         width: parent.width;
                         text: root.scenario-benchmark-available ? "Keyboard: arrows + Enter  ·  B starts benchmark  ·  F1 opens controls" : "Keyboard: arrows + Enter  ·  F1 opens controls";
                         color: #7d8494;
@@ -1663,7 +1740,7 @@ export component MainWindow inherits Window {
                         y: root.launcher-scenario == "clock" || root.launcher-material-combat ? 270px : root.launcher-spacewars-settings || root.launcher-scenario == "pizza" ? 218px : root.launcher-scenario == "falling" ? 114px : 166px;
                         width: 180px;
                         height: 44px;
-                        text: "Start Game";
+                        text: root.launcher-material-match ? "Play World" : "Start Game";
                         activated => {
                             root.launcher-start-game();
                         }
@@ -1745,7 +1822,7 @@ export component MainWindow inherits Window {
                         y: parent.height - 58px;
                         width: 180px;
                         height: 44px;
-                        text: "Start Game";
+                        text: root.launcher-material-match ? "Play World" : "Start Game";
                         selected: root.launcher-controls-focus-index == 2;
                         activated => {
                             root.launcher-controls-focus-index = 2;

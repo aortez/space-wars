@@ -19,6 +19,18 @@ pub(crate) fn moved_launcher_selection(current: i32, action: UiAction) -> i32 {
     }
 }
 
+/// World actions occupy the first row; Settings, Controls and Quit the second.
+pub(crate) fn moved_match_launcher_selection(current: i32, action: UiAction) -> i32 {
+    let current = current.clamp(0, 5) as usize;
+    match action {
+        UiAction::Up => [2, 0, 1, 1, 5, 0][current],
+        UiAction::Down => [1, 2, 0, 0, 0, 4][current],
+        UiAction::Left => [0, 5, 4, 2, 3, 1][current],
+        UiAction::Right => [0, 5, 3, 4, 2, 1][current],
+        _ => current as i32,
+    }
+}
+
 pub(crate) fn moved_launcher_controls_selection(current: i32, action: UiAction) -> i32 {
     match action {
         UiAction::Up | UiAction::Left => moved_selection(current, 3, -1),

@@ -757,6 +757,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         screen,
         &UiInventoryContext {
             selected_scenario: selected_scenario.clone(),
+            world_seed: window.get_launcher_seed_text().to_string(),
             launcher_focus_index: window.get_launcher_focus_index(),
             launcher_settings_focus_index: window.get_launcher_settings_focus_index(),
             launcher_controls_focus_index: window.get_launcher_controls_focus_index(),

@@ -5,6 +5,10 @@ match. Each player independently selects **human** or **rule bot** in Settings:
 two humans, either human/bot arrangement, or two bots watching the same round.
 The default is two humans. Choices persist through restart and relaunch.
 
+The subsequent [world-selection flow](match-worlds.md) adds New Match for a
+fresh seed, Rematch for the current world, and visible seeds in the menus.
+The checkpoint results below retain the original promotion evidence.
+
 This is the same simulation, mission policy and world profile as the material
 arena, with one physics step and gravity solve. This promotion changes the
 client entry point and player selection, without changing terrain, damage,

@@ -79,6 +79,7 @@ enum ScenarioControlRequest {
     Pause,
     Resume,
     Restart,
+    NewMatch,
     Benchmark,
     ClockEvent(engine_common::ClockEventKind),
     ClockSettings(engine_common::ClockSettings),
@@ -162,6 +163,10 @@ impl ScenarioControls {
 
     pub fn request_restart(&mut self) {
         self.request = Some(ScenarioControlRequest::Restart);
+    }
+
+    pub fn request_new_match(&mut self) {
+        self.request = Some(ScenarioControlRequest::NewMatch);
     }
 
     pub fn request_benchmark(&mut self) {
@@ -474,6 +479,7 @@ pub fn start_scenario_loop(
         asset,
     } = options;
     let scenario_name = scenario.to_string();
+    let mut seed = seed;
     let initial_viewport = Viewport::from_window(window.window());
     let start_mode = if start_benchmark {
         ScenarioStartMode::Benchmark(benchmark_configuration)
@@ -658,6 +664,11 @@ pub fn start_scenario_loop(
             window.set_scenario_error_text(SharedString::from(error_text));
         }
         if step_result.scenario_replaced {
+            if let Some(new_seed) = step_result.new_seed {
+                seed = new_seed;
+                window.set_launcher_seed_text(SharedString::from(seed.to_string()));
+                window.invoke_match_world_changed();
+            }
             scenario_revision = next_scenario_revision();
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
@@ -798,6 +809,7 @@ struct HostStepResult {
     scenario_replaced: bool,
     ingame_controls_visible: Option<bool>,
     scenario_error_text: Option<String>,
+    new_seed: Option<u64>,
 }
 
 impl HostStepResult {
@@ -808,6 +820,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: None,
             scenario_error_text: None,
+            new_seed: None,
         }
     }
 
@@ -818,6 +831,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: None,
             scenario_error_text: None,
+            new_seed: None,
         }
     }
 
@@ -828,6 +842,7 @@ impl HostStepResult {
             scenario_replaced: false,
             ingame_controls_visible: Some(visible),
             scenario_error_text: None,
+            new_seed: None,
         }
     }
 
@@ -951,11 +966,20 @@ fn step_scenario_inner(
                 tracing::info!(benchmark = *benchmark_active, "resumed from in-game menu.");
                 return HostStepResult::default();
             }
-            ScenarioControlRequest::Restart => {
+            ScenarioControlRequest::Restart | ScenarioControlRequest::NewMatch => {
+                let new_match = request == ScenarioControlRequest::NewMatch;
+                if new_match && scenario_name != "spacewars" {
+                    return HostStepResult::default();
+                }
+                let replacement_seed = if new_match {
+                    crate::match_world::fresh_seed(seed)
+                } else {
+                    seed
+                };
                 return match restart_scenario(
                     scenario,
                     scenario_name,
-                    seed,
+                    replacement_seed,
                     accumulator,
                     input,
                     paused,
@@ -963,7 +987,10 @@ fn step_scenario_inner(
                     settings,
                     viewport,
                 ) {
-                    Ok(()) => HostStepResult::scenario_restarted(),
+                    Ok(()) => HostStepResult {
+                        new_seed: new_match.then_some(replacement_seed),
+                        ..HostStepResult::scenario_restarted()
+                    },
                     Err(error) => {
                         *paused = true;
                         *accumulator = Duration::ZERO;
@@ -2950,6 +2977,98 @@ mod tests {
             scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT),
             initial
         );
+    }
+
+    #[test]
+    fn new_material_worlds_rematch_the_latest_seed_and_reset_held_controls() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
+        settings.spacewars.player_2_controller = engine_common::SpacewarsController::Human;
+        settings.combat_breaks.interval_seconds = 8;
+        settings.material_combat.asteroids.interval_seconds = 3;
+        let mut seed = u64::MAX;
+        let mut scenario = HostedScenario::new(
+            "spacewars",
+            seed,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let mut input = ClientInput::default();
+        let mut controls = ScenarioControls::default();
+        let mut benchmark_active = false;
+        let dt = Duration::from_nanos(16_666_667);
+        for _ in 0..3 {
+            let old_world = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+            for _ in 0..120 {
+                scenario.step(&[], dt);
+            }
+            for new_match in [true, false] {
+                input.press(input::GameKey::P2Thrust);
+                let mut accumulator = Duration::from_secs(1);
+                let mut paused = true;
+                if new_match {
+                    controls.request_new_match();
+                } else {
+                    controls.request_restart();
+                }
+                let result = step_scenario(
+                    &mut scenario,
+                    "spacewars",
+                    seed,
+                    TickModel::FixedTimestep { hz: 60 },
+                    Some(dt),
+                    Duration::ZERO,
+                    &mut accumulator,
+                    &mut input,
+                    &mut controls,
+                    &mut paused,
+                    &mut benchmark_active,
+                    false,
+                    &settings,
+                    TEST_VIEWPORT,
+                    &[],
+                );
+                assert!(result.scenario_replaced);
+                assert_eq!(result.new_seed.is_some(), new_match);
+                if let Some(next) = result.new_seed {
+                    assert_ne!(next, seed);
+                    seed = next;
+                }
+                assert!(!paused);
+                assert!(!scenario.is_game_over());
+                assert_eq!(accumulator, Duration::ZERO);
+                let expected = HostedScenario::new(
+                    "spacewars",
+                    seed,
+                    &settings,
+                    TEST_VIEWPORT,
+                    ScenarioStartMode::Normal,
+                )
+                .unwrap();
+                let frames = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+                assert_eq!(
+                    frames,
+                    expected.render_frames(RenderBackend::Vector, TEST_VIEWPORT)
+                );
+                assert_ne!(frames, old_world);
+                // Compare subsequent motion too, so stale human input or bot policy
+                // from the preceding world cannot hide behind an initial frame.
+                let mut expected = expected;
+                let mut neutral = ClientInput::default();
+                for _ in 0..30 {
+                    let actions = scenario.actions(&mut input, false, &[]);
+                    let expected_actions = expected.actions(&mut neutral, false, &[]);
+                    scenario.step(&actions, dt);
+                    expected.step(&expected_actions, dt);
+                }
+                assert_eq!(
+                    scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT),
+                    expected.render_frames(RenderBackend::Vector, TEST_VIEWPORT),
+                );
+            }
+        }
     }
 
     #[test]
