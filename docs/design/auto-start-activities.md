@@ -1,9 +1,10 @@
 # Automatic activities
 
-Status: first implementation validated and deployed to `sw-picade`, 2026-09-11, on
-`auto-start-activities`. Includes merged main `4f8894e` and the committed
-Device Info change `2e6791f`. See [the user guide](../auto-start.md) for current
-controls and saved settings.
+Status: updated against merged main `07b9dc0` (Device Info and responsive kiosk
+menus, PR #70) on `auto-start-activities`, now checked out directly in
+`/home/data/workspace/space-wars2`. The earlier cabinet validation described
+below used build `8041b952ac4c`; this layout integration has not been deployed
+as part of this update. See [the user guide](../auto-start.md) for controls and settings.
 
 ## Goal and first slice
 
@@ -335,3 +336,25 @@ and the default **10-minute** match limit. Captured real device screenshots of
 Clock, bot play, and the settings screen. The three completed repeat rounds
 were verified in desktop full-client tests; this cabinet smoke check did not
 wait for three full ten-minute rounds or simulate physical gamepad presses.
+
+### Integration with merged responsive menus
+
+After PR #70 merged as `07b9dc0`, rebased the auto-start commits onto that
+main revision and dropped the already-merged Device Info precursor from the
+branch. The branch is now checked out directly in `space-wars2`.
+
+Auto-start uses `MenuPage`, its opaque background, responsive rows, 48-pixel
+actions, and fixed footer. App Settings places it below Device Info and
+updates the scroll extent and focus-reveal range for all five rows. The idle
+countdown occupies the new launcher's subtitle. The merged scenario-picker
+confirmation behavior and directional navigation are retained.
+
+Validation passed 291 client unit tests (one unrelated ignored), including
+keyboard/touch scrolling in an 800×360 window, and seven real-client UI
+workflows covering automatic Clock, three repeated bot results, Device Info,
+launcher navigation, saved sound settings, manual controller choices, and
+rematches/new worlds. Rendering comparisons cover 800×480, 1024×768, and
+480×800, including Auto-start, save errors, and match settings.
+
+No PR was open for the auto-start branch at this point. The updated branch is
+local; this integration does not publish a PR or redeploy the cabinet.

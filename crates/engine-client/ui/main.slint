@@ -2631,7 +2631,7 @@ export component MainWindow inherits Window {
             available-width: parent.width; available-height: parent.height;
             heading: "Auto-start";
             subtitle: "Runs when the launcher is idle";
-            hint: self.width < 600px ? "← / → adjust · A select · B / Esc back" : "Left / Right adjust · A / Enter selects · B / Esc back";
+            hint: self.width < 600px ? "Left / Right adjust · A select · B / Esc back" : "Left / Right adjust · A / Enter selects · B / Esc back";
             property <length> row-height: self.height >= 500px ? 64px : 52px;
             ChoiceRow {
                 x: 24px; y: 82px; width: parent.width - 48px; height: parent.row-height;

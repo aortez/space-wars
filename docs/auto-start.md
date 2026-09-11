@@ -1,7 +1,9 @@
 # Automatic activities
 
 Open **App Settings → Auto-start** from the launcher or a paused scenario.
-Choose **Off**, **Clock**, or **Spacewars bots**, then choose the idle delay.
+Auto-start is below Device Info in the scrolling list; D-pad/arrow navigation
+reveals the selected row. Choose **Off**, **Clock**, or **Spacewars bots**, then
+choose the idle delay.
 The default is Off with a 30-second delay. Controller stops are 5, 10, 30,
 60, 120, 300, and 600 seconds. **Start now** previews an enabled activity
 from the launcher after its settings have saved.

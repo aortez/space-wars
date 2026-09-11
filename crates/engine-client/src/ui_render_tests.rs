@@ -139,6 +139,11 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_launcher_settings_visible(true);
         }),
+        ("launcher-match-settings", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_launcher_scenario("spacewars".into());
+            ui.set_launcher_settings_visible(true);
+        }),
         ("launcher-controls", |ui| {
             ui.set_launcher_visible(true);
             ui.set_launcher_controls_visible(true);
