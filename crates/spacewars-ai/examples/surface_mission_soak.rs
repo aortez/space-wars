@@ -42,6 +42,12 @@ fn main() {
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
     let trace = arg("--trace", "false") == "true";
+    let match_rules = arg("--match", "false") == "true";
+    let require_finish = arg("--require-finish", "false") == "true";
+    assert!(
+        !require_finish || match_rules,
+        "--require-finish needs --match true"
+    );
     let probe_ground_start = arg("--probe-ground-start", "false") == "true";
     let mut probed_ground_start = false;
     let require_route = arg("--require-route", "false") == "true";
@@ -74,6 +80,9 @@ fn main() {
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
+    if match_rules {
+        state.enable_match_rules();
+    }
     let initial_world = state.mission_observation(seat, None);
     let planet_count = initial_world.planets.len();
     state.set_asteroid_pressure(MaterialAsteroidSettings {
@@ -123,6 +132,9 @@ fn main() {
         seconds * 60
     };
     for tick in 0..max_ticks {
+        if state.match_outcome().is_some() {
+            break;
+        }
         if mode == "pursuit"
             && pursuit_started_tick.map_or(tick >= prepare_seconds * 60, |start| {
                 tick >= start + seconds * 60
@@ -286,7 +298,8 @@ fn main() {
             samples.push(json!({"second":(tick+1)/60,"pilots":observations,"missions":pilots.each_ref().map(|p|p.telemetry()),"planets":state.mission_observation(seat, None).planets,"audit":audit,
                 "combat": [state.combat_telemetry(0), state.combat_telemetry(1)],
                 "damage": [state.damage_observation(0), state.damage_observation(1)],
-                "solar": [state.solar_exposure(0), state.solar_exposure(1)]}));
+                "solar": [state.solar_exposure(0), state.solar_exposure(1)],
+                "round": state.match_observation()}));
             if frames && ((tick + 1) / 60 == 1 || (tick + 1) % 1800 == 0) {
                 for i in 0..2 {
                     fs::write(
@@ -320,6 +333,8 @@ fn main() {
     // one-second samples; contact latency never depends on sample alignment.
     let final_combat = [state.combat_telemetry(0), state.combat_telemetry(1)];
     let mut report = json!({"version":2,"seed":seed,"seat":seat,"mirror":mirror,"mode":mode,"seconds":seconds,"bearing":bearing,
+        "match_rules":match_rules,"round":state.match_observation(),
+        "termination":if state.match_outcome().is_some(){"round_finished"}else{"budget_exhausted"},
         "elapsed_ticks":elapsed_ticks,"metrics":metrics,"final_combat":final_combat,"final_audit":final_audit,
         "combat_breaks":breaks,
         "pursuit_trial":(mode=="pursuit").then(|| json!({"prepare_limit_seconds":prepare_seconds,
@@ -333,6 +348,15 @@ fn main() {
         "claim_footing_recoveries":claim_footing_recoveries});
     report["objective_refresh"] =
         json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
+    if frames && state.match_outcome().is_some() {
+        for seat in 0..2 {
+            fs::write(
+                out.join(format!("frame-final-p{}.json", seat + 1)),
+                serde_json::to_vec(&SurfaceSortieScenario::player_frame(&state, seat)).unwrap(),
+            )
+            .unwrap();
+        }
+    }
     fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
@@ -343,6 +367,12 @@ fn main() {
         json!({"physics_ok":report["physics_ok"],"distinct_departures":completed,"steps":report["steps"],"sensors":report["sensors"]})
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
+    if require_finish {
+        assert!(
+            state.match_outcome().is_some(),
+            "round did not finish within the original budget"
+        );
+    }
     if mode == "pursuit" {
         assert!(
             pursuit_started_tick.is_some(),

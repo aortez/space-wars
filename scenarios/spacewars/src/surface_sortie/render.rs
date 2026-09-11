@@ -906,7 +906,9 @@ fn draw_player_hud(
             }),
         );
     }
-    let mode = if observation.location == PilotLocation::OnFoot {
+    let mode = if observation.pilot_vitals.is_some_and(|v| !v.alive()) {
+        "DEAD"
+    } else if observation.location == PilotLocation::OnFoot {
         "ON FOOT"
     } else if ship.form == ShipForm::EscapePod {
         "POD"
@@ -1083,16 +1085,29 @@ fn draw_player_hud(
     } else {
         vehicle_status
     };
-    let lines = [
-        (
-            0.445,
+    let pilot_status = observation.pilot_vitals.map_or_else(
+        || {
             format!(
                 "P{}  {mode}  /  planet {}",
                 player + 1,
                 observation.motion.planet
-            ),
-            color,
-        ),
+            )
+        },
+        |v| format!("P{}  {mode}  /  pilot {:.0}%", player + 1, v.health),
+    );
+    let vehicle_status = if let Some(v) = observation
+        .pilot_vitals
+        .filter(|v| v.protected_until_tick > observation.tick)
+    {
+        format!(
+            "Ejection protection {:.1}s",
+            (v.protected_until_tick - observation.tick) as f32 / 60.0
+        )
+    } else {
+        vehicle_status
+    };
+    let lines = [
+        (0.445, pilot_status, color),
         (0.385, vehicle_status, LIGHT),
         (
             0.325,
@@ -1106,7 +1121,14 @@ fn draw_player_hud(
         ),
         (
             -0.29,
-            if !observation.controls_armed {
+            if let Some(outcome) = state.match_outcome() {
+                match outcome {
+                    match_rules::MatchOutcome::Winner(owner) => {
+                        format!("Round over / P{} wins", owner.index() + 1)
+                    }
+                    match_rules::MatchOutcome::Draw => "Draw / both pilots lost".to_owned(),
+                }
+            } else if !observation.controls_armed {
                 "Release controls to continue".to_owned()
             } else if let Some(message) = recovery_message {
                 message

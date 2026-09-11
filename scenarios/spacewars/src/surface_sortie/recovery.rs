@@ -109,7 +109,7 @@ impl SurfacePilot {
         self.recovery.is_some()
     }
 
-    pub(crate) fn vehicle_destroyed(&mut self, ship: &mut ShipState) {
+    pub(crate) fn vehicle_destroyed(&mut self, ship: &mut ShipState, tick: u64) {
         let recovery = self.recovery.as_mut().expect("Expedition recovery");
         recovery.ships_lost += 1;
         recovery.scuttle = Duration::ZERO;
@@ -124,6 +124,9 @@ impl SurfacePilot {
             let velocity = ship.velocity;
             let spin = physics::physical_angular_velocity(ship);
             ship.change_to_escape_pod();
+            if let Some(vitals) = &mut self.vitals {
+                vitals.protect_ejection(tick);
+            }
             ship.position = origin - physics::ship_pivot(ship.form);
             // Combat uses Rapier's resolved velocity: the contact impulse has
             // already been applied. Keep the older asteroid/recovery fixtures'

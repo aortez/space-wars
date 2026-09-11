@@ -618,6 +618,7 @@ pub struct LaserHit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LaserTarget {
     Ship(usize),
+    Spaceling(usize),
     Rover(u64),
     Debris(usize),
     Body(BodyId),
@@ -1464,6 +1465,7 @@ impl SpacewarsScenario {
         let collision_started = Instant::now();
         update_ship_lasers(state, dt);
         state.laser_hits = resolve_laser_hits(state);
+        surface_sortie::match_rules::apply_lasers(state, surface_pilots);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
 
         terrain::queue_cannon_hits(state);
@@ -1478,8 +1480,10 @@ impl SpacewarsScenario {
             // Capture incoming size before collision damage chips the asteroid.
             pressure.record_contacts(state, &contacts);
         }
+        surface_sortie::match_rules::apply_contacts(state, surface_pilots, &contacts);
         resolve_physics_collisions(state, &contacts, &accepted_ports);
         surface_sortie::solar::apply_damage(state, surface_pilots, dt);
+        surface_sortie::match_rules::apply_heat(state, surface_pilots, dt);
         handle_ship_deaths_with_surface_pilots(state, surface_pilots);
         handle_rover_deaths(state);
         surface_sortie::combat::record_hits(state, surface_pilots);
@@ -2153,6 +2157,7 @@ fn resolve_laser_hits(state: &mut SpacewarsState) -> Vec<LaserHit> {
             Some(MechanicalEntity::Body(body)) => LaserTarget::Body(body),
             Some(MechanicalEntity::TerrainFragment(id)) => LaserTarget::TerrainFragment(id),
             Some(MechanicalEntity::Ship(ship)) => LaserTarget::Ship(ship),
+            Some(MechanicalEntity::Spaceling(player)) => LaserTarget::Spaceling(player),
             Some(MechanicalEntity::Rover(id)) => {
                 if !state.rovers.iter().any(|rover| rover.id == id) {
                     continue;
@@ -2204,7 +2209,7 @@ fn apply_laser_hit(state: &mut SpacewarsState, hit: LaserHit) {
             let impact_direction = hit.point - state.debris[debris].position;
             damage_debris(state, debris, hit.damage, impact_direction, 0x1A5E_0000);
         }
-        LaserTarget::Body(_) | LaserTarget::TerrainFragment(_) => {}
+        LaserTarget::Body(_) | LaserTarget::TerrainFragment(_) | LaserTarget::Spaceling(_) => {}
     }
 }
 
@@ -2226,6 +2231,13 @@ fn spawn_laser_hit_particles(state: &mut SpacewarsState, direction: Vec2, hit: L
 
 fn impact_target_data(state: &SpacewarsState, target: LaserTarget) -> Option<(Vec2, Color, f32)> {
     match target {
+        LaserTarget::Spaceling(player) => state
+            .physics
+            .world
+            .motion(physics::primary_body(surface_sortie::pilot_physics_id(
+                PlayerId::from_index(player)?,
+            )))
+            .map(|m| (m.position, state.players[player].color, 1.0)),
         LaserTarget::TerrainFragment(id) => state
             .physics
             .world
@@ -2266,6 +2278,7 @@ fn body_impact_data(state: &SpacewarsState, body: BodyId) -> Option<(Vec2, Color
 fn laser_target_salt(target: LaserTarget) -> u64 {
     match target {
         LaserTarget::Ship(ship) => 0x5100_0000 ^ ship as u64,
+        LaserTarget::Spaceling(player) => 0x5ACE_0000 ^ player as u64,
         LaserTarget::Rover(id) => 0x707E_0000 ^ id,
         LaserTarget::Debris(debris) => 0xDEB0_0000 ^ debris as u64,
         LaserTarget::TerrainFragment(id) => 0x7E00_0000 ^ id,
@@ -3468,7 +3481,7 @@ fn handle_ship_deaths_with_surface_pilots(
         fragments.extend(breakup);
         ship.fragmented = true;
         if let Some(pilot) = survivor {
-            pilot.vehicle_destroyed(ship);
+            pilot.vehicle_destroyed(ship, state.tick + 1);
         } else {
             ship.change_to_escape_pod();
         }

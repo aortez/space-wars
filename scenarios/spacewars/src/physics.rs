@@ -15,10 +15,10 @@ use engine_rapier::{
 use super::{
     BODY_BOUNDS_RADIUS_SCALE, BodyId, CANNON_SHELL_RADIUS, DEFAULT_ELASTICITY, DebrisKind,
     DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
-    RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING,
-    SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE, ShipForm, ShipState,
-    SunState, planet_surface_velocity, rotate_points, spaceport_docking_anchor,
-    spaceport_local_points,
+    PlayerId, RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT,
+    SHIP_RIGHT_WING, SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE,
+    SPACEWARS_PLAYER_COUNT, ShipForm, ShipState, SunState, planet_surface_velocity, rotate_points,
+    spaceport_docking_anchor, spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
@@ -146,6 +146,7 @@ pub(super) enum MechanicalEntity {
     Body(BodyId),
     TerrainFragment(u64),
     Ship(usize),
+    Spaceling(usize),
     Rover(u64),
     Debris(u64),
 }
@@ -830,6 +831,14 @@ impl SpacewarsPhysics {
                 primary_body(PhysicsId::new(*id)),
             );
         }
+        for player in 0..SPACEWARS_PLAYER_COUNT {
+            capture(
+                MechanicalEntity::Spaceling(player),
+                primary_body(super::surface_sortie::pilot_physics_id(
+                    PlayerId::from_index(player).unwrap(),
+                )),
+            );
+        }
         for id in self.debris_keys.keys().copied() {
             capture(
                 MechanicalEntity::Debris(id),
@@ -866,6 +875,9 @@ impl SpacewarsPhysics {
     pub fn apply_velocity_delta(&mut self, entity: MechanicalEntity, delta_velocity: Vec2) -> bool {
         let entity = match entity {
             MechanicalEntity::Ship(index) => ship_entity(index),
+            MechanicalEntity::Spaceling(index) => {
+                super::surface_sortie::pilot_physics_id(PlayerId::from_index(index).unwrap())
+            }
             MechanicalEntity::Debris(id) | MechanicalEntity::TerrainFragment(id) => {
                 PhysicsId::new(id)
             }
@@ -1831,6 +1843,9 @@ fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
         ),
         value if (SHIP_ENTITY_BASE..SHIP_ENTITY_BASE + 2).contains(&value) => {
             Some(MechanicalEntity::Ship((value - SHIP_ENTITY_BASE) as usize))
+        }
+        value if (40_000..40_000 + SPACEWARS_PLAYER_COUNT as u64).contains(&value) => {
+            Some(MechanicalEntity::Spaceling((value - 40_000) as usize))
         }
         value if (ROVER_ENTITY_BASE..DEBRIS_ENTITY_BASE).contains(&value) => {
             Some(MechanicalEntity::Rover(value - ROVER_ENTITY_BASE))

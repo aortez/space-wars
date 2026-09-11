@@ -276,6 +276,11 @@ pub trait ClientScenario {
         false
     }
 
+    /// Result text for scenarios that do not use the legacy center panel.
+    fn game_over_message(&self) -> Option<String> {
+        None
+    }
+
     fn runtime_error(&self) -> Option<String> {
         None
     }

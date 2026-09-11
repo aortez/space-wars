@@ -66,7 +66,8 @@ pub struct CombatTarget {
 pub struct CombatObservationV2 {
     pub version: u32,
     pub recovery: RecoveryTaskObservationV1,
-    /// Only a living, occupied full ship is an aerial combat target.
+    /// Labs target occupied full ships. Finished matches also expose living
+    /// spacelings and occupied pods through the same first-solid query.
     pub target: Option<CombatTarget>,
     pub laser_available: bool,
     pub cannon_ready: bool,
@@ -172,6 +173,12 @@ impl SurfaceSortieState {
                     let Some(enemy) = combat.target else {
                         return true;
                     };
+                    let pilot = &self.pilots[enemy.owner.index()];
+                    if pilot.body.is_some()
+                        || self.world.ships[pilot.vehicle.0].form != ShipForm::Ship
+                    {
+                        return true; // This survivor has no ship weapons.
+                    }
                     let target = site.vehicle_position + site.normal * height;
                     let delta = target - enemy.motion.position;
                     let vehicle = self.pilots[enemy.owner.index()].vehicle.0;
@@ -248,18 +255,35 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[p.vehicle.0];
         let target = self.pilots.iter().enumerate().find_map(|(seat, other)| {
             let target = &self.world.ships[other.vehicle.0];
-            if seat == player
-                || other.body.is_some()
-                || target.dead
-                || target.form != ShipForm::Ship
-            {
+            if seat == player || other.vitals.is_some_and(|v| !v.alive()) {
                 return None;
             }
-            let motion = self
-                .world
-                .physics
-                .world
-                .motion(self.world.physics.ship_body(other.vehicle.0))?;
+            let (motion, entity, health) =
+                if let Some(snapshot) = other.snapshot(&self.world.physics) {
+                    let vitals = other.vitals?;
+                    (
+                        snapshot.motion,
+                        MechanicalEntity::Spaceling(seat),
+                        vitals.health,
+                    )
+                } else {
+                    if target.dead || target.form == ShipForm::EscapePod && other.vitals.is_none() {
+                        return None;
+                    }
+                    let health = if target.form == ShipForm::EscapePod {
+                        other.vitals?.health
+                    } else {
+                        target.life
+                    };
+                    (
+                        self.world
+                            .physics
+                            .world
+                            .motion(self.world.physics.ship_body(other.vehicle.0))?,
+                        MechanicalEntity::Ship(other.vehicle.0),
+                        health,
+                    )
+                };
             let delta = motion.position - p.ship.position;
             let trace = p
                 .queries_ready
@@ -272,8 +296,7 @@ impl SurfaceSortieState {
                     )
                 })
                 .flatten();
-            let visible = trace
-                .is_some_and(|hit| hit.target == Some(MechanicalEntity::Ship(other.vehicle.0)));
+            let visible = trace.is_some_and(|hit| hit.target == Some(entity));
             let ground_occluded = trace.is_some_and(|hit| {
                 matches!(
                     hit.target,
@@ -282,7 +305,7 @@ impl SurfaceSortieState {
             });
             Some(CombatTarget {
                 owner: other.owner,
-                health: target.life,
+                health,
                 visible,
                 ground_occluded,
                 motion: PilotMotion {
@@ -319,7 +342,7 @@ impl SurfaceSortieState {
 /// Read contact indices before debris cleanup compacts the shared collection.
 pub(crate) fn record_hits(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
     for hit in &world.laser_hits {
-        if let LaserTarget::Ship(target) = hit.target {
+        if let LaserTarget::Ship(target) | LaserTarget::Spaceling(target) = hit.target {
             if let Some(c) = pilots
                 .iter_mut()
                 .find(|p| p.vehicle.0 == hit.shooter)
@@ -335,16 +358,24 @@ pub(crate) fn record_hits(world: &SpacewarsState, pilots: &mut [SurfacePilot]) {
             continue;
         };
         if debris.kind == DebrisKind::Shell {
-            if let Some(c) = pilots
-                .iter_mut()
-                .find(|p| Some(p.owner.index()) == debris.owner_id)
-                .and_then(|p| p.combat.as_mut())
-            {
-                c.telemetry.cannon_hits += 1;
-            }
-            record_taken(pilots, hit.ship, world.tick + 1, "cannon");
+            record_missile_hit(pilots, hit.ship, debris.owner_id, world.tick + 1);
         }
     }
+}
+pub(super) fn record_missile_hit(
+    pilots: &mut [SurfacePilot],
+    target: usize,
+    shooter: Option<usize>,
+    tick: u64,
+) {
+    if let Some(c) = pilots
+        .iter_mut()
+        .find(|p| Some(p.owner.index()) == shooter)
+        .and_then(|p| p.combat.as_mut())
+    {
+        c.telemetry.cannon_hits += 1;
+    }
+    record_taken(pilots, target, tick, "cannon");
 }
 fn record_taken(pilots: &mut [SurfacePilot], target: usize, tick: u64, source: &'static str) {
     if let Some(c) = pilots
@@ -447,7 +478,7 @@ mod tests {
         ship.velocity = Vec2::new(24.0, -18.0);
         let origin = ship.position + physics::ship_pivot(ship.form);
         ship.translate_life_with_impulse(-1000.0, Vec2::new(1000.0, -1000.0));
-        state.pilots[0].vehicle_destroyed(ship);
+        state.pilots[0].vehicle_destroyed(ship, state.world.tick + 1);
         assert_eq!(ship.form, ShipForm::EscapePod);
         assert_eq!(ship.velocity, Vec2::new(24.0, -18.0));
         assert_eq!(ship.position + physics::ship_pivot(ship.form), origin);

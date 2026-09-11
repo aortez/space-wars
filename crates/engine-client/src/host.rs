@@ -748,6 +748,9 @@ pub fn start_scenario_loop(
             &window,
             scenario.center_panel_state(paused, benchmark_active, &performance_text),
         );
+        if let Some(message) = scenario.inner.game_over_message() {
+            window.set_spacewars_message_text(SharedString::from(message));
+        }
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);

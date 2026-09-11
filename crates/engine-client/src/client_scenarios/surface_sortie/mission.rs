@@ -16,7 +16,11 @@ pub(crate) const TRAVEL_DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegist
 
 pub(crate) const ARENA_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars-terrain-arena",
-    controls_help: "Generated three-planet arena: P1 human, P2 mission bot. The launch seed reproduces planet sizes, spacing and motion. Land, exit and raise a flag where you stand; destroying its footing returns ownership to neutral. The bot chooses destinations, captures on foot, boards and travels onward. A/Space thrusts or jumps; left/right turns or walks; Down/S brakes; B/X exits or boards. Hold RB/J for swept cruise. RT/LB or E fires the laser aboard and mines on foot; gamepad X or K launches a missile. On foot, right stick aims, Y/T changes cut size, and holding A in the air uses the jetpack. Stand still on owned ground to rebuild after losing your ship. Hold A+B+Down for three seconds to scuttle a stranded full ship. Settings adjust asteroid arrivals and strength across all three planets. Start/Esc pauses; R restarts the same seed. Pods and spacelings are invulnerable in this playtest; match victory is not enabled. Select spacewars-terrain-arena-duel to watch two mission bots.",
+    capabilities: ScenarioCapabilities {
+        game_over: true,
+        ..TRAVEL_REGISTRATION.capabilities
+    },
+    controls_help: "Generated three-planet arena: P1 human, P2 mission bot. The launch seed reproduces planet sizes, spacing and motion. Land, exit and raise a flag where you stand; destroying its footing returns ownership to neutral. The bot chooses destinations, captures on foot, boards and travels onward. A/Space thrusts or jumps; left/right turns or walks; Down/S brakes; B/X exits or boards. Hold RB/J for swept cruise. RT/LB or E fires the laser aboard and mines on foot; gamepad X or K launches a missile. On foot, right stick aims, Y/T changes cut size, and holding A in the air uses the jetpack. Stand still on owned ground to rebuild after losing your ship. Hold A+B+Down for three seconds to scuttle a stranded full ship. Settings adjust asteroid arrivals and strength across all three planets. Start/Esc pauses; R restarts the same seed. Pilot health persists on foot and in the pod. Ship loss ejects you with 3 seconds of protection; later laser, missile, hard-impact and solar heat damage can kill the pilot. Pilot death ends the round even with owned planets; simultaneous deaths draw. Losing your ship and flags alone does not eliminate you. Use Play again to restart the same seed. Select spacewars-terrain-arena-duel to watch two mission bots.",
     create: create_arena_human,
     ..TRAVEL_REGISTRATION
 };
@@ -34,7 +38,7 @@ struct MaterialMissionClientScenario {
 }
 fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
     let mut state = if arena {
-        SurfaceSortieScenario::init_material_arena(seed)
+        SurfaceSortieScenario::init_material_match(seed)
     } else {
         SurfaceSortieScenario::init_material_travel(seed, false)
     };
@@ -109,7 +113,7 @@ impl ClientScenario for MaterialMissionClientScenario {
         self.sortie.tick_model()
     }
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        if dt.is_zero() {
+        if dt.is_zero() || self.is_game_over() {
             return self.sortie.step(&[], dt);
         }
         let mut actions = if self.duel {
@@ -147,6 +151,21 @@ impl ClientScenario for MaterialMissionClientScenario {
     fn frame_layout(&self) -> FrameLayout {
         self.sortie.frame_layout()
     }
+    fn is_game_over(&self) -> bool {
+        self.sortie.state.match_outcome().is_some()
+    }
+    fn game_over_message(&self) -> Option<String> {
+        use scenario_spacewars::surface_sortie::match_rules::MatchOutcome;
+        self.sortie
+            .state
+            .match_outcome()
+            .map(|outcome| match outcome {
+                MatchOutcome::Winner(owner) => {
+                    format!("Player {} wins / opposing pilot lost", owner.index() + 1)
+                }
+                MatchOutcome::Draw => "Draw / both pilots lost".to_owned(),
+            })
+    }
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -170,6 +189,9 @@ mod tests {
                 .downcast_mut::<MaterialMissionClientScenario>()
                 .unwrap();
             let before = host.pilots[1].telemetry().clone();
+            assert_eq!(host.registration().capabilities.game_over, arena);
+            assert_eq!(host.sortie.state.match_observation().is_some(), arena);
+            assert!(!host.is_game_over());
             let input = [SurfaceWeaponAction {
                 laser: true,
                 cannon: true,
@@ -209,6 +231,19 @@ mod tests {
                 .downcast_ref::<MaterialMissionClientScenario>()
                 .unwrap();
             assert_eq!(reset.pilots[1].telemetry(), &before);
+            assert!(!reset.is_game_over());
+            if arena {
+                assert!(
+                    reset
+                        .sortie
+                        .state
+                        .match_observation()
+                        .unwrap()
+                        .pilots
+                        .iter()
+                        .all(|p| p.health == 100.0 && p.alive())
+                );
+            }
         }
     }
 }

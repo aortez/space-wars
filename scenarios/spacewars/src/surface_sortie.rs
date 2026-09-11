@@ -21,6 +21,7 @@ pub mod jetpack;
 mod landing;
 mod landing_diagnostics;
 pub mod landing_objective;
+pub mod match_rules;
 mod material;
 pub mod mission;
 mod motion;
@@ -50,7 +51,7 @@ pub use solar::{SolarExposure, SolarHazard};
 mod tests;
 
 const CONTROL_V2: u32 = 0x5355_0002;
-fn pilot_physics_id(player: PlayerId) -> PhysicsId {
+pub(super) fn pilot_physics_id(player: PlayerId) -> PhysicsId {
     PhysicsId::new(40_000 + player.index() as u64)
 }
 const SURFACE_RADIUS: f32 = 60.0;
@@ -159,6 +160,7 @@ pub struct SurfaceSortieState {
     mining: Option<material::SurfaceMining>,
     damage: impact::SurfaceDamageState,
     asteroids: asteroids::AsteroidPressure,
+    round: Option<match_rules::MatchRound>,
 }
 
 #[derive(Clone)]
@@ -171,6 +173,7 @@ pub(super) struct SurfacePilot {
     wing_input: bool,
     flight_enabled: bool,
     pub(super) combat: Option<combat::CombatSeat>,
+    vitals: Option<match_rules::PilotVitals>,
     damage: impact::SurfaceDamageObservation,
     transfers: u64,
     last_transfer: TransferResult,
@@ -215,6 +218,7 @@ impl SurfacePilot {
             wing_input: false,
             flight_enabled: false,
             combat: None,
+            vitals: None,
             damage: impact::SurfaceDamageObservation::default(),
             transfers: 0,
             last_transfer: TransferResult::Ready,
@@ -259,6 +263,8 @@ pub struct SurfaceSessionObservation {
     pub players: Vec<SurfaceSortieObservation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub terrain: Vec<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub round: Option<match_rules::MatchObservation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -281,6 +287,8 @@ pub struct SurfaceSortieObservation {
     pub jumps: u64,
     pub ship_position: Vec2,
     pub ship_health: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pilot_vitals: Option<match_rules::PilotVitals>,
     pub solar: Option<SolarExposure>,
     pub ship_available: bool,
     pub vehicle_form: ShipForm,
@@ -344,6 +352,7 @@ impl SurfaceSortieState {
             jumps: snapshot.map_or(0, |s| s.jumps),
             ship_position: ship.position,
             ship_health: ship.life,
+            pilot_vitals: self.pilots[player].vitals,
             solar: self.solar_exposure(player),
             ship_available: self.vehicle_available(player),
             vehicle_form: ship.form,
@@ -614,7 +623,7 @@ impl Scenario for SurfaceSortieScenario {
 
     fn step(state: &mut SurfaceSortieState, actions: &[Action], dt: Duration) -> StepResult {
         // This fixture uses the same 60 Hz fixed-step contract as Spacewars.
-        if dt.is_zero() {
+        if dt.is_zero() || state.match_outcome().is_some() {
             return StepResult::default();
         }
         state
@@ -722,6 +731,9 @@ impl Scenario for SurfaceSortieScenario {
         );
         state.reconcile_recovery_vehicles();
         state.record_surface_damage(damage_before);
+        if state.finish_round() {
+            return result;
+        }
         for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
             let Some(before) = before else { continue };
             let pilot = &mut state.pilots[player];
@@ -756,6 +768,7 @@ impl Scenario for SurfaceSortieScenario {
                     .map(|player| state.observation(player))
                     .collect(),
                 terrain: terrain::observation(&state.world).payload,
+                round: state.match_observation(),
             })
             .expect("finite sortie observation"),
         }
@@ -822,6 +835,7 @@ impl SurfaceSortieScenario {
             mining: None,
             damage: impact::SurfaceDamageState::default(),
             asteroids: asteroids::AsteroidPressure::default(),
+            round: None,
         }
     }
 
