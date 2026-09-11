@@ -29,6 +29,9 @@ mod clock;
 #[path = "ui_control_functional/sound.rs"]
 mod sound;
 
+#[path = "ui_control_functional/performance.rs"]
+mod performance;
+
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 

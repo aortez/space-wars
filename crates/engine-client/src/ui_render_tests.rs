@@ -34,6 +34,8 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_scenario_error_text("".into());
     ui.set_touch_test_visible(false);
     ui.set_sound_visible(false);
+    ui.set_performance_overlay_enabled(false);
+    ui.set_performance_overlay_text("".into());
     ui.set_launcher_busy(false);
     ui.set_spacewars_ui_visible(false);
     ui.set_launcher_scenario("clock".into());
@@ -73,6 +75,18 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
     let windows = windows.borrow();
     let cases: &[MenuCase] = &[
         ("gameplay", |_| {}),
+        ("overlay-enabled", |ui| {
+            ui.set_performance_overlay_enabled(true);
+            ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
+        }),
+        ("overlay-paused", |ui| {
+            ui.set_performance_overlay_enabled(true);
+            ui.set_performance_overlay_text("Paused".into());
+            ui.set_ingame_menu_visible(true);
+        }),
+        ("overlay-disabled", |ui| {
+            ui.set_performance_overlay_text("FPS 60 | UPS 60".into());
+        }),
         ("launcher", |ui| ui.set_launcher_visible(true)),
         ("launcher-settings", |ui| {
             ui.set_launcher_visible(true);

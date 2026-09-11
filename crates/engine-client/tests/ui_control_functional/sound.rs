@@ -8,6 +8,10 @@ fn sound_controls_persist_across_scenarios_restart_and_process_restart() {
         let sound = harness.activate_guarded("launcher.sound", &launcher);
         assert_eq!(sound.screen, UiScreen::LauncherSound);
         assert_eq!(control_value(&sound, "sound.volume.next"), Some("25%"));
+        assert_eq!(control_value(&sound, "settings.fps-counter"), Some("off"));
+        harness.activate_guarded("settings.fps-counter", &sound);
+        let sound = harness.wait_sound_save("saved");
+        assert_eq!(control_value(&sound, "settings.fps-counter"), Some("on"));
         harness.activate_guarded("sound.volume.previous", &sound);
         let mut sound = harness.wait_sound_save("saved");
         // Cabinet amplifiers need useful stops below 10%, including durable
@@ -69,6 +73,7 @@ fn sound_controls_persist_across_scenarios_restart_and_process_restart() {
         assert_eq!(stored.audio.master_volume, 0.10);
         assert!(stored.audio.muted);
         assert_eq!(stored.launch.scenario, "falling");
+        assert!(stored.video.show_fps);
         harness.capture_screenshot("pause-sound.png");
 
         let pause = harness.activate_guarded("sound.back", &saved);
@@ -159,11 +164,12 @@ fn sound_controls_persist_across_scenarios_restart_and_process_restart() {
         assert_eq!(control_value(&sound, "sound.volume.next"), Some("10%"));
         assert_eq!(control_value(&sound, "sound.mute"), Some("on"));
         assert_eq!(control_value(&sound, "sound.save-status"), Some("saved"));
+        assert_eq!(control_value(&sound, "settings.fps-counter"), Some("on"));
     });
 }
 
 impl FunctionalHarness {
-    fn wait_sound_save(&mut self, expected: &str) -> UiState {
+    pub(super) fn wait_sound_save(&mut self, expected: &str) -> UiState {
         let deadline = Instant::now() + TRANSITION_TIMEOUT;
         loop {
             let state = self.state();

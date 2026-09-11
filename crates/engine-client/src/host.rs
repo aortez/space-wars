@@ -304,6 +304,8 @@ pub fn start_debug_render_loop(
     let weak_window = window.as_weak();
     let start = Instant::now();
     let mut frame_count = 0_u64;
+    let mut performance = PerformanceStats::new(TickModel::Variable, start);
+    window.set_performance_overlay_text(performance.overlay_text(false, false).into());
     let mut raster_renderer = raster::RasterRenderer::new();
 
     timer.start(TimerMode::Repeated, TIMER_INTERVAL, move || {
@@ -314,6 +316,9 @@ pub fn start_debug_render_loop(
         let convert_start = Instant::now();
         let frame = render::debug_frame(start.elapsed(), stress_triangles);
         let scene_item_count = present_frame(&window, frame, renderer, &mut raster_renderer);
+        if performance.record_frame(Instant::now(), 1, 0) {
+            window.set_performance_overlay_text(performance.overlay_text(false, false).into());
+        }
 
         frame_count += 1;
         if frame_count % 120 == 0 {
@@ -526,6 +531,7 @@ pub fn start_scenario_loop(
     window.set_clock_controls_pending(false);
     let mut performance = PerformanceStats::new(tick_model, last_tick);
     let initial_game_over = scenario.is_game_over();
+    window.set_performance_overlay_text(performance.overlay_text(false, initial_game_over).into());
     let input_diagnostics = input.borrow().runtime_diagnostics_text();
     window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
         &scenario_name,
@@ -599,6 +605,7 @@ pub fn start_scenario_loop(
     }
 
     let mut last_realtime_emulated_frames = 0;
+    let mut last_realtime_submitted_frames = 0;
     let mut last_diagnostics_revision = input.borrow().runtime_diagnostics_revision();
     let mut last_diagnostics_scenario_revision = scenario_revision;
     let mut last_diagnostics_paused = paused;
@@ -680,6 +687,7 @@ pub fn start_scenario_loop(
             scenario_revision = next_scenario_revision();
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
+            last_realtime_submitted_frames = 0;
             match replace_realtime_presenter(
                 &window,
                 &realtime_presenter,
@@ -720,56 +728,24 @@ pub fn start_scenario_loop(
         }
         window.set_clock_controls_pending(controls.borrow().clock_controls_pending());
         scenario.record_realtime_displayed_loop_iteration();
-        let updates = if let Some(telemetry) = scenario.realtime_telemetry() {
+        let (updates, mut submitted_frames) = if let Some(telemetry) = scenario.realtime_telemetry() {
             let updates = telemetry
                 .emulated_frames
                 .saturating_sub(last_realtime_emulated_frames) as usize;
+            let frames = telemetry
+                .submitted_video_frames
+                .saturating_sub(last_realtime_submitted_frames) as usize;
             last_realtime_emulated_frames = telemetry.emulated_frames;
+            last_realtime_submitted_frames = telemetry.submitted_video_frames;
             trace_realtime_telemetry(telemetry);
-            updates
+            (updates, frames)
         } else {
-            step_result.updates
+            (step_result.updates, 0)
         };
-        let performance_sample_completed = performance.record_frame(now, updates);
         if paused != last_diagnostics_paused {
             performance.cpu_profile.clear();
         }
-        let diagnostics_revision = input.runtime_diagnostics_revision();
         let game_over = scenario.is_game_over();
-        if performance_sample_completed
-            || diagnostics_revision != last_diagnostics_revision
-            || scenario_revision != last_diagnostics_scenario_revision
-            || paused != last_diagnostics_paused
-            || game_over != last_diagnostics_game_over
-            || benchmark_active != last_diagnostics_benchmark_active
-        {
-            let input_diagnostics = if paused || game_over {
-                input.paused_runtime_diagnostics_text()
-            } else {
-                input.runtime_diagnostics_text()
-            };
-            window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
-                &scenario_name,
-                scenario_revision,
-                paused,
-                game_over,
-                benchmark_active,
-                renderer,
-                raster_scale,
-                &performance,
-                &input_diagnostics,
-            )));
-            last_diagnostics_revision = diagnostics_revision;
-            last_diagnostics_scenario_revision = scenario_revision;
-            last_diagnostics_paused = paused;
-            last_diagnostics_game_over = game_over;
-            last_diagnostics_benchmark_active = benchmark_active;
-        }
-        let performance_text = performance.display_text();
-        set_center_panel(
-            &window,
-            scenario.center_panel_state(paused, benchmark_active, &performance_text),
-        );
         window.set_game_over_visible(game_over);
         set_ingame_menu(&window, paused && !game_over);
         window.set_scenario_pointer_enabled(scenario.registration().capabilities.pointer_input);
@@ -781,7 +757,10 @@ pub fn start_scenario_loop(
             projection_viewport = viewport;
             if presented_native_frame_id != Some(frame.frame_id) {
                 match present_native_video(&window, frame, &mut native_video_renderer) {
-                    Ok(frame_id) => presented_native_frame_id = Some(frame_id),
+                    Ok(frame_id) => {
+                        presented_native_frame_id = Some(frame_id);
+                        submitted_frames = 1;
+                    }
                     Err(error) => {
                         paused = true;
                         accumulator = Duration::ZERO;
@@ -808,6 +787,7 @@ pub fn start_scenario_loop(
                 raster_scale,
                 &mut raster_renderer,
             );
+            submitted_frames = 1;
             if !paused {
                 let internal = if renderer == RenderBackend::Raster {
                     scaled_viewport(viewport, raster_scale)
@@ -823,6 +803,48 @@ pub fn start_scenario_loop(
                     internal.width.ceil() as u32, internal.height.ceil() as u32], primitives);
             }
         }
+        // Sample submissions, not host polls: NES/Falling can submit several
+        // frames between ticks, or none (including duplicate/paused polls).
+        if paused != last_diagnostics_paused || game_over != last_diagnostics_game_over {
+            performance.reset_rates(now);
+        }
+        let performance_sample_completed = performance.record_frame(now, submitted_frames, updates);
+        let diagnostics_revision = input.runtime_diagnostics_revision();
+        if performance_sample_completed
+            || diagnostics_revision != last_diagnostics_revision
+            || scenario_revision != last_diagnostics_scenario_revision
+            || paused != last_diagnostics_paused
+            || game_over != last_diagnostics_game_over
+            || benchmark_active != last_diagnostics_benchmark_active
+        {
+            let input_diagnostics = if paused || game_over {
+                input.paused_runtime_diagnostics_text()
+            } else {
+                input.runtime_diagnostics_text()
+            };
+            window.set_runtime_diagnostics(SharedString::from(runtime_diagnostics_text(
+                &scenario_name,
+                scenario_revision,
+                paused,
+                game_over,
+                benchmark_active,
+                renderer,
+                raster_scale,
+                &performance,
+                &input_diagnostics,
+            )));
+            window.set_performance_overlay_text(performance.overlay_text(paused, game_over).into());
+            last_diagnostics_revision = diagnostics_revision;
+            last_diagnostics_scenario_revision = scenario_revision;
+            last_diagnostics_paused = paused;
+            last_diagnostics_game_over = game_over;
+            last_diagnostics_benchmark_active = benchmark_active;
+        }
+        let performance_text = performance.display_text();
+        set_center_panel(
+            &window,
+            scenario.center_panel_state(paused, benchmark_active, &performance_text),
+        );
     });
 
     Ok(timer)
@@ -1319,8 +1341,8 @@ struct PerformanceStats {
     cpu_profile: profiling::CpuProfile,
     target_label: String,
     sample_started: Instant,
-    frames_in_sample: u32,
-    updates_in_sample: u32,
+    frames_in_sample: u64,
+    updates_in_sample: u64,
     frames_total: u64,
     updates_total: u64,
     measured_fps: Option<f32>,
@@ -1342,10 +1364,12 @@ impl PerformanceStats {
         }
     }
 
-    fn record_frame(&mut self, now: Instant, updates: usize) -> bool {
-        self.frames_in_sample += 1;
-        self.updates_in_sample += updates as u32;
-        self.frames_total = self.frames_total.saturating_add(1);
+    fn record_frame(&mut self, now: Instant, submitted_frames: usize, updates: usize) -> bool {
+        self.frames_in_sample = self
+            .frames_in_sample
+            .saturating_add(submitted_frames as u64);
+        self.updates_in_sample = self.updates_in_sample.saturating_add(updates as u64);
+        self.frames_total = self.frames_total.saturating_add(submitted_frames as u64);
         self.updates_total = self.updates_total.saturating_add(updates as u64);
 
         let elapsed = now.saturating_duration_since(self.sample_started);
@@ -1362,6 +1386,28 @@ impl PerformanceStats {
         true
     }
 
+    fn reset_rates(&mut self, now: Instant) {
+        self.sample_started = now;
+        self.frames_in_sample = 0;
+        self.updates_in_sample = 0;
+        self.measured_fps = None;
+        self.measured_ups = None;
+    }
+
+    fn overlay_text(&self, paused: bool, game_over: bool) -> String {
+        if game_over {
+            "Round over".into()
+        } else if paused {
+            "Paused".into()
+        } else {
+            format!(
+                "FPS {} | UPS {}",
+                measured_label(self.measured_fps),
+                measured_label(self.measured_ups)
+            )
+        }
+    }
+
     fn display_text(&self) -> String {
         format!(
             "Target {} | FPS {} | UPS {}",
@@ -1373,7 +1419,7 @@ impl PerformanceStats {
 
     fn diagnostics_text(&self) -> String {
         format!(
-            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}{}",
+            "performance_target={}\nfps={}\nups={}\nframes_total={}\nupdates_total={}\nfps_source=submitted-frames{}",
             self.target_label,
             measured_diagnostics_label(self.measured_fps),
             measured_diagnostics_label(self.measured_ups),
@@ -2518,19 +2564,19 @@ mod tests {
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS -- | UPS --");
         assert_eq!(
             stats.diagnostics_text(),
-            "performance_target=60 Hz\nfps=--\nups=--\nframes_total=0\nupdates_total=0"
+            "performance_target=60 Hz\nfps=--\nups=--\nframes_total=0\nupdates_total=0\nfps_source=submitted-frames"
         );
 
         for frame in 1..=60 {
             let sample_completed =
-                stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1);
+                stats.record_frame(start + Duration::from_secs_f64(frame as f64 / 60.0), 1, 1);
             assert_eq!(sample_completed, frame == 60);
         }
 
         assert_eq!(stats.display_text(), "Target 60 Hz | FPS 60 | UPS 60");
         assert_eq!(
             stats.diagnostics_text(),
-            "performance_target=60 Hz\nfps=60.0\nups=60.0\nframes_total=60\nupdates_total=60"
+            "performance_target=60 Hz\nfps=60.0\nups=60.0\nframes_total=60\nupdates_total=60\nfps_source=submitted-frames"
         );
     }
 
@@ -2538,7 +2584,7 @@ mod tests {
     fn runtime_diagnostics_include_launch_state_and_performance() {
         let start = Instant::now();
         let mut stats = PerformanceStats::new(TickModel::Variable, start);
-        stats.record_frame(start + Duration::from_secs(1), 3);
+        stats.record_frame(start + Duration::from_secs(1), 1, 3);
 
         assert_eq!(
             runtime_diagnostics_text(
@@ -2552,8 +2598,39 @@ mod tests {
                 &stats,
                 "No active rule-bot diagnostics.",
             ),
-            "scenario=pizza\nscenario_revision=17\npaused=false\ngame_over=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nNo active rule-bot diagnostics."
+            "scenario=pizza\nscenario_revision=17\npaused=false\ngame_over=false\nbenchmark_active=true\nrenderer=raster\nraster_scale=2.00\nperformance_target=variable\nfps=1.0\nups=3.0\nframes_total=1\nupdates_total=3\nfps_source=submitted-frames\nNo active rule-bot diagnostics."
         );
+    }
+
+    #[test]
+    fn performance_rates_count_submissions_not_polls_or_emulated_frames() {
+        let start = Instant::now();
+        let mut stats = PerformanceStats::new(TickModel::EmulatorClock, start);
+        // A delayed UI can miss/coalesce video frames while the worker keeps
+        // emulating. Polls without a new submission must not inflate FPS.
+        for poll in 1..=100 {
+            stats.record_frame(
+                start + Duration::from_millis(poll * 10),
+                if poll == 100 { 30 } else { 0 },
+                if poll == 100 { 60 } else { 0 },
+            );
+        }
+        assert_eq!(stats.overlay_text(false, false), "FPS 30 | UPS 60");
+        assert_eq!(stats.frames_total, 30);
+        assert_eq!(stats.updates_total, 60);
+        stats.record_frame(start + Duration::from_secs(2), 0, 0);
+        assert_eq!(stats.overlay_text(false, false), "FPS 0 | UPS 0");
+        assert_eq!(stats.overlay_text(true, false), "Paused");
+        assert_eq!(stats.overlay_text(false, true), "Round over");
+
+        stats.reset_rates(start + Duration::from_secs(2));
+        assert_eq!(stats.overlay_text(false, false), "FPS -- | UPS --");
+        assert_eq!(stats.frames_total, 30, "resume retains session totals");
+        stats.record_frame(start + Duration::from_secs(3), 60, 60);
+        assert_eq!(stats.overlay_text(false, false), "FPS 60 | UPS 60");
+        let restarted = PerformanceStats::new(TickModel::EmulatorClock, start);
+        assert_eq!(restarted.frames_total, 0);
+        assert_eq!(restarted.overlay_text(false, false), "FPS -- | UPS --");
     }
 
     #[test]
