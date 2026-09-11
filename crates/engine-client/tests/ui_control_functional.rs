@@ -792,51 +792,62 @@ impl FunctionalHarness {
 
     fn capture_screenshot(&mut self, name: &str) -> PathBuf {
         let path = self.run_path().join(name);
-        let response = self.screenshot_request(&path, TRANSITION_TIMEOUT);
-        match response {
-            Ok(message) => {
-                self.history.push(json!({
-                    "elapsed_ms": self.elapsed_ms(),
-                    "command": format!("screenshot {}", path.display()),
-                    "outcome": "ok",
-                    "response": message,
-                }));
+        let deadline = Instant::now() + TRANSITION_TIMEOUT;
+        loop {
+            let response = self.screenshot_request(&path, TRANSITION_TIMEOUT);
+            match response {
+                Ok(message) => {
+                    self.history.push(json!({
+                        "elapsed_ms": self.elapsed_ms(),
+                        "command": format!("screenshot {}", path.display()),
+                        "outcome": "ok",
+                        "response": message,
+                    }));
+                }
+                Err(error) => {
+                    self.record_error_message(
+                        &format!("screenshot {}", path.display()),
+                        &error.to_string(),
+                        error.failure(),
+                    );
+                    panic!("screenshot capture failed: {error}");
+                }
             }
-            Err(error) => {
-                self.record_error_message(
-                    &format!("screenshot {}", path.display()),
-                    &error.to_string(),
-                    error.failure(),
-                );
-                panic!("screenshot capture failed: {error}");
+            let bytes = fs::read(&path).unwrap_or_else(|error| {
+                panic!("could not read screenshot {}: {error}", path.display())
+            });
+            let mut reader = png::Decoder::new(bytes.as_slice())
+                .read_info()
+                .unwrap_or_else(|error| panic!("invalid PNG {}: {error}", path.display()));
+            let mut pixels = vec![0; reader.output_buffer_size()];
+            let info = reader
+                .next_frame(&mut pixels)
+                .unwrap_or_else(|error| panic!("could not decode {}: {error}", path.display()));
+            assert!(info.width > 0 && info.height > 0);
+            assert_eq!(info.color_type, png::ColorType::Rgba);
+            assert_eq!(info.bit_depth, png::BitDepth::Eight);
+            let pixels = &pixels[..info.buffer_size()];
+            let first_rgb = &pixels[..3];
+            let opaque = pixels.chunks_exact(4).all(|pixel| pixel[3] == 255);
+            // The control socket can become ready before the first Slint draw.
+            // Keep the opacity assertion, but wait for that initial frame to exist.
+            if !opaque && Instant::now() < deadline {
+                self.history.push(json!({"elapsed_ms": self.elapsed_ms(), "command": "wait for opaque screenshot frame"}));
+                thread::sleep(POLL_INTERVAL);
+                continue;
             }
+            assert!(
+                opaque,
+                "{} contains transparent screenshot pixels",
+                path.display()
+            );
+            assert!(
+                pixels.chunks_exact(4).any(|pixel| &pixel[..3] != first_rgb),
+                "{} is a blank, single-color screenshot",
+                path.display()
+            );
+            return path;
         }
-        let bytes = fs::read(&path).unwrap_or_else(|error| {
-            panic!("could not read screenshot {}: {error}", path.display())
-        });
-        let mut reader = png::Decoder::new(bytes.as_slice())
-            .read_info()
-            .unwrap_or_else(|error| panic!("invalid PNG {}: {error}", path.display()));
-        let mut pixels = vec![0; reader.output_buffer_size()];
-        let info = reader
-            .next_frame(&mut pixels)
-            .unwrap_or_else(|error| panic!("could not decode {}: {error}", path.display()));
-        assert!(info.width > 0 && info.height > 0);
-        assert_eq!(info.color_type, png::ColorType::Rgba);
-        assert_eq!(info.bit_depth, png::BitDepth::Eight);
-        let pixels = &pixels[..info.buffer_size()];
-        let first_rgb = &pixels[..3];
-        assert!(
-            pixels.chunks_exact(4).all(|pixel| pixel[3] == 255),
-            "{} contains transparent screenshot pixels",
-            path.display()
-        );
-        assert!(
-            pixels.chunks_exact(4).any(|pixel| &pixel[..3] != first_rgb),
-            "{} is a blank, single-color screenshot",
-            path.display()
-        );
-        path
     }
 
     fn require_state_result(

@@ -26,7 +26,7 @@ Land the pod, exit, claim ground if necessary, then stand still on an owned
 planet for eight seconds to rebuild. Board the replacement after it settles.
 Losing every ship and flag does not eliminate a living pilot. Pilot health
 persists through transfers and rebuilding; pilot death ends that player's
-round, even with owned planets. Simultaneous deaths draw. **Play Again** starts
+round, even with owned planets. Simultaneous deaths draw. **Rematch** starts
 the same seed with fresh health, terrain, ownership and bot state.
 
 | Action | Assigned gamepad | P1 keyboard | P2 keyboard |
