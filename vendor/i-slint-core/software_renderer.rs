@@ -7,6 +7,7 @@
 
 #![warn(missing_docs)]
 
+mod diagnostics;
 mod draw_functions;
 mod fixed;
 mod fonts;
@@ -380,6 +381,10 @@ fn region_line_ranges(
 mod target_pixel_buffer;
 
 #[cfg(feature = "experimental")]
+pub use diagnostics::{DrawDiagnostic, DrawDiagnosticObserver, DRAW_DIAGNOSTIC_COUNT};
+use diagnostics::{DrawDiagnostic as Diagnostic, Span as DiagnosticSpan};
+
+#[cfg(feature = "experimental")]
 pub use target_pixel_buffer::{
     DrawRectangleArgs, DrawTextureArgs, TargetPixelBuffer, TexturePixelFormat,
 };
@@ -518,6 +523,9 @@ impl SoftwareRenderer {
         &self,
         buffer: &mut impl target_pixel_buffer::TargetPixelBuffer,
     ) -> PhysicalRegion {
+        let observer = buffer.diagnostic_observer();
+        let _render_span = DiagnosticSpan::new(observer, Diagnostic::Render);
+        let prepare_span = DiagnosticSpan::new(observer, Diagnostic::Prepare);
         let pixels_per_line = buffer.line_slice(0).len();
         let num_lines = buffer.num_lines();
         let buffer_pixel_count = num_lines * pixels_per_line;
@@ -563,9 +571,11 @@ impl SoftwareRenderer {
         );
         let mut renderer = self.partial_rendering_state.create_partial_renderer(buffer_renderer);
         let window_adapter = renderer.window_adapter.clone();
+        drop(prepare_span);
 
         window_inner
             .draw_contents(|components| {
+                let dirty_span = DiagnosticSpan::new(observer, Diagnostic::DirtyRegion);
                 let logical_size = (size.cast() / factor).cast();
 
                 let dirty_region_of_existing_buffer = match self.repaint_buffer_type.get() {
@@ -605,6 +615,8 @@ impl SoftwareRenderer {
                 drop(i);
 
                 renderer.actual_renderer.processor.dirty_region = dirty_region.clone();
+                drop(dirty_span);
+                let background_span = DiagnosticSpan::new(observer, Diagnostic::Background);
                 if !renderer
                     .actual_renderer
                     .processor
@@ -622,6 +634,8 @@ impl SoftwareRenderer {
                     );
                 }
 
+                drop(background_span);
+                let items_span = DiagnosticSpan::new(observer, Diagnostic::Items);
                 for (component, origin) in components {
                     crate::item_rendering::render_component_items(
                         component,
@@ -630,6 +644,7 @@ impl SoftwareRenderer {
                         &window_adapter,
                     );
                 }
+                drop(items_span);
 
                 if let Some(metrics) = &self.rendering_metrics_collector {
                     metrics.measure_frame_rendered(&mut renderer);
@@ -926,10 +941,8 @@ impl RendererSealed for SoftwareRenderer {
         // Output rotation belongs to the display, not to the logical window contents returned by
         // a snapshot. Rendering a quarter-turned window into this logical-size buffer also violates
         // render()'s stride requirements and panics for non-square windows.
-        let restore_rotation = RestoreRotation {
-            renderer: self,
-            rotation: self.rendering_rotation(),
-        };
+        let restore_rotation =
+            RestoreRotation { renderer: self, rotation: self.rendering_rotation() };
         self.set_rendering_rotation(RenderingRotation::NoRotation);
         self.set_repaint_buffer_type(RepaintBufferType::NewBuffer);
         self.render(target_buffer.make_mut_slice(), width as usize);
@@ -1182,6 +1195,9 @@ fn prepare_scene(
 }
 
 trait ProcessScene {
+    fn diagnostic_observer(&self) -> Option<diagnostics::DrawDiagnosticObserver> {
+        None
+    }
     fn process_scene_texture(&mut self, geometry: PhysicalRect, texture: SceneTexture<'static>);
     fn process_target_texture(
         &mut self,
@@ -1489,7 +1505,12 @@ impl<B: target_pixel_buffer::TargetPixelBuffer> RenderToBuffer<'_, B> {
 }
 
 impl<B: target_pixel_buffer::TargetPixelBuffer> ProcessScene for RenderToBuffer<'_, B> {
+    fn diagnostic_observer(&self) -> Option<diagnostics::DrawDiagnosticObserver> {
+        self.buffer.diagnostic_observer()
+    }
+
     fn process_scene_texture(&mut self, geometry: PhysicalRect, texture: SceneTexture<'static>) {
+        let _span = DiagnosticSpan::new(self.diagnostic_observer(), Diagnostic::TextureFallback);
         self.process_texture_impl(geometry, texture);
     }
 
@@ -1498,10 +1519,13 @@ impl<B: target_pixel_buffer::TargetPixelBuffer> ProcessScene for RenderToBuffer<
         texture: &target_pixel_buffer::DrawTextureArgs,
         clip: PhysicalRect,
     ) {
+        let _span = DiagnosticSpan::new(self.diagnostic_observer(), Diagnostic::Texture);
         if self.buffer.draw_texture(texture, &self.dirty_region.intersection(&clip)) {
             return;
         }
 
+        let _fallback =
+            DiagnosticSpan::new(self.diagnostic_observer(), Diagnostic::TextureFallback);
         let Some((texture, geometry)) = SceneTexture::from_target_texture(texture, &clip) else {
             return;
         };
@@ -1514,6 +1538,7 @@ impl<B: target_pixel_buffer::TargetPixelBuffer> ProcessScene for RenderToBuffer<
         args: &target_pixel_buffer::DrawRectangleArgs,
         clip: PhysicalRect,
     ) {
+        let _span = DiagnosticSpan::new(self.diagnostic_observer(), Diagnostic::Rectangle);
         if self.buffer.draw_rectangle(args, &self.dirty_region.intersection(&clip)) {
             return;
         }
@@ -2236,6 +2261,7 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
         size: LogicalSize,
         _: &CachedRenderingData,
     ) {
+        let _span = DiagnosticSpan::new(self.processor.diagnostic_observer(), Diagnostic::Image);
         let geom = LogicalRect::from(size);
         if self.should_draw(&geom) {
             let source = image.source();
@@ -2285,6 +2311,7 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
         size: LogicalSize,
         _cache: &CachedRenderingData,
     ) {
+        let _span = DiagnosticSpan::new(self.processor.diagnostic_observer(), Diagnostic::Text);
         let string = text.text();
         if string.trim().is_empty() {
             return;
@@ -2359,6 +2386,7 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
         self_rc: &ItemRc,
         size: LogicalSize,
     ) {
+        let _span = DiagnosticSpan::new(self.processor.diagnostic_observer(), Diagnostic::Text);
         let geom = LogicalRect::from(size);
         if !self.should_draw(&geom) {
             return;
@@ -2468,6 +2496,7 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
 
     #[cfg(feature = "std")]
     fn draw_path(&mut self, _path: Pin<&crate::items::Path>, _: &ItemRc, _size: LogicalSize) {
+        let _span = DiagnosticSpan::new(self.processor.diagnostic_observer(), Diagnostic::Path);
         // TODO
     }
 

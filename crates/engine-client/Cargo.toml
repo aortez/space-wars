@@ -32,6 +32,8 @@ gilrs = { workspace = true }
 png = { workspace = true }
 sha2 = { workspace = true }
 slint = { workspace = true }
+# Local, opt-in software-renderer observation hooks for the presentation lab.
+i-slint-core = { version = "=1.13.1", default-features = false, features = ["experimental", "software-renderer"] }
 tempfile = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -44,6 +46,10 @@ slint-build = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Public diagnostics from our existing vendored LinuxKMS backend, on its UI thread.
+i-slint-backend-linuxkms = { version = "=1.13.1", default-features = false, optional = true }
+
 [features]
 default = ["desktop"]
 desktop = [
@@ -55,6 +61,7 @@ desktop = [
     "slint/unstable-winit-030",
 ]
 pi-kiosk = [
+    "dep:i-slint-backend-linuxkms",
     "slint/backend-linuxkms",
     "slint/compat-1-2",
     "slint/software-renderer-systemfonts",
