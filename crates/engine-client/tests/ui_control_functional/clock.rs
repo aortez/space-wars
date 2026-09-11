@@ -5,6 +5,91 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn digit_slide_controls_preview_cleanup_and_persistence() {
+    run_functional_test("clock-digit-slide", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.digit-slide.next"),
+            Some("Off")
+        );
+        harness.capture_screenshot("clock-digit-slide-launcher.png");
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        assert!(!initial.settings.events.digit_slide);
+        assert_eq!(initial.profile, "off");
+        let catalog = initial
+            .events
+            .iter()
+            .find(|e| e.kind == ClockEventKind::DigitSlide)
+            .unwrap();
+        assert_eq!(
+            catalog.trigger,
+            engine_common::ClockEventTrigger::TimeChange
+        );
+        assert_eq!(catalog.duration_ticks, scenario_clock::DIGIT_SLIDE_TICKS);
+        harness.clock_trigger_event(&initial, ClockEventKind::DigitSlide);
+        // The animation lasts less than a second. Don't require a loaded CI
+        // process to catch it: exact phases/pause/rendering are core tests.
+        let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 1, 0);
+        assert!(recovered.digit_slide.is_none());
+        assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
+        assert_eq!(recovered.next_event_tick, None);
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let mut page = harness.change_clock_setting("pause.clock.digit-slide", "On", &page);
+        let configured = harness.clock_state();
+        assert!(configured.settings.events.digit_slide);
+        page = harness.press_guarded(UiAction::Left, &page);
+        assert_eq!(page.selected_control.as_deref(), Some("pause.clock.duck"));
+        page = harness.press_guarded(UiAction::Right, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.digit-slide")
+        );
+        for _ in 0..ClockEventKind::ALL.len() - 1 {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Digit Slide")
+        );
+        harness.capture_screenshot("clock-digit-slide-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let recovered = harness.clock_wait(&initial, "idle", initial.event_id + 2, 0);
+        assert!(recovered.digit_slide.is_none());
+        assert_eq!(recovered.settings, configured.settings);
+        harness.capture_screenshot("clock-digit-slide-recovered.png");
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_eq!(restarted.event_id, 0);
+        assert_eq!(restarted.settings, configured.settings);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        assert_eq!(harness.clock_state().settings, configured.settings);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
     use engine_common::ClockMarqueePreset;
     run_functional_test("clock-marquee", |harness| {
@@ -218,7 +303,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
     run_functional_test("clock-live-controls", |harness| {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
-        harness.activate_guarded("launcher.start", &state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        // This workflow checks explicit event IDs, not host wall-clock edges.
+        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
         let initial = harness.clock_state();
         harness.clock_trigger(&initial);
@@ -495,6 +583,9 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         let state = harness.activate_until_scenario("clock", state);
         let state = harness.activate_guarded("launcher.settings", &state);
         let state = harness.activate_guarded("launcher.settings.clock.event-profile.next", &state);
+        // Keep the periodic schedule test independent of when a real minute
+        // rolls over. Time-change triggers are driven by injected core readings.
+        let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Demo")
@@ -511,7 +602,10 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 .collect::<Vec<_>>(),
             ClockEventKind::ALL
         );
-        assert!(initial.events.iter().all(|event| event.enabled));
+        assert!(
+            initial.events.iter().all(|event| event.enabled
+                == (event.trigger == engine_common::ClockEventTrigger::Periodic))
+        );
         assert!((360..=600).contains(&initial.next_event_tick.unwrap()));
         let mut previous = None;
         for event_id in 1..=2 {
@@ -558,6 +652,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.marquee.next",
+            "launcher.settings.clock.digit-slide.next",
         ] {
             assert_eq!(control_value(&state, id), Some("On"));
             state = harness.activate_guarded(id, &state);

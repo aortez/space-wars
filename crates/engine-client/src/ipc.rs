@@ -898,6 +898,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
             clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
+            clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
             clock_marquee_preset: window.get_launcher_clock_marquee_preset().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },

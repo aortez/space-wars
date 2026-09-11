@@ -22,6 +22,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.events.duck);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
+    window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
     window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
     window.set_launcher_clock_marquee_message(settings.marquee_message.as_str().into());
 }
@@ -140,6 +141,7 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         7 => settings.events.meltdown = !settings.events.meltdown,
         8 => settings.events.duck = !settings.events.duck,
         9 => settings.events.marquee = !settings.events.marquee,
+        11 => settings.events.digit_slide = !settings.events.digit_slide,
         10 => {
             let presets = engine_common::ClockMarqueePreset::ALL;
             let index = presets
@@ -172,7 +174,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(index, action))
         }
         UiAction::Left | UiAction::Right => {
-            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9) {
+            if matches!(index, 2 | 3 | 5 | 6 | 7 | 8 | 9 | 11) {
                 window.set_ingame_clock_focus_index(ui_navigation::moved_clock_selection(
                     index, action,
                 ));
@@ -183,7 +185,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=10) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=11) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

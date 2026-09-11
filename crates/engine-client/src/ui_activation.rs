@@ -108,6 +108,7 @@ fn activation_target(control_id: &str, benchmark_available: bool) -> Option<Acti
         "pause.clock.meltdown" => pause_clock(7, UiAction::Confirm),
         "pause.clock.duck" => pause_clock(8, UiAction::Confirm),
         "pause.clock.marquee" => pause_clock(9, UiAction::Confirm),
+        "pause.clock.digit-slide" => pause_clock(11, UiAction::Confirm),
         "pause.clock.marquee-preset.previous" => pause_clock(10, UiAction::Left),
         "pause.clock.marquee-preset.next" => pause_clock(10, UiAction::Right),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
@@ -148,13 +149,14 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         | "launcher.settings.clock.time-format" => 2,
         "launcher.settings.spacewars.planets"
         | "launcher.settings.pizza.spawn-rate"
-        | "launcher.settings.clock.event-profile" => 3,
-        "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.falling" => 4,
-        "launcher.settings.spacewars.player-health" | "launcher.settings.clock.color-cycle" => 5,
-        "launcher.settings.spacewars.player-2" | "launcher.settings.clock.meltdown" => 6,
-        "launcher.settings.clock.duck" => 7,
-        "launcher.settings.clock.marquee" => 8,
-        "launcher.settings.clock.marquee-preset" => 9,
+        | "launcher.settings.clock.digit-slide" => 3,
+        "launcher.settings.spacewars.asteroids" | "launcher.settings.clock.event-profile" => 4,
+        "launcher.settings.spacewars.player-health" | "launcher.settings.clock.falling" => 5,
+        "launcher.settings.spacewars.player-2" | "launcher.settings.clock.color-cycle" => 6,
+        "launcher.settings.clock.meltdown" => 7,
+        "launcher.settings.clock.duck" => 8,
+        "launcher.settings.clock.marquee" => 9,
+        "launcher.settings.clock.marquee-preset" => 10,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

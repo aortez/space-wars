@@ -33,7 +33,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck or marquee.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee or digit-slide.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -53,7 +53,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -76,7 +76,10 @@ fn parse_event(value: &str) -> Result<ClockEventKind, String> {
         .into_iter()
         .find(|kind| kind.as_str() == value)
         .ok_or_else(|| {
-            format!("Unknown Clock event {value:?}; choose falling, color-cycle, meltdown, duck or marquee")
+            format!(
+                "Unknown Clock event {value:?}; choose {}",
+                ClockEventKind::ALL.map(ClockEventKind::as_str).join(", ")
+            )
         })
 }
 
@@ -100,11 +103,12 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; automatic={}, reuse delay={} ticks, ready at={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
                         event.duration_ticks,
+                        event.trigger.as_str(),
                         event.enabled,
                         event.cooldown_ticks,
                         event.automatic_ready_at_tick
@@ -297,6 +301,16 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 marquee.lighting
             );
         }
+        if let Some(slide) = &state.digit_slide {
+            println!(
+                "Digit Slide: {:?} -> {:?}; changed={:?}, progress={:.1}%, preview={}",
+                slide.from_digits,
+                slide.to_digits,
+                slide.changed_slots,
+                slide.progress_milli as f32 / 10.0,
+                slide.preview
+            );
+        }
     }
     Ok(())
 }
@@ -306,6 +320,27 @@ mod tests {
     use super::*;
     use crate::{Args, Command};
     use clap::Parser;
+
+    #[test]
+    fn every_catalog_event_is_a_valid_cli_trigger_and_sliding_is_a_known_phase() {
+        for kind in ClockEventKind::ALL {
+            assert!(
+                Args::try_parse_from(["spacewars-cli", "clock", "trigger", kind.as_str()]).is_ok()
+            );
+        }
+        assert!(
+            Args::try_parse_from([
+                "spacewars-cli",
+                "clock",
+                "wait",
+                "--event",
+                "digit-slide",
+                "--phase",
+                "sliding"
+            ])
+            .is_ok()
+        );
+    }
 
     #[test]
     fn message_cli_validates_before_contacting_the_client() {

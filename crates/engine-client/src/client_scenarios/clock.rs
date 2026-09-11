@@ -12,11 +12,14 @@ use super::{
 use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
+pub(super) mod benchmark;
+
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
     launcher_visible: true,
     capabilities: ScenarioCapabilities {
         benchmark: false,
+        headless_benchmark: true,
         pointer_input: false,
         player_zoom: false,
         game_over: false,
@@ -31,6 +34,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
 pub(crate) struct ClockClientScenario {
     pub(crate) state: ClockState,
     last_emitted_reading: Cell<Option<ClockReading>>,
+    benchmark: Option<benchmark::Driver>,
 }
 
 impl ClockClientScenario {
@@ -47,9 +51,17 @@ fn create(
     seed: u64,
     settings: &Settings,
     viewport: Viewport,
-    _mode: ScenarioStartMode,
+    mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    if let ScenarioStartMode::Benchmark(config) = mode {
+        let (state, driver) = benchmark::Driver::new(config.clock, seed, viewport.aspect_ratio());
+        return Ok(Box::new(ClockClientScenario {
+            state,
+            last_emitted_reading: Cell::new(None),
+            benchmark: Some(driver),
+        }));
+    }
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: viewport.aspect_ratio(),
@@ -70,6 +82,7 @@ fn create(
     Ok(Box::new(ClockClientScenario {
         state,
         last_emitted_reading: Cell::new(Some(reading)),
+        benchmark: None,
     }))
 }
 
@@ -83,11 +96,31 @@ impl ClientScenario for ClockClientScenario {
     }
 
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
+        if let Some(driver) = &mut self.benchmark {
+            let scripted = if dt.is_zero() {
+                Vec::new()
+            } else {
+                driver.next_actions()
+            };
+            return ClockScenario::step(&mut self.state, &scripted, dt);
+        }
         ClockScenario::step(&mut self.state, actions, dt)
     }
 
     fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+        if self.benchmark.is_some() {
+            return Vec::new();
+        }
         self.actions_for_reading(local_clock_reading())
+    }
+
+    fn benchmark_counts(&self) -> Option<super::BenchmarkCounts> {
+        Some(super::BenchmarkCounts {
+            bodies: self.state.body_count(),
+            colliders: self.state.collider_count(),
+            clock_event_active: self.state.event_kind().is_some(),
+            ..Default::default()
+        })
     }
 
     fn render_frames(&self, _renderer: RenderBackend, _viewport: Viewport) -> Vec<RenderFrame> {
@@ -127,6 +160,7 @@ impl ClientScenario for ClockClientScenario {
                     kind: event.kind,
                     label: event.kind.label().into(),
                     effect: event.effect.as_str().into(),
+                    trigger: event.trigger,
                     duration_ticks: event.duration_ticks,
                     cooldown_ticks: event.cooldown_ticks,
                     enabled: self.state.event_enabled(event.kind),
@@ -142,6 +176,7 @@ impl ClientScenario for ClockClientScenario {
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             marquee: self.state.marquee_state(),
+            digit_slide: self.state.digit_slide_state(),
             reading: self
                 .state
                 .reading()
@@ -247,6 +282,120 @@ mod tests {
     }
 
     #[test]
+    fn digit_slide_clips_and_recovers_on_both_render_paths() {
+        for viewport in [
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+            Viewport::new(1280.0, 720.0),
+        ] {
+            let from = ClockReading::new(12, 34, 59).unwrap();
+            let to = ClockReading::new(12, 35, 0).unwrap();
+            let config = ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                ..ClockConfig::default()
+            };
+            let mut state = ClockScenario::init(config, 42);
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(from)],
+                Duration::ZERO,
+            );
+            let mut reference = ClockScenario::init(config, 42);
+            ClockScenario::step(
+                &mut reference,
+                &[ClockAction::set_reading(to)],
+                Duration::ZERO,
+            );
+            let normal = ClockScenario::render_frame(&reference);
+            let mut scenario = ClockClientScenario {
+                state,
+                last_emitted_reading: Cell::new(Some(from)),
+                benchmark: None,
+            };
+            let actions = scenario.actions_for_reading(to);
+            scenario.step(&actions, Duration::from_nanos(16_666_667));
+            assert_eq!(
+                scenario
+                    .clock_state()
+                    .unwrap()
+                    .digit_slide
+                    .unwrap()
+                    .changed_slots,
+                [false, false, false, true]
+            );
+            let mut renderer = crate::raster::RasterRenderer::new();
+            let normal_image = renderer
+                .image_from_frames_with_layout(
+                    std::slice::from_ref(&normal),
+                    viewport,
+                    scenario.frame_layout(),
+                    crate::raster::RasterOptions::default(),
+                )
+                .to_rgb8()
+                .unwrap();
+            for tick in 1..=scenario_clock::DIGIT_SLIDE_TICKS {
+                if tick > 1 {
+                    scenario.step(&[], Duration::from_nanos(16_666_667));
+                }
+                if ![1, 12, 24, 36, 48].contains(&tick) {
+                    continue;
+                }
+                let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                assert_eq!(
+                    frames,
+                    scenario.render_frames(RenderBackend::Vector, viewport)
+                );
+                let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                    &frames,
+                    viewport,
+                    scenario.frame_layout(),
+                );
+                assert!(!presentation.main_primitives.is_empty());
+                let pixels = renderer
+                    .image_from_frames_with_layout(
+                        &frames,
+                        viewport,
+                        scenario.frame_layout(),
+                        crate::raster::RasterOptions::default(),
+                    )
+                    .to_rgb8()
+                    .unwrap();
+                // Only the rightmost slot moves. The colon uses the new reading
+                // immediately; everything outside the last slot matches it.
+                for (index, pixel) in pixels.as_slice().iter().enumerate() {
+                    if index % (pixels.width() as usize) < pixels.width() as usize / 2 {
+                        assert_eq!(pixel, &normal_image.as_slice()[index]);
+                    }
+                }
+                if tick == scenario_clock::DIGIT_SLIDE_TICKS {
+                    assert_eq!(frames[0], normal);
+                    assert_eq!(pixels.as_bytes(), normal_image.as_bytes());
+                    assert!(scenario.clock_state().unwrap().digit_slide.is_none());
+                } else {
+                    assert_ne!(pixels.as_bytes(), normal_image.as_bytes());
+                }
+                if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                    let directory = std::path::PathBuf::from(directory);
+                    std::fs::create_dir_all(&directory).unwrap();
+                    let file = std::fs::File::create(directory.join(format!(
+                        "digit-slide-{tick}-{}x{}.png",
+                        viewport.width, viewport.height
+                    )))
+                    .unwrap();
+                    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                    encoder.set_color(png::ColorType::Rgb);
+                    encoder.set_depth(png::BitDepth::Eight);
+                    encoder
+                        .write_header()
+                        .unwrap()
+                        .write_image_data(pixels.as_bytes())
+                        .unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
     fn marquee_recipes_render_on_both_backends_at_landscape_and_portrait_sizes() {
         for viewport in [
             Viewport::new(800.0, 480.0),
@@ -281,6 +430,7 @@ mod tests {
                 let mut scenario = ClockClientScenario {
                     state,
                     last_emitted_reading: Cell::new(None),
+                    benchmark: None,
                 };
                 let mut renderer = crate::raster::RasterRenderer::new();
                 let mut previous_frame = None;
@@ -382,6 +532,7 @@ mod tests {
             let mut scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(None),
+                benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();
             for tick in 0..=scenario_clock::DUCK_TICKS {
@@ -476,6 +627,7 @@ mod tests {
             let mut scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(None),
+                benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();
             for tick in 0..=510 {

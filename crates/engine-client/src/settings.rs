@@ -363,6 +363,7 @@ mod tests {
                 meltdown: false,
                 duck: false,
                 marquee: false,
+                digit_slide: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -396,6 +397,27 @@ mod tests {
             settings.clock.marquee_preset = preset;
             let decoded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
             assert_eq!(decoded.clock, settings.clock);
+        }
+    }
+
+    #[test]
+    fn digit_slide_defaults_on_without_changing_existing_clock_choices() {
+        let mut settings: Settings = toml::from_str("[clock]\ntime_format='12-hour'\nevent_profile='off'\nmarquee_preset='text-ribbon'\nmarquee_message='HELLO'\n[clock.events]\nfalling=false\ncolor_cycle=true\nmeltdown=false\nduck=false\nmarquee=false\n").unwrap();
+        assert!(settings.clock.events.digit_slide);
+        assert!(!settings.clock.events.marquee);
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
+        assert_eq!(
+            settings.clock.time_format,
+            engine_common::ClockTimeFormat::TwelveHour
+        );
+        assert_eq!(settings.clock.marquee_message.as_str(), "HELLO");
+        for enabled in [true, false] {
+            settings.clock.events.digit_slide = enabled;
+            let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(restored.clock, settings.clock);
         }
     }
 

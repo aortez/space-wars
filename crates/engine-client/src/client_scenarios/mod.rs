@@ -21,6 +21,8 @@ mod spaceling_lab;
 mod spacewars;
 mod surface_sortie;
 
+pub use clock::benchmark::{ClockBenchmarkCase, ClockBenchmarkConfig};
+
 #[cfg(test)]
 pub(crate) use pizza::PizzaClientScenario;
 #[cfg(test)]
@@ -45,6 +47,7 @@ impl RenderBackend {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BenchmarkConfiguration {
     pub pizza: PizzaBenchmarkConfig,
+    pub clock: ClockBenchmarkConfig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +71,9 @@ impl ScenarioStartMode {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BenchmarkCounts {
+    pub bodies: usize,
+    pub colliders: usize,
+    pub clock_event_active: bool,
     pub asteroids: usize,
     pub fragments: usize,
     pub shells: usize,
@@ -148,6 +154,8 @@ impl std::ops::AddAssign for BenchmarkStepMetrics {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ScenarioCapabilities {
     pub benchmark: bool,
+    /// Headless fixtures may be available without exposing a visual bench menu.
+    pub headless_benchmark: bool,
     pub pointer_input: bool,
     pub player_zoom: bool,
     pub game_over: bool,
@@ -214,7 +222,9 @@ impl ScenarioRegistration {
         mode: ScenarioStartMode,
         asset: &ScenarioAsset,
     ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-        if mode.is_benchmark() && !self.capabilities.benchmark {
+        if mode.is_benchmark()
+            && !(self.capabilities.benchmark || self.capabilities.headless_benchmark)
+        {
             return Err(ScenarioCreateError::BenchmarkUnsupported { name: self.id });
         }
         (self.create)(seed, settings, viewport, mode, asset)
@@ -422,6 +432,7 @@ mod tests {
         launcher_visible: false,
         capabilities: ScenarioCapabilities {
             benchmark: false,
+            headless_benchmark: false,
             pointer_input: false,
             player_zoom: false,
             game_over: false,
