@@ -1,6 +1,6 @@
 # Automatic activities
 
-Status: first implementation desktop-validated, 2026-09-11, on
+Status: first implementation validated and deployed to `sw-picade`, 2026-09-11, on
 `auto-start-activities`. Includes merged main `4f8894e` and the committed
 Device Info change `2e6791f`. See [the user guide](../auto-start.md) for current
 controls and saved settings.
@@ -314,3 +314,24 @@ consider rotation/playlists and time-of-day schedules only when requested.
 The numbered verification plan above also lists useful future fault-injection
 cases. It is not a claim that every error, stale callback, or direct-launch
 combination has a dedicated end-to-end test.
+
+### Cabinet check
+
+Deployed application/CLI build `8041b952ac4c` to `sw-picade.local` using the
+restricted fast updater. Its runtime fingerprint matched the installed image;
+binary hashes matched the bundle after deployment, and the kiosk kept one
+healthy process with zero restarts throughout the checks. Device Info confirmed
+the build, cabinet controls as Player 1, and Xbox 360 controller as Player 2.
+
+Through the structured UI API, Clock remained in Auto-start settings beyond
+the configured five-second delay, launched after returning to the launcher,
+and returned to the menu on an available input action. Spacewars then launched
+with both effective rule bots and its ordinary ten-minute timer counting down.
+Host pause/return ended the automatic match cleanly. Every pre-existing saved
+setting compared equal afterward, including audio and controller choices.
+
+Left the cabinet on Auto-start settings with **Off**, a **30-second** delay,
+and the default **10-minute** match limit. Captured real device screenshots of
+Clock, bot play, and the settings screen. The three completed repeat rounds
+were verified in desktop full-client tests; this cabinet smoke check did not
+wait for three full ten-minute rounds or simulate physical gamepad presses.
