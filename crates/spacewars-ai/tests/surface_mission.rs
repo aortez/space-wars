@@ -729,3 +729,204 @@ fn generated_corner_return_boards_the_original_ship_and_departs() {
         assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
     }
 }
+
+fn opportunity_observation() -> scenario_spacewars::surface_sortie::mission::MissionObservationV1 {
+    use engine_core::Vec2;
+    let mut state = SurfaceSortieScenario::init_material_match(42);
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut o = state.mission_observation(0, None);
+    o.sun = None;
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.controls_armed = true;
+    p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 180.0);
+    p.ship.velocity = Vec2::ZERO;
+    let target = o.local.combat.target.as_mut().unwrap();
+    target.motion.position = p.ship.position + Vec2::Y * 150.0;
+    target.motion.velocity = Vec2::ZERO;
+    target.visible = true;
+    target.ground_occluded = false;
+    o.opponent.as_mut().unwrap().motion = target.motion;
+    o
+}
+
+#[test]
+fn match_opportunities_use_visible_vulnerability_or_secured_ground_and_keep_lab_itineraries() {
+    for case in 0..8 {
+        let mut o = opportunity_observation();
+        match case {
+            0 => {} // Healthy opponent; establish a foothold first.
+            1 | 5 | 6 | 7 => o.planets[0].claim.as_mut().unwrap().owner = Some(context(0).actor),
+            2 => o.local.combat.target.as_mut().unwrap().health_fraction = 0.4,
+            3 => o.local.combat.target.as_mut().unwrap().ship_form = Some(ShipForm::EscapePod),
+            4 => o.local.combat.target.as_mut().unwrap().ship_form = None,
+            _ => unreachable!(),
+        }
+        if case == 5 {
+            o.local.combat.target.as_mut().unwrap().visible = false;
+            o.local.combat.target.as_mut().unwrap().ground_occluded = true;
+        } else if case == 6 {
+            o.local.combat.target.as_mut().unwrap().motion.position.x += 700.0;
+        } else if case == 7 {
+            o.match_rules = false;
+        }
+        let before = o.clone();
+        let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+        let intent = brain.intent(&o);
+        assert_eq!(
+            brain.telemetry().pursuit.is_some(),
+            (1..=4).contains(&case),
+            "case {case}"
+        );
+        assert_eq!(o, before);
+        let telemetry = brain.telemetry().clone();
+        assert_eq!(brain.intent(&o), intent);
+        assert_eq!(brain.telemetry(), &telemetry);
+        let mut copy = brain.clone();
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        assert_eq!(brain.intent(&o), copy.intent(&o));
+        assert_eq!(brain.telemetry(), copy.telemetry());
+        brain.reset(context(0));
+        assert!(brain.telemetry().pursuit.is_none());
+    }
+}
+
+#[test]
+fn pursuit_survives_a_brief_occlusion_but_returns_to_capture_after_its_budget() {
+    for lose_sight in [false, true] {
+        let mut o = opportunity_observation();
+        o.planets[0].claim.as_mut().unwrap().owner = Some(context(0).actor);
+        let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+        brain.intent(&o);
+        let start = o.local.combat.recovery.flight.pilot.tick;
+        o.local.combat.recovery.flight.pilot.tick = start + 60;
+        o.local.combat.target.as_mut().unwrap().visible = false;
+        o.local.combat.target.as_mut().unwrap().ground_occluded = true;
+        brain.intent(&o);
+        assert_eq!(brain.telemetry().goal, MissionGoal::Hunt);
+        if !lose_sight {
+            o.local.combat.target.as_mut().unwrap().visible = true;
+            o.local.combat.target.as_mut().unwrap().ground_occluded = false;
+        }
+        o.local.combat.recovery.flight.pilot.tick =
+            start + if lose_sight { 6 * 60 } else { 30 * 60 };
+        brain.intent(&o);
+        assert!(brain.telemetry().pursuit.is_none());
+        assert!(brain.telemetry().target.is_some());
+        assert_ne!(brain.telemetry().goal, MissionGoal::Hunt);
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        o.local.combat.target.as_mut().unwrap().visible = true;
+        brain.intent(&o);
+        assert!(
+            brain.telemetry().pursuit.is_none(),
+            "do not immediately restart an expired chase"
+        );
+    }
+}
+
+#[test]
+fn losing_the_ship_interrupts_pursuit_and_uses_unarmed_recovery_controls() {
+    let mut o = opportunity_observation();
+    o.planets[0].claim.as_mut().unwrap().owner = Some(context(0).actor);
+    let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+    brain.intent(&o);
+    assert!(brain.telemetry().pursuit.is_some());
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    o.local.combat.recovery.flight.pilot.ship_form = ShipForm::EscapePod;
+    o.local
+        .combat
+        .recovery
+        .flight
+        .pilot
+        .recovery
+        .as_mut()
+        .unwrap()
+        .ships_lost += 1;
+    let intent = brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Recover);
+    assert!(brain.telemetry().pursuit.is_none());
+    assert!(!intent.weapons.laser && !intent.weapons.cannon);
+}
+
+#[test]
+fn visible_opponent_does_not_cancel_a_committed_capture() {
+    use engine_core::Vec2;
+    let mut o = opportunity_observation();
+    o.local.combat.target.as_mut().unwrap().visible = false;
+    let mut brain = MaterialMissionPilot::new(context(0), CombatBreakSettings::default());
+    brain.intent(&o);
+    let destination = brain.telemetry().target.unwrap();
+    let planet = o
+        .planets
+        .iter()
+        .find(|p| p.index == destination)
+        .unwrap()
+        .clone();
+    let p = &mut o.local.combat.recovery.flight.pilot;
+    p.tick += 1;
+    p.ship.position = planet.motion.position + Vec2::Y * (planet.radius + 80.0);
+    p.ship.velocity = planet.motion.velocity;
+    p.planet = planet;
+    p.queries_ready = true;
+    brain.intent(&o);
+    assert!(brain.telemetry().capture.is_some());
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    o.planets[0].claim.as_mut().unwrap().owner = Some(context(0).actor);
+    let target = o.local.combat.target.as_mut().unwrap();
+    target.visible = true;
+    target.motion.position = o.local.combat.recovery.flight.pilot.ship.position + Vec2::Y * 150.0;
+    brain.intent(&o);
+    assert_eq!(brain.telemetry().goal, MissionGoal::Capture);
+    assert!(brain.telemetry().pursuit.is_none());
+}
+
+#[test]
+fn generated_match_captures_engages_survives_ship_loss_and_reaches_a_real_result() {
+    let mut state = SurfaceSortieScenario::init_material_match(42);
+    let initial = state.terrain_diagnostics().occupied_cells;
+    let mut brains =
+        [0, 1].map(|seat| MaterialMissionPilot::new(context(seat), CombatBreakSettings::default()));
+    let mut claimed = false;
+    let mut survived_loss = false;
+    let mut pursuit = false;
+    for _ in 0..180 * 60 {
+        let mut actions = Vec::new();
+        for (seat, brain) in brains.iter_mut().enumerate() {
+            let o = state.mission_observation(seat, brain.site_request());
+            actions.extend(brain.intent(&o).encode(context(seat).actor));
+            claimed |= o
+                .planets
+                .iter()
+                .any(|p| p.claim.as_ref().is_some_and(|c| c.owner.is_some()));
+            pursuit |= brain.telemetry().pursuit.is_some();
+            survived_loss |= o
+                .local
+                .combat
+                .recovery
+                .flight
+                .pilot
+                .recovery
+                .as_ref()
+                .unwrap()
+                .ships_lost
+                > 0
+                && state.match_outcome().is_none();
+        }
+        SurfaceSortieScenario::step(&mut state, &actions, DT);
+        if state.match_outcome().is_some() {
+            break;
+        }
+    }
+    assert!(claimed && survived_loss && pursuit);
+    assert!((0..2).any(|seat| {
+        let c = state.combat_telemetry(seat);
+        c.cannon_hits > 0 || c.laser_hit_ticks > 0
+    }));
+    assert!(
+        state.match_outcome().is_some(),
+        "{:?}",
+        brains.map(|b| b.telemetry().clone())
+    );
+    let audit = state.terrain_diagnostics();
+    assert!(audit.issues.is_empty() && audit.max_speed < 500.0);
+    assert_eq!(audit.occupied_cells + audit.removed_cells, initial);
+}

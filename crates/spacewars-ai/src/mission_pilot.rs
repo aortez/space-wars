@@ -19,7 +19,10 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v7";
+pub const MISSION_POLICY: &str = "material_mission_v8";
+const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
+const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
+const PURSUIT_LOST_SIGHT_TICKS: u64 = 6 * 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -78,6 +81,14 @@ pub struct MissionTelemetry {
     pub avoidance: Option<MissionAvoidance>,
     pub opponent: Option<PlayerId>,
     pub combat: Option<CombatPilotTelemetry>,
+    pub pursuit: Option<MissionPursuit>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MissionPursuit {
+    pub started_tick: u64,
+    pub last_visible_tick: u64,
+    pub reason: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -114,6 +125,7 @@ pub struct MaterialMissionPilot {
     solar_detour: Option<(usize, f32)>,
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
+    next_pursuit_tick: u64,
 }
 
 impl MaterialMissionPilot {
@@ -137,6 +149,7 @@ impl MaterialMissionPilot {
                 avoidance: None,
                 opponent: None,
                 combat: None,
+                pursuit: None,
             },
             capture: None,
             recovery: None,
@@ -154,6 +167,7 @@ impl MaterialMissionPilot {
             solar_detour: None,
             previous_tick: None,
             previous_intent: CombatIntent::default(),
+            next_pursuit_tick: 0,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -273,6 +287,7 @@ impl MaterialMissionPilot {
                     || p.ship_form != ShipForm::Ship
                     || p.location == PilotLocation::OnFoot && self.capture.is_none())
         {
+            self.end_pursuit(p.tick, "ship or surface recovery required");
             self.reconsider(p.tick, "ship or surface recovery required", false);
             self.recovery = Some(RecoverShipTask::new(self.context));
         }
@@ -339,6 +354,9 @@ impl MaterialMissionPilot {
         }
         if !p.controls_armed {
             return CombatIntent::default();
+        }
+        if self.pursuit_opportunity(o) {
+            return self.hunt(o);
         }
         self.telemetry.reason = None;
         let owned = |planet: &PilotPlanetObservation| {
@@ -526,6 +544,86 @@ impl MaterialMissionPilot {
         };
         self.guide(o, desired)
     }
+    fn end_pursuit(&mut self, tick: u64, reason: &'static str) {
+        if self.telemetry.pursuit.take().is_some() {
+            self.event(tick, "pursuit_ended", Some(reason));
+            self.next_pursuit_tick = tick + PURSUIT_RETRY_TICKS;
+            self.pursuit_climb = None;
+            self.solar_detour = None;
+        }
+    }
+
+    fn pursuit_opportunity(&mut self, o: &MissionObservationV1) -> bool {
+        let c = &o.local.combat;
+        let p = &c.recovery.flight.pilot;
+        // Finish the committed landing, on-foot objective and departure before
+        // changing missions. Solar escape and recovery have already taken priority.
+        if !o.match_rules
+            || self.capture.is_some()
+            || p.location == PilotLocation::OnFoot
+            || !p.ship_available
+            || p.ship_form != ShipForm::Ship
+        {
+            self.end_pursuit(p.tick, "surface task takes priority");
+            return false;
+        }
+        let Some(target) = c.target else {
+            self.end_pursuit(p.tick, "opponent unavailable");
+            return false;
+        };
+        let distance = target.motion.position.distance_to(p.ship.position);
+        if let Some(pursuit) = &mut self.telemetry.pursuit {
+            if target.visible {
+                pursuit.last_visible_tick = p.tick;
+            }
+            let reason = if p.tick.saturating_sub(pursuit.started_tick) >= PURSUIT_BUDGET_TICKS {
+                Some("pursuit budget exhausted")
+            } else if distance > 600.0 {
+                Some("opponent left local range")
+            } else if p.tick.saturating_sub(pursuit.last_visible_tick) >= PURSUIT_LOST_SIGHT_TICKS {
+                Some("opponent remained hidden")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                self.end_pursuit(p.tick, reason);
+                return false;
+            }
+            return true;
+        }
+        if p.tick < self.next_pursuit_tick || !target.visible {
+            return false;
+        }
+        let vulnerable = target.ship_form != Some(ShipForm::Ship) || target.health_fraction < 0.5;
+        let established = o.planets.iter().any(|planet| {
+            planet
+                .claim
+                .as_ref()
+                .is_some_and(|claim| claim.owner == Some(p.owner))
+        });
+        let under_fire = c
+            .weapons
+            .last_hit_taken_tick
+            .is_some_and(|tick| p.tick.saturating_sub(tick) < 3 * 60);
+        let reason = if vulnerable && distance < 400.0 {
+            "nearby vulnerable opponent"
+        } else if under_fire && distance < 300.0 {
+            "responding to incoming fire"
+        } else if established && distance < 300.0 {
+            "nearby opponent after securing ground"
+        } else {
+            return false;
+        };
+        self.reconsider(p.tick, "pausing travel for nearby opponent", false);
+        self.telemetry.pursuit = Some(MissionPursuit {
+            started_tick: p.tick,
+            last_visible_tick: p.tick,
+            reason,
+        });
+        self.event(p.tick, "pursuit_started", Some(reason));
+        true
+    }
+
     fn hunt(&mut self, o: &MissionObservationV1) -> CombatIntent {
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;

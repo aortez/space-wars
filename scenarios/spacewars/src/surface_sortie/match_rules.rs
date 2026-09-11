@@ -21,6 +21,23 @@ pub struct PilotDamageEvent {
     pub tick: u64,
     pub cause: PilotDamageCause,
     pub amount: f32,
+    pub contact: Option<PilotDamageContact>,
+}
+
+/// The last damaging contact, captured before debris cleanup. This bounded
+/// record describes the solver input; it neither changes damage nor runs queries.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct PilotDamageContact {
+    pub on_foot: bool,
+    pub other_kind: &'static str,
+    pub other_id: Option<u64>,
+    pub point: Option<Vec2>,
+    /// From the pilot toward the other body.
+    pub normal: Vec2,
+    pub closing_speed: f32,
+    pub impulse: f32,
+    pub actor_motion: Option<pilot::PilotMotion>,
+    pub other_motion: Option<pilot::PilotMotion>,
 }
 
 /// Persistent through boarding, ejection and rebuilding; flags do not heal it.
@@ -63,6 +80,7 @@ impl PilotVitals {
             tick,
             cause,
             amount,
+            contact: None,
         });
         if self.health <= 0.0 {
             self.death_tick = Some(tick);
@@ -252,6 +270,10 @@ pub(crate) fn apply_contacts(
                         external_hits.push((pilot.vehicle.0, shell.owner_id));
                     }
                     (MISSILE_DAMAGE, PilotDamageCause::Missile)
+                } else if debris.is_some_and(|(_, d)| d.damage_scalar == 0.0) {
+                    // Breakup pieces already have zero direct damage in
+                    // Spacewars. Their physical shove can still cause a crash.
+                    (0.0, PilotDamageCause::Impact)
                 } else {
                     (
                         ((contact.closing_speed - SAFE_IMPACT_SPEED) * IMPACT_DAMAGE_PER_SPEED)
@@ -259,11 +281,54 @@ pub(crate) fn apply_contacts(
                         PilotDamageCause::Impact,
                     )
                 };
-            pilot
-                .vitals
-                .as_mut()
-                .unwrap()
-                .damage(amount, cause, world.tick + 1);
+            let vitals = pilot.vitals.as_mut().unwrap();
+            let before = vitals.health;
+            vitals.damage(amount, cause, world.tick + 1);
+            if vitals.health < before {
+                let (other_kind, other_id) = match other {
+                    MechanicalEntity::World => ("world", None),
+                    MechanicalEntity::Body(BodyId::Sun) => ("sun", None),
+                    MechanicalEntity::Body(BodyId::Planet(i)) => ("planet", Some(i as u64)),
+                    MechanicalEntity::TerrainFragment(i) => ("terrain_fragment", Some(i)),
+                    MechanicalEntity::Ship(i) => ("ship", Some(i as u64)),
+                    MechanicalEntity::Spaceling(i) => ("spaceling", Some(i as u64)),
+                    MechanicalEntity::Rover(i) => ("rover", Some(i)),
+                    MechanicalEntity::Debris(i) => (
+                        debris.map_or("debris", |(_, d)| match d.kind {
+                            DebrisKind::Shell => "missile",
+                            DebrisKind::Asteroid => "asteroid",
+                            DebrisKind::Fragment => "wreckage",
+                        }),
+                        Some(i),
+                    ),
+                };
+                let motion = |entity| {
+                    world
+                        .physics
+                        .pre_step_motion(entity)
+                        .map(|m| pilot::PilotMotion {
+                            position: m.position,
+                            velocity: m.linear_velocity,
+                            angle: m.angle,
+                            spin: m.angular_velocity,
+                        })
+                };
+                vitals.last_damage.as_mut().unwrap().contact = Some(PilotDamageContact {
+                    on_foot: pilot.body.is_some(),
+                    other_kind,
+                    other_id,
+                    point: contact.point,
+                    normal: if contact.a == entity {
+                        contact.normal
+                    } else {
+                        -contact.normal
+                    },
+                    closing_speed: contact.closing_speed,
+                    impulse: contact.impulse_magnitude,
+                    actor_motion: motion(entity),
+                    other_motion: motion(other),
+                });
+            }
         }
     }
     for index in spent_shells {

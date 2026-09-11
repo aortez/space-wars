@@ -334,7 +334,8 @@ fn main() {
                     .last_damage
                     .is_some_and(|d| d.tick == u64::from(tick) + 1)
             {
-                damage_events.push(json!({"tick":tick + 1,"seat":seat,"pilot_damage":vitals.last_damage,"pilot_health":vitals.health}));
+                damage_events.push(json!({"tick":tick + 1,"seat":seat,"pilot_damage":vitals.last_damage,"pilot_health":vitals.health,
+                    "protected_until_tick":vitals.protected_until_tick,"brain":brains[seat].telemetry()}));
             }
             let damage = state.damage_observation(seat);
             if damage.last_damage_tick == Some(u64::from(tick) + 1) {

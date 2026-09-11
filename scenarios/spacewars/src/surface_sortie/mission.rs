@@ -7,6 +7,9 @@ use pilot::{LandingSiteId, PilotMotion, PilotPlanetObservation};
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionObservationV1 {
     pub version: u32,
+    /// Finished-match priorities are opt-in; historical capture labs retain
+    /// their original itinerary and survival rules.
+    pub match_rules: bool,
     pub local: TacticalSortieObservationV1,
     /// Cheap world context. Only the current approach planet receives detailed
     /// landing/ground surveys; these bounds never authorize surface actions.
@@ -232,6 +235,7 @@ impl SurfaceSortieState {
             .collect();
         MissionObservationV1 {
             version: 1,
+            match_rules: self.round.is_some(),
             local: self.tactical_sortie_observation(player, site),
             planets,
             sun: self.world.sun.map(|sun| MissionObstacle {
@@ -239,7 +243,9 @@ impl SurfaceSortieState {
                 radius: sun.radius * BODY_BOUNDS_RADIUS_SCALE,
             }),
             opponent: self.pilots.iter().find_map(|other| {
-                if other.owner == self.pilots[player].owner {
+                if other.owner == self.pilots[player].owner
+                    || other.vitals.is_some_and(|v| !v.alive())
+                {
                     return None;
                 }
                 let body = if let Some(body) = &other.body {

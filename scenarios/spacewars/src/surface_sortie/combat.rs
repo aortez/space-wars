@@ -58,6 +58,9 @@ pub struct CombatTarget {
     pub owner: PlayerId,
     pub motion: PilotMotion,
     pub health: f32,
+    pub health_fraction: f32,
+    /// None means an external spaceling; pods carry a living exposed pilot.
+    pub ship_form: Option<ShipForm>,
     /// First-solid query to the target center, excluding the observing ship.
     pub visible: bool,
     pub ground_occluded: bool,
@@ -306,6 +309,13 @@ impl SurfaceSortieState {
             Some(CombatTarget {
                 owner: other.owner,
                 health,
+                health_fraction: health
+                    / if other.body.is_some() || target.form == ShipForm::EscapePod {
+                        match_rules::PILOT_HEALTH
+                    } else {
+                        target.life_max.max(1.0)
+                    },
+                ship_form: other.body.is_none().then_some(target.form),
                 visible,
                 ground_occluded,
                 motion: PilotMotion {

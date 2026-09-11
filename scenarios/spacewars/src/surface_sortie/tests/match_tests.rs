@@ -250,6 +250,8 @@ fn shared_laser_rays_damage_both_survivor_forms_and_report_visible_targets() {
         let target = state.combat_observation(0, None).target.unwrap();
         assert!(target.visible);
         assert_eq!(target.health, PILOT_HEALTH);
+        assert_eq!(target.health_fraction, 1.0);
+        assert_eq!(target.ship_form, (!on_foot).then_some(ShipForm::EscapePod));
         let fire = combat::SurfaceWeaponAction {
             laser: true,
             cannon: false,
@@ -321,6 +323,12 @@ fn fast_external_pilot_impact_uses_its_pre_solver_velocity() {
     weightless(&mut state);
     let planet = state.world.planets[0];
     let position = planet.position - Vec2::Y * (planet.radius + 6.0);
+    for (seat, ship) in state.world.ships.iter_mut().enumerate() {
+        ship.position =
+            planet.position + Vec2::X * (planet.radius + 100.0 + seat as f32 * 20.0) - SHIP_PIVOT;
+        ship.velocity = Vec2::ZERO;
+        ship.omega = 0.0;
+    }
     external(&mut state, 0, position);
     let body = state.pilots[0].body.as_ref().unwrap().body();
     state
@@ -334,6 +342,50 @@ fn fast_external_pilot_impact_uses_its_pre_solver_velocity() {
         vitals(&state, 0).last_damage.unwrap().cause,
         PilotDamageCause::Impact
     );
+    let contact = vitals(&state, 0).last_damage.unwrap().contact.unwrap();
+    assert!(contact.on_foot && contact.closing_speed > 12.0);
+    assert_eq!(contact.other_kind, "planet");
+    assert_eq!(contact.other_id, Some(0));
+    assert!(contact.actor_motion.unwrap().velocity.y > 20.0);
+    assert!(contact.point.is_some() && contact.impulse > 0.0);
+}
+
+#[test]
+fn breakup_wreckage_keeps_its_physical_collision_without_direct_pilot_damage() {
+    for on_foot in [false, true] {
+        let mut state = target_round(on_foot);
+        let position = state
+            .combat_observation(0, None)
+            .target
+            .unwrap()
+            .motion
+            .position;
+        state.world.debris.push(DebrisState::new_fragment(
+            position - Vec2::X * 8.0,
+            [Vec2::new(-1.0, -1.0), Vec2::new(1.0, -1.0), Vec2::Y],
+            Vec2::X * 80.0,
+            0.0,
+            Color::WHITE,
+        ));
+        let target = if on_foot {
+            pilot_physics_id(PlayerId::PLAYER_2)
+        } else {
+            state.world.physics.ship_body(1).entity
+        };
+        let mut collision = false;
+        for _ in 0..10 {
+            idle(&mut state, 1);
+            collision |= state.world.physics.world.contact_events().iter().any(|e| {
+                (e.collider_a.entity == target || e.collider_b.entity == target)
+                    && e.impulse_magnitude > 0.0
+            });
+            assert_eq!(vitals(&state, 1).health, PILOT_HEALTH);
+        }
+        assert!(
+            collision,
+            "the wreckage must really hit the {on_foot:?} survivor"
+        );
+    }
 }
 
 #[test]

@@ -848,6 +848,10 @@ impl SpacewarsPhysics {
         self.pre_step_motions = motions;
     }
 
+    pub(super) fn pre_step_motion(&self, entity: MechanicalEntity) -> Option<BodyMotion> {
+        self.pre_step_motions.get(&entity).copied()
+    }
+
     fn contact_closing_speed(
         &self,
         a: MechanicalEntity,

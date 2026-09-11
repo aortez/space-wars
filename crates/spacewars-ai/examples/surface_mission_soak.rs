@@ -113,6 +113,7 @@ fn main() {
     let mut samples = Vec::new();
     let mut events = Vec::new();
     let mut asteroid_events = Vec::new();
+    let mut pilot_damage_events = Vec::new();
     let mut failures = Vec::new();
     let mut last = [String::new(), String::new()];
     let mut last_posture = [None, None];
@@ -272,6 +273,14 @@ fn main() {
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
         elapsed_ticks = tick + 1;
+        if let Some(round) = state.match_observation() {
+            for (seat, vitals) in round.pilots.iter().enumerate() {
+                if vitals.last_damage.is_some_and(|d| d.tick == tick + 1) {
+                    pilot_damage_events.push(json!({"tick":tick+1,"seat":seat,
+                        "vitals":vitals,"mission":pilots[seat].telemetry()}));
+                }
+            }
+        }
         for (i, metrics) in metrics.iter_mut().enumerate() {
             let combat = state.combat_telemetry(i);
             if combat.cannon_hits > 0 || combat.laser_hit_ticks > 0 {
@@ -336,6 +345,7 @@ fn main() {
         "match_rules":match_rules,"round":state.match_observation(),
         "termination":if state.match_outcome().is_some(){"round_finished"}else{"budget_exhausted"},
         "elapsed_ticks":elapsed_ticks,"metrics":metrics,"final_combat":final_combat,"final_audit":final_audit,
+        "pilot_damage_events":pilot_damage_events,
         "combat_breaks":breaks,
         "pursuit_trial":(mode=="pursuit").then(|| json!({"prepare_limit_seconds":prepare_seconds,
             "started_tick":pursuit_started_tick,"measured_ticks":pursuit_started_tick.map(|start|elapsed_ticks-start),

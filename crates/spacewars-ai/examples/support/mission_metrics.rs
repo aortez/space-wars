@@ -9,6 +9,10 @@ pub struct MissionMetrics {
     pub first_all_owned_tick: Option<u64>,
     pub first_hunt_tick: Option<u64>,
     pub first_contact_tick: Option<u64>,
+    pub first_opportunity_tick: Option<u64>,
+    pub pursuit_starts: u32,
+    pub opportunity_ticks: u64,
+    pub mission_ticks: BTreeMap<String, u64>,
     pub phase_ticks: BTreeMap<String, u64>,
     pub longest_phase_ticks: BTreeMap<String, u64>,
     pub visits: Vec<Visit>,
@@ -36,6 +40,14 @@ pub struct Visit {
 impl MissionMetrics {
     pub fn observe(&mut self, o: &MissionObservationV1, m: &MissionTelemetry) {
         let p = &o.local.combat.recovery.flight.pilot;
+        *self
+            .mission_ticks
+            .entry(m.goal.label().to_owned())
+            .or_default() += 1;
+        if m.pursuit.is_some() && m.goal == MissionGoal::Hunt {
+            self.first_opportunity_tick.get_or_insert(p.tick);
+            self.opportunity_ticks += 1;
+        }
         if o.planets.iter().all(|planet| {
             planet
                 .claim
@@ -71,6 +83,9 @@ impl MissionMetrics {
             })
             .map_or(0, |index| index + 1);
         for event in &m.events[first..] {
+            if event.kind == "pursuit_started" {
+                self.pursuit_starts += 1;
+            }
             if event.kind == "selected" {
                 self.visits.push(Visit {
                     planet: event.planet.unwrap(),
@@ -174,5 +189,41 @@ mod tests {
         metrics.observe(&o, &mission);
         assert_eq!(metrics.visits.len(), 2);
         assert_eq!(metrics.phase_ticks.values().sum::<u64>(), 3);
+    }
+
+    #[test]
+    fn an_opportunistic_chase_is_distinct_from_hunting_after_all_captures() {
+        let mut state = SurfaceSortieScenario::init_material_match(42);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let o = state.mission_observation(0, None);
+        let brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            CombatBreakSettings::default(),
+        );
+        let mut mission = brain.telemetry().clone();
+        mission.goal = MissionGoal::Hunt;
+        mission.pursuit = Some(spacewars_ai::mission_pilot::MissionPursuit {
+            started_tick: 1,
+            last_visible_tick: 1,
+            reason: "nearby vulnerable opponent",
+        });
+        mission.events.push(MissionEvent {
+            tick: 1,
+            planet: None,
+            kind: "pursuit_started",
+            reason: Some("nearby vulnerable opponent"),
+        });
+        let mut metrics = MissionMetrics::default();
+        metrics.observe(&o, &mission);
+        assert_eq!(metrics.first_opportunity_tick, Some(1));
+        assert_eq!(metrics.pursuit_starts, 1);
+        assert_eq!(metrics.opportunity_ticks, 1);
+        assert_eq!(metrics.first_all_owned_tick, None);
+        assert_eq!(metrics.first_hunt_tick, None);
+        assert!(metrics.visits.is_empty());
+        assert_eq!(metrics.mission_ticks.values().sum::<u64>(), 1);
     }
 }
