@@ -30,6 +30,9 @@ fn reset_panels(ui: &MainWindow) {
     ui.set_ingame_controls_visible(false);
     ui.set_ingame_clock_visible(false);
     ui.set_game_over_visible(false);
+    ui.set_autostart_settings_visible(false);
+    ui.set_autostart_running(false);
+    ui.set_autostart_caption("".into());
     ui.set_controller_disconnected_visible(false);
     ui.set_scenario_error_text("".into());
     ui.set_touch_test_visible(false);
@@ -116,6 +119,10 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_launcher_focus_index(1);
         }),
+        ("launcher-countdown", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_autostart_caption("Spacewars bots starts in 30 seconds".into());
+        }),
         ("launcher-spacewars", |ui| {
             ui.set_launcher_scenario("spacewars".into());
             ui.set_launcher_scenario_title("Space-Wars".into());
@@ -145,6 +152,24 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
         }),
+        ("launcher-autostart", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_autostart_settings_visible(true);
+            ui.set_autostart_choice("Spacewars bots".into());
+            ui.set_autostart_start_available(true);
+        }),
+        ("launcher-sound-autostart", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_sound_focus_index(4);
+        }),
+        ("launcher-autostart-save-error", |ui| {
+            ui.set_launcher_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_autostart_settings_visible(true);
+            ui.set_settings_save_error("Storage is not writable".into());
+        }),
         ("launcher-info", |ui| {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
@@ -154,7 +179,7 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_launcher_visible(true);
             ui.set_sound_visible(true);
             ui.set_settings_save_error("Storage is not writable".into());
-            ui.set_sound_focus_index(5);
+            ui.set_sound_focus_index(6);
         }),
         ("busy", |ui| {
             ui.set_launcher_visible(true);
@@ -177,6 +202,11 @@ fn menu_lifecycles_match_full_repaints_and_preserve_root_state() {
             ui.set_ingame_menu_visible(true);
             ui.set_sound_visible(true);
             ui.set_device_info_visible(true);
+        }),
+        ("pause-autostart", |ui| {
+            ui.set_ingame_menu_visible(true);
+            ui.set_sound_visible(true);
+            ui.set_autostart_settings_visible(true);
         }),
         ("disconnected", |ui| {
             ui.set_controller_disconnected_visible(true)

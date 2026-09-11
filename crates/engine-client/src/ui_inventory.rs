@@ -4,6 +4,7 @@ use spacewars_control::{UiAction, UiControl, UiScreen};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ScreenVisibility {
+    pub(crate) autostart: bool,
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
     pub(crate) device_info: bool,
@@ -23,7 +24,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound && visibility.device_info {
+        if visibility.sound && visibility.autostart {
+            UiScreen::LauncherAutostart
+        } else if visibility.sound && visibility.device_info {
             UiScreen::LauncherInfo
         } else if visibility.sound {
             UiScreen::LauncherSound
@@ -36,6 +39,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound && visibility.autostart {
+        UiScreen::PauseAutostart
     } else if visibility.ingame_menu && visibility.sound && visibility.device_info {
         UiScreen::PauseInfo
     } else if visibility.ingame_menu && visibility.sound {
@@ -53,6 +58,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct UiInventoryContext {
+    pub(crate) automatic: bool,
+    pub(crate) autostart_controls: Vec<UiControl>,
+    pub(crate) autostart_focus: i32,
     pub(crate) device_info_controls: Vec<UiControl>,
     pub(crate) launcher_busy_stage: String,
     pub(crate) launcher_busy_elapsed: String,
@@ -79,6 +87,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) scenario_error: Option<String>,
     pub(crate) renderer: String,
     pub(crate) raster_scale: String,
+    pub(crate) match_length: String,
     pub(crate) combat_break_interval: String,
     pub(crate) combat_break_duration: String,
     pub(crate) combat_mission: String,
@@ -133,6 +142,20 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             controls: context.device_info_controls.clone(),
             actions: UiAction::ALL.to_vec(),
             error: None,
+        },
+        UiScreen::LauncherAutostart | UiScreen::PauseAutostart => UiInventory {
+            selected_control: selected_from_index(
+                &[
+                    "autostart.activity",
+                    "autostart.delay",
+                    "autostart.start-now",
+                    "autostart.back",
+                ],
+                context.autostart_focus,
+            ),
+            controls: context.autostart_controls.clone(),
+            actions: UiAction::ALL.to_vec(),
+            error: context.settings_save_error.clone(),
         },
         UiScreen::LauncherSettings => launcher_settings_inventory(context),
         UiScreen::LauncherControls => launcher_controls_inventory(context),
@@ -194,6 +217,18 @@ fn world_control(
 }
 
 fn game_over_inventory(context: &UiInventoryContext) -> UiInventory {
+    if context.automatic {
+        return UiInventory {
+            selected_control: Some("game-over.return-to-launcher".into()),
+            controls: vec![
+                UiControl::new("game-over.return-to-launcher", "Launcher", true),
+                UiControl::new("game-over.world-seed", "World seed", false)
+                    .with_value(context.world_seed.clone()),
+            ],
+            actions: UiAction::ALL.to_vec(),
+            error: context.scenario_error.clone(),
+        };
+    }
     let mut ids = vec!["game-over.play-again"];
     let mut controls = vec![world_control(
         "game-over.play-again",
@@ -312,6 +347,10 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                     "launcher.settings.match.asteroid-strength",
                     context.combat_asteroid_strength.clone(),
                 ),
+                (
+                    "launcher.settings.match.length",
+                    context.match_length.clone(),
+                ),
             ] {
                 push_choice(&mut controls, id, &value);
             }
@@ -324,6 +363,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.match.break-duration",
                 "launcher.settings.match.asteroid-interval",
                 "launcher.settings.match.asteroid-strength",
+                "launcher.settings.match.length",
                 "launcher.settings.back",
             ]
         }
@@ -717,12 +757,14 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     controls.push(UiControl::new("settings.device-info", "Device Info", true));
+    controls.push(UiControl::new("settings.autostart", "Auto-start", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
         "sound.mute",
         "settings.fps-counter",
         "settings.device-info",
+        "settings.autostart",
         "sound.back",
     ];
     if context.settings_save_error.is_some() {
@@ -1013,6 +1055,7 @@ mod tests {
                 launcher_busy: false,
                 sound: false,
                 device_info: false,
+                autostart: false,
                 launcher: true,
                 launcher_controls: true,
                 launcher_settings: true,
@@ -1094,7 +1137,7 @@ mod tests {
     #[test]
     fn settings_inventory_matches_each_scenario() {
         let cases = [
-            ("spacewars", 18, "launcher.settings.match.player-2"),
+            ("spacewars", 20, "launcher.settings.match.player-2"),
             (
                 "spacewars-classic",
                 16,

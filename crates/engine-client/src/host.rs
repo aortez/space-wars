@@ -528,6 +528,7 @@ pub fn start_scenario_loop(
     let mut paused = false;
     let mut benchmark_active = start_benchmark;
     let mut scenario_revision = next_scenario_revision();
+    window.set_scenario_instance(scenario_revision.to_string().into());
     controls
         .borrow_mut()
         .publish_clock_state(&scenario, scenario_revision, paused);
@@ -696,6 +697,7 @@ pub fn start_scenario_loop(
                 window.invoke_match_world_changed();
             }
             scenario_revision = next_scenario_revision();
+            window.set_scenario_instance(scenario_revision.to_string().into());
             performance = PerformanceStats::new(tick_model, now);
             last_realtime_emulated_frames = 0;
             last_realtime_submitted_frames = 0;
@@ -844,6 +846,10 @@ pub fn start_scenario_loop(
                 &performance,
                 &input_diagnostics,
             )));
+            let details = scenario.inner.runtime_diagnostics();
+            if !details.is_empty() {
+                window.set_runtime_diagnostics(format!("{}\n{details}", window.get_runtime_diagnostics()).into());
+            }
             window.set_performance_overlay_text(performance.overlay_text(paused, game_over).into());
             last_diagnostics_revision = diagnostics_revision;
             last_diagnostics_scenario_revision = scenario_revision;

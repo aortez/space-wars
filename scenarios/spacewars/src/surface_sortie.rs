@@ -715,6 +715,7 @@ impl Scenario for SurfaceSortieScenario {
             ship.set_cannon(armed && weapons.cannon);
         }
         // Schedule terrain, solve gravity, and step Rapier exactly once for all seats.
+        let match_dt = dt;
         let dt = dt.as_secs_f32();
         state.update_surface_wings(dt);
         let damage_before = state.damage_sample();
@@ -731,7 +732,8 @@ impl Scenario for SurfaceSortieScenario {
         );
         state.reconcile_recovery_vehicles();
         state.record_surface_damage(damage_before);
-        if state.finish_round() {
+        state.advance_match_time(match_dt);
+        if state.finish_round(false) {
             return result;
         }
         for (player, (before, effective)) in samples.into_iter().zip(effective_inputs).enumerate() {
@@ -757,6 +759,7 @@ impl Scenario for SurfaceSortieScenario {
         state.update_planet_claims(Duration::from_secs_f32(dt));
         state.update_recovery(Duration::from_secs_f32(dt));
         state.update_mining();
+        state.finish_round(true);
         result
     }
 

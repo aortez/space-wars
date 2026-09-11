@@ -190,6 +190,47 @@ fn flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_at
 }
 
 #[test]
+fn match_expiry_scores_a_flag_destroyed_on_the_final_step_as_neutral() {
+    use crate::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
+    let mut state = SurfaceSortieScenario::init_material_combat_flight(42, &[]);
+    state.enable_match_rules();
+    state.world.planets[0].wrapper_omega = 0.0;
+    idle(&mut state, 240);
+    transfer(&mut state, 0);
+    idle(&mut state, 240);
+    assert_eq!(state.world.planets[0].owner_id, Some(0));
+    let cell = flag_cell(&state);
+    let remaining = Duration::from_secs(600) - DT * state.world.tick as u32;
+    state.advance_match_time(remaining - DT);
+    let mut retained = state.clone();
+    state
+        .world
+        .queue_planet_edit(
+            0,
+            TerrainEdit {
+                brush: Brush::Circle {
+                    center: cell,
+                    radius: 2,
+                },
+                mode: EditMode::Remove,
+            },
+        )
+        .unwrap();
+    step(&mut retained, &[]);
+    step(&mut state, &[]);
+    assert_eq!(
+        retained.match_outcome(),
+        Some(MatchOutcome::Winner(PlayerId::PLAYER_1))
+    );
+    assert_eq!(state.world.planets[0].owner_id, None);
+    let observation = state.match_observation().unwrap();
+    assert_eq!(observation.reason, Some(MatchEndReason::TimeLimit));
+    assert_eq!(observation.outcome, Some(MatchOutcome::Draw));
+    assert_eq!(observation.owned_planets, [0, 0]);
+    assert!(observation.pilots.iter().all(|pilot| pilot.alive()));
+}
+
+#[test]
 fn removal_of_ship_support_rejects_same_tick_transfer() {
     let mut state = parked(1);
     let body = state

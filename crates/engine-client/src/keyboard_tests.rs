@@ -95,6 +95,113 @@ fn scenario_confirmation_focuses_play_without_changing_the_selection() {
 }
 
 #[test]
+fn automatic_activity_consumes_keyboard_and_touch_before_exposing_the_launcher() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    let directory = tempfile::tempdir().unwrap();
+    let settings = Arc::new(RwLock::new(Settings::default()));
+    let writer =
+        settings_writer::SettingsWriter::new(directory.path().join("settings.toml")).unwrap();
+    let catalog = Rc::new(RefCell::new(nes_roms::NesRomCatalog::new(directory.path())));
+    let (input, _) = input::new_shared_input();
+    let launcher = launcher::Launcher::new(
+        &window,
+        Rc::new(RefCell::new(None)),
+        host::new_scenario_controls(),
+        Rc::clone(&input),
+        Arc::clone(&settings),
+        Rc::clone(&catalog),
+        writer.clone(),
+    );
+    install_ui_navigation(&window);
+    install_keyboard_navigation(&window, input);
+    let _timer = autostart::install(&window, launcher, settings, writer, catalog, true);
+    let exits = Rc::new(Cell::new(0));
+    let exited = Rc::clone(&exits);
+    let weak = window.as_weak();
+    window.on_ingame_return_launcher(move || {
+        exited.set(exited.get() + 1);
+        let window = weak.upgrade().unwrap();
+        window.set_launcher_visible(true);
+        window.set_launcher_focus_index(1);
+    });
+    let starts = Rc::new(Cell::new(0));
+    let started = Rc::clone(&starts);
+    window.on_launcher_start_game(move || started.set(started.get() + 1));
+    window.show().unwrap();
+    window.set_launcher_visible(false);
+    window.set_autostart_running(true);
+    window.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Return.into(),
+    });
+    assert!(window.get_launcher_visible());
+    assert_eq!(exits.get(), 1);
+    window
+        .window()
+        .dispatch_event(WindowEvent::KeyPressRepeated {
+            text: Key::Return.into(),
+        });
+    window.window().dispatch_event(WindowEvent::KeyReleased {
+        text: Key::Return.into(),
+    });
+    assert_eq!(starts.get(), 0, "exit input must not start a manual game");
+    key(&window, Key::Return);
+    assert_eq!(starts.get(), 1, "fresh input remains usable");
+
+    // A release delivered outside the window must not leave consumed input stuck.
+    window.set_launcher_visible(false);
+    window.set_autostart_running(true);
+    window.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::Return.into(),
+    });
+    window.global::<UserActivity>().set_pointer_held(true);
+    window.global::<UserActivity>().invoke_focus_lost();
+    assert!(!window.global::<UserActivity>().get_pointer_held());
+    key(&window, Key::Return);
+    assert_eq!(starts.get(), 2, "fresh input works after focus loss");
+
+    window.set_launcher_visible(false);
+    window.set_autostart_running(true);
+    click(&window, 400.0, 280.0);
+    assert_eq!(exits.get(), 3);
+    assert!(!window.get_autostart_running());
+    assert_eq!(
+        starts.get(),
+        2,
+        "pointer release must not click the newly exposed menu"
+    );
+
+    // The new App Settings list must reveal Auto-start below Device Info,
+    // even when a short window cannot show all rows at once.
+    window.set_sound_visible(true);
+    window.set_sound_focus_index(3);
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 360.0));
+    key(&window, Key::DownArrow);
+    assert_eq!(window.get_sound_focus_index(), 4);
+    window.window().take_snapshot().unwrap();
+    click(&window, 400.0, 190.0);
+    assert!(window.get_autostart_settings_visible());
+    assert_eq!(window.get_autostart_focus_index(), 0);
+    key(&window, Key::DownArrow);
+    key(&window, Key::RightArrow);
+    assert_eq!(window.get_autostart_delay(), "60");
+    // The child's Back action stays below its rows and returns one level.
+    click(&window, 600.0, 288.0);
+    assert!(!window.get_autostart_settings_visible());
+    assert!(window.get_sound_visible());
+    assert_eq!(window.get_sound_focus_index(), 4);
+    assert_eq!(exits.get(), 3);
+    window.window().take_snapshot().unwrap();
+    click(&window, 400.0, 288.0);
+    assert!(!window.get_sound_visible());
+}
+
+#[test]
 fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts() {
     slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
     let window = MainWindow::new().unwrap();
@@ -431,7 +538,7 @@ fn sound_keyboard_touch_and_menu_actions_share_persistent_controls() {
     assert_eq!(settings.read().unwrap().audio.master_volume, 0.40);
     assert!(!window.get_settings_save_error().is_empty());
     std::fs::remove_dir(&path).unwrap();
-    window.set_sound_focus_index(5);
+    window.set_sound_focus_index(6);
     window.invoke_ui_action(UiAction::Confirm.code());
     pump_until(|| !window.get_settings_save_pending());
     assert!(window.get_settings_save_error().is_empty());

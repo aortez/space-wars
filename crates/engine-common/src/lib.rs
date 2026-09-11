@@ -10,7 +10,9 @@ use serde::{
     de::{IgnoredAny, MapAccess, SeqAccess, Visitor},
 };
 
+mod activity_settings;
 mod clock_message;
+pub use activity_settings::{AutostartSettings, MatchSettings};
 pub mod render;
 
 pub use clock_message::{ClockMarqueeMessage, ClockMessageError, MAX_CLOCK_MESSAGE_BYTES};
@@ -121,6 +123,8 @@ impl std::error::Error for SimError {}
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    pub autostart: AutostartSettings,
+    pub spacewars_match: MatchSettings,
     pub video: VideoSettings,
     pub audio: AudioSettings,
     pub controls: ControlBindings,

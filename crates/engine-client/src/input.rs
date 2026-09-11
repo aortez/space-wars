@@ -182,9 +182,13 @@ pub(crate) fn install_window_input(window: &MainWindow, input: SharedInput) {
     // `run()`. The event filter only needs the winit adapter, so install it
     // before the event loop starts.
     let keyboard_input = Rc::clone(&input);
+    let weak = window.as_weak();
     window.window().on_winit_window_event(move |_, event| {
         if matches!(event, WindowEvent::Focused(false)) {
             keyboard_input.borrow_mut().handle_focus_loss();
+            if let Some(window) = weak.upgrade() {
+                window.global::<crate::UserActivity>().invoke_focus_lost();
+            }
             return EventResult::Propagate;
         }
 

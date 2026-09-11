@@ -164,6 +164,8 @@ enum UiScreenArg {
     LauncherSound,
     #[value(name = "launcher.info")]
     LauncherInfo,
+    #[value(name = "launcher.autostart")]
+    LauncherAutostart,
     #[value(name = "launcher.settings")]
     LauncherSettings,
     #[value(name = "launcher.controls")]
@@ -178,6 +180,8 @@ enum UiScreenArg {
     PauseSound,
     #[value(name = "pause.info")]
     PauseInfo,
+    #[value(name = "pause.autostart")]
+    PauseAutostart,
     #[value(name = "pause.controls")]
     PauseControls,
     #[value(name = "pause.clock")]
@@ -193,6 +197,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::LauncherMain => Self::LauncherMain,
             UiScreenArg::LauncherSound => Self::LauncherSound,
             UiScreenArg::LauncherInfo => Self::LauncherInfo,
+            UiScreenArg::LauncherAutostart => Self::LauncherAutostart,
             UiScreenArg::LauncherSettings => Self::LauncherSettings,
             UiScreenArg::LauncherControls => Self::LauncherControls,
             UiScreenArg::LauncherTouchTest => Self::LauncherTouchTest,
@@ -200,6 +205,7 @@ impl From<UiScreenArg> for UiScreen {
             UiScreenArg::PauseMain => Self::PauseMain,
             UiScreenArg::PauseSound => Self::PauseSound,
             UiScreenArg::PauseInfo => Self::PauseInfo,
+            UiScreenArg::PauseAutostart => Self::PauseAutostart,
             UiScreenArg::PauseControls => Self::PauseControls,
             UiScreenArg::PauseClock => Self::PauseClock,
             UiScreenArg::GameOver => Self::GameOver,

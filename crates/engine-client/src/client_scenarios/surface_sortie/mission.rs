@@ -75,6 +75,10 @@ fn create_with_seats(
     } else {
         SurfaceSortieScenario::init_material_travel(seed, false)
     };
+    if arena {
+        let seconds = settings.spacewars_match.normalized().time_limit_seconds;
+        state.set_match_time_limit((seconds != 0).then(|| Duration::from_secs(seconds.into())));
+    }
     state.set_asteroid_pressure(settings.material_combat.asteroids);
     Box::new(MaterialMissionClientScenario {
         sortie: SurfaceSortieClientScenario { state },
@@ -189,16 +193,27 @@ impl ClientScenario for MaterialMissionClientScenario {
         self.sortie.state.match_outcome().is_some()
     }
     fn game_over_message(&self) -> Option<String> {
-        use scenario_spacewars::surface_sortie::match_rules::MatchOutcome;
-        self.sortie
-            .state
-            .match_outcome()
-            .map(|outcome| match outcome {
-                MatchOutcome::Winner(owner) => {
-                    format!("Player {} wins / opposing pilot lost", owner.index() + 1)
-                }
-                MatchOutcome::Draw => "Draw / both pilots lost".to_owned(),
-            })
+        self.sortie.state.match_result_message()
+    }
+    fn runtime_diagnostics(&self) -> String {
+        let Some(round) = self.sortie.state.match_observation() else {
+            return String::new();
+        };
+        format!(
+            "match_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}",
+            if self.bots[0] { "rule_bot" } else { "human" },
+            if self.bots[1] { "rule_bot" } else { "human" },
+            round
+                .remaining_seconds
+                .map_or_else(|| "unlimited".into(), |n| format!("{n:.3}")),
+            round.owned_planets[0],
+            round.owned_planets[1],
+            round.reason,
+            self.sortie
+                .state
+                .match_result_message()
+                .unwrap_or_else(|| "in_progress".into()),
+        )
     }
     #[cfg(test)]
     fn as_any(&self) -> &dyn std::any::Any {

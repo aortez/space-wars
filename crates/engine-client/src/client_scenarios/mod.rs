@@ -320,6 +320,10 @@ pub trait ClientScenario {
         None
     }
 
+    fn runtime_diagnostics(&self) -> String {
+        String::new()
+    }
+
     fn zoom_player_in(&mut self, _player: usize) {}
     fn zoom_player_out(&mut self, _player: usize) {}
 

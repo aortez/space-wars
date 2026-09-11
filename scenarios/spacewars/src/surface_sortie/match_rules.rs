@@ -95,14 +95,42 @@ pub enum MatchOutcome {
     Draw,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchEndReason {
+    PilotDeath,
+    SimultaneousDeaths,
+    TimeLimit,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub(super) struct MatchRound {
+    time_limit: Option<Duration>,
+    elapsed: Duration,
+    reason: Option<MatchEndReason>,
     outcome: Option<MatchOutcome>,
     finished_tick: Option<u64>,
 }
 
+impl Default for MatchRound {
+    fn default() -> Self {
+        Self {
+            time_limit: Some(Duration::from_secs(600)),
+            elapsed: Duration::ZERO,
+            reason: None,
+            outcome: None,
+            finished_tick: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MatchObservation {
+    pub time_limit_seconds: Option<f64>,
+    pub elapsed_seconds: f64,
+    pub remaining_seconds: Option<f64>,
+    pub reason: Option<MatchEndReason>,
+    pub owned_planets: [usize; 2],
     pub version: u32,
     pub pilots: Vec<PilotVitals>,
     pub outcome: Option<MatchOutcome>,
@@ -133,6 +161,61 @@ impl SurfaceSortieState {
         }
     }
 
+    pub fn set_match_time_limit(&mut self, limit: Option<Duration>) {
+        assert_eq!(self.world.tick, 0, "configure the match before stepping");
+        if let Some(round) = &mut self.round {
+            round.time_limit = limit;
+        }
+    }
+
+    pub(super) fn advance_match_time(&mut self, dt: Duration) {
+        if let Some(round) = &mut self.round {
+            round.elapsed = round.elapsed.saturating_add(dt);
+            if let Some(limit) = round.time_limit {
+                round.elapsed = round.elapsed.min(limit);
+            }
+        }
+    }
+
+    pub fn match_result_message(&self) -> Option<String> {
+        let round = self.round.as_ref()?;
+        let outcome = round.outcome?;
+        Some(match (outcome, round.reason?) {
+            (MatchOutcome::Winner(owner), MatchEndReason::PilotDeath) => {
+                format!("Player {} wins / opposing pilot lost", owner.index() + 1)
+            }
+            (MatchOutcome::Winner(owner), MatchEndReason::TimeLimit) => format!(
+                "Player {} wins / time limit / more planets owned",
+                owner.index() + 1
+            ),
+            (MatchOutcome::Draw, MatchEndReason::TimeLimit) => {
+                "Draw / time limit / equal planets".into()
+            }
+            _ => "Draw / both pilots lost".into(),
+        })
+    }
+
+    pub fn match_clock_label(&self) -> Option<String> {
+        let round = self.round.as_ref()?;
+        Some(match round.time_limit {
+            Some(limit) => {
+                let seconds = limit.saturating_sub(round.elapsed).as_secs_f64().ceil() as u64;
+                format!("Time {:02}:{:02}", seconds / 60, seconds % 60)
+            }
+            None => "Time unlimited".into(),
+        })
+    }
+
+    fn owned_planet_counts(&self) -> [usize; 2] {
+        std::array::from_fn(|seat| {
+            self.world
+                .planets
+                .iter()
+                .filter(|planet| planet.owner_id == Some(seat))
+                .count()
+        })
+    }
+
     pub fn match_outcome(&self) -> Option<MatchOutcome> {
         self.round.as_ref().and_then(|round| round.outcome)
     }
@@ -140,7 +223,14 @@ impl SurfaceSortieState {
     pub fn match_observation(&self) -> Option<MatchObservation> {
         let round = self.round.as_ref()?;
         Some(MatchObservation {
-            version: 1,
+            version: 2,
+            time_limit_seconds: round.time_limit.map(|limit| limit.as_secs_f64()),
+            elapsed_seconds: round.elapsed.as_secs_f64(),
+            remaining_seconds: round
+                .time_limit
+                .map(|limit| limit.saturating_sub(round.elapsed).as_secs_f64()),
+            reason: round.reason,
+            owned_planets: self.owned_planet_counts(),
             pilots: self
                 .pilots
                 .iter()
@@ -152,7 +242,8 @@ impl SurfaceSortieState {
     }
 
     /// Evaluate both pilots only after all damage in the shared physics step.
-    pub(super) fn finish_round(&mut self) -> bool {
+    pub(super) fn finish_round(&mut self, evaluate_timeout: bool) -> bool {
+        let owned = self.owned_planet_counts();
         let Some(round) = &mut self.round else {
             return false;
         };
@@ -161,11 +252,28 @@ impl SurfaceSortieState {
             .iter()
             .filter(|p| p.vitals.unwrap().alive())
             .collect();
-        round.outcome = match alive.as_slice() {
-            [] => Some(MatchOutcome::Draw),
-            [pilot] => Some(MatchOutcome::Winner(pilot.owner)),
+        let result = match alive.as_slice() {
+            [] => Some((MatchOutcome::Draw, MatchEndReason::SimultaneousDeaths)),
+            [pilot] => Some((
+                MatchOutcome::Winner(pilot.owner),
+                MatchEndReason::PilotDeath,
+            )),
+            _ if evaluate_timeout
+                && round.time_limit.is_some_and(|limit| round.elapsed >= limit) =>
+            {
+                let outcome = match owned[0].cmp(&owned[1]) {
+                    std::cmp::Ordering::Greater => MatchOutcome::Winner(PlayerId::PLAYER_1),
+                    std::cmp::Ordering::Less => MatchOutcome::Winner(PlayerId::PLAYER_2),
+                    std::cmp::Ordering::Equal => MatchOutcome::Draw,
+                };
+                Some((outcome, MatchEndReason::TimeLimit))
+            }
             _ => None,
         };
+        if let Some((outcome, reason)) = result {
+            round.outcome = Some(outcome);
+            round.reason = Some(reason);
+        }
         if round.outcome.is_none() {
             return false;
         }

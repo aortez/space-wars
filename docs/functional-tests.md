@@ -1,5 +1,15 @@
 # Functional UI tests
 
+The `autostart_` workflows exercise persistent launcher-idle Clock and bot
+activities, settings suspension, input reset, client restart, Off, pause/resume,
+and preservation of manual preferences. Three short real bot matches expire
+through the shared scenario rule and repeat with distinct world seeds and
+scenario revisions. They inspect actual effective controller diagnostics and
+save screenshots. Virtual-time unit tests cover exact idle boundaries; scenario
+tests cover ownership-based expiry, elimination precedence, and frozen results.
+Backend-neutral Slint input tests check that returning from an automatic
+activity consumes the original keyboard/touch input.
+
 The functional suite launches the real `engine-client` binary and controls it
 only through the public Unix-socket API in `spacewars-control`. It protects the
 process, protocol, Slint callback, menu-navigation, rendering, and screenshot
