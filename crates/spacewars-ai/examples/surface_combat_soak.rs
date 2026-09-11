@@ -328,14 +328,14 @@ fn main() {
         if !environment.arrivals.is_empty() || !environment.impacts.is_empty() {
             asteroid_events.push(json!({"tick":tick + 1,"arrivals":environment.arrivals,"impacts":environment.impacts}));
         }
-        for seat in 0..2 {
+        for (seat, brain) in brains.iter().enumerate() {
             if let Some(vitals) = state.observation(seat).pilot_vitals
                 && vitals
                     .last_damage
                     .is_some_and(|d| d.tick == u64::from(tick) + 1)
             {
                 damage_events.push(json!({"tick":tick + 1,"seat":seat,"pilot_damage":vitals.last_damage,"pilot_health":vitals.health,
-                    "protected_until_tick":vitals.protected_until_tick,"brain":brains[seat].telemetry()}));
+                    "protected_until_tick":vitals.protected_until_tick,"brain":brain.telemetry()}));
             }
             let damage = state.damage_observation(seat);
             if damage.last_damage_tick == Some(u64::from(tick) + 1) {

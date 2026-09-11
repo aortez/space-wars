@@ -6,6 +6,11 @@ See [the result report](objective-landings.md) for the complete measurements,
 Pi image identity and controls. These failures remain open; physics audits
 passing does not turn an incomplete sortie into a successful mission.
 
+The later [match-pacing investigation](match-pacing.md) adds exact contact
+records for damaging on-foot touchdowns and distinguishes them from lethal pod
+collisions with wreckage or the world boundary. Use those match-rule cases when
+investigating survival; the landing fixtures below retain their original rules.
+
 ## Evidence to preserve
 
 The artifact directory is:

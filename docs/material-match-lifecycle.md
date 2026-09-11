@@ -5,6 +5,11 @@ The confirmed rule is that a living pilot can survive loss of every ship and
 flag, reclaim a planet and rebuild. Pilot death ends that player's round even
 if they still own planets. There is no respawn entitlement from a flag.
 
+These are the first-slice results. The subsequent [match-pacing investigation](match-pacing.md)
+identifies the recorded impact deaths, corrects direct wreckage damage and
+adds bounded pursuit before every planet is secured. Its paired desktop/Pi
+results and deployment supersede the current-build counts below.
+
 The earlier landing investigations are parked with exact reproductions,
 recordings and next hypotheses in [the resumption guide](landing-investigation-guide.md),
 committed at `e18b960`. They remain open.

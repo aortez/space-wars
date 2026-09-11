@@ -8,6 +8,10 @@ Prospective jetpack access and damaged approaches are [parked with reproduction
 notes](landing-investigation-guide.md). The current priority is the match lifecycle.
 Its first implementation and measurements are now recorded in
 [pilot health and finished rounds](material-match-lifecycle.md).
+The following [match-pacing pass](match-pacing.md) adds bounded pursuit between
+capture trips, corrects direct wreckage damage and records completed generated
+rounds. High collision kicks and hard on-foot touchdowns remain open; the
+ordinary Spacewars entry-point promotion is still separate.
 The source review and archived desktop/Pi traces add detail to the
 [mission reliability results](mission-reliability.md).
 
