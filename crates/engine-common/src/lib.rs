@@ -794,6 +794,8 @@ pub struct SpacewarsSettings {
     #[serde(default = "default_spacewars_player_view_height")]
     pub player_2_view_height: f32,
     #[serde(default)]
+    pub player_1_controller: SpacewarsController,
+    #[serde(default)]
     pub player_2_controller: SpacewarsController,
 }
 
@@ -807,6 +809,7 @@ impl Default for SpacewarsSettings {
             player_health_percent: DEFAULT_SPACEWARS_PLAYER_HEALTH_PERCENT,
             player_1_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
             player_2_view_height: DEFAULT_SPACEWARS_PLAYER_VIEW_HEIGHT,
+            player_1_controller: SpacewarsController::Human,
             player_2_controller: SpacewarsController::Human,
         }
     }
@@ -829,6 +832,7 @@ impl SpacewarsSettings {
             ),
             player_1_view_height: normalize_spacewars_player_view_height(self.player_1_view_height),
             player_2_view_height: normalize_spacewars_player_view_height(self.player_2_view_height),
+            player_1_controller: self.player_1_controller,
             player_2_controller: self.player_2_controller,
         }
     }

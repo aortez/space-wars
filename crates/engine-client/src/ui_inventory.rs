@@ -66,6 +66,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) spacewars_planets: String,
     pub(crate) spacewars_asteroids: String,
     pub(crate) spacewars_player_health: String,
+    pub(crate) spacewars_player_1: String,
     pub(crate) spacewars_player_2: String,
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
@@ -191,6 +192,52 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
     let mut controls = Vec::new();
     let selected_ids: &[&str] = match context.selected_scenario.as_str() {
         "spacewars" => {
+            for (id, value) in [
+                ("launcher.settings.renderer", context.renderer.clone()),
+                (
+                    "launcher.settings.raster-scale",
+                    format!("{}×", context.raster_scale),
+                ),
+                (
+                    "launcher.settings.match.player-1",
+                    context.spacewars_player_1.clone(),
+                ),
+                (
+                    "launcher.settings.match.player-2",
+                    context.spacewars_player_2.clone(),
+                ),
+                (
+                    "launcher.settings.match.break-interval",
+                    context.combat_break_interval.clone(),
+                ),
+                (
+                    "launcher.settings.match.break-duration",
+                    context.combat_break_duration.clone(),
+                ),
+                (
+                    "launcher.settings.match.asteroid-interval",
+                    context.combat_asteroid_interval.clone(),
+                ),
+                (
+                    "launcher.settings.match.asteroid-strength",
+                    context.combat_asteroid_strength.clone(),
+                ),
+            ] {
+                push_choice(&mut controls, id, &value);
+            }
+            &[
+                "launcher.settings.renderer",
+                "launcher.settings.raster-scale",
+                "launcher.settings.match.player-1",
+                "launcher.settings.match.player-2",
+                "launcher.settings.match.break-interval",
+                "launcher.settings.match.break-duration",
+                "launcher.settings.match.asteroid-interval",
+                "launcher.settings.match.asteroid-strength",
+                "launcher.settings.back",
+            ]
+        }
+        "spacewars-classic" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -606,6 +653,7 @@ mod tests {
             spacewars_planets: "on".into(),
             spacewars_asteroids: "off".into(),
             spacewars_player_health: "125".into(),
+            spacewars_player_1: "human".into(),
             spacewars_player_2: "rule bot".into(),
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
@@ -758,7 +806,12 @@ mod tests {
     #[test]
     fn settings_inventory_matches_each_scenario() {
         let cases = [
-            ("spacewars", 16, "launcher.settings.spacewars.player-2"),
+            ("spacewars", 18, "launcher.settings.match.player-2"),
+            (
+                "spacewars-classic",
+                16,
+                "launcher.settings.spacewars.player-2",
+            ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
             ("clock", 14, "launcher.settings.clock.color-cycle"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
@@ -775,7 +828,8 @@ mod tests {
             let mut context = context(scenario);
             context.launcher_settings_focus_index = match scenario {
                 "surface-expedition" | "spacewars-terrain" => 2,
-                "spacewars" => 6,
+                "spacewars" => 3,
+                "spacewars-classic" => 6,
                 "pizza" => 3,
                 "clock" => 5,
                 "rover-lab" => 1,
@@ -796,7 +850,8 @@ mod tests {
 
     #[test]
     fn settings_choices_expose_the_visible_value() {
-        let inventory = inventory_for_screen(UiScreen::LauncherSettings, &context("spacewars"));
+        let inventory =
+            inventory_for_screen(UiScreen::LauncherSettings, &context("spacewars-classic"));
         let value = |id: &str| {
             inventory
                 .controls

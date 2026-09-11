@@ -170,7 +170,7 @@ pub(super) fn run_terrain_lifecycle(scenario: &'static str) {
     });
 }
 
-fn wait_for_terrain_frame(
+pub(super) fn wait_for_terrain_frame(
     harness: &mut FunctionalHarness,
     name: &str,
     minimum_scene_pixels: usize,

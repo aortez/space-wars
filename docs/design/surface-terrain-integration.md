@@ -1,10 +1,15 @@
 # Surface gameplay and destructible terrain integration
 
+The [normal Spacewars match](../spacewars-match.md) now uses the generated
+three-planet material loop. Each player can independently be human or a mission
+bot. The former game and benchmark remain under `spacewars-classic`; the
+historical lab registrations remain available. The sections below retain the
+integration history. Merging remains deferred pending the integrated playtest.
+
 The latest [pilot impact survival pass](../pilot-impact-survival.md) calibrates
 supplied missile/wreckage inertia and corrects jetpack steering against moving
 ground. The bounded desktop/Pi matrix retains real pilot deaths, recovery and
-unfinished rounds. Promotion into ordinary Spacewars remains the next integration
-milestone; merging is deferred.
+unfinished rounds. Its recorded landing regression remains open.
 
 The current [objective landing pass](../objective-landings.md) measures a walking
 and jumping round trip to enemy flags before choosing a landing, and adds
@@ -120,11 +125,11 @@ Finished-match survival rule, confirmed by the user on 2026-09-10: a living
 spaceling or escape pod keeps the player in the game even with no full ship
 and no owned planets. They may claim or reclaim a planet and rebuild through
 the ordinary mechanics. Losing the last flag during recovery must preserve
-that opportunity. Match integration must therefore replace the legacy
-no-ship/no-planets elimination rule; terminal pilot defeat and any respawn
-rules remain to be designed. See the
-[continuation investigation](../continuation-investigation.md) for the planned
-work and acceptance cases.
+that opportunity. The user subsequently confirmed that pilot death ends the
+round even with owned planets; flags do not grant respawns. The implemented
+[material lifecycle](../material-match-lifecycle.md) supplies those rules, and
+the [normal entry](../spacewars-match.md) now hosts them. Classic retains the
+old no-ship/no-planets elimination rule for historical comparisons.
 
 The first acceptance scene combines one destructible planet with the shared
 one/two-player surface loop. Generated-world expansion follows validation of

@@ -119,23 +119,30 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.renderer" | "launcher.settings.nes.cartridge" => 0,
         "launcher.settings.raster-scale" => 1,
         "launcher.settings.spacewars.preset"
+        | "launcher.settings.match.player-1"
         | "launcher.settings.travel.asteroid-interval"
         | "launcher.settings.combat.break-interval"
         | "launcher.settings.expedition.players"
         | "launcher.settings.pizza.desired-balls"
         | "launcher.settings.clock.time-format" => 2,
         "launcher.settings.spacewars.planets"
+        | "launcher.settings.match.player-2"
         | "launcher.settings.travel.asteroid-strength"
         | "launcher.settings.combat.break-duration"
         | "launcher.settings.pizza.spawn-rate"
         | "launcher.settings.clock.event-profile" => 3,
         "launcher.settings.spacewars.asteroids"
+        | "launcher.settings.match.break-interval"
         | "launcher.settings.clock.falling"
         | "launcher.settings.combat.mission" => 4,
         "launcher.settings.spacewars.player-health"
+        | "launcher.settings.match.break-duration"
         | "launcher.settings.clock.color-cycle"
         | "launcher.settings.combat.asteroid-interval" => 5,
-        "launcher.settings.spacewars.player-2" | "launcher.settings.combat.asteroid-strength" => 6,
+        "launcher.settings.spacewars.player-2"
+        | "launcher.settings.combat.asteroid-strength"
+        | "launcher.settings.match.asteroid-interval" => 6,
+        "launcher.settings.match.asteroid-strength" => 7,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

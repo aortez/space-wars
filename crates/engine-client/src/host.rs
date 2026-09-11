@@ -2301,7 +2301,7 @@ mod tests {
         config: &SpacewarsConfig,
     ) -> Result<HostedScenario, HostError> {
         HostedScenario::new(
-            "spacewars",
+            "spacewars-classic",
             seed,
             &settings_from_config(config),
             TEST_VIEWPORT,
@@ -2348,19 +2348,19 @@ mod tests {
         };
 
         assert!(err.to_string().contains("unknown scenario"));
-        assert!(err.to_string().contains("spacewars"));
+        assert!(err.to_string().contains("spacewars-classic"));
     }
 
     #[test]
     fn failed_replacement_retains_the_current_usable_scenario() {
-        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 0).unwrap();
         spacewars_state_mut(&mut scenario).tick = 73;
 
         let error = replace_scenario(&mut scenario, || {
             Err(HostError::ScenarioCreation {
-                name: "spacewars".into(),
+                name: "spacewars-classic".into(),
                 source: ScenarioCreateError::MissingAsset {
-                    name: "spacewars",
+                    name: "spacewars-classic",
                     asset: "missing-test-asset".into(),
                 },
             })
@@ -2872,8 +2872,89 @@ mod tests {
     }
 
     #[test]
+    fn normal_spacewars_host_pause_and_restart_keep_both_selected_controllers() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
+        settings.spacewars.player_2_controller = engine_common::SpacewarsController::RuleBot;
+        let mut scenario = HostedScenario::new(
+            "spacewars",
+            7,
+            &settings,
+            TEST_VIEWPORT,
+            ScenarioStartMode::Normal,
+        )
+        .unwrap();
+        let initial = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        assert_eq!(initial.len(), 4);
+        assert_eq!(
+            scenario.frame_layout(),
+            render::FrameLayout::PlayerViewsWithMinimaps
+        );
+        assert!(scenario.registration().capabilities.game_over);
+        assert!(!scenario.registration().capabilities.benchmark);
+        for _ in 0..60 {
+            scenario.step(&[], Duration::from_nanos(16_666_667));
+        }
+        let advanced = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
+        assert_ne!(initial, advanced);
+        let mut input = ClientInput::default();
+        let mut accumulator = Duration::ZERO;
+        let mut controls = ScenarioControls::default();
+        let mut paused = true;
+        let mut benchmark_active = false;
+        let step = Duration::from_nanos(16_666_667);
+        step_scenario(
+            &mut scenario,
+            "spacewars",
+            7,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(step),
+            Duration::from_secs(1),
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &settings,
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert_eq!(
+            scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT),
+            advanced
+        );
+        controls.request_restart();
+        let result = step_scenario(
+            &mut scenario,
+            "spacewars",
+            7,
+            TickModel::FixedTimestep { hz: 60 },
+            Some(step),
+            Duration::ZERO,
+            &mut accumulator,
+            &mut input,
+            &mut controls,
+            &mut paused,
+            &mut benchmark_active,
+            false,
+            &settings,
+            TEST_VIEWPORT,
+            &[],
+        );
+        assert!(result.scenario_replaced);
+        assert!(!paused);
+        assert!(!benchmark_active);
+        assert!(!scenario.is_game_over());
+        assert_eq!(
+            scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT),
+            initial
+        );
+    }
+
+    #[test]
     fn spacewars_scenario_renders_initial_world() {
-        let scenario = hosted_scenario("spacewars", 0).unwrap();
+        let scenario = hosted_scenario("spacewars-classic", 0).unwrap();
         let frame = scenario.render_frame();
         let state = spacewars_state(&scenario);
 
@@ -2900,7 +2981,7 @@ mod tests {
 
     #[test]
     fn spacewars_scenario_renders_original_style_local_play_frames_for_client() {
-        let scenario = hosted_scenario("spacewars", 0).unwrap();
+        let scenario = hosted_scenario("spacewars-classic", 0).unwrap();
         let viewport = Viewport::new(1000.0, 700.0);
         let frames = scenario.render_frames(RenderBackend::Vector, viewport);
 
@@ -2936,7 +3017,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_health_pod_and_planet_score() {
-        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 0).unwrap();
         let (total_planets, free_planets) = {
             let state = spacewars_state_mut(&mut scenario);
             let total_planets = state.planets.len().max(1) as f32;
@@ -2973,7 +3054,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_winner_and_eliminated_player() {
-        let mut scenario = hosted_scenario("spacewars", 0).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 0).unwrap();
         let state = spacewars_state_mut(&mut scenario);
         state.players[0].eliminated = true;
         state.winner = Some(1);
@@ -2993,7 +3074,7 @@ mod tests {
 
     #[test]
     fn spacewars_panel_state_reports_pause_message() {
-        let scenario = hosted_scenario("spacewars", 0).unwrap();
+        let scenario = hosted_scenario("spacewars-classic", 0).unwrap();
 
         let panel = scenario
             .center_panel_state(true, false, "Target 60 Hz | FPS 60 | UPS 0")
@@ -3009,7 +3090,7 @@ mod tests {
     #[test]
     fn spacewars_panel_state_reports_benchmark_message() {
         let scenario = HostedScenario::new(
-            "spacewars",
+            "spacewars-classic",
             0,
             &Settings::default(),
             TEST_VIEWPORT,
@@ -3044,7 +3125,7 @@ mod tests {
 
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3074,7 +3155,7 @@ mod tests {
 
     #[test]
     fn pause_key_toggles_and_freezes_spacewars_steps() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::ZERO;
         let mut controls = ScenarioControls::default();
@@ -3084,7 +3165,7 @@ mod tests {
         input.press(input::GameKey::Pause);
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3103,7 +3184,7 @@ mod tests {
 
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3125,7 +3206,7 @@ mod tests {
         input.press(input::GameKey::Pause);
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3145,7 +3226,7 @@ mod tests {
 
     #[test]
     fn controller_disconnect_pause_is_idempotent() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3155,7 +3236,7 @@ mod tests {
         input.press(input::GameKey::ForcePause);
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3177,7 +3258,7 @@ mod tests {
 
     #[test]
     fn escape_toggles_pause_and_backs_out_of_controls() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3187,7 +3268,7 @@ mod tests {
         input.press(input::GameKey::Back);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3209,7 +3290,7 @@ mod tests {
         input.press(input::GameKey::Back);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3230,7 +3311,7 @@ mod tests {
         input.press(input::GameKey::Back);
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3250,7 +3331,7 @@ mod tests {
 
     #[test]
     fn menu_controls_key_toggles_controls_screen_while_paused() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3260,7 +3341,7 @@ mod tests {
         input.press(input::GameKey::Controls);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3281,7 +3362,7 @@ mod tests {
         input.press(input::GameKey::Controls);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3301,7 +3382,7 @@ mod tests {
 
     #[test]
     fn controls_key_opens_the_controls_screen_and_pauses_gameplay() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3311,7 +3392,7 @@ mod tests {
         input.press(input::GameKey::Controls);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3334,7 +3415,7 @@ mod tests {
 
     #[test]
     fn q_returns_to_launcher_from_pause_menu() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3344,7 +3425,7 @@ mod tests {
         input.press(input::GameKey::ReturnLauncher);
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3366,7 +3447,7 @@ mod tests {
 
     #[test]
     fn benchmark_key_starts_dense_spacewars_workload() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3376,7 +3457,7 @@ mod tests {
         input.press(input::GameKey::Benchmark);
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3446,7 +3527,7 @@ mod tests {
 
     #[test]
     fn escape_after_game_over_returns_to_launcher_without_stepping() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let state = spacewars_state_mut(&mut scenario);
         state.winner = Some(1);
         let tick_before = state.tick;
@@ -3460,7 +3541,7 @@ mod tests {
 
         let result = step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3486,7 +3567,7 @@ mod tests {
 
     #[test]
     fn scenario_controls_pause_resume_restart_and_start_benchmark() {
-        let mut scenario = hosted_scenario("spacewars", 42).unwrap();
+        let mut scenario = hosted_scenario("spacewars-classic", 42).unwrap();
         let mut input = ClientInput::default();
         let mut accumulator = Duration::from_secs(1);
         let mut controls = ScenarioControls::default();
@@ -3496,7 +3577,7 @@ mod tests {
         controls.request_pause();
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3517,7 +3598,7 @@ mod tests {
         controls.request_resume();
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3545,7 +3626,7 @@ mod tests {
         controls.request_restart();
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),
@@ -3568,7 +3649,7 @@ mod tests {
         controls.request_benchmark();
         step_scenario(
             &mut scenario,
-            "spacewars",
+            "spacewars-classic",
             42,
             TickModel::FixedTimestep { hz: 60 },
             Some(Duration::from_secs_f64(1.0 / 60.0)),

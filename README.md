@@ -11,10 +11,14 @@ Below is a zoomed out view of a CTF game mode.
 
 The local launcher includes the following scenarios and presets:
 
-- **Spacewars** — the two-player arcade reboot. Its ships, escape pods,
-  asteroids, physical debris, projectiles, celestial bodies, spaceport sensors,
-  and laser queries share the canonical Rapier mechanics world; gameplay still
-  owns gravity fields, damage, capture, rebuilding, and effects.
+- **Spacewars** — a complete round on three generated destructible planets:
+  natural landing, on-foot flags, mining, combat, escape pods and rebuilding.
+  Each player can be human or a mission bot, including bot versus bot. A living
+  pilot can recover after losing every ship and flag; pilot death ends the round.
+  See [Spacewars match](docs/spacewars-match.md) for controls and settings.
+- **Spacewars Classic** — the previous berth-based game and historical visual
+  benchmark, under `spacewars-classic`. Its world presets, legacy bot and
+  no-ship/no-planets defeat rules remain available for comparison.
 - **Pizza** — a seeded interactive gravity-and-collision ball simulation.
   Rapier owns rigid-body motion and contacts while the scenario supplies mutual
   gravity and gameplay damage. Click empty space to make a ball, or grab and
@@ -44,7 +48,7 @@ The local launcher includes the following scenarios and presets:
   [headless compatibility matrix](docs/surface-compatibility.md) measure the
   gravity/motion gaps before ordinary-game integration. **surface-sortie-world**
   tries an explicit Surface V1 gravity/spin/orbit profile on those generated
-  layouts. Ordinary Spacewars and the shared controllers remain unchanged.
+  layouts. These historical diagnostic presets remain available independently.
   **surface-expedition** enables planet-to-planet travel and flag-based planet
   claiming: land, disembark and wait 3 seconds; enemy flags must first be lowered
   up close. After ship loss, land and exit the escape pod (or continue with the
@@ -161,15 +165,15 @@ jump, and `R` to restart. Gamepad `B` or keyboard `X` applies an off-center
 test shove: the spaceling tumbles, settles, and recovers on physical support.
 Holding jump/shove does not repeat it; jump is not buffered during knockdown.
 
-To try the first Spacewars AI opponent, open Spacewars settings in the launcher
-and change **Player 2** from **human** to **rule bot**. **Small Duel** is the
-clearest combat test bed. In worlds with planets, the bot selects uncaptured
-spaceports, matches their orbital and wrapper motion, captures them, and
-departs for another target; an escape pod instead seeks an owned port for
-rebuilding. Pods treat the moving staging rings as geometric waypoints rather
-than trying to hover at ship-only velocity tolerances, and reacquire an owned
-port if contact is lost before the rebuild completes. The ordinary two-human
-setup remains the default.
+In **Spacewars → Settings**, set **Player 1** and **Player 2** independently to
+**human** or **rule bot**. Bots use the same landing, on-foot capture, weapons,
+jetpack and recovery actions as humans. Both choices persist through Play Again
+and relaunching. The default remains two human players; choose two bots to watch
+a match. Bot combat breaks and asteroid arrivals/strength are configurable.
+
+The previous port-seeking AI and **Small Duel** preset are available in
+**spacewars-classic**. Historical benchmark commands should select that scenario;
+`--benchmark` without an explicit scenario also selects Classic.
 
 On Unix, query the running client through its control socket:
 
@@ -287,7 +291,7 @@ spacewars-cli host pause --timeout 3s
 ```
 
 The command observes the current UI revision, submits a guarded host request,
-and polls with the same overall deadline. From Spacewars, the visible Benchmark
+and polls with the same overall deadline. From Spacewars Classic, the visible Benchmark
 menu item can then be activated by ID:
 
 ```sh
@@ -301,7 +305,7 @@ their next action:
 ```sh
 spacewars-cli host pause --timeout 3s
 spacewars-cli ui activate pause.restart --expect-screen pause.main
-spacewars-cli ui wait --screen gameplay --scenario spacewars --timeout 3s
+spacewars-cli ui wait --screen gameplay --scenario spacewars-classic --timeout 3s
 
 spacewars-cli host pause --timeout 3s
 spacewars-cli ui activate pause.return-to-launcher --expect-screen pause.main

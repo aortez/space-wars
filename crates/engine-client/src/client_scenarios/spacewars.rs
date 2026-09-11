@@ -15,7 +15,7 @@ use crate::input::{ClientInput, GameKey};
 use crate::render::{self, FrameLayout, Viewport};
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
-    id: "spacewars",
+    id: "spacewars-classic",
     launcher_visible: true,
     capabilities: ScenarioCapabilities {
         benchmark: true,

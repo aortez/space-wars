@@ -16,7 +16,8 @@ use spacewars_ai::{
 
 mod mission;
 pub(super) use mission::{
-    ARENA_DUEL_REGISTRATION, ARENA_REGISTRATION, TRAVEL_DUEL_REGISTRATION, TRAVEL_REGISTRATION,
+    ARENA_DUEL_REGISTRATION, ARENA_REGISTRATION, MATCH_REGISTRATION, TRAVEL_DUEL_REGISTRATION,
+    TRAVEL_REGISTRATION,
 };
 
 use super::{
@@ -311,18 +312,20 @@ fn capture_pilot(seed: u64, actor: PlayerId, settings: &Settings) -> Option<Tact
 }
 
 fn human_pilot_actions(actions: &[Action]) -> Vec<Action> {
+    human_seat_actions(actions, [false, true])
+}
+
+fn human_seat_actions(actions: &[Action], bots: [bool; 2]) -> Vec<Action> {
     actions
         .iter()
         .filter(|action| {
-            SurfaceWeaponAction::decode(action)
-                .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
+            SurfaceWeaponAction::decode(action).is_some_and(|(owner, _)| !bots[owner.index()])
                 || SurfaceSortieAction::decode(action)
-                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
-                || SurfaceWingAction::decode(action)
-                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
-                || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| seat == 0)
+                    .is_some_and(|(owner, _)| !bots[owner.index()])
+                || SurfaceWingAction::decode(action).is_some_and(|(owner, _)| !bots[owner.index()])
+                || SurfaceMiningAction::decode(action).is_some_and(|(seat, _)| !bots[seat])
                 || SurfaceImpactAction::decode(action)
-                    .is_some_and(|(owner, _)| owner == PlayerId::PLAYER_1)
+                    .is_some_and(|(owner, _)| !bots[owner.index()])
         })
         .cloned()
         .collect()

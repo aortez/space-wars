@@ -448,7 +448,7 @@ fn effective_launch_options(args: &Args, settings: &Settings) -> EffectiveLaunch
     let scenario = if args.rom.is_some() {
         "nes".into()
     } else if args.uses_benchmark() && args.scenario.is_none() {
-        "spacewars".into()
+        "spacewars-classic".into()
     } else {
         args.scenario
             .clone()
@@ -636,6 +636,9 @@ fn show_launcher(
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p1_controller(SharedString::from(spacewars_controller_label(
+        setup.player_1_controller,
+    )));
     window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
         setup.player_2_controller,
     )));
@@ -1219,7 +1222,8 @@ fn cycle_launcher_scenario(window: &MainWindow, delta: i32) {
 
 fn launcher_settings_item_count(window: &MainWindow) -> i32 {
     match window.get_launcher_scenario().as_str() {
-        "spacewars" => 8,
+        "spacewars" => 9,
+        "spacewars-classic" => 8,
         "pizza" => 5,
         "spacewars-terrain-combat" | "spacewars-terrain-duel" => 8,
         "spacewars-terrain-travel"
@@ -1317,9 +1321,46 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
             ))),
             _ => {}
         },
-        "spacewars" => adjust_spacewars_launcher_setting(window, focus, delta),
+        "spacewars" => adjust_material_match_launcher_setting(window, focus, delta),
+        "spacewars-classic" => adjust_spacewars_launcher_setting(window, focus, delta),
         "pizza" => adjust_pizza_launcher_setting(window, focus, delta),
         "clock" => adjust_clock_launcher_setting(window, focus, delta),
+        _ => {}
+    }
+}
+
+fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    match focus {
+        2 => window.set_launcher_p1_controller(SharedString::from(cycle_label(
+            window.get_launcher_p1_controller().as_str(),
+            &["human", "rule bot"],
+            delta,
+        ))),
+        3 => window.set_launcher_p2_controller(SharedString::from(cycle_label(
+            window.get_launcher_p2_controller().as_str(),
+            &["human", "rule bot"],
+            delta,
+        ))),
+        4 => window.set_launcher_combat_break_interval(SharedString::from(cycle_label(
+            window.get_launcher_combat_break_interval().as_str(),
+            &["Off", "8", "15", "30"],
+            delta,
+        ))),
+        5 => window.set_launcher_combat_break_duration(SharedString::from(cycle_label(
+            window.get_launcher_combat_break_duration().as_str(),
+            &["2", "4", "6", "8"],
+            delta,
+        ))),
+        6 => window.set_launcher_combat_asteroid_interval(SharedString::from(cycle_label(
+            window.get_launcher_combat_asteroid_interval().as_str(),
+            &["Off", "8", "3", "1"],
+            delta,
+        ))),
+        7 => window.set_launcher_combat_asteroid_strength(SharedString::from(cycle_label(
+            window.get_launcher_combat_asteroid_strength().as_str(),
+            &["Light", "Mixed", "Heavy"],
+            delta,
+        ))),
         _ => {}
     }
 }
@@ -1477,6 +1518,13 @@ fn handle_launcher_apply_preset(weak_window: &slint::Weak<MainWindow>) {
     let preset = window.get_launcher_spacewars_preset();
     match spacewars_preset_from_label(preset.as_str()) {
         Ok(Some(mut setup)) => {
+            match spacewars_controller_from_label(window.get_launcher_p1_controller().as_str()) {
+                Ok(controller) => setup.player_1_controller = controller,
+                Err(message) => {
+                    window.set_launcher_error_text(SharedString::from(message));
+                    return;
+                }
+            }
             match spacewars_controller_from_label(window.get_launcher_p2_controller().as_str()) {
                 Ok(controller) => setup.player_2_controller = controller,
                 Err(message) => {
@@ -1762,6 +1810,9 @@ fn set_spacewars_setup_fields(window: &MainWindow, setup: &SpacewarsSettings) {
     window.set_launcher_player_health_text(SharedString::from(
         setup.player_health_percent.to_string(),
     ));
+    window.set_launcher_p1_controller(SharedString::from(spacewars_controller_label(
+        setup.player_1_controller,
+    )));
     window.set_launcher_p2_controller(SharedString::from(spacewars_controller_label(
         setup.player_2_controller,
     )));
@@ -1787,6 +1838,7 @@ fn spacewars_preset_from_label(label: &str) -> Result<Option<SpacewarsSettings>,
 fn preset_label_for_setup(setup: &SpacewarsSettings) -> &'static str {
     let mut setup = setup.normalized();
     // Controller selection is orthogonal to the world/gameplay preset.
+    setup.player_1_controller = SpacewarsController::Human;
     setup.player_2_controller = SpacewarsController::Human;
     if setup == original_spacewars_preset() {
         PRESET_ORIGINAL
@@ -1844,11 +1896,23 @@ fn launcher_selections_from_window(
 ) -> Result<LauncherSelections, String> {
     let launch = launch_options_from_window(window)?;
     let (clock, spacewars, pizza) = match launch.scenario.as_str() {
-        "spacewars" => (
+        "spacewars-classic" => (
             current_settings.clock,
             spacewars_setup_from_window(window)?,
             current_settings.pizza.clone(),
         ),
+        "spacewars" => {
+            let mut setup = current_settings.spacewars.clone();
+            setup.player_1_controller =
+                spacewars_controller_from_label(window.get_launcher_p1_controller().as_str())?;
+            setup.player_2_controller =
+                spacewars_controller_from_label(window.get_launcher_p2_controller().as_str())?;
+            (
+                current_settings.clock,
+                setup,
+                current_settings.pizza.clone(),
+            )
+        }
         "pizza" => (
             current_settings.clock,
             current_settings.spacewars.clone(),
@@ -1887,7 +1951,7 @@ fn launcher_selections_from_window(
     };
     let combat_breaks = if matches!(
         launch.scenario.as_str(),
-        "spacewars-terrain-combat" | "spacewars-terrain-duel"
+        "spacewars" | "spacewars-terrain-combat" | "spacewars-terrain-duel"
     ) {
         engine_common::CombatBreakSettings {
             interval_seconds: match window.get_launcher_combat_break_interval().as_str() {
@@ -1907,7 +1971,8 @@ fn launcher_selections_from_window(
     };
     let material_combat = if matches!(
         launch.scenario.as_str(),
-        "spacewars-terrain-combat"
+        "spacewars"
+            | "spacewars-terrain-combat"
             | "spacewars-terrain-duel"
             | "spacewars-terrain-travel"
             | "spacewars-terrain-travel-duel"
@@ -1970,6 +2035,8 @@ fn spacewars_setup_from_window(window: &MainWindow) -> Result<SpacewarsSettings,
         window.get_launcher_p1_zoom_text().as_str(),
         window.get_launcher_p2_zoom_text().as_str(),
     )?;
+    setup.player_1_controller =
+        spacewars_controller_from_label(window.get_launcher_p1_controller().as_str())?;
     setup.player_2_controller =
         spacewars_controller_from_label(window.get_launcher_p2_controller().as_str())?;
     Ok(setup.normalized())
@@ -2069,6 +2136,7 @@ fn spacewars_setup_from_values(
             MIN_SPACEWARS_PLAYER_VIEW_HEIGHT,
             MAX_SPACEWARS_PLAYER_VIEW_HEIGHT,
         )?,
+        player_1_controller: SpacewarsController::Human,
         player_2_controller: SpacewarsController::Human,
     };
 
@@ -2466,7 +2534,7 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_without_cli_scenario_uses_spacewars() {
+    fn benchmark_without_cli_scenario_uses_classic_spacewars() {
         let mut settings = Settings::default();
         settings.launch.scenario = "null".into();
         let mut args = base_args();
@@ -2474,7 +2542,7 @@ mod tests {
 
         let launch = effective_launch_options(&args, &settings);
 
-        assert_eq!(launch.scenario, "spacewars");
+        assert_eq!(launch.scenario, "spacewars-classic");
     }
 
     #[test]
@@ -2800,6 +2868,7 @@ mod tests {
                 player_health_percent: 250,
                 player_1_view_height: 420.0,
                 player_2_view_height: 640.0,
+                player_1_controller: SpacewarsController::RuleBot,
                 player_2_controller: SpacewarsController::RuleBot,
             },
             pizza: PizzaSettings {
@@ -2884,6 +2953,7 @@ mod tests {
             player_health_percent: 250,
             player_1_view_height: 420.0,
             player_2_view_height: 640.0,
+            player_1_controller: SpacewarsController::Human,
             player_2_controller: SpacewarsController::RuleBot,
         };
 

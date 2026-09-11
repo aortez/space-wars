@@ -35,6 +35,9 @@ mod terrain_lab;
 #[path = "ui_control_functional/spacewars_terrain.rs"]
 mod spacewars_terrain;
 
+#[path = "ui_control_functional/spacewars_match.rs"]
+mod spacewars_match;
+
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn launcher_navigation_uses_the_public_control_api() {
@@ -75,16 +78,18 @@ fn launcher_navigation_uses_the_public_control_api() {
                 "launcher.settings.renderer.next",
                 "launcher.settings.raster-scale.previous",
                 "launcher.settings.raster-scale.next",
-                "launcher.settings.spacewars.preset.previous",
-                "launcher.settings.spacewars.preset.next",
-                "launcher.settings.spacewars.planets.previous",
-                "launcher.settings.spacewars.planets.next",
-                "launcher.settings.spacewars.asteroids.previous",
-                "launcher.settings.spacewars.asteroids.next",
-                "launcher.settings.spacewars.player-health.previous",
-                "launcher.settings.spacewars.player-health.next",
-                "launcher.settings.spacewars.player-2.previous",
-                "launcher.settings.spacewars.player-2.next",
+                "launcher.settings.match.player-1.previous",
+                "launcher.settings.match.player-1.next",
+                "launcher.settings.match.player-2.previous",
+                "launcher.settings.match.player-2.next",
+                "launcher.settings.match.break-interval.previous",
+                "launcher.settings.match.break-interval.next",
+                "launcher.settings.match.break-duration.previous",
+                "launcher.settings.match.break-duration.next",
+                "launcher.settings.match.asteroid-interval.previous",
+                "launcher.settings.match.asteroid-interval.next",
+                "launcher.settings.match.asteroid-strength.previous",
+                "launcher.settings.match.asteroid-strength.next",
                 "launcher.settings.back",
                 "launcher.settings.start",
             ]
@@ -283,10 +288,11 @@ fn launcher_can_run_the_clock_menu_lifecycle() {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn launcher_can_run_the_spacewars_menu_lifecycle() {
-    run_functional_test("launcher-spacewars-menu-lifecycle", |harness| {
+fn launcher_can_run_the_classic_spacewars_menu_lifecycle() {
+    run_functional_test("launcher-classic-spacewars-menu-lifecycle", |harness| {
         let mut state = harness.wait_until_ready();
         assert_launcher_main(&state);
+        state = harness.activate_until_scenario("spacewars-classic", state);
 
         let unavailable = harness.expect_pause_failure(&state);
         assert_eq!(unavailable.code, ControlFailureCode::WrongScreen);
@@ -299,14 +305,14 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(launcher_revision),
             },
             TRANSITION_TIMEOUT,
         );
         assert_eq!(state.screen, UiScreen::Gameplay);
-        assert_eq!(state.active_scenario.as_deref(), Some("spacewars"));
-        assert_eq!(state.selected_scenario, "spacewars");
+        assert_eq!(state.active_scenario.as_deref(), Some("spacewars-classic"));
+        assert_eq!(state.selected_scenario, "spacewars-classic");
         let gameplay_scenario_revision = state
             .scenario_revision
             .expect("gameplay must report a scenario revision");
@@ -320,7 +326,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -343,7 +349,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(benchmark_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -360,7 +366,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -372,7 +378,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(restart_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -391,7 +397,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(pause_requested.revision),
             },
             TRANSITION_TIMEOUT,
@@ -409,7 +415,8 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
             },
             TRANSITION_TIMEOUT,
         );
-        assert_launcher_main(&state);
+        assert_eq!(state.screen, UiScreen::LauncherMain);
+        assert_eq!(state.selected_scenario, "spacewars-classic");
         assert_eq!(state.scenario_revision, None);
         assert!(!state.paused);
         assert!(!state.benchmark_active);
@@ -421,7 +428,7 @@ fn launcher_can_run_the_spacewars_menu_lifecycle() {
         state = harness.wait_for(
             UiStatePredicate {
                 screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
+                scenario: Some("spacewars-classic".into()),
                 revision_after: Some(returned_launcher_revision),
             },
             TRANSITION_TIMEOUT,
@@ -447,7 +454,16 @@ fn run_functional_test_with_backend(
     backend: &'static str,
     workflow: impl FnOnce(&mut FunctionalHarness),
 ) {
-    let mut harness = FunctionalHarness::spawn(name, backend)
+    run_functional_test_with_seed(name, backend, 4242, workflow);
+}
+
+fn run_functional_test_with_seed(
+    name: &'static str,
+    backend: &'static str,
+    seed: u64,
+    workflow: impl FnOnce(&mut FunctionalHarness),
+) {
+    let mut harness = FunctionalHarness::spawn(name, backend, seed)
         .unwrap_or_else(|error| panic!("could not start {name}: {error}"));
     let result = catch_unwind(AssertUnwindSafe(|| workflow(&mut harness)));
     if let Err(payload) = result {
@@ -470,7 +486,7 @@ struct FunctionalHarness {
 }
 
 impl FunctionalHarness {
-    fn spawn(test_name: &'static str, backend: &'static str) -> Result<Self, String> {
+    fn spawn(test_name: &'static str, backend: &'static str, seed: u64) -> Result<Self, String> {
         let artifact_root = workspace_root().join("target/functional-test-artifacts");
         fs::create_dir_all(&artifact_root).map_err(|error| {
             format!(
@@ -505,7 +521,7 @@ impl FunctionalHarness {
             "--config-dir".to_string(),
             config_directory.display().to_string(),
             "--seed".into(),
-            "4242".into(),
+            seed.to_string(),
             "--renderer".into(),
             "raster".into(),
             "--raster-scale".into(),
