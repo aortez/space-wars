@@ -35,16 +35,18 @@ fn main() {
     let surface = argument("--surface", "original");
     let mut state = match surface.as_str() {
         "original" => SurfaceSortieScenario::init_material(seed, players),
-        "blocks" | "contour" => SurfaceSortieScenario::init_surface_comparison(
+        "blocks" | "contour" | "round" => SurfaceSortieScenario::init_surface_comparison(
             seed,
             players,
-            if surface == "contour" {
+            if surface == "round" {
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Interpolated
+            } else if surface == "contour" {
                 scenario_spacewars::surface_sortie::comparison::TerrainSurface::Contour
             } else {
                 scenario_spacewars::surface_sortie::comparison::TerrainSurface::Blocks
             },
         ),
-        _ => panic!("--surface must be original, blocks or contour"),
+        _ => panic!("--surface must be original, blocks, contour or round"),
     };
     let mut brain = RulePilotV2::with_direction(
         BrainReset {

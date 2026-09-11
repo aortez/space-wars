@@ -2,7 +2,11 @@ use super::*;
 
 #[test]
 fn dynamic_terrain_recomputes_mass_and_preserves_surviving_point_velocities() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         edited_mass_and_velocity(surface);
     }
 }
@@ -305,7 +309,11 @@ fn invalid_replacement_is_atomic_and_ccd_stops_at_thin_terrain() {
 
 #[test]
 fn dynamic_body_crosses_a_completed_tunnel_without_hidden_contacts() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         cross_completed_tunnel(surface);
     }
 }

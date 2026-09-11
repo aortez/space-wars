@@ -114,7 +114,7 @@ impl TerrainAssembly {
             }
             let index = chunk.id.0 as usize;
             // Durability is material state, not a collider change. Keep existing
-            // handles and solver contacts when the rectangle cover is unchanged.
+            // handles and solver contacts when the derived shapes are unchanged.
             if self.shapes[index].0 == chunk.rectangles && self.shapes[index].1 == chunk.polygons {
                 self.revisions[index] = Some(chunk.generation);
                 continue;

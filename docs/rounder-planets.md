@@ -8,6 +8,12 @@ cargo run --locked -p engine-client -- --scenario spacewars-surface-contour --se
 cargo run --locked -p engine-client -- --scenario spacewars-surface-blocks --seed 42
 ```
 
+The next refinement is available as **`spacewars-surface-round`**. It preserves
+boundary samples and interpolates crossings within the grid, addressing the
+remaining bump in the midpoint contour. See [Interpolated surfaces](rounder-planets-interpolated.md)
+for its implementation, measured roundness and validation. The report below
+preserves the first two-mode checkpoint.
+
 Both scenes use the same radius-60 planet, material layout, ships, controls and
 initial excavations. The planet is stationary and its grid is rotated 45 degrees
 under the initial landing. A shallow crater, a roofed tunnel and a cap attached by

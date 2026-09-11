@@ -15,6 +15,23 @@ pub(crate) const SURFACE_CONTOUR_REGISTRATION: ScenarioRegistration = ScenarioRe
     ..TERRAIN_REGISTRATION
 };
 
+pub(crate) const SURFACE_ROUND_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
+    id: "spacewars-surface-round",
+    controls_help: "Surface comparison: round ground. Compare with spacewars-surface-blocks and spacewars-surface-contour using the same seed. The original circle and mining cuts locate the surface between material samples. One stationary planet, diagonal landing, a crater, a tunnel and a cap attached by one cell. A/Space thrusts, jumps or gets up; hold in air for jetpack. Left/right turns or walks. B/X exits or boards. Right stick/arrows aim; RT/LB/E mines; Y/T changes size. Dark lines show collision shapes. Start/Esc pauses; restart repeats the scene. Choose 1 or 2 human players in Settings.",
+    create: create_round,
+    ..TERRAIN_REGISTRATION
+};
+
+fn create_round(
+    seed: u64,
+    settings: &Settings,
+    _: Viewport,
+    _: ScenarioStartMode,
+    _: &ScenarioAsset,
+) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    Ok(create(seed, settings, TerrainSurface::Interpolated))
+}
+
 fn create_blocks(
     seed: u64,
     settings: &Settings,
@@ -53,6 +70,7 @@ mod tests {
         for (registration, label) in [
             (&SURFACE_BLOCKS_REGISTRATION, "STEPS"),
             (&SURFACE_CONTOUR_REGISTRATION, "SLOPES"),
+            (&SURFACE_ROUND_REGISTRATION, "ROUND"),
         ] {
             let viewport = Viewport::new(800.0, 480.0);
             let mut scenario = registration

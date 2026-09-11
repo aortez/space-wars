@@ -337,6 +337,7 @@ impl SurfaceSortieState {
             surface_comparison: self.surface_comparison.map(|s| match s {
                 engine_terrain::TerrainSurface::Blocks => "blocks",
                 engine_terrain::TerrainSurface::Contour => "contour-v1",
+                engine_terrain::TerrainSurface::Interpolated => "interpolated-v1",
             }),
             version: if self.has_material_ground() { 11 } else { 10 },
             generated_case: self.generated_case,

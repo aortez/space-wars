@@ -30,11 +30,15 @@ fn parked(surface: TerrainSurface) -> SurfaceSortieState {
 
 #[test]
 fn matched_fields_land_exit_and_claim_on_diagonal_ground() {
-    let mut hashes = Vec::new();
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    let mut fields = Vec::new();
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         let mut state = SurfaceSortieScenario::init_surface_comparison(42, 2, surface);
         idle(&mut state, 600);
-        hashes.push(state.world.terrain.planets[&0].field.hash());
+        fields.push(state.world.terrain.planets[&0].field.cells().to_vec());
         println!(
             "landing {surface:?}: P1={:?}, P2={:?}",
             state.observation(0).landing.phase,
@@ -65,12 +69,18 @@ fn matched_fields_land_exit_and_claim_on_diagonal_ground() {
         );
         assert!(state.observation(0).planet_claim.unwrap().flag.is_some());
     }
-    assert_eq!(hashes[0], hashes[1]);
+    assert!(fields.windows(2).all(|pair| pair[0] == pair[1]));
 }
 
 #[test]
 fn contour_mining_invalidates_flag_support_and_replays() {
-    let mut state = parked(TerrainSurface::Contour);
+    for surface in [TerrainSurface::Contour, TerrainSurface::Interpolated] {
+        mining_support_and_replay(surface);
+    }
+}
+
+fn mining_support_and_replay(surface: TerrainSurface) {
+    let mut state = parked(surface);
     step(
         &mut state,
         SurfaceSortieAction {
@@ -113,7 +123,13 @@ fn contour_mining_invalidates_flag_support_and_replays() {
 
 #[test]
 fn final_bridge_cut_preserves_fragment_surface_material_and_mass() {
-    let mut state = SurfaceSortieScenario::init_surface_comparison(42, 1, TerrainSurface::Contour);
+    for surface in [TerrainSurface::Contour, TerrainSurface::Interpolated] {
+        bridge_cut(surface);
+    }
+}
+
+fn bridge_cut(surface: TerrainSurface) {
+    let mut state = SurfaceSortieScenario::init_surface_comparison(42, 1, surface);
     assert!(state.world.terrain.fragments.is_empty());
     let before = state.terrain_diagnostics();
     state
@@ -132,7 +148,7 @@ fn final_bridge_cut_preserves_fragment_surface_material_and_mass() {
     idle(&mut state, 1);
     assert_eq!(state.world.terrain.fragments.len(), 1);
     for fragment in state.world.terrain.fragments.values() {
-        assert_eq!(fragment.geometry.surface(), TerrainSurface::Contour);
+        assert_eq!(fragment.geometry.surface(), surface);
         let cells = fragment
             .terrain
             .cells()
@@ -167,7 +183,13 @@ fn final_bridge_cut_preserves_fragment_surface_material_and_mass() {
 
 #[test]
 fn contour_flag_survives_nearby_edits_then_loses_ownership_with_its_cell() {
-    let mut state = parked(TerrainSurface::Contour);
+    for surface in [TerrainSurface::Contour, TerrainSurface::Interpolated] {
+        flag_reanchoring(surface);
+    }
+}
+
+fn flag_reanchoring(surface: TerrainSurface) {
+    let mut state = parked(surface);
     step(
         &mut state,
         SurfaceSortieAction {
@@ -181,9 +203,10 @@ fn contour_flag_survives_nearby_edits_then_loses_ownership_with_its_cell() {
     let t = &state.world.terrain.planets[&0];
     let cell = t
         .geometry
-        .source_cell(
+        .contact_cell(
             &t.field,
-            (flag.position - flag.normal * 0.08 - frame.position).rotate_radians(-frame.angle),
+            (flag.position - frame.position).rotate_radians(-frame.angle),
+            flag.normal.rotate_radians(-frame.angle),
         )
         .unwrap();
     let neighbor = CellCoord::new(cell.x - 1, cell.y);
@@ -295,11 +318,14 @@ fn walking_comparison_on_untouched_diagonal_ground() {
         for direction in [-1.0, 1.0] {
             let blocks = walk(TerrainSurface::Blocks, bearing, direction);
             let contour = walk(TerrainSurface::Contour, bearing, direction);
+            let round = walk(TerrainSurface::Interpolated, bearing, direction);
             println!(
-                "walk quadrant={quadrant} direction={direction}: blocks={blocks:?} contour={contour:?}"
+                "walk quadrant={quadrant} direction={direction}: blocks={blocks:?} contour={contour:?} round={round:?}"
             );
             assert!(contour.0 > 20.0, "contour walk stalled: {contour:?}");
             assert_eq!(contour.2, 0, "contour walk knocked down");
+            assert!(round.0 > 20.0, "round walk stalled: {round:?}");
+            assert_eq!(round.2, 0, "round walk knocked down");
         }
     }
 }

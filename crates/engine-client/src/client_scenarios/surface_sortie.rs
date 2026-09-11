@@ -15,7 +15,9 @@ use spacewars_ai::{
 };
 
 mod comparison;
-pub(super) use comparison::{SURFACE_BLOCKS_REGISTRATION, SURFACE_CONTOUR_REGISTRATION};
+pub(super) use comparison::{
+    SURFACE_BLOCKS_REGISTRATION, SURFACE_CONTOUR_REGISTRATION, SURFACE_ROUND_REGISTRATION,
+};
 
 mod mission;
 pub(super) use mission::{
@@ -622,6 +624,9 @@ impl ClientScenario for SurfaceSortieClientScenario {
                 }
                 scenario_spacewars::surface_sortie::comparison::TerrainSurface::Contour => {
                     &SURFACE_CONTOUR_REGISTRATION
+                }
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Interpolated => {
+                    &SURFACE_ROUND_REGISTRATION
                 }
             };
         }

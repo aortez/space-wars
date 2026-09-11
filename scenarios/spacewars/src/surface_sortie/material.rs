@@ -191,10 +191,10 @@ impl SurfaceSortieState {
             };
             contacts.map(|contact| {
                 contact.and_then(|contact| {
-                    terrain.geometry.source_cell(
+                    terrain.geometry.contact_cell(
                         &terrain.field,
-                        (contact.position - contact.normal * 0.08 - frame.position)
-                            .rotate_radians(-frame.angle),
+                        (contact.position - frame.position).rotate_radians(-frame.angle),
+                        contact.normal.rotate_radians(-frame.angle),
                     )
                 })
             })
@@ -395,8 +395,12 @@ impl SurfaceSortieState {
                 .world
                 .motion(physics::primary_body(hit.collider.entity))
                 .expect("material body");
-            let local = (hit.point - hit.normal * 0.08 - body.position).rotate_radians(-body.angle);
-            let Some(center) = field.surface_cell(local, self.world.terrain.surface) else {
+            let local = (hit.point - body.position).rotate_radians(-body.angle);
+            let Some(center) = field.contact_cell(
+                local,
+                hit.normal.rotate_radians(-body.angle),
+                self.world.terrain.surface,
+            ) else {
                 continue;
             };
             self.world

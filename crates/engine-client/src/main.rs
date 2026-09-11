@@ -1406,7 +1406,8 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         "surface-expedition"
         | "spacewars-terrain"
         | "spacewars-surface-blocks"
-        | "spacewars-surface-contour" => 4,
+        | "spacewars-surface-contour"
+        | "spacewars-surface-round" => 4,
         _ => 3,
     }
 }
@@ -1446,6 +1447,7 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         | "spacewars-terrain"
         | "spacewars-surface-blocks"
         | "spacewars-surface-contour"
+        | "spacewars-surface-round"
             if focus == 2 =>
         {
             let next = cycle_label(
@@ -2085,6 +2087,7 @@ fn launcher_selections_from_window(
             | "spacewars-terrain"
             | "spacewars-surface-blocks"
             | "spacewars-surface-contour"
+            | "spacewars-surface-round"
     ) {
         engine_common::SurfaceExpeditionSettings {
             players: match window.get_launcher_expedition_players().as_str() {

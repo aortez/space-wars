@@ -4,12 +4,15 @@
 //! Cell centres and edge connectivity survive; no contour operation edits matter.
 
 use super::*;
+pub(crate) mod interpolated;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum TerrainSurface {
     #[default]
     Blocks,
     Contour,
+    /// Interpolate stored shape distances; use midpoint samples for legacy fields.
+    Interpolated,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +22,8 @@ pub struct SolidPolygon {
     pub material: MaterialId,
     /// Stable material owner, including for a triangle extending into a void cell.
     pub source: CellCoord,
-    /// A clipped cell carries one full cell's mass. Concave fill carries none.
+    /// One polygon per boundary cell carries its full material mass. Other
+    /// patches (including concave fill and interpolated partitions) carry none.
     pub owns_cell: bool,
 }
 
@@ -127,6 +131,9 @@ pub(super) fn contour_chunk(t: &Terrain, id: ChunkId) -> (Vec<SolidRect>, Vec<So
 }
 
 pub(super) fn source_cell(t: &Terrain, surface: TerrainSurface, p: Vec2) -> Option<CellCoord> {
+    if surface == TerrainSurface::Interpolated {
+        return interpolated::source_cell(t, p);
+    }
     let cell = t.local_to_cell(p)?;
     if surface == TerrainSurface::Blocks {
         return solid(t, cell).then_some(cell);
@@ -159,6 +166,7 @@ fn contains(vertices: &[Vec2], p: Vec2) -> bool {
 /// contour. Only exposed edges qualify, not internal decomposition seams.
 pub(super) fn project_source(
     t: &Terrain,
+    surface: TerrainSurface,
     owner: CellCoord,
     point: Vec2,
     normal: Vec2,
@@ -166,8 +174,16 @@ pub(super) fn project_source(
     if !solid(t, owner) {
         return None;
     }
-    let mut polygons = vec![cell_polygon(t, owner)];
-    polygons.extend(fills(t, owner).into_iter().map(|p| p.vertices));
+    let polygons = if surface == TerrainSurface::Interpolated {
+        interpolated::owned_polygons(t, owner)
+            .into_iter()
+            .map(|p| p.vertices)
+            .collect()
+    } else {
+        let mut polygons = vec![cell_polygon(t, owner)];
+        polygons.extend(fills(t, owner).into_iter().map(|p| p.vertices));
+        polygons
+    };
     let mut best: Option<(f32, Vec2, Vec2)> = None;
     for vertices in polygons {
         for (i, &a) in vertices.iter().enumerate() {
@@ -181,19 +197,18 @@ pub(super) fn project_source(
                 let start = a + edge * (half as f32 * 0.5);
                 let delta = edge * 0.5;
                 let middle = start + delta * 0.5;
-                if source_cell(
-                    t,
-                    TerrainSurface::Contour,
-                    middle + outward * (t.cell_size() * 0.001),
-                )
-                .is_some()
-                {
+                if source_cell(t, surface, middle + outward * (t.cell_size() * 0.001)).is_some() {
                     continue;
                 }
                 let candidate = start
                     + delta * ((point - start).dot(delta) / delta.length_squared()).clamp(0.0, 1.0);
                 let distance = candidate.distance_to(point);
-                if distance <= t.cell_size() * 0.75 && best.is_none_or(|v| distance < v.0) {
+                let reach = if surface == TerrainSurface::Interpolated {
+                    1.5
+                } else {
+                    0.75
+                };
+                if distance <= t.cell_size() * reach && best.is_none_or(|v| distance < v.0) {
                     best = Some((distance, candidate, outward));
                 }
             }

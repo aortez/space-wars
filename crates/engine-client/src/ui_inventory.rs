@@ -591,7 +591,8 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
         "surface-expedition"
         | "spacewars-terrain"
         | "spacewars-surface-blocks"
-        | "spacewars-surface-contour" => {
+        | "spacewars-surface-contour"
+        | "spacewars-surface-round" => {
             push_choice(
                 &mut controls,
                 "launcher.settings.renderer",
@@ -1159,6 +1160,11 @@ mod tests {
                 8,
                 "launcher.settings.expedition.players",
             ),
+            (
+                "spacewars-surface-round",
+                8,
+                "launcher.settings.expedition.players",
+            ),
             ("falling", 2, "launcher.settings.back"),
             ("nes", 4, "launcher.settings.nes.cartridge"),
             (
@@ -1174,7 +1180,8 @@ mod tests {
                 "surface-expedition"
                 | "spacewars-terrain"
                 | "spacewars-surface-blocks"
-                | "spacewars-surface-contour" => 2,
+                | "spacewars-surface-contour"
+                | "spacewars-surface-round" => 2,
                 "spacewars" => 3,
                 "spacewars-classic" => 6,
                 "pizza" => 3,

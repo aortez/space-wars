@@ -1123,10 +1123,10 @@ fn draw_player_hud(
         |surface| {
             format!(
                 "{} / {pilot_status}",
-                if surface == engine_terrain::TerrainSurface::Contour {
-                    "SLOPES"
-                } else {
-                    "STEPS"
+                match surface {
+                    engine_terrain::TerrainSurface::Blocks => "STEPS",
+                    engine_terrain::TerrainSurface::Contour => "SLOPES",
+                    engine_terrain::TerrainSurface::Interpolated => "ROUND",
                 }
             )
         },

@@ -314,7 +314,7 @@ impl SurfaceSortieState {
                 })
             });
             if !lost
-                && terrain.geometry.surface() == engine_terrain::TerrainSurface::Contour
+                && terrain.geometry.surface() != engine_terrain::TerrainSurface::Blocks
                 && let Some(flag) = &mut claim.flag
                 && flag.anchor.surface_revision != terrain.field.revision()
             {
@@ -383,7 +383,7 @@ impl SurfaceSortieState {
         let footing = self.world.terrain.planets.get(&planet).and_then(|terrain| {
             terrain
                 .geometry
-                .source_cell(&terrain.field, position - normal * 0.08)
+                .contact_cell(&terrain.field, position, normal)
                 .filter(|cell| {
                     terrain
                         .field

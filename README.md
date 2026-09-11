@@ -87,6 +87,8 @@ The local launcher includes the following scenarios and presets:
 - **Surface comparison** — `spacewars-surface-blocks` and
   `spacewars-surface-contour` compare steps and slopes on the same destructible
   planet, with collision outlines and the real landing, mining and recovery loop.
+  `spacewars-surface-round` retains finer boundary positions to follow the circle
+  and mining cuts more closely; see [Interpolated surfaces](docs/rounder-planets-interpolated.md).
   See [Rounder planets](docs/rounder-planets.md) for controls and measured results.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational

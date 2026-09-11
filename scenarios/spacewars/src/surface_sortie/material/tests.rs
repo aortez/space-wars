@@ -86,9 +86,10 @@ fn flag_cell(state: &SurfaceSortieState) -> CellCoord {
     let terrain = &state.world.terrain.planets[&0];
     terrain
         .geometry
-        .source_cell(
+        .contact_cell(
             &terrain.field,
-            (flag.position - flag.normal * 0.08 - frame.position).rotate_radians(-frame.angle),
+            (flag.position - frame.position).rotate_radians(-frame.angle),
+            flag.normal.rotate_radians(-frame.angle),
         )
         .unwrap()
 }
@@ -151,7 +152,11 @@ fn material_ships_land_without_berths_and_only_the_spaceling_claims() {
 
 #[test]
 fn flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker_on(
             surface,
         );
@@ -591,7 +596,11 @@ fn aimed_mining_removes_material_and_clone_continuation_preserves_physics() {
 
 #[test]
 fn detached_flag_footing_does_not_carry_planet_ownership_with_the_fragment() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         detached_flag_footing_does_not_carry_planet_ownership_with_the_fragment_on(surface);
     }
 }
@@ -758,7 +767,11 @@ fn two_material_claimants_contest_without_seat_order_ownership() {
 
 #[test]
 fn material_recovery_rebuilds_once_and_flag_loss_interrupts_construction() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         material_recovery_rebuilds_once_and_flag_loss_interrupts_construction_on(surface);
     }
 }
@@ -809,7 +822,11 @@ fn material_recovery_rebuilds_once_and_flag_loss_interrupts_construction_on(
 
 #[test]
 fn material_escape_pod_can_land_and_disembark() {
-    for surface in [TerrainSurface::Blocks, TerrainSurface::Contour] {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
         material_escape_pod_can_land_and_disembark_on(surface);
     }
 }

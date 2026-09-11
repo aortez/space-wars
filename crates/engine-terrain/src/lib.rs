@@ -6,6 +6,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 mod surface;
 pub use surface::{SolidPolygon, TerrainSurface};
+mod boundary;
+mod storage;
 
 mod connectivity;
 pub use connectivity::DetachedTerrain;
@@ -182,6 +184,9 @@ pub struct Terrain {
     cells: Vec<Cell>,
     revision: u64,
     chunk_revisions: Vec<u64>,
+    /// Optional signed shape samples, positive in surviving material. Version 2.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    distances: Option<Vec<f32>>,
 }
 
 #[derive(Deserialize)]
@@ -194,11 +199,13 @@ struct TerrainState {
     cells: Vec<Cell>,
     revision: u64,
     chunk_revisions: Vec<u64>,
+    #[serde(default)]
+    distances: Option<Vec<f32>>,
 }
 
 impl<'de> Deserialize<'de> for Terrain {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let state = TerrainState::deserialize(deserializer)?;
+        let state = storage::deserialize(deserializer)?;
         let terrain = Self {
             version: state.version,
             width: state.width,
@@ -208,6 +215,7 @@ impl<'de> Deserialize<'de> for Terrain {
             cells: state.cells,
             revision: state.revision,
             chunk_revisions: state.chunk_revisions,
+            distances: state.distances,
         };
         terrain.validate().map_err(serde::de::Error::custom)?;
         Ok(terrain)
@@ -256,13 +264,19 @@ impl Terrain {
                 (width.div_ceil(CHUNK_SIZE) * height.div_ceil(CHUNK_SIZE))
                     as usize
             ],
+            distances: None,
         })
     }
 
     fn validate(&self) -> Result<(), TerrainError> {
         validate_dimensions(self.width, self.height, self.cell_size)?;
         validate_materials(&self.materials)?;
-        if self.version != FORMAT_VERSION
+        if self.version
+            != if self.distances.is_some() {
+                2
+            } else {
+                FORMAT_VERSION
+            }
             || self.cells.len() != (self.width * self.height) as usize
             || self.chunk_revisions.len()
                 != (self.width.div_ceil(CHUNK_SIZE) * self.height.div_ceil(CHUNK_SIZE)) as usize
@@ -273,6 +287,7 @@ impl Terrain {
         {
             return Err(TerrainError("invalid terrain state layout or revision"));
         }
+        self.validate_distances()?;
         for cell in &self.cells {
             if cell.material == MaterialId::VOID {
                 if *cell != Cell::VOID {
@@ -298,6 +313,28 @@ impl Terrain {
     /// Material owner of a point in a derived collision surface.
     pub fn surface_cell(&self, point: Vec2, surface: TerrainSurface) -> Option<CellCoord> {
         surface::source_cell(self, surface, point)
+    }
+
+    /// Resolve a contact without stepping entirely through a thin interpolated
+    /// patch. Later insets tolerate solver separation; legacy sampling is retained.
+    pub fn contact_cell(
+        &self,
+        point: Vec2,
+        normal: Vec2,
+        surface: TerrainSurface,
+    ) -> Option<CellCoord> {
+        if surface != TerrainSurface::Interpolated {
+            return self.surface_cell(point - normal * 0.08, surface);
+        }
+        [
+            0.0,
+            self.cell_size * 0.0001,
+            self.cell_size * 0.001,
+            self.cell_size * 0.01,
+            0.08,
+        ]
+        .into_iter()
+        .find_map(|inset| self.surface_cell(point - normal * inset, surface))
     }
 
     pub fn cell_size(&self) -> f32 {
@@ -402,6 +439,7 @@ impl Terrain {
         }
         let mut dirty = vec![false; self.chunk_count()];
         let mut removed = [0u32; 256];
+        let mut removed_coords = Vec::new();
         for coord in coordinates {
             let (x, y) = (coord.x, coord.y);
             let index = y as usize * self.width as usize + x as usize;
@@ -415,6 +453,9 @@ impl Terrain {
             };
             self.cells[index] = if durability == 0 {
                 removed[cell.material.0 as usize] += 1;
+                if self.distances.is_some() {
+                    removed_coords.push(coord);
+                }
                 Cell::VOID
             } else {
                 Cell { durability, ..cell }
@@ -433,6 +474,7 @@ impl Terrain {
             dirty[chunk as usize] = true;
         }
         if result.changed_cells > 0 {
+            self.cut_boundary(edit.brush, &removed_coords, &mut dirty);
             self.revision += 1;
             result.revision = self.revision;
             for (index, changed) in dirty.into_iter().enumerate() {
@@ -476,6 +518,11 @@ impl Terrain {
         }
         for cell in &self.cells {
             write(&[cell.material.0, cell.durability]);
+        }
+        if let Some(distances) = &self.distances {
+            for value in distances {
+                write(&value.to_bits().to_le_bytes());
+            }
         }
         hash
     }
@@ -607,7 +654,7 @@ impl ChunkGeometry {
     }
 }
 
-/// Derived geometry; the material field and its serialization remain unchanged.
+/// Derived collision/drawing geometry from material and optional shape samples.
 /// Recreate this cache when replacing/restoring a field: revisions identify edits
 /// within one terrain instance, not global field identity.
 #[derive(Debug, Clone)]
@@ -634,11 +681,12 @@ impl TerrainGeometry {
         let (rectangles, polygons) = match surface {
             TerrainSurface::Blocks => (chunk_rectangles(t, id), Vec::new()),
             TerrainSurface::Contour => surface::contour_chunk(t, id),
+            TerrainSurface::Interpolated => surface::interpolated::chunk(t, id),
         };
         let columns = t.width.div_ceil(CHUNK_SIZE);
         let rows = t.height.div_ceil(CHUNK_SIZE);
         let (cx, cy) = ((id.0 % columns) as i32, (id.0 / columns) as i32);
-        let halo = i32::from(surface == TerrainSurface::Contour);
+        let halo = i32::from(surface != TerrainSurface::Blocks);
         let mut dependencies = Vec::new();
         for y in (cy - halo).max(0)..=(cy + halo).min(rows as i32 - 1) {
             for x in (cx - halo).max(0)..=(cx + halo).min(columns as i32 - 1) {
@@ -665,6 +713,10 @@ impl TerrainGeometry {
         surface::source_cell(terrain, self.surface, point)
     }
 
+    pub fn contact_cell(&self, terrain: &Terrain, point: Vec2, normal: Vec2) -> Option<CellCoord> {
+        terrain.contact_cell(point, normal, self.surface)
+    }
+
     pub fn project_source_surface(
         &self,
         terrain: &Terrain,
@@ -672,8 +724,8 @@ impl TerrainGeometry {
         point: Vec2,
         normal: Vec2,
     ) -> Option<(Vec2, Vec2)> {
-        (self.surface == TerrainSurface::Contour)
-            .then(|| surface::project_source(terrain, source, point, normal))
+        (self.surface != TerrainSurface::Blocks)
+            .then(|| surface::project_source(terrain, self.surface, source, point, normal))
             .flatten()
     }
 

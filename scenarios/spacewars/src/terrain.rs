@@ -130,6 +130,12 @@ impl SpacewarsState {
             .get(index)
             .ok_or(TerrainError("unknown planet"))?;
         let field = generate_field(planet.radius, self.seed ^ index as u64)?;
+        let field = if self.terrain.surface == TerrainSurface::Interpolated {
+            field
+                .with_surface_distances(|p| planet.radius * BODY_BOUNDS_RADIUS_SCALE - p.length())?
+        } else {
+            field
+        };
         let geometry = TerrainGeometry::with_surface(&field, self.terrain.surface);
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
         let footing =
@@ -516,10 +522,14 @@ fn impact_edit(
     work: u8,
 ) -> Option<TerrainEdit> {
     let inside = contact.position - contact.normal * 0.001;
-    if surface == TerrainSurface::Contour {
+    if surface != TerrainSurface::Blocks {
         return Some(TerrainEdit {
             brush: Brush::Circle {
-                center: field.surface_cell(inside, surface)?,
+                center: if surface == TerrainSurface::Interpolated {
+                    field.contact_cell(contact.position, contact.normal, surface)?
+                } else {
+                    field.surface_cell(inside, surface)?
+                },
                 radius,
             },
             mode: EditMode::Damage(work),
@@ -873,6 +883,8 @@ pub(super) fn observation(state: &SpacewarsState) -> Observation {
     }
     if terrain.surface == TerrainSurface::Contour {
         payload.extend(b"contour-v1");
+    } else if terrain.surface == TerrainSurface::Interpolated {
+        payload.extend(b"interpolated-v1");
     }
     Observation { payload }
 }
