@@ -19,6 +19,55 @@ mod tests {
     const DT: Duration = Duration::from_nanos(16_666_667);
 
     #[test]
+    fn explicitly_sideways_grounded_pod_lifts_through_shared_physics() {
+        for surface in [
+            engine_terrain::TerrainSurface::Blocks,
+            engine_terrain::TerrainSurface::Interpolated,
+        ] {
+            let mut state = SurfaceSortieScenario::init_material_surface(42, 1, surface);
+            // Define the challenging initial pose directly. A seed's accidental
+            // asteroid bounce is not a stable way to require a sideways landing.
+            let planet = state.world.planets[0];
+            let ship = &mut state.world.ships[0];
+            ship.change_to_escape_pod();
+            ship.position = planet.position + Vec2::Y * (SURFACE_RADIUS + 1.0) - POD_PIVOT;
+            ship.rotation_radians = std::f32::consts::FRAC_PI_2;
+            ship.direction = -Vec2::X;
+            ship.velocity = Vec2::ZERO;
+            ship.omega = 0.0;
+            for _ in 0..300 {
+                SurfaceSortieScenario::step(&mut state, &[], DT);
+                if state
+                    .recovery_task_observation(0, None)
+                    .pod_righting
+                    .unwrap()
+                    .eligible
+                {
+                    break;
+                }
+            }
+            let before = state.recovery_task_observation(0, None);
+            assert!(before.pod_righting.unwrap().eligible, "{before:?}");
+            let start = before.flight.pilot.ship.position;
+            let up = (start - planet.position).normalized();
+            let chord = SurfaceSortieAction {
+                primary_held: true,
+                brake_held: true,
+                ..Default::default()
+            }
+            .encode(PlayerId::PLAYER_1);
+            for _ in 0..60 {
+                SurfaceSortieScenario::step(&mut state, std::slice::from_ref(&chord), DT);
+            }
+            let after = state.recovery_task_observation(0, None);
+            assert_eq!(after.pod_righting.unwrap().lifts, 1);
+            assert!((after.flight.pilot.ship.position - start).dot(up) > 1.0);
+            assert!(!state.world.physics.surface_vehicle_ground_contact(0, 0, up));
+            assert!(state.terrain_diagnostics().issues.is_empty());
+        }
+    }
+
+    #[test]
     fn lift_requires_a_live_grounded_pod_and_pausing_preserves_motor_state() {
         let mut state = SurfaceSortieScenario::init_material_flight(
             42,

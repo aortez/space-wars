@@ -4,6 +4,11 @@
 use engine_core::Vec2;
 use serde::{Deserialize, Deserializer, Serialize};
 
+mod surface;
+pub use surface::{SolidPolygon, TerrainSurface};
+mod boundary;
+mod storage;
+
 mod connectivity;
 pub use connectivity::DetachedTerrain;
 
@@ -179,6 +184,9 @@ pub struct Terrain {
     cells: Vec<Cell>,
     revision: u64,
     chunk_revisions: Vec<u64>,
+    /// Optional signed shape samples, positive in surviving material. Version 2.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    distances: Option<Vec<f32>>,
 }
 
 #[derive(Deserialize)]
@@ -191,11 +199,13 @@ struct TerrainState {
     cells: Vec<Cell>,
     revision: u64,
     chunk_revisions: Vec<u64>,
+    #[serde(default)]
+    distances: Option<Vec<f32>>,
 }
 
 impl<'de> Deserialize<'de> for Terrain {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let state = TerrainState::deserialize(deserializer)?;
+        let state = storage::deserialize(deserializer)?;
         let terrain = Self {
             version: state.version,
             width: state.width,
@@ -205,6 +215,7 @@ impl<'de> Deserialize<'de> for Terrain {
             cells: state.cells,
             revision: state.revision,
             chunk_revisions: state.chunk_revisions,
+            distances: state.distances,
         };
         terrain.validate().map_err(serde::de::Error::custom)?;
         Ok(terrain)
@@ -253,13 +264,19 @@ impl Terrain {
                 (width.div_ceil(CHUNK_SIZE) * height.div_ceil(CHUNK_SIZE))
                     as usize
             ],
+            distances: None,
         })
     }
 
     fn validate(&self) -> Result<(), TerrainError> {
         validate_dimensions(self.width, self.height, self.cell_size)?;
         validate_materials(&self.materials)?;
-        if self.version != FORMAT_VERSION
+        if self.version
+            != if self.distances.is_some() {
+                2
+            } else {
+                FORMAT_VERSION
+            }
             || self.cells.len() != (self.width * self.height) as usize
             || self.chunk_revisions.len()
                 != (self.width.div_ceil(CHUNK_SIZE) * self.height.div_ceil(CHUNK_SIZE)) as usize
@@ -270,6 +287,7 @@ impl Terrain {
         {
             return Err(TerrainError("invalid terrain state layout or revision"));
         }
+        self.validate_distances()?;
         for cell in &self.cells {
             if cell.material == MaterialId::VOID {
                 if *cell != Cell::VOID {
@@ -292,6 +310,33 @@ impl Terrain {
     pub fn height(&self) -> u32 {
         self.height
     }
+    /// Material owner of a point in a derived collision surface.
+    pub fn surface_cell(&self, point: Vec2, surface: TerrainSurface) -> Option<CellCoord> {
+        surface::source_cell(self, surface, point)
+    }
+
+    /// Resolve a contact without stepping entirely through a thin interpolated
+    /// patch. Later insets tolerate solver separation; legacy sampling is retained.
+    pub fn contact_cell(
+        &self,
+        point: Vec2,
+        normal: Vec2,
+        surface: TerrainSurface,
+    ) -> Option<CellCoord> {
+        if surface != TerrainSurface::Interpolated {
+            return self.surface_cell(point - normal * 0.08, surface);
+        }
+        [
+            0.0,
+            self.cell_size * 0.0001,
+            self.cell_size * 0.001,
+            self.cell_size * 0.01,
+            0.08,
+        ]
+        .into_iter()
+        .find_map(|inset| self.surface_cell(point - normal * inset, surface))
+    }
+
     pub fn cell_size(&self) -> f32 {
         self.cell_size
     }
@@ -394,6 +439,7 @@ impl Terrain {
         }
         let mut dirty = vec![false; self.chunk_count()];
         let mut removed = [0u32; 256];
+        let mut removed_coords = Vec::new();
         for coord in coordinates {
             let (x, y) = (coord.x, coord.y);
             let index = y as usize * self.width as usize + x as usize;
@@ -407,6 +453,9 @@ impl Terrain {
             };
             self.cells[index] = if durability == 0 {
                 removed[cell.material.0 as usize] += 1;
+                if self.distances.is_some() {
+                    removed_coords.push(coord);
+                }
                 Cell::VOID
             } else {
                 Cell { durability, ..cell }
@@ -425,6 +474,7 @@ impl Terrain {
             dirty[chunk as usize] = true;
         }
         if result.changed_cells > 0 {
+            self.cut_boundary(edit.brush, &removed_coords, &mut dirty);
             self.revision += 1;
             result.revision = self.revision;
             for (index, changed) in dirty.into_iter().enumerate() {
@@ -468,6 +518,11 @@ impl Terrain {
         }
         for cell in &self.cells {
             write(&[cell.material.0, cell.durability]);
+        }
+        if let Some(distances) = &self.distances {
+            for value in distances {
+                write(&value.to_bits().to_le_bytes());
+            }
         }
         hash
     }
@@ -523,6 +578,14 @@ impl SolidRect {
 /// Bounded greedy rectangle cover. Every solid cell appears exactly once; holes
 /// and chunk edges are represented exactly. Durability does not split geometry.
 pub fn chunk_rectangles(terrain: &Terrain, id: ChunkId) -> Vec<SolidRect> {
+    rectangles_matching(terrain, id, |_| true)
+}
+
+fn rectangles_matching(
+    terrain: &Terrain,
+    id: ChunkId,
+    include: impl Fn(CellCoord) -> bool,
+) -> Vec<SolidRect> {
     let Some(bounds) = terrain.chunk_bounds(id) else {
         return Vec::new();
     };
@@ -534,11 +597,12 @@ pub fn chunk_rectangles(terrain: &Terrain, id: ChunkId) -> Vec<SolidRect> {
     for y in bounds.min.y..=bounds.max.y {
         for x in bounds.min.x..=bounds.max.x {
             let material = terrain.cell(CellCoord::new(x, y)).unwrap().material;
-            if used[index(x, y)] || material == MaterialId::VOID {
+            if used[index(x, y)] || material == MaterialId::VOID || !include(CellCoord::new(x, y)) {
                 continue;
             }
             let available = |cx, cy, used: &[bool]| {
                 !used[index(cx, cy)]
+                    && include(CellCoord::new(cx, cy))
                     && terrain.cell(CellCoord::new(cx, cy)).unwrap().material == material
             };
             let mut end_x = x;
@@ -569,37 +633,119 @@ pub fn chunk_rectangles(terrain: &Terrain, id: ChunkId) -> Vec<SolidRect> {
 pub struct ChunkGeometry {
     pub id: ChunkId,
     pub revision: u64,
+    /// Includes changes in neighbouring material used to reconstruct this chunk.
+    pub generation: u64,
     pub rectangles: Vec<SolidRect>,
+    pub polygons: Vec<SolidPolygon>,
+    dependencies: Vec<(ChunkId, u64)>,
 }
 
-/// One cache per terrain instance. Recreate this cache when replacing/restoring
-/// a field; revisions describe edits within that instance, not global identity.
+impl ChunkGeometry {
+    pub fn shape_count(&self) -> usize {
+        self.rectangles.len() + self.polygons.len()
+    }
+
+    pub fn material_cells(&self) -> u64 {
+        self.rectangles
+            .iter()
+            .map(|r| u64::from(r.width) * u64::from(r.height))
+            .sum::<u64>()
+            + self.polygons.iter().filter(|p| p.owns_cell).count() as u64
+    }
+}
+
+/// Derived collision/drawing geometry from material and optional shape samples.
+/// Recreate this cache when replacing/restoring a field: revisions identify edits
+/// within one terrain instance, not global field identity.
 #[derive(Debug, Clone)]
 pub struct TerrainGeometry {
     chunks: Vec<ChunkGeometry>,
+    surface: TerrainSurface,
 }
 
 impl TerrainGeometry {
     pub fn new(terrain: &Terrain) -> Self {
+        Self::with_surface(terrain, TerrainSurface::Blocks)
+    }
+
+    pub fn with_surface(terrain: &Terrain, surface: TerrainSurface) -> Self {
         Self {
             chunks: (0..terrain.chunk_count())
-                .map(|index| {
-                    let id = ChunkId(index as u32);
-                    ChunkGeometry {
-                        id,
-                        revision: terrain.chunk_revision(id).unwrap(),
-                        rectangles: chunk_rectangles(terrain, id),
-                    }
-                })
+                .map(|i| Self::build_chunk(terrain, ChunkId(i as u32), surface))
                 .collect(),
+            surface,
         }
+    }
+
+    fn build_chunk(t: &Terrain, id: ChunkId, surface: TerrainSurface) -> ChunkGeometry {
+        let (rectangles, polygons) = match surface {
+            TerrainSurface::Blocks => (chunk_rectangles(t, id), Vec::new()),
+            TerrainSurface::Contour => surface::contour_chunk(t, id),
+            TerrainSurface::Interpolated => surface::interpolated::chunk(t, id),
+        };
+        let columns = t.width.div_ceil(CHUNK_SIZE);
+        let rows = t.height.div_ceil(CHUNK_SIZE);
+        let (cx, cy) = ((id.0 % columns) as i32, (id.0 / columns) as i32);
+        let halo = i32::from(surface != TerrainSurface::Blocks);
+        let mut dependencies = Vec::new();
+        for y in (cy - halo).max(0)..=(cy + halo).min(rows as i32 - 1) {
+            for x in (cx - halo).max(0)..=(cx + halo).min(columns as i32 - 1) {
+                let neighbor = ChunkId(y as u32 * columns + x as u32);
+                dependencies.push((neighbor, t.chunk_revision(neighbor).unwrap()));
+            }
+        }
+        ChunkGeometry {
+            id,
+            revision: t.chunk_revision(id).unwrap(),
+            generation: t.revision(),
+            rectangles,
+            polygons,
+            dependencies,
+        }
+    }
+
+    pub fn surface(&self) -> TerrainSurface {
+        self.surface
+    }
+
+    /// Resolve sloped ground back to actual material, including concave fill.
+    pub fn source_cell(&self, terrain: &Terrain, point: Vec2) -> Option<CellCoord> {
+        surface::source_cell(terrain, self.surface, point)
+    }
+
+    pub fn contact_cell(&self, terrain: &Terrain, point: Vec2, normal: Vec2) -> Option<CellCoord> {
+        terrain.contact_cell(point, normal, self.surface)
+    }
+
+    pub fn project_source_surface(
+        &self,
+        terrain: &Terrain,
+        source: CellCoord,
+        point: Vec2,
+        normal: Vec2,
+    ) -> Option<(Vec2, Vec2)> {
+        (self.surface != TerrainSurface::Blocks)
+            .then(|| surface::project_source(terrain, self.surface, source, point, normal))
+            .flatten()
+    }
+
+    pub fn is_current(&self, terrain: &Terrain) -> bool {
+        self.chunks.len() == terrain.chunk_count()
+            && self.chunks.iter().all(|c| {
+                c.dependencies
+                    .iter()
+                    .all(|&(id, revision)| terrain.chunk_revision(id) == Some(revision))
+            })
     }
 
     pub fn chunks(&self) -> &[ChunkGeometry] {
         &self.chunks
     }
     pub fn rectangle_count(&self) -> usize {
-        self.chunks.iter().map(|chunk| chunk.rectangles.len()).sum()
+        self.chunks.iter().map(|c| c.rectangles.len()).sum()
+    }
+    pub fn shape_count(&self) -> usize {
+        self.chunks.iter().map(ChunkGeometry::shape_count).sum()
     }
 
     pub fn refresh(&mut self, terrain: &Terrain) -> Vec<ChunkId> {
@@ -610,11 +756,14 @@ impl TerrainGeometry {
         );
         let mut changed = Vec::new();
         for chunk in &mut self.chunks {
-            let revision = terrain.chunk_revision(chunk.id).unwrap();
-            if chunk.revision != revision {
-                chunk.rectangles = chunk_rectangles(terrain, chunk.id);
-                chunk.revision = revision;
-                changed.push(chunk.id);
+            if chunk
+                .dependencies
+                .iter()
+                .any(|&(id, revision)| terrain.chunk_revision(id) != Some(revision))
+            {
+                let id = chunk.id;
+                *chunk = Self::build_chunk(terrain, id, self.surface);
+                changed.push(id);
             }
         }
         changed

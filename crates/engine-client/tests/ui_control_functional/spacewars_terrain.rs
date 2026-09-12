@@ -1,5 +1,17 @@
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn surface_comparison_launch_pause_restart_and_both_renderers() {
+    for scenario in [
+        "spacewars-surface-blocks",
+        "spacewars-surface-contour",
+        "spacewars-surface-round",
+    ] {
+        super::terrain_lab::run_terrain_lifecycle(scenario);
+    }
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn spacewars_terrain_launch_pause_restart_and_both_renderers() {
     super::terrain_lab::run_terrain_lifecycle("spacewars-terrain");
 }

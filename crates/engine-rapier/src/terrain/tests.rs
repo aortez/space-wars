@@ -2,6 +2,16 @@ use super::*;
 
 #[test]
 fn dynamic_terrain_recomputes_mass_and_preserves_surviving_point_velocities() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        edited_mass_and_velocity(surface);
+    }
+}
+
+fn edited_mass_and_velocity(surface: TerrainSurface) {
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     let mut terrain = Terrain::generate(
         9,
@@ -20,7 +30,7 @@ fn dynamic_terrain_recomputes_mass_and_preserves_surviving_point_velocities() {
         },
     )
     .unwrap();
-    let mut geometry = TerrainGeometry::new(&terrain);
+    let mut geometry = TerrainGeometry::with_surface(&terrain, surface);
     let velocity = Vec2::new(3.0, -2.0);
     let mut assembly = TerrainAssembly::insert(
         &mut world,
@@ -34,7 +44,10 @@ fn dynamic_terrain_recomputes_mass_and_preserves_surviving_point_velocities() {
         },
         &terrain,
         &geometry,
-        TerrainSpec::default(),
+        TerrainSpec {
+            surface,
+            ..TerrainSpec::default()
+        },
     )
     .unwrap();
     let body = assembly.body();
@@ -82,6 +95,12 @@ use engine_core::Vec2;
 use engine_terrain::{Brush, CellCoord, EditMode, Material, MaterialId, TerrainEdit};
 
 fn fixture() -> (PhysicsWorld, Terrain, TerrainGeometry, TerrainAssembly) {
+    fixture_surface(TerrainSurface::Blocks)
+}
+
+fn fixture_surface(
+    surface: TerrainSurface,
+) -> (PhysicsWorld, Terrain, TerrainGeometry, TerrainAssembly) {
     let terrain = Terrain::generate(
         96,
         64,
@@ -93,7 +112,7 @@ fn fixture() -> (PhysicsWorld, Terrain, TerrainGeometry, TerrainAssembly) {
         |_| MaterialId(1),
     )
     .unwrap();
-    let geometry = TerrainGeometry::new(&terrain);
+    let geometry = TerrainGeometry::with_surface(&terrain, surface);
     let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
     let assembly = TerrainAssembly::insert(
         &mut world,
@@ -104,7 +123,10 @@ fn fixture() -> (PhysicsWorld, Terrain, TerrainGeometry, TerrainAssembly) {
         },
         &terrain,
         &geometry,
-        TerrainSpec::default(),
+        TerrainSpec {
+            surface,
+            ..TerrainSpec::default()
+        },
     )
     .unwrap();
     world.step(1.0 / 60.0);
@@ -287,7 +309,17 @@ fn invalid_replacement_is_atomic_and_ccd_stops_at_thin_terrain() {
 
 #[test]
 fn dynamic_body_crosses_a_completed_tunnel_without_hidden_contacts() {
-    let (mut world, mut terrain, mut geometry, mut assembly) = fixture();
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        cross_completed_tunnel(surface);
+    }
+}
+
+fn cross_completed_tunnel(surface: TerrainSurface) {
+    let (mut world, mut terrain, mut geometry, mut assembly) = fixture_surface(surface);
     terrain
         .apply(TerrainEdit {
             brush: Brush::Capsule {
@@ -327,3 +359,6 @@ fn dynamic_body_crosses_a_completed_tunnel_without_hidden_contacts() {
     );
     assert!((motion.position.y - 0.25).abs() < 0.01);
 }
+
+mod compound;
+mod contour;

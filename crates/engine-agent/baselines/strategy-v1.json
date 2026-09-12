@@ -7,8 +7,8 @@
       "preset": "standard_no_asteroids",
       "controllers": ["rule_ship_v5", "idle_v1"],
       "max_ticks": 18000,
-      "ticks": 7371,
-      "trace_sha256": "35755e713fe5bf92156fd6e54ce7d17753c8af01a87e200ae57b026f31717ce7"
+      "ticks": 18000,
+      "trace_sha256": "97e9bf2c5c2c28ff89b4180d32be5e86b304121410c9819539a9ca72fb8963bb"
     },
     {
       "seed": 0,
@@ -16,7 +16,7 @@
       "controllers": ["idle_v1", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "0d1bf072822766e989b218b6c386fa0dc19f8061dc68f393de809e42fa7df98f"
+      "trace_sha256": "abb2a866b0ef9d5af194cb561f0b3e3608155d7aa2f42253ede0db6b1eb72670"
     },
     {
       "seed": 0,
@@ -24,7 +24,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "dc3ab87ce58d8a658465eb5378ff3870c86bebb0b9ef4ce4eca1d27b70f91f6d"
+      "trace_sha256": "7b5faf1f11996bdde2a4c657b355f9f371b6d45d34360c326e486a06404c141e"
     },
     {
       "seed": 1,
@@ -32,7 +32,7 @@
       "controllers": ["rule_ship_v5", "idle_v1"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "510425ac8c689ec74caae2273c2ed81053b92b3e98c284ef6f6ea235971d574c"
+      "trace_sha256": "c9d701346d6b7f0990443956473b311c908b16c2d72e4a50bd7886f7a154aa3c"
     },
     {
       "seed": 1,
@@ -40,7 +40,7 @@
       "controllers": ["idle_v1", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "5b4b8b74cac116f11ed9801fe7b4bb2af1edda3b83254c5c0797312d9a195b18"
+      "trace_sha256": "063d1372bc9059296e53af129fb8829cda901fafe89be42411e20530ba8dacfa"
     },
     {
       "seed": 1,
@@ -48,7 +48,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "4958e3c3b9d0c4075fcd5418da71f7e9a4613a4be084f643b657f880bd755aa3"
+      "trace_sha256": "c5ce896f872cd5730e4fa7182ef7351032a164b3f3aa5320df1d7a2fa1affa03"
     },
     {
       "seed": 2,
@@ -56,15 +56,15 @@
       "controllers": ["rule_ship_v5", "idle_v1"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "c64abe7ac4a7e2488d1982dae84c3f5d5dd2bd94b8a8723eb6207ce4eea6fe99"
+      "trace_sha256": "cc178e422bc7bb7dc25ca5be307c4ead5dd1288428e56785726974ff5b393881"
     },
     {
       "seed": 2,
       "preset": "standard_no_asteroids",
       "controllers": ["idle_v1", "rule_ship_v5"],
       "max_ticks": 18000,
-      "ticks": 10698,
-      "trace_sha256": "07a634da6e521b7198bf35a9ceb38a01938b8f569dd8ccb1a15fd6e29ca2fef6"
+      "ticks": 12359,
+      "trace_sha256": "cacc2718f59a2285110111d1155c49254773e352ac7d81287ec0fd4b17424e70"
     },
     {
       "seed": 2,
@@ -72,15 +72,15 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "7c62c6622e16355388944c1ca304cbda6c87d204cdb4d3416b5021e6f5f32edd"
+      "trace_sha256": "30a037e43e8f0c43e38443e42defd0523f8a52e3a89673fa2b80133c6b5be33f"
     },
     {
       "seed": 3,
       "preset": "standard_no_asteroids",
       "controllers": ["rule_ship_v5", "idle_v1"],
       "max_ticks": 18000,
-      "ticks": 16749,
-      "trace_sha256": "69b8e18ba579d8479e2e7e4dcc661d39d114d6607697fb0a19e421da1501317d"
+      "ticks": 18000,
+      "trace_sha256": "f9273292eb7ba01839269038f655c6e3da64e57b1779715d78f8dcd2a5365cbe"
     },
     {
       "seed": 3,
@@ -88,7 +88,7 @@
       "controllers": ["idle_v1", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "8d5bacc9919e6bff0df81518684ee8ba8fd1358731a2260ecc3fb916e9398320"
+      "trace_sha256": "bf6e61b03b892b9c73aceb3e6c7051f0c534616ea3e6b5907f80a3cbe9103a9c"
     },
     {
       "seed": 3,
@@ -96,7 +96,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 18000,
-      "trace_sha256": "a08499b98db13890d916891a23ed03da2e5325ec0f58aad67cc5fba3bbc25088"
+      "trace_sha256": "b95b5235ffca08cb35221217149a4f4783b6aa3e9a0856480954089a7f4b2d1f"
     }
   ]
 }

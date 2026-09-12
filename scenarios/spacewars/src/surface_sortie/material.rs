@@ -86,9 +86,18 @@ impl SurfaceSortieScenario {
     /// Historical terrain stress fixtures and ordinary Spacewars stay available
     /// to their existing runners with their original world parameters.
     pub fn init_material(seed: u64, players: usize) -> SurfaceSortieState {
+        Self::init_material_surface(seed, players, engine_terrain::TerrainSurface::Blocks)
+    }
+
+    pub(super) fn init_material_surface(
+        seed: u64,
+        players: usize,
+        surface: engine_terrain::TerrainSurface,
+    ) -> SurfaceSortieState {
         assert!((1..=SPACEWARS_PLAYER_COUNT).contains(&players));
         let mut state = Self::init(SurfaceMotionPreset::Stationary, seed);
         state.outposts.clear();
+        state.world.terrain.surface = surface;
         state.world.terrain.legacy_services = false;
         state
             .world
@@ -126,6 +135,11 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    /// Read-only material inspection for geometry comparisons and diagnostics.
+    pub fn planet_terrain(&self, planet: usize) -> Option<&engine_terrain::Terrain> {
+        self.world.planet_terrain(planet)
+    }
+
     pub fn has_material_ground(&self) -> bool {
         self.mining.is_some()
     }
@@ -182,9 +196,10 @@ impl SurfaceSortieState {
             };
             contacts.map(|contact| {
                 contact.and_then(|contact| {
-                    terrain.field.local_to_cell(
-                        (contact.position - contact.normal * 0.08 - frame.position)
-                            .rotate_radians(-frame.angle),
+                    terrain.geometry.contact_cell(
+                        &terrain.field,
+                        (contact.position - frame.position).rotate_radians(-frame.angle),
+                        contact.normal.rotate_radians(-frame.angle),
                     )
                 })
             })
@@ -271,6 +286,20 @@ impl SurfaceSortieState {
             spec.collision_groups,
             exclude_actor,
         );
+        self.material_access_with_clearance(planet, form, position, angle, clear)
+    }
+
+    /// Share floor selection between live access and a proposed vehicle pose.
+    /// Forecasts supply their own collision predicate, not a different search.
+    pub(super) fn material_access_with_clearance(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+        clear: impl Fn(Vec2, f32) -> bool,
+    ) -> Option<RayHit> {
+        let spec = Self::spec();
         let mut first = None;
         for hit in self.material_access_candidates_at(planet, form, position, angle) {
             first.get_or_insert(hit);
@@ -385,8 +414,12 @@ impl SurfaceSortieState {
                 .world
                 .motion(physics::primary_body(hit.collider.entity))
                 .expect("material body");
-            let local = (hit.point - hit.normal * 0.08 - body.position).rotate_radians(-body.angle);
-            let Some(center) = field.local_to_cell(local) else {
+            let local = (hit.point - body.position).rotate_radians(-body.angle);
+            let Some(center) = field.contact_cell(
+                local,
+                hit.normal.rotate_radians(-body.angle),
+                self.world.terrain.surface,
+            ) else {
                 continue;
             };
             self.world

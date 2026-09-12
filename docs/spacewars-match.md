@@ -5,6 +5,13 @@ match. Each player independently selects **human** or **rule bot** in Settings:
 two humans, either human/bot arrangement, or two bots watching the same round.
 The default is two humans. Choices persist through restart and relaunch.
 
+Generated planets use interpolated round surfaces shared by drawing, collisions
+and mining. Material quantities remain cell based. The
+[surface comparison report](rounder-planets-matches.md) records the measured
+cost and gameplay changes against the previous blocks.
+The [routing follow-up](mission-route-clearance.md) covers the resulting landing,
+transfer and pursuit acceptance fixes, including the remaining narrow margins.
+
 The subsequent [world-selection flow](match-worlds.md) adds New Match for a
 fresh seed, Rematch for the current world, and visible seeds in the menus.
 The [fresh-world survey](fresh-world-survey.md) is the current assessment before
