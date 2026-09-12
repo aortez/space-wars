@@ -1,5 +1,9 @@
 # Landing forecasts must move their own vehicle
 
+Follow-up: [transfer detours and pursuit climbs](mission-route-clearance.md)
+addresses the two mission failures retained below. This report preserves the
+landing fix's original evidence and results at `19dfb4d`.
+
 This follows the [rounded-match comparison](rounder-planets-matches.md).
 The mirrored seed-42/P1 delay is a clearance-forecast bug: the bot's approaching
 ship obstructs its own proposed hatch. The survey tests that hatch against the
