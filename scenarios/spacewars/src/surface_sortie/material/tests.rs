@@ -859,7 +859,14 @@ fn material_escape_pod_can_land_and_disembark_on(surface: TerrainSurface) {
 
 #[test]
 fn corner_contacts_only_preserve_an_earned_landing_with_two_live_feet() {
-    let mut state = SurfaceSortieScenario::init_material_arena_trial(0, true, 0.0);
+    // Preserve the actual block corner from the original replay. The rounded
+    // default deliberately removes this corner and changes its contact normals.
+    let mut state = SurfaceSortieScenario::init_material_arena_surface_trial(
+        0,
+        true,
+        0.0,
+        TerrainSurface::Blocks,
+    );
     step(&mut state, &[]);
     let planet = 2;
     let frame = motion::SurfaceFrame::read(&state.world.physics, planet);

@@ -1,4 +1,4 @@
-//! Opt-in matched terrain scenes. Ordinary Spacewars keeps its existing surface.
+//! Matched single-planet scenes preserve all three surfaces for comparisons.
 use super::*;
 pub use engine_terrain::TerrainSurface;
 use engine_terrain::{Brush, CellCoord, EditMode, TerrainEdit};

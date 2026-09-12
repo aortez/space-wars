@@ -13,7 +13,8 @@ cargo run --locked -p engine-client -- --scenario spacewars-surface-round --seed
 All three comparison presets remain available. They use the same material,
 prepared cuts and Expedition controls, including one or two human players.
 `ROUND` identifies the refined mode; `SLOPES` is the midpoint contour and `STEPS`
-the original blocks. The ordinary generated `spacewars` match still uses blocks.
+the original blocks. Generated `spacewars` matches now use the refined surface;
+see the [before/after match measurements](rounder-planets-matches.md).
 
 ## Shape and material are distinct
 

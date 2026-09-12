@@ -86,6 +86,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=1)
     parser.add_argument("--measure-draw", action="store_true",
                         help="Time two player draw lists and minimaps every tick; use --jobs 1 for comparisons")
+    parser.add_argument("--surface", choices=["default", "blocks", "round"], default="default")
     parser.add_argument("--wall-timeout", type=int, default=600)
     args = parser.parse_args()
     if args.jobs < 1 or args.wall_timeout < 1 or any(not 0 <= s < 2**64 for s in args.seeds):
@@ -101,6 +102,7 @@ def main():
                     seeds=args.seeds, asteroid_intervals=args.asteroid_intervals,
                     seconds=args.seconds, jobs=args.jobs,
                     measure_draw=args.measure_draw,
+                    surface=args.surface,
                     binary=str(binary), binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest(),
                     combat_break_interval=15, combat_break_duration=4,
                     world="generated", mode="duel", match_rules=True, mirror=False,
@@ -119,6 +121,8 @@ def main():
                    "--frames", "true", "--trace", "true", "--out", str(out)]
         if args.measure_draw:
             command += ["--measure-draw", "true"]
+        if args.surface != "default":
+            command += ["--surface", args.surface]
         write_json(out / "command.json", command)
         start = time.monotonic()
         row = dict(case=name, seed=seed, asteroid_interval=interval, command=command)
@@ -131,6 +135,8 @@ def main():
             report = json.loads(raw)
             assert report["seed"] == seed and report["seconds"] == args.seconds
             assert report["mode"] == "duel" and report["match_rules"] and not report["mirror"]
+            if args.surface != "default":
+                assert report["terrain_surface"] == args.surface
             assert report["asteroids"]["settings"] == dict(interval_seconds=interval, severity="mixed")
             assert report["combat_breaks"] == dict(interval_seconds=15, duration_seconds=4)
             assert all(p["tick"] == report["elapsed_ticks"] for p in report["final_pilots"])

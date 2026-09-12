@@ -41,6 +41,22 @@ impl SurfaceSortieScenario {
     /// Keep the generator's first three planets, including their sizes and
     /// orbital spacing. Surface V1 supplies the established force/motion profile.
     pub fn init_material_arena_trial(seed: u64, mirror: bool, bearing: f32) -> SurfaceSortieState {
+        Self::init_material_arena_surface_trial(
+            seed,
+            mirror,
+            bearing,
+            engine_terrain::TerrainSurface::Interpolated,
+        )
+    }
+
+    /// Matched diagnostic worlds retain the previous surface without changing
+    /// the normal match or adding a player-facing physics setting.
+    pub fn init_material_arena_surface_trial(
+        seed: u64,
+        mirror: bool,
+        bearing: f32,
+        surface: engine_terrain::TerrainSurface,
+    ) -> SurfaceSortieState {
         assert!(bearing.is_finite());
         let mut world = SpacewarsScenario::init(
             SpacewarsConfig {
@@ -91,6 +107,7 @@ impl SurfaceSortieScenario {
             None,
         );
         state.world.terrain.legacy_services = false;
+        state.world.terrain.surface = surface;
         for index in 0..state.world.planets.len() {
             state
                 .world
@@ -274,6 +291,73 @@ impl SurfaceSortieState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_match_uses_round_surfaces_with_the_same_material_and_world() {
+        use engine_terrain::TerrainSurface;
+        for seed in [0, 7, 42] {
+            let mut round = SurfaceSortieScenario::init_material_match(seed);
+            let blocks = SurfaceSortieScenario::init_material_arena_surface_trial(
+                seed,
+                false,
+                0.0,
+                TerrainSurface::Blocks,
+            );
+            assert_eq!(round.world.terrain.surface, TerrainSurface::Interpolated);
+            let before = round.terrain_diagnostics();
+            assert!(before.issues.is_empty());
+            assert_eq!(before.surface_sample_bytes, before.cell_bytes * 2);
+            assert_eq!(
+                before.terrain_rectangles + before.terrain_polygons,
+                before.terrain_colliders
+            );
+            assert!(before.terrain_polygons > 0);
+            for i in 0..3 {
+                let field = round.planet_terrain(i).unwrap();
+                assert_eq!(field.cells(), blocks.planet_terrain(i).unwrap().cells());
+                assert_eq!(
+                    round.world.planets[i].position,
+                    blocks.world.planets[i].position
+                );
+                assert_eq!(
+                    round.world.planets[i].radius,
+                    blocks.world.planets[i].radius
+                );
+                assert_eq!(
+                    round.world.terrain.planets[&i].geometry.surface(),
+                    TerrainSurface::Interpolated
+                );
+                let center = field.local_to_cell(Vec2::ZERO).unwrap();
+                round
+                    .world
+                    .queue_planet_edit(
+                        i,
+                        engine_terrain::TerrainEdit {
+                            brush: engine_terrain::Brush::Circle { center, radius: 3 },
+                            mode: engine_terrain::EditMode::Remove,
+                        },
+                    )
+                    .unwrap();
+            }
+            let mut copy = round.clone();
+            for _ in 0..60 {
+                SurfaceSortieScenario::step(&mut round, &[], Duration::from_nanos(16_666_667));
+                SurfaceSortieScenario::step(&mut copy, &[], Duration::from_nanos(16_666_667));
+            }
+            let after = round.terrain_diagnostics();
+            assert!(after.issues.is_empty());
+            assert!(after.removed_cells > 0);
+            assert_eq!(
+                after.occupied_cells + after.removed_cells,
+                before.occupied_cells
+            );
+            assert_eq!(
+                SurfaceSortieScenario::observe(&round).payload,
+                SurfaceSortieScenario::observe(&copy).payload
+            );
+            assert_eq!(after.motion_hash, copy.terrain_diagnostics().motion_hash);
+        }
+    }
 
     #[test]
     fn arena_preserves_generated_sizes_spacing_and_seeded_reflections() {

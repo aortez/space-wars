@@ -18,7 +18,9 @@ Both scenes use the same radius-60 planet, material layout, ships, controls and
 initial excavations. The planet is stationary and its grid is rotated 45 degrees
 under the initial landing. A shallow crater, a roofed tunnel and a cap attached by
 one cell occupy the opposite hemisphere. Settings supports one or two human seats.
-The ordinary `spacewars` match still uses the existing stepped geometry.
+At this checkpoint ordinary `spacewars` still used stepped geometry. The later
+[generated-match comparison](rounder-planets-matches.md) records its adoption
+of the refined round surface.
 
 Use the normal Expedition controls: land rear-first, B/X to exit or board,
 left/right to walk, A/Space to jump or get up, and hold A while airborne for the

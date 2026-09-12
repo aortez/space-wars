@@ -63,6 +63,12 @@ fn main() {
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     let world_kind = arg("--world", "fixed");
+    let surface = arg("--surface", "default");
+    assert!(["default", "blocks", "round"].contains(&surface.as_str()));
+    assert!(
+        surface == "default" || world_kind == "generated",
+        "--surface needs --world generated"
+    );
     let defaults = CombatBreakSettings::default();
     let breaks = CombatBreakSettings {
         interval_seconds: arg("--break-interval", &defaults.interval_seconds.to_string())
@@ -83,7 +89,21 @@ fn main() {
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
     let mut state = if world_kind == "generated" {
-        SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
+        if surface == "default" {
+            SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
+        } else {
+            use scenario_spacewars::surface_sortie::comparison::TerrainSurface;
+            SurfaceSortieScenario::init_material_arena_surface_trial(
+                seed,
+                mirror,
+                bearing,
+                if surface == "blocks" {
+                    TerrainSurface::Blocks
+                } else {
+                    TerrainSurface::Interpolated
+                },
+            )
+        }
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
@@ -391,6 +411,11 @@ fn main() {
     report["objective_refresh"] =
         json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
     report["initial_audit"] = json!(initial_audit);
+    report["terrain_surface"] = json!(if initial_audit.surface_sample_bytes > 0 {
+        "round"
+    } else {
+        "blocks"
+    });
     report["draw_lists"] = timing(draws);
     report["measured_tick"] = timing(measured_ticks);
     report["measurement_scope"] = json!({"draw_enabled":measure_draw,

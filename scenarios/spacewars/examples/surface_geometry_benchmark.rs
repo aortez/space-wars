@@ -43,7 +43,21 @@ fn main() {
     assert!((1..=20).contains(&repeats));
     let out = PathBuf::from(arg("--out", "/tmp/surface-geometry"));
     fs::create_dir(&out).expect("new output directory");
-    let state = SurfaceSortieScenario::init_material_arena(seed);
+    let surface = arg("--surface", "default");
+    let state = match surface.as_str() {
+        "default" => SurfaceSortieScenario::init_material_arena(seed),
+        "blocks" | "round" => SurfaceSortieScenario::init_material_arena_surface_trial(
+            seed,
+            false,
+            0.0,
+            if surface == "blocks" {
+                TerrainSurface::Blocks
+            } else {
+                TerrainSurface::Interpolated
+            },
+        ),
+        _ => panic!("--surface must be default, blocks or round"),
+    };
     let world = state.mission_observation(0, None);
     let mut reports = Vec::new();
     for (planet, observation) in world.planets.iter().enumerate() {

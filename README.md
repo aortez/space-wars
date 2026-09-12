@@ -16,6 +16,8 @@ The local launcher includes the following scenarios and presets:
   Each player can be human or a mission bot, including bot versus bot. A living
   pilot can recover after losing every ship and flag; pilot death ends the round.
   See [Spacewars match](docs/spacewars-match.md) for controls and settings.
+  Planets now use round terrain boundaries; the
+  [before/after measurements](docs/rounder-planets-matches.md) track their cost.
   The [fresh-world survey](docs/fresh-world-survey.md) records current match
   reliability and the remaining AI follow-ups before merging.
 - **Spacewars Classic** — the previous berth-based game and historical visual
