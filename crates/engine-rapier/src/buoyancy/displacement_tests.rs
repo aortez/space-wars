@@ -282,7 +282,7 @@ fn dynamic_displacement_differs_from_one_way_and_replays_exactly() {
 }
 
 #[test]
-fn displacement_adapter_rejects_unsupported_bodies_and_caller_can_clear_after_removal() {
+fn displacement_adapter_uses_live_box_and_circle_poses_and_caller_clears_after_removal() {
     let mut f = Fixture::new(0.55, 128, true);
     f.physics
         .set_pose(f.body.body(), Vec2::new(0.0, 10.0), 0.0, true);
@@ -313,10 +313,16 @@ fn displacement_adapter_rejects_unsupported_bodies_and_caller_can_clear_after_re
         0.55,
     )
     .unwrap();
+    f.physics
+        .set_pose(body.body(), Vec2::new(0.0, 10.0), 1.0, true);
+    body.sync_displacement(&f.physics, &mut f.water, 0).unwrap();
+    assert!((f.water.stats().displaced - std::f64::consts::PI * 25.0).abs() < 0.52);
     assert_eq!(
-        body.sync_displacement(&f.physics, &mut f.water, 0),
-        Err(WaterError::InvalidGeometry)
+        body.displacement(&f.physics).unwrap().center,
+        Vec2::new(0.0, 10.0)
     );
+    assert!(f.physics.remove_entity(body.body().entity));
+    assert_eq!(body.displacement(&f.physics), Err(WaterError::InvalidInput));
 }
 
 #[test]
@@ -379,6 +385,187 @@ fn rotating_displacer_settles_after_tilt_and_spin_across_timesteps() {
                     .all(|c| (c.surface - level).abs() < 0.1)
             );
         }
+    }
+}
+
+#[test]
+fn mixed_displacers_float_at_combined_level_with_matched_control_and_replay() {
+    for dt in [1.0 / 30.0, 1.0 / 60.0, 1.0 / 120.0] {
+        let make = |feedback| {
+            let mut f = Fixture::with_rotation(0.55, 128, feedback, 40.0, false, 0.35, 0.0);
+            let circle = BuoyantBody::insert(
+                &mut f.physics,
+                PhysicsId::new(2),
+                BodySpec {
+                    position: Vec2::new(25.0, 35.0),
+                    can_sleep: false,
+                    ccd_enabled: true,
+                    ..BodySpec::default()
+                },
+                HullShape::Circle { radius: 5.0 },
+                0.55,
+            )
+            .unwrap();
+            (f, circle)
+        };
+        let mut a = make(true);
+        let mut b = make(true);
+        let mut control = make(false);
+        for _ in 0..(60.0 / dt) as usize {
+            for (f, circle) in [&mut a, &mut b, &mut control] {
+                let inputs = [
+                    f.body.displacement(&f.physics).unwrap(),
+                    circle.displacement(&f.physics).unwrap(),
+                ];
+                f.water
+                    .set_displacers(0, if f.feedback { &inputs } else { &[] })
+                    .unwrap();
+                f.water.step(dt).unwrap();
+                f.physics.clear_forces();
+                for body in [&f.body, &*circle] {
+                    body.apply_forces(&mut f.physics, &f.water, BuoyancyConfig::default(), dt)
+                        .unwrap();
+                }
+                f.physics.step(dt as f32);
+                if f.feedback {
+                    f.water
+                        .set_displacers(
+                            0,
+                            &[
+                                f.body.displacement(&f.physics).unwrap(),
+                                circle.displacement(&f.physics).unwrap(),
+                            ],
+                        )
+                        .unwrap();
+                }
+                assert!((f.water.stats().pooled - 2000.0).abs() < 1e-7);
+                assert!(
+                    f.water.pools()[0]
+                        .columns()
+                        .all(|c| c.volume >= 0.0 && c.surface < 55.0)
+                );
+            }
+            assert_eq!(a.0.water.pools(), b.0.water.pools());
+            assert_eq!(
+                a.0.physics.motion(a.0.body.body()),
+                b.0.physics.motion(b.0.body.body())
+            );
+            assert_eq!(
+                a.0.physics.motion(a.1.body()),
+                b.0.physics.motion(b.1.body())
+            );
+        }
+        let mass = a.0.physics.body_mass(a.0.body.body()).unwrap() as f64
+            + a.0.physics.body_mass(a.1.body()).unwrap() as f64;
+        let displaced = a.0.water.stats().displaced;
+        // Circle occupancy is an unweighted inscribed polygon; buoyancy uses
+        // its normalized area. Bound the documented approximation explicitly.
+        assert!(
+            (displaced - mass).abs() < mass * 0.01,
+            "dt={dt} displaced={displaced} mass={mass}"
+        );
+        let level = 20.0 + displaced / 100.0;
+        assert!(
+            a.0.water.pools()[0]
+                .columns()
+                .all(|c| (c.surface - level).abs() < 0.04)
+        );
+        for (body, other) in [(&a.0.body, &control.0.body), (&a.1, &control.1)] {
+            let pose = a.0.physics.motion(body.body()).unwrap();
+            let control_pose = control.0.physics.motion(other.body()).unwrap();
+            assert!(
+                (pose.position.y as f64 - control_pose.position.y as f64 - displaced / 100.0).abs()
+                    < 0.08
+            );
+            assert!(pose.linear_velocity.length() < 0.03, "{pose:?}");
+        }
+        assert_eq!(control.0.water.stats().displaced, 0.0);
+        assert!(a.0.physics.remove_entity(a.1.body().entity));
+        assert_eq!(
+            a.1.displacement(&a.0.physics),
+            Err(WaterError::InvalidInput)
+        );
+        a.0.water
+            .set_displacers(0, &[a.0.body.displacement(&a.0.physics).unwrap()])
+            .unwrap();
+        assert!(a.0.water.stats().displaced < displaced);
+        assert!((a.0.water.stats().pooled - 2000.0).abs() < 1e-7);
+    }
+}
+
+#[test]
+fn overlapping_dynamic_bodies_count_union_then_resolve_contact_without_losing_water() {
+    let mut f = Fixture::with_rotation(0.55, 128, true, 40.0, false, 0.25, 0.0);
+    f.physics
+        .set_pose(f.body.body(), Vec2::new(-10.0, 10.0), 0.25, true);
+    let circle = BuoyantBody::insert(
+        &mut f.physics,
+        PhysicsId::new(2),
+        BodySpec {
+            position: Vec2::new(-2.0, 11.0),
+            can_sleep: false,
+            ccd_enabled: true,
+            ..BodySpec::default()
+        },
+        HullShape::Circle { radius: 5.0 },
+        0.55,
+    )
+    .unwrap();
+    f.water
+        .set_displacers(
+            0,
+            &[
+                f.body.displacement(&f.physics).unwrap(),
+                circle.displacement(&f.physics).unwrap(),
+            ],
+        )
+        .unwrap();
+    assert!(f.water.stats().displaced < 250.0); // Sum would exceed 278.
+    let collider = ColliderId::new(circle.body().entity, ColliderRole::PRIMARY, 0);
+    let mut contact = false;
+    for _ in 0..1200 {
+        f.water.step(1.0 / 60.0).unwrap();
+        f.physics.clear_forces();
+        for body in [&f.body, &circle] {
+            body.apply_forces(
+                &mut f.physics,
+                &f.water,
+                BuoyancyConfig::default(),
+                1.0 / 60.0,
+            )
+            .unwrap();
+        }
+        f.physics.step(1.0 / 60.0);
+        contact |= f
+            .physics
+            .surface_contacts(collider)
+            .any(|c| c.collider.entity == f.body.body().entity);
+        f.water
+            .set_displacers(
+                0,
+                &[
+                    f.body.displacement(&f.physics).unwrap(),
+                    circle.displacement(&f.physics).unwrap(),
+                ],
+            )
+            .unwrap();
+        assert!((f.water.stats().pooled - 2000.0).abs() < 1e-7);
+        assert!(
+            f.water.pools()[0]
+                .columns()
+                .all(|c| c.volume >= 0.0 && c.surface.is_finite() && c.surface < 60.0)
+        );
+    }
+    assert!(
+        contact,
+        "exercise actual body-body contact, not just independent floaters"
+    );
+    for body in [&f.body, &circle] {
+        let motion = f.physics.motion(body.body()).unwrap();
+        assert!(
+            motion.position.y > 15.0 && motion.position.y < 30.0,
+            "{motion:?}"
+        );
     }
 }
 

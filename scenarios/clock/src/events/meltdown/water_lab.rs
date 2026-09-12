@@ -8,7 +8,11 @@ use engine_rapier::{
         PhysicsWorld, PhysicsWorldConfig,
     },
 };
-use engine_water::{Boundary, WaterWorld, displacement::DisplacementBox, immersion::HullShape};
+use engine_water::{
+    Boundary, WaterWorld,
+    displacement::{DisplacementBody, DisplacementBox, MAX_DISPLACERS},
+    immersion::HullShape,
+};
 
 pub(crate) struct LabBody {
     pub body: BuoyantBody,
@@ -33,8 +37,10 @@ pub(crate) struct WaterLab {
     pub piston: Option<Piston>,
     pub reference_y: Option<f32>,
     displacement_enabled: bool,
-    /// Index into `bodies`; exactly one box can own this tank's occupancy input.
+    /// Original one-box fixtures; the mixed fixture uses a complete batch instead.
     dynamic_displacer: Option<usize>,
+    /// The mixed fixture submits ALL bodies together, never last-body-wins.
+    multiple_displacers: bool,
 }
 
 impl WaterLab {
@@ -169,9 +175,18 @@ impl WaterLab {
                         piston.body.entity,
                         BodySpec {
                             position: Vec2::new(piston.x, piston.raised_y),
-                            lock_rotation: !mode.is_rotating_tank(),
-                            angle: if mode.is_rotating_tank() { 0.65 } else { 0.0 },
-                            angular_velocity: if mode.is_rotating_tank() { -0.8 } else { 0.0 },
+                            lock_rotation: !(mode.is_rotating_tank() || mode.is_multiple_tank()),
+                            angle: if mode.is_rotating_tank() || mode.is_multiple_tank() {
+                                0.65
+                            } else {
+                                0.0
+                            },
+                            angular_velocity: if mode.is_rotating_tank() || mode.is_multiple_tank()
+                            {
+                                -0.8
+                            } else {
+                                0.0
+                            },
                             can_sleep: false,
                             ccd_enabled: true,
                             ..BodySpec::default()
@@ -191,6 +206,34 @@ impl WaterLab {
                     palette: if mode == ClockWaterLab::Sinking { 2 } else { 0 },
                 });
             }
+            if mode.is_multiple_tank() {
+                bodies.push(LabBody {
+                    body: BuoyantBody::insert(
+                        &mut world,
+                        PhysicsId::new(11),
+                        BodySpec {
+                            position: Vec2::new(
+                                -width * 0.12,
+                                spec.bed[0] as f32 + initial_depth * 3.0,
+                            ),
+                            linear_velocity: Vec2::new(width * 0.02, 0.0),
+                            angle: -0.45,
+                            angular_velocity: 0.6,
+                            can_sleep: false,
+                            ccd_enabled: true,
+                            ..BodySpec::default()
+                        },
+                        HullShape::Box {
+                            half_width: width * 0.045,
+                            half_height: initial_depth * 0.3,
+                        },
+                        1.8,
+                    )
+                    .unwrap(),
+                    report: BuoyancyReport::default(),
+                    palette: 2,
+                });
+            }
             return Self {
                 world,
                 supports,
@@ -198,7 +241,9 @@ impl WaterLab {
                 piston: (!mode.is_dynamic_tank()).then_some(piston),
                 reference_y: Some(initial_level),
                 displacement_enabled: mode.has_displacement(),
-                dynamic_displacer: mode.is_dynamic_tank().then_some(1),
+                dynamic_displacer: (mode.is_dynamic_tank() && !mode.is_multiple_tank())
+                    .then_some(1),
+                multiple_displacers: mode.is_multiple_tank(),
             };
         }
         let pitch = layout.pitch.max(12.0);
@@ -274,6 +319,7 @@ impl WaterLab {
             reference_y: None,
             displacement_enabled: false,
             dynamic_displacer: None,
+            multiple_displacers: false,
         }
     }
 
@@ -308,6 +354,27 @@ impl WaterLab {
     }
 
     fn sync_dynamic_displacement(&self, water: &mut WaterWorld) {
+        if self.multiple_displacers {
+            let mut inputs = [DisplacementBody {
+                center: Vec2::ZERO,
+                angle: 0.0,
+                shape: HullShape::Circle { radius: 1.0 },
+            }; MAX_DISPLACERS];
+            let count = if self.displacement_enabled {
+                self.bodies.len()
+            } else {
+                0
+            };
+            for (input, body) in inputs[..count].iter_mut().zip(&self.bodies) {
+                *input = body
+                    .body
+                    .displacement(&self.world)
+                    .expect("live mixed water-lab body");
+            }
+            water
+                .set_displacers(0, &inputs[..count])
+                .expect("bounded mixed bodies in a closed tank");
+        }
         if let Some(index) = self.dynamic_displacer {
             if self.displacement_enabled {
                 self.bodies[index]

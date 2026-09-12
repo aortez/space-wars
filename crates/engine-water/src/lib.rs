@@ -71,7 +71,7 @@ impl std::fmt::Display for WaterError {
         f.write_str(match self {
             Self::InvalidGeometry => "invalid or out-of-bounds water geometry/configuration",
             Self::InvalidInput => "invalid or out-of-bounds water input",
-            Self::Capacity => "water parcel capacity exhausted; retry when space is available",
+            Self::Capacity => "water resource capacity exhausted",
         })
     }
 }
@@ -98,7 +98,7 @@ pub struct Pool {
     flux: Vec<f64>,
     donor_scale: Vec<f64>,
     displaced: Vec<f64>,
-    displacer: Option<displacement::DisplacementBox>,
+    displacement: displacement::Displacement,
 }
 
 impl Pool {
@@ -344,7 +344,7 @@ impl WaterWorld {
                         flux: vec![0.0; n + 1],
                         donor_scale: vec![0.0; n],
                         displaced: vec![0.0; n],
-                        displacer: None,
+                        displacement: displacement::Displacement::default(),
                     }
                 })
                 .collect(),
@@ -415,7 +415,7 @@ impl WaterWorld {
             .iter()
             .filter_map(|pool| {
                 let i = pool.index(point.x as f64)?;
-                if pool.displacer.is_some_and(|b| b.contains(point)) {
+                if pool.displacement.contains(point) {
                     return None;
                 }
                 let surface = pool.surface(i);

@@ -1,9 +1,77 @@
-//! Conservative, hydrostatic-reference displacement for one oriented box
-//! per closed flat basin. Occupancy raises local pressure heads; existing
+//! Conservative, hydrostatic-reference displacement for bounded solid unions
+//! in closed flat basins. Occupancy raises local pressure heads; existing
 //! level-driven fluxes spread the disturbance without adding/removing liquid.
 //! This is not a solid flow barrier or a general moving-boundary fluid solver.
-use crate::{Boundary, Pool, WaterError, WaterWorld, immersion::clip};
+use crate::{
+    Boundary, Pool, WaterError, WaterWorld,
+    immersion::{HullShape, clip},
+};
 use engine_core::Vec2;
+
+mod union;
+
+/// Per pool, not a general large-body-count fluid solver.
+pub const MAX_DISPLACERS: usize = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DisplacementBody {
+    pub center: Vec2,
+    /// Counterclockwise radians. Circle orientation has no geometric effect.
+    pub angle: f32,
+    pub shape: HullShape,
+}
+
+impl DisplacementBody {
+    fn as_box(self) -> Option<DisplacementBox> {
+        match self.shape {
+            HullShape::Box {
+                half_width,
+                half_height,
+            } => Some(DisplacementBox {
+                center: self.center,
+                half_extents: Vec2::new(half_width, half_height),
+                angle: self.angle,
+            }),
+            HullShape::Circle { .. } => None,
+        }
+    }
+
+    fn contains(self, point: Vec2) -> bool {
+        match self.shape {
+            HullShape::Box { .. } => self.as_box().unwrap().contains(point),
+            HullShape::Circle { radius } => {
+                let x = point.x as f64 - self.center.x as f64;
+                let y = point.y as f64 - self.center.y as f64;
+                x * x + y * y <= (radius as f64).powi(2)
+            }
+        }
+    }
+}
+
+impl From<DisplacementBox> for DisplacementBody {
+    fn from(value: DisplacementBox) -> Self {
+        Self {
+            center: value.center,
+            angle: value.angle,
+            shape: HullShape::Box {
+                half_width: value.half_extents.x,
+                half_height: value.half_extents.y,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct Displacement {
+    bodies: Vec<DisplacementBody>,
+    outline: union::Outline,
+}
+
+impl Displacement {
+    pub(crate) fn contains(&self, point: Vec2) -> bool {
+        self.bodies.iter().any(|body| body.contains(point))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DisplacementBox {
@@ -34,27 +102,78 @@ impl WaterWorld {
         pool: usize,
         value: Option<DisplacementBox>,
     ) -> Result<(), WaterError> {
+        match value {
+            Some(body) => self.set_displacers(pool, &[body.into()]),
+            None => self.set_displacers(pool, &[]),
+        }
+    }
+
+    /// Atomically replace this pool's complete occupancy snapshot. An empty
+    /// slice clears it; omitted bodies are removed, never retained implicitly.
+    /// Submit once per pool, not separately for each body. Call before stepping
+    /// water and again after mechanics to align rendering with the final poses.
+    ///
+    /// Up to MAX_DISPLACERS boxes/circles, in closed flat basins. The SUM of box
+    /// diagonals/circle diameters must fit within 75% of basin width, including
+    /// bodies currently dry or outside it. This conservative, pose-independent
+    /// bound guarantees positive free capacity even as bodies move/rotate.
+    /// Overlapping outlines count only once. Circles use inscribed 32-gons
+    /// (full area underestimation < 0.65%); no overlap-dependent area weighting.
+    /// Scratch storage is allocated on first use and reused by later snapshots.
+    pub fn set_displacers(
+        &mut self,
+        pool: usize,
+        bodies: &[DisplacementBody],
+    ) -> Result<(), WaterError> {
         let pool = self.pools.get_mut(pool).ok_or(WaterError::InvalidInput)?;
-        if let Some(body) = value {
+        if bodies.len() > MAX_DISPLACERS {
+            return Err(WaterError::Capacity);
+        }
+        let mut diameter = 0.0;
+        for body in bodies {
+            let valid_size = |size: f32| size.is_finite() && (0.001..=1000.0).contains(&size);
+            let valid_shape = match body.shape {
+                HullShape::Box {
+                    half_width,
+                    half_height,
+                } => valid_size(half_width) && valid_size(half_height),
+                HullShape::Circle { radius } => valid_size(radius),
+            };
             if ![body.center.x, body.center.y]
                 .iter()
                 .all(|v| v.is_finite() && v.abs() <= 1.0e6)
-                || ![body.half_extents.x, body.half_extents.y]
-                    .iter()
-                    .all(|v| v.is_finite() && (0.001..=1000.0).contains(v))
                 || !body.angle.is_finite()
-                || (body.half_extents.x as f64).hypot(body.half_extents.y as f64) * 2.0
-                    > pool.spec.column_width * pool.volume.len() as f64 * 0.75
+                || !valid_shape
             {
                 return Err(WaterError::InvalidInput);
             }
-            if pool.spec.boundaries != [Boundary::Closed; 2]
-                || pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0])
-            {
-                return Err(WaterError::InvalidGeometry);
+            diameter += match body.shape {
+                HullShape::Box {
+                    half_width,
+                    half_height,
+                } => 2.0 * (half_width as f64).hypot(half_height as f64),
+                HullShape::Circle { radius } => 2.0 * radius as f64,
+            };
+        }
+        if diameter > pool.spec.column_width * pool.volume.len() as f64 * 0.75 {
+            return Err(WaterError::InvalidInput);
+        }
+        if !bodies.is_empty()
+            && (pool.spec.boundaries != [Boundary::Closed; 2]
+                || pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0]))
+        {
+            return Err(WaterError::InvalidGeometry);
+        }
+        if pool.displacement.bodies != bodies {
+            if pool.displacement.bodies.capacity() == 0 {
+                pool.displacement.bodies.reserve_exact(MAX_DISPLACERS);
+            }
+            pool.displacement.bodies.clear();
+            pool.displacement.bodies.extend_from_slice(bodies);
+            if bodies.len() != 1 || bodies[0].as_box().is_none() {
+                pool.displacement.outline.rebuild(bodies, &pool.spec);
             }
         }
-        pool.displacer = value;
         pool.displaced.fill(0.0);
         pool.refresh_displacement();
         Ok(())
@@ -63,10 +182,21 @@ impl WaterWorld {
 
 impl Pool {
     pub(crate) fn refresh_displacement(&mut self) {
-        let Some(body) = self.displacer else {
+        if self.displacement.bodies.is_empty() {
+            return;
+        }
+        self.displaced.fill(0.0);
+        let body = if self.displacement.bodies.len() == 1 {
+            self.displacement.bodies[0].as_box()
+        } else {
+            None
+        };
+        let Some(body) = body else {
+            self.displacement
+                .outline
+                .fill_columns(&self.spec, &self.volume, &mut self.displaced);
             return;
         };
-        self.displaced.fill(0.0);
         if body.angle != 0.0 {
             self.refresh_rotated_displacement(body);
             return;

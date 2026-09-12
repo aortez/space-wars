@@ -3,7 +3,7 @@ use crate::{PoolSpec, WaterConfig};
 
 const DT: f64 = 1.0 / 60.0;
 
-fn tank(columns: usize) -> WaterWorld {
+pub(super) fn tank(columns: usize) -> WaterWorld {
     let mut w = WaterWorld::new(
         WaterConfig {
             gravity: 40.0,
@@ -37,7 +37,7 @@ fn body(y: f32) -> DisplacementBox {
     }
 }
 
-fn conserved(w: &WaterWorld) {
+pub(super) fn conserved(w: &WaterWorld) {
     let s = w.stats();
     assert!(
         (s.injected - s.pooled - s.in_flight - s.drained - s.reclaimed).abs() < 1e-7,
@@ -52,7 +52,7 @@ fn conserved(w: &WaterWorld) {
     assert_eq!(s.drained, 0.0);
 }
 
-fn settle(w: &mut WaterWorld, expected: f64) {
+pub(super) fn settle(w: &mut WaterWorld, expected: f64) {
     for _ in 0..3600 {
         w.step(DT).unwrap();
         conserved(w);

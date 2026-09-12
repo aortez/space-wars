@@ -176,6 +176,105 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
 }
 
 #[test]
+fn mixed_tank_previews_contact_replay_pause_and_release_all_bodies() {
+    use engine_rapier::world::{ColliderId, ColliderRole};
+    for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
+        for mode in [ClockWaterLab::Multiple, ClockWaterLab::MultipleControl] {
+            let make = || {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: aspect,
+                        water_lab: mode,
+                        event_profile: ClockEventProfile::Off,
+                        ..ClockConfig::default()
+                    },
+                    42,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[
+                        ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                        ClockAction::preview_event(ClockEventKind::Meltdown),
+                    ],
+                    Duration::ZERO,
+                );
+                state
+            };
+            let mut a = make();
+            let mut b = make();
+            let mut wet = [false; 3];
+            let mut contact = false;
+            for elapsed in 0..510 {
+                assert_volume(&a);
+                assert_eq!((a.body_count(), a.collider_count()), (4, 6));
+                let Some(crate::events::ActiveEvent::Meltdown(event)) = &a.active_event else {
+                    panic!()
+                };
+                let lab = event.floats.as_ref().unwrap();
+                assert_eq!(lab.bodies.len(), 3);
+                let stats = event.water.stats();
+                assert_eq!((stats.in_flight, stats.drained), (0.0, 0.0));
+                if !mode.has_displacement() {
+                    assert_eq!(stats.displaced, 0.0);
+                }
+                for (i, body) in lab.bodies.iter().enumerate() {
+                    wet[i] |= body.report.submerged_fraction > 0.1;
+                    let collider =
+                        ColliderId::new(body.body.body().entity, ColliderRole::PRIMARY, 0);
+                    contact |= lab.world.surface_contacts(collider).any(|c| {
+                        lab.bodies
+                            .iter()
+                            .any(|b| b.body.body().entity == c.collider.entity)
+                    });
+                    let pose = lab.world.motion(body.body.body()).unwrap();
+                    assert!(pose.position.x.is_finite() && pose.position.y.is_finite());
+                }
+                if elapsed == 360 && mode.has_displacement() {
+                    assert!(stats.displaced > 0.0);
+                }
+                if elapsed % 30 == 0 {
+                    assert_eq!(
+                        ClockScenario::render_frame(&a),
+                        ClockScenario::render_frame(&b)
+                    );
+                }
+                if elapsed == 180 {
+                    let frozen = ClockScenario::render_frame(&a);
+                    ClockScenario::step(&mut a, &[], Duration::ZERO);
+                    assert_eq!(frozen, ClockScenario::render_frame(&a));
+                }
+                tick(&mut a);
+                tick(&mut b);
+            }
+            assert!(wet.into_iter().all(|v| v));
+            assert!(
+                contact,
+                "{mode:?} aspect={aspect}: intended to exercise body-body contact"
+            );
+            assert!(a.meltdown_state().is_none());
+            assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+            for resize in [false, true] {
+                a = make();
+                for _ in 0..210 {
+                    tick(&mut a);
+                }
+                if resize {
+                    a.set_aspect_ratio(1.0);
+                } else {
+                    ClockScenario::step(
+                        &mut a,
+                        &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+                        Duration::ZERO,
+                    );
+                }
+                assert!(a.meltdown_state().is_none());
+                assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+            }
+        }
+    }
+}
+
+#[test]
 fn rotating_clock_scale_tank_settles_when_allowed_to_run_past_event_deadline() {
     for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
         let mut state = ClockScenario::init(
@@ -526,7 +625,11 @@ fn assert_volume(state: &ClockState) {
             .as_ref()
             .is_some_and(|f| f.reference_y.is_some())
         {
-            (3, 5)
+            if state.config.water_lab.is_multiple_tank() {
+                (4, 6)
+            } else {
+                (3, 5)
+            }
         } else if event.lab {
             (4, 10)
         } else {

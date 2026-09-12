@@ -4,7 +4,7 @@ use crate::{WaterError, WaterWorld};
 use engine_core::Vec2;
 
 const SIDES: usize = 32;
-const CLIPPED_VERTICES: usize = SIDES + 4;
+pub(crate) const CLIPPED_VERTICES: usize = SIDES + 4;
 type Point = [f64; 2];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -73,6 +73,10 @@ impl WaterHull {
 
     pub fn area(&self) -> f64 {
         self.area
+    }
+
+    pub(crate) fn points(&self) -> &[Point] {
+        &self.points[..self.len]
     }
 
     /// Pools must describe non-overlapping occupied water regions. This models

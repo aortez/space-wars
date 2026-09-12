@@ -869,6 +869,8 @@ mod tests {
             scenario_clock::ClockWaterLab::Sinking,
             scenario_clock::ClockWaterLab::Rotating,
             scenario_clock::ClockWaterLab::RotatingControl,
+            scenario_clock::ClockWaterLab::Multiple,
+            scenario_clock::ClockWaterLab::MultipleControl,
         ] {
             check_meltdown_rendering(mode);
         }

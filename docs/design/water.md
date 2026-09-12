@@ -6,6 +6,7 @@ The second slice adds opt-in one-way Rapier buoyancy. The third adds a deliberat
 narrow displacement experiment: a prescribed box entering/leaving a closed tank.
 The fourth closes that feedback loop for a freely moving, rotation-locked box.
 The fifth extends that same single-body feedback to a rotating box.
+The sixth adds bounded, overlap-aware batches of boxes and circles.
 
 ## Model and boundaries
 
@@ -46,8 +47,9 @@ split into substeps no larger than 1/240 second. Speeds and donor withdrawals
 are limited; these are stability/work bounds, not an accuracy guarantee at
 arbitrary depths or scales. Geometry and source inputs must be finite and within
 the API bounds; rejected source additions leave accounting unchanged.
-Pool work is linear in column count. Parcel collection scans candidate columns
-along each swept path in each pool; both pool and parcel counts are bounded.
+Without body displacement, pool work is linear in column count. Parcel collection
+scans candidate columns along each swept path in each pool; both pool and parcel
+counts are bounded.
 
 `Pool::columns()` exposes the same bed, surface, liquid volume and separate body
 occupancy used by simulation.
@@ -231,8 +233,9 @@ the liquid. The initial experiment used **one axis-aligned box per closed, flat
 basin**. The current API also accepts an `angle`, as described under
 [rotating box feedback](#rotating-box-feedback). The box's diagonal must fit
 within 75% of basin width. Box/tank intersections are clipped to basin width
-and bed. Multiple boxes, open edges and uneven beds remain unsupported;
-invalid submissions leave the existing input unchanged.
+and bed. The later [multiple-body slice](#multiple-body-displacement) adds batches
+of boxes/circles; open edges and uneven beds still reject displacement inputs.
+Invalid submissions leave the existing input unchanged.
 
 For basin width `W`, bed `z`, liquid area `V`, and box area below a candidate level
 `A(h)`, the reference level solves `W * (h - z) - A(h) = V`. The axis-aligned box
@@ -338,8 +341,9 @@ performed for this slice.
 `BuoyantBody::sync_displacement(&physics, &mut water, pool)` submits the existing
 body's authoritative Rapier pose and matching box dimensions to the water model.
 The initial binding accepted only a dynamic, rotation-locked box at zero angle;
-the rotating extension below removes that pose restriction. Circles, removed
-bodies and unsupported pools still fail without changing occupancy.
+the rotating extension below removes that pose restriction. The multiple-body
+extension also admits circles; removed bodies and unsupported pools still fail
+without changing occupancy.
 There is no automatic registry or second body representation. One
 caller owns each pool's sole occupancy input and clears it explicitly with
 `set_displacer(pool, None)` when removing the body or disabling feedback.
@@ -563,15 +567,167 @@ Manual device testing was also approved. The override runs in a temporary
 same-user session; reboot restores normal managed startup. Other devices were
 not changed.
 
+## Multiple-body displacement
+
+`WaterWorld::set_displacers(pool, &[DisplacementBody { center, angle, shape }, ...])`
+replaces the pool's **complete** occupancy snapshot atomically. Empty clears it;
+omitted bodies are removed. It never accumulates last frame's input or adds a
+solid's area to the liquid ledger. `set_displacer` remains a one-box convenience;
+existing analytic/rotated single-box paths are retained.
+
+This slice admits at most **eight** centered boxes/circles per closed, flat basin.
+The **sum** of box diagonals and circle diameters must be <=75% of basin width,
+even for dry/outside bodies. This conservative orientation-independent budget
+keeps free reference capacity monotone as all the bodies move. It is not a claim
+to handle thousands of mutually displacing bodies or densely packed full tanks.
+The same eight-body input and collective-width checks apply before mutation;
+invalid geometry, nonfinite poses or over-capacity batches leave occupancy intact.
+
+Occupancy is the **union**, not the sum, of the submitted outlines. A small
+Rapier contact overlap, a duplicate input, or a body contained in another cannot
+invent extra displaced space. Each convex outline is clipped against the common
+tank sides/bed. Exposed edge segments are retained after subtracting intervals
+covered by other polygons; coincident edges have one deterministic owner. Area
+below a level follows a boundary integral. The same cached edges provide the
+40-iteration capacity solve and per-column occupancy without rebuilding the union.
+An unoccupied hole stays unoccupied, but is not a sealed or air-filled cavity.
+
+Boxes are exact polygons. Circles share immersion's inscribed 32-gon geometry,
+but **do not** apply its per-hull area normalization to the union: weighting
+overlapping polygons independently would reintroduce double counting. A fully
+submerged circle underestimates its true area by <0.65%; partial immersion and
+body-union overlap remain polygon approximations. Buoyancy still uses normalized
+individual hull area, so the mixed equilibrium tests allow this small difference.
+Point sampling excludes each actual box/circle. Buoyancy integrates each body's
+own immersion independently; this is not a shared pressure/contact-force solve.
+
+Union work is bounded by O(body² × vertices²) for outline construction, with
+bounding-box rejection for separated bodies. Reference solving scans retained
+segments; column accumulation visits their overlapping columns only. One batch
+allocates at most 2,304 segments (72 KiB) on first general-union use and reuses
+that capacity thereafter. Normal pools and single-box fixtures do not allocate
+that union buffer. Unchanged pose submissions reuse the cached outline. There
+is no per-step geometry allocation or unbounded inclusion/exclusion recursion.
+
+`BuoyantBody::displacement(&physics)` returns one authoritative box/circle input
+without mutating water. Collect all opted-in bodies into one pool submission:
+
+```rust
+let inputs = [a.displacement(&physics)?, b.displacement(&physics)?];
+water.set_displacers(0, &inputs)?;
+water.step(dt)?;
+physics.clear_forces();
+for body in [&a, &b] {
+    body.apply_forces(&mut physics, &water, config, dt).unwrap();
+}
+physics.step(dt as f32);
+water.set_displacers(0, &[a.displacement(&physics)?, b.displacement(&physics)?])?;
+```
+
+Calling `sync_displacement` separately for several bodies would replace the
+previous submission: that convenience method explicitly owns the **sole** input.
+Caller-owned membership avoids a hidden registry or stale body handles; omit a
+removed body from the next snapshot. No implicit solid-to-liquid conversion occurs.
+
+### Preview and verification
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=multiple cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=multiple-control cargo run --release -p engine-client -- --scenario clock
+cargo run --locked --release -p engine-water --example multi_displacement_benchmark
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --multiple
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --multiple-control
+```
+
+Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+orange density-0.55 box and yellow density-0.55 ball float; the red density-1.8
+box drops onto the orange one and sinks. All three contribute displacement in
+`multiple`; `multiple-control` keeps identical geometry and initial motion but
+turns feedback off. Each has four bodies/six colliders including the tank, 128
+columns, a dashed initial-level guide and the existing bounded event lifecycle.
+They are environment-only previews, not new launcher scenarios or saved settings.
+Normal digit-fed Meltdown remains unchanged and body-free.
+
+### Sixth-slice measurements and validation (2026-09-12)
+
+Desktop Rust 1.94.1 release, three runs of 24 events at each of 800×480, 480×800
+and 1280×720. Ranges are the median per-run p95 at each size:
+
+| Mode | Step p95 | Draw-list p95 |
+| --- | ---: | ---: |
+| Mixed bodies, feedback on | 19.1–19.3 µs | 4.7–4.8 µs |
+| Mixed bodies, feedback off | 9.8–9.9 µs | 4.7–4.8 µs |
+| Original rotating-box feedback | 16.7–16.9 µs | 4.7 µs |
+| Normal Meltdown | 4.5 µs | 6.0–6.3 µs |
+
+All individual mixed-feedback step p95s ranged 19.0–22.5 µs. The preview peaks
+at 385 primitives, four bodies/six colliders and 128 columns. Those figures
+exclude rasterization/presentation and do not establish Pi performance.
+
+The water-only benchmark keeps a 100-unit-wide tank, 2,000 liquid area units
+and fixed body sizes while increasing the submitted count. It measures pose
+submission plus water stepping for 6,000 ticks after 600 warm-up ticks. Three-run
+median p95s below include moving/rotating hulls; crowded cases repeatedly overlap:
+
+| Bodies | Separated, 128 columns | Crowded, 128 columns | Crowded, 512 columns |
+| --- | ---: | ---: | ---: |
+| 1 | 5.50 µs | 5.69 µs | 14.97 µs |
+| 2 | 6.90 µs | 7.81 µs | 15.70 µs |
+| 4 | 10.41 µs | 24.14 µs | 31.61 µs |
+| 8 | 16.80 µs | 62.24 µs | 69.42 µs |
+
+Empty-input controls stayed around 1.9 µs at 128 columns and 7.3 µs at 512.
+At eight crowded bodies/512 columns, submission alone had a median p95 of
+58.43 µs, versus 14.00 µs for stepping. These component percentiles need not
+sum to the combined percentile. The cost of rebuilding overlapping outlines
+dominates at the admission limit, rather than column flow. Largest accounting
+error across these runs was 4.55e-12 on the 2,000 initial area units. The fixture
+does not include Rapier, rendering or a worst-case guarantee for every arrangement.
+
+Validation: 35 water tests, 67 Rapier tests, 84 Clock tests and 298 client tests
+pass (four existing ignored tests remain ignored). The geometry tests include
+known areas, touching/nested/duplicate/triple overlaps, holes, circles, bed/wall
+clipping, order-insensitive occupancy, large-coordinate translation and an
+independent inclusion/exclusion oracle across 80 seeded four-body cases. Every
+column is compared, including partial immersion; the oracle is test-only and
+not used in production. Repeated eight-body entry/exit/removal checks exact
+replay, conservation and reuse of the bounded input/outline buffers.
+
+Rapier regressions verify combined float levels versus a matched control at
+30/60/120 Hz, contact resolution after initial overlap, authoritative input
+poses and removal. Clock tests exercise actual body-body contacts, pause, event
+replacement, resize, recovery and cleanup at portrait/landscape aspects. Both
+render paths pass at four device sizes, and generated plus real-client captures
+were inspected. Real-client workflows under private Xvfb pass for `multiple`,
+`multiple-control` and normal Meltdown. Workspace/all-target check, Rust 1.89
+core/scenario all-target check, formatting and scoped strict Clippy pass (with
+the previously noted unrelated `collapsible_else_if` lint allowed).
+The subsequent Yocto ARM release build passed and was fast-deployed to
+`sw-picade-2` (client SHA-256
+`2c6cc87c066e940ac6ba07107827bff13f31f59aaa03393f9a3254c709e11fd0`). The
+restricted updater verified the installed pair and managed kiosk startup. Clock
+was then relaunched with `SPACEWARS_CLOCK_WATER_LAB=multiple`; the environment,
+mixed-body screenshot, four-body/six-collider counts and conserved 24-cell liquid
+volume were checked. During the sampled preview, telemetry reported 60 FPS/UPS,
+0.282 ms mean simulation step, 0.338 ms step p95 and no display-flip read errors.
+These are short device samples, not scaling or long-run performance guarantees.
+Saved settings/data and other devices were not changed. As with the preceding
+lab previews, the environment override is a temporary same-user session; reboot
+restores normal managed startup.
+
 ## Later slices
 
-Next candidates are multiple-hull occupancy and explicit obstacle-aware
-flow, each with conservation and stability tests. Use the existing prescribed,
-dynamic and one-way controls for comparisons. More aggressive impact or very
-light-body workloads should get separate accuracy/stability limits before
-generalizing this binding. It does not support arbitrary rigid bodies, sealed
-moving obstructions or splash physics.
+Next is displacement in spilling basins, with changing-volume conservation and
+stability tests, followed by Clock's actual melting/spilling/drainage/recovery
+polish. Uneven beds need an explicit reference-capacity treatment. Solid-to-liquid
+conversion should transfer material once, without counting both occupancy and
+liquid. Use the prescribed, dynamic and one-way controls for comparisons.
+More aggressive impact or very light-body workloads need separate accuracy/
+stability limits before generalizing this binding. It does not support arbitrary
+rigid bodies, sealed moving obstructions, momentum-conserving coupling or splashes.
 
 Arbitrary enclosed cavities, inverted vessels, planetary gravity, and free
 floating liquid require a richer representation. Keep body coupling separate
 so those experiments need not change the Clock or rigid-body implementation.
+Pressure-based atmospheres, compressed/trapped gas and underwater/space pressure
+interactions are future work, not requirements for finishing the Clock events.

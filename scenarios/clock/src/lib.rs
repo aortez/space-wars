@@ -197,6 +197,8 @@ pub enum ClockWaterLab {
     Sinking,
     Rotating,
     RotatingControl,
+    Multiple,
+    MultipleControl,
 }
 
 impl ClockWaterLab {
@@ -210,6 +212,8 @@ impl ClockWaterLab {
             Some("sinking") => Self::Sinking,
             Some("rotating") => Self::Rotating,
             Some("rotating-control") => Self::RotatingControl,
+            Some("multiple") => Self::Multiple,
+            Some("multiple-control") => Self::MultipleControl,
             _ => Self::Off,
         }
     }
@@ -224,6 +228,8 @@ impl ClockWaterLab {
             Self::Sinking => "sinking",
             Self::Rotating => "rotating",
             Self::RotatingControl => "rotating-control",
+            Self::Multiple => "multiple",
+            Self::MultipleControl => "multiple-control",
         }
     }
     pub const fn is_tank(self) -> bool {
@@ -232,14 +238,18 @@ impl ClockWaterLab {
     pub const fn is_dynamic_tank(self) -> bool {
         matches!(self, Self::Floating | Self::FloatingControl | Self::Sinking)
             || self.is_rotating_tank()
+            || self.is_multiple_tank()
     }
     pub const fn is_rotating_tank(self) -> bool {
         matches!(self, Self::Rotating | Self::RotatingControl)
     }
+    pub const fn is_multiple_tank(self) -> bool {
+        matches!(self, Self::Multiple | Self::MultipleControl)
+    }
     pub const fn has_displacement(self) -> bool {
         matches!(
             self,
-            Self::Displacement | Self::Floating | Self::Sinking | Self::Rotating
+            Self::Displacement | Self::Floating | Self::Sinking | Self::Rotating | Self::Multiple
         )
     }
 }
@@ -624,6 +634,8 @@ mod tests {
             ("sinking", ClockWaterLab::Sinking),
             ("rotating", ClockWaterLab::Rotating),
             ("rotating-control", ClockWaterLab::RotatingControl),
+            ("multiple", ClockWaterLab::Multiple),
+            ("multiple-control", ClockWaterLab::MultipleControl),
         ] {
             assert_eq!(ClockWaterLab::from_override(Some(value)), expected);
         }

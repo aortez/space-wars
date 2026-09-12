@@ -7,7 +7,7 @@ use crate::world::{
 use engine_core::Vec2;
 use engine_water::{
     MAX_STEP, WaterError, WaterWorld,
-    displacement::DisplacementBox,
+    displacement::DisplacementBody,
     immersion::{HullShape, WaterHull},
 };
 
@@ -88,8 +88,24 @@ impl BuoyantBody {
         self.shape
     }
 
+    /// Read a box/circle occupancy input from the authoritative collider pose.
+    /// Collect these into one `WaterWorld::set_displacers` call per pool; calling
+    /// the single-body sync method repeatedly would replace the preceding body.
+    /// A removed/non-dynamic body is an error, never a stale cached pose.
+    pub fn displacement(&self, world: &PhysicsWorld) -> Result<DisplacementBody, WaterError> {
+        let motion = world.motion(self.body).ok_or(WaterError::InvalidInput)?;
+        if world.dynamic_body_inertia(self.body).is_none() {
+            return Err(WaterError::InvalidGeometry);
+        }
+        Ok(DisplacementBody {
+            center: motion.position,
+            angle: motion.angle,
+            shape: self.shape,
+        })
+    }
+
     /// Submit this body's authoritative pose as the pool's sole displacer.
-    /// Dynamic boxes, including rotating boxes, are supported. The water
+    /// Dynamic boxes/circles, including rotating boxes, are supported. The water
     /// model validates the closed/flat basin and footprint. Failure is atomic.
     ///
     /// Submit before water stepping/force sampling and after physics stepping
@@ -103,25 +119,7 @@ impl BuoyantBody {
         water: &mut WaterWorld,
         pool: usize,
     ) -> Result<(), WaterError> {
-        let HullShape::Box {
-            half_width,
-            half_height,
-        } = self.shape
-        else {
-            return Err(WaterError::InvalidGeometry);
-        };
-        let motion = world.motion(self.body).ok_or(WaterError::InvalidInput)?;
-        if world.dynamic_body_inertia(self.body).is_none() {
-            return Err(WaterError::InvalidGeometry);
-        }
-        water.set_displacer(
-            pool,
-            Some(DisplacementBox {
-                center: motion.position,
-                half_extents: Vec2::new(half_width, half_height),
-                angle: motion.angle,
-            }),
-        )
+        water.set_displacers(pool, &[self.displacement(world)?])
     }
 
     /// Call once after `world.clear_forces()` and before each physics step.
