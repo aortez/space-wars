@@ -34,6 +34,8 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
             ClockWaterLab::Floating,
             ClockWaterLab::FloatingControl,
             ClockWaterLab::Sinking,
+            ClockWaterLab::Rotating,
+            ClockWaterLab::RotatingControl,
         ] {
             let make = || {
                 let mut state = ClockScenario::init(
@@ -58,6 +60,7 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
             let mut a = make();
             let mut b = make();
             let mut saw_wet = false;
+            let mut peak_tilt: f32 = 0.0;
             for elapsed in 0..510 {
                 assert_volume(&a);
                 assert_eq!((a.body_count(), a.collider_count()), (3, 5));
@@ -78,7 +81,15 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
                     panic!()
                 };
                 let motion = lab.world.motion(body.body.body()).unwrap();
-                assert_eq!((motion.angle, motion.angular_velocity), (0.0, 0.0));
+                if mode.is_rotating_tank() {
+                    assert_eq!(
+                        lab.world.body_rotation_locked(body.body.body()),
+                        Some(false)
+                    );
+                    peak_tilt = peak_tilt.max(motion.angle.sin().abs());
+                } else {
+                    assert_eq!((motion.angle, motion.angular_velocity), (0.0, 0.0));
+                }
                 saw_wet |= body.report.submerged_fraction > 0.1;
                 let stats = event.water.stats();
                 assert_eq!((stats.in_flight, stats.drained), (0.0, 0.0));
@@ -86,6 +97,20 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
                     assert_eq!(stats.displaced, 0.0);
                 }
                 if elapsed == 360 {
+                    if mode.is_rotating_tank() {
+                        assert!(peak_tilt > 0.5);
+                        assert!(
+                            motion.angle.sin().abs() < 0.025,
+                            "{mode:?} {aspect} {motion:?}"
+                        );
+                        // This short preview is still settling; long-lived
+                        // tanks below test the eventual resting state.
+                        eprintln!("short preview {mode:?} aspect={aspect} motion={motion:?}");
+                        assert!(
+                            motion.angular_velocity.abs() < 0.25,
+                            "{mode:?} {aspect} {motion:?}"
+                        );
+                    }
                     let spec = event.water.pools()[0].spec();
                     let area = 4.0 * half_width as f64 * half_height as f64;
                     let mass = lab.world.body_mass(body.body.body()).unwrap() as f64;
@@ -147,6 +172,65 @@ fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
                 assert_eq!((a.body_count(), a.collider_count()), (0, 0));
             }
         }
+    }
+}
+
+#[test]
+fn rotating_clock_scale_tank_settles_when_allowed_to_run_past_event_deadline() {
+    for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: aspect,
+                water_lab: ClockWaterLab::Rotating,
+                event_profile: ClockEventProfile::Off,
+                ..ClockConfig::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[
+                ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                ClockAction::preview_event(ClockEventKind::Meltdown),
+            ],
+            Duration::ZERO,
+        );
+        let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
+            panic!()
+        };
+        let lab = event.floats.as_mut().unwrap();
+        let mut early_tilt: f32 = 0.0;
+        let mut late_tilt: f32 = 0.0;
+        let mut late_spin: f32 = 0.0;
+        let mut late_speed: f32 = 0.0;
+        for tick in 0..3600 {
+            lab.prepare_displacement(&mut event.water, tick);
+            event.water.step(1.0 / 60.0).unwrap();
+            lab.step(&mut event.water);
+            let m = lab.world.motion(lab.bodies[1].body.body()).unwrap();
+            let s = event.water.stats();
+            assert!((s.injected - s.pooled).abs() < 1e-6);
+            assert!(
+                event.water.pools()[0]
+                    .columns()
+                    .all(|c| c.volume >= 0.0 && c.surface.is_finite())
+            );
+            if tick < 600 {
+                early_tilt = early_tilt.max(m.angle.sin().abs());
+            }
+            if tick >= 3000 {
+                late_tilt = late_tilt.max(m.angle.sin().abs());
+                late_spin = late_spin.max(m.angular_velocity.abs());
+                late_speed = late_speed.max(m.linear_velocity.length());
+            }
+        }
+        eprintln!(
+            "long preview aspect={aspect} tilt={late_tilt} spin={late_spin} speed={late_speed}"
+        );
+        assert!(late_tilt < 0.01 && late_tilt < early_tilt * 0.02);
+        assert!(late_spin < 0.02 && late_speed < 0.1);
+        let mass = lab.world.body_mass(lab.bodies[1].body.body()).unwrap() as f64;
+        assert!((event.water.stats().displaced - mass).abs() < mass * 0.01);
     }
 }
 

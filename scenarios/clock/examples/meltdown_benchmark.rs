@@ -16,7 +16,11 @@ fn summary(label: &str, values: &mut [f64]) {
 }
 
 fn main() {
-    let water_lab = if std::env::args().any(|a| a == "--floating-control") {
+    let water_lab = if std::env::args().any(|a| a == "--rotating-control") {
+        scenario_clock::ClockWaterLab::RotatingControl
+    } else if std::env::args().any(|a| a == "--rotating") {
+        scenario_clock::ClockWaterLab::Rotating
+    } else if std::env::args().any(|a| a == "--floating-control") {
         scenario_clock::ClockWaterLab::FloatingControl
     } else if std::env::args().any(|a| a == "--floating") {
         scenario_clock::ClockWaterLab::Floating

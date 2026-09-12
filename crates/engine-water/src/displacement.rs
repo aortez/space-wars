@@ -1,21 +1,34 @@
-//! Conservative, hydrostatic-reference displacement for one axis-aligned box
+//! Conservative, hydrostatic-reference displacement for one oriented box
 //! per closed flat basin. Occupancy raises local pressure heads; existing
 //! level-driven fluxes spread the disturbance without adding/removing liquid.
 //! This is not a solid flow barrier or a general moving-boundary fluid solver.
-use crate::{Boundary, Pool, WaterError, WaterWorld};
+use crate::{Boundary, Pool, WaterError, WaterWorld, immersion::clip};
 use engine_core::Vec2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DisplacementBox {
     pub center: Vec2,
     pub half_extents: Vec2,
+    /// Counterclockwise radians, matching the body's authoritative pose.
+    pub angle: f32,
+}
+
+impl DisplacementBox {
+    pub(crate) fn contains(self, point: Vec2) -> bool {
+        let (sin, cos) = (self.angle as f64).sin_cos();
+        let x = point.x as f64 - self.center.x as f64;
+        let y = point.y as f64 - self.center.y as f64;
+        (x * cos + y * sin).abs() <= self.half_extents.x as f64
+            && (-x * sin + y * cos).abs() <= self.half_extents.y as f64
+    }
 }
 
 impl WaterWorld {
     /// Replace the complete occupancy input for this pool, or remove it with
     /// None. One-way mode is simply no occupancy input. Rejections are atomic.
-    /// Supported: closed flat basins, box width <= 75% of basin width. Boxes can
-    /// move horizontally/vertically; rotation and multiple boxes are later work.
+    /// Supported: closed flat basins, box diagonal <= 75% of basin width. The
+    /// orientation-independent bound keeps free capacity positive at every
+    /// angle and prevents an accepted body rotating into an unsupported pose.
     pub fn set_displacer(
         &mut self,
         pool: usize,
@@ -29,7 +42,8 @@ impl WaterWorld {
                 || ![body.half_extents.x, body.half_extents.y]
                     .iter()
                     .all(|v| v.is_finite() && (0.001..=1000.0).contains(v))
-                || body.half_extents.x as f64 * 2.0
+                || !body.angle.is_finite()
+                || (body.half_extents.x as f64).hypot(body.half_extents.y as f64) * 2.0
                     > pool.spec.column_width * pool.volume.len() as f64 * 0.75
             {
                 return Err(WaterError::InvalidInput);
@@ -53,6 +67,11 @@ impl Pool {
             return;
         };
         self.displaced.fill(0.0);
+        if body.angle != 0.0 {
+            self.refresh_rotated_displacement(body);
+            return;
+        }
+        // Preserve the analytic axis-aligned path (and existing control runs).
         let width = self.spec.column_width * self.volume.len() as f64;
         let bed = self.spec.bed[0];
         let left = (body.center.x as f64 - body.half_extents.x as f64).max(self.spec.left);
@@ -82,6 +101,102 @@ impl Pool {
             *area = (right.min(x + self.spec.column_width) - left.max(x)).max(0.0) * depth;
         }
     }
+
+    fn refresh_rotated_displacement(&mut self, body: DisplacementBox) {
+        // Work relative to the body origin, avoiding cancellation in polygon
+        // areas when a small hull has large world coordinates. A rectangle
+        // clipped against the tank/water/column bounds needs at most 8 vertices.
+        let (sin, cos) = (body.angle as f64).sin_cos();
+        let (x, y) = (body.half_extents.x as f64, body.half_extents.y as f64);
+        let mut polygon = [[0.0; 2]; 12];
+        for (p, [x, y]) in polygon.iter_mut().zip([[-x, -y], [x, -y], [x, y], [-x, y]]) {
+            *p = [x * cos - y * sin, x * sin + y * cos];
+        }
+        let mut len = 4;
+        let width = self.spec.column_width * self.volume.len() as f64;
+        let left = self.spec.left - body.center.x as f64;
+        let bed = self.spec.bed[0] - body.center.y as f64;
+        for (axis, bound, greater) in [(0, left, true), (0, left + width, false), (1, bed, true)] {
+            clip(&mut polygon, &mut len, axis, bound, greater);
+        }
+        let area = polygon_area(&polygon[..len]);
+        let liquid: f64 = self.volume.iter().sum();
+        if area == 0.0 || liquid == 0.0 {
+            return;
+        }
+        let empty_level = bed + liquid / width;
+        let bottom = polygon[..len]
+            .iter()
+            .map(|p| p[1])
+            .fold(f64::INFINITY, f64::min);
+        let top = polygon[..len]
+            .iter()
+            .map(|p| p[1])
+            .fold(f64::NEG_INFINITY, f64::max);
+        if empty_level <= bottom {
+            return;
+        }
+        if empty_level < top {
+            // Solve W*(h-bed) - occupied(h) = liquid. Free width is always
+            // >= W/4, so capacity is monotone. Fixed iterations bound work;
+            // this solves the reference surface, not each rippling column.
+            let mut low = empty_level;
+            let mut high = empty_level + area / width;
+            for _ in 0..40 {
+                let level = (low + high) * 0.5;
+                let mut submerged = polygon;
+                let mut count = len;
+                clip(&mut submerged, &mut count, 1, level, false);
+                if width * (level - bed) - polygon_area(&submerged[..count]) < liquid {
+                    low = level;
+                } else {
+                    high = level;
+                }
+            }
+            clip(&mut polygon, &mut len, 1, (low + high) * 0.5, false);
+        }
+        let min_x = polygon[..len]
+            .iter()
+            .map(|p| p[0])
+            .fold(f64::INFINITY, f64::min);
+        let max_x = polygon[..len]
+            .iter()
+            .map(|p| p[0])
+            .fold(f64::NEG_INFINITY, f64::max);
+        for (i, occupied) in self.displaced.iter_mut().enumerate() {
+            let x = left + i as f64 * self.spec.column_width;
+            if x >= max_x || x + self.spec.column_width <= min_x {
+                continue;
+            }
+            let mut column = polygon;
+            let mut count = len;
+            clip(&mut column, &mut count, 0, x, true);
+            clip(
+                &mut column,
+                &mut count,
+                0,
+                x + self.spec.column_width,
+                false,
+            );
+            *occupied = polygon_area(&column[..count]);
+        }
+    }
+}
+
+fn polygon_area(points: &[[f64; 2]]) -> f64 {
+    if points.len() < 3 {
+        return 0.0;
+    }
+    let origin = points[0];
+    points[1..]
+        .windows(2)
+        .map(|pair| {
+            let a = [pair[0][0] - origin[0], pair[0][1] - origin[1]];
+            let b = [pair[1][0] - origin[0], pair[1][1] - origin[1]];
+            (a[0] * b[1] - b[0] * a[1]) * 0.5
+        })
+        .sum::<f64>()
+        .max(0.0)
 }
 
 #[cfg(test)]

@@ -195,6 +195,8 @@ pub enum ClockWaterLab {
     Floating,
     FloatingControl,
     Sinking,
+    Rotating,
+    RotatingControl,
 }
 
 impl ClockWaterLab {
@@ -206,6 +208,8 @@ impl ClockWaterLab {
             Some("floating") => Self::Floating,
             Some("floating-control") => Self::FloatingControl,
             Some("sinking") => Self::Sinking,
+            Some("rotating") => Self::Rotating,
+            Some("rotating-control") => Self::RotatingControl,
             _ => Self::Off,
         }
     }
@@ -218,6 +222,8 @@ impl ClockWaterLab {
             Self::Floating => "floating",
             Self::FloatingControl => "floating-control",
             Self::Sinking => "sinking",
+            Self::Rotating => "rotating",
+            Self::RotatingControl => "rotating-control",
         }
     }
     pub const fn is_tank(self) -> bool {
@@ -225,9 +231,16 @@ impl ClockWaterLab {
     }
     pub const fn is_dynamic_tank(self) -> bool {
         matches!(self, Self::Floating | Self::FloatingControl | Self::Sinking)
+            || self.is_rotating_tank()
+    }
+    pub const fn is_rotating_tank(self) -> bool {
+        matches!(self, Self::Rotating | Self::RotatingControl)
     }
     pub const fn has_displacement(self) -> bool {
-        matches!(self, Self::Displacement | Self::Floating | Self::Sinking)
+        matches!(
+            self,
+            Self::Displacement | Self::Floating | Self::Sinking | Self::Rotating
+        )
     }
 }
 
@@ -609,6 +622,8 @@ mod tests {
             ("floating", ClockWaterLab::Floating),
             ("floating-control", ClockWaterLab::FloatingControl),
             ("sinking", ClockWaterLab::Sinking),
+            ("rotating", ClockWaterLab::Rotating),
+            ("rotating-control", ClockWaterLab::RotatingControl),
         ] {
             assert_eq!(ClockWaterLab::from_override(Some(value)), expected);
         }

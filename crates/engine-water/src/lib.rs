@@ -415,10 +415,7 @@ impl WaterWorld {
             .iter()
             .filter_map(|pool| {
                 let i = pool.index(point.x as f64)?;
-                if pool.displacer.is_some_and(|b| {
-                    (point.x - b.center.x).abs() <= b.half_extents.x
-                        && (point.y - b.center.y).abs() <= b.half_extents.y
-                }) {
+                if pool.displacer.is_some_and(|b| b.contains(point)) {
                     return None;
                 }
                 let surface = pool.surface(i);

@@ -89,7 +89,7 @@ impl BuoyantBody {
     }
 
     /// Submit this body's authoritative pose as the pool's sole displacer.
-    /// Only unrotated, rotation-locked dynamic boxes are supported. The water
+    /// Dynamic boxes, including rotating boxes, are supported. The water
     /// model validates the closed/flat basin and footprint. Failure is atomic.
     ///
     /// Submit before water stepping/force sampling and after physics stepping
@@ -111,11 +111,7 @@ impl BuoyantBody {
             return Err(WaterError::InvalidGeometry);
         };
         let motion = world.motion(self.body).ok_or(WaterError::InvalidInput)?;
-        if world.body_rotation_locked(self.body) != Some(true)
-            || motion.angle != 0.0
-            || motion.angular_velocity != 0.0
-            || world.dynamic_body_inertia(self.body).is_none()
-        {
+        if world.dynamic_body_inertia(self.body).is_none() {
             return Err(WaterError::InvalidGeometry);
         }
         water.set_displacer(
@@ -123,6 +119,7 @@ impl BuoyantBody {
             Some(DisplacementBox {
                 center: motion.position,
                 half_extents: Vec2::new(half_width, half_height),
+                angle: motion.angle,
             }),
         )
     }

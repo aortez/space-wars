@@ -169,7 +169,9 @@ impl WaterLab {
                         piston.body.entity,
                         BodySpec {
                             position: Vec2::new(piston.x, piston.raised_y),
-                            lock_rotation: true,
+                            lock_rotation: !mode.is_rotating_tank(),
+                            angle: if mode.is_rotating_tank() { 0.65 } else { 0.0 },
+                            angular_velocity: if mode.is_rotating_tank() { -0.8 } else { 0.0 },
                             can_sleep: false,
                             ccd_enabled: true,
                             ..BodySpec::default()
@@ -299,6 +301,7 @@ impl WaterLab {
                 self.displacement_enabled.then_some(DisplacementBox {
                     center: target,
                     half_extents: piston.half_extents,
+                    angle: 0.0,
                 }),
             )
             .expect("one bounded axis-aligned box in a closed tank");
@@ -310,7 +313,7 @@ impl WaterLab {
                 self.bodies[index]
                     .body
                     .sync_displacement(&self.world, water, 0)
-                    .expect("one rotation-locked dynamic box in a closed tank");
+                    .expect("one bounded dynamic box in a closed tank");
             } else {
                 water.set_displacer(0, None).expect("one-way tank control");
             }

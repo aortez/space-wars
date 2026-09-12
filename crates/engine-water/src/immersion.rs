@@ -140,8 +140,8 @@ impl WaterHull {
     }
 }
 
-fn clip(
-    polygon: &mut [Point; CLIPPED_VERTICES],
+pub(crate) fn clip<const N: usize>(
+    polygon: &mut [Point; N],
     len: &mut usize,
     axis: usize,
     bound: f64,

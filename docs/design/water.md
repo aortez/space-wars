@@ -5,6 +5,7 @@ Meltdown integration, deterministic fixtures, visual preview, and benchmarks.
 The second slice adds opt-in one-way Rapier buoyancy. The third adds a deliberately
 narrow displacement experiment: a prescribed box entering/leaving a closed tank.
 The fourth closes that feedback loop for a freely moving, rotation-locked box.
+The fifth extends that same single-body feedback to a rotating box.
 
 ## Model and boundaries
 
@@ -226,10 +227,12 @@ Clippy passes with only the pre-existing `collapsible_else_if` lint in
 
 `WaterWorld::set_displacer(pool, Some(DisplacementBox { center, half_extents }))`
 opts a pool into displacement. `None` removes the occupancy input, preserving
-the liquid. The API accepts **one axis-aligned box per closed, flat basin**, at
-most 75% of basin width. Box/tank intersections are clipped to the basin width
-and bed. Rotation, multiple boxes, open edges and uneven beds are rejected or
-not represented; invalid submissions leave the existing input unchanged.
+the liquid. The initial experiment used **one axis-aligned box per closed, flat
+basin**. The current API also accepts an `angle`, as described under
+[rotating box feedback](#rotating-box-feedback). The box's diagonal must fit
+within 75% of basin width. Box/tank intersections are clipped to basin width
+and bed. Multiple boxes, open edges and uneven beds remain unsupported;
+invalid submissions leave the existing input unchanged.
 
 For basin width `W`, bed `z`, liquid area `V`, and box area below a candidate level
 `A(h)`, the reference level solves `W * (h - z) - A(h) = V`. The axis-aligned box
@@ -334,9 +337,10 @@ performed for this slice.
 
 `BuoyantBody::sync_displacement(&physics, &mut water, pool)` submits the existing
 body's authoritative Rapier pose and matching box dimensions to the water model.
-It accepts only a dynamic, rotation-locked box at zero angle; circles, unlocked
-or rotated boxes, removed bodies and unsupported pools fail without changing
-occupancy. There is no automatic registry or second body representation. One
+The initial binding accepted only a dynamic, rotation-locked box at zero angle;
+the rotating extension below removes that pose restriction. Circles, removed
+bodies and unsupported pools still fail without changing occupancy.
+There is no automatic registry or second body representation. One
 caller owns each pool's sole occupancy input and clears it explicitly with
 `set_displacer(pool, None)` when removing the body or disabling feedback.
 
@@ -442,9 +446,126 @@ Workspace/all-target compile, host `pi-kiosk` feature check, formatting and scop
 Clippy pass (the same unrelated `collapsible_else_if` lint remains allowed).
 This is not an ARM build or Pi deployment.
 
+Subsequently, revision `71ecb0e` was ARM release-built and deployed to
+`sw-picade-2`. A `floating` preview was visually inspected and telemetry showed
+three bodies, five colliders, nonzero displacement, and 60 FPS/UPS. This was a
+small-scene check, not a Pi scaling benchmark. The environment override is a
+temporary same-user session; reboot restores normal managed startup.
+
+## Rotating box feedback
+
+`DisplacementBox::angle` carries the same counterclockwise-radian pose used by
+Rapier and rendering. `BuoyantBody::sync_displacement` now accepts an unlocked
+dynamic box as well as the previous locked box. No pose is prescribed after
+spawning: buoyancy torque, drag, gravity and contacts determine its motion.
+The integration order and one-displacer-per-pool ownership contract are unchanged.
+
+The rotated rectangle is clipped against the basin sides and bed. Its area
+below a candidate reference level supplies `A(h)` in the same capacity equation
+`W * (h - bed) - A(h) = liquid`. Forty bounded bisection iterations solve that
+monotone equation, then clipping the submerged polygon against each overlapping
+column distributes occupied area. Geometry uses body-relative `f64` coordinates
+and fixed stack buffers; stepping still allocates no geometry storage.
+Exactly zero angle retains the original analytic path. Water point queries
+exclude the actual oriented box, not its axis-aligned bounding rectangle.
+
+The admission bound is now **box diagonal <= 75% of basin width**, rather than
+only its current horizontal width. This guarantees positive free capacity at
+every orientation and prevents a successfully admitted hull from becoming
+unsupported just because it rotates. This is a deliberately conservative size
+limit, not a new obstacle/contact solver. Closed flat basins, one box, permeable
+flow and hydrostatic-reference occupancy remain the model's limits. In
+particular, rotation does not add conserved water/body momentum, sealed hull
+interiors, impact splashes or breaking waves.
+
+### Preview and verification
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=rotating cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=rotating-control cargo run --release -p engine-client -- --scenario clock
+cargo test --locked -p engine-water -p engine-rapier -p scenario-clock
+cargo run --locked --release -p engine-water --example displacement_benchmark -- --rotating
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --rotating
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --rotating-control
+```
+
+Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+orange box starts tilted 0.65 radians with angular velocity -0.8 radians/second,
+off-center above the existing tank. Density, geometry, drag and gravity match
+the locked floating fixture. `rotating-control` disables only displacement
+feedback; it has exactly the same initial tilt/spin and remains free to rotate.
+The yellow ball remains a one-way observer. All earlier modes remain available,
+normal Meltdown is unchanged, and the new previews retain three bodies/five
+colliders and the existing event/pause/resize/cleanup lifecycle.
+
+Geometry regressions cover known full/half/quarter areas, partial immersion,
+bed/wall clipping, near-axis angles, rotated point queries, translation to large
+coordinates, source/reclaim updates, invalid-input atomicity, deterministic
+entry/exit/rotation and reused occupancy storage. The mechanics fixture tests
+two floating densities at 30/60/120 Hz with gravity 40 and 400, and 32/128/512
+columns at gravity 40. It checks settling, liquid conservation, correct final
+water levels and decaying tilt/spin after both the initial drop and a later
+off-center impulse. A matched one-way control and exact replay remain separate
+checks; the original locked/sinking tests still run.
+
+Clock's seven-second material phase may end with small residual rocking. At six
+seconds the portrait fixture had about 0.12 rad/s angular speed despite being
+almost level. A separate 60-second fixture retains the Clock's actual scale,
+gravity, damping and observer ball without event cleanup: across portrait and
+landscape layouts, late spin falls below 0.02 rad/s and tilt below 0.01 radians.
+The short preview is not evidence of instantaneous equilibrium.
+
+### Fifth-slice measurements and validation (2026-09-12)
+
+Desktop Rust 1.94.1 release, three runs of 24 events at each of 800×480, 480×800
+and 1280×720. As above, ranges are the median per-run p95 at each size:
+
+| Mode | Step p95 | Draw-list p95 |
+| --- | ---: | ---: |
+| Rotating, feedback on | 17.2–17.5 µs | 5.7–6.1 µs |
+| Rotating, feedback off | 8.0–8.2 µs | 5.2–5.5 µs |
+| Locked floating, feedback on | 9.2–9.5 µs | 5.3–5.6 µs |
+| Normal Meltdown | 4.7–4.8 µs | 6.2–6.7 µs |
+
+All individual rotating step p95s ranged 17.0–18.9 µs. These are desktop
+simulation/draw-list costs, not raster/presentation, Pi CPU or scaling claims.
+The rotated clipping/reference solve adds measurable cost; the zero-angle and
+normal paths retain their existing costs. The new previews remain bounded at
+384 primitives, three bodies and five colliders.
+
+The prescribed rotating water-only workload (12,000 measured ticks after 600
+warm-up ticks) measured submit-plus-step p95 of 3.34/6.40/17.95 µs at 32/128/512
+columns, versus 0.54/1.83/7.29 µs for the no-occupancy controls. Largest liquid
+accounting error was 9.33e-12 on 2,000 initial area units. These single-run values
+exclude body physics and drawing; unlike the Clock runs, the prescribed shape
+continues rotating and moving throughout the benchmark.
+
+Validation: 27 water tests, 65 Rapier tests, 83 Clock tests and 298 client tests
+pass (three existing extended Duck sweeps and one existing client test remain
+ignored). Both rendering paths pass at four device aspects; portrait/landscape
+captures were inspected. Real-client Meltdown workflows under Xvfb cover
+rotating, rotating-control and normal Meltdown, including preview, pause,
+recovery, restart and launcher return. Workspace/all-target check, Rust 1.89
+core/scenario all-target check, formatting and scoped Clippy pass, with the existing unrelated
+`collapsible_else_if` lint still allowed. A host `pi-kiosk` feature check could
+not finish because the host lacks `libseat.pc`; the subsequent Yocto ARM release
+build passed with its target dependencies.
+
+The rotating extension was then fast-deployed to `sw-picade-2` (client SHA-256
+`685c93b48201531ea860c50d1d7ebfb1747183157036bc2fc81cb82487ea383b`). The
+restricted updater verified the installed binaries and managed kiosk startup.
+Clock was relaunched with `SPACEWARS_CLOCK_WATER_LAB=rotating`; the environment,
+tilted-box screenshot, nonzero displacement and three-body/five-collider counts
+were checked. During the sampled preview, telemetry reported 60 FPS/UPS,
+0.222 ms mean simulation step, 0.260 ms step p95 and no display-flip read errors.
+These are short device samples, not scaling or long-run performance guarantees.
+Manual device testing was also approved. The override runs in a temporary
+same-user session; reboot restores normal managed startup. Other devices were
+not changed.
+
 ## Later slices
 
-Next candidates are multiple/rotating hull occupancy and explicit obstacle-aware
+Next candidates are multiple-hull occupancy and explicit obstacle-aware
 flow, each with conservation and stability tests. Use the existing prescribed,
 dynamic and one-way controls for comparisons. More aggressive impact or very
 light-body workloads should get separate accuracy/stability limits before

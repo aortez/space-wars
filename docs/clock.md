@@ -132,6 +132,15 @@ ball remains a one-way observer. These modes retain the same three-body/five-
 collider budget, preview controls and cleanup lifecycle. See
 [dynamic feedback, tests and limitations](design/water.md#dynamic-box-feedback).
 
+`SPACEWARS_CLOCK_WATER_LAB=rotating` uses the same tank with the orange box
+tilted and spinning at spawn, with rotation unlocked. Its changing orientation
+now displaces water too; buoyancy and drag determine how it rights itself.
+`rotating-control` preserves the same initial motion but disables displacement
+feedback. The original locked modes stay available for comparison. Small rocking
+can remain during this short preview; longer settling and off-center-impulse
+tests are described in [rotating box feedback](design/water.md#rotating-box-feedback).
+These remain single-box, closed-tank experiments, not sealed flow barriers.
+
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently

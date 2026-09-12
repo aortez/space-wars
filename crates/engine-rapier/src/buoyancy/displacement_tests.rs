@@ -15,6 +15,18 @@ impl Fixture {
     }
 
     fn with_gravity(density: f32, columns: usize, feedback: bool, gravity: f32) -> Self {
+        Self::with_rotation(density, columns, feedback, gravity, true, 0.0, 0.0)
+    }
+
+    fn with_rotation(
+        density: f32,
+        columns: usize,
+        feedback: bool,
+        gravity: f32,
+        locked: bool,
+        angle: f32,
+        spin: f32,
+    ) -> Self {
         let mut physics = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -gravity),
             length_unit: 10.0,
@@ -75,7 +87,9 @@ impl Fixture {
             PhysicsId::new(1),
             BodySpec {
                 position: Vec2::new(-15.0, 40.0),
-                lock_rotation: true,
+                lock_rotation: locked,
+                angle,
+                angular_velocity: spin,
                 can_sleep: false,
                 ccd_enabled: true,
                 ..BodySpec::default()
@@ -127,7 +141,11 @@ impl Fixture {
                 .all(|c| c.volume >= 0.0 && c.surface.is_finite() && c.surface < 55.0)
         );
         let m = self.physics.motion(self.body.body()).unwrap();
-        assert_eq!((m.angle, m.angular_velocity), (0.0, 0.0));
+        if self.physics.body_rotation_locked(self.body.body()) == Some(true) {
+            assert_eq!((m.angle, m.angular_velocity), (0.0, 0.0));
+        } else {
+            assert!(m.angle.is_finite() && m.angular_velocity.is_finite());
+        }
         // Fast impacts can overlap the bed before the contact solver corrects
         // penetration. Bound containment here; check the settled floor height
         // tightly below instead of assuming exact non-penetration every tick.
@@ -272,40 +290,119 @@ fn displacement_adapter_rejects_unsupported_bodies_and_caller_can_clear_after_re
         .sync_displacement(&f.physics, &mut f.water, 0)
         .unwrap();
     assert!(f.water.stats().displaced > 0.0);
-    let before = f.water.pools().to_vec();
     f.physics
         .set_pose(f.body.body(), Vec2::new(0.0, 10.0), 0.1, true);
-    assert_eq!(
-        f.body.sync_displacement(&f.physics, &mut f.water, 0),
-        Err(WaterError::InvalidGeometry)
-    );
-    assert_eq!(f.water.pools(), before);
+    f.body
+        .sync_displacement(&f.physics, &mut f.water, 0)
+        .unwrap();
+    assert!(f.water.stats().displaced > 0.0);
+    let before = f.water.pools().to_vec();
     f.physics.remove_entity(f.body.body().entity);
     assert_eq!(
         f.body.sync_displacement(&f.physics, &mut f.water, 0),
         Err(WaterError::InvalidInput)
     );
+    assert_eq!(f.water.pools(), before);
     f.water.set_displacer(0, None).unwrap();
     assert_eq!(f.water.stats().displaced, 0.0);
-    for shape in [
-        HullShape::Box {
-            half_width: 10.0,
-            half_height: 5.0,
-        },
+    let body = BuoyantBody::insert(
+        &mut f.physics,
+        PhysicsId::new(2),
+        BodySpec::default(),
         HullShape::Circle { radius: 5.0 },
+        0.55,
+    )
+    .unwrap();
+    assert_eq!(
+        body.sync_displacement(&f.physics, &mut f.water, 0),
+        Err(WaterError::InvalidGeometry)
+    );
+}
+
+#[test]
+fn rotating_displacer_settles_after_tilt_and_spin_across_timesteps() {
+    for (columns, dt, gravity) in [
+        (128, 1.0 / 30.0, 40.0),
+        (128, 1.0 / 60.0, 40.0),
+        (128, 1.0 / 120.0, 40.0),
+        (32, 1.0 / 60.0, 40.0),
+        (512, 1.0 / 60.0, 40.0),
+        (128, 1.0 / 30.0, 400.0),
+        (128, 1.0 / 60.0, 400.0),
+        (128, 1.0 / 120.0, 400.0),
     ] {
-        let body = BuoyantBody::insert(
-            &mut f.physics,
-            PhysicsId::new(2),
-            BodySpec::default(),
-            shape,
-            0.55,
-        )
-        .unwrap();
-        assert_eq!(
-            body.sync_displacement(&f.physics, &mut f.water, 0),
-            Err(WaterError::InvalidGeometry)
-        );
-        f.physics.remove_entity(body.body().entity);
+        for density in [0.35, 0.75] {
+            let mut f = Fixture::with_rotation(density, columns, true, gravity, false, 0.65, -0.8);
+            let mass = f.physics.body_mass(f.body.body()).unwrap() as f64;
+            let level = 20.0 + mass / 100.0;
+            let expected_y = level + 5.0 - 10.0 * density as f64;
+            let mut early: f32 = 0.0;
+            let mut late: f32 = 0.0;
+            let mut late_speed: f32 = 0.0;
+            let mut late_spin: f32 = 0.0;
+            let mut late_height: f64 = 0.0;
+            for tick in 0..(60.0 / dt) as usize {
+                if tick == (20.0 / dt) as usize {
+                    let m = f.physics.motion(f.body.body()).unwrap();
+                    // A second, off-center disturbance must recover too.
+                    assert!(f.physics.apply_impulse_at_point(
+                        f.body.body(),
+                        Vec2::new(0.0, mass as f32 * 2.0),
+                        m.position + Vec2::new(10.0, 0.0),
+                        true,
+                    ));
+                }
+                f.step(dt);
+                let m = f.physics.motion(f.body.body()).unwrap();
+                // Upright and upside-down are equivalent for this uniform box.
+                let tilt = m.angle.sin().abs();
+                if tick as f64 * dt < 10.0 {
+                    early = early.max(tilt);
+                }
+                if tick as f64 * dt >= 50.0 {
+                    late = late.max(tilt);
+                    late_speed = late_speed.max(m.linear_velocity.length());
+                    late_spin = late_spin.max(m.angular_velocity.abs());
+                    late_height = late_height.max((m.position.y as f64 - expected_y).abs());
+                }
+            }
+            eprintln!(
+                "rotating density={density} columns={columns} dt={dt} gravity={gravity} tilt={late} speed={late_speed} spin={late_spin} height={late_height} displaced={}",
+                f.water.stats().displaced
+            );
+            assert!(early > 0.4 && late < 0.02 && late < early * 0.04);
+            assert!(late_speed < 0.1 && late_spin < 0.02 && late_height < 0.1);
+            assert!((f.water.stats().displaced - mass).abs() < 1.0);
+            assert!(
+                f.water.pools()[0]
+                    .columns()
+                    .all(|c| (c.surface - level).abs() < 0.1)
+            );
+        }
     }
+}
+
+#[test]
+fn rotating_feedback_is_replayable_and_differs_from_matching_one_way_control() {
+    let make = |feedback| Fixture::with_rotation(0.55, 128, feedback, 40.0, false, -0.65, 0.8);
+    let mut a = make(true);
+    let mut b = make(true);
+    let mut control = make(false);
+    for _ in 0..3600 {
+        assert_eq!(a.step(1.0 / 60.0), b.step(1.0 / 60.0));
+        control.step(1.0 / 60.0);
+        assert_eq!(a.water.pools(), b.water.pools());
+        assert_eq!(
+            a.physics.motion(a.body.body()),
+            b.physics.motion(b.body.body())
+        );
+    }
+    let y = |f: &Fixture| f.physics.motion(f.body.body()).unwrap().position.y;
+    assert!((y(&a) - y(&control) - 1.1).abs() < 0.05);
+    assert_eq!(control.water.stats().displaced, 0.0);
+    assert!(
+        control.water.pools()[0]
+            .columns()
+            .all(|c| c.surface == 20.0)
+    );
 }

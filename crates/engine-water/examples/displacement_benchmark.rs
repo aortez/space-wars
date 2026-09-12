@@ -10,6 +10,8 @@ const TICKS: usize = 12_000;
 const WARMUP: usize = 600;
 
 fn main() {
+    let rotating = std::env::args().any(|a| a == "--rotating");
+    println!("rotating={rotating}");
     for columns in [32, 128, 512] {
         for enabled in [false, true] {
             let mut water = WaterWorld::new(
@@ -46,6 +48,7 @@ fn main() {
                         (20.0 + 12.0 * phase.cos()) as f32,
                     ),
                     half_extents: Vec2::new(10.0, 5.0),
+                    angle: if rotating { phase as f32 } else { 0.0 },
                 };
                 let start = Instant::now();
                 black_box(&mut water)
