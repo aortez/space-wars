@@ -1,5 +1,6 @@
 use super::planner::{Capabilities, Course, Rejection, Surface};
 use super::*;
+use engine_common::{ClockDuckCoursePattern, ClockDuckJumpProfile};
 
 const ASPECTS: [f32; 7] = [
     0.25,
@@ -11,6 +12,57 @@ const ASPECTS: [f32; 7] = [
     4.0,
 ];
 
+#[test]
+fn lookahead_preserves_a_second_running_jump_that_greedy_landing_loses() {
+    let radius = 8.0;
+    let caps = Capabilities {
+        height: 35.6,
+        flight: 52.0 / 60.0,
+        speed: 160.0,
+        acceleration: 960.0,
+    };
+    let course = Course::authored(800.0, radius, ClockDuckCoursePattern::TwoJump);
+    assert!(course.valid_routes(radius, caps));
+    let start = flow::Start {
+        surface: 0,
+        x: 150.0,
+        velocity: 160.0,
+        direction: 1.0,
+    };
+    let linked = flow::plan(&course, start, radius, caps).unwrap();
+    let greedy = flow::single_jump_plan(&course, start, radius, caps).unwrap();
+    assert_eq!(
+        (linked.source, linked.target, linked.next_target),
+        (0, 1, Some(2))
+    );
+    assert!(
+        linked.landing.x < greedy.landing.x,
+        "linked={linked:?} greedy={greedy:?}"
+    );
+    assert!(linked.cruise < greedy.cruise);
+    let onward = |p: planner::Plan| {
+        flow::single_jump_plan(
+            &course,
+            flow::Start {
+                surface: 1,
+                x: p.landing.x + p.cruise * DT * 2.0,
+                velocity: p.cruise,
+                direction: 1.0,
+            },
+            radius,
+            caps,
+        )
+    };
+    assert!(
+        onward(greedy).is_none(),
+        "center landing consumes the next runway"
+    );
+    assert!(
+        onward(linked).is_some(),
+        "earlier touchdown leaves a running continuation"
+    );
+}
+
 #[derive(Debug, Default)]
 struct RunStats {
     landings: u32,
@@ -21,6 +73,10 @@ struct RunStats {
     moving: u32,
     fallbacks: u32,
     lookahead: u32,
+    skipped: u32,
+    chains: u32,
+    chained_directions: [u32; 2],
+    skipped_directions: [u32; 2],
 }
 
 fn run(event: DuckEvent, label: &str) -> (u32, u64) {
@@ -32,12 +88,21 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
     let mut stats = RunStats::default();
     let mut landings = 0;
     let mut exit_tick = None;
+    let mut last_landing: Option<engine_common::ClockDuckPlanState> = None;
+    let mut moving_since_landing = false;
+    let mut chained_flight = false;
     for tick in 1..=DUCK_TICKS {
         let before = event.diagnostics();
         event.step();
         let after = event.diagnostics();
         let navigation = after.navigation.unwrap();
         let planning = navigation.planning.unwrap();
+        if last_landing.is_some()
+            && let Some(world) = &event.world
+        {
+            moving_since_landing &= world.motion(DUCK_BODY).unwrap().linear_velocity.x.abs()
+                > event.movement.run_speed * 0.05;
+        }
         if stats.first_crossing == 0 {
             if navigation.wall_tags.iter().sum::<u32>() > 0 {
                 stats.first_crossing = tick;
@@ -60,9 +125,15 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
         assert!(event.physics_counts().0 <= planner::MAX_SURFACES + 1);
         if after.jumps > before.jumps {
             assert!(before.grounded, "{label}: airborne jump");
+            chained_flight = false;
             if let Some(plan) = planning.plan
                 && plan.running_takeoff
             {
+                chained_flight = last_landing.is_some_and(|previous| {
+                    previous.running_takeoff
+                        && previous.target == plan.source
+                        && previous.next_target == Some(plan.target)
+                }) && moving_since_landing;
                 let speed = event
                     .world
                     .as_ref()
@@ -81,6 +152,48 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
             assert_eq!(planning.support, Some(previous_plan.target));
             assert!(before.grounded, "landing must be solver-supported");
             landings = planning.confirmed_landings;
+            stats.chains += u32::from(chained_flight);
+            let direction = usize::from(previous_plan.target > previous_plan.source);
+            stats.chained_directions[direction] += u32::from(chained_flight);
+            let skipped = previous_plan
+                .target
+                .abs_diff(previous_plan.source)
+                .saturating_sub(1) as u32;
+            stats.skipped_directions[direction] += skipped;
+            assert_eq!(
+                planning.skipped_platforms
+                    - before
+                        .navigation
+                        .unwrap()
+                        .planning
+                        .unwrap()
+                        .skipped_platforms,
+                skipped
+            );
+            chained_flight = false;
+            last_landing = Some(previous_plan);
+            moving_since_landing = true;
+        } else {
+            assert_eq!(
+                planning.skipped_platforms,
+                before
+                    .navigation
+                    .unwrap()
+                    .planning
+                    .unwrap()
+                    .skipped_platforms,
+                "only confirmed landings earn shortcuts"
+            );
+        }
+        if event.controller.navigator.flight_tick.is_some()
+            && let Some(plan) = planning.plan
+            && plan.target.abs_diff(plan.source) > 1
+            && let Some(support) = planning.support
+        {
+            assert!(
+                support == plan.source || support == plan.target,
+                "shortcut must fly over the intervening platform"
+            );
         }
         if let Some(outcome) = after.outcome {
             assert_eq!(
@@ -107,14 +220,18 @@ fn run_stats(mut event: DuckEvent, label: &str) -> RunStats {
         navigation.wall_tags.iter().all(|count| *count > 0),
         "{label}: {final_state:?}"
     );
-    assert!(landings >= (event.course.as_ref().unwrap().surfaces.len() - 1) as u32 * 3);
     assert_eq!(event.physics_counts(), (0, 0));
     let planning = navigation.planning.unwrap();
+    assert!(
+        landings + planning.skipped_platforms
+            >= (event.course.as_ref().unwrap().surfaces.len() - 1) as u32 * 3
+    );
     stats.landings = landings;
     stats.exit_tick = exit_tick.expect("must exit");
     stats.running = planning.running_jumps;
     stats.moving = planning.moving_landings;
     stats.fallbacks = planning.flowing_fallbacks;
+    stats.skipped = planning.skipped_platforms;
     stats
 }
 
@@ -154,6 +271,14 @@ fn compare_profiles(seeds: std::ops::Range<u64>) {
                 totals[index].moving += result.moving;
                 totals[index].fallbacks += result.fallbacks;
                 totals[index].lookahead += result.lookahead;
+                totals[index].skipped += result.skipped;
+                totals[index].chains += result.chains;
+                for direction in 0..2 {
+                    totals[index].chained_directions[direction] +=
+                        result.chained_directions[direction];
+                    totals[index].skipped_directions[direction] +=
+                        result.skipped_directions[direction];
+                }
             }
         }
     }
@@ -168,6 +293,111 @@ fn compare_profiles(seeds: std::ops::Range<u64>) {
     assert!(totals[1].moving >= totals[1].running * 9 / 10);
     assert!(totals[1].first_crossing < totals[0].first_crossing);
     assert!(totals[1].stopped_before_first_wall < totals[0].stopped_before_first_wall);
+}
+
+#[test]
+fn authored_routes_prove_linked_jumps_and_shortcuts_in_the_real_solver() {
+    for (pattern, profile, aspect) in [
+        (
+            ClockDuckCoursePattern::TwoJump,
+            ClockDuckJumpProfile::Flowing,
+        ),
+        (
+            ClockDuckCoursePattern::Shortcut,
+            ClockDuckJumpProfile::Flowing,
+        ),
+        (
+            ClockDuckCoursePattern::TwoJump,
+            ClockDuckJumpProfile::Careful,
+        ),
+        (
+            ClockDuckCoursePattern::Shortcut,
+            ClockDuckJumpProfile::Careful,
+        ),
+    ]
+    .into_iter()
+    .flat_map(|(pattern, profile)| {
+        [800.0 / 480.0, 1024.0 / 768.0].map(|aspect| (pattern, profile, aspect))
+    }) {
+        let mut event = DuckEvent::new_platforms(Layout::new(aspect), 42);
+        event.course = Some(Course::authored(event.width, event.radius, pattern));
+        event.select_jump_profile(Some(profile));
+        let stats = run_stats(event, &format!("{pattern:?} {profile:?}"));
+        eprintln!("authored {pattern:?} {profile:?} aspect={aspect}: {stats:?}");
+        if profile == ClockDuckJumpProfile::Careful {
+            assert_eq!(stats.skipped, 0);
+        } else if pattern == ClockDuckCoursePattern::TwoJump {
+            assert!(
+                stats.chained_directions.iter().all(|count| *count > 0),
+                "two real landings, with no stop between the jumps, in either direction"
+            );
+        } else {
+            assert!(
+                stats.skipped_directions.iter().all(|count| *count > 0),
+                "must confirm landing beyond the intermediate platform in either direction"
+            );
+        }
+    }
+}
+
+#[test]
+fn seeded_patterns_are_playable_by_both_profiles_at_every_aspect() {
+    pattern_matrix(0..4);
+}
+
+#[test]
+#[ignore = "extended deterministic authored-course sweep"]
+fn authored_pattern_stress() {
+    pattern_matrix(4..32);
+}
+
+fn pattern_matrix(seeds: std::ops::Range<u64>) {
+    #[derive(Debug, Default)]
+    struct Totals {
+        landings: u32,
+        chains: u32,
+        skipped: u32,
+    }
+    let mut totals = [Totals::default(), Totals::default()];
+    for pattern in [
+        ClockDuckCoursePattern::Platforms,
+        ClockDuckCoursePattern::Terraces,
+        ClockDuckCoursePattern::TwoJump,
+        ClockDuckCoursePattern::Shortcut,
+    ] {
+        for aspect in ASPECTS {
+            for seed in seeds.clone() {
+                for (index, profile) in
+                    [ClockDuckJumpProfile::Careful, ClockDuckJumpProfile::Flowing]
+                        .into_iter()
+                        .enumerate()
+                {
+                    let mut event = DuckEvent::new_course(Layout::new(aspect), seed, Some(pattern));
+                    let course = event.course.as_ref().unwrap();
+                    assert_eq!(course.pattern, pattern);
+                    assert!(!course.fallback);
+                    assert_eq!(
+                        course.surfaces,
+                        Course::varied(event.width, event.radius, seed, Some(pattern)).surfaces
+                    );
+                    event.select_jump_profile(Some(profile));
+                    let stats = run_stats(
+                        event,
+                        &format!("{pattern:?} {profile:?} aspect={aspect} seed={seed}"),
+                    );
+                    totals[index].landings += stats.landings;
+                    totals[index].chains += stats.chains;
+                    totals[index].skipped += stats.skipped;
+                }
+            }
+        }
+    }
+    eprintln!(
+        "pattern sweep seeds={seeds:?} careful={:?} flowing={:?}",
+        totals[0], totals[1]
+    );
+    assert_eq!(totals[0].skipped, 0);
+    assert!(totals[1].chains > 0 && totals[1].skipped > 0);
 }
 
 #[test]
@@ -577,6 +807,7 @@ fn planner_rejects_unreachable_narrow_and_obstructed_landings() {
     ] {
         let course = Course {
             surfaces: vec![base, target],
+            pattern: ClockDuckCoursePattern::Platforms,
             attempts: 0,
             fallback: false,
         };
@@ -586,6 +817,7 @@ fn planner_rejects_unreachable_narrow_and_obstructed_landings() {
         );
     }
     let course = Course {
+        pattern: ClockDuckCoursePattern::Platforms,
         surfaces: vec![
             base,
             Surface {

@@ -69,6 +69,7 @@ impl Driver {
         let mut state = ClockScenario::init(
             ClockConfig {
                 duck_jump_profile: Some(engine_common::ClockDuckJumpProfile::Careful),
+                duck_course_pattern: Some(engine_common::ClockDuckCoursePattern::Platforms),
                 aspect_ratio: aspect,
                 event_profile: ClockEventProfile::Off,
                 marquee_preset: config.marquee_preset,

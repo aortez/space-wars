@@ -311,10 +311,12 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 );
                 if let Some(planning) = navigation.planning {
                     println!(
-                        "Duck movement: {} running jumps, {} moving landings, {} careful fallbacks",
+                        "Duck movement: {:?} course; {} running jumps, {} moving landings, {} careful fallbacks, {} platforms skipped",
+                        planning.pattern,
                         planning.running_jumps,
                         planning.moving_landings,
-                        planning.flowing_fallbacks
+                        planning.flowing_fallbacks,
+                        planning.skipped_platforms
                     );
                     println!(
                         "Duck landings: {} confirmed, {} short, {} long, {} wrong-surface; support={:?}/{}, rejected={} ({:?}), fallback={}",

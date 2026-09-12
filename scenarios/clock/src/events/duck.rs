@@ -58,7 +58,20 @@ pub(crate) struct DuckEvent {
 }
 
 impl DuckEvent {
+    #[cfg(test)]
     pub fn new_platforms(layout: Layout, seed: u64) -> Self {
+        Self::new_course(
+            layout,
+            seed,
+            Some(engine_common::ClockDuckCoursePattern::Platforms),
+        )
+    }
+
+    pub fn new_course(
+        layout: Layout,
+        seed: u64,
+        pattern: Option<engine_common::ClockDuckCoursePattern>,
+    ) -> Self {
         let mut event = Self::new(layout, seed);
         // Preserve room for the full jump arc below the clock on very wide
         // displays. Standard device layouts keep the existing duck size.
@@ -66,7 +79,12 @@ impl DuckEvent {
             .radius
             .min((layout.face_origin.y - layout.floor_y - 4.0) / 10.5);
         event.movement = Movement::new(event.width, event.radius);
-        event.course = Some(planner::Course::generated(event.width, event.radius, seed));
+        event.course = Some(planner::Course::varied(
+            event.width,
+            event.radius,
+            seed,
+            pattern,
+        ));
         event
     }
 
@@ -442,6 +460,7 @@ impl DuckEvent {
                         ]
                     };
                     ClockDuckPlanningState {
+                        pattern: course.pattern,
                         surface_count: course.surfaces.len(),
                         support: self.supported_surface(),
                         plan: navigator.plan.map(|plan| ClockDuckPlanState {
@@ -475,6 +494,7 @@ impl DuckEvent {
                         running_jumps: navigator.running_jumps,
                         flowing_fallbacks: navigator.flowing_fallbacks,
                         moving_landings: navigator.moving_landings,
+                        skipped_platforms: navigator.skipped_platforms,
                     }
                 }),
             }),

@@ -299,6 +299,7 @@ pub(super) struct Navigator {
     pub running_jumps: u32,
     pub flowing_fallbacks: u32,
     pub moving_landings: u32,
+    pub skipped_platforms: u32,
     pub plan: Option<Plan>,
     pub flight_tick: Option<u32>,
     pub confirmed: u32,
@@ -369,6 +370,8 @@ impl Controller {
                     && observed.position.x <= right + radius * 0.25
                 {
                     self.navigator.confirmed += 1;
+                    self.navigator.skipped_platforms +=
+                        plan.target.abs_diff(plan.source).saturating_sub(1) as u32;
                     if observed.velocity.x.abs() > capabilities.speed * 0.15 {
                         self.navigator.moving_landings += 1;
                     }
@@ -488,6 +491,7 @@ impl Controller {
                 .unwrap_or_else(|| planner::plan(course, source, target, radius, capabilities))
             {
                 Ok(plan) => {
+                    self.target_obstacle = Some(plan.target);
                     self.navigator.plan = Some(plan);
                     self.navigator.reason = None;
                 }

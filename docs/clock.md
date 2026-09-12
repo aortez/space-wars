@@ -94,16 +94,27 @@ whole event-local representation. This does not depend on destructible terrain.
 
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
-then plays wall-tag across raised platforms and gaps. Seeded variations choose
-two or three platforms, their heights, widths and positions, and the entrance
-side. Each landing becomes the starting point for the next planned jump. The opposite
+then plays wall-tag across raised platforms and gaps. Each visit independently
+selects a seeded course pattern and movement personality. The patterns are:
+
+- **Platforms:** the original two/three randomly spaced raised platforms.
+- **Terraces:** low–high–low steps, with seeded height variation.
+- **Two-jump:** a small landing platform between two runways. Arrival position
+  and speed determine whether there is room for another running takeoff.
+- **Shortcut:** a low intermediate platform that can be landed on or skipped
+  in one longer jump to the following surface.
+
+Authored patterns keep their runway/gap widths and vary raised heights by ±10%.
+All preserve a safe adjacent-platform route for Careful, in both directions.
+The entrance side is seeded too. Each landing becomes the starting point for the
+next planned jump. The opposite
 door is entirely hidden for 20 simulation seconds after spawn (warm-up included).
 When it appears, the duck finishes its current crossing, turning at the entrance
 if necessary, and leaves through the exit. The course fades away, restoring the
 ordinary floor and center drain; the clock follows live time throughout.
 
 The duck uses **one dynamic round body** and one fixed body/collider per landing
-surface, including the entrance and exit runways: normally **five or six bodies
+surface, including the entrance and exit runways: normally **four to six bodies
 and colliders**. The course ceiling is seven surfaces plus the duck, with no
 joints or growing particle/entity lists. An acceleration-limited movement controller provides
 standing, walking, running and grounded jumping. Run speed is 1.4 times walk
@@ -155,7 +166,7 @@ speed limits, calibration and generated course. It considers three takeoff
 positions and three landing positions, carrying constant horizontal speed through
 flight and touchdown. A two-link lookahead scores the approach/flight time of
 the next jump too, preferring landings that leave a running continuation. There
-are at most 9 + 9×9 candidate arcs per planning decision, with at most 120
+are at most 9 + 9×9 + 9 + 9 = **108 candidate arcs** per planning decision, with at most 120
 clearance samples per arc. There is no second physics world or per-frame route
 search; the small candidate arrays are stack allocated.
 
@@ -163,8 +174,18 @@ Both takeoff and landing retain room to brake safely. At launch, the planned
 arc is re-anchored to the actual position and checked again; after contact, the
 next decision uses actual support/velocity, not the prediction. If a running
 takeoff is unavailable or invalidated, Flowing falls back to the **unchanged
-Careful hop**. It does not skip platforms or change jump strength. Moving
-platforms, variable-height jumps and longer route searches remain future work.
+Careful hop**. Edge landing candidates include a tick of launch-position margin
+so a slightly early actual takeoff does not immediately invalidate the landing.
+
+Flowing also considers skipping **one** intermediate platform. It compares the
+direct jump's estimated approach/flight time with the two adjacent links,
+requiring at least a 5% saving when a running route exists. The existing fallback
+penalty is used for a non-running continuation; this is a bounded heuristic,
+not a globally optimal route search. The entire arc must clear the intervening
+platform and leave braking room on the destination. Unavailable/obstructed
+shortcuts are refused. Jump strength is unchanged. A linked pair of jumps always
+has real ground contact between them: this is **not an airborne double jump**.
+Moving platforms, variable-height jumps and longer searches remain future work.
 
 To compare profiles, use the same `--seed` and preview sequence:
 
@@ -179,13 +200,24 @@ SPACEWARS_CLOCK_DUCK_PROFILE=careful \
 # Running jumps where the course leaves enough room; careful hops elsewhere.
 SPACEWARS_CLOCK_DUCK_PROFILE=flowing \
   cargo run --release -p engine-client -- --scenario clock --seed 42
+
+# Revisit a specific test course with the trajectory overlay.
+SPACEWARS_CLOCK_DUCK_PROFILE=flowing SPACEWARS_CLOCK_DUCK_COURSE=two-jump \
+  SPACEWARS_CLOCK_DUCK_DEBUG=1 \
+  cargo run --release -p engine-client -- --scenario clock --seed 42
 ```
 
 The environment override is read when creating/restarting the Clock scenario;
 `careful` and `flowing` force a personality, while unset, `mixed`, or unknown
 values use the seeded mix. It is not a persistent menu setting. Changing the
 override requires relaunching the process. Standard benchmark mode remains
-pinned to the Careful configuration. The seeded physics comparison below
+pinned to Careful on the original Platforms pattern. The course override accepts
+`platforms`, `terraces`, `two-jump`, or `shortcut`; unset, `mixed`, and unknown
+values select a seeded pattern. Preview Duck through Clock Controls after
+launching. Use `shortcut` in the last command to watch platform skipping, or
+switch the personality to `careful` to watch the adjacent route on the same course.
+These overrides are independent and do not change event scheduling.
+The seeded physics comparison below
 exercises both profiles.
 The upright pixel sprite and sliding doors are presentation, not articulated
 physics. Doors are logical backstage entry/exit markers, not trapping colliders.
@@ -456,7 +488,8 @@ null until sampled. `left_to_right` remains the **entrance side**; use
 current crossing's surface transitions; total jumps include warm-up jumps. Navigation fields retain
 the final controller state during reset, not a claim of a still-live body.
 
-`navigation.planning` adds surface count, current physical support (null when
+`navigation.planning` adds `pattern` (`platforms`, `terraces`, `two-jump`,
+`shortcut`), surface count, current physical support (null when
 airborne or despawned), generation attempts/fallback status, measured acceleration,
 confirmed landings, undershoots, overshoots, wrong-surface landings and rejected
 plans. The rejection reason is `too-narrow`, `too-high`, `out-of-range`, or
@@ -473,6 +506,10 @@ counts running-plan refusals/aborts that use the careful planner (separate from
 and optional `next_target`: the latter is a feasible second link at planning
 time, not a commitment to execute it regardless of the actual landing. Older
 payloads without these fields default to Careful, false/null and zero counts.
+`skipped_platforms` counts intermediate platforms bypassed by **confirmed**
+landings, not proposed shortcuts or merely passing overhead. A fallback course
+reports its actual Platforms pattern. Older payloads default to Platforms and
+zero skips.
 
 Older schema-8 payloads without `navigation` still decode; this adds no commands
 or action payload changes. Both text and JSON `clock state` show these diagnostics.
@@ -633,7 +670,8 @@ The release Duck UI workflow passed under Xvfb with both profiles (including the
 Flowing overlay), covering diagnostics, pause, preview replacement, exit,
 cleanup, restart and relaunch.
 
-The two-profile comparison uses **448 identical course/seed/aspect combinations
+The pre-authored-course baseline comparison (commit `65db26f`, before shortcut
+selection and the landing-margin refinement) used **448 identical course/seed/aspect combinations
 per profile** (seeds 0–63 across the same seven aspect ratios). All 896 runs
 exited and cleaned up without falls, timeouts or missed landings. Careful's
 5,163 confirmed landings and Flowing's 7,587 total **12,750 physical landings**.
@@ -679,6 +717,37 @@ overlay-on/off simulation equivalence are covered too.
 Raster captures were reviewed at 800×480 and 1024×768, including a trajectory
 overlay capture. Automated render checks also cover portrait and verify the
 actual exit-frame pixels before/after the timer.
+
+The authored-course regression suite adds a one-jump-planner ablation: on the
+Two-jump fixture, aiming for the platform center leaves no running continuation,
+while lookahead chooses an earlier, slower landing that preserves one. Solver
+tests then require actual consecutive running takeoffs **and confirmed landings**,
+without stopping between them, in both directions. The Shortcut fixture must
+actually bypass a platform and land on the second in both directions; Careful
+must still finish via adjacent platforms. Separate checks reject an obstructing
+platform and a too-narrow shortcut destination. Skip counters only advance after
+confirmed target contact, and every jump must begin grounded.
+
+The normal pattern matrix covers four seeds × four patterns × seven aspects ×
+two profiles (224 runs). Its extended sweep covers seeds 4–31. Both enforce
+zero missed landings/falls/timeouts, both wall tags, at least three traversals
+(counting skipped links), bounded bodies and complete cleanup. Rendering tests
+cover all four patterns with both personalities at four resolutions.
+
+The combined **1,792-run** sweep passed: **21,418 confirmed landings**, including
+**7,066 completed running-jump pairs** and **958 confirmed platform skips** for
+Flowing; Careful skipped none. The fixed Two-jump fixture completes five running
+pairs per visit, and the Shortcut fixture skips five platforms per visit, at both
+800×480 and 1024×768 aspect ratios. These totals include return crossings while
+waiting for the exit; they are not counts of distinct platforms.
+
+```sh
+cargo test -p scenario-clock authored_routes -- --nocapture
+cargo test -p scenario-clock skips_an_intermediate -- --nocapture
+cargo test -p scenario-clock lookahead_preserves -- --nocapture
+cargo test -p scenario-clock seeded_patterns -- --nocapture
+cargo test -p scenario-clock authored_pattern_stress -- --ignored --nocapture
+```
 
 Formatting, diff checks, the host `pi-kiosk` feature check and strict Clippy with
 `--no-deps` for Clock/common/control/CLI passed. Dependency-inclusive Clippy

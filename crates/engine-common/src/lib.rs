@@ -516,6 +516,16 @@ pub enum ClockDuckJumpProfile {
     Flowing,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckCoursePattern {
+    #[default]
+    Platforms,
+    Terraces,
+    TwoJump,
+    Shortcut,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockDuckBehavior {
@@ -546,6 +556,8 @@ pub struct ClockDuckPlanState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDuckPlanningState {
+    #[serde(default)]
+    pub pattern: ClockDuckCoursePattern,
     pub surface_count: usize,
     pub support: Option<usize>,
     pub plan: Option<ClockDuckPlanState>,
@@ -564,6 +576,8 @@ pub struct ClockDuckPlanningState {
     pub flowing_fallbacks: u32,
     #[serde(default)]
     pub moving_landings: u32,
+    #[serde(default)]
+    pub skipped_platforms: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

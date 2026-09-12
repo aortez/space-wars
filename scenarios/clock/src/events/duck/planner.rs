@@ -1,6 +1,7 @@
 //! Bounded, course-local planning. Geometry is shared with rendering/physics;
 //! reachability uses measured movement capabilities, never a second simulator.
 
+use engine_common::ClockDuckCoursePattern;
 use engine_core::Vec2;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
@@ -26,6 +27,7 @@ impl Surface {
 #[derive(Debug, Clone)]
 pub struct Course {
     pub surfaces: Vec<Surface>,
+    pub pattern: ClockDuckCoursePattern,
     pub attempts: u32,
     pub fallback: bool,
 }
@@ -193,11 +195,47 @@ pub fn plan(
 }
 
 impl Course {
+    #[cfg(test)]
     pub fn generated(width: f32, radius: f32, seed: u64) -> Self {
         Self::generate_with_budget(width, radius, seed, 16)
     }
 
+    #[cfg(test)]
     pub fn generate_with_budget(width: f32, radius: f32, seed: u64, budget: u32) -> Self {
+        Self::pattern_with_budget(
+            width,
+            radius,
+            seed,
+            ClockDuckCoursePattern::Platforms,
+            budget,
+        )
+    }
+
+    pub fn varied(
+        width: f32,
+        radius: f32,
+        seed: u64,
+        pattern: Option<ClockDuckCoursePattern>,
+    ) -> Self {
+        let mut selector = StdRng::seed_from_u64(seed ^ 0x434f_5552_5345_5459);
+        let pattern = pattern.unwrap_or_else(|| {
+            [
+                ClockDuckCoursePattern::Platforms,
+                ClockDuckCoursePattern::Terraces,
+                ClockDuckCoursePattern::TwoJump,
+                ClockDuckCoursePattern::Shortcut,
+            ][selector.random_range(0..4)]
+        });
+        Self::pattern_with_budget(width, radius, seed, pattern, 16)
+    }
+
+    fn pattern_with_budget(
+        width: f32,
+        radius: f32,
+        seed: u64,
+        pattern: ClockDuckCoursePattern,
+        budget: u32,
+    ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed ^ 0x504c_4154_464f_524d);
         // Generate against a smaller capability envelope than the tuned duck.
         // The runtime planner still has to measure its own actual capabilities.
@@ -208,31 +246,44 @@ impl Course {
             acceleration: width / 5.0 * 6.0,
         };
         for attempt in 1..=budget.min(16) {
-            let count = rng.random_range(2..=3);
-            let mut surfaces = Vec::with_capacity(MAX_SURFACES);
-            surfaces.push(Surface {
-                start: -radius * 8.0,
-                end: width * 0.25,
-                height: 0.0,
-            });
-            let slot = width * 0.5 / count as f32;
-            for i in 0..count {
-                let center =
-                    width * 0.25 + slot * (i as f32 + 0.5) + rng.random_range(-0.04..0.04) * slot;
-                let half_width = slot * rng.random_range(0.29..0.37);
+            let surfaces = if pattern == ClockDuckCoursePattern::Platforms {
+                let count = rng.random_range(2..=3);
+                let mut surfaces = Vec::with_capacity(MAX_SURFACES);
                 surfaces.push(Surface {
-                    start: center - half_width,
-                    end: center + half_width,
-                    height: radius * rng.random_range(0.7..2.6),
+                    start: -radius * 8.0,
+                    end: width * 0.25,
+                    height: 0.0,
                 });
-            }
-            surfaces.push(Surface {
-                start: width * 0.75,
-                end: width + radius * 8.0,
-                height: 0.0,
-            });
+                let slot = width * 0.5 / count as f32;
+                for i in 0..count {
+                    let center = width * 0.25
+                        + slot * (i as f32 + 0.5)
+                        + rng.random_range(-0.04..0.04) * slot;
+                    let half_width = slot * rng.random_range(0.29..0.37);
+                    surfaces.push(Surface {
+                        start: center - half_width,
+                        end: center + half_width,
+                        height: radius * rng.random_range(0.7..2.6),
+                    });
+                }
+                surfaces.push(Surface {
+                    start: width * 0.75,
+                    end: width + radius * 8.0,
+                    height: 0.0,
+                });
+                surfaces
+            } else {
+                let mut surfaces = Self::authored(width, radius, pattern).surfaces;
+                // Keep recognizable routes; vary raised surfaces without changing
+                // the authored runway/landing widths. Every result is revalidated.
+                for surface in &mut surfaces {
+                    surface.height *= rng.random_range(0.9..1.1);
+                }
+                surfaces
+            };
             let course = Self {
                 surfaces,
+                pattern,
                 attempts: attempt,
                 fallback: false,
             };
@@ -244,6 +295,44 @@ impl Course {
         course.attempts = budget.min(16);
         course.fallback = true;
         course
+    }
+
+    pub fn authored(width: f32, radius: f32, pattern: ClockDuckCoursePattern) -> Self {
+        let spans: &[(f32, f32, f32)] = match pattern {
+            ClockDuckCoursePattern::TwoJump => {
+                &[(0.0, 0.30, 0.0), (0.33, 0.42, 1.0), (0.45, 1.0, 0.0)]
+            }
+            ClockDuckCoursePattern::Shortcut => &[
+                (0.0, 0.24, 0.0),
+                (0.255, 0.315, 0.45),
+                (0.33, 0.64, 0.0),
+                (0.70, 1.0, 0.0),
+            ],
+            ClockDuckCoursePattern::Terraces => &[
+                (0.0, 0.25, 0.0),
+                (0.28, 0.42, 0.9),
+                (0.45, 0.59, 2.0),
+                (0.62, 0.76, 1.0),
+                (0.79, 1.0, 0.0),
+            ],
+            ClockDuckCoursePattern::Platforms => return Self::fixed(width, radius, 0),
+        };
+        let mut surfaces: Vec<_> = spans
+            .iter()
+            .map(|&(start, end, height)| Surface {
+                start: start * width,
+                end: end * width,
+                height: height * radius,
+            })
+            .collect();
+        surfaces.first_mut().unwrap().start = -radius * 8.0;
+        surfaces.last_mut().unwrap().end = width + radius * 8.0;
+        Self {
+            surfaces,
+            pattern,
+            attempts: 0,
+            fallback: false,
+        }
     }
 
     pub fn valid_routes(&self, radius: f32, capabilities: Capabilities) -> bool {
@@ -330,6 +419,7 @@ impl Course {
         };
         Self {
             surfaces,
+            pattern: ClockDuckCoursePattern::Platforms,
             attempts: 0,
             fallback: false,
         }

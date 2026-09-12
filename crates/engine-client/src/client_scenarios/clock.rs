@@ -73,6 +73,9 @@ fn create(
                     .as_deref(),
             ),
             time_format: settings.clock.time_format,
+            duck_course_pattern: duck_course_pattern(
+                std::env::var("SPACEWARS_CLOCK_DUCK_COURSE").ok().as_deref(),
+            ),
             event_profile: settings.clock.event_profile,
             events: settings.clock.events,
             marquee_preset: settings.clock.marquee_preset,
@@ -97,6 +100,17 @@ fn duck_jump_profile(value: Option<&str>) -> Option<engine_common::ClockDuckJump
     match value {
         Some("careful") => Some(engine_common::ClockDuckJumpProfile::Careful),
         Some("flowing") => Some(engine_common::ClockDuckJumpProfile::Flowing),
+        _ => None,
+    }
+}
+
+fn duck_course_pattern(value: Option<&str>) -> Option<engine_common::ClockDuckCoursePattern> {
+    use engine_common::ClockDuckCoursePattern;
+    match value {
+        Some("platforms") => Some(ClockDuckCoursePattern::Platforms),
+        Some("terraces") => Some(ClockDuckCoursePattern::Terraces),
+        Some("two-jump") => Some(ClockDuckCoursePattern::TwoJump),
+        Some("shortcut") => Some(ClockDuckCoursePattern::Shortcut),
         _ => None,
     }
 }
@@ -516,10 +530,20 @@ mod tests {
 
     #[test]
     fn duck_course_reaches_both_render_paths_and_resets_to_the_normal_arena() {
-        for profile in [
+        for (profile, pattern) in [
             engine_common::ClockDuckJumpProfile::Careful,
             engine_common::ClockDuckJumpProfile::Flowing,
-        ] {
+        ]
+        .into_iter()
+        .flat_map(|profile| {
+            [
+                engine_common::ClockDuckCoursePattern::Platforms,
+                engine_common::ClockDuckCoursePattern::Terraces,
+                engine_common::ClockDuckCoursePattern::TwoJump,
+                engine_common::ClockDuckCoursePattern::Shortcut,
+            ]
+            .map(|pattern| (profile, pattern))
+        }) {
             for viewport in [
                 Viewport::new(800.0, 480.0),
                 Viewport::new(1024.0, 768.0),
@@ -530,6 +554,7 @@ mod tests {
                     ClockConfig {
                         aspect_ratio: viewport.aspect_ratio(),
                         duck_jump_profile: Some(profile),
+                        duck_course_pattern: Some(pattern),
                         event_profile: engine_common::ClockEventProfile::Off,
                         ..ClockConfig::default()
                     },
@@ -604,7 +629,13 @@ mod tests {
                         crate::raster::RasterOptions::default(),
                     );
                     let pixels = image.to_rgb8().unwrap();
-                    if [1235, 1260].contains(&tick) {
+                    // Shorter patterns may already be fading after a successful
+                    // exit at this timestamp. Only inspect an active course.
+                    let active_duck = scenario
+                        .state
+                        .duck_state()
+                        .is_some_and(|duck| duck.outcome.is_none());
+                    if [1235, 1260].contains(&tick) && active_duck {
                         // Inspect the exit frame itself, not just telemetry or its
                         // closed panel: it must be absent before the spawn timer.
                         let duck = scenario.state.duck_state().unwrap();
@@ -622,7 +653,7 @@ mod tests {
                         assert_eq!(
                             visible,
                             tick == 1260,
-                            "exit frame at {tick} in {viewport:?}"
+                            "exit frame at {tick} in {viewport:?} {pattern:?} {profile:?}"
                         );
                     }
                     let yellow = pixels
@@ -630,7 +661,7 @@ mod tests {
                         .iter()
                         .filter(|p| p.r > 240 && p.g > 200 && p.b < 50)
                         .count();
-                    if [60, 170, 395, 600, 900, 1260].contains(&tick) {
+                    if [60, 170, 395, 600, 900, 1260].contains(&tick) && active_duck {
                         assert!(yellow > 25, "duck missing at {tick} in {viewport:?}");
                     }
                     if tick == 0 || tick == scenario_clock::DUCK_TICKS {
@@ -641,7 +672,7 @@ mod tests {
                         let directory = std::path::PathBuf::from(directory);
                         std::fs::create_dir_all(&directory).unwrap();
                         let file = std::fs::File::create(directory.join(format!(
-                            "duck-{profile:?}-{tick}-{}x{}.png",
+                            "duck-{pattern:?}-{profile:?}-{tick}-{}x{}.png",
                             viewport.width, viewport.height
                         )))
                         .unwrap();
@@ -788,6 +819,22 @@ mod tests {
         );
         for value in [None, Some("mixed"), Some(""), Some("unknown")] {
             assert_eq!(duck_jump_profile(value), None);
+        }
+    }
+
+    #[test]
+    fn duck_course_override_preserves_authored_choices_and_defaults_to_a_seeded_mix() {
+        use engine_common::ClockDuckCoursePattern;
+        for (value, pattern) in [
+            ("platforms", ClockDuckCoursePattern::Platforms),
+            ("terraces", ClockDuckCoursePattern::Terraces),
+            ("two-jump", ClockDuckCoursePattern::TwoJump),
+            ("shortcut", ClockDuckCoursePattern::Shortcut),
+        ] {
+            assert_eq!(duck_course_pattern(Some(value)), Some(pattern));
+        }
+        for value in [None, Some("mixed"), Some("unknown")] {
+            assert_eq!(duck_course_pattern(value), None);
         }
     }
 

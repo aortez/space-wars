@@ -1060,7 +1060,10 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
             assert_eq!(planning.running_jumps, 0);
         }
         assert_eq!(duck.jumps, 2 + planning.confirmed_landings);
-        assert!(planning.confirmed_landings >= (planning.surface_count - 1) as u32 * 3);
+        assert!(
+            planning.confirmed_landings + planning.skipped_platforms
+                >= (planning.surface_count - 1) as u32 * 3
+        );
         assert_eq!(
             (
                 planning.undershoots,

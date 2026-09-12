@@ -52,12 +52,62 @@ pub(super) fn plan(course: &Course, start: Start, radius: f32, caps: Capabilitie
             best_cost = cost;
         }
     }
+    // Compare equal progress: one direct jump versus the two adjacent links
+    // above. Require a useful time saving, not merely another reachable arc.
+    let skip_target = if start.direction > 0.0 {
+        start.surface.checked_add(2)
+    } else {
+        start.surface.checked_sub(2)
+    }
+    .filter(|target| *target < course.surfaces.len());
+    if let Some(target) = skip_target {
+        let mut shortcut = None;
+        let mut shortcut_cost = best_cost * 0.95;
+        for candidate in candidates_to(course, start, target, radius, caps)
+            .into_iter()
+            .flatten()
+        {
+            let cost = cost(candidate, start, radius);
+            if cost < shortcut_cost {
+                shortcut = Some(candidate);
+                shortcut_cost = cost;
+            }
+        }
+        if let Some(mut candidate) = shortcut {
+            let arrival = Start {
+                surface: candidate.target,
+                x: candidate.landing.x + start.direction * candidate.cruise * DT * 2.0,
+                velocity: start.direction * candidate.cruise,
+                direction: start.direction,
+            };
+            if candidates(course, arrival, radius, caps)
+                .iter()
+                .any(Option::is_some)
+            {
+                candidate.next_target = adjacent(course, arrival.surface, start.direction);
+            }
+            best = Some(candidate);
+        }
+    }
     best
 }
 
 fn cost(plan: Plan, start: Start, radius: f32) -> f32 {
     let run_up = (plan.takeoff.x - start.x).abs();
     run_up / ((start.velocity.abs() + plan.cruise) * 0.5).max(radius) + plan.flight
+}
+
+#[cfg(test)]
+pub(super) fn single_jump_plan(
+    course: &Course,
+    start: Start,
+    radius: f32,
+    caps: Capabilities,
+) -> Option<Plan> {
+    candidates(course, start, radius, caps)
+        .into_iter()
+        .flatten()
+        .min_by(|a, b| cost(*a, start, radius).total_cmp(&cost(*b, start, radius)))
 }
 
 fn adjacent(course: &Course, source: usize, direction: f32) -> Option<usize> {
@@ -69,12 +119,22 @@ fn adjacent(course: &Course, source: usize, direction: f32) -> Option<usize> {
 }
 
 // Three takeoff positions by three landing positions. Stack-only storage and
-// one further link bound the work to at most 9 + 9*9 candidate arcs per decision.
+// one further link plus one shortcut bound work to 9 + 9*9 + 9 + 9 arcs.
 fn candidates(course: &Course, start: Start, radius: f32, caps: Capabilities) -> [Option<Plan>; 9] {
-    let mut result = [None; 9];
     let Some(target) = adjacent(course, start.surface, start.direction) else {
-        return result;
+        return [None; 9];
     };
+    candidates_to(course, start, target, radius, caps)
+}
+
+fn candidates_to(
+    course: &Course,
+    start: Start,
+    target: usize,
+    radius: f32,
+    caps: Capabilities,
+) -> [Option<Plan>; 9] {
+    let mut result = [None; 9];
     let from = course.surfaces[start.surface];
     let to = course.surfaces[target];
     let Some((left, right)) = from.inside(radius) else {
@@ -83,10 +143,13 @@ fn candidates(course: &Course, start: Start, radius: f32, caps: Capabilities) ->
     let Some((land_left, land_right)) = to.inside(radius) else {
         return result;
     };
+    // The controller can launch up to one cruise tick early. Keep edge
+    // candidates that far inside the interval so re-anchoring remains safe.
+    let landing_margin = caps.speed * DT;
     let near = if start.direction > 0.0 {
-        land_left
+        land_left + landing_margin
     } else {
-        land_right
+        land_right - landing_margin
     };
     let far = if start.direction > 0.0 { right } else { left };
     let middle = (land_left + land_right) * 0.5;
@@ -233,6 +296,71 @@ fn safe(course: &Course, plan: Plan, radius: f32, caps: Capabilities) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skips_an_intermediate_platform_only_with_a_clear_useful_landing() {
+        let radius = 8.0;
+        let caps = Capabilities {
+            height: 35.6,
+            flight: 52.0 / 60.0,
+            speed: 160.0,
+            acceleration: 960.0,
+        };
+        let mut course = Course::authored(
+            800.0,
+            radius,
+            engine_common::ClockDuckCoursePattern::Shortcut,
+        );
+        let start = Start {
+            surface: 0,
+            x: 120.0,
+            velocity: 160.0,
+            direction: 1.0,
+        };
+        assert!(
+            course.valid_routes(radius, caps),
+            "Careful retains the adjacent route"
+        );
+        let jump = plan(&course, start, radius, caps).unwrap();
+        assert_eq!((jump.source, jump.target), (0, 2));
+        let adjacent_cost = candidates(&course, start, radius, caps)
+            .into_iter()
+            .flatten()
+            .map(|first| {
+                let arrival = Start {
+                    surface: 1,
+                    x: first.landing.x + first.cruise * DT * 2.0,
+                    velocity: first.cruise,
+                    direction: 1.0,
+                };
+                cost(first, start, radius)
+                    + candidates(&course, arrival, radius, caps)
+                        .into_iter()
+                        .flatten()
+                        .map(|second| cost(second, arrival, radius))
+                        .reduce(f32::min)
+                        .unwrap_or(2.5)
+            })
+            .reduce(f32::min)
+            .unwrap();
+        assert!(cost(jump, start, radius) < adjacent_cost * 0.95);
+        course.surfaces[1].height = caps.height * 2.0;
+        assert!(
+            candidates_to(&course, start, 2, radius, caps)
+                .iter()
+                .all(Option::is_none)
+        );
+        assert!(
+            plan(&course, start, radius, caps).is_none(),
+            "do not jump through a blocked shortcut"
+        );
+        course.surfaces[1].height = radius * 0.45;
+        course.surfaces[2].end = course.surfaces[2].start + radius * 2.0;
+        assert!(
+            plan(&course, start, radius, caps).is_none_or(|jump| jump.target != 2),
+            "reject an unsafe landing even if the gap is reachable"
+        );
+    }
 
     #[test]
     fn running_arcs_keep_speed_and_revalidate_actual_takeoff_in_both_directions() {

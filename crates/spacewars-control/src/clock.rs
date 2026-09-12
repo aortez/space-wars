@@ -542,6 +542,7 @@ mod tests {
                 exit_visible: true,
                 body_radius_milli: 8000,
                 planning: Some(engine_common::ClockDuckPlanningState {
+                    pattern: engine_common::ClockDuckCoursePattern::Shortcut,
                     surface_count: 5,
                     support: Some(1),
                     plan: Some(engine_common::ClockDuckPlanState {
@@ -566,6 +567,7 @@ mod tests {
                     running_jumps: 10,
                     flowing_fallbacks: 1,
                     moving_landings: 10,
+                    skipped_platforms: 2,
                 }),
             }),
         });
@@ -585,7 +587,13 @@ mod tests {
             .unwrap();
         navigation.remove("jump_profile");
         let planning = navigation["planning"].as_object_mut().unwrap();
-        for field in ["running_jumps", "flowing_fallbacks", "moving_landings"] {
+        for field in [
+            "running_jumps",
+            "flowing_fallbacks",
+            "moving_landings",
+            "skipped_platforms",
+            "pattern",
+        ] {
             planning.remove(field);
         }
         let plan = planning["plan"].as_object_mut().unwrap();
@@ -598,6 +606,11 @@ mod tests {
             engine_common::ClockDuckJumpProfile::Careful
         );
         let planning = navigation.planning.unwrap();
+        assert_eq!(
+            planning.pattern,
+            engine_common::ClockDuckCoursePattern::Platforms
+        );
+        assert_eq!(planning.skipped_platforms, 0);
         assert_eq!(
             (
                 planning.running_jumps,

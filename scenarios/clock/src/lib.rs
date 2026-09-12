@@ -189,6 +189,8 @@ pub struct ClockConfig {
     pub duck_debug_overlay: bool,
     /// None chooses a seeded personality once per Duck event.
     pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
+    /// None selects a seeded course pattern, independently of personality.
+    pub duck_course_pattern: Option<engine_common::ClockDuckCoursePattern>,
     pub time_format: ClockTimeFormat,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
@@ -202,6 +204,7 @@ impl Default for ClockConfig {
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
             duck_jump_profile: None,
+            duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
             event_profile: ClockEventProfile::default(),
             events: ClockEvents::default(),
@@ -217,6 +220,7 @@ impl ClockConfig {
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             duck_debug_overlay: self.duck_debug_overlay,
             duck_jump_profile: self.duck_jump_profile,
+            duck_course_pattern: self.duck_course_pattern,
             time_format: self.time_format,
             event_profile: self.event_profile,
             events: self.events,
@@ -402,10 +406,8 @@ impl ClockState {
                 layout,
             },
             seed,
-            self.config.marquee_preset,
-            self.config.marquee_message,
+            self.config,
             previous_display,
-            self.config.duck_jump_profile,
         ));
     }
 
