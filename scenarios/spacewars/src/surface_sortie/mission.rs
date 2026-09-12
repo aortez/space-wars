@@ -57,6 +57,23 @@ impl SurfaceSortieScenario {
         bearing: f32,
         surface: engine_terrain::TerrainSurface,
     ) -> SurfaceSortieState {
+        Self::init_material_arena_collision_trial(
+            seed,
+            mirror,
+            bearing,
+            surface,
+            engine_rapier::terrain::TerrainColliders::default(),
+        )
+    }
+
+    /// Compare collision layouts with the same generated material and boundary.
+    pub fn init_material_arena_collision_trial(
+        seed: u64,
+        mirror: bool,
+        bearing: f32,
+        surface: engine_terrain::TerrainSurface,
+        colliders: engine_rapier::terrain::TerrainColliders,
+    ) -> SurfaceSortieState {
         assert!(bearing.is_finite());
         let mut world = SpacewarsScenario::init(
             SpacewarsConfig {
@@ -69,6 +86,7 @@ impl SurfaceSortieScenario {
             seed,
         );
         assert!(world.planets.len() >= 3);
+        world.terrain.colliders = colliders;
         world.planets.truncate(3);
         world.rover_builds.truncate(3);
         let radius = world
@@ -308,9 +326,22 @@ mod tests {
             assert!(before.issues.is_empty());
             assert_eq!(before.surface_sample_bytes, before.cell_bytes * 2);
             assert_eq!(
-                before.terrain_rectangles + before.terrain_polygons,
+                round
+                    .world
+                    .terrain
+                    .planets
+                    .values()
+                    .map(|p| {
+                        p.geometry
+                            .chunks()
+                            .iter()
+                            .filter(|c| c.shape_count() > 0)
+                            .count()
+                    })
+                    .sum::<usize>(),
                 before.terrain_colliders
             );
+            assert!(before.terrain_rectangles + before.terrain_polygons > before.terrain_colliders);
             assert!(before.terrain_polygons > 0);
             for i in 0..3 {
                 let field = round.planet_terrain(i).unwrap();

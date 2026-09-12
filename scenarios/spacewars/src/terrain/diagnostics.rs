@@ -1,7 +1,5 @@
 //! Opt-in inspection for endurance runners. None of these scans run in gameplay.
 
-use engine_rapier::world::{ColliderId, ColliderRole};
-
 use super::*;
 
 #[derive(Debug, Clone, Serialize)]
@@ -126,13 +124,7 @@ impl SpacewarsState {
                     ));
                 }
                 covered += chunk.material_cells();
-                for part in 0..chunk.shape_count() {
-                    expected_colliders.insert(ColliderId::new(
-                        body.entity,
-                        ColliderRole::new(physics::terrain_spec().first_chunk_role + chunk.id.0),
-                        part as u16,
-                    ));
-                }
+                expected_colliders.extend(assembly.chunk_collider_ids(chunk));
             }
             if covered != occupied as u64 {
                 result.issues.push(format!(

@@ -51,6 +51,7 @@ struct PendingEdit {
 #[derive(Debug, Clone)]
 pub(super) struct TerrainState {
     pub surface: TerrainSurface,
+    pub colliders: engine_rapier::terrain::TerrainColliders,
     pub planets: BTreeMap<usize, PlanetTerrain>,
     pub fragments: BTreeMap<u64, TerrainFragment>,
     pending: Vec<PendingEdit>,
@@ -69,6 +70,7 @@ impl Default for TerrainState {
     fn default() -> Self {
         Self {
             surface: TerrainSurface::Blocks,
+            colliders: engine_rapier::terrain::TerrainColliders::default(),
             planets: BTreeMap::new(),
             fragments: BTreeMap::new(),
             pending: Vec::new(),
@@ -157,6 +159,7 @@ impl SpacewarsState {
             &geometry,
             engine_rapier::terrain::TerrainSpec {
                 surface: self.terrain.surface,
+                colliders: self.terrain.colliders,
                 ..physics::terrain_spec()
             },
         )
@@ -367,6 +370,7 @@ pub(super) fn commit(state: &mut SpacewarsState) {
                 center,
                 engine_rapier::terrain::TerrainSpec {
                     surface: state.terrain.surface,
+                    colliders: state.terrain.colliders,
                     ..physics::terrain_spec()
                 },
             )

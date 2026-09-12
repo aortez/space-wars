@@ -360,4 +360,5 @@ fn cross_completed_tunnel(surface: TerrainSurface) {
     assert!((motion.position.y - 0.25).abs() < 0.01);
 }
 
+mod compound;
 mod contour;

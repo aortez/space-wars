@@ -1,5 +1,6 @@
 //! Matched single-planet scenes preserve all three surfaces for comparisons.
 use super::*;
+pub use engine_rapier::terrain::TerrainColliders;
 pub use engine_terrain::TerrainSurface;
 use engine_terrain::{Brush, CellCoord, EditMode, TerrainEdit};
 
@@ -67,6 +68,10 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    pub fn terrain_collider_layout(&self) -> TerrainColliders {
+        self.world.terrain.colliders
+    }
+
     pub fn surface_comparison(&self) -> Option<TerrainSurface> {
         self.surface_comparison
     }

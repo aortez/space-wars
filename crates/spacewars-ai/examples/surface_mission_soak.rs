@@ -72,6 +72,9 @@ fn main() {
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     let world_kind = arg("--world", "fixed");
     let surface = arg("--surface", "default");
+    let colliders = arg("--terrain-colliders", "default");
+    assert!(["default", "separate", "compound"].contains(&colliders.as_str()));
+    assert!(colliders == "default" || world_kind == "generated");
     assert!(["default", "blocks", "round"].contains(&surface.as_str()));
     assert!(
         surface == "default" || world_kind == "generated",
@@ -97,11 +100,13 @@ fn main() {
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
     let mut state = if world_kind == "generated" {
-        if surface == "default" {
+        if surface == "default" && colliders == "default" {
             SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
         } else {
-            use scenario_spacewars::surface_sortie::comparison::TerrainSurface;
-            SurfaceSortieScenario::init_material_arena_surface_trial(
+            use scenario_spacewars::surface_sortie::comparison::{
+                TerrainColliders, TerrainSurface,
+            };
+            SurfaceSortieScenario::init_material_arena_collision_trial(
                 seed,
                 mirror,
                 bearing,
@@ -109,6 +114,11 @@ fn main() {
                     TerrainSurface::Blocks
                 } else {
                     TerrainSurface::Interpolated
+                },
+                match colliders.as_str() {
+                    "separate" => TerrainColliders::Separate,
+                    "compound" => TerrainColliders::ChunkCompound,
+                    _ => TerrainColliders::default(),
                 },
             )
         }
@@ -444,6 +454,7 @@ fn main() {
     report["draw_lists"] = timing(draws);
     report["measured_tick"] = timing(measured_ticks);
     report["physics_profile"] = physics_profile.map_or(serde_json::Value::Null, |p| p.report());
+    report["terrain_colliders"] = json!(format!("{:?}", state.terrain_collider_layout()));
     report["measurement_scope"] = json!({"draw_enabled":measure_draw,
         "draw_frames_per_tick":if measure_draw {4} else {0},
         "includes":"mission sensors + policies + scenario step + optional two player frames and two minimaps",

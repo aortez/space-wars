@@ -17,7 +17,7 @@ use rapier2d::prelude::{
     ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups,
     InteractionTestMode, IslandManager, MassProperties, MultibodyJointSet, NarrowPhase,
     PhysicsPipeline, PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray,
-    RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
+    RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, SharedShape, Vector,
 };
 use serde::{Deserialize, Serialize};
 
@@ -200,6 +200,18 @@ pub enum ColliderShape {
     Polyline {
         vertices: Vec<Vec2>,
     },
+    /// A flat collection of convex children. Nested compounds and polylines
+    /// are rejected before entering the backend.
+    Compound {
+        children: Vec<CompoundChild>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompoundChild {
+    pub shape: ColliderShape,
+    pub position: Vec2,
+    pub angle: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -415,6 +427,10 @@ pub struct SurfaceContact {
 pub struct ContactEvent {
     pub collider_a: ColliderId,
     pub collider_b: ColliderId,
+    /// Compound child identities keep impact aggregation local to each convex
+    /// piece. The collider IDs still identify real physical colliders.
+    pub subshape_a: Option<u32>,
+    pub subshape_b: Option<u32>,
     pub point: Option<Vec2>,
     /// Surface point and outward normal in each parent body's local frame.
     /// These remain attached to the hit surfaces after motion or CCD substeps.
@@ -467,13 +483,11 @@ impl EventHandler for ContactEventCollector {
         contact_pair: &ContactPair,
         _total_force_magnitude: f32,
     ) {
-        let Some(event) = contact_event_from_pair(colliders, contact_pair) else {
-            return;
-        };
-        self.events
+        let mut events = self
+            .events
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .push(event);
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        append_contact_events(colliders, contact_pair, &mut events);
     }
 }
 
@@ -1064,6 +1078,33 @@ impl PhysicsWorld {
         }
         self.raw.integration_parameters.dt = dt_seconds;
 
+        // Rapier 0.34 interpolates a position-based target over each CCD
+        // substep's dt, spending the full move in the first substep and then
+        // reporting zero velocity. Integrate the prescribed full-step velocity
+        // instead, so moving ground cannot kick its passengers during CCD.
+        // Restore the public position-based control mode after the solve.
+        let mut kinematic_targets = Vec::new();
+        if self.raw.integration_parameters.max_ccd_substeps > 1 {
+            for entry in &self.bodies {
+                let body = &self.raw.bodies[entry.handle];
+                if body.body_type() != RigidBodyType::KinematicPositionBased
+                    || body.next_position() == body.position()
+                {
+                    continue;
+                }
+                let body = &mut self.raw.bodies[entry.handle];
+                body.recompute_mass_properties_from_colliders(&self.raw.colliders);
+                let target = *body.next_position();
+                let center = body.local_center_of_mass();
+                let velocity = (target * center - *body.position() * center) / dt_seconds;
+                let spin = (target.rotation * body.rotation().inverse()).angle() / dt_seconds;
+                body.set_body_type(RigidBodyType::KinematicVelocityBased, false);
+                body.set_linvel(velocity, false);
+                body.set_angvel(spin, false);
+                kinematic_targets.push((entry.handle, target));
+            }
+        }
+
         let started = Instant::now();
         if self.collect_events {
             self.contact_event_collector.clear();
@@ -1074,6 +1115,24 @@ impl PhysicsWorld {
         }
         let wall_time = started.elapsed();
         let counters = self.raw.physics_pipeline.counters;
+        for (handle, target) in kinematic_targets {
+            let body = &mut self.raw.bodies[handle];
+            body.set_body_type(RigidBodyType::KinematicPositionBased, false);
+            // Preserve the exact prescribed endpoint instead of feeding f32
+            // integration drift into the following step's velocity. Only the
+            // kinematic driver is corrected; dynamic passengers are untouched.
+            body.set_position(target, false);
+            let children = body.colliders().to_vec();
+            for child in children {
+                let collider = &mut self.raw.colliders[child];
+                collider.set_position(target * collider.position_wrt_parent().copied().unwrap());
+                let aabb = collider
+                    .compute_broad_phase_aabb(&self.raw.integration_parameters, &self.raw.bodies);
+                self.raw
+                    .broad_phase
+                    .set_aabb(&self.raw.integration_parameters, child, aabb);
+            }
+        }
 
         let mut candidate_pairs = 0;
         let mut contact_pairs = 0;
@@ -1699,19 +1758,33 @@ impl PhysicsWorld {
             if !pair.has_any_active_contact() {
                 continue;
             }
-            if let Some(event) = contact_event_from_pair(&self.raw.colliders, pair) {
-                self.contact_events.push(event);
-            }
+            append_contact_events(&self.raw.colliders, pair, &mut self.contact_events);
         }
         // A CCD pair may be reported in more than one solver substep and in
         // the final graph. Gameplay receives the strongest occurrence once.
         self.contact_events.sort_unstable_by(|left, right| {
-            (left.collider_a, left.collider_b)
-                .cmp(&(right.collider_a, right.collider_b))
+            (
+                left.collider_a,
+                left.subshape_a,
+                left.collider_b,
+                left.subshape_b,
+            )
+                .cmp(&(
+                    right.collider_a,
+                    right.subshape_a,
+                    right.collider_b,
+                    right.subshape_b,
+                ))
                 .then_with(|| right.impulse_magnitude.total_cmp(&left.impulse_magnitude))
         });
-        self.contact_events
-            .dedup_by_key(|event| (event.collider_a, event.collider_b));
+        self.contact_events.dedup_by_key(|event| {
+            (
+                event.collider_a,
+                event.subshape_a,
+                event.collider_b,
+                event.subshape_b,
+            )
+        });
 
         for (_, collider_a, _, collider_b, intersecting) in self.raw.intersection_pairs() {
             if !intersecting {
@@ -1756,24 +1829,7 @@ fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider>
     if !valid_collider_spec(spec) {
         return None;
     }
-    let builder = match &spec.shape {
-        ColliderShape::Ball { radius } => ColliderBuilder::ball(*radius),
-        ColliderShape::Capsule {
-            half_segment,
-            radius,
-        } => ColliderBuilder::capsule_y(*half_segment, *radius),
-        ColliderShape::Cuboid {
-            half_width,
-            half_height,
-        } => ColliderBuilder::cuboid(*half_width, *half_height),
-        ColliderShape::ConvexPolygon { vertices } => {
-            let vertices = vertices.iter().copied().map(to_rapier).collect::<Vec<_>>();
-            ColliderBuilder::convex_hull(&vertices)?
-        }
-        ColliderShape::Polyline { vertices } => {
-            ColliderBuilder::polyline(vertices.iter().copied().map(to_rapier).collect(), None)
-        }
-    };
+    let builder = ColliderBuilder::new(build_shape(&spec.shape)?);
     let builder = builder
         .position(Pose::new(to_rapier(spec.local_position), spec.local_angle))
         .density(spec.density)
@@ -1802,17 +1858,111 @@ fn build_collider(spec: &ColliderSpec, collect_events: bool) -> Option<Collider>
     Some(builder.build())
 }
 
-fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Option<ContactEvent> {
-    let collider_a = colliders.get(pair.collider1)?;
-    let collider_b = colliders.get(pair.collider2)?;
-    let mut id_a = decode_collider(collider_a.user_data)?;
-    let mut id_b = decode_collider(collider_b.user_data)?;
-    let (magnitude, strongest_normal) = pair.max_impulse();
-    let mut normal = from_rapier(strongest_normal);
-    let mut impulse = from_rapier(pair.total_impulse());
-    let local_contacts = pair
+fn build_shape(shape: &ColliderShape) -> Option<SharedShape> {
+    Some(match shape {
+        ColliderShape::Ball { radius } => SharedShape::ball(*radius),
+        ColliderShape::Capsule {
+            half_segment,
+            radius,
+        } => SharedShape::capsule_y(*half_segment, *radius),
+        ColliderShape::Cuboid {
+            half_width,
+            half_height,
+        } => SharedShape::cuboid(*half_width, *half_height),
+        ColliderShape::ConvexPolygon { vertices } => {
+            let vertices = vertices.iter().copied().map(to_rapier).collect::<Vec<_>>();
+            SharedShape::convex_hull(&vertices)?
+        }
+        ColliderShape::Polyline { vertices } => {
+            SharedShape::polyline(vertices.iter().copied().map(to_rapier).collect(), None)
+        }
+        ColliderShape::Compound { children } => SharedShape::compound(
+            children
+                .iter()
+                .map(|child| {
+                    Some((
+                        Pose::new(to_rapier(child.position), child.angle),
+                        build_shape(&child.shape)?,
+                    ))
+                })
+                .collect::<Option<Vec<_>>>()?,
+        ),
+    })
+}
+
+fn append_contact_events(
+    colliders: &ColliderSet,
+    pair: &ContactPair,
+    target: &mut Vec<ContactEvent>,
+) {
+    let Some(a) = colliders.get(pair.collider1) else {
+        return;
+    };
+    let Some(b) = colliders.get(pair.collider2) else {
+        return;
+    };
+    let compound_a = a.shape().as_compound().is_some();
+    let compound_b = b.shape().as_compound().is_some();
+    if !compound_a && !compound_b {
+        target.extend(contact_event_from_manifolds(
+            a,
+            b,
+            None,
+            None,
+            pair.manifolds.iter(),
+        ));
+        return;
+    }
+    // A compound is a broad-phase grouping, not one chunk-wide damage event.
+    // Preserve one event per convex child pair, including CCD callback contacts.
+    let keys: BTreeSet<_> = pair
         .manifolds
         .iter()
+        .filter(|m| !m.data.solver_contacts.is_empty())
+        .map(|m| {
+            (
+                compound_a.then_some(m.subshape1),
+                compound_b.then_some(m.subshape2),
+            )
+        })
+        .collect();
+    for (part_a, part_b) in keys {
+        let manifolds = pair.manifolds.iter().filter(|m| {
+            part_a.is_none_or(|part| part == m.subshape1)
+                && part_b.is_none_or(|part| part == m.subshape2)
+        });
+        target.extend(contact_event_from_manifolds(
+            a, b, part_a, part_b, manifolds,
+        ));
+    }
+}
+
+fn contact_event_from_manifolds<'a>(
+    collider_a: &Collider,
+    collider_b: &Collider,
+    mut subshape_a: Option<u32>,
+    mut subshape_b: Option<u32>,
+    manifolds: impl Iterator<Item = &'a rapier2d::geometry::ContactManifold> + Clone,
+) -> Option<ContactEvent> {
+    let mut id_a = decode_collider(collider_a.user_data)?;
+    let mut id_b = decode_collider(collider_b.user_data)?;
+    let (magnitude, strongest_normal) = manifolds.clone().fold((0.0, Vector::ZERO), |best, m| {
+        let impulse = m.points.iter().map(|p| p.data.impulse).sum::<f32>();
+        if impulse > best.0 {
+            (impulse, m.data.normal)
+        } else {
+            best
+        }
+    });
+    let mut normal = from_rapier(strongest_normal);
+    let mut impulse = from_rapier(
+        manifolds
+            .clone()
+            .map(|m| m.points.iter().map(|p| p.data.impulse).sum::<f32>() * m.data.normal)
+            .sum(),
+    );
+    let local_contacts = manifolds
+        .clone()
         .filter(|manifold| !manifold.data.solver_contacts.is_empty())
         .max_by(|a, b| {
             let a = a.points.iter().map(|p| p.data.impulse).sum::<f32>();
@@ -1851,24 +2001,25 @@ fn contact_event_from_pair(colliders: &ColliderSet, pair: &ContactPair) -> Optio
         local_contacts.map_or((None, None), |(a, b)| (Some(a), Some(b)));
     if id_b < id_a {
         std::mem::swap(&mut id_a, &mut id_b);
+        std::mem::swap(&mut subshape_a, &mut subshape_b);
         std::mem::swap(&mut local_contact_a, &mut local_contact_b);
         normal = -normal;
         impulse = -impulse;
     }
-    let point = pair
-        .manifolds
-        .iter()
+    let point = manifolds
+        .clone()
         .flat_map(|manifold| &manifold.data.solver_contacts)
         .next()
         .map(|contact| from_rapier(contact.point));
-    let solver_contacts = pair
-        .manifolds
-        .iter()
+    let solver_contacts = manifolds
+        .clone()
         .map(|manifold| manifold.data.solver_contacts.len())
         .sum();
     Some(ContactEvent {
         collider_a: id_a,
         collider_b: id_b,
+        subshape_a,
+        subshape_b,
         point,
         local_contact_a,
         local_contact_b,
@@ -1907,7 +2058,25 @@ fn valid_body_spec(spec: BodySpec) -> bool {
 }
 
 fn valid_collider_spec(spec: &ColliderSpec) -> bool {
-    let valid_shape = match &spec.shape {
+    valid_shape(&spec.shape)
+        && finite_vec2(spec.local_position)
+        && spec.local_angle.is_finite()
+        && spec.density.is_finite()
+        && spec.density >= 0.0
+        && spec.mass_properties.is_none_or(|m| {
+            finite_vec2(m.center)
+                && m.mass.is_finite()
+                && m.mass > 0.0
+                && m.inertia.is_finite()
+                && m.inertia > 0.0
+        })
+        && spec.friction.is_finite()
+        && spec.friction >= 0.0
+        && spec.restitution.is_finite()
+}
+
+fn valid_shape(shape: &ColliderShape) -> bool {
+    match shape {
         ColliderShape::Ball { radius } => radius.is_finite() && *radius > 0.0,
         ColliderShape::Capsule {
             half_segment,
@@ -1930,22 +2099,18 @@ fn valid_collider_spec(spec: &ColliderSpec) -> bool {
         ColliderShape::Polyline { vertices } => {
             vertices.len() >= 2 && vertices.iter().copied().all(finite_vec2)
         }
-    };
-    valid_shape
-        && finite_vec2(spec.local_position)
-        && spec.local_angle.is_finite()
-        && spec.density.is_finite()
-        && spec.density >= 0.0
-        && spec.mass_properties.is_none_or(|m| {
-            finite_vec2(m.center)
-                && m.mass.is_finite()
-                && m.mass > 0.0
-                && m.inertia.is_finite()
-                && m.inertia > 0.0
-        })
-        && spec.friction.is_finite()
-        && spec.friction >= 0.0
-        && spec.restitution.is_finite()
+        ColliderShape::Compound { children } => {
+            !children.is_empty()
+                && children.iter().all(|child| {
+                    !matches!(
+                        child.shape,
+                        ColliderShape::Compound { .. } | ColliderShape::Polyline { .. }
+                    ) && valid_shape(&child.shape)
+                        && finite_vec2(child.position)
+                        && child.angle.is_finite()
+                })
+        }
+    }
 }
 
 fn body_motion(body: &RigidBody) -> BodyMotion {
@@ -2004,6 +2169,7 @@ pub(crate) fn from_rapier(value: Vector) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    mod compound;
 
     const BALL_ROLE: BodyRole = BodyRole::new(1);
     const BALL_COLLIDER: ColliderRole = ColliderRole::new(1);

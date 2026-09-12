@@ -8,6 +8,9 @@ into a compound collider, preserving the material and visible boundary.
 This checkpoint adds profiling and fixes timing accounting; it makes no
 collision representation or gameplay changes and claims no speedup.
 
+Follow-up: [chunk compound implementation and measurements](terrain-chunk-compounds.md).
+The results below remain the original profiling checkpoint.
+
 ## Measurement
 
 The runner now accepts `--profile-physics true`. It records the existing shared
