@@ -33,6 +33,8 @@ pub(crate) struct WaterLab {
     pub piston: Option<Piston>,
     pub reference_y: Option<f32>,
     displacement_enabled: bool,
+    /// Index into `bodies`; exactly one box can own this tank's occupancy input.
+    dynamic_displacer: Option<usize>,
 }
 
 impl WaterLab {
@@ -125,19 +127,21 @@ impl WaterLab {
                 raised_y: spec.bed[0] as f32 + initial_depth * 1.85,
                 lowered_y: spec.bed[0] as f32 + initial_depth * 0.45,
             };
-            assert!(world.insert_body(
-                piston.body,
-                BodySpec {
-                    kind: BodyKind::KinematicPosition,
-                    position: Vec2::new(piston.x, piston.raised_y),
-                    ..BodySpec::default()
-                },
-                &[ColliderSpec::cuboid(
-                    ColliderId::new(piston.body.entity, ColliderRole::PRIMARY, 0),
-                    half_extents.x,
-                    half_extents.y
-                )]
-            ));
+            if !mode.is_dynamic_tank() {
+                assert!(world.insert_body(
+                    piston.body,
+                    BodySpec {
+                        kind: BodyKind::KinematicPosition,
+                        position: Vec2::new(piston.x, piston.raised_y),
+                        ..BodySpec::default()
+                    },
+                    &[ColliderSpec::cuboid(
+                        ColliderId::new(piston.body.entity, ColliderRole::PRIMARY, 0),
+                        half_extents.x,
+                        half_extents.y
+                    )]
+                ));
+            }
             let observer = BuoyantBody::insert(
                 &mut world,
                 PhysicsId::new(1),
@@ -153,17 +157,46 @@ impl WaterLab {
                 0.55,
             )
             .unwrap();
+            let mut bodies = vec![LabBody {
+                body: observer,
+                report: BuoyancyReport::default(),
+                palette: 1,
+            }];
+            if mode.is_dynamic_tank() {
+                bodies.push(LabBody {
+                    body: BuoyantBody::insert(
+                        &mut world,
+                        piston.body.entity,
+                        BodySpec {
+                            position: Vec2::new(piston.x, piston.raised_y),
+                            lock_rotation: true,
+                            can_sleep: false,
+                            ccd_enabled: true,
+                            ..BodySpec::default()
+                        },
+                        HullShape::Box {
+                            half_width: half_extents.x,
+                            half_height: half_extents.y,
+                        },
+                        if mode == ClockWaterLab::Sinking {
+                            1.8
+                        } else {
+                            0.55
+                        },
+                    )
+                    .unwrap(),
+                    report: BuoyancyReport::default(),
+                    palette: if mode == ClockWaterLab::Sinking { 2 } else { 0 },
+                });
+            }
             return Self {
                 world,
                 supports,
-                bodies: vec![LabBody {
-                    body: observer,
-                    report: BuoyancyReport::default(),
-                    palette: 1,
-                }],
-                piston: Some(piston),
+                bodies,
+                piston: (!mode.is_dynamic_tank()).then_some(piston),
                 reference_y: Some(initial_level),
-                displacement_enabled: mode == ClockWaterLab::Displacement,
+                displacement_enabled: mode.has_displacement(),
+                dynamic_displacer: mode.is_dynamic_tank().then_some(1),
             };
         }
         let pitch = layout.pitch.max(12.0);
@@ -238,10 +271,12 @@ impl WaterLab {
             piston: None,
             reference_y: None,
             displacement_enabled: false,
+            dynamic_displacer: None,
         }
     }
 
     pub fn prepare_displacement(&mut self, water: &mut WaterWorld, tick: u64) {
+        self.sync_dynamic_displacement(water);
         let Some(piston) = &self.piston else {
             return;
         };
@@ -269,7 +304,20 @@ impl WaterLab {
             .expect("one bounded axis-aligned box in a closed tank");
     }
 
-    pub fn step(&mut self, water: &WaterWorld) {
+    fn sync_dynamic_displacement(&self, water: &mut WaterWorld) {
+        if let Some(index) = self.dynamic_displacer {
+            if self.displacement_enabled {
+                self.bodies[index]
+                    .body
+                    .sync_displacement(&self.world, water, 0)
+                    .expect("one rotation-locked dynamic box in a closed tank");
+            } else {
+                water.set_displacer(0, None).expect("one-way tank control");
+            }
+        }
+    }
+
+    pub fn step(&mut self, water: &mut WaterWorld) {
         self.world.clear_forces();
         for b in &mut self.bodies {
             b.report = b
@@ -283,5 +331,8 @@ impl WaterLab {
                 .expect("valid water-lab coupling");
         }
         self.world.step(1.0 / 60.0);
+        // Keep final-frame water occupancy aligned with the actual collider.
+        // No second water/physics step and no liquid added by this submission.
+        self.sync_dynamic_displacement(water);
     }
 }

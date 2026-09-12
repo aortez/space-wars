@@ -1,4 +1,4 @@
-//! Opt-in, one-way pool -> body coupling. No raw Rapier types or water mutation.
+//! Opt-in pool -> body forces, with explicit restricted box-displacement feedback.
 //! This first adapter owns one centered box/circle collider per dynamic body.
 use crate::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
@@ -6,7 +6,8 @@ use crate::world::{
 };
 use engine_core::Vec2;
 use engine_water::{
-    MAX_STEP, WaterWorld,
+    MAX_STEP, WaterError, WaterWorld,
+    displacement::DisplacementBox,
     immersion::{HullShape, WaterHull},
 };
 
@@ -85,6 +86,45 @@ impl BuoyantBody {
     }
     pub fn shape(&self) -> HullShape {
         self.shape
+    }
+
+    /// Submit this body's authoritative pose as the pool's sole displacer.
+    /// Only unrotated, rotation-locked dynamic boxes are supported. The water
+    /// model validates the closed/flat basin and footprint. Failure is atomic.
+    ///
+    /// Submit before water stepping/force sampling and after physics stepping
+    /// so rendering sees the final pose. The caller owns the pool's occupancy
+    /// input: clear it with `set_displacer(pool, None)` when removing the body
+    /// or switching feedback off. This does not step either simulation or apply
+    /// forces; one-way buoyancy remains independently available.
+    pub fn sync_displacement(
+        &self,
+        world: &PhysicsWorld,
+        water: &mut WaterWorld,
+        pool: usize,
+    ) -> Result<(), WaterError> {
+        let HullShape::Box {
+            half_width,
+            half_height,
+        } = self.shape
+        else {
+            return Err(WaterError::InvalidGeometry);
+        };
+        let motion = world.motion(self.body).ok_or(WaterError::InvalidInput)?;
+        if world.body_rotation_locked(self.body) != Some(true)
+            || motion.angle != 0.0
+            || motion.angular_velocity != 0.0
+            || world.dynamic_body_inertia(self.body).is_none()
+        {
+            return Err(WaterError::InvalidGeometry);
+        }
+        water.set_displacer(
+            pool,
+            Some(DisplacementBox {
+                center: motion.position,
+                half_extents: Vec2::new(half_width, half_height),
+            }),
+        )
     }
 
     /// Call once after `world.clear_forces()` and before each physics step.
@@ -166,3 +206,6 @@ impl BuoyantBody {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod displacement_tests;

@@ -123,6 +123,15 @@ or full body/fluid solver. Both tank modes use three bodies and five colliders,
 and reclaim the water during normal event recovery. See the
 [displacement model and benchmark commands](design/water.md#closed-tank-displacement-experiment).
 
+`SPACEWARS_CLOCK_WATER_LAB=floating` drops a freely moving orange box into that
+tank: the box now changes the water, and buoyancy from that water acts on the
+same box. `floating-control` disables its displacement for comparison; `sinking`
+uses a denser red box that settles on the floor. Rotation is solver-locked for
+this first axis-aligned binding, while translation remains free. The yellow
+ball remains a one-way observer. These modes retain the same three-body/five-
+collider budget, preview controls and cleanup lifecycle. See
+[dynamic feedback, tests and limitations](design/water.md#dynamic-box-feedback).
+
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently

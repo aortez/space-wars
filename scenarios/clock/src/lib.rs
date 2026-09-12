@@ -192,6 +192,9 @@ pub enum ClockWaterLab {
     Cascade,
     Displacement,
     DisplacementControl,
+    Floating,
+    FloatingControl,
+    Sinking,
 }
 
 impl ClockWaterLab {
@@ -200,6 +203,9 @@ impl ClockWaterLab {
             Some("1" | "cascade") => Self::Cascade,
             Some("displacement") => Self::Displacement,
             Some("displacement-control") => Self::DisplacementControl,
+            Some("floating") => Self::Floating,
+            Some("floating-control") => Self::FloatingControl,
+            Some("sinking") => Self::Sinking,
             _ => Self::Off,
         }
     }
@@ -209,10 +215,19 @@ impl ClockWaterLab {
             Self::Cascade => "collecting-pool",
             Self::Displacement => "displacement",
             Self::DisplacementControl => "displacement-control",
+            Self::Floating => "floating",
+            Self::FloatingControl => "floating-control",
+            Self::Sinking => "sinking",
         }
     }
     pub const fn is_tank(self) -> bool {
-        matches!(self, Self::Displacement | Self::DisplacementControl)
+        matches!(self, Self::Displacement | Self::DisplacementControl) || self.is_dynamic_tank()
+    }
+    pub const fn is_dynamic_tank(self) -> bool {
+        matches!(self, Self::Floating | Self::FloatingControl | Self::Sinking)
+    }
+    pub const fn has_displacement(self) -> bool {
+        matches!(self, Self::Displacement | Self::Floating | Self::Sinking)
     }
 }
 
@@ -591,6 +606,9 @@ mod tests {
             ("cascade", ClockWaterLab::Cascade),
             ("displacement", ClockWaterLab::Displacement),
             ("displacement-control", ClockWaterLab::DisplacementControl),
+            ("floating", ClockWaterLab::Floating),
+            ("floating-control", ClockWaterLab::FloatingControl),
+            ("sinking", ClockWaterLab::Sinking),
         ] {
             assert_eq!(ClockWaterLab::from_override(Some(value)), expected);
         }

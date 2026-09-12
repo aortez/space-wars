@@ -16,7 +16,13 @@ fn summary(label: &str, values: &mut [f64]) {
 }
 
 fn main() {
-    let water_lab = if std::env::args().any(|a| a == "--displacement-control") {
+    let water_lab = if std::env::args().any(|a| a == "--floating-control") {
+        scenario_clock::ClockWaterLab::FloatingControl
+    } else if std::env::args().any(|a| a == "--floating") {
+        scenario_clock::ClockWaterLab::Floating
+    } else if std::env::args().any(|a| a == "--sinking") {
+        scenario_clock::ClockWaterLab::Sinking
+    } else if std::env::args().any(|a| a == "--displacement-control") {
         scenario_clock::ClockWaterLab::DisplacementControl
     } else if std::env::args().any(|a| a == "--displacement") {
         scenario_clock::ClockWaterLab::Displacement

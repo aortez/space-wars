@@ -861,6 +861,17 @@ mod tests {
         check_meltdown_rendering(scenario_clock::ClockWaterLab::DisplacementControl);
     }
 
+    #[test]
+    fn meltdown_dynamic_tanks_reach_both_render_paths() {
+        for mode in [
+            scenario_clock::ClockWaterLab::Floating,
+            scenario_clock::ClockWaterLab::FloatingControl,
+            scenario_clock::ClockWaterLab::Sinking,
+        ] {
+            check_meltdown_rendering(mode);
+        }
+    }
+
     fn check_meltdown_rendering(water_lab: scenario_clock::ClockWaterLab) {
         for viewport in [
             Viewport::new(800.0, 480.0),
@@ -895,7 +906,7 @@ mod tests {
                 if tick > 0 {
                     scenario.step(&[], Duration::from_nanos(16_666_667));
                 }
-                if ![0, 75, 125, 210, 360, 450, 510].contains(&tick) {
+                if ![0, 30, 75, 125, 210, 360, 450, 510].contains(&tick) {
                     continue;
                 }
                 let frames = scenario.render_frames(RenderBackend::Raster, viewport);

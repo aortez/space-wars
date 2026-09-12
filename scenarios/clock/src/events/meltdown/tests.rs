@@ -28,6 +28,129 @@ fn tick(state: &mut ClockState) {
 }
 
 #[test]
+fn dynamic_tank_previews_float_sink_replay_and_clean_up() {
+    for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
+        for mode in [
+            ClockWaterLab::Floating,
+            ClockWaterLab::FloatingControl,
+            ClockWaterLab::Sinking,
+        ] {
+            let make = || {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: aspect,
+                        water_lab: mode,
+                        event_profile: ClockEventProfile::Off,
+                        ..ClockConfig::default()
+                    },
+                    42,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[
+                        ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                        ClockAction::preview_event(ClockEventKind::Meltdown),
+                    ],
+                    Duration::ZERO,
+                );
+                state
+            };
+            let mut a = make();
+            let mut b = make();
+            let mut saw_wet = false;
+            for elapsed in 0..510 {
+                assert_volume(&a);
+                assert_eq!((a.body_count(), a.collider_count()), (3, 5));
+                let Some(crate::events::ActiveEvent::Meltdown(event)) = &a.active_event else {
+                    panic!()
+                };
+                let lab = event.floats.as_ref().unwrap();
+                assert!(
+                    lab.piston.is_none(),
+                    "the dynamic box must not have a prescribed target"
+                );
+                let body = &lab.bodies[1];
+                let engine_water::immersion::HullShape::Box {
+                    half_width,
+                    half_height,
+                } = body.body.shape()
+                else {
+                    panic!()
+                };
+                let motion = lab.world.motion(body.body.body()).unwrap();
+                assert_eq!((motion.angle, motion.angular_velocity), (0.0, 0.0));
+                saw_wet |= body.report.submerged_fraction > 0.1;
+                let stats = event.water.stats();
+                assert_eq!((stats.in_flight, stats.drained), (0.0, 0.0));
+                if !mode.has_displacement() {
+                    assert_eq!(stats.displaced, 0.0);
+                }
+                if elapsed == 360 {
+                    let spec = event.water.pools()[0].spec();
+                    let area = 4.0 * half_width as f64 * half_height as f64;
+                    let mass = lab.world.body_mass(body.body.body()).unwrap() as f64;
+                    let expected_occupancy = if mode.has_displacement() {
+                        mass.min(area)
+                    } else {
+                        0.0
+                    };
+                    let level = lab.reference_y.unwrap() as f64
+                        + expected_occupancy / (spec.column_width * spec.bed.len() as f64);
+                    let expected_y = if mode == ClockWaterLab::Sinking {
+                        spec.bed[0] + half_height as f64
+                    } else {
+                        level + half_height as f64 * (1.0 - 2.0 * 0.55)
+                    };
+                    assert!(
+                        (stats.displaced - expected_occupancy).abs() < area * 0.03,
+                        "{mode:?} {aspect} displaced={} expected={expected_occupancy}",
+                        stats.displaced
+                    );
+                    assert!(
+                        (motion.position.y as f64 - expected_y).abs() < half_height as f64 * 0.08,
+                        "{mode:?} {aspect} motion={motion:?} expected_y={expected_y}"
+                    );
+                    assert!(body.report.submerged_fraction > 0.5);
+                }
+                if elapsed % 30 == 0 {
+                    assert_eq!(
+                        ClockScenario::render_frame(&a),
+                        ClockScenario::render_frame(&b)
+                    );
+                }
+                if elapsed == 180 {
+                    let frozen = ClockScenario::render_frame(&a);
+                    ClockScenario::step(&mut a, &[], Duration::ZERO);
+                    assert_eq!(frozen, ClockScenario::render_frame(&a));
+                }
+                tick(&mut a);
+                tick(&mut b);
+            }
+            assert!(saw_wet);
+            assert!(a.meltdown_state().is_none());
+            assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+            for resize in [false, true] {
+                a = make();
+                for _ in 0..210 {
+                    tick(&mut a);
+                }
+                if resize {
+                    a.set_aspect_ratio(1.0);
+                } else {
+                    ClockScenario::step(
+                        &mut a,
+                        &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+                        Duration::ZERO,
+                    );
+                }
+                assert!(a.meltdown_state().is_none());
+                assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+            }
+        }
+    }
+}
+
+#[test]
 fn displacement_preview_replays_and_drives_the_observer_without_changing_liquid() {
     for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
         let make = |mode| {
@@ -314,7 +437,11 @@ fn assert_volume(state: &ClockState) {
     };
     assert_eq!(
         (state.body_count(), state.collider_count()),
-        if event.floats.as_ref().is_some_and(|f| f.piston.is_some()) {
+        if event
+            .floats
+            .as_ref()
+            .is_some_and(|f| f.reference_y.is_some())
+        {
             (3, 5)
         } else if event.lab {
             (4, 10)

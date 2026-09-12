@@ -4,6 +4,7 @@ First delivery for Clock water (#55): reusable water accounting and motion,
 Meltdown integration, deterministic fixtures, visual preview, and benchmarks.
 The second slice adds opt-in one-way Rapier buoyancy. The third adds a deliberately
 narrow displacement experiment: a prescribed box entering/leaving a closed tank.
+The fourth closes that feedback loop for a freely moving, rotation-locked box.
 
 ## Model and boundaries
 
@@ -329,13 +330,126 @@ Formatting, scoped Clippy (with the previously noted unrelated lint allowed),
 and the host `pi-kiosk` feature check pass. No Pi deployment or ARM build was
 performed for this slice.
 
+## Dynamic box feedback
+
+`BuoyantBody::sync_displacement(&physics, &mut water, pool)` submits the existing
+body's authoritative Rapier pose and matching box dimensions to the water model.
+It accepts only a dynamic, rotation-locked box at zero angle; circles, unlocked
+or rotated boxes, removed bodies and unsupported pools fail without changing
+occupancy. There is no automatic registry or second body representation. One
+caller owns each pool's sole occupancy input and clears it explicitly with
+`set_displacer(pool, None)` when removing the body or disabling feedback.
+
+`BodySpec::lock_rotation` maps to a Rapier solver constraint and defaults to false.
+It leaves translation free: the Clock does not reset the body's angle, position
+or velocity each frame. The constraint is included in ordinary physics snapshots.
+
+The frame order is explicit:
+
+```rust
+body.sync_displacement(&physics, &mut water, 0)?;
+water.step(dt)?;
+physics.clear_forces();
+// Other external forces can accumulate here.
+body.apply_forces(&mut physics, &water, buoyancy_config, dt).unwrap();
+physics.step(dt as f32);
+body.sync_displacement(&physics, &mut water, 0)?;
+```
+
+The last submission aligns the rendered water occupancy with the final collider
+pose. It does not step the water again or add liquid. Forces for an interval use
+the pre-integration body pose and newly stepped water. This is an explicit,
+split-step approximation, **not** a coupled pressure/contact solve or a guarantee
+of momentum/energy conservation. Existing lift and drag formulas are unchanged.
+The same closed/flat tank, single-box and permeable-flow limits still apply.
+
+For a freely floating box, settled displaced area should equal `mass / fluid
+density`, and the mean level rises by that area divided by tank width. A body
+denser than water sinks until solid contact supports the remaining weight.
+Contact penetration is clipped against the bed when computing occupancy.
+
+### Visual fixtures and checks
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=floating cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=floating-control cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=sinking cargo run --release -p engine-client -- --scenario clock
+```
+
+Use **Clock Controls → Preview Event: Meltdown → Preview** as before. `floating`
+drops an orange box of density 0.55; `floating-control` repeats the same setup
+without its displacement feedback. `sinking` uses a red box of density 1.8.
+Fluid density is 1.0. The yellow observer ball still responds through one-way
+buoyancy only. All three modes use the same tank/box dimensions as the prescribed
+preview and exactly two dynamic bodies plus one fixed support body/five colliders.
+The dashed line is the initial water level. The floating box's expected settled
+occupancy is 1.848 cell-equivalent areas, raising mean depth by 7.7%; sinking
+occupancy approaches 3.36 areas, subject to floor contact tolerance. Impact peaks
+are not settled values. Normal Meltdown and all earlier previews remain available.
+
+```sh
+cargo test --locked -p engine-rapier displacement_ -- --nocapture
+cargo test --locked -p scenario-clock dynamic_tank
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --floating
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --floating-control
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --sinking
+```
+
+The engine fixture runs 60 simulated seconds per case. It drops boxes of density
+0.35, 0.75 and 1.8 into a 100-wide, initially 20-deep tank. Tests cover 30/60/120 Hz
+at gravity 40 and 400, plus 32/128/512-column resolution checks at gravity 40.
+They verify conserved liquid, bounded positions/surfaces, tight final levels and
+immersion ratios, low final speed, and much smaller late oscillations than the
+initial drop. Other tests compare feedback against the one-way control, replay
+exactly, check invalid-input atomicity/removal, and verify torque resistance,
+free translation and physics snapshot restoration of the rotation lock.
+
+**Fast floor impacts still allow transient overlap.** At gravity 400, the dense
+box's maximum floor penetration in this fixture was approximately 2.72, 1.68 and
+0.36 units at 30, 60 and 120 Hz respectively, for a 10-high box. Rapier corrected
+the overlap and settled within 0.016 units of the expected supported center.
+The tests bound containment and final contact position, not exact non-penetration
+at every tick. This slice does not retune CCD/contact handling, and stable
+buoyancy must not be read as a claim of perfect fast-impact collision accuracy.
+
+### Fourth-slice measurements and validation (2026-09-12)
+
+Desktop Rust 1.89 release, three runs per mode, each running 24 complete events
+at 800×480, 480×800 and 1280×720. The table takes the median of the three per-run
+p95 values at each size, then reports the range across sizes:
+
+| Mode | Step p95 | Draw-list p95 |
+| --- | ---: | ---: |
+| Floating, feedback off | 7.9–8.3 µs | 4.5–4.9 µs |
+| Floating, feedback on | 9.2–9.6 µs | 4.7–4.8 µs |
+| Sinking, feedback on | 9.1–9.5 µs | 4.7–4.8 µs |
+| Normal Meltdown | 4.8 µs | 6.2–6.4 µs |
+
+Across **all** runs/sizes, floating step p95 ranged 9.2–10.8 µs and its control
+7.9–9.9 µs; sinking ranged 9.1–12.1 µs and normal 4.7–5.8 µs. These small desktop
+workloads have measurable run-to-run noise. Draw-list timings exclude raster,
+presentation and device CPU cost. Both dynamic tank variants stay at 384 peak
+primitives, three bodies and five colliders; normal remains body-free.
+
+Validation passed: 63 Rapier tests, 23 water tests, 82 Clock tests, 51
+common/control/CLI tests and 298 client tests. The expanded gravity/timestep
+matrix was rerun after the full suite. Three existing extended Duck sweeps and
+one existing client test remain ignored. Real-client workflows pass under Xvfb
+for floating, floating-control, sinking and normal Meltdown, including pause,
+preview, recovery, restart and launcher return. Both render paths are covered;
+portrait/landscape captures and the real-client floating preview were inspected.
+Workspace/all-target compile, host `pi-kiosk` feature check, formatting and scoped
+Clippy pass (the same unrelated `collapsible_else_if` lint remains allowed).
+This is not an ARM build or Pi deployment.
+
 ## Later slices
 
-Use the controlled-box/control pair to judge whether this approximation is
-useful before adding feedback to freely moving bodies. Further candidates are
-multiple/rotating hull occupancy and explicit obstacle-aware flow, each with
-conservation and stability tests. Do not assume this first box model supports
-arbitrary rigid bodies, sealed moving obstructions or splash physics.
+Next candidates are multiple/rotating hull occupancy and explicit obstacle-aware
+flow, each with conservation and stability tests. Use the existing prescribed,
+dynamic and one-way controls for comparisons. More aggressive impact or very
+light-body workloads should get separate accuracy/stability limits before
+generalizing this binding. It does not support arbitrary rigid bodies, sealed
+moving obstructions or splash physics.
 
 Arbitrary enclosed cavities, inverted vessels, planetary gravity, and free
 floating liquid require a richer representation. Keep body coupling separate

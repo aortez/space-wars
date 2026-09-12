@@ -15,9 +15,9 @@ use rapier2d::prelude::{
     ActiveEvents, BroadPhaseBvh, CCDSolver, Collider, ColliderBuilder, ColliderHandle, ColliderSet,
     CollisionEvent, ContactPair, EventHandler, GenericJoint, Group, ImpulseJoint,
     ImpulseJointHandle, ImpulseJointSet, IntegrationParameters, InteractionGroups,
-    InteractionTestMode, IslandManager, MultibodyJointSet, NarrowPhase, PhysicsPipeline,
-    PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray, RigidBody,
-    RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
+    InteractionTestMode, IslandManager, LockedAxes, MultibodyJointSet, NarrowPhase,
+    PhysicsPipeline, PhysicsWorld as RapierWorld, Pose, QueryFilter, QueryFilterFlags, Ray,
+    RigidBody, RigidBodyBuilder, RigidBodyHandle, RigidBodySet, RigidBodyType, Vector,
 };
 use serde::{Deserialize, Serialize};
 
@@ -154,6 +154,8 @@ pub struct BodySpec {
     pub angle: f32,
     pub linear_velocity: Vec2,
     pub angular_velocity: f32,
+    /// Constrain angular motion through the solver; translations remain free.
+    pub lock_rotation: bool,
     pub linear_damping: f32,
     pub angular_damping: f32,
     pub gravity_scale: f32,
@@ -170,6 +172,7 @@ impl Default for BodySpec {
             angle: 0.0,
             linear_velocity: Vec2::ZERO,
             angular_velocity: 0.0,
+            lock_rotation: false,
             linear_damping: 0.0,
             angular_damping: 0.0,
             gravity_scale: 1.0,
@@ -881,6 +884,11 @@ impl PhysicsWorld {
         let body = self.raw.bodies.get(self.body_handle(id)?)?;
         body.is_dynamic()
             .then(|| body.mass_properties().local_mprops.principal_inertia())
+    }
+
+    pub fn body_rotation_locked(&self, id: BodyId) -> Option<bool> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        Some(body.is_rotation_locked())
     }
 
     /// Make edited collider mass, inertia, and center of mass available before
@@ -1723,6 +1731,11 @@ fn build_body(id: BodyId, spec: BodySpec) -> RigidBody {
         .rotation(spec.angle)
         .linvel(to_rapier(spec.linear_velocity))
         .angvel(spec.angular_velocity)
+        .locked_axes(if spec.lock_rotation {
+            LockedAxes::ROTATION_LOCKED
+        } else {
+            LockedAxes::empty()
+        })
         .linear_damping(spec.linear_damping)
         .angular_damping(spec.angular_damping)
         .gravity_scale(spec.gravity_scale)

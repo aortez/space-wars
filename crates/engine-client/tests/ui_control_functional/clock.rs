@@ -936,10 +936,7 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let material = draining.meltdown.unwrap();
         assert!(material.pooled_microunits > 0);
         assert_eq!(material.drained_microunits > 0, !water_lab);
-        assert_eq!(
-            material.displaced_microunits > 0,
-            mode == scenario_clock::ClockWaterLab::Displacement
-        );
+        assert_eq!(material.displaced_microunits > 0, mode.has_displacement());
         assert!(material.water_columns <= scenario_clock::WATER_COLUMNS);
         assert_eq!(draining.scenario_revision, initial.scenario_revision);
         assert!(!draining.settings.events.meltdown);

@@ -205,7 +205,7 @@ impl MeltdownEvent {
             }
         }
         if let Some(floats) = &mut self.floats {
-            floats.step(&self.water);
+            floats.step(&mut self.water);
         }
         self.tick >= MELTING_TICKS + DRAINING_TICKS + REFORMING_TICKS
     }
