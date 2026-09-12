@@ -490,7 +490,7 @@ impl ClockEvents {
 }
 
 /// Bounded Clock-local material, not Rapier bodies. One original square is
-/// 1,000,000 volume units. Rounding each aggregate can differ by one unit.
+/// 1,000,000 volume units. Rounding the four water aggregates can differ by two units.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockMeltdownState {
     pub initial_cells: usize,
@@ -498,8 +498,18 @@ pub struct ClockMeltdownState {
     pub airborne_cells: usize,
     pub water_columns: usize,
     pub pooled_microunits: u64,
+    /// Water physically in flight, not yet deposited or drained.
+    #[serde(default)]
+    pub spilling_microunits: u64,
+    /// Occupied body space in the displacement lab, NOT liquid volume.
+    #[serde(default)]
+    pub displaced_microunits: u64,
+    #[serde(default)]
+    pub spill_parcels: usize,
+    #[serde(default)]
+    pub capacity_limited_ticks: u64,
     pub drained_microunits: u64,
-    /// Residue removed by the bounded reform phase, not counted as drainage.
+    /// Water/cells reclaimed during reformation, not counted as drainage.
     pub reclaimed_microunits: u64,
 }
 

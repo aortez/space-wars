@@ -7,6 +7,7 @@ members = [
     "crates/engine-nes",
     "crates/engine-rapier",
     "crates/engine-terrain",
+    "crates/engine-water",
     "crates/spacewars-ai",
     "crates/engine-client",
     "crates/spacewars-control",
@@ -69,6 +70,7 @@ engine-gravity = { path = "crates/engine-gravity" }
 engine-nes = { path = "crates/engine-nes" }
 engine-rapier = { path = "crates/engine-rapier" }
 engine-terrain = { path = "crates/engine-terrain" }
+engine-water = { path = "crates/engine-water" }
 spacewars-ai = { path = "crates/spacewars-ai" }
 spacewars-control = { path = "crates/spacewars-control" }
 scenario-clock = { path = "scenarios/clock" }

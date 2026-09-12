@@ -876,6 +876,10 @@ impl FunctionalHarness {
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
+    let mode = scenario_clock::ClockWaterLab::from_override(
+        std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
+    );
+    let water_lab = mode != scenario_clock::ClockWaterLab::Off;
     run_functional_test("clock-meltdown", |harness| {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
@@ -891,8 +895,16 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let initial = harness.clock_state();
         harness.clock_trigger_event(&initial, ClockEventKind::Meltdown);
         let melting = harness.clock_wait(&initial, "melting", 1, 75);
-        assert!(melting.meltdown.unwrap().airborne_cells > 0);
-        assert_eq!((melting.body_count, melting.collider_count), (0, 0));
+        if water_lab {
+            assert_eq!(melting.meltdown.unwrap().initial_cells, 24);
+            assert_eq!(
+                (melting.body_count, melting.collider_count),
+                if mode.is_tank() { (3, 5) } else { (4, 10) }
+            );
+        } else {
+            assert!(melting.meltdown.unwrap().airborne_cells > 0);
+            assert_eq!((melting.body_count, melting.collider_count), (0, 0));
+        }
         harness.capture_screenshot("clock-melting.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
         let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
@@ -922,7 +934,9 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let draining = harness.clock_wait(&initial, "draining", 2, 10);
         let material = draining.meltdown.unwrap();
-        assert!(material.drained_microunits > 0 && material.pooled_microunits > 0);
+        assert!(material.pooled_microunits > 0);
+        assert_eq!(material.drained_microunits > 0, !water_lab);
+        assert_eq!(material.displaced_microunits > 0, mode.has_displacement());
         assert!(material.water_columns <= scenario_clock::WATER_COLUMNS);
         assert_eq!(draining.scenario_revision, initial.scenario_revision);
         assert!(!draining.settings.events.meltdown);
@@ -934,18 +948,22 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         harness.activate_guarded("pause.resume", &menu);
         let reforming = harness.clock_wait(&initial, "reforming", 2, 15);
         let material = reforming.meltdown.unwrap();
-        assert_eq!(
-            (
-                material.waiting_cells,
-                material.airborne_cells,
-                material.water_columns
-            ),
-            (0, 0, 0)
+        assert_eq!((material.waiting_cells, material.airborne_cells), (0, 0));
+        assert_eq!(material.drained_microunits > 0, !water_lab);
+        assert!(material.reclaimed_microunits > 0);
+        assert!(
+            (material.pooled_microunits
+                + material.spilling_microunits
+                + material.drained_microunits
+                + material.reclaimed_microunits)
+                .abs_diff(material.initial_cells as u64 * 1_000_000)
+                <= 2
         );
-        assert!(material.drained_microunits > material.initial_cells as u64 * 990_000);
+        assert!(material.spill_parcels <= scenario_clock::MAX_SPILL_PARCELS);
         harness.capture_screenshot("clock-melt-reforming.png");
         let idle = harness.clock_wait(&initial, "idle", 2, 0);
         assert_eq!(idle.meltdown, None);
+        assert_eq!((idle.body_count, idle.collider_count), (0, 0));
         assert_eq!(idle.next_event_tick, None);
         harness.capture_screenshot("clock-melt-recovered.png");
         harness.clock_trigger_event(&idle, ClockEventKind::Meltdown);
