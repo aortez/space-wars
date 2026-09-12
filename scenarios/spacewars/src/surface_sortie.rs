@@ -314,6 +314,18 @@ pub struct SurfaceSortieObservation {
 }
 
 impl SurfaceSortieState {
+    /// Timings from the shared world step, including terrain preparation.
+    /// Seat input, support, landing, claim and recovery work in the surrounding
+    /// sortie step is not included. Nested Rapier timers must not be summed.
+    pub fn last_step_metrics(&self) -> crate::SpacewarsStepMetrics {
+        self.world.last_step_metrics
+    }
+
+    /// Optional linear candidate-graph scan, excluded from step timing.
+    pub fn physics_pair_diagnostics(&self) -> engine_rapier::world::PhysicsPairDiagnostics {
+        self.world.physics.world.pair_diagnostics()
+    }
+
     pub fn player_count(&self) -> usize {
         self.pilots.len()
     }

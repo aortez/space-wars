@@ -536,6 +536,15 @@ pub struct PhysicsStepMetrics {
     pub contacts: usize,
 }
 
+/// Optional scan of the final narrow-phase candidate graph. Candidates need
+/// not touch; same-body shapes cannot generate solver contacts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PhysicsPairDiagnostics {
+    pub same_body_candidates: usize,
+    pub other_candidates: usize,
+    pub active_contact_pairs: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhysicsWorldError(String);
 
@@ -1119,6 +1128,23 @@ impl PhysicsWorld {
 
     pub fn contact_events(&self) -> &[ContactEvent] {
         &self.contact_events
+    }
+
+    /// Scan only when profiling: this is linear in the candidate-pair count,
+    /// which can greatly exceed the number of live contacts.
+    pub fn pair_diagnostics(&self) -> PhysicsPairDiagnostics {
+        let mut result = PhysicsPairDiagnostics::default();
+        for pair in self.raw.contact_pairs() {
+            let a = self.raw.colliders[pair.collider1].parent();
+            let b = self.raw.colliders[pair.collider2].parent();
+            if a.is_some() && a == b {
+                result.same_body_candidates += 1;
+            } else {
+                result.other_candidates += 1;
+            }
+            result.active_contact_pairs += usize::from(pair.has_any_active_contact());
+        }
+        result
     }
 
     pub fn sensor_intersections(&self) -> &[SensorIntersection] {
@@ -2112,6 +2138,32 @@ mod tests {
         );
         world.remove_entity(entity);
         assert_eq!(world.velocity_at_point(body, origin), None);
+    }
+
+    #[test]
+    fn pair_diagnostics_separate_same_body_candidates_from_real_contacts() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::ZERO,
+            ..Default::default()
+        });
+        let body = insert_ball(&mut world, 1, Vec2::ZERO);
+        assert!(world.insert_collider(
+            body,
+            &ColliderSpec::ball(ColliderId::new(body.entity, BALL_COLLIDER, 1), 0.25)
+        ));
+        insert_ball(&mut world, 2, Vec2::new(0.2, 0.0));
+        let metrics = world.step(1.0 / 60.0);
+        let before = world.snapshot_bytes().unwrap();
+        let pairs = world.pair_diagnostics();
+        assert_eq!(pairs.same_body_candidates, 1);
+        assert_eq!(pairs.other_candidates, 2);
+        assert_eq!(pairs.active_contact_pairs, 2);
+        assert_eq!(
+            metrics.candidate_pairs,
+            pairs.same_body_candidates + pairs.other_candidates
+        );
+        assert_eq!(metrics.contact_pairs, pairs.active_contact_pairs);
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
     }
 
     #[test]

@@ -3,6 +3,8 @@
 mod ground_start_probe;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
+#[path = "support/physics_profile.rs"]
+mod physics_profile;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -48,6 +50,8 @@ fn main() {
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
     let measure_draw = arg("--measure-draw", "false") == "true";
+    let mut physics_profile = (arg("--profile-physics", "false") == "true")
+        .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
     // Optional dense, half-open physics-tick window; ordinary traces stay sparse.
     let trace_start: u64 = arg("--trace-start-tick", "0").parse().unwrap();
@@ -315,6 +319,18 @@ fn main() {
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
+        if let Some(profile) = &mut physics_profile {
+            profile.record(state.last_step_metrics(), *steps.last().unwrap());
+            if tick % 60 == 59 || state.match_outcome().is_some() {
+                let pairs = state.physics_pair_diagnostics();
+                profile.record_pairs(
+                    tick + 1,
+                    pairs.same_body_candidates,
+                    pairs.other_candidates,
+                    pairs.active_contact_pairs,
+                );
+            }
+        }
         if measure_draw {
             let clock = Instant::now();
             for player in 0..2 {
@@ -427,6 +443,7 @@ fn main() {
     report["dense_trace_ticks"] = json!([trace_start, trace_end]);
     report["draw_lists"] = timing(draws);
     report["measured_tick"] = timing(measured_ticks);
+    report["physics_profile"] = physics_profile.map_or(serde_json::Value::Null, |p| p.report());
     report["measurement_scope"] = json!({"draw_enabled":measure_draw,
         "draw_frames_per_tick":if measure_draw {4} else {0},
         "includes":"mission sensors + policies + scenario step + optional two player frames and two minimaps",
