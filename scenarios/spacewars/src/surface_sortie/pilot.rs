@@ -93,6 +93,8 @@ impl SurfaceSortieState {
         player: usize,
         requested_site: Option<LandingSiteId>,
     ) -> PilotObservationV1 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("pilot_observation");
         let pilot = &self.pilots[player];
         let ship = &self.world.ships[pilot.vehicle.0];
         let body = self.world.physics.ship_body(pilot.vehicle.0);
@@ -193,6 +195,8 @@ impl SurfaceSortieState {
         id: LandingSiteId,
         pod: bool,
     ) -> Option<PilotLandingSite> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("vehicle_landing_site");
         if id.bearing >= LANDING_SITE_COUNT || self.world.physics.material_queries_dirty {
             return None;
         }

@@ -637,10 +637,17 @@ pub struct ChunkGeometry {
     pub generation: u64,
     pub rectangles: Vec<SolidRect>,
     pub polygons: Vec<SolidPolygon>,
+    bounds: Option<(Vec2, Vec2)>,
     dependencies: Vec<(ChunkId, u64)>,
 }
 
 impl ChunkGeometry {
+    /// Tight local-space min/max of all derived vertices, including patches
+    /// extending outside their source cells. Empty chunks have no bounds.
+    pub fn local_bounds(&self) -> Option<(Vec2, Vec2)> {
+        self.bounds
+    }
+
     pub fn shape_count(&self) -> usize {
         self.rectangles.len() + self.polygons.len()
     }
@@ -683,6 +690,25 @@ impl TerrainGeometry {
             TerrainSurface::Contour => surface::contour_chunk(t, id),
             TerrainSurface::Interpolated => surface::interpolated::chunk(t, id),
         };
+        let mut bounds: Option<(Vec2, Vec2)> = None;
+        let mut include = |point: Vec2| {
+            let (min, max) = bounds.get_or_insert((point, point));
+            min.x = min.x.min(point.x);
+            min.y = min.y.min(point.y);
+            max.x = max.x.max(point.x);
+            max.y = max.y.max(point.y);
+        };
+        for rect in &rectangles {
+            let center = rect.local_center(t);
+            let half = rect.half_extents(t);
+            include(center - half);
+            include(center + half);
+        }
+        for polygon in &polygons {
+            for &point in &polygon.vertices {
+                include(point);
+            }
+        }
         let columns = t.width.div_ceil(CHUNK_SIZE);
         let rows = t.height.div_ceil(CHUNK_SIZE);
         let (cx, cy) = ((id.0 % columns) as i32, (id.0 / columns) as i32);
@@ -700,6 +726,7 @@ impl TerrainGeometry {
             generation: t.revision(),
             rectangles,
             polygons,
+            bounds,
             dependencies,
         }
     }

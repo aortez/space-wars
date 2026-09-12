@@ -698,7 +698,47 @@ pub(super) fn render_body(
     position: Vec2,
     angle: f32,
 ) {
+    render_body_in_view(frame, field, geometry, position, angle, None);
+}
+
+pub(super) fn render_body_in_view(
+    frame: &mut RenderFrame,
+    field: &Terrain,
+    geometry: &TerrainGeometry,
+    position: Vec2,
+    angle: f32,
+    view: Option<engine_common::RenderRect>,
+) {
+    // An AABB around the inverse-transformed camera is conservative for rotated
+    // bodies. Only these four points are transformed before rejecting chunks.
+    let local_view = view.map(|view| {
+        let points = [
+            Vec2::new(view.min.x, view.min.y),
+            Vec2::new(view.min.x, view.max.y),
+            Vec2::new(view.max.x, view.min.y),
+            Vec2::new(view.max.x, view.max.y),
+        ]
+        .map(|p| (p - position).rotate_radians(-angle));
+        let mut min = points[0];
+        let mut max = points[0];
+        for p in points {
+            min.x = min.x.min(p.x);
+            min.y = min.y.min(p.y);
+            max.x = max.x.max(p.x);
+            max.y = max.y.max(p.y);
+        }
+        (min, max)
+    });
     for chunk in geometry.chunks() {
+        if let Some((view_min, view_max)) = local_view {
+            let Some((min, max)) = chunk.local_bounds() else {
+                continue;
+            };
+            if max.x < view_min.x || max.y < view_min.y || min.x > view_max.x || min.y > view_max.y
+            {
+                continue;
+            }
+        }
         for rect in &chunk.rectangles {
             let color = if rect.material == ORE {
                 RenderColor::rgb(0.53, 0.49, 0.25)

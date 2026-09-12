@@ -8,6 +8,85 @@ use std::{cell::RefCell, rc::Rc};
 struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
+#[test]
+fn retained_text_updates_match_replaced_models_and_full_repaints() {
+    use crate::{PrimitiveKind, ScenePrimitive, host::update_raster_text_overlay};
+    use slint::{Color, ModelRc, VecModel};
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let uis = [MainWindow::new().unwrap(), MainWindow::new().unwrap()];
+    for ui in &uis {
+        ui.show().unwrap();
+    }
+    let windows = windows.borrow();
+    for (width, height) in [(320, 180), (180, 320)] {
+        for window in windows.iter() {
+            window.set_size(PhysicalSize::new(width, height));
+        }
+        let mut pixels = [
+            SharedPixelBuffer::<Rgb8Pixel>::new(width, height),
+            SharedPixelBuffer::<Rgb8Pixel>::new(width, height),
+        ];
+        let first = ScenePrimitive {
+            kind: PrimitiveKind::Text,
+            width: width as f32 / 2.0,
+            height: height as f32,
+            text: "Walking back to ship".into(),
+            text_x: 10.0,
+            text_y: 30.0,
+            color: Color::from_rgb_u8(255, 230, 150).into(),
+            font_size: 16.0,
+            ..Default::default()
+        };
+        let mut rows = vec![
+            first.clone(),
+            ScenePrimitive {
+                x: width as f32 / 2.0,
+                text: "Other pilot".into(),
+                ..first.clone()
+            },
+        ];
+        for step in 0..10 {
+            match step {
+                1 => {} // Identical publication must preserve existing pixels.
+                2 => rows[0].text = "Board".into(),
+                3 => {
+                    rows[0].text_x = -12.0;
+                    rows[0].text_y = 80.0;
+                }
+                4 => {
+                    rows[0].font_size = 24.0;
+                    rows[0].color = Color::from_argb_u8(120, 20, 255, 100).into();
+                }
+                5 => rows.push(ScenePrimitive {
+                    text_y: 120.0,
+                    text: "Rebuilt".into(),
+                    ..first.clone()
+                }),
+                6 => {
+                    rows.remove(0);
+                }
+                7 => rows.clear(),
+                8 => rows.push(first.clone()),
+                9 => rows[0].width = 30.0,
+                _ => {}
+            }
+            update_raster_text_overlay(&uis[0], rows.clone());
+            uis[1].set_primitives(ModelRc::new(VecModel::from(rows.clone())));
+            for index in 0..2 {
+                windows[index].request_redraw();
+                assert!(windows[index].draw_if_needed(|renderer| {
+                    renderer.render(pixels[index].make_mut_slice(), width as usize);
+                }));
+            }
+            assert!(
+                pixels[0].as_bytes() == pixels[1].as_bytes(),
+                "text step {step}, {width}×{height}: stale pixels or clipping changed"
+            );
+        }
+    }
+}
+
 impl Platform for TestPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         let mut windows = self.0.borrow_mut();

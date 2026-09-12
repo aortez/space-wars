@@ -221,11 +221,16 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    /// Without a selected site, survey landing candidates only while aboard.
+    /// On-foot missions retain local physical gates and explicit site checks;
+    /// escape-pod surveys keep their existing recovery semantics.
     pub fn mission_observation(
         &self,
         player: usize,
         site: Option<LandingSiteId>,
     ) -> MissionObservationV1 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("mission_observation");
         let current = self.motion_planet_index(player);
         let site = site
             .map(|mut id| {
@@ -239,6 +244,16 @@ impl SurfaceSortieState {
             && site.is_some_and(|id| id.bearing >= pilot::LANDING_SITE_COUNT)
         {
             None
+        } else if site.is_none()
+            && self.location(player) == PilotLocation::OnFoot
+            && self.world.ships[self.pilots[player].vehicle.0].form == ShipForm::Ship
+        {
+            // Walking/boarding does not consume landing candidates. Use the
+            // same no-site request as travel, without suppressing local sensors.
+            Some(LandingSiteId {
+                planet: current,
+                bearing: pilot::LANDING_SITE_COUNT,
+            })
         } else {
             site
         };
@@ -309,6 +324,85 @@ impl SurfaceSortieState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn on_foot_missions_skip_landing_candidates_but_keep_local_gates_and_selected_sites() {
+        let mut state = SurfaceSortieScenario::init_material_surface(
+            42,
+            1,
+            engine_terrain::TerrainSurface::Interpolated,
+        );
+        let dt = Duration::from_nanos(16_666_667);
+        for _ in 0..120 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
+        }
+        assert!(
+            !state
+                .mission_observation(0, None)
+                .local
+                .combat
+                .recovery
+                .sites
+                .is_empty()
+        );
+        assert_eq!(state.try_transfer(0), TransferResult::Exited);
+        for _ in 0..60 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
+        }
+        assert_eq!(state.location(0), PilotLocation::OnFoot);
+        let before = SurfaceSortieScenario::observe(&state);
+        let mut original = state.recovery_task_observation(0, None);
+        assert!(!original.sites.is_empty());
+        assert!(original.ground.is_some());
+        let selected = original.sites[0].id;
+        original.sites.clear();
+        original.flight.pilot.sites.clear();
+        let observation = state.mission_observation(0, None);
+        assert_eq!(observation.local.combat.recovery, original);
+        assert!(observation.local.cover.is_empty());
+        assert_eq!(
+            state.mission_observation(0, Some(selected)).local,
+            state.tactical_sortie_observation(0, Some(selected))
+        );
+        assert_eq!(
+            before.payload,
+            SurfaceSortieScenario::observe(&state).payload
+        );
+
+        // Returning aboard restores the ordinary full survey on the next read.
+        assert_eq!(state.try_transfer(0), TransferResult::Boarded);
+        assert!(
+            !state
+                .mission_observation(0, None)
+                .local
+                .combat
+                .recovery
+                .sites
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn mission_no_site_request_keeps_escape_pod_landing_surveys() {
+        let mut state = SurfaceSortieScenario::init_material(42, 1);
+        let dt = Duration::from_nanos(16_666_667);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let health = state.world.ships[0].life_max;
+        state.world.ships[0].translate_life(-health);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
+        let expected = state.tactical_sortie_observation(0, None);
+        assert!(!expected.combat.recovery.sites.is_empty());
+        for request in [
+            None,
+            Some(LandingSiteId {
+                planet: 0,
+                bearing: pilot::LANDING_SITE_COUNT,
+            }),
+        ] {
+            assert_eq!(state.mission_observation(0, request).local, expected);
+        }
+    }
 
     #[test]
     fn generated_match_uses_round_surfaces_with_the_same_material_and_world() {

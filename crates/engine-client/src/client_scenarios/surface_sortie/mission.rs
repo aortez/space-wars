@@ -189,6 +189,13 @@ impl ClientScenario for MaterialMissionClientScenario {
     fn frame_layout(&self) -> FrameLayout {
         self.sortie.frame_layout()
     }
+    fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
+        let mut frames = self.sortie.render_frames_reference(viewport)?;
+        for seat in (0..2).filter(|&seat| self.bots[seat]) {
+            pilot_hud_for(&mut frames, seat, &self.pilots[seat].label());
+        }
+        Some(frames)
+    }
     fn is_game_over(&self) -> bool {
         self.sortie.state.match_outcome().is_some()
     }

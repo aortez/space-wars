@@ -114,3 +114,127 @@ fn invalid_probe_limits_are_rejected_before_opening_a_display() {
         assert!(!output.status.success());
     }
 }
+
+#[test]
+fn frozen_material_scales_are_repeatable_without_settings_or_devices() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let mut checksums = BTreeMap::new();
+    for detail in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_engine-client"));
+        command
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .env("SLINT_BACKEND", "nonexistent-backend")
+            .arg("--config-dir")
+            .arg(directory.path())
+            .args([
+                "--benchmark-presentation",
+                "--presentation-raster",
+                "--presentation-match-ticks",
+                "0",
+                "--presentation-raster-ablation",
+                "--benchmark-width",
+                "128",
+                "--benchmark-height",
+                "96",
+                "--presentation-frames",
+                "2",
+                "--presentation-repeats",
+                "2",
+            ]);
+        if detail {
+            command.arg("--presentation-detail");
+        }
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).unwrap();
+        let mut lines = text.lines();
+        let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+        let rows: Vec<_> = lines.collect();
+        assert_eq!(rows.len(), 24);
+        for line in rows {
+            let values: Vec<_> = line.split(',').collect();
+            assert_eq!(values.len(), columns.len());
+            let row: BTreeMap<_, _> = columns.iter().copied().zip(values).collect();
+            let key = (row["variant"].to_owned(), row["scale"].to_owned());
+            if let Some(previous) = checksums.insert(key, row["checksum"].to_owned()) {
+                assert_eq!(previous, row["checksum"]);
+            }
+            for (key, value) in row {
+                if key.ends_with("_ms") {
+                    let value: f64 = value.parse().unwrap();
+                    assert!(value.is_finite() && value >= 0.0);
+                }
+            }
+        }
+    }
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn terrain_culling_probe_preserves_pixels_and_settings() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+        .env_remove("DISPLAY")
+        .env_remove("WAYLAND_DISPLAY")
+        .env("SLINT_BACKEND", "nonexistent-backend")
+        .arg("--config-dir")
+        .arg(directory.path())
+        .args([
+            "--benchmark-presentation",
+            "--presentation-raster",
+            "--presentation-terrain-culling",
+            "--presentation-match-ticks",
+            "0",
+            "--benchmark-width",
+            "128",
+            "--benchmark-height",
+            "96",
+            "--presentation-frames",
+            "2",
+            "--presentation-repeats",
+            "2",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    let csv = String::from_utf8(output.stdout).unwrap();
+    let mut lines = csv.lines();
+    let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+    let rows: Vec<BTreeMap<_, _>> = lines
+        .map(|line| columns.iter().copied().zip(line.split(',')).collect())
+        .collect();
+    assert_eq!(rows.len(), 8);
+    let mut checksums = BTreeMap::new();
+    let mut counts = BTreeMap::new();
+    for row in &rows {
+        if let Some(previous) = checksums.insert(row["scale"], row["checksum"]) {
+            assert_eq!(previous, row["checksum"]);
+        }
+        counts.insert(row["variant"], row["primitives"].parse::<usize>().unwrap());
+        for (key, value) in row {
+            if key.ends_with("_ms") {
+                let ms = value.parse::<f64>().unwrap();
+                assert!(ms.is_finite() && ms >= 0.0);
+            }
+        }
+    }
+    assert!(counts["complete"] < counts["unculled"]);
+    assert_eq!(rows[0]["variant"], "complete");
+    assert_eq!(rows[4]["variant"], "unculled", "pair order must alternate");
+}

@@ -25,6 +25,8 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> RecoveryTaskObservationV1 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("recovery_task_observation");
         let flight = self.flight_pilot_observation(player, site);
         let p = &flight.pilot;
         let sites = if !p.queries_ready || !p.ship_available {

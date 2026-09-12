@@ -374,6 +374,8 @@ impl SurfaceSortieState {
         replacing: bool,
         gravity: f32,
     ) -> Option<GroundMap> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("survey_ground_with_gravity");
         if self.world.physics.material_queries_dirty {
             return None;
         }

@@ -153,6 +153,8 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> PilotObservationV2 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("flight_pilot_observation");
         PilotObservationV2 {
             version: 2,
             pilot: self.pilot_observation(player, site),

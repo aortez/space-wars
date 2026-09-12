@@ -11,6 +11,7 @@ pub(super) struct FrameSample {
     pub step: Duration,
     pub scene: Duration,
     pub prepare: Duration,
+    pub raster: crate::raster::RasterTimings,
     pub total: Duration,
     pub updates: usize,
 }
@@ -60,6 +61,53 @@ impl CpuProfile {
             ("scene", |s: &FrameSample| s.scene),
             ("prepare", |s: &FrameSample| s.prepare),
             ("callback", |s: &FrameSample| s.total),
+            ("raster_buffers", |s: &FrameSample| s.raster.buffers),
+            ("raster_clear", |s: &FrameSample| s.raster.clear),
+            ("raster_player", |s: &FrameSample| s.raster.player_views),
+            ("raster_player_starfield", |s: &FrameSample| {
+                s.raster.player_starfield
+            }),
+            ("raster_player_world", |s: &FrameSample| {
+                s.raster.player_world
+            }),
+            ("raster_player_sun_planets", |s: &FrameSample| {
+                s.raster.player_sun_planets
+            }),
+            ("raster_player_spaceports", |s: &FrameSample| {
+                s.raster.player_spaceports
+            }),
+            ("raster_player_effects", |s: &FrameSample| {
+                s.raster.player_effects
+            }),
+            ("raster_player_ships", |s: &FrameSample| {
+                s.raster.player_ships
+            }),
+            ("raster_player_debris", |s: &FrameSample| {
+                s.raster.player_debris
+            }),
+            ("raster_player_particles", |s: &FrameSample| {
+                s.raster.player_particles
+            }),
+            ("raster_player_other", |s: &FrameSample| {
+                s.raster.player_other
+            }),
+            ("raster_player_hud", |s: &FrameSample| s.raster.player_hud),
+            ("raster_player_sun_corona", |s: &FrameSample| {
+                s.raster.player_sun_corona
+            }),
+            ("raster_overview_refresh", |s: &FrameSample| {
+                s.raster.overview_refresh
+            }),
+            ("raster_overview_live", |s: &FrameSample| {
+                s.raster.overview_live
+            }),
+            ("raster_overview_blit", |s: &FrameSample| {
+                s.raster.overview_blit
+            }),
+            ("raster_other_frames", |s: &FrameSample| {
+                s.raster.other_frames
+            }),
+            ("raster_image", |s: &FrameSample| s.raster.image),
         ] {
             let mut values = [Duration::ZERO; SAMPLE_LIMIT];
             for (value, sample) in values.iter_mut().zip(&self.samples) {

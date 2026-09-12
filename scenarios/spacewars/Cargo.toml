@@ -6,6 +6,10 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Opt-in read-only mission sensor profiling for diagnostic runners.
+sensor-profile = []
+
 [dependencies]
 engine-common = { workspace = true }
 engine-core = { workspace = true }

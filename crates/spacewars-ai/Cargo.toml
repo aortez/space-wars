@@ -6,6 +6,9 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+sensor-profile = ["scenario-spacewars/sensor-profile"]
+
 [dependencies]
 engine-common = { workspace = true }
 engine-core = { workspace = true }

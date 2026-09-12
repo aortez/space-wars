@@ -67,6 +67,7 @@ impl RasterOptions {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RasterTimings {
+    pub buffers: Duration,
     pub clear: Duration,
     pub player_views: Duration,
     pub player_starfield: Duration,
@@ -79,6 +80,9 @@ pub struct RasterTimings {
     pub player_debris: Duration,
     pub player_particles: Duration,
     pub player_other: Duration,
+    // Nested in player_other; material-match HUD backing/energy bars and sun.
+    pub player_hud: Duration,
+    pub player_sun_corona: Duration,
     pub overview_refresh: Duration,
     pub overview_blit: Duration,
     pub overview_live: Duration,
@@ -106,13 +110,22 @@ impl RasterTimings {
             SPACEWARS_SHIP_LAYER => self.player_ships += elapsed,
             SPACEWARS_DEBRIS_LAYER => self.player_debris += elapsed,
             SPACEWARS_PARTICLE_LAYER => self.player_particles += elapsed,
-            _ => self.player_other += elapsed,
+            _ => {
+                self.player_other += elapsed;
+                if matches!(z, 15 | 20) {
+                    self.player_hud += elapsed;
+                }
+                if matches!(z, -22 | -21) {
+                    self.player_sun_corona += elapsed;
+                }
+            }
         }
     }
 }
 
 impl std::ops::AddAssign for RasterTimings {
     fn add_assign(&mut self, rhs: Self) {
+        self.buffers += rhs.buffers;
         self.clear += rhs.clear;
         self.player_views += rhs.player_views;
         self.player_starfield += rhs.player_starfield;
@@ -125,6 +138,8 @@ impl std::ops::AddAssign for RasterTimings {
         self.player_debris += rhs.player_debris;
         self.player_particles += rhs.player_particles;
         self.player_other += rhs.player_other;
+        self.player_hud += rhs.player_hud;
+        self.player_sun_corona += rhs.player_sun_corona;
         self.overview_refresh += rhs.overview_refresh;
         self.overview_blit += rhs.overview_blit;
         self.overview_live += rhs.overview_live;
@@ -140,6 +155,7 @@ pub struct RasterRenderResult {
 
 #[derive(Debug)]
 pub struct RasterRenderer {
+    last_timings: RasterTimings,
     // Primitive alpha is resolved while drawing. Keeping the completed frame RGB lets Slint's
     // software renderer copy pixels directly instead of blending an already-opaque texture.
     buffers: Vec<SharedPixelBuffer<Rgb8Pixel>>,
@@ -154,6 +170,7 @@ pub struct RasterRenderer {
 impl RasterRenderer {
     pub fn new() -> Self {
         Self {
+            last_timings: RasterTimings::default(),
             buffers: Vec::new(),
             width: 0,
             height: 0,
@@ -162,6 +179,10 @@ impl RasterRenderer {
             overview_buffers: OverviewBuffers::default(),
             starfield_cache: StarfieldVisibilityCache::default(),
         }
+    }
+
+    pub fn last_timings(&self) -> RasterTimings {
+        self.last_timings
     }
 
     pub fn image_from_frames_with_layout(
@@ -182,6 +203,7 @@ impl RasterRenderer {
         layout: FrameLayout,
         options: RasterOptions,
     ) -> RasterRenderResult {
+        let started = Instant::now();
         let viewport = viewport.with_default_if_empty();
         let width = viewport.width.ceil().max(1.0) as u32;
         let height = viewport.height.ceil().max(1.0) as u32;
@@ -189,13 +211,18 @@ impl RasterRenderer {
 
         let buffer_index = self.active_buffer;
         self.active_buffer = (self.active_buffer + 1) % self.buffers.len();
-        let mut timings = RasterTimings::default();
+        let mut timings = RasterTimings {
+            buffers: started.elapsed(),
+            ..Default::default()
+        };
 
         {
             let frame_index = self.frame_index;
             let overview_buffers = &mut self.overview_buffers;
             let starfield_cache = &mut self.starfield_cache;
+            let started = Instant::now();
             let pixels = self.buffers[buffer_index].make_mut_slice();
+            timings.buffers += started.elapsed();
             let started = Instant::now();
             let frame_viewport = Viewport::new(width as f32, height as f32);
             let background = if frames.len() == 1 {
@@ -239,11 +266,10 @@ impl RasterRenderer {
                     layout,
                 );
                 let players = frames.len() / 2;
-                let started = Instant::now();
                 for player in 0..players {
-                    canvas.draw_frame(&frames[player], viewports[player]);
+                    timings +=
+                        canvas.draw_player_frame_timed(&frames[player], viewports[player], None);
                 }
-                timings.other_frames += started.elapsed();
                 for player in 0..players {
                     draw_uncached_overview(
                         &mut canvas,
@@ -271,6 +297,7 @@ impl RasterRenderer {
         let started = Instant::now();
         let image = Image::from_rgb8(self.buffers[buffer_index].clone());
         timings.image += started.elapsed();
+        self.last_timings = timings;
         RasterRenderResult { image, timings }
     }
 
@@ -342,8 +369,7 @@ fn draw_spacewars_layout(
         *timings += canvas.draw_player_frame_timed(
             &frames[index],
             viewports[index],
-            starfield_cache,
-            frame_index,
+            Some((starfield_cache, frame_index)),
         );
     }
 
@@ -542,8 +568,7 @@ impl<'a> Canvas<'a> {
         &mut self,
         frame: &RenderFrame,
         viewport: Viewport,
-        starfield_cache: &mut StarfieldVisibilityCache,
-        frame_index: u64,
+        mut starfield_cache: Option<(&mut StarfieldVisibilityCache, u64)>,
     ) -> RasterTimings {
         let mut timings = RasterTimings::default();
         let frame_started = Instant::now();
@@ -555,13 +580,15 @@ impl<'a> Canvas<'a> {
             let layer_started = Instant::now();
             if layer.z == SPACEWARS_STARFIELD_LAYER
                 && layer.primitives.len() >= STARFIELD_CACHE_MIN_PRIMITIVES
+                && starfield_cache.is_some()
             {
+                let (cache, frame_index) = starfield_cache.as_mut().unwrap();
                 self.draw_cached_starfield_layer(
                     frame.camera,
                     viewport,
                     layer,
-                    starfield_cache,
-                    frame_index,
+                    cache,
+                    *frame_index,
                     clip,
                     &|_, _| true,
                 );
@@ -1056,7 +1083,11 @@ fn project(camera: Camera2, point: RenderPoint, viewport: Viewport) -> PixelPoin
     }
 }
 
-fn primitive_visible(camera: Camera2, viewport: Viewport, primitive: &RenderPrimitive) -> bool {
+pub(crate) fn primitive_visible(
+    camera: Camera2,
+    viewport: Viewport,
+    primitive: &RenderPrimitive,
+) -> bool {
     let padding = world_units_per_pixel(camera, viewport) * 4.0;
     let Some(primitive_bounds) = primitive_world_bounds(primitive, padding) else {
         return false;
@@ -1725,6 +1756,40 @@ mod tests {
         let mut pixels = vec![BACKGROUND; width as usize * height as usize];
         Canvas::new(width, height, &mut pixels).draw_frame(frame, viewport);
         pixels
+    }
+
+    #[test]
+    fn material_player_timing_preserves_uncached_pixels() {
+        let viewport = Viewport::new(160.0, 120.0);
+        let mut frame = rectangle_frame(
+            viewport,
+            [4.0, 9.0, 155.0, 112.0],
+            RenderColor::rgb(0.2, 0.4, 0.6),
+        );
+        frame.layers[0].z = SPACEWARS_PLANET_LAYER;
+        // Above the legacy starfield cache threshold: the material layout must
+        // retain its original uncached drawing, including resize behavior.
+        for i in 0..150 {
+            frame.push_primitive(
+                SPACEWARS_STARFIELD_LAYER,
+                RenderPrimitive::Circle(RenderCircle {
+                    center: RenderPoint::new(i as f32 - 75.0, i as f32 - 40.0),
+                    radius: 0.6,
+                    fill: Some(Fill::new(RenderColor::rgb(1.0, 0.9, 0.7))),
+                    stroke: None,
+                }),
+            );
+        }
+        for scale in [1.0, 2.0] {
+            let viewport = Viewport::new(viewport.width * scale, viewport.height * scale);
+            let expected = reference_single_frame(&frame, viewport);
+            let mut pixels = vec![BACKGROUND; expected.len()];
+            let timings = Canvas::new(viewport.width as u32, viewport.height as u32, &mut pixels)
+                .draw_player_frame_timed(&frame, viewport, None);
+            assert_eq!(pixels, expected);
+            assert!(timings.player_views >= timings.player_sun_planets + timings.player_starfield);
+            assert!(timings.player_sun_planets > Duration::ZERO);
+        }
     }
 
     fn assert_frame_matches_reference(

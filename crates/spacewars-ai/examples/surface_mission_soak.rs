@@ -53,6 +53,12 @@ fn main() {
     let mut physics_profile = (arg("--profile-physics", "false") == "true")
         .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
+    let timing_csv = arg("--timing-csv", "false") == "true";
+    // Compare production observations with the former full on-foot surveys.
+    // Reference sensors/policy are outside timings, but may affect CPU caches.
+    let verify_on_foot_surveys = arg("--verify-on-foot-surveys", "false") == "true";
+    let mut restored_on_foot_surveys = 0_u64;
+    let mut verified_player_ticks = 0_u64;
     // Optional dense, half-open physics-tick window; ordinary traces stay sparse.
     let trace_start: u64 = arg("--trace-start-tick", "0").parse().unwrap();
     let trace_end: u64 = arg("--trace-end-tick", "0").parse().unwrap();
@@ -90,7 +96,9 @@ fn main() {
             .unwrap(),
     }
     .normalized();
-    assert!(seat < 2 && (1..=180).contains(&seconds));
+    // Manual profiling may cover a full ten-minute match. Existing mission
+    // fixtures still pass their explicit, unchanged three-minute budgets.
+    assert!(seat < 2 && (1..=600).contains(&seconds));
     assert!(["quiet", "intercept", "duel", "hunt", "pursuit"].contains(&mode.as_str()));
     assert!(!require_hunt || mode == "hunt" || mode == "pursuit");
     assert!((1..=180).contains(&prepare_seconds));
@@ -99,6 +107,13 @@ fn main() {
     fs::create_dir_all(&out).unwrap();
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
+    let mut timing_csv = timing_csv.then(|| {
+        let mut file = BufWriter::new(fs::File::create(out.join("timing.csv")).unwrap());
+        writeln!(file, "tick,sensor_p1_ms,sensor_p2_ms,policy_p1_ms,policy_p2_ms,step_ms,physics_ms,lifecycle_ms,workload_ms,active_bodies,candidate_pairs,contact_pairs,goal_p1,goal_p2,location_p1,location_p2,ground_nodes_p1,ground_nodes_p2").unwrap();
+        file
+    });
+    #[cfg(feature = "sensor-profile")]
+    let mut sensor_profiles = BufWriter::new(fs::File::create(out.join("sensors.jsonl")).unwrap());
     let mut state = if world_kind == "generated" {
         if surface == "default" && colliders == "default" {
             SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
@@ -143,6 +158,9 @@ fn main() {
             breaks,
         )
     });
+    // Independent policy state consumes the original observations and must
+    // emit identical encoded controls on every tick. This work is not timed.
+    let mut reference_pilots = verify_on_foot_surveys.then(|| pilots.clone());
     let mut interceptor = RulePilotV4::with_combat_breaks(
         BrainReset {
             actor: PlayerId::from_index(1 - seat).unwrap(),
@@ -202,19 +220,75 @@ fn main() {
         let mut actions = Vec::new();
         let sensor_start = sensors.len();
         let policy_start = policies.len();
+        let mut sensor_times = [0.0; 2];
+        let mut policy_times = [0.0; 2];
+        let mut ground_nodes = [0; 2];
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
+                let site = pilots[i].site_request();
                 let clock = Instant::now();
-                let o = state.mission_observation(i, pilots[i].site_request());
+                #[cfg(not(feature = "sensor-profile"))]
+                let o = state.mission_observation(i, site);
+                #[cfg(feature = "sensor-profile")]
+                let (o, profile) =
+                    scenario_spacewars::surface_sortie::sensor_profile::measure(|| {
+                        state.mission_observation(i, site)
+                    });
                 let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
                 sensors.push(sensor_ms);
+                #[cfg(feature = "sensor-profile")]
+                {
+                    serde_json::to_writer(
+                        &mut sensor_profiles,
+                        &json!({"tick":tick+1,"seat":i,"profile":profile}),
+                    )
+                    .unwrap();
+                    writeln!(sensor_profiles).unwrap();
+                }
+                sensor_times[i] = sensor_ms;
+                ground_nodes[i] = o
+                    .local
+                    .combat
+                    .recovery
+                    .ground
+                    .as_ref()
+                    .map_or(0, |g| g.nodes.len());
                 if o.local.landing_objective.is_some() {
                     objective_sensors.push(sensor_ms);
                 }
                 let clock = Instant::now();
                 let mut intent = pilots[i].intent(&o);
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
+                policy_times[i] = *policies.last().unwrap();
+                if let Some(reference) = &mut reference_pilots {
+                    let reference_site = reference[i].site_request();
+                    let mut original = if reference_site == site {
+                        o.clone()
+                    } else {
+                        state.mission_observation(i, reference_site)
+                    };
+                    let p = &original.local.combat.recovery.flight.pilot;
+                    let full_survey = reference_site.is_none_or(|id| {
+                        id.bearing < scenario_spacewars::surface_sortie::pilot::LANDING_SITE_COUNT
+                            && id.planet != p.planet.index
+                    });
+                    if full_survey
+                        && p.location == scenario_spacewars::surface_sortie::PilotLocation::OnFoot
+                        && p.ship_form == scenario_spacewars::ShipForm::Ship
+                    {
+                        // The lower-level survey API retains its old semantics.
+                        original.local = state.tactical_sortie_observation(i, None);
+                        restored_on_foot_surveys += 1;
+                    }
+                    let expected = reference[i].intent(&original);
+                    assert_eq!(
+                        intent.encode(owner),
+                        expected.encode(owner),
+                        "omitting on-foot surveys changed controls at tick {tick}, seat {i}"
+                    );
+                    verified_player_ticks += 1;
+                }
                 metrics[i].observe(&o, pilots[i].telemetry());
                 if mode == "pursuit" && i == seat && metrics[i].first_hunt_tick.is_some() {
                     if pursuit_started_tick.is_none() && frames {
@@ -320,15 +394,29 @@ fn main() {
                 let clock = Instant::now();
                 let o = state.combat_observation(i, interceptor.site_request());
                 sensors.push(clock.elapsed().as_secs_f64() * 1000.0);
+                sensor_times[i] = *sensors.last().unwrap();
                 let clock = Instant::now();
                 let intent = interceptor.intent(&o);
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
+                policy_times[i] = *policies.last().unwrap();
                 actions.extend(intent.encode(owner));
             }
         }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
+        // Read already-computed counters after the timed step. Locations are
+        // post-step; sensor costs/node counts describe the pre-step observation.
+        if let Some(file) = &mut timing_csv {
+            let m = state.last_step_metrics();
+            let ms = |time: Duration| time.as_secs_f64() * 1000.0;
+            writeln!(file, "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{:?},{:?},{:?},{:?},{},{}",
+                tick + 1, sensor_times[0], sensor_times[1], policy_times[0], policy_times[1],
+                steps.last().unwrap(), ms(m.physics_time), ms(m.lifecycle_time), ms(m.workload_time),
+                m.rapier.active_bodies, m.rapier.candidate_pairs, m.rapier.contact_pairs,
+                pilots[0].telemetry().goal, pilots[1].telemetry().goal,
+                state.location(0), state.location(1), ground_nodes[0], ground_nodes[1]).unwrap();
+        }
         if let Some(profile) = &mut physics_profile {
             profile.record(state.last_step_metrics(), *steps.last().unwrap());
             if tick % 60 == 59 || state.match_outcome().is_some() {
@@ -408,6 +496,11 @@ fn main() {
     if let Some(trace) = &mut trace {
         trace.flush().unwrap();
     }
+    if let Some(file) = &mut timing_csv {
+        file.flush().unwrap();
+    }
+    #[cfg(feature = "sensor-profile")]
+    sensor_profiles.flush().unwrap();
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
         || final_audit.occupied_cells + final_audit.removed_cells != initial
@@ -452,6 +545,11 @@ fn main() {
     });
     report["dense_trace_ticks"] = json!([trace_start, trace_end]);
     report["draw_lists"] = timing(draws);
+    if verify_on_foot_surveys {
+        report["sensor_verification"] = json!({"restored_on_foot_surveys":restored_on_foot_surveys,
+            "verified_player_ticks":verified_player_ticks,
+            "verification_scope":"independent reference policies consume full on-foot surveys; encoded actions match on every verified player tick; reference work is outside timing samples"});
+    }
     report["measured_tick"] = timing(measured_ticks);
     report["physics_profile"] = physics_profile.map_or(serde_json::Value::Null, |p| p.report());
     report["terrain_colliders"] = json!(format!("{:?}", state.terrain_collider_layout()));

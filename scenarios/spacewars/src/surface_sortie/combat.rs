@@ -164,6 +164,8 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> TacticalSortieObservationV1 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
         let combat = self.combat_observation(player, site);
         let cover: Vec<_> = combat
             .recovery
@@ -253,6 +255,8 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> CombatObservationV2 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("combat_observation");
         let recovery = self.recovery_task_observation(player, site);
         let p = &recovery.flight.pilot;
         let ship = &self.world.ships[p.vehicle.0];

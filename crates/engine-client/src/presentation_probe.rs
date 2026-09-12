@@ -16,6 +16,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+mod raster;
+mod text;
+
 #[derive(Debug, Default, clap::Args)]
 pub struct Options {
     /// Compare frozen images in a bare window and the full UI; print CSV, without a display.
@@ -33,6 +36,32 @@ pub struct Options {
     /// Publish a fresh identical image before every draw, outside the draw timer.
     #[arg(long)]
     presentation_republish: bool,
+    /// Compare replaced and retained Spacewars text models with identical pixels.
+    #[arg(
+        long,
+        requires = "benchmark_presentation",
+        conflicts_with = "presentation_republish"
+    )]
+    presentation_text: bool,
+    /// Compare frozen material-match rasterization at scales 1 and 2.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_republish"])]
+    presentation_raster: bool,
+    /// Simulation ticks at which to freeze seed 42; simulation is outside timing.
+    #[arg(long, requires = "presentation_raster", value_delimiter = ',', default_value = "120,1800,7200", value_parser = clap::value_parser!(u32).range(0..=10800))]
+    presentation_match_ticks: Vec<u32>,
+    /// Also measure diagnostic removals of terrain fills/strokes, HUD backing and corona.
+    #[arg(long, requires = "presentation_raster")]
+    presentation_raster_ablation: bool,
+    /// Pair chunk culling with the uncropped reference and require identical pixels.
+    #[arg(
+        long,
+        requires = "presentation_raster",
+        conflicts_with = "presentation_raster_ablation"
+    )]
+    presentation_terrain_culling: bool,
+    /// Save frozen geometry and output PNGs, outside all measurement timers.
+    #[arg(long, requires = "presentation_raster")]
+    presentation_output: Option<std::path::PathBuf>,
 }
 
 slint::slint! {
@@ -260,6 +289,12 @@ fn render(
 pub fn run(options: &Options, width: u32, height: u32) -> Result<(), Box<dyn std::error::Error>> {
     if width > 2048 || height > 2048 {
         return Err("presentation viewport must be at most 2048×2048".into());
+    }
+    if options.presentation_text {
+        return text::run(options, width, height);
+    }
+    if options.presentation_raster {
+        return raster::run(options, width, height);
     }
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(ProbePlatform(windows.clone())))?;

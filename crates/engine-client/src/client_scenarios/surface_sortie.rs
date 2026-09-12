@@ -703,20 +703,10 @@ impl ClientScenario for SurfaceSortieClientScenario {
         actions
     }
     fn render_frames(&self, _renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
-        let count = self.state.player_count();
-        let aspect = viewport.aspect_ratio() / count as f32;
-        let mut frames = Vec::with_capacity(count * 2);
-        for player in 0..count {
-            frames.push(SurfaceSortieScenario::player_frame(&self.state, player));
-        }
-        for player in 0..count {
-            frames.push(SurfaceSortieScenario::minimap_frame(
-                &self.state,
-                player,
-                aspect,
-            ));
-        }
-        frames
+        self.frames_for_view(viewport, true)
+    }
+    fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
+        Some(self.frames_for_view(viewport, false))
     }
     fn frame_layout(&self) -> FrameLayout {
         FrameLayout::PlayerViewsWithMinimaps
@@ -728,6 +718,36 @@ impl ClientScenario for SurfaceSortieClientScenario {
     #[cfg(test)]
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+impl SurfaceSortieClientScenario {
+    fn frames_for_view(&self, viewport: Viewport, cull: bool) -> Vec<RenderFrame> {
+        let count = self.state.player_count();
+        let aspect = viewport.aspect_ratio() / count as f32;
+        // Scene construction is independent of the selected raster scale. Use
+        // its smallest supported size for conservative stroke/rounding padding;
+        // both presentation backends then consume the same drawing commands.
+        let pane = engine_common::RenderPoint::new(
+            viewport.width / count as f32 * crate::MIN_RASTER_SCALE,
+            viewport.height * crate::MIN_RASTER_SCALE,
+        );
+        let mut frames = Vec::with_capacity(count * 2);
+        for player in 0..count {
+            frames.push(if cull {
+                SurfaceSortieScenario::player_frame_in_view(&self.state, player, pane)
+            } else {
+                SurfaceSortieScenario::player_frame(&self.state, player)
+            });
+        }
+        for player in 0..count {
+            frames.push(SurfaceSortieScenario::minimap_frame(
+                &self.state,
+                player,
+                aspect,
+            ));
+        }
+        frames
     }
 }
 
@@ -753,6 +773,9 @@ fn surface_controls(input: &ClientInput, player: usize) -> (f32, bool, bool) {
         input.is_pressed(GameKey::P2Reverse) || gamepad_interact,
     )
 }
+
+#[cfg(test)]
+mod culling_tests;
 
 #[cfg(test)]
 mod tests {

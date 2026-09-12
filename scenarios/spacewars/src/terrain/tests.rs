@@ -508,3 +508,94 @@ fn detached_terrain_collides_with_the_sun_ordinary_planets_and_world_boundary() 
         assert!(contacted, "detached terrain should collide in case {case}");
     }
 }
+
+#[test]
+fn chunk_culling_preserves_visible_geometry_after_rotation_edits_and_detachment() {
+    let mut state = fixture();
+    cut(&mut state, Vec2::new(0.0, -90.0), Vec2::new(0.0, 90.0), 14);
+    step(&mut state);
+    assert!(!state.terrain.fragments.is_empty());
+    let mut rejected = 0;
+    for (field, geometry) in state
+        .terrain
+        .planets
+        .values()
+        .map(|p| (&p.field, &p.geometry))
+        .chain(
+            state
+                .terrain
+                .fragments
+                .values()
+                .map(|p| (&p.terrain, &p.geometry)),
+        )
+    {
+        for angle in [0.0, 0.73, -1.8, std::f32::consts::PI] {
+            for position in [Vec2::ZERO, Vec2::new(-1457.0, 2973.0)] {
+                for height in [3.0, 44.0, 260.0] {
+                    for offset in [Vec2::ZERO, Vec2::new(38.0, 51.0), Vec2::new(-78.0, -33.0)] {
+                        let camera =
+                            engine_common::Camera2::new(render_point(position + offset), height);
+                        let view = camera.world_bounds(0.6);
+                        let mut full = RenderFrame::new(camera);
+                        let mut culled = RenderFrame::new(camera);
+                        render_body(&mut full, field, geometry, position, angle);
+                        render_body_in_view(
+                            &mut culled,
+                            field,
+                            geometry,
+                            position,
+                            angle,
+                            Some(view),
+                        );
+                        let all: Vec<_> = full.layers.iter().flat_map(|l| &l.primitives).collect();
+                        let kept: Vec<_> =
+                            culled.layers.iter().flat_map(|l| &l.primitives).collect();
+                        let mut remaining = all.iter().copied();
+                        for primitive in &kept {
+                            assert!(remaining.any(|p| p == *primitive), "drawing order changed");
+                        }
+                        let mut visible = kept.iter().peekable();
+                        for primitive in &all {
+                            if visible.peek() == Some(&primitive) {
+                                visible.next();
+                                continue;
+                            }
+                            let RenderPrimitive::Polygon(polygon) = primitive else {
+                                panic!("terrain polygon")
+                            };
+                            // Convex polygon/rectangle SAT, independent of the
+                            // chunk's cached bounds and inverse camera transform.
+                            let corners = [
+                                view.min,
+                                engine_common::RenderPoint::new(view.max.x, view.min.y),
+                                view.max,
+                                engine_common::RenderPoint::new(view.min.x, view.max.y),
+                            ];
+                            let mut axes = vec![Vec2::X, Vec2::Y];
+                            for i in 0..polygon.points.len() {
+                                let a = polygon.points[i];
+                                let b = polygon.points[(i + 1) % polygon.points.len()];
+                                axes.push(Vec2::new(a.y - b.y, b.x - a.x));
+                            }
+                            let outside = axes.into_iter().any(|axis| {
+                                let interval =
+                                    |points: &[engine_common::RenderPoint]| {
+                                        points.iter().map(|p| p.x * axis.x + p.y * axis.y).fold(
+                                            (f32::INFINITY, f32::NEG_INFINITY),
+                                            |(lo, hi), v| (lo.min(v), hi.max(v)),
+                                        )
+                                    };
+                                let (a, b) = interval(&polygon.points);
+                                let (c, d) = interval(&corners);
+                                b < c || d < a
+                            });
+                            assert!(outside, "visible polygon was discarded");
+                        }
+                        rejected += all.len() - kept.len();
+                    }
+                }
+            }
+        }
+    }
+    assert!(rejected > 0, "test must exercise culling");
+}
