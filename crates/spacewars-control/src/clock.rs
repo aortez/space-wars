@@ -497,7 +497,10 @@ mod tests {
             initial_cells: 70,
             water_columns: 60,
             pooled_microunits: 30_000_000,
-            drained_microunits: 40_000_000,
+            spilling_microunits: 5_000_000,
+            spill_parcels: 12,
+            capacity_limited_ticks: 3,
+            drained_microunits: 35_000_000,
             ..Default::default()
         });
         assert_eq!(
@@ -509,6 +512,20 @@ mod tests {
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
         );
+        let mut legacy = serde_json::to_value(&state).unwrap();
+        let material = legacy["meltdown"].as_object_mut().unwrap();
+        for field in [
+            "spilling_microunits",
+            "spill_parcels",
+            "capacity_limited_ticks",
+        ] {
+            material.remove(field);
+        }
+        let restored: ClockState = serde_json::from_value(legacy).unwrap();
+        let material = restored.meltdown.unwrap();
+        assert_eq!(material.spilling_microunits, 0);
+        assert_eq!(material.spill_parcels, 0);
+        assert_eq!(material.capacity_limited_ticks, 0);
     }
 
     #[test]

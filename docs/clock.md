@@ -78,19 +78,39 @@ follow live time throughout; the event creates no physics objects.
 
 Meltdown releases the lit digit cells individually, with seeded release delays,
 gravity, spin and side-wall reflection. On first floor contact a cell becomes
-water, which pools, flows toward the existing center opening and drains away.
+water, which pools and spills through the existing center opening.
 The colon and dim face outline stay visible. After seven seconds, the latest
-time fades back in over 1.5 seconds. Water is a lightweight Clock-local effect:
-ballistic cells do not collide with each other, and the pool uses conservative
-neighbor leveling plus a stylized inward current, not a general fluid solver.
+time fades back in over 1.5 seconds while remaining water is gradually reclaimed.
+The reusable `engine-water` model drives flow from surface-level differences,
+with damping and conservative donor limits. There is no forced inward current;
+flat basins retain more water than the original Clock-local effect did.
 
-The resource ceiling is **96 cells and 128 water columns**, with no Rapier bodies
-or growing droplet lists. The two floor halves meet the existing drain lips
-exactly. Each fixed tick performs two bounded pool passes. Drain-stream geometry
-is visual only; it never introduces additional simulated volume. The reform
-boundary accounts for and clears any remaining material rather than reporting
-it as successfully drained. Preview replacement, resize and restart drop the
-whole event-local representation. This does not depend on destructible terrain.
+The Clock resource ceiling is **96 cells, 128 columns and 128 spill parcels**,
+with no Rapier bodies. The two floor halves meet the existing drain lips exactly.
+Each 60 Hz tick uses four bounded pool substeps. Overflow travels as ballistic
+parcels: the renderer stretches/thins their ribbons with falling speed, and the
+model can collect them in a lower basin. Water is counted as drained only after
+leaving the lower world boundary, not upon crossing a ledge. Full parcel capacity
+holds water upstream. This is a fixed-down, unit-depth approximation, not a general
+fluid solver; cells/parcels do not collide with one another.
+
+Reform cleanup is accounted separately from drainage. Preview replacement,
+resize and restart drop the entire event-local representation. This does not
+depend on destructible terrain. See [the water design](design/water.md) for model
+limits, performance measurements, and the future buoyancy boundary.
+
+To inspect a stepped basin spilling into a closed collecting pool, use the
+development-only override below, then select **Clock Controls → Preview Event:
+Meltdown → Preview**. It replaces Meltdown's material source for that process;
+normal startup is unchanged, and no extra launcher scenario or setting is added.
+The optional preview also includes an orange floating box, yellow floating ball,
+and dense red sinking box. These are real Rapier bodies with one-way buoyancy
+and drag; they do not yet displace water or make waves. Normal Meltdown remains
+body-free. The preview's banks are shared between drawing and physics geometry.
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=1 cargo run --release -p engine-client -- --scenario clock
+```
 
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
@@ -466,11 +486,13 @@ or in idle/cooldown when no event is active. The embedded event catalog includes
 trigger type, enablement and per-kind automatic-ready ticks; `clock events` displays it.
 These diagnostics do not affect `ui state` revisions. The optional `meltdown`
 object is present only during Meltdown (including its reform phase). It reports
-initial/waiting/airborne cells, occupied water columns, and pooled, drained and
+initial/waiting/airborne cells, occupied water columns, active spill parcels,
+capacity-limited ticks, and pooled, in-flight (`spilling_microunits`), drained and
 reclaimed volume. One original cell equals 1,000,000 micro-units; independently
-rounded totals can differ by one unit. Waiting plus airborne cell volume plus
-the three volume aggregates must equal the initial material. Reclaimed volume
-is explicit deadline cleanup, not drainage. Idle and other events report null.
+rounded totals can differ by two units. Waiting plus airborne cell volume plus
+the four volume aggregates must equal the initial material. Reclaimed volume
+is explicit reform cleanup, not drainage. Idle and other events report null.
+The three added spill fields default to zero when reading older payloads.
 The optional `duck` object reports entrance side, position in thousandths of
 render world units, grounded state, jumps, cleared/total obstacles, door openness
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only
@@ -614,6 +636,10 @@ completion reliably. Device validation/deployment is tracked separately from
 these local checks.
 
 ### Meltdown local validation (2026-09-09)
+
+This subsection records the original inward-current implementation. Its >99%
+drainage result and timings are historical, not acceptance criteria for the new
+level-driven model. Current validation and benchmarks are in [water design](design/water.md).
 
 The workspace/all-target suite passed **869 tests**, with 15 display-dependent
 workflows ignored in that command. The five Clock workflows were run explicitly

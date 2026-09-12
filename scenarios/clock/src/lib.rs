@@ -28,7 +28,9 @@ use engine_common::{
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
 pub use events::marquee::MARQUEE_TICKS;
-pub use events::meltdown::{DRAINING_TICKS, MAX_MELTDOWN_CELLS, MELTING_TICKS, WATER_COLUMNS};
+pub use events::meltdown::{
+    DRAINING_TICKS, MAX_MELTDOWN_CELLS, MAX_SPILL_PARCELS, MELTING_TICKS, WATER_COLUMNS,
+};
 use events::{ActiveEvent, EventContext, EventSchedule};
 pub use events::{
     COLOR_CYCLE_TICKS, COOLDOWN_TICKS, DigitPalette, EVENT_CATALOG, EventDefinition, EventEffect,
@@ -187,6 +189,8 @@ impl ClockAction {
 pub struct ClockConfig {
     pub aspect_ratio: f32,
     pub duck_debug_overlay: bool,
+    /// Development-only collecting-pool preview using the Meltdown lifecycle.
+    pub water_lab: bool,
     /// None chooses a seeded personality once per Duck event.
     pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     /// None selects a seeded course pattern, independently of personality.
@@ -203,6 +207,7 @@ impl Default for ClockConfig {
         Self {
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
+            water_lab: false,
             duck_jump_profile: None,
             duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
@@ -219,6 +224,7 @@ impl ClockConfig {
         Self {
             aspect_ratio: normalize_aspect_ratio(self.aspect_ratio),
             duck_debug_overlay: self.duck_debug_overlay,
+            water_lab: self.water_lab,
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
             time_format: self.time_format,

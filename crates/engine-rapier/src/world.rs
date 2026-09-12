@@ -875,6 +875,14 @@ impl PhysicsWorld {
         Some(from_rapier(body.center_of_mass()))
     }
 
+    /// Scalar rotational inertia about the COM. Non-dynamic bodies are not
+    /// force-responsive and return None. Rapier remains the mass authority.
+    pub fn dynamic_body_inertia(&self, id: BodyId) -> Option<f32> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        body.is_dynamic()
+            .then(|| body.mass_properties().local_mprops.principal_inertia())
+    }
+
     /// Make edited collider mass, inertia, and center of mass available before
     /// the next step. The caller chooses how velocity should change after a cut.
     pub fn refresh_mass_properties(&mut self, id: BodyId) -> bool {
@@ -994,6 +1002,19 @@ impl PhysicsWorld {
             return false;
         };
         body.apply_impulse_at_point(to_rapier(impulse), to_rapier(point), wake_up);
+        true
+    }
+
+    /// Torque about the center of mass. Like other forces, persists until
+    /// `clear_forces`; Rapier applies inverse inertia during integration.
+    pub fn apply_torque(&mut self, id: BodyId, torque: f32, wake_up: bool) -> bool {
+        if !torque.is_finite() {
+            return false;
+        }
+        let Some(body) = self.body_mut(id) else {
+            return false;
+        };
+        body.add_torque(torque, wake_up);
         true
     }
 

@@ -34,7 +34,10 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    render_floor(&mut frame, layout);
+    if !matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event)) if event.lab)
+    {
+        render_floor(&mut frame, layout);
+    }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         let opacity = 1.0 - event.playback().strength;
         if opacity > 0.0 {
@@ -164,7 +167,6 @@ fn render_meltdown(
     event: &crate::events::meltdown::MeltdownEvent,
     layout: Layout,
 ) {
-    use crate::events::meltdown::MeltdownEvent;
     let water_color = RenderColor::rgb(0.08, 0.55, 0.85);
     let edge_color = RenderColor::rgb(0.36, 0.91, 1.0);
     for cell in &event.cells {
@@ -177,19 +179,31 @@ fn render_meltdown(
             DigitPalette::default(),
         );
     }
-    let width = MeltdownEvent::column_width(layout);
-    let cell_area = (layout.pitch * 0.8).powi(2);
-    for (index, volume) in event.water.iter().enumerate() {
-        let height = *volume as f32 * cell_area / width;
+    if let Some(lab) = &event.floats {
+        for (min, max) in &lab.supports {
+            frame.push_primitive(
+                ARENA_LAYER,
+                rectangle(
+                    RenderPoint::new(min.x, min.y),
+                    RenderPoint::new(max.x, max.y),
+                    FLOOR_EDGE_COLOR,
+                    None,
+                ),
+            );
+        }
+    }
+    for column in event.water.pools().iter().flat_map(|pool| pool.columns()) {
+        let height = (column.surface - column.bed) as f32;
         if height < 0.25 {
             continue;
         }
-        let left = MeltdownEvent::column_left(layout, index);
-        let top = layout.floor_y + height;
+        let left = column.left as f32;
+        let width = column.width as f32;
+        let top = column.surface as f32;
         frame.push_primitive(
             ACTIVE_CELL_LAYER,
             rectangle(
-                RenderPoint::new(left, layout.floor_y),
+                RenderPoint::new(left, column.bed as f32),
                 RenderPoint::new(left + width, top),
                 water_color,
                 None,
@@ -205,24 +219,95 @@ fn render_meltdown(
             ),
         );
     }
-    // Bounded visual stream; it represents already-accounted drained volume.
-    // No extra particles are spawned and no water is reintroduced to the pool.
-    if event.stream > 0.005 {
-        let lip = layout.drain_half_width();
-        let thickness = layout.pitch * 0.35 * event.stream.sqrt();
-        for side in [-1.0, 1.0] {
-            let x = side * (lip - thickness * 0.5);
+    // The ribbons represent water still in flight. Their area is the transported
+    // volume: accelerating water stretches and thins rather than retaining a
+    // pool-height rectangle down the entire cliff.
+    for parcel in event.water.parcels() {
+        let speed = parcel.velocity.length();
+        let direction = if speed > 0.001 {
+            parcel.velocity / speed
+        } else {
+            Vec2::new(0.0, -1.0)
+        };
+        let length = (speed * parcel.duration as f32).max(0.5);
+        let half_width = (parcel.volume as f32 / length) * 0.5;
+        if half_width < 0.025 {
+            continue;
+        }
+        let along = direction * (length * 0.5);
+        let across = Vec2::new(-direction.y, direction.x) * half_width;
+        let points = [
+            parcel.position - along - across,
+            parcel.position + along - across,
+            parcel.position + along + across,
+            parcel.position - along + across,
+        ]
+        .into_iter()
+        .map(|p| {
+            // Point parcels stop at the channel wall; trim the ribbon's
+            // finite width too so it does not paint through the bank.
+            let x = if !event.lab && p.y < layout.floor_y {
+                p.x.clamp(-layout.drain_half_width(), layout.drain_half_width())
+            } else {
+                p.x
+            };
+            RenderPoint::new(x, p.y)
+        })
+        .collect();
+        frame.push_primitive(
+            ACTIVE_CELL_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon {
+                points,
+                fill: Some(Fill::new(water_color)),
+                stroke: None,
+            }),
+        );
+    }
+    if let Some(lab) = &event.floats {
+        for (index, body) in lab.bodies.iter().enumerate() {
+            let motion = lab
+                .world
+                .motion(body.body.body())
+                .expect("live water-lab body");
+            let color = match index {
+                0 => RenderColor::rgb(1.0, 0.62, 0.18),
+                1 => RenderColor::rgb(1.0, 0.91, 0.28),
+                _ => RenderColor::rgb(0.85, 0.32, 0.4),
+            };
+            let (sides, radius, half_width, half_height) = match body.body.shape() {
+                engine_water::immersion::HullShape::Circle { radius } => (32, radius, 0.0, 0.0),
+                engine_water::immersion::HullShape::Box {
+                    half_width,
+                    half_height,
+                } => (4, 0.0, half_width, half_height),
+            };
+            let (sin, cos) = motion.angle.sin_cos();
+            let points = (0..sides)
+                .map(|i| {
+                    let p = if sides == 4 {
+                        [
+                            Vec2::new(-half_width, -half_height),
+                            Vec2::new(half_width, -half_height),
+                            Vec2::new(half_width, half_height),
+                            Vec2::new(-half_width, half_height),
+                        ][i]
+                    } else {
+                        let a = std::f32::consts::TAU * i as f32 / sides as f32;
+                        Vec2::new(a.cos() * radius, a.sin() * radius)
+                    };
+                    RenderPoint::new(
+                        motion.position.x + p.x * cos - p.y * sin,
+                        motion.position.y + p.x * sin + p.y * cos,
+                    )
+                })
+                .collect();
             frame.push_primitive(
                 ACTIVE_CELL_LAYER,
-                rectangle(
-                    RenderPoint::new(x - thickness * 0.5, layout.bounds_min.y),
-                    RenderPoint::new(x + thickness * 0.5, layout.floor_y),
-                    RenderColor {
-                        a: event.stream.sqrt(),
-                        ..water_color
-                    },
-                    None,
-                ),
+                RenderPrimitive::Polygon(RenderPolygon {
+                    points,
+                    fill: Some(Fill::new(color)),
+                    stroke: Some(Stroke::new(RenderColor::rgb(1.0, 0.95, 0.8), 0.6)),
+                }),
             );
         }
     }

@@ -263,13 +263,16 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
         if let Some(material) = state.meltdown {
             println!(
-                "Meltdown: {} waiting, {} airborne, {} wet columns; water {:.3}, drained {:.3}, reclaimed {:.3} cell-volumes",
+                "Meltdown: {} waiting, {} airborne, {} wet columns; water {:.3}, spilling {:.3} ({} parcels), drained {:.3}, reclaimed {:.3} cell-volumes; capacity-limited ticks={}",
                 material.waiting_cells,
                 material.airborne_cells,
                 material.water_columns,
                 material.pooled_microunits as f64 / 1_000_000.0,
+                material.spilling_microunits as f64 / 1_000_000.0,
+                material.spill_parcels,
                 material.drained_microunits as f64 / 1_000_000.0,
-                material.reclaimed_microunits as f64 / 1_000_000.0
+                material.reclaimed_microunits as f64 / 1_000_000.0,
+                material.capacity_limited_ticks
             );
         }
         if let Some(duck) = state.duck {

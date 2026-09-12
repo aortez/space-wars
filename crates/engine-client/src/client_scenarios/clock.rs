@@ -65,6 +65,7 @@ fn create(
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: viewport.aspect_ratio(),
+            water_lab: std::env::var("SPACEWARS_CLOCK_WATER_LAB").is_ok_and(|value| value == "1"),
             duck_debug_overlay: std::env::var("SPACEWARS_CLOCK_DUCK_DEBUG")
                 .is_ok_and(|value| value == "1"),
             duck_jump_profile: duck_jump_profile(
@@ -840,15 +841,26 @@ mod tests {
 
     #[test]
     fn meltdown_reaches_both_render_paths_and_raster_water_is_visible() {
+        check_meltdown_rendering(false);
+    }
+
+    #[test]
+    fn meltdown_collecting_pool_reaches_both_render_paths() {
+        check_meltdown_rendering(true);
+    }
+
+    fn check_meltdown_rendering(water_lab: bool) {
         for viewport in [
             Viewport::new(800.0, 480.0),
             Viewport::new(480.0, 800.0),
             Viewport::new(1280.0, 720.0),
+            Viewport::new(1024.0, 768.0),
         ] {
             let mut state = ClockScenario::init(
                 ClockConfig {
                     aspect_ratio: viewport.aspect_ratio(),
                     event_profile: engine_common::ClockEventProfile::Off,
+                    water_lab,
                     ..ClockConfig::default()
                 },
                 42,
@@ -885,7 +897,8 @@ mod tests {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        <= 500
+                        <= 800,
+                    "bounded cells, columns, spill parcels and reforming face at tick {tick} {viewport:?}"
                 );
                 let presentation = crate::render::scene_presentation_from_frames_with_layout(
                     &frames,
@@ -908,15 +921,21 @@ mod tests {
                 if tick == 125 || tick == 210 {
                     assert!(blue > 100, "missing water at tick {tick} {viewport:?}");
                 }
-                if tick == 0 || tick == 510 {
+                if (tick == 0 && !water_lab) || tick == 510 {
                     assert_eq!(blue, 0);
                 }
                 if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
                     let directory = std::path::PathBuf::from(directory);
                     std::fs::create_dir_all(&directory).unwrap();
                     let file = std::fs::File::create(directory.join(format!(
-                        "meltdown-{tick}-{}x{}.png",
-                        viewport.width, viewport.height
+                        "meltdown-{}-{tick}-{}x{}.png",
+                        if water_lab {
+                            "collecting-pool"
+                        } else {
+                            "normal"
+                        },
+                        viewport.width,
+                        viewport.height
                     )))
                     .unwrap();
                     let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
