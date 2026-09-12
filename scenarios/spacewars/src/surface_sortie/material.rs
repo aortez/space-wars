@@ -135,6 +135,11 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
+    /// Read-only material inspection for geometry comparisons and diagnostics.
+    pub fn planet_terrain(&self, planet: usize) -> Option<&engine_terrain::Terrain> {
+        self.world.planet_terrain(planet)
+    }
+
     pub fn has_material_ground(&self) -> bool {
         self.mining.is_some()
     }

@@ -29,8 +29,14 @@ fn arg(name: &str, default: &str) -> String {
         .map_or_else(|| default.to_owned(), |p| p[1].clone())
 }
 fn timing(mut values: Vec<f64>) -> serde_json::Value {
+    if values.is_empty() {
+        return serde_json::Value::Null;
+    }
     values.sort_by(f64::total_cmp);
-    json!({"p95_ms": values[(values.len() * 95 / 100).min(values.len()-1)], "max_ms":values.last()})
+    let percentile = |p: usize| values[(values.len() * p / 100).min(values.len() - 1)];
+    json!({"count":values.len(), "mean_ms":values.iter().sum::<f64>() / values.len() as f64,
+        "p50_ms":percentile(50), "p95_ms":percentile(95), "p99_ms":percentile(99),
+        "max_ms":values.last(), "over_16_67_ms":values.iter().filter(|&&v|v > 1000.0 / 60.0).count()})
 }
 fn main() {
     let seed = arg("--seed", "42").parse().unwrap();
@@ -41,6 +47,7 @@ fn main() {
     let mode = arg("--mode", "quiet");
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
+    let measure_draw = arg("--measure-draw", "false") == "true";
     let trace = arg("--trace", "false") == "true";
     let match_rules = arg("--match", "false") == "true";
     let require_finish = arg("--require-finish", "false") == "true";
@@ -105,11 +112,14 @@ fn main() {
         },
         breaks,
     );
-    let initial = state.terrain_diagnostics().occupied_cells;
+    let initial_audit = state.terrain_diagnostics();
+    let initial = initial_audit.occupied_cells;
     let mut sensors = Vec::new();
     let mut objective_sensors = Vec::new();
     let mut policies = Vec::new();
     let mut steps = Vec::new();
+    let mut draws = Vec::new();
+    let mut measured_ticks = Vec::new();
     let mut samples = Vec::new();
     let mut events = Vec::new();
     let mut asteroid_events = Vec::new();
@@ -152,6 +162,8 @@ fn main() {
             strike_tick = Some(tick);
         }
         let mut actions = Vec::new();
+        let sensor_start = sensors.len();
+        let policy_start = policies.len();
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
@@ -275,6 +287,21 @@ fn main() {
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
+        if measure_draw {
+            let clock = Instant::now();
+            for player in 0..2 {
+                std::hint::black_box(SurfaceSortieScenario::player_frame(&state, player));
+                std::hint::black_box(SurfaceSortieScenario::minimap_frame(&state, player, 1.0));
+            }
+            let draw_ms = clock.elapsed().as_secs_f64() * 1000.0;
+            draws.push(draw_ms);
+            measured_ticks.push(
+                steps.last().unwrap()
+                    + sensors[sensor_start..].iter().sum::<f64>()
+                    + policies[policy_start..].iter().sum::<f64>()
+                    + draw_ms,
+            );
+        }
         elapsed_ticks = tick + 1;
         if let Some(round) = state.match_observation() {
             for (seat, vitals) in round.pilots.iter().enumerate() {
@@ -363,6 +390,13 @@ fn main() {
         "claim_footing_recoveries":claim_footing_recoveries});
     report["objective_refresh"] =
         json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
+    report["initial_audit"] = json!(initial_audit);
+    report["draw_lists"] = timing(draws);
+    report["measured_tick"] = timing(measured_ticks);
+    report["measurement_scope"] = json!({"draw_enabled":measure_draw,
+        "draw_frames_per_tick":if measure_draw {4} else {0},
+        "includes":"mission sensors + policies + scenario step + optional two player frames and two minimaps",
+        "excludes":"audit, trace, metrics bookkeeping, file IO, rasterization and presentation"});
     if frames && state.match_outcome().is_some() {
         for seat in 0..2 {
             fs::write(

@@ -6,6 +6,12 @@ use super::*;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TerrainDiagnostics {
+    /// Raw storage, excluding geometry caches and allocator overhead.
+    pub cell_bytes: usize,
+    pub surface_sample_bytes: usize,
+    pub terrain_rectangles: usize,
+    pub terrain_polygons: usize,
+    pub terrain_polygon_vertices: usize,
     pub occupied_cells: u64,
     pub removed_cells: u64,
     pub fragments: usize,
@@ -30,6 +36,11 @@ impl SpacewarsState {
     pub fn terrain_diagnostics(&self) -> TerrainDiagnostics {
         let world = &self.physics.world;
         let mut result = TerrainDiagnostics {
+            cell_bytes: 0,
+            surface_sample_bytes: 0,
+            terrain_rectangles: 0,
+            terrain_polygons: 0,
+            terrain_polygon_vertices: 0,
             occupied_cells: 0,
             removed_cells: self.terrain.removed_cells,
             fragments: self.terrain.fragments.len(),
@@ -65,6 +76,8 @@ impl SpacewarsState {
                     .map(|f| (&f.terrain, &f.geometry, &f.assembly, f.hash)),
             );
         for (field, geometry, assembly, hash) in fields {
+            result.cell_bytes += field.cell_bytes();
+            result.surface_sample_bytes += field.surface_sample_bytes();
             let body = assembly.body();
             expected_bodies.insert(body);
             let occupied = field
@@ -98,6 +111,13 @@ impl SpacewarsState {
             }
             let mut covered = 0_u64;
             for chunk in geometry.chunks() {
+                result.terrain_rectangles += chunk.rectangles.len();
+                result.terrain_polygons += chunk.polygons.len();
+                result.terrain_polygon_vertices += chunk
+                    .polygons
+                    .iter()
+                    .map(|p| p.vertices.len())
+                    .sum::<usize>();
                 if field.chunk_revision(chunk.id) != Some(chunk.revision) {
                     result.issues.push(format!(
                         "terrain {} has stale chunk {}",
