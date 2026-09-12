@@ -270,37 +270,57 @@ impl SurfaceSortieState {
             }
         }
         let spec = Self::spec();
-        let hatch_clear = |hatch: RayHit, radial: Vec2| {
+        // Forecast the exit beside the proposed landed vehicle. Testing against
+        // this ship's current airborne pose can reject its own destination and
+        // repeatedly interrupt touchdown. Keep the proposed hull/feet and every
+        // other obstacle in the clearance test; this grants no real transfer.
+        let vehicle = self.pilots[player].vehicle.0;
+        let world_clear = self.world.physics.world.capsule_clearance_test_excluding(
+            spec.half_segment,
+            spec.radius + 0.04,
+            spec.collision_groups,
+            vec![
+                self.world.physics.surface_vehicle_entity(vehicle),
+                pilot_physics_id(self.pilots[player].owner),
+            ],
+        );
+        let vehicle_clear = self.world.physics.surface_vehicle_capsule_clearance(
+            vehicle,
+            &self.world.ships[vehicle],
+            spec.half_segment,
+            spec.radius + 0.04,
+        );
+        let hatch_clear = |hatch: RayHit, position: Vec2, angle: f32| {
+            let radial = (position - frame.position).normalized();
             hatch.normal.dot(radial) >= 0.65
                 && [hatch.normal, radial].into_iter().all(|axis| {
-                    self.world.physics.world.capsule_is_clear(
-                        hatch.point + axis * (spec.half_height() + 0.12),
-                        rotation_for_direction(axis),
-                        spec.half_segment,
-                        spec.radius + 0.04,
-                        spec.collision_groups,
-                    )
+                    let point = hatch.point + axis * (spec.half_height() + 0.12);
+                    let rotation = rotation_for_direction(axis);
+                    world_clear(point, rotation) && vehicle_clear(point, rotation, position, angle)
                 })
         };
         let mut hatch_has_settling_margin = false;
         let hatch = if pod {
             let origin = vehicle_position + Vec2::new(normal.y, -normal.x) * 2.8;
             let hatch = ground(origin, -normal, 5.0)?;
-            hatch_clear(hatch, up).then_some(hatch)?
+            hatch_clear(hatch, vehicle_position, rotation_for_direction(normal)).then_some(hatch)?
         } else {
             // Use the real exit pose and leave room to stand radially upright.
             // Require room for lateral drift, then report whether a combined
             // slide and tilt is also safe. A bot may need to retry a one-foot
             // stop when rotating here would close the hatch.
             let hatch_at = |position: Vec2, angle: f32| {
-                self.material_access_at(
+                self.material_access_with_clearance(
                     id.planet,
                     ShipForm::Ship,
                     position,
                     angle,
-                    Some(pilot_physics_id(self.pilots[player].owner)),
+                    |point, rotation| {
+                        world_clear(point, rotation)
+                            && vehicle_clear(point, rotation, position, angle)
+                    },
                 )
-                .filter(|hit| hatch_clear(*hit, (position - frame.position).normalized()))
+                .filter(|hit| hatch_clear(*hit, position, angle))
             };
             let angle = rotation_for_direction(normal);
             for offset in [-0.75, 0.75] {
@@ -401,8 +421,84 @@ impl SurfaceSortieScenario {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use engine_rapier::world::{
+        BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
+    };
     use engine_terrain::{Brush, EditMode, TerrainEdit};
     const DT: Duration = Duration::from_nanos(16_666_667);
+
+    #[test]
+    fn landing_forecast_moves_its_own_ship_but_keeps_other_obstacles() {
+        let mut state = SurfaceSortieScenario::init_material_surface(
+            42,
+            1,
+            engine_terrain::TerrainSurface::Interpolated,
+        );
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let site = state.pilot_observation(0, None).sites[0];
+        let body = state.world.physics.ship_body(0);
+        let right = Vec2::new(site.normal.y, -site.normal.x);
+        // The arriving hull overlaps the forecast exit, while both feet remain
+        // airborne. The ship will occupy a different pose after touchdown.
+        state.world.physics.world.set_pose(
+            body,
+            site.vehicle_position + right * 8.0,
+            rotation_for_direction(site.normal),
+            true,
+        );
+        state
+            .world
+            .physics
+            .world
+            .set_velocity(body, Vec2::ZERO, 0.0, true);
+        state.world.physics.world.step(DT.as_secs_f32());
+        let spec = SurfaceSortieState::spec();
+        let hatch = site.hatch_position + site.normal * (spec.half_height() + 0.12);
+        let clear = |excluded| {
+            state.world.physics.world.capsule_is_clear_except(
+                hatch,
+                rotation_for_direction(site.normal),
+                spec.half_segment,
+                spec.radius + 0.04,
+                spec.collision_groups,
+                excluded,
+            )
+        };
+        assert!(
+            !clear(None),
+            "the live ship really obstructs the proposed exit"
+        );
+        assert!(clear(Some(body.entity)));
+        let before = state.world.physics.world.snapshot_bytes().unwrap();
+        let forecast = state.pilot_observation(0, Some(site.id));
+        assert_eq!(
+            forecast.sites.len(),
+            1,
+            "own airborne hull must not invalidate the site"
+        );
+        assert_ne!(forecast.landing.phase, LandingPhase::Landed);
+        assert_ne!(forecast.transfer, TransferResult::Ready);
+        assert_eq!(before, state.world.physics.world.snapshot_bytes().unwrap());
+
+        let obstacle = PhysicsId::new(45_124);
+        assert!(state.world.physics.world.insert_body(
+            PhysicsBodyId::new(obstacle, BodyRole::PRIMARY),
+            BodySpec {
+                kind: engine_rapier::world::BodyKind::Fixed,
+                position: hatch,
+                ..BodySpec::default()
+            },
+            &[ColliderSpec::ball(
+                ColliderId::new(obstacle, ColliderRole::PRIMARY, 0),
+                2.0
+            )],
+        ));
+        state.world.physics.world.step(DT.as_secs_f32());
+        assert!(
+            state.pilot_observation(0, Some(site.id)).sites.is_empty(),
+            "a different solid obstacle must still reject the forecast"
+        );
+    }
 
     #[test]
     fn sensors_are_read_only_and_sites_follow_material_frames_and_revisions() {

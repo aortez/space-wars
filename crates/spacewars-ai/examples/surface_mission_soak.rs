@@ -49,6 +49,10 @@ fn main() {
     let frames = arg("--frames", "false") == "true";
     let measure_draw = arg("--measure-draw", "false") == "true";
     let trace = arg("--trace", "false") == "true";
+    // Optional dense, half-open physics-tick window; ordinary traces stay sparse.
+    let trace_start: u64 = arg("--trace-start-tick", "0").parse().unwrap();
+    let trace_end: u64 = arg("--trace-end-tick", "0").parse().unwrap();
+    assert!(trace_end == 0 || (trace && trace_start < trace_end));
     let match_rules = arg("--match", "false") == "true";
     let require_finish = arg("--require-finish", "false") == "true";
     assert!(
@@ -256,7 +260,8 @@ fn main() {
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
                 let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
                 if let Some(trace) = &mut trace
-                    && (tick % 60 == 0
+                    && ((trace_start..trace_end).contains(&tick)
+                        || tick % 60 == 0
                         || label != last[i]
                         || posture_key != last_posture[i]
                         || o.local.landing_objective.is_some())
@@ -266,6 +271,9 @@ fn main() {
                         &json!({
                             "version": 1, "tick": tick, "seat": i,
                             "observation": o, "actions": intent.encode(owner),
+                            "controls": {"turn": intent.flight.controls.horizontal,
+                                "thrust": intent.flight.controls.primary_held,
+                                "brake": intent.flight.controls.brake_held},
                             "mission": pilots[i].telemetry(),
                             "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
                             "posture": posture.map(|s| json!({
@@ -416,6 +424,7 @@ fn main() {
     } else {
         "blocks"
     });
+    report["dense_trace_ticks"] = json!([trace_start, trace_end]);
     report["draw_lists"] = timing(draws);
     report["measured_tick"] = timing(measured_ticks);
     report["measurement_scope"] = json!({"draw_enabled":measure_draw,

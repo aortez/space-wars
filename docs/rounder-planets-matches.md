@@ -1,5 +1,9 @@
 # Rounded terrain in generated matches
 
+Follow-up: [landing forecasts](landing-forecast.md) identifies and fixes the
+mirrored seed-42 self-obstruction loop, and records the remaining routing and
+duel regressions. The measurements below retain the original `fff99b3` result.
+
 The ordinary `spacewars` match and both generated arena presets now construct
 all three planets with `TerrainSurface::Interpolated`. The initializer attaches
 the existing circle samples before building collision geometry. Planet sizes,

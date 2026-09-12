@@ -286,6 +286,20 @@ impl SurfaceSortieState {
             spec.collision_groups,
             exclude_actor,
         );
+        self.material_access_with_clearance(planet, form, position, angle, clear)
+    }
+
+    /// Share floor selection between live access and a proposed vehicle pose.
+    /// Forecasts supply their own collision predicate, not a different search.
+    pub(super) fn material_access_with_clearance(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+        clear: impl Fn(Vec2, f32) -> bool,
+    ) -> Option<RayHit> {
+        let spec = Self::spec();
         let mut first = None;
         for hit in self.material_access_candidates_at(planet, form, position, angle) {
             first.get_or_insert(hit);

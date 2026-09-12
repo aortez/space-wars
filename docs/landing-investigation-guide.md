@@ -1,5 +1,9 @@
 # Resuming the deferred landing investigations
 
+For the rounded generated-world follow-up, see [landing forecasts](landing-forecast.md):
+it traces the approaching ship blocking its own proposed hatch, fixes the
+forecast pose, and preserves the remaining solar-routing and pursuit cases.
+
 Parked on 2026-09-10 so work can proceed toward complete material matches.
 The current implementation is `37106c6`, with verified results at `1ede0f2`.
 See [the result report](objective-landings.md) for the complete measurements,
