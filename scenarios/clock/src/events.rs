@@ -168,18 +168,22 @@ impl ActiveEvent {
         kind: ClockEventKind,
         context: EventContext<'_>,
         seed: u64,
-        marquee_preset: engine_common::ClockMarqueePreset,
-        marquee_message: engine_common::ClockMarqueeMessage,
+        config: super::ClockConfig,
         previous_display: Option<DisplaySnapshot>,
     ) -> Self {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
             ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(context, seed))),
-            ClockEventKind::Duck => Self::Duck(Box::new(DuckEvent::new(context.layout, seed))),
+            ClockEventKind::Duck => {
+                let mut event =
+                    DuckEvent::new_course(context.layout, seed, config.duck_course_pattern);
+                event.select_jump_profile(config.duck_jump_profile);
+                Self::Duck(Box::new(event))
+            }
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
-                marquee_preset,
-                marquee_message,
+                config.marquee_preset,
+                config.marquee_message,
                 context.display,
             ))),
             ClockEventKind::DigitSlide => {

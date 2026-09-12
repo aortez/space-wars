@@ -65,7 +65,17 @@ fn create(
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: viewport.aspect_ratio(),
+            duck_debug_overlay: std::env::var("SPACEWARS_CLOCK_DUCK_DEBUG")
+                .is_ok_and(|value| value == "1"),
+            duck_jump_profile: duck_jump_profile(
+                std::env::var("SPACEWARS_CLOCK_DUCK_PROFILE")
+                    .ok()
+                    .as_deref(),
+            ),
             time_format: settings.clock.time_format,
+            duck_course_pattern: duck_course_pattern(
+                std::env::var("SPACEWARS_CLOCK_DUCK_COURSE").ok().as_deref(),
+            ),
             event_profile: settings.clock.event_profile,
             events: settings.clock.events,
             marquee_preset: settings.clock.marquee_preset,
@@ -84,6 +94,25 @@ fn create(
         last_emitted_reading: Cell::new(Some(reading)),
         benchmark: None,
     }))
+}
+
+fn duck_jump_profile(value: Option<&str>) -> Option<engine_common::ClockDuckJumpProfile> {
+    match value {
+        Some("careful") => Some(engine_common::ClockDuckJumpProfile::Careful),
+        Some("flowing") => Some(engine_common::ClockDuckJumpProfile::Flowing),
+        _ => None,
+    }
+}
+
+fn duck_course_pattern(value: Option<&str>) -> Option<engine_common::ClockDuckCoursePattern> {
+    use engine_common::ClockDuckCoursePattern;
+    match value {
+        Some("platforms") => Some(ClockDuckCoursePattern::Platforms),
+        Some("terraces") => Some(ClockDuckCoursePattern::Terraces),
+        Some("two-jump") => Some(ClockDuckCoursePattern::TwoJump),
+        Some("shortcut") => Some(ClockDuckCoursePattern::Shortcut),
+        _ => None,
+    }
 }
 
 impl ClientScenario for ClockClientScenario {
@@ -501,14 +530,178 @@ mod tests {
 
     #[test]
     fn duck_course_reaches_both_render_paths_and_resets_to_the_normal_arena() {
-        for viewport in [
-            Viewport::new(800.0, 480.0),
-            Viewport::new(480.0, 800.0),
-            Viewport::new(1280.0, 720.0),
+        for (profile, pattern) in [
+            engine_common::ClockDuckJumpProfile::Careful,
+            engine_common::ClockDuckJumpProfile::Flowing,
+        ]
+        .into_iter()
+        .flat_map(|profile| {
+            [
+                engine_common::ClockDuckCoursePattern::Platforms,
+                engine_common::ClockDuckCoursePattern::Terraces,
+                engine_common::ClockDuckCoursePattern::TwoJump,
+                engine_common::ClockDuckCoursePattern::Shortcut,
+            ]
+            .map(|pattern| (profile, pattern))
+        }) {
+            for viewport in [
+                Viewport::new(800.0, 480.0),
+                Viewport::new(1024.0, 768.0),
+                Viewport::new(480.0, 800.0),
+                Viewport::new(1280.0, 720.0),
+            ] {
+                let mut state = ClockScenario::init(
+                    ClockConfig {
+                        aspect_ratio: viewport.aspect_ratio(),
+                        duck_jump_profile: Some(profile),
+                        duck_course_pattern: Some(pattern),
+                        event_profile: engine_common::ClockEventProfile::Off,
+                        ..ClockConfig::default()
+                    },
+                    42,
+                );
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::set_reading(
+                        ClockReading::new(8, 8, 0).unwrap(),
+                    )],
+                    Duration::ZERO,
+                );
+                let normal = ClockScenario::render_frame(&state);
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::trigger_event(
+                        engine_common::ClockEventKind::Duck,
+                    )],
+                    Duration::ZERO,
+                );
+                let mut scenario = ClockClientScenario {
+                    state,
+                    last_emitted_reading: Cell::new(None),
+                    benchmark: None,
+                };
+                let mut renderer = crate::raster::RasterRenderer::new();
+                for tick in 0..=scenario_clock::DUCK_TICKS {
+                    if tick > 0 {
+                        scenario.step(&[], Duration::from_nanos(16_666_667));
+                    }
+                    if ![
+                        0,
+                        18,
+                        60,
+                        170,
+                        395,
+                        600,
+                        900,
+                        1235,
+                        1260,
+                        1650,
+                        1800,
+                        scenario_clock::DUCK_TICKS,
+                    ]
+                    .contains(&tick)
+                    {
+                        continue;
+                    }
+                    let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+                    assert_eq!(
+                        frames,
+                        scenario.render_frames(RenderBackend::Vector, viewport)
+                    );
+                    assert!(
+                        frames[0]
+                            .layers
+                            .iter()
+                            .map(|l| l.primitives.len())
+                            .sum::<usize>()
+                            < 300
+                    );
+                    let presentation = crate::render::scene_presentation_from_frames_with_layout(
+                        &frames,
+                        viewport,
+                        scenario.frame_layout(),
+                    );
+                    assert!(!presentation.main_primitives.is_empty());
+                    let image = renderer.image_from_frames_with_layout(
+                        &frames,
+                        viewport,
+                        scenario.frame_layout(),
+                        crate::raster::RasterOptions::default(),
+                    );
+                    let pixels = image.to_rgb8().unwrap();
+                    // Shorter patterns may already be fading after a successful
+                    // exit at this timestamp. Only inspect an active course.
+                    let active_duck = scenario
+                        .state
+                        .duck_state()
+                        .is_some_and(|duck| duck.outcome.is_none());
+                    if [1235, 1260].contains(&tick) && active_duck {
+                        // Inspect the exit frame itself, not just telemetry or its
+                        // closed panel: it must be absent before the spawn timer.
+                        let duck = scenario.state.duck_state().unwrap();
+                        let world_width = 480.0 * viewport.aspect_ratio();
+                        let radius = duck.navigation.unwrap().body_radius_milli as f32 / 1000.0;
+                        let side = if duck.left_to_right { 1.0 } else { -1.0 };
+                        let scale = viewport.height / 480.0;
+                        let x = (viewport.width * 0.5
+                            + (world_width * 0.5 - 2.0 * radius) * side * scale)
+                            as usize;
+                        let y = (viewport.height * 0.5 - (-163.2 + 4.1 * radius) * scale) as usize;
+                        let frame_pixel = pixels.as_slice()[y * pixels.width() as usize + x];
+                        let visible =
+                            frame_pixel.r > 40 && frame_pixel.g > 80 && frame_pixel.b > 100;
+                        assert_eq!(
+                            visible,
+                            tick == 1260,
+                            "exit frame at {tick} in {viewport:?} {pattern:?} {profile:?}"
+                        );
+                    }
+                    let yellow = pixels
+                        .as_slice()
+                        .iter()
+                        .filter(|p| p.r > 240 && p.g > 200 && p.b < 50)
+                        .count();
+                    if [60, 170, 395, 600, 900, 1260].contains(&tick) && active_duck {
+                        assert!(yellow > 25, "duck missing at {tick} in {viewport:?}");
+                    }
+                    if tick == 0 || tick == scenario_clock::DUCK_TICKS {
+                        assert_eq!(yellow, 0);
+                        assert_eq!(frames[0], normal);
+                    }
+                    if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                        let directory = std::path::PathBuf::from(directory);
+                        std::fs::create_dir_all(&directory).unwrap();
+                        let file = std::fs::File::create(directory.join(format!(
+                            "duck-{pattern:?}-{profile:?}-{tick}-{}x{}.png",
+                            viewport.width, viewport.height
+                        )))
+                        .unwrap();
+                        let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                        encoder.set_color(png::ColorType::Rgb);
+                        encoder.set_depth(png::BitDepth::Eight);
+                        encoder
+                            .write_header()
+                            .unwrap()
+                            .write_image_data(pixels.as_bytes())
+                            .unwrap();
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn duck_planning_overlay_is_visible_without_changing_the_physics() {
+        for profile in [
+            engine_common::ClockDuckJumpProfile::Careful,
+            engine_common::ClockDuckJumpProfile::Flowing,
         ] {
+            let viewport = Viewport::new(800.0, 480.0);
             let mut state = ClockScenario::init(
                 ClockConfig {
                     aspect_ratio: viewport.aspect_ratio(),
+                    duck_debug_overlay: true,
+                    duck_jump_profile: Some(profile),
                     event_profile: engine_common::ClockEventProfile::Off,
                     ..ClockConfig::default()
                 },
@@ -516,88 +709,132 @@ mod tests {
             );
             ClockScenario::step(
                 &mut state,
-                &[ClockAction::set_reading(
-                    ClockReading::new(8, 8, 0).unwrap(),
-                )],
+                &[
+                    ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                    ClockAction::preview_event(engine_common::ClockEventKind::Duck),
+                ],
                 Duration::ZERO,
             );
-            let normal = ClockScenario::render_frame(&state);
-            ClockScenario::step(
-                &mut state,
-                &[ClockAction::trigger_event(
-                    engine_common::ClockEventKind::Duck,
-                )],
-                Duration::ZERO,
+            for _ in 0..240 {
+                ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+            }
+            if profile == engine_common::ClockDuckJumpProfile::Flowing {
+                // Capture the running arc, not an earlier careful fallback.
+                for _ in 0..1000 {
+                    let duck = state.duck_state().unwrap();
+                    if !duck.grounded
+                        && duck.navigation.unwrap().behavior
+                            == engine_common::ClockDuckBehavior::Jumping
+                        && duck
+                            .navigation
+                            .unwrap()
+                            .planning
+                            .unwrap()
+                            .plan
+                            .is_some_and(|plan| plan.running_takeoff)
+                    {
+                        break;
+                    }
+                    ClockScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+                }
+                assert!(
+                    state
+                        .duck_state()
+                        .unwrap()
+                        .navigation
+                        .unwrap()
+                        .planning
+                        .unwrap()
+                        .plan
+                        .unwrap()
+                        .running_takeoff
+                );
+            }
+            assert!(
+                state
+                    .duck_state()
+                    .unwrap()
+                    .navigation
+                    .unwrap()
+                    .planning
+                    .unwrap()
+                    .plan
+                    .is_some()
             );
-            let mut scenario = ClockClientScenario {
+            let scenario = ClockClientScenario {
                 state,
                 last_emitted_reading: Cell::new(None),
                 benchmark: None,
             };
+            let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+            assert_eq!(
+                frames,
+                scenario.render_frames(RenderBackend::Vector, viewport)
+            );
             let mut renderer = crate::raster::RasterRenderer::new();
-            for tick in 0..=scenario_clock::DUCK_TICKS {
-                if tick > 0 {
-                    scenario.step(&[], Duration::from_nanos(16_666_667));
-                }
-                if ![0, 18, 60, 170, 260, 395, 460, 590, 600].contains(&tick) {
-                    continue;
-                }
-                let frames = scenario.render_frames(RenderBackend::Raster, viewport);
-                assert_eq!(
-                    frames,
-                    scenario.render_frames(RenderBackend::Vector, viewport)
-                );
-                assert!(
-                    frames[0]
-                        .layers
-                        .iter()
-                        .map(|l| l.primitives.len())
-                        .sum::<usize>()
-                        < 300
-                );
-                let presentation = crate::render::scene_presentation_from_frames_with_layout(
-                    &frames,
-                    viewport,
-                    scenario.frame_layout(),
-                );
-                assert!(!presentation.main_primitives.is_empty());
-                let image = renderer.image_from_frames_with_layout(
-                    &frames,
-                    viewport,
-                    scenario.frame_layout(),
-                    crate::raster::RasterOptions::default(),
-                );
-                let pixels = image.to_rgb8().unwrap();
-                let yellow = pixels
-                    .as_slice()
-                    .iter()
-                    .filter(|p| p.r > 240 && p.g > 200 && p.b < 50)
-                    .count();
-                if [60, 170, 260, 395].contains(&tick) {
-                    assert!(yellow > 25, "duck missing at {tick} in {viewport:?}");
-                }
-                if tick == 0 || tick == 600 {
-                    assert_eq!(yellow, 0);
-                    assert_eq!(frames[0], normal);
-                }
-                if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
-                    let directory = std::path::PathBuf::from(directory);
-                    std::fs::create_dir_all(&directory).unwrap();
-                    let file = std::fs::File::create(directory.join(format!(
-                        "duck-{tick}-{}x{}.png",
-                        viewport.width, viewport.height
-                    )))
+            let image = renderer.image_from_frames_with_layout(
+                &frames,
+                viewport,
+                scenario.frame_layout(),
+                crate::raster::RasterOptions::default(),
+            );
+            let pixels = image.to_rgb8().unwrap();
+            let purple = pixels
+                .as_slice()
+                .iter()
+                .filter(|pixel| {
+                    pixel.r > 180 && pixel.r < 240 && pixel.g > 70 && pixel.g < 140 && pixel.b > 230
+                })
+                .count();
+            assert!(purple > 20, "planned arc should be visible");
+            if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {
+                let directory = std::path::PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                let file = std::fs::File::create(
+                    directory.join(format!("duck-planner-{profile:?}-overlay.png")),
+                )
+                .unwrap();
+                let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
+                encoder.set_color(png::ColorType::Rgb);
+                encoder.set_depth(png::BitDepth::Eight);
+                encoder
+                    .write_header()
+                    .unwrap()
+                    .write_image_data(pixels.as_bytes())
                     .unwrap();
-                    let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
-                    encoder.set_color(png::ColorType::Rgb);
-                    encoder.set_depth(png::BitDepth::Eight);
-                    encoder
-                        .write_header()
-                        .unwrap()
-                        .write_image_data(pixels.as_bytes())
-                        .unwrap();
-                }
             }
+        }
+    }
+
+    #[test]
+    fn duck_profile_override_preserves_both_choices_and_defaults_to_a_seeded_mix() {
+        use engine_common::ClockDuckJumpProfile;
+        assert_eq!(
+            duck_jump_profile(Some("flowing")),
+            Some(ClockDuckJumpProfile::Flowing)
+        );
+        assert_eq!(
+            duck_jump_profile(Some("careful")),
+            Some(ClockDuckJumpProfile::Careful)
+        );
+        for value in [None, Some("mixed"), Some(""), Some("unknown")] {
+            assert_eq!(duck_jump_profile(value), None);
+        }
+    }
+
+    #[test]
+    fn duck_course_override_preserves_authored_choices_and_defaults_to_a_seeded_mix() {
+        use engine_common::ClockDuckCoursePattern;
+        for (value, pattern) in [
+            ("platforms", ClockDuckCoursePattern::Platforms),
+            ("terraces", ClockDuckCoursePattern::Terraces),
+            ("two-jump", ClockDuckCoursePattern::TwoJump),
+            ("shortcut", ClockDuckCoursePattern::Shortcut),
+        ] {
+            assert_eq!(duck_course_pattern(Some(value)), Some(pattern));
+        }
+        for value in [None, Some("mixed"), Some("unknown")] {
+            assert_eq!(duck_course_pattern(value), None);
         }
     }
 
