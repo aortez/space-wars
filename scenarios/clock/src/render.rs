@@ -194,7 +194,7 @@ fn render_meltdown(
     }
     for column in event.water.pools().iter().flat_map(|pool| pool.columns()) {
         let height = (column.surface - column.bed) as f32;
-        if height < 0.25 {
+        if height < 0.25 || column.volume <= 0.0 {
             continue;
         }
         let left = column.left as f32;
@@ -264,17 +264,44 @@ fn render_meltdown(
         );
     }
     if let Some(lab) = &event.floats {
-        for (index, body) in lab.bodies.iter().enumerate() {
-            let motion = lab
-                .world
-                .motion(body.body.body())
-                .expect("live water-lab body");
+        if let Some(y) = lab.reference_y {
+            let spec = event.water.pools()[0].spec();
+            let width = spec.column_width * spec.bed.len() as f64;
+            for i in 0..24 {
+                let x = (spec.left + width * i as f64 / 24.0) as f32;
+                frame.push_primitive(
+                    ACTIVE_CELL_LAYER,
+                    rectangle(
+                        RenderPoint::new(x, y - 0.35),
+                        RenderPoint::new(x + width as f32 / 48.0, y + 0.35),
+                        RenderColor::rgb(0.58, 0.65, 0.8),
+                        None,
+                    ),
+                );
+            }
+        }
+        let bodies = lab
+            .bodies
+            .iter()
+            .map(|b| (b.body.body(), b.body.shape(), b.palette))
+            .chain(lab.piston.iter().map(|p| {
+                (
+                    p.body,
+                    engine_water::immersion::HullShape::Box {
+                        half_width: p.half_extents.x,
+                        half_height: p.half_extents.y,
+                    },
+                    0,
+                )
+            }));
+        for (body, shape, index) in bodies {
+            let motion = lab.world.motion(body).expect("live water-lab body");
             let color = match index {
                 0 => RenderColor::rgb(1.0, 0.62, 0.18),
                 1 => RenderColor::rgb(1.0, 0.91, 0.28),
                 _ => RenderColor::rgb(0.85, 0.32, 0.4),
             };
-            let (sides, radius, half_width, half_height) = match body.body.shape() {
+            let (sides, radius, half_width, half_height) = match shape {
                 engine_water::immersion::HullShape::Circle { radius } => (32, radius, 0.0, 0.0),
                 engine_water::immersion::HullShape::Box {
                     half_width,

@@ -876,7 +876,10 @@ impl FunctionalHarness {
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
-    let water_lab = std::env::var("SPACEWARS_CLOCK_WATER_LAB").is_ok_and(|v| v == "1");
+    let mode = scenario_clock::ClockWaterLab::from_override(
+        std::env::var("SPACEWARS_CLOCK_WATER_LAB").ok().as_deref(),
+    );
+    let water_lab = mode != scenario_clock::ClockWaterLab::Off;
     run_functional_test("clock-meltdown", |harness| {
         let state = harness.wait_until_ready();
         let state = harness.activate_until_scenario("clock", state);
@@ -894,7 +897,10 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let melting = harness.clock_wait(&initial, "melting", 1, 75);
         if water_lab {
             assert_eq!(melting.meltdown.unwrap().initial_cells, 24);
-            assert_eq!((melting.body_count, melting.collider_count), (4, 10));
+            assert_eq!(
+                (melting.body_count, melting.collider_count),
+                if mode.is_tank() { (3, 5) } else { (4, 10) }
+            );
         } else {
             assert!(melting.meltdown.unwrap().airborne_cells > 0);
             assert_eq!((melting.body_count, melting.collider_count), (0, 0));
@@ -930,6 +936,10 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
         let material = draining.meltdown.unwrap();
         assert!(material.pooled_microunits > 0);
         assert_eq!(material.drained_microunits > 0, !water_lab);
+        assert_eq!(
+            material.displaced_microunits > 0,
+            mode == scenario_clock::ClockWaterLab::Displacement
+        );
         assert!(material.water_columns <= scenario_clock::WATER_COLUMNS);
         assert_eq!(draining.scenario_revision, initial.scenario_revision);
         assert!(!draining.settings.events.meltdown);

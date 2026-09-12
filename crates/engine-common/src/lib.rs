@@ -501,6 +501,9 @@ pub struct ClockMeltdownState {
     /// Water physically in flight, not yet deposited or drained.
     #[serde(default)]
     pub spilling_microunits: u64,
+    /// Occupied body space in the displacement lab, NOT liquid volume.
+    #[serde(default)]
+    pub displaced_microunits: u64,
     #[serde(default)]
     pub spill_parcels: usize,
     #[serde(default)]

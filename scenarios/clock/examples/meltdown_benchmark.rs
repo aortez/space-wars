@@ -16,15 +16,16 @@ fn summary(label: &str, values: &mut [f64]) {
 }
 
 fn main() {
-    let water_lab = std::env::args().skip(1).any(|a| a == "--water-lab");
-    println!(
-        "fixture={}",
-        if water_lab {
-            "buoyancy lab"
-        } else {
-            "normal meltdown"
-        }
-    );
+    let water_lab = if std::env::args().any(|a| a == "--displacement-control") {
+        scenario_clock::ClockWaterLab::DisplacementControl
+    } else if std::env::args().any(|a| a == "--displacement") {
+        scenario_clock::ClockWaterLab::Displacement
+    } else if std::env::args().any(|a| a == "--water-lab") {
+        scenario_clock::ClockWaterLab::Cascade
+    } else {
+        scenario_clock::ClockWaterLab::Off
+    };
+    println!("fixture={}", water_lab.as_str());
     let duration = EVENT_CATALOG[ClockEventKind::Meltdown as usize].duration_ticks;
     for (width, height) in [(800, 480), (480, 800), (1280, 720)] {
         let mut steps = Vec::new();
@@ -34,6 +35,7 @@ fn main() {
         let mut peak_columns = 0;
         let mut peak_spills = 0;
         let mut max_reclaimed = 0;
+        let mut peak_displaced = 0;
         let mut peak_bodies = 0;
         let mut peak_colliders = 0;
         for seed in 0..24 {
@@ -81,15 +83,17 @@ fn main() {
                     peak_columns = peak_columns.max(m.water_columns);
                     peak_spills = peak_spills.max(m.spill_parcels);
                     max_reclaimed = max_reclaimed.max(m.reclaimed_microunits);
+                    peak_displaced = peak_displaced.max(m.displaced_microunits);
                 }
             }
             assert_eq!(state.meltdown_state(), None);
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         }
         println!(
-            "{width}x{height}: 24 events, {} ticks, peak cells={peak_cells} columns={peak_columns} spills={peak_spills} bodies={peak_bodies} colliders={peak_colliders} primitives={peak_primitives} reclaimed={:.6} cell-volumes",
+            "{width}x{height}: 24 events, {} ticks, peak cells={peak_cells} columns={peak_columns} spills={peak_spills} bodies={peak_bodies} colliders={peak_colliders} primitives={peak_primitives} reclaimed={:.6} cell-volumes displaced_peak={:.6} cell-equivalent areas (not water)",
             steps.len(),
-            max_reclaimed as f64 / 1_000_000.0
+            max_reclaimed as f64 / 1_000_000.0,
+            peak_displaced as f64 / 1_000_000.0
         );
         summary("step", &mut steps);
         summary("draw list (not raster/presentation)", &mut frames);

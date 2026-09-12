@@ -1,5 +1,5 @@
-//! Optional three-body demonstration; normal Meltdown stays particle/column only.
-use crate::layout::Layout;
+//! Optional buoyancy/displacement fixtures; normal Meltdown stays particle/column only.
+use crate::{ClockWaterLab, layout::Layout};
 use engine_core::Vec2;
 use engine_rapier::{
     buoyancy::{BuoyancyConfig, BuoyancyReport, BuoyantBody},
@@ -8,23 +8,38 @@ use engine_rapier::{
         PhysicsWorld, PhysicsWorldConfig,
     },
 };
-use engine_water::{Boundary, WaterWorld, immersion::HullShape};
+use engine_water::{Boundary, WaterWorld, displacement::DisplacementBox, immersion::HullShape};
 
 pub(crate) struct LabBody {
     pub body: BuoyantBody,
     pub report: BuoyancyReport,
+    pub palette: usize,
+}
+
+pub(crate) struct Piston {
+    pub body: BodyId,
+    pub half_extents: Vec2,
+    x: f32,
+    raised_y: f32,
+    lowered_y: f32,
 }
 
 pub(crate) struct WaterLab {
     pub world: PhysicsWorld,
     /// Shared by rendering and colliders, so the banks cannot visually disagree.
     pub supports: Vec<(Vec2, Vec2)>,
-    /// Cork box, floating ball, dense box (in that order).
+    /// Explicitly opted-in buoyant bodies. The controlled piston is separate.
     pub bodies: Vec<LabBody>,
+    pub piston: Option<Piston>,
+    pub reference_y: Option<f32>,
+    displacement_enabled: bool,
 }
 
 impl WaterLab {
-    pub fn new(water: &WaterWorld, layout: Layout) -> Self {
+    pub fn new(water: &WaterWorld, layout: Layout, mode: ClockWaterLab) -> Self {
+        let displacement = mode.is_tank();
+        let initial_level = water.pools()[0].columns().next().unwrap().surface as f32;
+        let initial_depth = initial_level - water.pools()[0].spec().bed[0] as f32;
         let mut supports = Vec::with_capacity(7);
         for pool in water.pools() {
             let spec = pool.spec();
@@ -56,7 +71,15 @@ impl WaterLab {
                     };
                     supports.push((
                         Vec2::new(x as f32 - 2.0, bed as f32 - 4.0),
-                        Vec2::new(x as f32 + 2.0, bed as f32 + layout.pitch * 2.0),
+                        Vec2::new(
+                            x as f32 + 2.0,
+                            bed as f32
+                                + if displacement {
+                                    initial_depth * 2.4
+                                } else {
+                                    layout.pitch * 2.0
+                                },
+                        ),
                     ));
                 }
             }
@@ -91,6 +114,58 @@ impl WaterLab {
             },
             &colliders
         ));
+        if displacement {
+            let spec = water.pools()[0].spec();
+            let width = (spec.column_width * spec.bed.len() as f64) as f32;
+            let half_extents = Vec2::new(width * 0.10, initial_depth * 0.35);
+            let piston = Piston {
+                body: BodyId::new(PhysicsId::new(10), BodyRole::PRIMARY),
+                half_extents,
+                x: -width * 0.20,
+                raised_y: spec.bed[0] as f32 + initial_depth * 1.85,
+                lowered_y: spec.bed[0] as f32 + initial_depth * 0.45,
+            };
+            assert!(world.insert_body(
+                piston.body,
+                BodySpec {
+                    kind: BodyKind::KinematicPosition,
+                    position: Vec2::new(piston.x, piston.raised_y),
+                    ..BodySpec::default()
+                },
+                &[ColliderSpec::cuboid(
+                    ColliderId::new(piston.body.entity, ColliderRole::PRIMARY, 0),
+                    half_extents.x,
+                    half_extents.y
+                )]
+            ));
+            let observer = BuoyantBody::insert(
+                &mut world,
+                PhysicsId::new(1),
+                BodySpec {
+                    position: Vec2::new(width * 0.25, initial_level + initial_depth * 0.1),
+                    can_sleep: false,
+                    ccd_enabled: true,
+                    ..BodySpec::default()
+                },
+                HullShape::Circle {
+                    radius: initial_depth * 0.15,
+                },
+                0.55,
+            )
+            .unwrap();
+            return Self {
+                world,
+                supports,
+                bodies: vec![LabBody {
+                    body: observer,
+                    report: BuoyancyReport::default(),
+                    palette: 1,
+                }],
+                piston: Some(piston),
+                reference_y: Some(initial_level),
+                displacement_enabled: mode == ClockWaterLab::Displacement,
+            };
+        }
         let pitch = layout.pitch.max(12.0);
         let upper = water.pools()[0].spec();
         let lower = water.pools()[1].spec();
@@ -153,13 +228,45 @@ impl WaterLab {
                 )
                 .expect("bounded water-lab body"),
                 report: BuoyancyReport::default(),
+                palette: i,
             })
             .collect();
         Self {
             world,
             supports,
             bodies,
+            piston: None,
+            reference_y: None,
+            displacement_enabled: false,
         }
+    }
+
+    pub fn prepare_displacement(&mut self, water: &mut WaterWorld, tick: u64) {
+        let Some(piston) = &self.piston else {
+            return;
+        };
+        let t = match tick {
+            0..=60 => 0.0,
+            61..=150 => (tick - 60) as f32 / 90.0,
+            151..=240 => 1.0,
+            241..=330 => 1.0 - (tick - 240) as f32 / 90.0,
+            _ => 0.0,
+        };
+        let t = t * t * (3.0 - 2.0 * t);
+        let target = Vec2::new(
+            piston.x,
+            piston.raised_y + (piston.lowered_y - piston.raised_y) * t,
+        );
+        self.world.set_next_kinematic_pose(piston.body, target, 0.0);
+        water
+            .set_displacer(
+                0,
+                self.displacement_enabled.then_some(DisplacementBox {
+                    center: target,
+                    half_extents: piston.half_extents,
+                }),
+            )
+            .expect("one bounded axis-aligned box in a closed tank");
     }
 
     pub fn step(&mut self, water: &WaterWorld) {

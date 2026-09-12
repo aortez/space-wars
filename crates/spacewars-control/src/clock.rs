@@ -498,6 +498,7 @@ mod tests {
             water_columns: 60,
             pooled_microunits: 30_000_000,
             spilling_microunits: 5_000_000,
+            displaced_microunits: 2_000_000,
             spill_parcels: 12,
             capacity_limited_ticks: 3,
             drained_microunits: 35_000_000,
@@ -516,6 +517,7 @@ mod tests {
         let material = legacy["meltdown"].as_object_mut().unwrap();
         for field in [
             "spilling_microunits",
+            "displaced_microunits",
             "spill_parcels",
             "capacity_limited_ticks",
         ] {
@@ -524,6 +526,7 @@ mod tests {
         let restored: ClockState = serde_json::from_value(legacy).unwrap();
         let material = restored.meltdown.unwrap();
         assert_eq!(material.spilling_microunits, 0);
+        assert_eq!(material.displaced_microunits, 0);
         assert_eq!(material.spill_parcels, 0);
         assert_eq!(material.capacity_limited_ticks, 0);
     }

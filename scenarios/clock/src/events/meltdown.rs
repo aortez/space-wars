@@ -6,7 +6,7 @@ use engine_water::{Boundary, Parcel, PoolSpec, WaterConfig, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS};
-use crate::{SegmentRepresentation, digits, layout::Layout};
+use crate::{ClockWaterLab, SegmentRepresentation, digits, layout::Layout};
 
 pub const MAX_MELTDOWN_CELLS: usize = 96;
 pub const WATER_COLUMNS: usize = 128;
@@ -42,7 +42,8 @@ pub(crate) struct MeltdownEvent {
 }
 
 impl MeltdownEvent {
-    pub fn new(context: EventContext<'_>, seed: u64, lab: bool) -> Self {
+    pub fn new(context: EventContext<'_>, seed: u64, mode: ClockWaterLab) -> Self {
+        let lab = mode != ClockWaterLab::Off;
         let mut rng = StdRng::seed_from_u64(seed);
         let mut cells = Vec::with_capacity(MAX_MELTDOWN_CELLS);
         if !lab {
@@ -66,7 +67,7 @@ impl MeltdownEvent {
             }
         }
         let cell_area = (context.layout.pitch as f64 * 0.8).powi(2);
-        let mut water = Self::water_world(context.layout, lab);
+        let mut water = Self::water_world(context.layout, mode);
         let initial_cells = if lab { 24 } else { cells.len() };
         if lab {
             let spec = water.pools()[0].spec().clone();
@@ -80,7 +81,7 @@ impl MeltdownEvent {
                     .unwrap();
             }
         }
-        let floats = lab.then(|| water_lab::WaterLab::new(&water, context.layout));
+        let floats = lab.then(|| water_lab::WaterLab::new(&water, context.layout, mode));
         Self {
             tick: 0,
             initial_cells,
@@ -94,11 +95,19 @@ impl MeltdownEvent {
         }
     }
 
-    fn water_world(layout: Layout, lab: bool) -> WaterWorld {
+    fn water_world(layout: Layout, mode: ClockWaterLab) -> WaterWorld {
         let half = layout.bounds_max.x as f64;
         let lip = layout.drain_half_width() as f64;
         let floor = layout.floor_y as f64;
-        let specs = if lab {
+        let specs = if mode.is_tank() {
+            let width = layout.pitch as f64 * 9.6;
+            vec![PoolSpec {
+                left: -width * 0.5,
+                column_width: width / WATER_COLUMNS as f64,
+                bed: vec![-220.0; WATER_COLUMNS],
+                boundaries: [Boundary::Closed; 2],
+            }]
+        } else if mode == ClockWaterLab::Cascade {
             vec![
                 PoolSpec {
                     left: -half * 0.8,
@@ -137,7 +146,7 @@ impl MeltdownEvent {
             WaterConfig {
                 exit_y: layout.bounds_min.y as f64,
                 max_parcels: MAX_SPILL_PARCELS,
-                spill_channel: (!lab).then_some([-lip, lip]),
+                spill_channel: (mode == ClockWaterLab::Off).then_some([-lip, lip]),
                 ..WaterConfig::default()
             },
             specs,
@@ -166,6 +175,9 @@ impl MeltdownEvent {
 
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
         self.tick += 1;
+        if let Some(floats) = &mut self.floats {
+            floats.prepare_displacement(&mut self.water, self.tick);
+        }
         if self.tick < MELTING_TICKS + DRAINING_TICKS {
             self.step_material(context.layout);
         } else {
@@ -282,6 +294,7 @@ impl MeltdownEvent {
             water_columns: water.wet_columns,
             pooled_microunits: micro(water.pooled),
             spilling_microunits: micro(water.in_flight),
+            displaced_microunits: micro(water.displaced),
             spill_parcels: water.parcels,
             capacity_limited_ticks: water.capacity_limited_ticks,
             drained_microunits: micro(water.drained) + (self.bypassed * 1_000_000.0).round() as u64,

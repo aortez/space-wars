@@ -97,7 +97,7 @@ fluid solver; cells/parcels do not collide with one another.
 Reform cleanup is accounted separately from drainage. Preview replacement,
 resize and restart drop the entire event-local representation. This does not
 depend on destructible terrain. See [the water design](design/water.md) for model
-limits, performance measurements, and the future buoyancy boundary.
+limits, performance measurements, and the optional buoyancy/displacement experiments.
 
 To inspect a stepped basin spilling into a closed collecting pool, use the
 development-only override below, then select **Clock Controls → Preview Event:
@@ -105,12 +105,23 @@ Meltdown → Preview**. It replaces Meltdown's material source for that process;
 normal startup is unchanged, and no extra launcher scenario or setting is added.
 The optional preview also includes an orange floating box, yellow floating ball,
 and dense red sinking box. These are real Rapier bodies with one-way buoyancy
-and drag; they do not yet displace water or make waves. Normal Meltdown remains
+and drag; they do not displace water or make waves. Normal Meltdown remains
 body-free. The preview's banks are shared between drawing and physics geometry.
 
 ```sh
 SPACEWARS_CLOCK_WATER_LAB=1 cargo run --release -p engine-client -- --scenario clock
 ```
+
+For the next experiment, set `SPACEWARS_CLOCK_WATER_LAB=displacement` instead.
+This uses a closed tank with a controlled orange box that lowers into the water
+and withdraws, raising/lowering the mean level and producing ripples. A yellow
+buoyant ball shows the response; the dashed line marks the original water level.
+`displacement-control` runs the same geometry and motion with displacement off.
+The box is kinematic and the ball remains one-way coupled. This is a bounded,
+single axis-aligned box/flat-tank approximation, not a watertight flow obstacle
+or full body/fluid solver. Both tank modes use three bodies and five colliders,
+and reclaim the water during normal event recovery. See the
+[displacement model and benchmark commands](design/water.md#closed-tank-displacement-experiment).
 
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
@@ -492,7 +503,10 @@ reclaimed volume. One original cell equals 1,000,000 micro-units; independently
 rounded totals can differ by two units. Waiting plus airborne cell volume plus
 the four volume aggregates must equal the initial material. Reclaimed volume
 is explicit reform cleanup, not drainage. Idle and other events report null.
-The three added spill fields default to zero when reading older payloads.
+`displaced_microunits` reports occupied body space in the displacement lab,
+in cell-equivalent area units; it is **not water** and is excluded from that
+accounting sum. This field and the added spill fields default to zero when
+reading older payloads.
 The optional `duck` object reports entrance side, position in thousandths of
 render world units, grounded state, jumps, cleared/total obstacles, door openness
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only

@@ -2,8 +2,8 @@
 
 First delivery for Clock water (#55): reusable water accounting and motion,
 Meltdown integration, deterministic fixtures, visual preview, and benchmarks.
-The second slice adds opt-in one-way Rapier buoyancy; two-way body displacement
-is later work.
+The second slice adds opt-in one-way Rapier buoyancy. The third adds a deliberately
+narrow displacement experiment: a prescribed box entering/leaving a closed tank.
 
 ## Model and boundaries
 
@@ -47,7 +47,8 @@ the API bounds; rejected source additions leave accounting unchanged.
 Pool work is linear in column count. Parcel collection scans candidate columns
 along each swept path in each pool; both pool and parcel counts are bounded.
 
-`Pool::columns()` exposes the same bed, surface and volume used by simulation.
+`Pool::columns()` exposes the same bed, surface, liquid volume and separate body
+occupancy used by simulation.
 `WaterWorld::sample(point)` queries occupied water and its local horizontal
 velocity. Closed boundaries retain unlimited height (not finite-height walls).
 Parcel deposition transfers volume but does not impart impact momentum to a
@@ -127,6 +128,8 @@ flow. Boxes use exact polygon clipping. Circles use 32 sides with weights
 normalized to the circle's true area; partial immersion and rotational drag
 remain approximations. It scans only horizontally overlapping columns and
 uses fixed stack buffers, with no per-step geometry allocations or Rapier types.
+Immersion integrates hypothetical water up to the column surface; it does not
+subtract a displacer or compute a union of overlapping solid hulls.
 
 `engine-rapier::buoyancy::BuoyantBody` builds a dynamic box/circle collider and its
 matching water hull together. It reads authoritative pose, mass, COM and inertia
@@ -218,10 +221,121 @@ host `pi-kiosk` feature check passes; no device deployment was performed.
 Clippy passes with only the pre-existing `collapsible_else_if` lint in
 `engine-rapier/src/spaceling.rs` allowed; that unrelated source was not modified.
 
+## Closed-tank displacement experiment
+
+`WaterWorld::set_displacer(pool, Some(DisplacementBox { center, half_extents }))`
+opts a pool into displacement. `None` removes the occupancy input, preserving
+the liquid. The API accepts **one axis-aligned box per closed, flat basin**, at
+most 75% of basin width. Box/tank intersections are clipped to the basin width
+and bed. Rotation, multiple boxes, open edges and uneven beds are rejected or
+not represented; invalid submissions leave the existing input unchanged.
+
+For basin width `W`, bed `z`, liquid area `V`, and box area below a candidate level
+`A(h)`, the reference level solves `W * (h - z) - A(h) = V`. The axis-aligned box
+makes this a cheap piecewise-linear inversion. Its reference submerged area is
+distributed over the overlapping columns. A column's pressure head is then
+`bed + (liquid area + occupied area) / column width`. Existing conservative fluxes
+spread the disturbance; moving or removing the box produces entry/exit ripples.
+In equilibrium, a fully submerged box raises the level by its area divided by
+the tank width. Removing it restores the original mean level.
+
+**Occupied area is not water.** It is exposed separately as `Column::displaced`
+and `WaterStats::displaced`, and never enters the liquid ledger. Sources,
+deposition and reform cleanup refresh occupancy when liquid volume changes.
+Empty/reclaimed tanks have no occupied-water height. Buffers are preallocated;
+occupancy updates are linear in column count with no per-step allocations.
+Without a displacer, the reference-level work is skipped.
+
+This is a **hydrostatic-reference approximation**, not exact instantaneous
+submersion against each rippling column. Occupancy changes pressure heads but
+does not block fluxes: the box is not a watertight wall, piston seal or dam.
+`sample(point)` excludes points inside the box, while hull immersion still
+uses hypothetical column water. The model does not conserve coupled body/water
+momentum or energy and does not simulate impact splashes or breaking waves.
+
+### Matching visual fixtures
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=displacement cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=displacement-control cargo run --release -p engine-client -- --scenario clock
+```
+
+Select **Clock Controls → Preview Event: Meltdown → Preview**. Both modes show
+the same closed tank, orange box, yellow floating ball and dashed initial-level
+line. The box is **kinematically controlled**, not falling freely: it waits one
+second, lowers over 1.5 seconds, holds for 1.5 seconds, then withdraws over 1.5
+seconds. The actuator supplies its motion/work. The yellow ball responds through
+one-way buoyancy; it is an observer and does not itself displace water. The
+`displacement-control` mode disables only the orange box's occupancy feedback.
+This separates the new effect from changes in geometry or other tuning.
+
+The tank starts with 24 cell-volumes and uses 128 columns, zero spill parcels,
+one kinematic box, one dynamic ball and one fixed support body (five colliders).
+At full insertion, the box occupies 3.36 cell-equivalent areas, giving a 14%
+mean-level rise. The last 1.5 seconds still reclaim water for Meltdown's normal
+cleanup. Pause, resize, replacement, restart and completion retain the existing
+lifecycle. Normal Meltdown stays body-free, and `SPACEWARS_CLOCK_WATER_LAB=1`
+(or `cascade`) retains the original one-way collecting-pool fixture.
+
+`clock state` reports `displaced_microunits` separately and labels it as body
+space, not water. Older payloads default the new field to zero.
+
+```sh
+cargo test --locked -p engine-water -p engine-rapier -p scenario-clock
+cargo run --locked --release -p engine-water --example displacement_benchmark
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --displacement
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --displacement-control
+```
+
+Regressions cover full/partial submersion, partial basin overlap, exact settled
+levels, source/reclaim changes, invalid-input atomicity, zero-water cleanup and
+repeated entry/exit plus horizontal motion at 30/60/120 Hz. They check bounded
+ripples, nonnegative liquid, conservation, deterministic replay and reused
+occupancy storage. Clock compares the same tank with feedback on/off, checks
+observer response, mean levels, pause/replay and lifecycle cleanup at device
+aspects. Render fixtures cover both tank modes through both rendering paths.
+
+The water-only benchmark measures occupancy submission **plus** water stepping
+for matched tanks, after 600 warm-up ticks, over 12,000 measured ticks. The
+prescribed box moves in four-second entry/exit/sideways cycles. Motion generation,
+diagnostics, Rapier and rendering are outside the timer. Clock's benchmark
+includes the lab physics and reports draw-list construction separately.
+
+### Third-slice desktop results (2026-09-11, Rust 1.89 release)
+
+| Columns | Control submit + step p95 | Displacement submit + step p95 |
+| --- | ---: | ---: |
+| 32 | 0.65 µs | 0.83 µs |
+| 128 | 3.72 µs | 3.74 µs |
+| 512 | 10.80 µs | 10.77 µs |
+
+These short timings include scheduler/frequency noise and different fluid motion;
+near-equal values do not establish zero displacement cost. The largest absolute
+water-accounting error was 5.46e-12 area units on 2,000 initial units.
+
+The complete Clock tank preview measured **5.9 µs step p95**, versus **5.0–5.1 µs**
+with displacement off, across the three benchmark sizes. Draw-list p95 was
+4.5–4.7 µs; both modes peaked at 384 primitives and three bodies/five colliders.
+Normal Meltdown remained at 4.6 µs step p95, 6.2–6.4 µs draw-list p95, and zero
+bodies. These are desktop simulation/draw-list timings, not raster/presentation
+cost, Pi CPU usage or device FPS.
+
+Validation passed: 23 water tests, 59 Rapier tests, 81 Clock tests, 51
+common/control/CLI tests, and 297 client tests. Three existing extended Duck
+sweeps and one existing client test remain ignored. The real-client Meltdown
+workflow passes under Xvfb in all four modes, including pause, preview, recovery,
+restart and launcher return. Portrait/landscape captures were visually inspected.
+Formatting, scoped Clippy (with the previously noted unrelated lint allowed),
+and the host `pi-kiosk` feature check pass. No Pi deployment or ARM build was
+performed for this slice.
+
 ## Later slices
 
-Next candidates are body-displaced volume and local surface disturbances, with
-conservation tests before adding visible splashes or moving obstructions.
+Use the controlled-box/control pair to judge whether this approximation is
+useful before adding feedback to freely moving bodies. Further candidates are
+multiple/rotating hull occupancy and explicit obstacle-aware flow, each with
+conservation and stability tests. Do not assume this first box model supports
+arbitrary rigid bodies, sealed moving obstructions or splash physics.
 
 Arbitrary enclosed cavities, inverted vessels, planetary gravity, and free
 floating liquid require a richer representation. Keep body coupling separate

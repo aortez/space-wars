@@ -1,9 +1,10 @@
 //! Fixed-down, unit-depth pools and ballistic spills. No clock, renderer, or
 //! rigid-body dependency. Bounded column fluxes approximate surface motion;
-//! this is not a general fluid/pressure solver or two-way body coupling.
+//! this is not a general fluid/pressure solver.
 
 use engine_core::Vec2;
 
+pub mod displacement;
 pub mod immersion;
 
 pub const MAX_POOLS: usize = 8;
@@ -84,6 +85,8 @@ pub struct Column {
     pub bed: f64,
     pub surface: f64,
     pub volume: f64,
+    /// Occupied space, not liquid; excluded from the water-volume ledger.
+    pub displaced: f64,
     pub velocity: f64,
 }
 
@@ -94,6 +97,8 @@ pub struct Pool {
     velocity: Vec<f64>,
     flux: Vec<f64>,
     donor_scale: Vec<f64>,
+    displaced: Vec<f64>,
+    displacer: Option<displacement::DisplacementBox>,
 }
 
 impl Pool {
@@ -123,12 +128,13 @@ impl Pool {
             bed: self.spec.bed[i],
             surface: self.surface(i),
             volume: self.volume[i],
+            displaced: self.displaced[i],
             velocity: (self.velocity[i] + self.velocity[i + 1]) * 0.5,
         }
     }
 
     fn surface(&self, i: usize) -> f64 {
-        self.spec.bed[i] + self.volume[i] / self.spec.column_width
+        self.spec.bed[i] + (self.volume[i] + self.displaced[i]) / self.spec.column_width
     }
 
     fn index(&self, x: f64) -> Option<usize> {
@@ -250,6 +256,8 @@ pub struct WaterStats {
     pub in_flight: f64,
     pub drained: f64,
     pub reclaimed: f64,
+    /// Solid occupancy at the pool reference level. Never counts as water.
+    pub displaced: f64,
     pub wet_columns: usize,
     pub parcels: usize,
     pub capacity_limited_ticks: u64,
@@ -335,6 +343,8 @@ impl WaterWorld {
                         velocity: vec![0.0; n + 1],
                         flux: vec![0.0; n + 1],
                         donor_scale: vec![0.0; n],
+                        displaced: vec![0.0; n],
+                        displacer: None,
                     }
                 })
                 .collect(),
@@ -359,6 +369,7 @@ impl WaterWorld {
         let pool = self.pools.get_mut(pool).ok_or(WaterError::InvalidInput)?;
         let i = pool.index(x).ok_or(WaterError::InvalidInput)?;
         pool.volume[i] += volume;
+        pool.refresh_displacement();
         self.injected += volume;
         Ok(())
     }
@@ -404,6 +415,12 @@ impl WaterWorld {
             .iter()
             .filter_map(|pool| {
                 let i = pool.index(point.x as f64)?;
+                if pool.displacer.is_some_and(|b| {
+                    (point.x - b.center.x).abs() <= b.half_extents.x
+                        && (point.y - b.center.y).abs() <= b.half_extents.y
+                }) {
+                    return None;
+                }
                 let surface = pool.surface(i);
                 (pool.volume[i] > 0.0
                     && point.y as f64 >= pool.spec.bed[i]
@@ -454,6 +471,7 @@ impl WaterWorld {
         let subdt = dt / substeps as f64;
         let mut limited = false;
         for pool in &mut self.pools {
+            pool.refresh_displacement();
             let mut free = self.config.max_parcels - self.parcels.len();
             let mut allow = [false; 2];
             for (edge, allowed) in allow.iter_mut().enumerate() {
@@ -573,6 +591,7 @@ impl WaterWorld {
                 pool.flux.fill(0.0);
                 pool.donor_scale.fill(0.0);
             }
+            pool.refresh_displacement();
         }
         for parcel in &mut self.parcels {
             let removed = parcel.volume * fraction;
@@ -590,6 +609,7 @@ impl WaterWorld {
             in_flight: self.parcels.iter().map(|p| p.volume).sum(),
             drained: self.drained,
             reclaimed: self.reclaimed,
+            displaced: self.pools.iter().flat_map(|p| &p.displaced).sum(),
             wet_columns: self
                 .pools
                 .iter()

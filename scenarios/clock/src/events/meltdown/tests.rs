@@ -28,12 +28,133 @@ fn tick(state: &mut ClockState) {
 }
 
 #[test]
+fn displacement_preview_replays_and_drives_the_observer_without_changing_liquid() {
+    for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
+        let make = |mode| {
+            let mut s = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: aspect,
+                    water_lab: mode,
+                    event_profile: ClockEventProfile::Off,
+                    ..ClockConfig::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut s,
+                &[
+                    ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                    ClockAction::preview_event(ClockEventKind::Meltdown),
+                ],
+                Duration::ZERO,
+            );
+            s
+        };
+        let mut a = make(ClockWaterLab::Displacement);
+        let mut b = make(ClockWaterLab::Displacement);
+        let mut control = make(ClockWaterLab::DisplacementControl);
+        let mut observer_difference: f32 = 0.0;
+        let mut ripples: f64 = 0.0;
+        for elapsed in 0..510 {
+            assert_volume(&a);
+            assert_volume(&control);
+            let Some(crate::events::ActiveEvent::Meltdown(event)) = &a.active_event else {
+                panic!()
+            };
+            let Some(crate::events::ActiveEvent::Meltdown(baseline)) = &control.active_event else {
+                panic!()
+            };
+            let s = event.water.stats();
+            // Redistribution changes summation order, not the amount of water.
+            assert!((s.pooled - baseline.water.stats().pooled).abs() < 1e-7);
+            assert_eq!(s.drained, 0.0);
+            assert_eq!(s.in_flight, 0.0);
+            assert_eq!(baseline.water.stats().displaced, 0.0);
+            let lab = event.floats.as_ref().unwrap();
+            let other = baseline.floats.as_ref().unwrap();
+            let reference = lab.reference_y.unwrap() as f64;
+            let spec = event.water.pools()[0].spec();
+            let width = spec.column_width * spec.bed.len() as f64;
+            let mean: f64 = event.water.pools()[0]
+                .columns()
+                .map(|c| c.surface)
+                .sum::<f64>()
+                / spec.bed.len() as f64;
+            if elapsed == 210 {
+                let p = lab.piston.as_ref().unwrap();
+                let area = 4.0 * p.half_extents.x as f64 * p.half_extents.y as f64;
+                assert!((s.displaced - area).abs() < 1e-6);
+                assert!((mean - reference - area / width).abs() < 1e-4);
+            }
+            if elapsed == 360 {
+                assert_eq!(s.displaced, 0.0);
+                assert!((mean - reference).abs() < 1e-4);
+            }
+            let motion = lab.world.motion(lab.bodies[0].body.body()).unwrap();
+            let unchanged = other.world.motion(other.bodies[0].body.body()).unwrap();
+            observer_difference =
+                observer_difference.max((motion.position - unchanged.position).length());
+            let (min, max) = event.water.pools()[0]
+                .columns()
+                .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), c| {
+                    (min.min(c.surface), max.max(c.surface))
+                });
+            if elapsed > 60 && elapsed < 420 {
+                ripples = ripples.max(max - min);
+            }
+            assert!(max < spec.bed[0] + (reference - spec.bed[0]) * 4.0);
+            if elapsed % 30 == 0 {
+                assert_eq!(
+                    ClockScenario::render_frame(&a),
+                    ClockScenario::render_frame(&b)
+                );
+            }
+            if elapsed == 180 {
+                let paused = ClockScenario::render_frame(&a);
+                ClockScenario::step(&mut a, &[], Duration::ZERO);
+                assert_eq!(paused, ClockScenario::render_frame(&a));
+            }
+            tick(&mut a);
+            tick(&mut b);
+            tick(&mut control);
+        }
+        assert!(
+            observer_difference > 0.1,
+            "observer did not react at {aspect}"
+        );
+        assert!(ripples > 1.0);
+        assert!(a.meltdown_state().is_none());
+        assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+        for elapsed in [90, 210, 450] {
+            a = make(ClockWaterLab::Displacement);
+            for _ in 0..elapsed {
+                tick(&mut a);
+            }
+            a.set_aspect_ratio(1.0);
+            assert!(a.meltdown_state().is_none());
+            assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+        }
+        a = make(ClockWaterLab::Displacement);
+        for _ in 0..210 {
+            tick(&mut a);
+        }
+        ClockScenario::step(
+            &mut a,
+            &[ClockAction::preview_event(ClockEventKind::ColorCycle)],
+            Duration::ZERO,
+        );
+        assert!(a.meltdown_state().is_none());
+        assert_eq!((a.body_count(), a.collider_count()), (0, 0));
+    }
+}
+
+#[test]
 fn collecting_pool_fixture_cascades_conserves_and_cleans_up_at_device_aspects() {
     for aspect in [0.6, 800.0 / 480.0, 1024.0 / 768.0] {
         let mut state = ClockScenario::init(
             ClockConfig {
                 aspect_ratio: aspect,
-                water_lab: true,
+                water_lab: ClockWaterLab::Cascade,
                 event_profile: ClockEventProfile::Off,
                 ..ClockConfig::default()
             },
@@ -125,7 +246,7 @@ fn buoyancy_lab_replays_without_changing_water_and_replacement_drops_bodies() {
     let make = || {
         let mut s = ClockScenario::init(
             ClockConfig {
-                water_lab: true,
+                water_lab: ClockWaterLab::Cascade,
                 event_profile: ClockEventProfile::Off,
                 ..ClockConfig::default()
             },
@@ -193,7 +314,13 @@ fn assert_volume(state: &ClockState) {
     };
     assert_eq!(
         (state.body_count(), state.collider_count()),
-        if event.lab { (4, 10) } else { (0, 0) }
+        if event.floats.as_ref().is_some_and(|f| f.piston.is_some()) {
+            (3, 5)
+        } else if event.lab {
+            (4, 10)
+        } else {
+            (0, 0)
+        }
     );
     assert!(
         event

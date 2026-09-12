@@ -185,12 +185,43 @@ impl ClockAction {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum ClockWaterLab {
+    #[default]
+    Off,
+    Cascade,
+    Displacement,
+    DisplacementControl,
+}
+
+impl ClockWaterLab {
+    pub fn from_override(value: Option<&str>) -> Self {
+        match value {
+            Some("1" | "cascade") => Self::Cascade,
+            Some("displacement") => Self::Displacement,
+            Some("displacement-control") => Self::DisplacementControl,
+            _ => Self::Off,
+        }
+    }
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "normal",
+            Self::Cascade => "collecting-pool",
+            Self::Displacement => "displacement",
+            Self::DisplacementControl => "displacement-control",
+        }
+    }
+    pub const fn is_tank(self) -> bool {
+        matches!(self, Self::Displacement | Self::DisplacementControl)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ClockConfig {
     pub aspect_ratio: f32,
     pub duck_debug_overlay: bool,
-    /// Development-only collecting-pool preview using the Meltdown lifecycle.
-    pub water_lab: bool,
+    /// Development-only water fixtures using the Meltdown lifecycle.
+    pub water_lab: ClockWaterLab,
     /// None chooses a seeded personality once per Duck event.
     pub duck_jump_profile: Option<engine_common::ClockDuckJumpProfile>,
     /// None selects a seeded course pattern, independently of personality.
@@ -207,7 +238,7 @@ impl Default for ClockConfig {
         Self {
             aspect_ratio: DEFAULT_ASPECT_RATIO,
             duck_debug_overlay: false,
-            water_lab: false,
+            water_lab: ClockWaterLab::Off,
             duck_jump_profile: None,
             duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
@@ -552,6 +583,22 @@ fn normalize_aspect_ratio(aspect_ratio: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn water_lab_overrides_are_explicit_and_normal_startup_is_unchanged() {
+        for (value, expected) in [
+            ("1", ClockWaterLab::Cascade),
+            ("cascade", ClockWaterLab::Cascade),
+            ("displacement", ClockWaterLab::Displacement),
+            ("displacement-control", ClockWaterLab::DisplacementControl),
+        ] {
+            assert_eq!(ClockWaterLab::from_override(Some(value)), expected);
+        }
+        for value in [None, Some(""), Some("0"), Some("unknown")] {
+            assert_eq!(ClockWaterLab::from_override(value), ClockWaterLab::Off);
+        }
+        assert_eq!(ClockConfig::default().water_lab, ClockWaterLab::Off);
+    }
 
     fn reading(hour: u8, minute: u8, second: u8) -> ClockReading {
         ClockReading::new(hour, minute, second).unwrap()
