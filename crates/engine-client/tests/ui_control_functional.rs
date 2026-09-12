@@ -504,7 +504,17 @@ fn run_functional_test_with_seed(
     seed: u64,
     workflow: impl FnOnce(&mut FunctionalHarness),
 ) {
-    let mut harness = FunctionalHarness::spawn(name, backend, seed)
+    run_functional_test_with_settings(name, backend, seed, None, workflow);
+}
+
+fn run_functional_test_with_settings(
+    name: &'static str,
+    backend: &'static str,
+    seed: u64,
+    settings: Option<engine_common::Settings>,
+    workflow: impl FnOnce(&mut FunctionalHarness),
+) {
+    let mut harness = FunctionalHarness::spawn_configured(name, backend, seed, settings)
         .unwrap_or_else(|error| panic!("could not start {name}: {error}"));
     let result = catch_unwind(AssertUnwindSafe(|| workflow(&mut harness)));
     if let Err(payload) = result {
@@ -527,10 +537,6 @@ struct FunctionalHarness {
 }
 
 impl FunctionalHarness {
-    fn spawn(test_name: &'static str, backend: &'static str, seed: u64) -> Result<Self, String> {
-        Self::spawn_configured(test_name, backend, seed, None)
-    }
-
     fn spawn_configured(
         test_name: &'static str,
         backend: &'static str,

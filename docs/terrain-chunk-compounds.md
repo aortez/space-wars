@@ -54,6 +54,8 @@ of mass, actual CCD subdivision and snapshot replay.
 
 This is a physics correction in addition to the collider optimization. Gameplay
 trajectories are therefore not expected to match the old executable bit for bit.
+The [CI follow-up](rounder-planets-ci.md) records its effect on the historical
+Classic AI replay suites and the finished-match UI fixture.
 
 ## Acceptance coverage
 
