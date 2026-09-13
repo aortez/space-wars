@@ -5,6 +5,9 @@ player cameras with small instruments at the outside bottom corners. P1's vitals
 sit to the right of its radar; P2 mirrors that arrangement. Vitals have **no panel
 background**: only text, a one-pixel glyph shadow, and meter tracks.
 
+[Smooth camera transitions](gameplay-camera.md) ease world framing independently
+of this screen-space HUD; radar footprints follow the displayed camera.
+
 The active body determines the readouts:
 
 - Ship: hull, weapon energy, reload state, and two missile pips.

@@ -51,13 +51,13 @@ fn create_contour(
     Ok(create(seed, settings, TerrainSurface::Contour))
 }
 fn create(seed: u64, settings: &Settings, surface: TerrainSurface) -> Box<dyn ClientScenario> {
-    Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init_surface_comparison(
+    Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init_surface_comparison(
             seed,
             settings.surface_expedition.players.count(),
             surface,
         ),
-    })
+    ))
 }
 
 #[cfg(test)]

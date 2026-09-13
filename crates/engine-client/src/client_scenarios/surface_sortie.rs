@@ -14,6 +14,7 @@ use spacewars_ai::{
     tactical_capture::TacticalCapturePilot,
 };
 
+mod camera;
 mod comparison;
 pub(super) use comparison::{
     SURFACE_BLOCKS_REGISTRATION, SURFACE_CONTOUR_REGISTRATION, SURFACE_ROUND_REGISTRATION,
@@ -87,6 +88,7 @@ pub(super) const EXPEDITION_REGISTRATION: ScenarioRegistration = ScenarioRegistr
 
 struct SurfaceSortieClientScenario {
     state: SurfaceSortieState,
+    cameras: Vec<camera::PlayerCamera>,
 }
 
 pub(super) const TERRAIN_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -142,9 +144,9 @@ fn create_jetpack_pilot(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(MaterialJetpackClientScenario {
-        sortie: SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material_jetpack(seed, 2),
-        },
+        sortie: SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_material_jetpack(
+            seed, 2,
+        )),
         brain: JetpackCrossingPilot::new(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: seed,
@@ -200,9 +202,7 @@ fn create_recovery_pilot(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(MaterialRecoveryClientScenario {
-        sortie: SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material(seed, 2),
-        },
+        sortie: SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_material(seed, 2)),
         brain: RulePilotV3::new(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: seed,
@@ -219,9 +219,7 @@ fn create_pilot(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(MaterialPilotClientScenario {
-        sortie: SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material(seed, 2),
-        },
+        sortie: SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_material(seed, 2)),
         brain: RulePilotV2::new(BrainReset {
             actor: PlayerId::PLAYER_2,
             episode_seed: seed,
@@ -249,9 +247,7 @@ fn create_combat_pilot(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(MaterialCombatClientScenario {
-        sortie: SurfaceSortieClientScenario {
-            state: material_combat_state(seed, settings),
-        },
+        sortie: SurfaceSortieClientScenario::new(material_combat_state(seed, settings)),
         brain: RulePilotV4::with_combat_breaks(
             BrainReset {
                 actor: PlayerId::PLAYER_2,
@@ -278,9 +274,7 @@ fn create_combat_duel(
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
     Ok(Box::new(MaterialCombatClientScenario {
-        sortie: SurfaceSortieClientScenario {
-            state: material_combat_state(seed, settings),
-        },
+        sortie: SurfaceSortieClientScenario::new(material_combat_state(seed, settings)),
         brain: RulePilotV4::with_combat_breaks(
             BrainReset {
                 actor: PlayerId::PLAYER_2,
@@ -535,12 +529,9 @@ fn create_material(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init_material(
-            seed,
-            settings.surface_expedition.players.count(),
-        ),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init_material(seed, settings.surface_expedition.players.count()),
+    )))
 }
 
 fn create_expedition(
@@ -550,12 +541,9 @@ fn create_expedition(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init_expedition(
-            seed,
-            settings.surface_expedition.players.count(),
-        ),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init_expedition(seed, settings.surface_expedition.players.count()),
+    )))
 }
 
 fn create(
@@ -565,9 +553,9 @@ fn create(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init(SurfaceMotionPreset::default(), seed),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init(SurfaceMotionPreset::default(), seed),
+    )))
 }
 
 fn create_orbit(
@@ -577,9 +565,9 @@ fn create_orbit(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, seed),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init(SurfaceMotionPreset::Orbit, seed),
+    )))
 }
 
 fn create_generated(
@@ -589,9 +577,9 @@ fn create_generated(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init(SurfaceMotionPreset::Generated, seed),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init(SurfaceMotionPreset::Generated, seed),
+    )))
 }
 
 fn create_world(
@@ -601,9 +589,9 @@ fn create_world(
     _mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
-    Ok(Box::new(SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init(SurfaceMotionPreset::GeneratedSurfaceV1, seed),
-    }))
+    Ok(Box::new(SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init(SurfaceMotionPreset::GeneratedSurfaceV1, seed),
+    )))
 }
 
 impl ClientScenario for SurfaceSortieClientScenario {
@@ -638,7 +626,20 @@ impl ClientScenario for SurfaceSortieClientScenario {
         SurfaceSortieScenario::tick_model()
     }
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult {
-        SurfaceSortieScenario::step(&mut self.state, actions, dt)
+        let tick = self.state.tick();
+        let result = SurfaceSortieScenario::step(&mut self.state, actions, dt);
+        // Pause and completed rounds do not advance presentation history.
+        if self.state.tick() != tick {
+            for (player, camera) in self.cameras.iter_mut().enumerate() {
+                let target = SurfaceSortieScenario::camera_target(
+                    &self.state,
+                    player,
+                    camera.framed_opponent,
+                );
+                camera.advance(target, dt);
+            }
+        }
+        result
     }
     fn map_input(&self, input: &mut ClientInput, _benchmark: bool) -> Vec<Action> {
         let mut actions: Vec<_> = (0..self.state.player_count())
@@ -713,6 +714,17 @@ impl ClientScenario for SurfaceSortieClientScenario {
 }
 
 impl SurfaceSortieClientScenario {
+    fn new(state: SurfaceSortieState) -> Self {
+        let cameras = (0..state.player_count())
+            .map(|player| {
+                camera::PlayerCamera::new(SurfaceSortieScenario::camera_target(
+                    &state, player, false,
+                ))
+            })
+            .collect();
+        Self { state, cameras }
+    }
+
     fn frames_for_view(&self, viewport: Viewport, cull: bool) -> Vec<RenderFrame> {
         let count = self.state.player_count();
         let aspect = viewport.aspect_ratio() / count as f32;
@@ -725,17 +737,19 @@ impl SurfaceSortieClientScenario {
         );
         let mut frames = Vec::with_capacity(count * 2 + 1);
         for player in 0..count {
-            frames.push(if cull {
-                SurfaceSortieScenario::player_frame_in_view(&self.state, player, pane)
-            } else {
-                SurfaceSortieScenario::player_frame(&self.state, player)
-            });
+            frames.push(SurfaceSortieScenario::player_frame_with_camera(
+                &self.state,
+                player,
+                self.cameras[player].displayed(aspect),
+                cull.then_some(pane),
+            ));
         }
         for player in 0..count {
-            frames.push(SurfaceSortieScenario::minimap_frame(
+            frames.push(SurfaceSortieScenario::minimap_frame_with_camera(
                 &self.state,
                 player,
                 aspect,
+                frames[player].camera,
             ));
         }
         frames.push(hud::frame(&self.state, viewport));
@@ -995,9 +1009,7 @@ mod tests {
     fn impact_keys_and_gamepads_are_seat_local_and_release_on_disconnect() {
         let pads = Rc::new(RefCell::new(GamepadInput::default()));
         let mut input = ClientInput::new(Rc::clone(&pads));
-        let host = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material(42, 2),
-        };
+        let host = SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_material(42, 2));
         input.press(GameKey::P1Cannon);
         input.press(GameKey::P1Wing);
         input.press(GameKey::P2ZoomOut);
@@ -1197,9 +1209,8 @@ mod tests {
 
     #[test]
     fn material_claim_and_excavation_render_with_the_shared_pilot_hud() {
-        let mut scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_material(42, 1),
-        };
+        let mut scenario =
+            SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_material(42, 1));
         let dt = Duration::from_nanos(16_666_667);
         for _ in 0..90 {
             scenario.step(&[], dt);
@@ -1365,9 +1376,8 @@ mod tests {
 
     #[test]
     fn expedition_two_player_frames_have_separate_cameras_maps_and_readable_huds() {
-        let mut scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_expedition(0, 2),
-        };
+        let mut scenario =
+            SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_expedition(0, 2));
         for _ in 0..120 {
             scenario.step(&[], Duration::from_secs_f64(1.0 / 60.0));
         }
@@ -1522,9 +1532,9 @@ mod tests {
                 scenario.state.observation(0).generated_case,
                 Some(GeneratedSurfaceCase::new(seed, 0, 0))
             );
-            let mut replay = SurfaceSortieClientScenario {
-                state: GeneratedSurfaceCase::new(seed, 0, 0).init().unwrap(),
-            };
+            let mut replay = SurfaceSortieClientScenario::new(
+                GeneratedSurfaceCase::new(seed, 0, 0).init().unwrap(),
+            );
             for _ in 0..60 {
                 replay.step(
                     &[SurfaceSortieAction::default().encode(PlayerId::PLAYER_1)],
@@ -1566,9 +1576,10 @@ mod tests {
 
     #[test]
     fn keyboard_and_nes_pad_produce_the_same_context_neutral_intent() {
-        let scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init(SurfaceMotionPreset::default(), 0),
-        };
+        let scenario = SurfaceSortieClientScenario::new(SurfaceSortieScenario::init(
+            SurfaceMotionPreset::default(),
+            0,
+        ));
         let mut keyboard = ClientInput::default();
         for key in [
             GameKey::P1TurnLeft,
@@ -1612,7 +1623,7 @@ mod tests {
         .map(|preset| SurfaceSortieScenario::init(preset, 0))
         .into_iter()
         {
-            let mut scenario = SurfaceSortieClientScenario { state };
+            let mut scenario = SurfaceSortieClientScenario::new(state);
             let dt = Duration::from_secs_f64(1.0 / 60.0);
             for frame in 0..120 {
                 scenario.step(
@@ -1722,9 +1733,9 @@ mod tests {
         use scenario_spacewars::surface_sortie::PlanetClaimPhase;
         let dt = Duration::from_secs_f64(1.0 / 60.0);
         for players in [1, 2] {
-            let mut scenario = SurfaceSortieClientScenario {
-                state: SurfaceSortieScenario::init_expedition(0, players),
-            };
+            let mut scenario = SurfaceSortieClientScenario::new(
+                SurfaceSortieScenario::init_expedition(0, players),
+            );
             for _ in 0..120 {
                 scenario.step(&[], dt);
             }
@@ -1869,9 +1880,8 @@ mod tests {
     fn expedition_recovery_is_playable_with_the_minimal_pad_and_visible_in_both_backends() {
         use scenario_spacewars::ShipForm;
         use scenario_spacewars::surface_sortie::{LandingPhase, PilotLocation};
-        let mut scenario = SurfaceSortieClientScenario {
-            state: SurfaceSortieScenario::init_expedition(0, 2),
-        };
+        let mut scenario =
+            SurfaceSortieClientScenario::new(SurfaceSortieScenario::init_expedition(0, 2));
         let pads = Rc::new(RefCell::new(GamepadInput::default()));
         let mut input = ClientInput::new(Rc::clone(&pads));
         let advance =

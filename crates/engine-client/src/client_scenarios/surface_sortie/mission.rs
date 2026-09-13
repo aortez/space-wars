@@ -86,7 +86,7 @@ fn create_with_seats(
     }
     state.set_asteroid_pressure(settings.material_combat.asteroids);
     Box::new(MaterialMissionClientScenario {
-        sortie: SurfaceSortieClientScenario { state },
+        sortie: SurfaceSortieClientScenario::new(state),
         bots,
         registration,
         seed,
@@ -636,7 +636,7 @@ mod tests {
             .as_any_mut()
             .downcast_mut::<MaterialMissionClientScenario>()
             .unwrap();
-        client.sortie.state = state;
+        client.sortie = SurfaceSortieClientScenario::new(state);
         assert!(client.is_game_over());
         assert_eq!(
             client.game_over_message().as_deref(),
