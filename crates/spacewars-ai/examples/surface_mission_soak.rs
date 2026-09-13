@@ -3,6 +3,8 @@
 mod ground_start_probe;
 #[path = "support/landing_cadence_probe.rs"]
 mod landing_cadence_probe;
+#[path = "support/live_planning.rs"]
+mod live_planning;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
 #[path = "support/physics_profile.rs"]
@@ -129,6 +131,8 @@ fn main() {
     assert!(["fixed", "generated"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
+    let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
+    assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
     let mut trace =
@@ -177,6 +181,16 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    assert!(
+        live_planning.as_ref().is_none_or(|live| {
+            (0..2).any(|i| {
+                live.enabled_for(i)
+                    && selected_policies[i] == MissionPolicy::Planner
+                    && (i == seat || mode == "duel")
+            })
+        }),
+        "live objective planning needs an active v10 seat"
+    );
     assert!(
         !verify_on_foot_surveys || selected_policies == [MissionPolicy::Legacy; 2],
         "historical on-foot sensor verification requires both legacy policies"
@@ -270,13 +284,23 @@ fn main() {
                     (!reference_first).then(|| probe.observe(&state, i, request))
                 });
                 let clock = Instant::now();
+                let mut observe = || {
+                    if let Some(live) = live_planning.as_mut().filter(|live| {
+                        live.enabled_for(i) && selected_policies[i] == MissionPolicy::Planner
+                    }) {
+                        let mut o =
+                            state.mission_observation_for_live_planning(i, request, cadence);
+                        live.observe(&state, i, &mut o.local);
+                        o
+                    } else {
+                        state.mission_observation_with_cadence(i, request, cadence)
+                    }
+                };
                 #[cfg(not(feature = "sensor-profile"))]
-                let o = state.mission_observation_with_cadence(i, request, cadence);
+                let o = observe();
                 #[cfg(feature = "sensor-profile")]
                 let (o, profile) =
-                    scenario_spacewars::surface_sortie::sensor_profile::measure(|| {
-                        state.mission_observation_with_cadence(i, request, cadence)
-                    });
+                    scenario_spacewars::surface_sortie::sensor_profile::measure(&mut observe);
                 let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
                 if let Some(probe) = &mut landing_probe {
                     let scheduled =
@@ -465,6 +489,9 @@ fn main() {
                 actions.extend(intent.encode(owner));
             }
         }
+        let planning_ms = live_planning
+            .as_mut()
+            .map_or(0.0, |live| live.advance(state.tick()));
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -505,6 +532,7 @@ fn main() {
                 steps.last().unwrap()
                     + sensors[sensor_start..].iter().sum::<f64>()
                     + policies[policy_start..].iter().sum::<f64>()
+                    + planning_ms
                     + draw_ms,
             );
         }
@@ -603,6 +631,9 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if let Some(live) = &mut live_planning {
+        report["live_objective_planning"] = live.report();
+    }
     report["landing_survey_hz"] = json!(survey_hz);
     report["landing_queries"] = json!(landing_query_counts);
     report["landing_cadence_comparison"] = json!(compare_landing_surveys);

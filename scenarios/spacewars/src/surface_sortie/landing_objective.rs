@@ -101,9 +101,21 @@ pub struct LandingObjectiveSurvey {
     pub version: u32,
     pub actor: PlayerId,
     pub tick: u64,
+    /// Publication after live dependency checks; `tick` remains the source tick.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validated_tick: Option<u64>,
     pub objective: LandingObjective,
     pub sites: Vec<LandingObjectiveRoute>,
     pub actual: Option<LandingObjectiveRoute>,
+}
+
+impl LandingObjectiveSurvey {
+    pub fn is_current(&self, tick: u64) -> bool {
+        self.tick == tick
+            || self.validated_tick == Some(tick)
+                && self.tick <= tick
+                && tick - self.tick <= live_planning::MAX_SURVEY_AGE_TICKS
+    }
 }
 
 impl SurfaceSortieState {
@@ -234,6 +246,7 @@ impl SurfaceSortieState {
             version: 1,
             actor: p.owner,
             tick: p.tick,
+            validated_tick: None,
             objective,
             sites,
             actual,

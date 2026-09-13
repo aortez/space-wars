@@ -21,6 +21,9 @@ use rapier2d::prelude::{
 };
 use serde::{Deserialize, Serialize};
 
+mod query_snapshot;
+pub use query_snapshot::{CapsuleQuery, QueryRegion, QuerySnapshot};
+
 const SNAPSHOT_VERSION: u32 = 1;
 const USER_DATA_COLLIDER_TAG: u128 = 0x43;
 const USER_DATA_BODY_TAG: u128 = 0x42;

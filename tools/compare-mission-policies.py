@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Seat-swapped material matches using the same policies as the launcher.
 
-No work quota is implemented yet: this measures behavior and actual cost,
-not equal-budget strength. Run sequentially on an otherwise idle host for timing.
+The optional live candidate profile budgets landing-objective work only.
+Whole-policy comparisons measure behavior and actual cost, not equal-budget
+strength. Run sequentially on an otherwise idle host for timing.
 """
 import argparse
 from collections import Counter
@@ -78,10 +79,18 @@ def main():
     parser.add_argument("--seconds", type=int, default=180, choices=range(1, 601), metavar="1..600")
     parser.add_argument("--asteroid-interval", type=int, default=0)
     parser.add_argument("--wall-timeout", type=int, default=900)
+    parser.add_argument("--live-objective-planning", action="store_true",
+                        help="use the live objective sensor for the candidate role only")
+    parser.add_argument("--objective-graph-budget", type=int, default=16384)
+    parser.add_argument("--objective-query-budget", type=int, default=1024)
     args = parser.parse_args()
     if (len(set(args.seeds)) != len(args.seeds) or any(not 0 <= s < 2**64 for s in args.seeds)
             or args.asteroid_interval < 0 or args.wall_timeout < 1):
         parser.error("seeds must be distinct u64s, interval nonnegative and timeout positive")
+    if args.live_objective_planning and args.candidate != "material_mission_v10":
+        parser.error("live objective planning currently requires the v10 candidate")
+    if any(not 0 <= n < 2**32 for n in (args.objective_graph_budget, args.objective_query_budget)):
+        parser.error("objective budgets must be u32s")
     binary = args.binary.resolve(strict=True)
     args.out.mkdir(parents=True, exist_ok=False)
     digest = hashlib.sha256(binary.read_bytes()).hexdigest()
@@ -93,6 +102,11 @@ def main():
                     landing_survey_hz=4, strict_work_quota=None,
                     budget_comparison="unbounded policies; actual cost only",
                     runs=[])
+    if args.live_objective_planning:
+        manifest["live_objective_configuration"] = dict(
+            role="candidate", sensor_profile="live_joint_objective_v1",
+            allowance=dict(graph=args.objective_graph_budget, physics_queries=args.objective_query_budget))
+        manifest["budget_comparison"] = "candidate landing-objective quota only; other sensors/policies unbounded"
     summary = []
     for seed in args.seeds:
         initial = None
@@ -107,6 +121,11 @@ def main():
                        "--seconds", str(args.seconds), "--asteroid-interval", str(args.asteroid_interval),
                        "--p1-policy", policies[0], "--p2-policy", policies[1],
                        "--timing-csv", "true", "--out", str(destination)]
+            if args.live_objective_planning:
+                command += ["--live-objective-planning", "true",
+                            "--live-objective-seats", str(roles.index("candidate")),
+                            "--objective-graph-budget", str(args.objective_graph_budget),
+                            "--objective-query-budget", str(args.objective_query_budget)]
             manifest["runs"].append(dict(command=command, roles=roles))
             write_json(args.out / "manifest.json", manifest)
             started = time.monotonic()
@@ -122,7 +141,11 @@ def main():
             if initial is None:
                 initial = report["initial_world"]
             assert initial == report["initial_world"], "seat swap changed initial world"
-            if args.baseline == args.candidate:
+            if args.live_objective_planning:
+                live = report["live_objective_planning"]
+                assert live["enabled_seats"] == [roles.index("candidate")]
+                assert live["allowance"] == manifest["live_objective_configuration"]["allowance"]
+            if args.baseline == args.candidate and not args.live_objective_planning:
                 deterministic = {key: report[key] for key in (
                     "events", "samples", "metrics", "final_pilots", "final_planets",
                     "round", "missions", "elapsed_ticks", "final_audit", "final_combat")}
@@ -134,6 +157,8 @@ def main():
                        termination=report["termination"], physics_ok=report["physics_ok"],
                        finish_reason=report["round"]["reason"],
                        players=summarize(report, destination / "timing.csv", roles))
+            if args.live_objective_planning:
+                row["live_objective_planning"] = report["live_objective_planning"]
             summary.append(row)
             write_json(args.out / "summary.json", summary)
             print(json.dumps(row), flush=True)

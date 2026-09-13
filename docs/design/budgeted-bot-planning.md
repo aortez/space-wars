@@ -3,9 +3,11 @@
 Status: steps 1–2 are merged. The first selectable
 joint-trip candidate and seat-swapped comparison harness are described in
 [mission policy comparison](../mission-policy-comparison.md). Step 3 now has a
-[resumable graph job and shared scheduler](../bot-planning-jobs.md), exercised
-offline. Live v10 still drains the search synchronously. Scheduling coherent
-physical surveys, live budget integration and strategic planning remain future work.
+[resumable graph job and shared scheduler](../bot-planning-jobs.md) and an
+[opt-in live landing-objective adapter](../live-bot-surveys.md). That adapter
+resumes coherent physical measurements and graph work under one shared
+allowance in the existing comparison runners. Default v10 remains synchronous;
+broader sensor coverage, cross-request reuse and strategic planning remain future work.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
@@ -27,12 +29,12 @@ registry and implementing the shared planning scheduler.
 `MaterialMissionPilot` already coordinates persistent mission tasks. Recovery,
 solar avoidance and opportunistic pursuit take precedence; selection among the
 remaining capture destinations largely uses straight-line distance. Tactical
-landing selection already considers cover and a measured ground round trip.
-Its route evaluation first chooses the cheapest outbound arrival, then tests
-the return from that particular arrival.
+landing selection considers cover and a measured ground round trip. Legacy v9
+first chooses the cheapest outbound arrival, then tests that arrival's return;
+v10 now chooses the endpoint using both legs together.
 
-Much of this planning currently happens synchronously while constructing an
-observation. The slowest measured observations take 51.88 and 53.69 ms, including
+Default planning still happens synchronously while constructing an observation.
+At the original profiling checkpoint, the slowest observations took 51.88 and 53.69 ms, including
 roughly 19 ms of ground connection construction and 14–16 ms of route searches.
 Connections dominate accumulated sensor time; graph searches amplify the worst
 pauses. Improving only Dijkstra will leave substantial work in world queries.
@@ -114,11 +116,10 @@ choices should not implicitly remove the human's opportunities to play.
 
 ## Lightweight policy comparisons
 
-Reuse the pattern in the existing ship-policy registry and seat-swapped
-comparison profiles. The material mission runner currently instantiates only
-`MaterialMissionPilot`; its policy string is not itself a registry of retained
-implementations. Before introducing changed behavior, retain the current
-implementation and explicitly select the baseline/candidate in each seat.
+The material mission registry now retains v9 and v10, and the existing
+seat-swapped comparison runner can select a live objective sensor for its
+candidate role. Before introducing further changed behavior, retain the current
+checkpoint and explicitly select the baseline/candidate in each seat.
 Share behavior-preserving helpers; version changed decision rules and planning
 inputs rather than copying an entire engine or silently changing a baseline's
 sensors. Keep defaults separate from concrete evaluation policy IDs.

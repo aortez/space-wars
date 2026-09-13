@@ -95,6 +95,8 @@ pub struct TacticalSortieObservationV1 {
     pub combat: CombatObservationV2,
     pub cover: Vec<LandingCover>,
     pub landing_objective: Option<landing_objective::LandingObjectiveSurvey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub objective_work: Option<live_planning::ObjectiveWorkState>,
     pub sun: Option<SolarHazard>,
     /// Prescribed circular motion about the sun, absent for linear fixtures.
     pub planet_orbit_omega: Option<f32>,
@@ -182,6 +184,29 @@ impl SurfaceSortieState {
         query: LandingSiteQuery,
         planning: landing_objective::ObjectivePlanning,
     ) -> TacticalSortieObservationV1 {
+        self.tactical_sortie_observation_profile(player, query, planning, true)
+    }
+
+    pub fn tactical_sortie_observation_for_live_planning(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> TacticalSortieObservationV1 {
+        self.tactical_sortie_observation_profile(
+            player,
+            query,
+            landing_objective::ObjectivePlanning::JointRoundTrip,
+            false,
+        )
+    }
+
+    pub(super) fn tactical_sortie_observation_profile(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        planning: landing_objective::ObjectivePlanning,
+        objective_surveys: bool,
+    ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
         let combat = self.combat_observation_with_query(player, query);
@@ -228,12 +253,17 @@ impl SurfaceSortieState {
             .collect();
         TacticalSortieObservationV1 {
             version: 1,
-            landing_objective: self.landing_objective_survey(
-                player,
-                &combat.recovery.flight.pilot,
-                &cover,
-                planning,
-            ),
+            objective_work: None,
+            landing_objective: objective_surveys
+                .then(|| {
+                    self.landing_objective_survey(
+                        player,
+                        &combat.recovery.flight.pilot,
+                        &cover,
+                        planning,
+                    )
+                })
+                .flatten(),
             combat,
             cover,
             sun: self.solar_hazard(),

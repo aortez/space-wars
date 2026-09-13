@@ -101,6 +101,7 @@ pub struct PlanningReport {
     pub jobs: Vec<JobAllocation>,
 }
 
+#[derive(Clone)]
 struct Slot<D, J> {
     token: RequestToken,
     dependencies: D,
@@ -117,6 +118,7 @@ struct Slot<D, J> {
 /// insertion order. Each step draws from the global and actor allowances. Unused
 /// work is offered to the next runnable actor in the same tick. No unused global
 /// allowance accumulates between ticks.
+#[derive(Clone)]
 pub struct PlanningQueue<D, J> {
     slots: BTreeMap<u64, Slot<D, J>>,
     capacity: usize,

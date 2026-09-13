@@ -65,11 +65,17 @@ pub struct TacticalTelemetry {
     pub solar: Option<SolarLandingPlan>,
     pub invalidations: u32,
     pub objective_replans: u32,
+    /// Cancelled live evidence is not a failed landing attempt.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub live_invalidations: u32,
     pub objective_route: Option<LandingObjectiveRoute>,
     pub exposed_ticks: u64,
     pub covered_ticks: u64,
     pub site: Option<LandingSiteId>,
     pub landing: PilotTelemetry,
+}
+fn is_zero(value: &u32) -> bool {
+    *value == 0
 }
 #[derive(Debug, Clone)]
 pub struct TacticalSortiePilot {
@@ -117,6 +123,7 @@ impl TacticalSortiePilot {
                 solar: None,
                 invalidations: 0,
                 objective_replans: 0,
+                live_invalidations: 0,
                 objective_route: None,
                 exposed_ticks: 0,
                 covered_ticks: 0,
@@ -290,7 +297,10 @@ impl TacticalSortiePilot {
         }
         let start = *self.telemetry.started_tick.get_or_insert(p.tick);
         if p.tick.saturating_sub(start) > 150 * 60
-            || self.telemetry.replans - self.telemetry.cover_replans - self.telemetry.solar_replans
+            || self.telemetry.replans
+                - self.telemetry.cover_replans
+                - self.telemetry.solar_replans
+                - self.telemetry.live_invalidations
                 >= 4
             || self.telemetry.cover_replans >= 8
             || self.telemetry.solar_replans >= 8
@@ -391,11 +401,26 @@ impl TacticalSortiePilot {
         let survey = o.landing_objective.as_ref().filter(|survey| {
             survey.version == 1
                 && survey.actor == p.owner
-                && survey.tick == p.tick
+                && survey.is_current(p.tick)
                 && objective.is_some_and(|target| target.matches(survey.objective))
                 && survey.sites.len()
                     <= scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
         });
+        if objective.is_some()
+            && o.objective_work
+                == Some(
+                    scenario_spacewars::surface_sortie::live_planning::ObjectiveWorkState::Stale,
+                )
+        {
+            self.telemetry.objective_replans += 1;
+            self.telemetry.live_invalidations += 1;
+            self.replan(p.tick);
+            return if p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed {
+                CombatIntent::default()
+            } else {
+                self.guide(o, up * 5.0, Vec2::ZERO)
+            };
+        }
         if self.site.is_some()
             && match (self.objective, objective) {
                 (Some(old), Some(new)) => !old.same_flag(new),

@@ -23,6 +23,7 @@ mod landing;
 mod landing_diagnostics;
 pub mod landing_gear;
 pub mod landing_objective;
+pub mod live_planning;
 pub mod match_rules;
 mod material;
 pub mod mission;

@@ -1,4 +1,6 @@
 //! Contested surface missions with physical setup, loss and queued route edits.
+#[path = "support/live_planning.rs"]
+mod live_planning;
 use engine_common::{CombatBreakSettings, Scenario};
 use scenario_spacewars::{
     PlayerId, ShipForm,
@@ -46,6 +48,8 @@ fn main() {
     let bearing_offset: f32 = arg("--offset", "0.6").parse().unwrap();
     let jetpacks: bool = arg("--jetpacks", "false").parse().unwrap();
     let survey_landing = arg("--survey-landing", "false") == "true";
+    let out = PathBuf::from(arg("--out", "/tmp/flag-soak"));
+    let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let landing_threat = arg("--landing-threat", "false") == "true";
     assert!(!survey_landing || mode == "capture");
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
@@ -89,6 +93,14 @@ fn main() {
     let mut navigation = GroundNavigationTask::new(context, GroundDestination::Flag);
     let mut recovery = RulePilotV3::new(context);
     let policy: MissionPolicy = arg("--policy", "material_mission_v9").parse().unwrap();
+    assert!(
+        live_planning
+            .as_ref()
+            .is_none_or(|live| live.enabled_for(seat)
+                && survey_landing
+                && mode == "capture"
+                && policy == MissionPolicy::Planner)
+    );
     let mut capture = TacticalCapturePilot::with_planning(
         context,
         CombatBreakSettings::default(),
@@ -143,11 +155,17 @@ fn main() {
         // Reuse the tactical observation's recovery component. Surveying twice
         // here would inflate the measured cost beyond the interactive host.
         let mut tactical = matches!(mode.as_str(), "capture" | "recovery").then(|| {
-            state.tactical_sortie_observation_with_planning(
-                seat,
-                site.into(),
-                policy.objective_planning(),
-            )
+            if let Some(live) = &mut live_planning {
+                let mut o = state.tactical_sortie_observation_for_live_planning(seat, site.into());
+                live.observe(&state, seat, &mut o);
+                o
+            } else {
+                state.tactical_sortie_observation_with_planning(
+                    seat,
+                    site.into(),
+                    policy.objective_planning(),
+                )
+            }
         });
         if survey_landing && !landing_threat {
             // This paired trial isolates a quiet contested landing. The defender
@@ -391,6 +409,9 @@ fn main() {
             actions.push(controls[seat].encode(owner));
         }
         actions.push(controls[1 - seat].encode(defender));
+        if let Some(live) = &mut live_planning {
+            live.advance(state.tick());
+        }
         let start = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, DT);
         step_times.push(start.elapsed().as_secs_f64() * 1000.0);
@@ -420,7 +441,6 @@ fn main() {
     let blocked = last_ground
         .as_ref()
         .is_some_and(|g| g.goal == GroundGoal::Blocked);
-    let out = PathBuf::from(arg("--out", "/tmp/flag-soak"));
     std::fs::create_dir_all(&out).unwrap();
     sensor_times.sort_by(f64::total_cmp);
     refresh_times.sort_by(f64::total_cmp);
@@ -436,6 +456,9 @@ fn main() {
         "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
     report["policy_configuration"] = json!(policy.descriptor());
+    if let Some(live) = &mut live_planning {
+        report["live_objective_planning"] = live.report();
+    }
     report["survey_landing"] = json!(survey_landing);
     report["landing_threat"] = json!(landing_threat);
     report["approach_started_tick"] = json!(approach_started_tick);
