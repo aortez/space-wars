@@ -1472,10 +1472,12 @@ dependencies = [
 name = "engine-client"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "chrono",
  "clap",
  "cpal",
  "directories",
+ "drm",
  "engine-common",
  "engine-core",
  "engine-nes",

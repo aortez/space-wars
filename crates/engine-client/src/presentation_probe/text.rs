@@ -17,6 +17,22 @@ pub(super) fn run(
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(ProbePlatform(windows.clone())))?;
     let uis = [crate::MainWindow::new()?, crate::MainWindow::new()?];
+    let (image, rows) = fixture(width, height, 2.0)?;
+    for ui in &uis {
+        ui.set_launcher_scenario("spacewars".into());
+        ui.set_raster_visible(true);
+        ui.set_raster_frame(image.clone());
+        ui.show()?;
+        ui.window().set_size(PhysicalSize::new(width, height));
+    }
+    compare(options, width, height, &windows.borrow(), &uis, rows)
+}
+
+pub(super) fn fixture(
+    width: u32,
+    height: u32,
+    scale: f32,
+) -> Result<(Image, Vec<crate::ScenePrimitive>), Box<dyn std::error::Error>> {
     let viewport = render::Viewport::new(width as f32, height as f32);
     let mut settings = engine_common::Settings::default();
     settings.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
@@ -36,18 +52,21 @@ pub(super) fn run(
     assert!(!rows.is_empty());
     let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
         &frames,
-        render::Viewport::new(width as f32 * 2.0, height as f32 * 2.0),
+        render::Viewport::new(width as f32 * scale, height as f32 * scale),
         scenario.frame_layout(),
-        crate::raster::RasterOptions::for_scale(2.0),
+        crate::raster::RasterOptions::for_scale(scale),
     );
-    for ui in &uis {
-        ui.set_launcher_scenario("spacewars".into());
-        ui.set_raster_visible(true);
-        ui.set_raster_frame(image.clone());
-        ui.show()?;
-        ui.window().set_size(PhysicalSize::new(width, height));
-    }
-    let windows = windows.borrow();
+    Ok((image, rows))
+}
+
+fn compare(
+    options: &Options,
+    width: u32,
+    height: u32,
+    windows: &[Rc<MinimalSoftwareWindow>],
+    uis: &[crate::MainWindow; 2],
+    rows: Vec<crate::ScenePrimitive>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut pixels = [
         vec![Xrgb::default(); (width * height) as usize],
         vec![Xrgb::default(); (width * height) as usize],

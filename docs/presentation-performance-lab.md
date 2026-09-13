@@ -12,6 +12,11 @@ The later [Spacewars text-model comparison](raster-text-reuse.md) uses
 `--presentation-text` to measure model replacement versus updating retained
 labels, with per-frame pixel comparisons and live cabinet validation.
 
+The [matched text-memory comparison](text-memory-profile.md) adds
+`--presentation-memory`, with an explicit `--presentation-drm-device` option
+for a private, never-presented buffer. It compares identical text in RAM and
+mapped DRM memory, alpha shortcuts, and whole-frame staging with copy cost.
+
 ## Frozen-image comparison
 
 ```sh

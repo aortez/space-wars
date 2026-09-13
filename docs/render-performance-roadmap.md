@@ -81,29 +81,47 @@ Nested renderer hooks now use monotonic time; the larger presentation stages
 retain CPU measurements. The deployed profiler also separates font matching,
 glyph work, text textures and fallback painting.
 
-The latest live capture averages 14.49 ms in KMS/Slint, including 6.41 ms of text.
+That follow-up's live capture averages 14.49 ms in KMS/Slint, including 6.41 ms of text.
 Only 0.10 ms is font matching; glyph lookup/placement/painting takes 4.70 ms, of
 which 4.39 ms is texture fallback. The previous live captures include the more
 expensive clock policy and different gameplay phases; do not treat their total
 FPS as a controlled comparison.
 
+## Implemented: avoid unnecessary glyph destination reads
+
+The [matched RAM/DRM experiment](text-memory-profile.md) confirms that the same
+336 glyph operations take 0.77 ms in RAM and 3.79 ms in mapped display memory.
+The LinuxKMS XRGB/ARGB pixel target now skips transparent pixels and directly
+writes opaque pixels. Partial-alpha blending is unchanged. Mapped glyph fallback
+falls to 2.53 ms; complete draws save **1.36–1.40 ms** with identical output.
+
+The deployed change's live sample averages 13.27 ms in KMS/Slint, with 5.04 ms
+of text and 3.31 ms of glyph work. The fresh match runs at 42.16 FPS / 59.31
+updates/s over 48.12 seconds; this is not evidence that the later-game
+control/physics stalls are resolved.
+
+The probe also measures RAM staging and includes its 1.45–1.47 ms full-frame
+copy. That helps its generic texture path, but the kiosk already uses a different
+opaque RGB image fast path. Keep direct buffers until an equivalent comparison
+through that production path justifies changing the strategy.
+
 ## Remaining work in this optimization pass
 
 Two measured problems now deserve separate, bounded investigations:
 
-- **Glyph blending into display memory:** compare the exact same frozen glyph
-  workload in RAM and a private mapped DRM buffer. The live fallback costs
-  roughly five times as much per glyph as the RAM fixture, but glyph sizes and
-  content differ. If destination memory explains it, measure transparent/opaque
-  blend shortcuts or small-region RAM compositing with transfer cost included.
-  Keep fonts, layout and output pixels equivalent.
-- **Control/physics stalls:** the latest 48.15-second match sample averages
-  36.51 FPS / 58.11 updates/s, but one rolling window drops to 9.1 FPS. That window
-  has host-step p95 76.93 ms and max 120.15 ms while drawing stays around 14 ms.
-  Reopen the [sensor/physics attribution](on-foot-survey-fix.md) with the saved
-  capture; the coarse step bucket does not identify the specific function.
+- **Control/physics stalls:** the next pre-deployment capture sustains
+  9.55 FPS / 47.74 updates/s for 48.28 seconds, with host-step work averaging
+  82.94 ms per displayed frame. Raw status, settings and a screenshot are saved
+  with the memory experiment. Reopen the
+  [sensor/physics attribution](on-foot-survey-fix.md); the coarse step bucket
+  combines policy and physics and does not identify a specific function.
+- **Remaining glyph display-memory cost:** compare RAM staging through the
+  actual LinuxKMS fast image path, including copy cost and clock/launcher
+  workloads. Alternatively, measure small glyph/HUD regions in RAM. Keep fonts,
+  layout and pixels equivalent; do not assume the generic probe's full-frame
+  staging result establishes the best live buffer mode.
 
-Scene construction is now about 1.16 ms in that live sample. Finer terrain
+Scene construction is about 1.19 ms in the post-deployment live sample. Finer terrain
 culling and native HUD/minimap blending remain candidates when measurements
 justify them, but neither addresses the large simulation stalls.
 
@@ -120,7 +138,7 @@ The game uses a 60 Hz fixed simulation step, and the host's render callback has
 a fixed 16 ms interval. Merely reducing raster scale does not change either.
 
 60 FPS permits 16.67 ms for a complete frame; 120 FPS permits 8.33 ms. The latest
-native KMS presentation alone averages 14.49 ms, leaving little of a 60 Hz budget
+native KMS presentation alone averages 13.27 ms, leaving little of a 60 Hz budget
 for simulation and scene preparation. First pursue steady 60 FPS on this cabinet. Higher-refresh
 work then includes confirming a suitable display mode, refresh-aware scheduling,
 input latency, and whether to interpolate rendering between existing simulation

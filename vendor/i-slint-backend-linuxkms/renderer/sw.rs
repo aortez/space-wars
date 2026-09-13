@@ -93,7 +93,17 @@ impl From<PremultipliedRgbaColor> for DumbBufferPixelXrgb888 {
 }
 
 impl TargetPixel for DumbBufferPixelXrgb888 {
+    #[inline]
     fn blend(&mut self, color: PremultipliedRgbaColor) {
+        // Avoid a display-memory read when source-over does not need the
+        // destination. Zero-alpha premultiplied pixels also have zero RGB.
+        if color.alpha == 0 {
+            return;
+        }
+        if color.alpha == 255 {
+            *self = color.into();
+            return;
+        }
         let mut x = PremultipliedRgbaColor::from(*self);
         x.blend(color);
         *self = x.into();

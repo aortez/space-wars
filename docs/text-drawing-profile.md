@@ -5,6 +5,9 @@ roughly 7.8 ms live text bucket after terrain scene culling. It adds a narrower
 breakdown and removes a measured source of profiler overhead. Text content,
 fonts, layout, colors and rasterization are unchanged.
 
+Follow-up: the [matched RAM/DRM experiment](text-memory-profile.md) now isolates
+the destination-memory cost and measures a pixel-equivalent blend shortcut.
+
 ## The clock experiment
 
 The old LinuxKMS observer read both monotonic and thread-CPU clocks at the start

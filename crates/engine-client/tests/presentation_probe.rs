@@ -305,3 +305,87 @@ fn text_probe_separates_glyph_work_and_cpu_clock_cost_without_changing_pixels() 
     assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn memory_probe_preserves_pixels_padding_and_settings_across_rotations() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    for size in [(320, 240), (237, 181)] {
+        for rotation in ["0", "90", "180", "270"] {
+            let output = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+                .env_remove("DISPLAY")
+                .env_remove("WAYLAND_DISPLAY")
+                .env("SLINT_BACKEND", "nonexistent-backend")
+                .arg("--config-dir")
+                .arg(directory.path())
+                .args([
+                    "--benchmark-presentation",
+                    "--presentation-memory",
+                    "--presentation-detail",
+                    "--presentation-frames",
+                    "2",
+                    "--presentation-repeats",
+                    "2",
+                    "--presentation-rotation",
+                    rotation,
+                    "--benchmark-width",
+                    &size.0.to_string(),
+                    "--benchmark-height",
+                    &size.1.to_string(),
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let csv = String::from_utf8(output.stdout).unwrap();
+            let mut lines = csv.lines();
+            let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+            let rows: Vec<BTreeMap<_, _>> = lines
+                .map(|line| {
+                    let values: Vec<_> = line.split(',').collect();
+                    assert_eq!(values.len(), columns.len());
+                    columns.iter().copied().zip(values).collect()
+                })
+                .collect();
+            assert_eq!(rows.len(), 8);
+            assert_eq!(rows[0]["blend"], "reference");
+            assert_eq!(rows[4]["blend"], "shortcut", "alternate paired block order");
+            for row in &rows {
+                assert_eq!(row["checksum"], rows[0]["checksum"]);
+                assert_eq!(row["memory"], "ram");
+                assert_eq!(row["rotation"], rotation);
+                assert!(row["glyph_calls"].parse::<f64>().unwrap() > 0.0);
+                let number = |key| row[key].parse::<f64>().unwrap();
+                assert!(
+                    (number("total_ms") - number("draw_ms") - number("copy_ms")).abs() < 0.000002
+                );
+                assert!(number("text_ms") >= number("glyph_run_ms"));
+                for (key, value) in row {
+                    if key.ends_with("_ms") {
+                        let value: f64 = value.parse().unwrap();
+                        assert!(value.is_finite() && value >= 0.0);
+                    }
+                }
+            }
+        }
+    }
+    // Device access is explicit, and a regular file must never become a buffer.
+    let rejected = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+        .args([
+            "--benchmark-presentation",
+            "--presentation-memory",
+            "--presentation-drm-device",
+        ])
+        .arg(&settings)
+        .output()
+        .unwrap();
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("DRM character device"));
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
