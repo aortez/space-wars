@@ -157,7 +157,11 @@ fn solar_warning_and_corona_match_active_heat_and_leave_noncombat_fixtures_uncha
     idle(&mut state, 60);
     let frame = SurfaceSortieScenario::player_frame(&state, 0);
     let encoded = serde_json::to_string(&frame).unwrap();
-    assert!(encoded.contains("SOLAR HEAT / hull 90% / -10%/s"));
+    let hud = state.player_hud(0);
+    assert!((hud.health.fraction - 0.9).abs() < 0.001);
+    let prompt = hud.prompt.unwrap();
+    assert_eq!(prompt.title, "Solar heat");
+    assert_eq!(prompt.detail, "Leave the sun: -10% hull/s");
     if let Some(path) = std::env::var_os("SPACEWARS_SOLAR_ARTIFACTS") {
         let root = std::path::PathBuf::from(path);
         std::fs::create_dir_all(&root).unwrap();

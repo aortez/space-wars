@@ -35,6 +35,9 @@ mod device_info;
 #[path = "ui_control_functional/performance.rs"]
 mod performance;
 
+#[path = "ui_control_functional/compact_hud.rs"]
+mod compact_hud;
+
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 

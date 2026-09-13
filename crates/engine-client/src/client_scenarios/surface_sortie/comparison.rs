@@ -85,9 +85,9 @@ mod tests {
             scenario.step(&[], Duration::from_nanos(16_666_667));
             for renderer in [RenderBackend::Vector, RenderBackend::Raster] {
                 let frames = scenario.render_frames(renderer, viewport);
-                let primitives: Vec<_> = frames[0]
-                    .layers
+                let primitives: Vec<_> = frames
                     .iter()
+                    .flat_map(|f| &f.layers)
                     .flat_map(|l| &l.primitives)
                     .collect();
                 assert!(
