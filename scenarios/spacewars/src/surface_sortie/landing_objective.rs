@@ -1,10 +1,26 @@
 //! Forecast access to an existing flag with the proposed landed hull present.
 //! These bounded measurements guide site selection, never transfer or claim permissions.
 use super::*;
-use ground_navigation::{GROUND_REFRESH_TICKS, GROUND_SAMPLES, GroundMap, GroundRouteDiagnostics};
+use ground_navigation::{
+    GROUND_REFRESH_TICKS, GROUND_SAMPLES, GroundMap, GroundNode, GroundRouteDiagnostics,
+};
 use pilot::{LandingSiteId, PilotObservationV1};
 
 pub const MAX_OBJECTIVE_SITES: usize = 8;
+
+/// Versioned sensor semantics, selected by the policy rather than by the world.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectivePlanning {
+    #[default]
+    Legacy,
+    JointRoundTrip,
+}
+impl ObjectivePlanning {
+    pub fn is_legacy(&self) -> bool {
+        *self == Self::Legacy
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct LandingObjective {
@@ -48,6 +64,9 @@ pub struct LandingObjectiveRoute {
     pub site: Option<LandingSiteId>,
     pub outbound: GroundRouteDiagnostics,
     pub returning: Option<GroundRouteDiagnostics>,
+    /// Jointly selected flag footing. Absent from the historical sensor profile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<GroundNode>,
 }
 
 impl LandingObjectiveRoute {
@@ -77,6 +96,8 @@ impl LandingObjectiveRoute {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct LandingObjectiveSurvey {
+    #[serde(skip_serializing_if = "ObjectivePlanning::is_legacy")]
+    pub planning: ObjectivePlanning,
     pub version: u32,
     pub actor: PlayerId,
     pub tick: u64,
@@ -91,6 +112,7 @@ impl SurfaceSortieState {
         player: usize,
         p: &PilotObservationV1,
         cover: &[combat::LandingCover],
+        planning: ObjectivePlanning,
     ) -> Option<LandingObjectiveSurvey> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("landing_objective_survey");
@@ -158,7 +180,7 @@ impl SurfaceSortieState {
                 }
             });
             let hatch = (hatch - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
-            measure_route(&avoiding, id, hatch, objective)
+            measure_route(&avoiding, id, hatch, objective, planning)
         };
         let mut candidates: Vec<_> = p.sites.iter().collect();
         candidates.sort_by(|a, b| {
@@ -208,6 +230,7 @@ impl SurfaceSortieState {
             None
         };
         Some(LandingObjectiveSurvey {
+            planning,
             version: 1,
             actor: p.owner,
             tick: p.tick,
@@ -223,10 +246,21 @@ fn measure_route(
     site: Option<LandingSiteId>,
     hatch: Vec2,
     objective: LandingObjective,
+    planning: ObjectivePlanning,
 ) -> LandingObjectiveRoute {
     #[cfg(feature = "sensor-profile")]
     let _profile = super::sensor_profile::Scope::new("landing_objective_routes");
     let routes = map.routes();
+    if planning == ObjectivePlanning::JointRoundTrip {
+        let trip =
+            routes.round_trip_to_actor_target(hatch, objective.position, objective.range, hatch);
+        return LandingObjectiveRoute {
+            site,
+            outbound: trip.outbound.diagnostics,
+            returning: trip.returning.map(|r| r.diagnostics),
+            endpoint: trip.endpoint,
+        };
+    }
     let outbound = routes.route_to_actor_target(hatch, objective.position, objective.range);
     let returning = outbound
         .path
@@ -234,6 +268,7 @@ fn measure_route(
         .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
         .map(|node| routes.route_to_hatch(node.position, hatch).diagnostics);
     LandingObjectiveRoute {
+        endpoint: None,
         site,
         outbound: outbound.diagnostics,
         returning,
@@ -278,7 +313,7 @@ mod tests {
             range: 1.0,
         };
         let start = Vec2::new(0.0, 60.0);
-        let one_way = measure_route(&map, None, start, objective);
+        let one_way = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
         assert!(one_way.outbound.failure.is_none());
         assert_eq!(
             one_way.returning.as_ref().unwrap().failure,
@@ -291,9 +326,13 @@ mod tests {
             kind: GroundEdgeKind::Walk,
             length: 2.0,
         }));
-        assert!(measure_route(&map, None, start, objective).cost().is_some());
+        assert!(
+            measure_route(&map, None, start, objective, ObjectivePlanning::Legacy)
+                .cost()
+                .is_some()
+        );
         map.edges.clear();
-        let disconnected = measure_route(&map, None, start, objective);
+        let disconnected = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
         assert!(disconnected.cost().is_none());
         assert!(disconnected.returning.is_none());
     }
@@ -305,7 +344,11 @@ mod tests {
             SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         }
         let mut p = state.pilot_observation(0, None);
-        assert!(state.landing_objective_survey(0, &p, &[]).is_none());
+        assert!(
+            state
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+                .is_none()
+        );
         // Supply a target observation while retaining the real material and hull
         // geometry. This sensor test makes no claim or ownership transition.
         let site = p.sites[0];
@@ -319,9 +362,16 @@ mod tests {
         });
         let before = state.world.physics.world.snapshot_bytes().unwrap();
         let audit = state.terrain_diagnostics();
-        let survey = state.landing_objective_survey(0, &p, &[]).unwrap();
+        let survey = state
+            .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+            .unwrap();
         assert!(!survey.sites.is_empty() && survey.sites.len() <= MAX_OBJECTIVE_SITES);
-        assert_eq!(survey, state.landing_objective_survey(0, &p, &[]).unwrap());
+        assert_eq!(
+            survey,
+            state
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+                .unwrap()
+        );
         assert_eq!(state.world.physics.world.snapshot_bytes().unwrap(), before);
         assert_eq!(
             serde_json::to_value(state.terrain_diagnostics()).unwrap(),
@@ -330,20 +380,32 @@ mod tests {
         p.sites = vec![site];
         assert_eq!(
             state
-                .landing_objective_survey(0, &p, &[])
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
                 .unwrap()
                 .sites
                 .len(),
             1
         );
         p.tick += 1;
-        assert!(state.landing_objective_survey(0, &p, &[]).is_none());
+        assert!(
+            state
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+                .is_none()
+        );
         p.tick -= 1;
         state.world.physics.material_queries_dirty = true;
-        assert!(state.landing_objective_survey(0, &p, &[]).is_none());
+        assert!(
+            state
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+                .is_none()
+        );
         assert!(state.world.physics.material_queries_dirty);
         state.world.physics.material_queries_dirty = false;
         p.planet.claim.as_mut().unwrap().owner = Some(p.owner);
-        assert!(state.landing_objective_survey(0, &p, &[]).is_none());
+        assert!(
+            state
+                .landing_objective_survey(0, &p, &[], ObjectivePlanning::Legacy)
+                .is_none()
+        );
     }
 }

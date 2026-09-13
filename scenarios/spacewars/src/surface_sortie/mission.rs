@@ -27,6 +27,7 @@ pub struct LandingSurveyStamp {
 pub struct MissionSensorRequest {
     pub site: Option<LandingSiteId>,
     pub last_survey: Option<LandingSurveyStamp>,
+    pub objective_planning: landing_objective::ObjectivePlanning,
 }
 
 impl LandingSurveyCadence {
@@ -288,6 +289,7 @@ impl SurfaceSortieState {
         self.mission_observation_with_cadence(
             player,
             MissionSensorRequest {
+                objective_planning: Default::default(),
                 site,
                 last_survey: None,
             },
@@ -373,7 +375,11 @@ impl SurfaceSortieState {
         MissionObservationV1 {
             version: 1,
             match_rules: self.round.is_some(),
-            local: self.tactical_sortie_observation_with_query(player, query),
+            local: self.tactical_sortie_observation_with_planning(
+                player,
+                query,
+                request.objective_planning,
+            ),
             planets,
             sun: self.world.sun.map(|sun| MissionObstacle {
                 position: sun.position,
@@ -423,6 +429,7 @@ mod tests {
             let before = state.world.physics.world.snapshot_bytes().unwrap();
             for seat in 0..2 {
                 let request = MissionSensorRequest {
+                    objective_planning: Default::default(),
                     site: None,
                     last_survey: last[seat],
                 };
@@ -458,6 +465,7 @@ mod tests {
                     other => panic!("unexpected query {other:?}"),
                 }
                 let request = MissionSensorRequest {
+                    objective_planning: Default::default(),
                     site: Some(selected),
                     last_survey: last[seat],
                 };
@@ -492,6 +500,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         let site = state.pilot_observation(0, None).sites[0];
         let mut request = MissionSensorRequest {
+            objective_planning: Default::default(),
             site: Some(site.id),
             last_survey: Some(LandingSurveyStamp {
                 tick: 1,
@@ -608,6 +617,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
         let request = MissionSensorRequest {
+            objective_planning: Default::default(),
             site: None,
             last_survey: Some(LandingSurveyStamp {
                 tick: 1,

@@ -1083,6 +1083,16 @@ pub enum SpacewarsController {
     #[default]
     Human,
     RuleBot,
+    PlannerBot,
+}
+impl SpacewarsController {
+    /// Automatic matches fill human seats but retain an explicitly chosen bot.
+    pub fn automatic_bot(self) -> Self {
+        match self {
+            Self::Human => Self::RuleBot,
+            bot => bot,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

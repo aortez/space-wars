@@ -3,7 +3,7 @@
 use super::*;
 
 mod routes;
-pub use routes::GroundRoutes;
+pub use routes::{GroundRoundTrip, GroundRoutes};
 
 pub const GROUND_SAMPLES: usize = 512;
 pub const GROUND_NEIGHBOR_SPAN: usize = 6;

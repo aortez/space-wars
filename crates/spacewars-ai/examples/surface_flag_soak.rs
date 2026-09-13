@@ -13,6 +13,7 @@ use serde_json::json;
 use spacewars_ai::{
     BrainReset,
     ground_task::{GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry},
+    mission_policy::MissionPolicy,
     pilot::{PilotBrain, RulePilotV1},
     recovery_pilot::RulePilotV3,
     tactical_capture::TacticalCapturePilot,
@@ -87,7 +88,12 @@ fn main() {
     }
     let mut navigation = GroundNavigationTask::new(context, GroundDestination::Flag);
     let mut recovery = RulePilotV3::new(context);
-    let mut capture = TacticalCapturePilot::new(context, CombatBreakSettings::default());
+    let policy: MissionPolicy = arg("--policy", "material_mission_v9").parse().unwrap();
+    let mut capture = TacticalCapturePilot::with_planning(
+        context,
+        CombatBreakSettings::default(),
+        policy.objective_planning(),
+    );
     let mut defender_pilot = RulePilotV1::new(BrainReset {
         actor: defender,
         episode_seed: seed,
@@ -136,8 +142,13 @@ fn main() {
         };
         // Reuse the tactical observation's recovery component. Surveying twice
         // here would inflate the measured cost beyond the interactive host.
-        let mut tactical = matches!(mode.as_str(), "capture" | "recovery")
-            .then(|| state.tactical_sortie_observation(seat, site));
+        let mut tactical = matches!(mode.as_str(), "capture" | "recovery").then(|| {
+            state.tactical_sortie_observation_with_planning(
+                seat,
+                site.into(),
+                policy.objective_planning(),
+            )
+        });
         if survey_landing && !landing_threat {
             // This paired trial isolates a quiet contested landing. The defender
             // remains a physical obstacle; asteroid duels separately test cover.
@@ -424,6 +435,7 @@ fn main() {
         "ground_refresh_p95_ms":refresh_times.get(refresh_times.len().saturating_sub(1)*95/100),"ground_refresh_max_ms":refresh_times.last(),
         "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
+    report["policy_configuration"] = json!(policy.descriptor());
     report["survey_landing"] = json!(survey_landing);
     report["landing_threat"] = json!(landing_threat);
     report["approach_started_tick"] = json!(approach_started_tick);

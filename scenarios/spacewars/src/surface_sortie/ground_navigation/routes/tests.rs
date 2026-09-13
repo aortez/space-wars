@@ -96,6 +96,100 @@ fn empty_maps_and_missing_endpoints_keep_failure_diagnostics() {
 }
 
 #[test]
+fn joint_trip_chooses_a_returnable_endpoint_and_preserves_jump_direction() {
+    use GroundEdgeKind::{Jump, Walk};
+    let start = Vec2::new(0.0, 60.0);
+    let hatch = Vec2::new(0.0, 60.9);
+    let flag = Vec2::new(0.0, 75.9);
+    let mut map = map(
+        vec![node(0, 0.0, 60.0), node(1, -1.0, 75.0), node(2, 1.0, 75.0)],
+        vec![
+            edge(0, 1, 1.0, Walk),
+            edge(0, 2, 2.0, Walk),
+            edge(2, 0, 2.0, Jump),
+        ],
+    );
+    let routes = map.routes();
+    let outbound = routes.route_to_actor_target(start, flag, 1.5);
+    assert_eq!(outbound.path, [0, 1]);
+    assert_eq!(
+        routes
+            .route_to_hatch(map.nodes[1].position, hatch)
+            .diagnostics
+            .failure,
+        Some(GroundRouteFailure::Disconnected)
+    );
+    let joint = routes.round_trip_to_actor_target(start, flag, 1.5, hatch);
+    assert_eq!(joint.endpoint.unwrap().id, 2);
+    assert_eq!(joint.outbound.path, [0, 2]);
+    let returning = joint.returning.unwrap();
+    assert_eq!(returning.path, [2, 0]);
+    assert_eq!(returning.diagnostics.jumps, 1);
+
+    // A long but valid return from the cheapest outbound point still loses.
+    map.edges.push(edge(1, 0, 100.0, Walk));
+    assert_eq!(
+        map.routes()
+            .round_trip_to_actor_target(start, flag, 1.5, hatch)
+            .endpoint
+            .unwrap()
+            .id,
+        2
+    );
+    map.edges.retain(|e| e.to != 0);
+    let blocked = map
+        .routes()
+        .round_trip_to_actor_target(start, flag, 1.5, hatch);
+    assert!(blocked.endpoint.is_none() && blocked.returning.is_none());
+    assert_eq!(
+        blocked.outbound.diagnostics.failure,
+        Some(GroundRouteFailure::Disconnected)
+    );
+}
+
+#[test]
+fn joint_trip_returns_to_any_boarding_node_without_using_jetpack_edges() {
+    use GroundEdgeKind::{Jetpack, Walk};
+    let start = Vec2::new(0.0, 60.0);
+    let hatch = Vec2::new(0.0, 60.9);
+    let flag = Vec2::new(0.0, 75.9);
+    let map = map(
+        vec![node(0, 0.0, 60.0), node(1, 0.0, 75.0), node(2, 1.5, 60.0)],
+        vec![
+            edge(0, 1, 15.0, Walk),
+            edge(1, 2, 15.0, Walk),
+            edge(1, 0, 1.0, Jetpack),
+        ],
+    );
+    let routes = map.routes();
+    let joint = routes.round_trip_to_actor_target(start, flag, 1.5, hatch);
+    assert_eq!(joint.outbound.path, [0, 1]);
+    assert_eq!(joint.returning.unwrap().path, [1, 2]);
+    assert!(
+        routes
+            .round_trip_to_actor_target(start, flag, 1.5, Vec2::ZERO)
+            .endpoint
+            .is_none()
+    );
+    assert_eq!(
+        routes
+            .round_trip_to_actor_target(Vec2::ZERO, flag, 1.5, hatch)
+            .outbound
+            .diagnostics
+            .failure,
+        Some(GroundRouteFailure::NoStartFooting)
+    );
+    assert_eq!(
+        routes
+            .round_trip_to_actor_target(start, Vec2::ZERO, 1.5, hatch)
+            .outbound
+            .diagnostics
+            .failure,
+        Some(GroundRouteFailure::NoDestinationFooting)
+    );
+}
+
+#[test]
 fn sparse_directed_surveys_match_complete_reference_routes() {
     let height = SurfaceSortieState::spec().half_height();
     for variant in 0..4_u16 {
@@ -171,5 +265,51 @@ fn sparse_directed_surveys_match_complete_reference_routes() {
             routes.route_toward_actor_target(start, target, 4.0),
             map.route_toward_actor_target(start, target, 4.0)
         );
+
+        // Independent exhaustive endpoint oracle over these sparse, directed
+        // graphs. The joint solver must agree on minimum *combined* cost.
+        let mut walking = map.clone();
+        walking.edges.retain(|e| e.kind != GroundEdgeKind::Jetpack);
+        let cost = |r: &GroundRoute| r.diagnostics.length + r.diagnostics.jumps as f32 * 2.0;
+        let hatch = start + start.normalized() * height;
+        for target in [hatch, -hatch, Vec2::new(120.0, 0.0)] {
+            let expected = walking
+                .nodes
+                .iter()
+                .filter(|n| {
+                    (n.position + n.position.normalized() * height).distance_to(target) < 4.0
+                })
+                .filter_map(|node| {
+                    let out = reference_route(&walking, start, node.position, 0.01, 0.0, false);
+                    let back = reference_route(
+                        &walking,
+                        node.position,
+                        hatch,
+                        HATCH_APPROACH_RANGE,
+                        height,
+                        false,
+                    );
+                    (out.diagnostics.failure.is_none() && back.diagnostics.failure.is_none())
+                        .then(|| cost(&out) + cost(&back))
+                })
+                .min_by(f32::total_cmp);
+            let actual = routes.round_trip_to_actor_target(start, target, 4.0, hatch);
+            assert_eq!(expected.is_some(), actual.endpoint.is_some());
+            if let Some(expected) = expected {
+                let back = actual.returning.as_ref().unwrap();
+                assert!((cost(&actual.outbound) + cost(back) - expected).abs() < 0.002);
+                assert_eq!(actual.outbound.path.last(), back.path.first());
+                for route in [&actual.outbound, back] {
+                    for pair in route.path.windows(2) {
+                        assert!(
+                            walking
+                                .edges
+                                .iter()
+                                .any(|e| e.from == pair[0] && e.to == pair[1])
+                        );
+                    }
+                }
+            }
+        }
     }
 }

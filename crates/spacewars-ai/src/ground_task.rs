@@ -15,6 +15,8 @@ use scenario_spacewars::surface_sortie::{
 use serde::Serialize;
 
 mod claim;
+mod flag_approach;
+pub use flag_approach::FlagApproach;
 mod jetpack;
 mod posture;
 mod rejoin;
@@ -101,9 +103,13 @@ pub struct GroundTelemetry {
     pub claim_relocations: u32,
     pub claim_target: Option<Vec2>,
     pub return_failure: Option<ShipReturnFailure>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_approach: Option<FlagApproach>,
 }
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
+    joint_flag: bool,
+    flag_survey_tick: Option<u64>,
     context: BrainReset,
     telemetry: GroundTelemetry,
     map: Option<GroundMap>,
@@ -129,6 +135,8 @@ pub struct GroundNavigationTask {
 impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
+            joint_flag: false,
+            flag_survey_tick: None,
             context,
             telemetry: GroundTelemetry {
                 policy: "ground_navigation_v10",
@@ -157,6 +165,7 @@ impl GroundNavigationTask {
                 claim_relocations: 0,
                 claim_target: None,
                 return_failure: None,
+                flag_approach: None,
             },
             map: None,
             best_distance: f32::INFINITY,
@@ -183,7 +192,11 @@ impl GroundNavigationTask {
         &self.telemetry
     }
     pub fn reset(&mut self, context: BrainReset) {
-        *self = Self::new(context, self.telemetry.destination);
+        *self = if self.joint_flag {
+            Self::with_flag_approach(context, None)
+        } else {
+            Self::new(context, self.telemetry.destination)
+        };
     }
     pub fn is_crossing(&self) -> bool {
         self.crossing_task.is_some() || self.settling_after_interrupt
@@ -191,6 +204,9 @@ impl GroundNavigationTask {
     /// Finish an active landing before following a changed objective.
     pub fn retarget(&mut self, destination: GroundDestination) {
         self.telemetry.destination = destination;
+        self.telemetry.flag_approach = None;
+        self.joint_flag = false;
+        self.flag_survey_tick = None;
         self.hatch_missing_since = None;
         self.hatch_unsettled_since = None;
         self.telemetry.return_failure = None;
@@ -387,7 +403,22 @@ impl GroundNavigationTask {
         if !self.update_map(o) {
             return action;
         }
-        if self.telemetry.destination == GroundDestination::Flag {
+        let planned_target = if self.joint_flag {
+            if p.tick.saturating_sub(start) > 90 * 60 {
+                self.block("ground traversal exceeded ninety seconds");
+                return action;
+            }
+            let Some(target) = self.planned_flag_target(o, foot) else {
+                return action;
+            };
+            target
+        } else {
+            None
+        };
+        if let Some(planned) = planned_target {
+            target = Some(planned);
+            target_local = target.map(local);
+        } else if self.telemetry.destination == GroundDestination::Flag {
             let Some(chosen) = self.claim_target(o, target, foot) else {
                 return action;
             };
@@ -426,7 +457,11 @@ impl GroundNavigationTask {
             return action;
         };
         let range = match self.telemetry.destination {
-            GroundDestination::Flag if self.telemetry.claim_target.is_some() => 0.45,
+            GroundDestination::Flag
+                if planned_target.is_some() || self.telemetry.claim_target.is_some() =>
+            {
+                0.45
+            }
             GroundDestination::Flag => p
                 .planet
                 .claim

@@ -8,9 +8,12 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
         assert_launcher_main(&state);
         for (p1, p2, renderer) in [
             ("human", "human", "vector"),
-            ("human", "rule bot", "raster"),
-            ("rule bot", "rule bot", "vector"),
-            ("rule bot", "human", "raster"),
+            ("human", "legacy bot", "raster"),
+            ("legacy bot", "legacy bot", "vector"),
+            ("legacy bot", "human", "raster"),
+            ("planner bot", "legacy bot", "raster"),
+            ("legacy bot", "planner bot", "vector"),
+            ("planner bot", "planner bot", "raster"),
         ] {
             state = harness.activate_guarded("launcher.settings", &state);
             assert_eq!(
@@ -29,7 +32,10 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
                 ("launcher.settings.match.player-2.next", p2),
                 ("launcher.settings.renderer.next", renderer),
             ] {
-                if control_value(&state, control) != Some(expected) {
+                for _ in 0..3 {
+                    if control_value(&state, control) == Some(expected) {
+                        break;
+                    }
                     state = harness.activate_guarded(control, &state);
                 }
                 assert_eq!(control_value(&state, control), Some(expected));
@@ -145,7 +151,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
                 "launcher.settings.match.player-2.next",
             ] {
                 state = harness.activate_guarded(control, &state);
-                assert_eq!(control_value(&state, control), Some("rule bot"));
+                assert_eq!(control_value(&state, control), Some("legacy bot"));
             }
             harness.activate_guarded("launcher.settings.start", &state);
             state = harness.wait_for(
@@ -240,7 +246,7 @@ fn normal_spacewars_physical_round_reaches_result_and_play_again() {
                 "launcher.settings.match.player-1.next",
                 "launcher.settings.match.player-2.next",
             ] {
-                assert_eq!(control_value(&state, control), Some("rule bot"));
+                assert_eq!(control_value(&state, control), Some("legacy bot"));
             }
         },
     );

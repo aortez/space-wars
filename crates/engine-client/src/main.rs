@@ -1513,12 +1513,12 @@ fn adjust_material_match_launcher_setting(window: &MainWindow, focus: i32, delta
     match focus {
         2 => window.set_launcher_p1_controller(SharedString::from(cycle_label(
             window.get_launcher_p1_controller().as_str(),
-            &["human", "rule bot"],
+            &["human", "legacy bot", "planner bot"],
             delta,
         ))),
         3 => window.set_launcher_p2_controller(SharedString::from(cycle_label(
             window.get_launcher_p2_controller().as_str(),
-            &["human", "rule bot"],
+            &["human", "legacy bot", "planner bot"],
             delta,
         ))),
         4 => window.set_launcher_combat_break_interval(SharedString::from(cycle_label(
@@ -1602,7 +1602,7 @@ fn adjust_spacewars_launcher_setting(window: &MainWindow, focus: i32, delta: i32
         6 => {
             let next = cycle_label(
                 window.get_launcher_p2_controller().as_str(),
-                &["human", "rule bot"],
+                &["human", "legacy bot"],
                 delta,
             );
             window.set_launcher_p2_controller(SharedString::from(next));
@@ -2319,14 +2319,16 @@ fn spacewars_setup_from_values(
 fn spacewars_controller_label(controller: SpacewarsController) -> &'static str {
     match controller {
         SpacewarsController::Human => "human",
-        SpacewarsController::RuleBot => "rule bot",
+        SpacewarsController::RuleBot => "legacy bot",
+        SpacewarsController::PlannerBot => "planner bot",
     }
 }
 
 fn spacewars_controller_from_label(label: &str) -> Result<SpacewarsController, String> {
     match label.trim() {
         "human" => Ok(SpacewarsController::Human),
-        "rule bot" => Ok(SpacewarsController::RuleBot),
+        "rule bot" | "legacy bot" => Ok(SpacewarsController::RuleBot),
+        "planner bot" => Ok(SpacewarsController::PlannerBot),
         other => Err(format!("Unknown Spacewars controller {other:?}.")),
     }
 }

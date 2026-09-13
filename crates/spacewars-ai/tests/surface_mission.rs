@@ -128,7 +128,8 @@ fn loss_during_transfer_enters_recovery_and_transfer_timeout_defers_destination(
 
 #[test]
 fn both_seats_physically_capture_board_and_depart_from_both_planets() {
-    for (seat, mirror, bearing) in [(0, false), (1, false), (0, true), (1, true)]
+    use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
+    for (seat, mirror, bearing, policy) in [(0, false), (1, false), (0, true), (1, true)]
         .into_iter()
         .flat_map(|(seat, mirror)| {
             [
@@ -138,14 +139,21 @@ fn both_seats_physically_capture_board_and_depart_from_both_planets() {
             ]
             .map(|bearing| (seat, mirror, bearing))
         })
+        .flat_map(|(seat, mirror, bearing)| {
+            MissionPolicy::ALL.map(|policy| (seat, mirror, bearing, policy))
+        })
     {
         let mut state = SurfaceSortieScenario::init_material_travel_trial(42, mirror, bearing);
-        let mut brain = MaterialMissionPilot::new(context(seat), CombatBreakSettings::default());
+        let mut brain = MissionBot::new(policy, context(seat), CombatBreakSettings::default());
         let initial = state.terrain_diagnostics().occupied_cells;
         // Match the three-minute acceptance window: a local landing can fail,
         // defer for thirty seconds and still complete on the next attempt.
         for _ in 0..180 * 60 {
-            let o = state.mission_observation(seat, brain.site_request());
+            let o = state.mission_observation_with_cadence(
+                seat,
+                brain.sensor_request(),
+                scenario_spacewars::surface_sortie::mission::LandingSurveyCadence::EveryTick,
+            );
             let mut intent = brain.intent(&o);
             intent.weapons = Default::default();
             let actions = intent.encode(context(seat).actor);
@@ -164,7 +172,7 @@ fn both_seats_physically_capture_board_and_depart_from_both_planets() {
         assert_eq!(
             destinations,
             BTreeSet::from([0, 1]),
-            "seat {seat} mirror {mirror}: {:?}",
+            "{policy:?} seat {seat} mirror {mirror}: {:?}",
             brain.telemetry()
         );
         let o = state.observation(seat);

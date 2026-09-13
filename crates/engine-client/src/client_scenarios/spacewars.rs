@@ -46,6 +46,11 @@ fn create(
     mode: ScenarioStartMode,
     _asset: &ScenarioAsset,
 ) -> Result<Box<dyn ClientScenario>, ScenarioCreateError> {
+    if mode == ScenarioStartMode::Normal
+        && settings.spacewars.player_2_controller == SpacewarsController::PlannerBot
+    {
+        return Err(ScenarioCreateError::RuntimeInitialization { name: "spacewars-classic", detail: "Planner bot requires the material Spacewars match. Choose legacy bot or human for Classic.".into() });
+    }
     let player_2_rule_bot = mode == ScenarioStartMode::Normal
         && settings.spacewars.player_2_controller == SpacewarsController::RuleBot;
     let state = match mode {

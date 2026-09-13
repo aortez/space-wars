@@ -20,7 +20,8 @@ use serde_json::json;
 use spacewars_ai::{
     BrainReset,
     combat_pilot::RulePilotV4,
-    mission_pilot::{MaterialMissionPilot, MissionGoal},
+    mission_pilot::MissionGoal,
+    mission_policy::{MissionBot, MissionPolicy},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -170,8 +171,15 @@ fn main() {
         interval_seconds: interval,
         severity: MaterialAsteroidSeverity::Mixed,
     });
+    let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
+        .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    assert!(
+        !verify_on_foot_surveys || selected_policies == [MissionPolicy::Legacy; 2],
+        "historical on-foot sensor verification requires both legacy policies"
+    );
     let mut pilots = std::array::from_fn::<_, 2, _>(|i| {
-        MaterialMissionPilot::new(
+        MissionBot::new(
+            selected_policies[i],
             BrainReset {
                 actor: PlayerId::from_index(i).unwrap(),
                 episode_seed: seed,
@@ -584,6 +592,7 @@ fn main() {
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
+    report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
     report["landing_survey_hz"] = json!(survey_hz);
     report["landing_queries"] = json!(landing_query_counts);
     report["landing_cadence_comparison"] = json!(compare_landing_surveys);
