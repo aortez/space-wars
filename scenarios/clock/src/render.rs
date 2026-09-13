@@ -13,6 +13,7 @@ mod duck;
 mod marquee;
 mod meltdown;
 mod meridiem;
+mod rain;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -66,6 +67,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         }
         marquee::render(&mut frame, event, layout);
         return frame;
+    }
+    if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
+        rain::render(&mut frame, event);
     }
     render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {

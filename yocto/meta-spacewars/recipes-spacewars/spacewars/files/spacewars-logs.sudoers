@@ -1,0 +1,2 @@
+# The root-owned helper accepts only a bounded entry count and optional follow.
+spacewars ALL=(root) NOPASSWD: /usr/sbin/spacewars-logs *

@@ -313,6 +313,69 @@ pub struct ClockSettings {
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,
     pub marquee_message: ClockMarqueeMessage,
+    pub rain_amount: ClockRainAmount,
+}
+
+/// Amount per Rain visit, independent of the global event frequency.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[repr(u8)]
+pub enum ClockRainAmount {
+    #[default]
+    Varied = 0,
+    Light = 1,
+    Medium = 2,
+    Heavy = 3,
+}
+
+impl ClockRainAmount {
+    pub const ALL: [Self; 4] = [Self::Varied, Self::Light, Self::Medium, Self::Heavy];
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Varied => "Varied",
+            Self::Light => "Light",
+            Self::Medium => "Medium",
+            Self::Heavy => "Heavy",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockRainDuckPhase {
+    Waiting,
+    Opening,
+    Floating,
+    Exited,
+    NotSpawned,
+    Reclaimed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockRainState {
+    pub seed: u64,
+    /// The resolved amount for this visit; settings may still say Varied.
+    pub amount: ClockRainAmount,
+    pub requested_microunits: u64,
+    /// Requested source budget whose delivery time has arrived, not yet liquid.
+    pub scheduled_microunits: u64,
+    pub injected_microunits: u64,
+    pub pooled_microunits: u64,
+    pub in_flight_microunits: u64,
+    pub drained_microunits: u64,
+    pub reclaimed_microunits: u64,
+    pub parcels: usize,
+    pub source_limited_ticks: u64,
+    pub water_limited_ticks: u64,
+    pub entry_depth_milli: u32,
+    pub required_depth_milli: u32,
+    pub duck_phase: ClockRainDuckPhase,
+    pub duck_spawns: u32,
+    pub duck_position_milli: Option<[i32; 2]>,
+    pub duck_velocity_milli: Option<[i32; 2]>,
+    pub duck_angle_milli: Option<i32>,
+    pub submerged_milli: u32,
+    pub door_open_milli: u32,
 }
 
 /// Bounded recipes, not separate scheduler events. The choice is captured when
@@ -416,16 +479,18 @@ pub enum ClockEventKind {
     Duck = 3,
     Marquee = 4,
     DigitSlide = 5,
+    Rain = 6,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
         Self::Duck,
         Self::Marquee,
         Self::DigitSlide,
+        Self::Rain,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -436,6 +501,7 @@ impl ClockEventKind {
             Self::Duck => "duck",
             Self::Marquee => "marquee",
             Self::DigitSlide => "digit-slide",
+            Self::Rain => "rain",
         }
     }
 
@@ -447,6 +513,7 @@ impl ClockEventKind {
             Self::Duck => "Duck",
             Self::Marquee => "Marquee",
             Self::DigitSlide => "Digit Slide",
+            Self::Rain => "Rain",
         }
     }
 }
@@ -461,6 +528,7 @@ pub struct ClockEvents {
     pub duck: bool,
     pub marquee: bool,
     pub digit_slide: bool,
+    pub rain: bool,
 }
 
 impl Default for ClockEvents {
@@ -472,6 +540,7 @@ impl Default for ClockEvents {
             duck: true,
             marquee: true,
             digit_slide: true,
+            rain: true,
         }
     }
 }
@@ -485,6 +554,7 @@ impl ClockEvents {
             ClockEventKind::Duck => self.duck,
             ClockEventKind::Marquee => self.marquee,
             ClockEventKind::DigitSlide => self.digit_slide,
+            ClockEventKind::Rain => self.rain,
         }
     }
 }

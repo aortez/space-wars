@@ -23,6 +23,8 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_duck_enabled(settings.events.duck);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
+    window.set_launcher_clock_rain_enabled(settings.events.rain);
+    window.set_launcher_clock_rain_amount(settings.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.marquee_preset.label().into());
     window.set_launcher_clock_marquee_message(settings.marquee_message.as_str().into());
 }
@@ -106,6 +108,7 @@ pub(crate) fn install(
         };
         let snapshot = {
             let mut settings = settings.write().unwrap();
+            log_settings_change(settings.clock, clock, "live_clock_controls");
             settings.clock = clock;
             settings.clone()
         };
@@ -114,6 +117,21 @@ pub(crate) fn install(
         window.set_settings_save_error("".into());
         window.set_clock_settings_error("".into());
     });
+}
+
+pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, source: &str) {
+    if previous == next {
+        return;
+    }
+    // Only settings changes, never ticks. Do not include user-supplied text.
+    tracing::info!(source,
+        old_profile = ?previous.event_profile, new_profile = ?next.event_profile,
+        old_events = ?previous.events, new_events = ?next.events,
+        old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
+        old_format = ?previous.time_format, new_format = ?next.time_format,
+        old_marquee = ?previous.marquee_preset, new_marquee = ?next.marquee_preset,
+        message_changed = previous.marquee_message != next.marquee_message,
+        "Clock settings changed.");
 }
 
 fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
@@ -142,6 +160,20 @@ fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Opt
         8 => settings.events.duck = !settings.events.duck,
         9 => settings.events.marquee = !settings.events.marquee,
         11 => settings.events.digit_slide = !settings.events.digit_slide,
+        12 => {
+            // One five-way choice keeps the small-display controls compact.
+            // Disabling Rain preserves the last amount in saved settings.
+            let current = if settings.events.rain {
+                settings.rain_amount as i32 + 1
+            } else {
+                0
+            };
+            let next = ui_navigation::moved_selection(current, 5, delta);
+            settings.events.rain = next != 0;
+            if next != 0 {
+                settings.rain_amount = engine_common::ClockRainAmount::ALL[next as usize - 1];
+            }
+        }
         10 => {
             let presets = engine_common::ClockMarqueePreset::ALL;
             let index = presets
@@ -185,7 +217,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=11) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=12) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
@@ -193,5 +225,33 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
             window.set_ingame_clock_visible(false)
         }
         UiAction::Start => window.invoke_ingame_resume(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use engine_common::ClockRainAmount;
+
+    #[test]
+    fn rain_choice_cycles_both_ways_and_preserves_amount_while_disabled() {
+        let original = ClockSettings::default();
+        let mut settings = original;
+        for amount in [
+            ClockRainAmount::Light,
+            ClockRainAmount::Medium,
+            ClockRainAmount::Heavy,
+        ] {
+            settings = adjusted_settings(settings, 12, 1).unwrap();
+            assert!(settings.events.rain);
+            assert_eq!(settings.rain_amount, amount);
+        }
+        settings = adjusted_settings(settings, 12, 1).unwrap();
+        assert!(!settings.events.rain);
+        assert_eq!(settings.rain_amount, ClockRainAmount::Heavy);
+        let backwards = adjusted_settings(settings, 12, -1).unwrap();
+        assert!(backwards.events.rain);
+        assert_eq!(backwards.rain_amount, ClockRainAmount::Heavy);
+        assert_eq!(adjusted_settings(settings, 12, 1), Some(original));
     }
 }

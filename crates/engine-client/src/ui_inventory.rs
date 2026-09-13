@@ -86,6 +86,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) launcher_error: Option<String>,
     pub(crate) scenario_error: Option<String>,
     pub(crate) renderer: String,
+    pub(crate) raster_only: bool,
     pub(crate) raster_scale: String,
     pub(crate) match_length: String,
     pub(crate) combat_break_interval: String,
@@ -110,6 +111,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) clock_duck_enabled: bool,
     pub(crate) clock_marquee_enabled: bool,
     pub(crate) clock_digit_slide_enabled: bool,
+    pub(crate) clock_rain: String,
     pub(crate) clock_marquee_preset: String,
     pub(crate) nes_cartridge_name: String,
 }
@@ -123,7 +125,7 @@ pub(crate) struct UiInventory {
 }
 
 pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContext) -> UiInventory {
-    match screen {
+    let mut inventory = match screen {
         UiScreen::LauncherBusy => UiInventory {
             selected_control: None,
             controls: vec![
@@ -200,7 +202,15 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
             error: context.scenario_error.clone(),
         },
         UiScreen::GameOver => game_over_inventory(context),
+    };
+    if context.raster_only {
+        for control in &mut inventory.controls {
+            if control.id.starts_with("launcher.settings.renderer.") {
+                control.enabled = false;
+            }
+        }
     }
+    inventory
 }
 
 fn world_control(
@@ -573,6 +583,11 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.marquee-preset",
                 &context.clock_marquee_preset,
             );
+            push_choice(
+                &mut controls,
+                "launcher.settings.clock.rain",
+                &context.clock_rain,
+            );
             &[
                 "launcher.settings.renderer",
                 "launcher.settings.raster-scale",
@@ -585,6 +600,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.duck",
                 "launcher.settings.clock.marquee",
                 "launcher.settings.clock.marquee-preset",
+                "launcher.settings.clock.rain",
                 "launcher.settings.back",
             ]
         }
@@ -874,6 +890,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
             },
         ),
     );
+    push_choice(&mut controls, "pause.clock.rain", &context.clock_rain);
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
@@ -892,6 +909,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.marquee",
                 "pause.clock.marquee-preset",
                 "pause.clock.digit-slide",
+                "pause.clock.rain",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -944,6 +962,7 @@ mod tests {
             clock_duck_enabled: true,
             clock_marquee_enabled: true,
             clock_digit_slide_enabled: true,
+            clock_rain: "Varied".into(),
             clock_marquee_preset: engine_common::ClockMarqueePreset::default().label().into(),
             nes_cartridge_name: "Demo Cartridge".into(),
             ..Default::default()
@@ -956,6 +975,29 @@ mod tests {
             .iter()
             .map(|control| control.id.as_str())
             .collect()
+    }
+
+    #[test]
+    fn raster_only_inventory_disables_renderer_but_not_scale_or_launch() {
+        for scenario in ["clock", "pizza", "spacewars-classic", "rover-lab"] {
+            let mut context = context(scenario);
+            context.raster_only = true;
+            let inventory = inventory_for_screen(UiScreen::LauncherSettings, &context);
+            let renderer_controls: Vec<_> = inventory
+                .controls
+                .iter()
+                .filter(|control| control.id.starts_with("launcher.settings.renderer."))
+                .collect();
+            assert_eq!(renderer_controls.len(), 2, "{scenario}");
+            assert!(renderer_controls.iter().all(|control| !control.enabled));
+            assert!(
+                inventory
+                    .controls
+                    .iter()
+                    .filter(|control| !control.id.starts_with("launcher.settings.renderer."))
+                    .all(|control| control.enabled)
+            );
+        }
     }
 
     #[test]
@@ -1148,7 +1190,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 24, "launcher.settings.clock.duck"),
+            ("clock", 26, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1392,7 +1434,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 16);
+        assert_eq!(inventory.controls.len(), 18);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);

@@ -26,12 +26,13 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..64 {
+            for bits in 0..128 {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
                         time_format,
                         event_profile,
                         marquee_preset,
+                        rain_amount: ClockRainAmount::ALL[bits % ClockRainAmount::ALL.len()],
                         marquee_message: "Hi, it's 12:34!".parse().unwrap(),
                         events: ClockEvents {
                             falling: bits & 1 != 0,
@@ -40,6 +41,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             duck: bits & 8 != 0,
                             marquee: bits & 16 != 0,
                             digit_slide: bits & 32 != 0,
+                            rain: bits & 64 != 0,
                         },
                     };
                     assert_eq!(
@@ -56,16 +58,17 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
         vec![1, 0, 24, 1, 3],
         vec![2, 0, 24, 1, 3, 0],
         vec![3, 0, 24, 1, 3, 0, b'A'], // valid old encoding is rejected
-        vec![4, 0, 24, 1, 3],
-        vec![4, 0, 13, 1, 3, 0, b'A'],
-        vec![4, 0, 24, 3, 3, 0, b'A'],
-        vec![4, 0, 24, 1, 64, 0, b'A'],
-        vec![4, 0, 24, 1, 3, 7, b'A'],
-        vec![4, 0, 24, 1, 3, 0],
-        vec![4, 0, 24, 1, 3, 0, b' '],
-        vec![4, 0, 24, 1, 3, 0, 0xff],
-        vec![4, 0, 24, 1, 3, 0, b'A', b'\n'],
-        [vec![4, 0, 24, 1, 3, 0], vec![b'A'; 33]].concat(),
+        vec![4, 0, 24, 1, 3, 0, b'A'],
+        vec![5, 0, 13, 1, 3, 0, 0, b'A'],
+        vec![5, 0, 24, 3, 3, 0, 0, b'A'],
+        vec![5, 0, 24, 1, 128, 0, 0, b'A'],
+        vec![5, 0, 24, 1, 3, 0, 4, b'A'],
+        vec![5, 0, 24, 1, 3, 7, 0, b'A'],
+        vec![5, 0, 24, 1, 3, 0, 0],
+        vec![5, 0, 24, 1, 3, 0, 0, b' '],
+        vec![5, 0, 24, 1, 3, 0, 0, 0xff],
+        vec![5, 0, 24, 1, 3, 0, 0, b'A', b'\n'],
+        [vec![5, 0, 24, 1, 3, 0, 0], vec![b'A'; 33]].concat(),
     ] {
         assert_eq!(
             ClockAction::decode(&Action::scenario(CLOCK_ACTION_CONFIGURE, payload)),
@@ -81,6 +84,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     for payload in [
         vec![4, 0],
         vec![4, 0, 6],
+        vec![5, 0, 7],
         vec![1, 0, 0],
         vec![2, 0, 0],
         vec![3, 0, 0],
@@ -114,8 +118,10 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             duck: false,
             marquee: false,
             digit_slide: false,
+            rain: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
+        rain_amount: ClockRainAmount::Varied,
         marquee_message: ClockMarqueeMessage::default(),
     };
     ClockScenario::step(
@@ -172,6 +178,7 @@ fn live_cadence_changes_reschedule_only_when_needed_and_preserve_cooldowns() {
     settings.events.meltdown = false;
     settings.events.duck = false;
     settings.events.marquee = false;
+    settings.events.rain = false;
     ClockScenario::step(
         &mut state,
         &[ClockAction::configure(settings)],

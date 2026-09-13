@@ -918,6 +918,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             launcher_error: non_empty(window.get_launcher_error_text().as_str()),
             scenario_error: non_empty(window.get_scenario_error_text().as_str()),
             renderer: window.get_launcher_renderer().to_string(),
+            raster_only: window.get_raster_only(),
             raster_scale: window.get_launcher_raster_scale_text().to_string(),
             match_length: window.get_launcher_match_length().to_string(),
             combat_break_interval: window.get_launcher_combat_break_interval().to_string(),
@@ -942,6 +943,11 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
+            clock_rain: if window.get_launcher_clock_rain_enabled() {
+                window.get_launcher_clock_rain_amount().to_string()
+            } else {
+                "Off".into()
+            },
             clock_marquee_preset: window.get_launcher_clock_marquee_preset().to_string(),
             nes_cartridge_name: window.get_launcher_nes_rom_name().to_string(),
         },

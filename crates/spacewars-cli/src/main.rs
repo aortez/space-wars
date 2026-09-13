@@ -1,6 +1,7 @@
 #[cfg(test)]
 use std::path::Path;
 mod clock;
+mod logs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
@@ -28,6 +29,9 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Read the Pi kiosk's journal, even when the application is not running.
+    Logs(logs::LogOptions),
+
     /// Inspect, trigger, or synchronize with Clock animations.
     Clock {
         #[command(subcommand)]
@@ -269,6 +273,7 @@ fn run() -> Result<(), CliError> {
     let client = ControlClient::new(socket);
 
     match args.command {
+        Command::Logs(options) => logs::run(&options).map_err(human_error),
         Command::Clock { command } => clock::run(&client, command),
         Command::Status => request_status(&client).map_err(human_error),
         Command::Screenshot { output } => request_screenshot(&client, output).map_err(human_error),

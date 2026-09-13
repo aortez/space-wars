@@ -471,6 +471,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-scenario: "spacewars";
     in-out property <string> launcher-seed-text: "0";
     in-out property <string> launcher-renderer: "vector";
+    in property <bool> raster-only: false;
     in-out property <string> launcher-raster-scale-text: "1.0";
     in-out property <string> launcher-spacewars-preset: "Original";
     in-out property <string> launcher-universe-radius-text: "1200";
@@ -505,6 +506,8 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
+    in-out property <bool> launcher-clock-rain-enabled: true;
+    in-out property <string> launcher-clock-rain-amount: "Varied";
     in-out property <string> launcher-clock-marquee-preset: "Clock wave";
     // Settings/CLI only for now; retained when other menu settings are saved.
     in-out property <string> launcher-clock-marquee-message: "SPACE WARS";
@@ -1110,28 +1113,39 @@ export component MainWindow inherits Window {
                 height: parent.height - 80px;
                 background: transparent;
 
-                ChoiceRow {
+                MenuButton {
                     x: 0px;
                     y: 0px;
-                    width: parent.width;
+                    width: 128px;
                     height: 48px;
-                    label: "Time Format";
-                    value: root.launcher-clock-time-format;
+                    text: "Time\n" + root.launcher-clock-time-format;
                     selected: root.ingame-clock-focus-index == 0;
                     enabled: !root.clock-controls-pending;
-                    previous => { root.ingame-clock-adjust(0, -1); }
-                    next => { root.ingame-clock-adjust(0, 1); }
+                    activated => { root.ingame-clock-adjust(0, 1); }
                 }
                 ChoiceRow {
-                    y: 56px;
-                    width: parent.width;
+                    x: 136px;
+                    y: 0px;
+                    width: parent.width - 136px;
                     height: 48px;
-                    label: "Event Profile";
+                    label: "Profile";
+                    label-fraction: 0.25;
                     value: root.launcher-clock-event-profile;
                     selected: root.ingame-clock-focus-index == 1;
                     enabled: !root.clock-controls-pending;
                     previous => { root.ingame-clock-adjust(1, -1); }
                     next => { root.ingame-clock-adjust(1, 1); }
+                }
+                ChoiceRow {
+                    y: 56px;
+                    width: parent.width;
+                    height: 48px;
+                    label: "Rain";
+                    value: root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off";
+                    selected: root.ingame-clock-focus-index == 12;
+                    enabled: !root.clock-controls-pending;
+                    previous => { root.ingame-clock-adjust(12, -1); }
+                    next => { root.ingame-clock-adjust(12, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -1148,7 +1162,7 @@ export component MainWindow inherits Window {
                     y: 112px;
                     width: (parent.width - 40px) / 5;
                     height: 48px;
-                    text: "Color Cycle\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
+                    text: "Colors\n" + (root.launcher-clock-color-cycle-enabled ? "On" : "Off");
                     selected: root.ingame-clock-focus-index == 3;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(3, 1); }
@@ -1596,7 +1610,8 @@ export component MainWindow inherits Window {
                         y: 0px;
                         width: root.launcher-spacewars-settings || root.launcher-scenario == "clock" ? (parent.width - 12px) / 2 : parent.width;
                         height: 48px;
-                        label: "Renderer";
+                        label: root.raster-only ? "Renderer (fixed)" : "Renderer";
+                        enabled: !root.raster-only;
                         value: root.launcher-renderer;
                         selected: root.launcher-settings-focus-index == 0;
                         previous => {
@@ -1876,22 +1891,26 @@ export component MainWindow inherits Window {
                             next => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
                         }
 
-                        ChoiceRow {
+                        MenuButton {
                             x: 0px;
                             y: 104px;
-                            width: parent.width;
+                            width: (parent.width - 12px) / 2;
                             height: 48px;
-                            label: "Event Profile";
-                            value: root.launcher-clock-event-profile;
+                            text: "Events: " + root.launcher-clock-event-profile;
                             selected: root.launcher-settings-focus-index == 4;
-                            previous => {
-                                root.launcher-settings-focus-index = 4;
-                                root.ui-action(2);
-                            }
-                            next => {
+                            activated => {
                                 root.launcher-settings-focus-index = 4;
                                 root.ui-action(3);
                             }
+                        }
+                        MenuButton {
+                            x: parent.width / 2 + 6px;
+                            y: 104px;
+                            width: (parent.width - 12px) / 2;
+                            height: 48px;
+                            text: "Rain: " + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
+                            selected: root.launcher-settings-focus-index == 11;
+                            activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
                         }
 
                         ChoiceRow {

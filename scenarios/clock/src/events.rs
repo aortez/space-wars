@@ -53,6 +53,8 @@ pub enum EventPhase {
     Resetting,
     Presenting,
     Sliding,
+    Raining,
+    Clearing,
 }
 
 impl EventPhase {
@@ -69,6 +71,8 @@ impl EventPhase {
             Self::Resetting => "resetting",
             Self::Presenting => "presenting",
             Self::Sliding => "sliding",
+            Self::Raining => "raining",
+            Self::Clearing => "clearing",
         }
     }
 }
@@ -144,6 +148,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: DIGIT_SLIDE_TICKS,
         cooldown_ticks: COOLDOWN_TICKS,
     },
+    EventDefinition {
+        kind: ClockEventKind::Rain,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Arena,
+        duration_ticks: crate::rain::RAIN_TICKS,
+        cooldown_ticks: 45 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -161,6 +172,7 @@ pub(super) enum ActiveEvent {
     Duck(Box<DuckEvent>),
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
+    Rain(Box<crate::rain::RainEvent>),
 }
 
 impl ActiveEvent {
@@ -193,6 +205,11 @@ impl ActiveEvent {
             ClockEventKind::DigitSlide => {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
+            ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
+                context.layout,
+                seed,
+                config.rain_amount,
+            ))),
         }
     }
 
@@ -204,6 +221,7 @@ impl ActiveEvent {
             Self::Duck(_) => ClockEventKind::Duck,
             Self::Marquee(_) => ClockEventKind::Marquee,
             Self::DigitSlide(_) => ClockEventKind::DigitSlide,
+            Self::Rain(_) => ClockEventKind::Rain,
         }
     }
 
@@ -216,6 +234,7 @@ impl ActiveEvent {
             Self::Duck(event) => event.step(),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
+            Self::Rain(event) => event.step(),
         }
     }
 
@@ -227,6 +246,7 @@ impl ActiveEvent {
             Self::Duck(event) => event.phase,
             Self::Marquee(_) => EventPhase::Presenting,
             Self::DigitSlide(_) => EventPhase::Sliding,
+            Self::Rain(event) => event.phase(),
         }
     }
 
@@ -238,6 +258,7 @@ impl ActiveEvent {
             Self::Duck(event) => event.phase_tick,
             Self::Marquee(event) => event.tick,
             Self::DigitSlide(event) => event.tick,
+            Self::Rain(event) => event.phase_tick(),
         }
     }
 
@@ -247,6 +268,7 @@ impl ActiveEvent {
             Self::Meltdown(event) => event.physics_counts(),
             Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) => (0, 0),
             Self::Duck(event) => event.physics_counts(),
+            Self::Rain(event) => event.physics_counts(),
         }
     }
 
@@ -258,10 +280,11 @@ impl ActiveEvent {
     }
 
     pub fn holds_lit_segments(&self) -> bool {
-        matches!(
-            self.phase(),
-            EventPhase::Falling | EventPhase::Melting | EventPhase::Draining
-        )
+        !matches!(self, Self::Rain(_))
+            && matches!(
+                self.phase(),
+                EventPhase::Falling | EventPhase::Melting | EventPhase::Draining
+            )
     }
 }
 

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 8;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 9;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -44,6 +44,8 @@ pub struct ClockState {
     pub duck: Option<engine_common::ClockDuckState>,
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
+    #[serde(default)]
+    pub rain: Option<engine_common::ClockRainState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -351,6 +353,7 @@ mod tests {
             duck: None,
             marquee: None,
             digit_slide: None,
+            rain: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -358,6 +361,59 @@ mod tests {
             settings_pending: false,
             settings_error: None,
         }
+    }
+
+    #[test]
+    fn rain_diagnostics_settings_and_named_trigger_round_trip() {
+        use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::Rain);
+        state.phase = Some("raining".into());
+        state.settings.rain_amount = ClockRainAmount::Varied;
+        state.rain = Some(ClockRainState {
+            seed: 42,
+            amount: ClockRainAmount::Heavy,
+            requested_microunits: 10_000_000,
+            scheduled_microunits: 5_000_000,
+            injected_microunits: 5_000_000,
+            pooled_microunits: 3_000_000,
+            in_flight_microunits: 1_000_000,
+            drained_microunits: 1_000_000,
+            reclaimed_microunits: 0,
+            parcels: 126,
+            source_limited_ticks: 2,
+            water_limited_ticks: 0,
+            entry_depth_milli: 21_000,
+            required_depth_milli: 12_000,
+            duck_phase: ClockRainDuckPhase::Floating,
+            duck_spawns: 1,
+            duck_position_milli: Some([100_000, -110_000]),
+            duck_velocity_milli: Some([-20_000, 1000]),
+            duck_angle_milli: Some(32),
+            submerged_milli: 450,
+            door_open_milli: 0,
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Rain);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        assert_eq!(ClockEventKind::DigitSlide as u8, 5);
+        assert_eq!(ClockEventKind::Rain as u8, 6);
+        let mut value = serde_json::to_value(&state).unwrap();
+        value.as_object_mut().unwrap().remove("rain");
+        assert!(
+            ClockState::from_json(&value.to_string())
+                .unwrap()
+                .rain
+                .is_none()
+        );
+        value["schema_version"] = 8.into();
+        assert!(ClockState::from_json(&value.to_string()).is_err());
     }
 
     #[test]

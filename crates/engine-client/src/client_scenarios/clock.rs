@@ -15,6 +15,8 @@ use crate::render::{FrameLayout, Viewport};
 pub(super) mod benchmark;
 #[cfg(test)]
 mod meridiem_tests;
+#[cfg(test)]
+mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
@@ -85,6 +87,7 @@ fn create(
             events: settings.clock.events,
             marquee_preset: settings.clock.marquee_preset,
             marquee_message: settings.clock.marquee_message,
+            rain_amount: settings.clock.rain_amount,
         },
         seed,
     );
@@ -211,6 +214,7 @@ impl ClientScenario for ClockClientScenario {
             duck: self.state.duck_state(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
+            rain: self.state.rain_state(),
             reading: self
                 .state
                 .reading()
