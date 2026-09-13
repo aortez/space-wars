@@ -291,8 +291,9 @@ authoritative state hashes. The same installed binary is used on the Pi so
 desktop and kiosk measurements cannot silently select different assets or
 workloads.
 
-`tests/no_allocation.rs` wraps the system allocator only in its test process
-and independently asserts that 10,000 steady-state NROM instructions, 10,000
+`tests/no_allocation.rs` wraps the system allocator only in its test process,
+with a separate `stats_alloc` counter for each thread. It independently asserts
+that 10,000 steady-state NROM instructions, 10,000
 MMC1 serial-banking instructions, 10,000 UxROM bank-switching instructions,
 10,000 CNROM bank-switching instructions,
 10,000 MMC3 bank-switching instructions,
@@ -300,6 +301,41 @@ MMC1 serial-banking instructions, 10,000 UxROM bank-switching instructions,
 10,000 complete CPU/PPU/APU scheduler slots, three complete `run_frame` calls
 with audio samples, and 100 checkpoint restores allocate, reallocate, and
 deallocate nothing.
+
+Measurements are scoped to the thread executing each synchronous NES workload,
+not the entire test process. The old process-wide counter could include libtest
+bookkeeping on another thread even when only one test ran, causing intermittent
+nonzero counts. `tests/support/allocation_counter.rs` uses const-initialized,
+drop-free thread-local counters and takes both snapshots around a synchronous
+closure. Every allocation still uses `System`; the wrapper only changes which
+counter observes it. It does not alter the core, workloads, warm-ups, or any of
+the six zero-allocation assertions. Future work moved to worker threads would
+need explicit measurement of those threads too.
+
+The synchronized cross-thread regression first failed with the old counter:
+an otherwise allocation-free region observed the worker's allocation and
+cleanup. It now verifies zero activity on the waiting thread and exact positive
+counts on the worker. Additional controls cover allocate/zeroed allocate,
+growing/shrinking reallocate, deallocate, standard Rust heap operations, fresh
+baselines, and nested regions. No sleeps or performance thresholds determine
+pass/fail; synchronization has a bounded failure timeout.
+
+Run the checks through the ordinary test harness, including parallel tests:
+
+```sh
+cargo +1.89.0 test --locked -p engine-nes --test no_allocation -- --test-threads=16
+cargo +1.89.0 test --locked --release -p engine-nes --test no_allocation
+```
+
+The unchanged CI package commands also discover this target on Linux and Windows.
+The allocator wrapper follows Rust's [allocator re-entrance guidance](https://doc.rust-lang.org/std/alloc/trait.GlobalAlloc.html#re-entrance)
+and [const thread-local initialization](https://doc.rust-lang.org/std/macro.thread_local.html).
+
+Local validation (2026-09-12, Rust 1.89): the CI NES/Falling package suite passes
+139 tests, including the allocation workload and four counter regressions.
+All 400 fresh-process repetitions pass with `--test-threads=16` (200 debug and
+200 release). Formatting, strict scoped Clippy, and the bundled-ROM release
+benchmark also pass; the benchmark's output/no-output state hashes match.
 
 The CPU example emits two versioned newline-delimited JSON objects containing
 crate/profile, OS/architecture, API/workload version, configuration,
