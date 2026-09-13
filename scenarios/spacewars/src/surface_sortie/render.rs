@@ -866,30 +866,12 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
         render_laser(frame, ship);
     }
     if !ship.dead && (ship.form == ShipForm::Ship || state.pilots[player].recovery.is_some()) {
-        let (feet, radius) = physics::surface_landing_geometry(ship.form);
-        for foot in feet {
-            let position = ship.position
-                + physics::ship_pivot(ship.form)
-                + foot.rotate_radians(ship.rotation_radians);
-            line(
-                frame,
-                1,
-                position,
-                position
-                    + Vec2::Y.rotate_radians(ship.rotation_radians)
-                        * radius
-                        * (1.3 / physics::LANDING_FOOT_RADIUS),
-                LIGHT,
-                2.0,
-            );
-            circle(
-                frame,
-                1,
-                position,
-                radius,
-                if parked { CYAN } else { LIGHT },
-            );
-        }
+        draw_landing_gear(
+            frame,
+            ship,
+            state.pilots[player].landing_gear.extension(),
+            parked,
+        );
     }
     if !ship.dead {
         render_exhaust(frame, ship);
@@ -928,6 +910,54 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
                 2.0,
             );
         }
+    }
+}
+
+/// Full ships fold their visual feet into the fuselage. At full extension the
+/// pads match the existing physical contacts exactly; pods retain fixed feet.
+pub(super) fn draw_landing_gear(
+    frame: &mut RenderFrame,
+    ship: &ShipState,
+    extension: f32,
+    parked: bool,
+) {
+    let full_ship = ship.form == ShipForm::Ship;
+    let extension = if full_ship {
+        extension.clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    if ship.dead || extension <= 0.0 {
+        return;
+    }
+    let origin = ship.position + physics::ship_pivot(ship.form);
+    let transform = |point: Vec2| origin + point.rotate_radians(ship.rotation_radians);
+    let (feet, radius) = physics::surface_landing_geometry(ship.form);
+    for foot in feet {
+        let hinge = if full_ship {
+            Vec2::new(foot.x * 0.5, -2.5)
+        } else {
+            foot + Vec2::Y * radius * (1.3 / physics::LANDING_FOOT_RADIUS)
+        };
+        let position = transform(hinge + (foot - hinge) * extension);
+        // Draw ship gear behind the hull, so retraction disappears into its
+        // bays instead of sliding circles over the top of the ship artwork.
+        let layer = if full_ship { SHIP_LAYER - 1 } else { 1 };
+        line(
+            frame,
+            layer,
+            transform(hinge),
+            position,
+            LIGHT,
+            if full_ship { 0.35 } else { 2.0 },
+        );
+        circle(
+            frame,
+            layer,
+            position,
+            radius,
+            if parked { CYAN } else { LIGHT },
+        );
     }
 }
 

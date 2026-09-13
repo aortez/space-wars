@@ -176,6 +176,10 @@ impl LandingTelemetry {
 }
 
 impl SurfacePilot {
+    pub(crate) fn is_aboard(&self) -> bool {
+        self.body.is_none()
+    }
+
     pub(crate) fn vehicle_index(&self) -> usize {
         self.vehicle.0
     }

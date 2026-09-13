@@ -37,6 +37,89 @@ fn changed_pixels(a: &SharedPixelBuffer<Rgb8Pixel>, b: &SharedPixelBuffer<Rgb8Pi
 }
 
 #[test]
+fn landing_gear_visual_fixture_exports_stowed_transition_and_landed_views() {
+    use scenario_spacewars::surface_sortie::landing_gear::fixture::{
+        self as gear, Case as GearCase,
+    };
+    let output = std::env::var_os("SPACEWARS_GEAR_ARTIFACTS").map(|path| {
+        let path = std::path::PathBuf::from(path);
+        if path.is_absolute() {
+            path
+        } else {
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(path)
+        }
+    });
+    if let Some(directory) = &output {
+        std::fs::create_dir_all(directory).unwrap();
+    }
+    let mut html = String::from(
+        "<!doctype html><meta charset=\"utf-8\"><title>Landing gear</title><style>body{background:#141a2b;color:#eee;font:16px system-ui;margin:24px}section{display:flex;flex-wrap:wrap;gap:16px}figure{margin:0}img{max-width:100%}a{color:#82deff}</style><h1>Landing gear</h1><p>Production raster/vector renderers; prescribed poses driven through the real gear animation. Gameplay captures below use the real surface simulation.</p>",
+    );
+    for (profile, width, height, camera) in [
+        ("detail", 400.0, 320.0, 18.0),
+        ("picade", 512.0, 768.0, 100.0),
+    ] {
+        for scale in [1.0, 2.0] {
+            writeln!(html, "<h2>{profile} · scale {scale}</h2><section>").unwrap();
+            for case in GearCase::ALL {
+                let snapshot = gear::capture(case, camera);
+                let viewport = Viewport::new(width * scale, height * scale);
+                let pixels = raster(&snapshot.frame, viewport);
+                let changed = changed_pixels(&pixels, &raster(&snapshot.bare, viewport));
+                if snapshot.extension == 0.0 {
+                    assert_eq!(changed, 0);
+                } else {
+                    assert!(changed >= 3, "gear invisible: {profile} {scale} {case:?}");
+                }
+                let vector = render::scene_primitives_from_frames(
+                    std::slice::from_ref(&snapshot.frame),
+                    viewport,
+                );
+                assert!(
+                    vector
+                        .iter()
+                        .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+                );
+                let bare_count = render::scene_primitives_from_frames(
+                    std::slice::from_ref(&snapshot.bare),
+                    viewport,
+                )
+                .len();
+                assert_eq!(vector.len() > bare_count, snapshot.extension > 0.0);
+                let name = format!("{profile}-{scale}x-{}", case.name());
+                if let Some(directory) = &output {
+                    write_png(&directory.join(format!("{name}.png")), &pixels);
+                    std::fs::write(
+                        directory.join(format!("{name}.svg")),
+                        svg(&snapshot.frame, viewport),
+                    )
+                    .unwrap();
+                }
+                writeln!(html, "<figure><figcaption>{} · {:.0}% · <a href=\"{name}.svg\">SVG</a></figcaption><img width=\"{width}\" height=\"{height}\" src=\"{name}.png\"></figure>", case.name(), snapshot.extension * 100.0).unwrap();
+            }
+            html.push_str("</section>");
+        }
+    }
+    html.push_str("<h2>Simulated gameplay</h2><section>");
+    for (name, frame) in gear::gameplay_captures() {
+        let pixels = raster(&frame, Viewport::new(800.0, 600.0));
+        if let Some(directory) = &output {
+            write_png(&directory.join(format!("{name}.png")), &pixels);
+        }
+        writeln!(html, "<figure><figcaption>{name}</figcaption><img width=\"800\" height=\"600\" src=\"{name}.png\"></figure>").unwrap();
+    }
+    html.push_str("</section>");
+    if let Some(directory) = &output {
+        std::fs::write(directory.join("index.html"), html).unwrap();
+    }
+}
+
+#[test]
 fn missile_visual_fixture_covers_loaded_reloading_and_flying_rounds() {
     use scenario_spacewars::weapons::fixture::{self as missiles, Case as MissileCase};
 

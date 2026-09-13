@@ -21,6 +21,7 @@ pub mod impact;
 pub mod jetpack;
 mod landing;
 mod landing_diagnostics;
+pub mod landing_gear;
 pub mod landing_objective;
 pub mod match_rules;
 mod material;
@@ -182,6 +183,7 @@ pub(super) struct SurfacePilot {
     transfers: u64,
     last_transfer: TransferResult,
     landing: LandingTelemetry,
+    landing_gear: landing_gear::LandingGear,
     pod_righting: pod_righting::PodRightingState,
     recovery: Option<recovery::SurfaceRecovery>,
     id: SpacelingId,
@@ -227,6 +229,7 @@ impl SurfacePilot {
             transfers: 0,
             last_transfer: TransferResult::Ready,
             landing: LandingTelemetry::default(),
+            landing_gear: landing_gear::LandingGear::default(),
             pod_righting: pod_righting::PodRightingState::default(),
             recovery: None,
         }
@@ -776,6 +779,9 @@ impl Scenario for SurfaceSortieScenario {
                 &state.world.ships[pilot.vehicle.0],
                 dt,
             );
+            pilot
+                .landing_gear
+                .advance(&pilot.landing, &state.world.ships[pilot.vehicle.0], dt);
             if let Some(snapshot) = pilot.snapshot(&state.world.physics) {
                 pilot.gait_phase = (pilot.gait_phase + snapshot.relative_speed.abs() * dt * 5.0)
                     .rem_euclid(std::f32::consts::TAU);

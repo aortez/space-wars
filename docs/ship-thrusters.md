@@ -2,8 +2,9 @@
 
 The current material-planet Spacewars match and Surface Sortie/Expedition use
 the same directional ion effects. Classic Spacewars retains its legacy exhaust.
-This slice changes presentation, not handling, weapon mechanics, landing gear
-or input bindings. It does not add another launcher scenario.
+This slice changes presentation, not handling, weapon mechanics or input bindings.
+Automatic landing gear and the unoccupied-ship effects fix are covered in
+[Ship landing gear](ship-landing-gear.md). Neither adds another launcher scenario.
 
 ## Missile presentation
 
@@ -62,6 +63,8 @@ nozzles sit outside the rendered hull rather than inside the old engine triangle
 Pulse phase advances only with simulation time. The wake fades after release;
 pause leaves it unchanged, and vehicle form changes clear the previous wake.
 Humans and bots use the same controller/output/render path.
+When the spaceling is outside, the unoccupied ship's jets and wake are suppressed;
+automatic stabilization still runs physically. Boarding restores fresh effects.
 
 ## Cost and boundaries
 

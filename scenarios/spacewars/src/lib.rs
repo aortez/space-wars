@@ -1467,7 +1467,13 @@ impl SpacewarsScenario {
             .synchronize_motion(&mut state.ships, &mut state.debris);
         for pilot in surface_pilots.iter() {
             let index = pilot.vehicle_index();
-            thrusters::advance(&mut state.ships[index], thruster_outputs[index], dt);
+            if pilot.is_aboard() {
+                thrusters::advance(&mut state.ships[index], thruster_outputs[index], dt);
+            } else {
+                // Unoccupied craft retain the existing landing stabilization,
+                // but must not look controlled by the spaceling's inputs.
+                thrusters::suspend(&mut state.ships[index]);
+            }
         }
 
         let collision_started = Instant::now();

@@ -119,6 +119,11 @@ to ordinary Spacewars flight. The fixture uses bounded thrust, braking, and turn
 rate control in the canonical Rapier world. The landing feet add two colliders
 to the existing hull body, not extra bodies, joints, or mass.
 
+[Automatic landing-gear artwork](ship-landing-gear.md) extends during a rear-first,
+open-wing approach and retracts after departure. This is visual only: the physical
+feet stay extended, and the landing/boarding rules above are unchanged. Unoccupied
+ships retain their stabilization but no longer show its ornamental thruster jets.
+
 The camera follows the active ship or spaceling, framing the nearby landed ship
 and pilot between the HUD strips even on the sides or underside of the planet.
 Farther from the ship it follows the pilot alone. A translucent, fixed-scale,
