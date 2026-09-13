@@ -165,8 +165,8 @@ fn autostart_bot_matches_use_match_results_repeat_fresh_worlds_and_preserve_huma
         h.pause_guarded(&first);
         wait_screen(h, UiScreen::PauseMain);
         let paused = status(h);
-        assert!(paused.contains("match_player_1=rule_bot"));
-        assert!(paused.contains("match_player_2=rule_bot"));
+        assert!(paused.contains("match_player_1=material_mission_v9"));
+        assert!(paused.contains("match_player_2=material_mission_v9"));
         let remaining = paused
             .lines()
             .find(|line| line.starts_with("match_remaining_seconds="))
