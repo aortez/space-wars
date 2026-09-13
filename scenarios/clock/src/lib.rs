@@ -6,12 +6,16 @@ mod digits;
 #[cfg(test)]
 mod event_tests;
 mod events;
+mod floor;
+#[cfg(test)]
+mod floor_tests;
 mod layout;
 #[cfg(test)]
 mod live_tests;
 mod meridiem;
 mod physics;
 mod presentation;
+mod rain;
 mod render;
 
 use std::time::Duration;
@@ -23,8 +27,8 @@ pub use digits::{
 
 use engine_common::{
     Action, ClockEventKind, ClockEventProfile, ClockEvents, ClockMarqueeMessage,
-    ClockMarqueePreset, ClockSettings, ClockTimeFormat, Observation, RenderFrame, Scenario,
-    StepResult, TickModel,
+    ClockMarqueePreset, ClockRainAmount, ClockSettings, ClockTimeFormat, Observation, RenderFrame,
+    Scenario, StepResult, TickModel,
 };
 pub use events::digit_slide::DIGIT_SLIDE_TICKS;
 pub use events::duck::DUCK_TICKS;
@@ -39,7 +43,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 4;
+pub const CLOCK_ACTION_VERSION: u16 = 5;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -49,7 +53,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 6 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 7 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -110,9 +114,11 @@ impl ClockAction {
                 | (u8::from(settings.events.meltdown) << 2)
                 | (u8::from(settings.events.duck) << 3)
                 | (u8::from(settings.events.marquee) << 4)
-                | (u8::from(settings.events.digit_slide) << 5),
+                | (u8::from(settings.events.digit_slide) << 5)
+                | (u8::from(settings.events.rain) << 6),
         );
         payload.push(settings.marquee_preset as u8);
+        payload.push(settings.rain_amount as u8);
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -156,7 +162,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 7..=MAX_CONFIGURE_BYTES) if payload[4] <= 63 => {
+            (CLOCK_ACTION_CONFIGURE, 8..=MAX_CONFIGURE_BYTES) if payload[4] <= 127 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -176,9 +182,11 @@ impl ClockAction {
                         duck: payload[4] & 8 != 0,
                         marquee: payload[4] & 16 != 0,
                         digit_slide: payload[4] & 32 != 0,
+                        rain: payload[4] & 64 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
-                    marquee_message: std::str::from_utf8(&payload[6..]).ok()?.parse().ok()?,
+                    rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[6]))?,
+                    marquee_message: std::str::from_utf8(&payload[7..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -284,6 +292,7 @@ pub struct ClockConfig {
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,
     pub marquee_message: ClockMarqueeMessage,
+    pub rain_amount: ClockRainAmount,
 }
 
 impl Default for ClockConfig {
@@ -299,6 +308,7 @@ impl Default for ClockConfig {
             events: ClockEvents::default(),
             marquee_preset: ClockMarqueePreset::default(),
             marquee_message: ClockMarqueeMessage::default(),
+            rain_amount: ClockRainAmount::default(),
         }
     }
 }
@@ -316,6 +326,7 @@ impl ClockConfig {
             events: self.events,
             marquee_preset: self.marquee_preset,
             marquee_message: self.marquee_message,
+            rain_amount: self.rain_amount,
         }
     }
 }
@@ -327,6 +338,7 @@ pub struct ClockState {
     segments: Vec<SegmentState>,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
+    floor: floor::FloorManager,
 }
 
 impl ClockState {
@@ -337,6 +349,7 @@ impl ClockState {
             events: self.config.events,
             marquee_preset: self.config.marquee_preset,
             marquee_message: self.config.marquee_message,
+            rain_amount: self.config.rain_amount,
         }
     }
 
@@ -348,6 +361,7 @@ impl ClockState {
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
+        self.config.rain_amount = settings.rain_amount;
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
         }
@@ -371,6 +385,10 @@ impl ClockState {
 
     pub fn aspect_ratio(&self) -> f32 {
         self.config.aspect_ratio
+    }
+
+    pub fn floor_mode(&self) -> engine_common::ClockFloorMode {
+        self.floor.mode()
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -462,6 +480,13 @@ impl ClockState {
         self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
     }
 
+    pub fn rain_state(&self) -> Option<engine_common::ClockRainState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Rain(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+
     fn trigger_event(&mut self, kind: ClockEventKind) {
         if self.can_trigger_event() {
             self.start_event(kind);
@@ -488,12 +513,14 @@ impl ClockState {
     ) {
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
+        self.floor.acquire(kind, self.config.water_lab);
         self.active_event = Some(ActiveEvent::new(
             kind,
             EventContext {
                 segments: &mut self.segments,
                 display: self.display,
                 layout,
+                floor: self.floor.geometry(layout),
             },
             seed,
             self.config,
@@ -505,6 +532,8 @@ impl ClockState {
         if let Some(event) = self.active_event.take() {
             self.schedule.finish(event.kind());
         }
+        // The event and its bodies/water have been dropped before closing.
+        self.floor.release();
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
@@ -519,6 +548,7 @@ impl ClockState {
                 segments: &mut self.segments,
                 display: self.display,
                 layout,
+                floor: self.floor.geometry(layout),
             }) {
                 self.finish_event();
             }
@@ -580,6 +610,7 @@ impl Scenario for ClockScenario {
             segments: digits::create_segments(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
+            floor: floor::FloorManager::default(),
         }
     }
 

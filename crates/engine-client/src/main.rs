@@ -23,6 +23,7 @@ mod nes_roms;
 mod presentation_probe;
 mod raster;
 mod render;
+mod renderer_policy;
 mod settings;
 mod settings_writer;
 mod sound_controls;
@@ -335,7 +336,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     needs_writeback |= normalize_launch_settings(&mut loaded);
     needs_writeback |= normalize_spacewars_settings(&mut loaded);
     needs_writeback |= normalize_pizza_settings(&mut loaded);
-    let effective_launch = effective_launch_options(&args, &loaded);
+    // CPU-only vector benchmarks still work; this is a display restriction.
+    let raster_only = cfg!(feature = "pi-kiosk") && !args.benchmark_headless;
+    needs_writeback |= renderer_policy::normalize_settings(&mut loaded, raster_only);
+    let mut effective_launch = effective_launch_options(&args, &loaded);
+    effective_launch.renderer =
+        renderer_policy::resolve(effective_launch.renderer, raster_only, "startup_options");
     let config_directory = settings_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
@@ -423,6 +429,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     select_slint_backend(&args)?;
     let window = MainWindow::new()?;
+    window.set_raster_only(raster_only);
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
     let _settings_status = settings_writer::install_status(&window, settings_writer.clone());
     let scenario_controls = host::new_scenario_controls();
@@ -691,7 +698,11 @@ fn show_launcher(
     window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
     apply_scenario_metadata(window, launch.scenario.as_str());
     window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
-    window.set_launcher_renderer(SharedString::from(renderer_label(launch.renderer)));
+    let renderer =
+        renderer_policy::resolve(launch.renderer, window.get_raster_only(), "show_launcher");
+    window.set_launcher_renderer(SharedString::from(renderer_label(renderer)));
+    tracing::info!(scenario = launch.scenario, renderer = renderer.label(),
+        saved_renderer = ?settings.launch.renderer, "showing launcher.");
     window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
         launch.raster_scale,
     )));
@@ -766,6 +777,8 @@ fn show_launcher(
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
+    window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
+    window.set_launcher_clock_rain_amount(settings.clock.rain_amount.label().into());
     window.set_launcher_clock_marquee_preset(settings.clock.marquee_preset.label().into());
     window.set_launcher_clock_marquee_message(settings.clock.marquee_message.as_str().into());
     refresh_nes_rom_library(window, settings, rom_catalog);
@@ -1400,7 +1413,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 5,
-        "clock" => 12,
+        "clock" => 13,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1424,12 +1437,20 @@ fn adjust_launcher_setting(window: &MainWindow, delta: i32) {
         return;
     }
     if focus == 0 {
-        let next = cycle_label(
-            window.get_launcher_renderer().as_str(),
-            &["vector", "raster"],
-            delta,
-        );
+        if window.get_raster_only() {
+            return;
+        }
+        let previous = window.get_launcher_renderer();
+        let next = cycle_label(previous.as_str(), &["vector", "raster"], delta);
         window.set_launcher_renderer(SharedString::from(next));
+        if previous != next {
+            tracing::info!(
+                source = "scenario_settings",
+                old_renderer = previous.as_str(),
+                new_renderer = next,
+                "renderer selection changed."
+            );
+        }
         return;
     }
     if focus == 1 {
@@ -1636,6 +1657,23 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 11 {
+        let current = if window.get_launcher_clock_rain_enabled() {
+            window.get_launcher_clock_rain_amount()
+        } else {
+            "Off".into()
+        };
+        let next = cycle_label(
+            current.as_str(),
+            &["Off", "Varied", "Light", "Medium", "Heavy"],
+            delta,
+        );
+        window.set_launcher_clock_rain_enabled(next != "Off");
+        if next != "Off" {
+            window.set_launcher_clock_rain_amount(next.into());
+        }
+        return;
+    }
     if focus == 3 {
         window.set_launcher_clock_digit_slide_enabled(
             !window.get_launcher_clock_digit_slide_enabled(),
@@ -1866,6 +1904,8 @@ fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelec
         changed = true;
     }
     if settings.launch.renderer != renderer {
+        tracing::info!(source = "launcher", old_renderer = ?settings.launch.renderer,
+            new_renderer = ?renderer, "applying renderer setting.");
         settings.launch.renderer = renderer;
         changed = true;
     }
@@ -1882,6 +1922,7 @@ fn apply_launcher_selections(settings: &mut Settings, selections: &LauncherSelec
         changed = true;
     }
     if settings.clock != clock {
+        clock_controls::log_settings_change(settings.clock, clock, "launcher");
         settings.clock = clock;
         changed = true;
     }
@@ -2224,11 +2265,16 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             duck: window.get_launcher_clock_duck_enabled(),
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
+            rain: window.get_launcher_clock_rain_enabled(),
         },
         marquee_preset: engine_common::ClockMarqueePreset::ALL
             .into_iter()
             .find(|preset| preset.label() == window.get_launcher_clock_marquee_preset().as_str())
             .ok_or("Unknown Clock marquee recipe")?,
+        rain_amount: engine_common::ClockRainAmount::ALL
+            .into_iter()
+            .find(|amount| amount.label() == window.get_launcher_clock_rain_amount().as_str())
+            .ok_or("Unknown Clock rain amount")?,
         marquee_message: window
             .get_launcher_clock_marquee_message()
             .as_str()
@@ -2439,6 +2485,8 @@ fn start_scenario_from_launch(
     asset: client_scenarios::ScenarioAsset,
 ) -> Result<Timer, host::HostError> {
     controls.borrow_mut().clear();
+    let renderer =
+        renderer_policy::resolve(launch.renderer, window.get_raster_only(), "scenario_start");
     window.set_launcher_scenario(SharedString::from(launch.scenario.clone()));
     apply_scenario_metadata(window, launch.scenario.as_str());
     let timer = host::start_scenario_loop(
@@ -2448,7 +2496,7 @@ fn start_scenario_from_launch(
         host::ScenarioLoopOptions {
             start_benchmark,
             benchmark_configuration,
-            renderer: launch.renderer,
+            renderer,
             raster_scale: launch.raster_scale,
             controls: Some(controls),
             input: Some(input),
@@ -2457,7 +2505,15 @@ fn start_scenario_from_launch(
         },
     )?;
     window.set_launcher_seed_text(SharedString::from(launch.seed.to_string()));
-    window.set_launcher_renderer(SharedString::from(renderer_label(launch.renderer)));
+    window.set_launcher_renderer(SharedString::from(renderer_label(renderer)));
+    tracing::info!(
+        scenario = launch.scenario,
+        seed = launch.seed,
+        renderer = renderer.label(),
+        raster_scale = launch.raster_scale,
+        benchmark = start_benchmark,
+        "scenario started."
+    );
     window.set_launcher_raster_scale_text(SharedString::from(format_raster_scale(
         launch.raster_scale,
     )));
@@ -3048,9 +3104,11 @@ mod tests {
                     duck: false,
                     marquee: false,
                     digit_slide: false,
+                    rain: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),
+                rain_amount: engine_common::ClockRainAmount::Heavy,
             },
             spacewars: SpacewarsSettings {
                 universe_radius: 2400,

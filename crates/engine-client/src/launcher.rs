@@ -156,6 +156,11 @@ impl Launcher {
             selections.launch.seed = crate::match_world::fresh_seed(selections.launch.seed);
         }
         let benchmark = mode == StartMode::Benchmark;
+        selections.launch.renderer = crate::renderer_policy::resolve(
+            selections.launch.renderer,
+            window.get_raster_only(),
+            "manual_launch",
+        );
         if benchmark
             && !host::scenario_registration(&selections.launch.scenario)
                 .is_some_and(|registration| registration.capabilities.benchmark)
@@ -180,6 +185,11 @@ impl Launcher {
         window.set_launcher_error_text("".into());
         let mut effective = self.settings.read().unwrap().clone();
         let mut launch = crate::launch_from_settings(&effective);
+        launch.renderer = crate::renderer_policy::resolve(
+            launch.renderer,
+            window.get_raster_only(),
+            "automatic_launch",
+        );
         launch.scenario = activity.scenario.into();
         if activity.repeat_matches {
             launch.seed = crate::match_world::fresh_seed(launch.seed);
@@ -211,6 +221,16 @@ impl Launcher {
             return;
         };
         let catalog = self.catalog.borrow().clone();
+        tracing::info!(
+            scenario = launch.scenario,
+            seed = launch.seed,
+            renderer = launch.renderer.label(),
+            raster_scale = launch.raster_scale,
+            automatic,
+            benchmark,
+            save_needed,
+            "launcher operation started."
+        );
         let (sender, receiver) = mpsc::channel();
         let started_at = Instant::now();
         let pending = PendingLaunch {
@@ -358,6 +378,8 @@ impl Launcher {
         window.set_launcher_busy(false);
         tracing::info!(
             scenario = pending.launch.scenario,
+            renderer = pending.launch.renderer.label(),
+            automatic = pending.automatic,
             outcome,
             elapsed_ms = pending.started_at.elapsed().as_millis() as u64,
             save_ms = pending.timings.save.as_millis() as u64,
@@ -411,6 +433,7 @@ mod tests {
     use super::*;
     use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
     use slint::platform::{Key, Platform, PlatformError, WindowAdapter, WindowEvent};
+    use spacewars_control::UiAction;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -491,6 +514,115 @@ mod tests {
                 std::thread::yield_now();
             }
         }
+    }
+
+    #[test]
+    fn raster_only_clock_survives_settings_return_and_stale_vector_selection() {
+        let harness = Harness::new(Arc::new(|_| Ok(())));
+        let window = &harness.window;
+        window.set_raster_only(true);
+        {
+            let mut settings = harness.launcher.settings.write().unwrap();
+            settings.launch.scenario = "clock".into();
+            settings.launch.renderer = engine_common::RendererSetting::Vector;
+            settings.clock.event_profile = engine_common::ClockEventProfile::Off;
+        }
+        harness.show_menu();
+        assert_eq!(window.get_launcher_renderer(), "raster");
+        window.set_launcher_settings_visible(true);
+        window.set_launcher_settings_focus_index(0);
+        for action in [UiAction::Left, UiAction::Right, UiAction::Confirm] {
+            window.invoke_ui_action(action.code());
+            assert_eq!(window.get_launcher_renderer(), "raster");
+        }
+
+        // A stale UI field must also be resolved before saving or starting.
+        window.set_launcher_renderer("vector".into());
+        window.invoke_launcher_start_game();
+        harness.wait_for(|| !window.get_launcher_busy());
+        assert_clock_is_raster(window);
+        assert_eq!(
+            harness.launcher.settings.read().unwrap().launch.renderer,
+            engine_common::RendererSetting::Raster
+        );
+
+        harness
+            .launcher
+            .render_timer
+            .borrow_mut()
+            .take()
+            .unwrap()
+            .stop();
+        harness.show_menu();
+        assert_eq!(window.get_launcher_renderer(), "raster");
+        window.invoke_launcher_start_game();
+        harness.wait_for(|| !window.get_launcher_busy());
+        assert_clock_is_raster(window);
+    }
+
+    fn assert_clock_is_raster(window: &MainWindow) {
+        assert!(window.get_launcher_error_text().is_empty());
+        assert_eq!(window.get_launcher_renderer(), "raster");
+        assert!(
+            window
+                .get_runtime_diagnostics()
+                .lines()
+                .any(|line| line == "renderer=raster")
+        );
+        assert!(window.get_raster_visible());
+        let pixels = window.get_raster_frame().to_rgb8().unwrap();
+        // Verify actual Clock content, not just a responsive host or HUD.
+        assert!(
+            pixels
+                .as_slice()
+                .iter()
+                .filter(|pixel| pixel.g > 100 && pixel.b > 100)
+                .count()
+                > 100
+        );
+    }
+
+    #[test]
+    fn automatic_clock_resolves_saved_vector_without_saving_autostart_overrides() {
+        let harness = Harness::new(Arc::new(|_| {
+            panic!("automatic launch must not save settings")
+        }));
+        harness.window.set_raster_only(true);
+        harness.launcher.settings.write().unwrap().launch.renderer =
+            engine_common::RendererSetting::Vector;
+        harness
+            .launcher
+            .start_automatic(&crate::autostart::Activity {
+                id: "clock",
+                label: "Clock",
+                scenario: "clock",
+                repeat_matches: false,
+            });
+        harness.wait_for(|| !harness.window.get_launcher_busy());
+        assert_clock_is_raster(&harness.window);
+    }
+
+    #[test]
+    fn direct_clock_launch_has_a_final_renderer_guard() {
+        let harness = Harness::new(Arc::new(|_| Ok(())));
+        harness.window.set_raster_only(true);
+        let settings = harness.launcher.settings.read().unwrap().clone();
+        let mut launch = crate::launch_from_settings(&settings);
+        launch.scenario = "clock".into();
+        launch.renderer = host::RenderBackend::Vector;
+        let timer = crate::start_scenario_from_launch(
+            &harness.window,
+            &launch,
+            false,
+            host::BenchmarkConfiguration::default(),
+            Rc::clone(&harness.launcher.controls),
+            Rc::clone(&harness.launcher.input),
+            settings,
+            ScenarioAsset::None,
+        )
+        .unwrap();
+        assert_clock_is_raster(&harness.window);
+        timer.stop();
     }
 
     #[test]

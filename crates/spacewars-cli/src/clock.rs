@@ -33,7 +33,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee or digit-slide.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide or rain.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -53,7 +53,7 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
@@ -253,13 +253,40 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.can_trigger
         );
         println!(
-            "Configured marquee: {} / {:?}; settings pending={}",
+            "Floor: {}\nConfigured marquee: {} / {:?}; settings pending={}",
+            state.floor.as_str(),
             state.settings.marquee_preset.label(),
             state.settings.marquee_message.as_str(),
             state.settings_pending
         );
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
+        }
+        if let Some(rain) = state.rain {
+            let world_vector = |value: Option<[i32; 2]>| {
+                value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0])
+            };
+            println!(
+                "Rain: {} / {:?}, spawns={}, entry depth={:.1}/{:.1}; position={:?}, velocity={:?}",
+                rain.amount.label(),
+                rain.duck_phase,
+                rain.duck_spawns,
+                rain.entry_depth_milli as f64 / 1000.0,
+                rain.required_depth_milli as f64 / 1000.0,
+                world_vector(rain.duck_position_milli),
+                world_vector(rain.duck_velocity_milli)
+            );
+            println!(
+                "Water (micro-units): injected={} pooled={} falling={} drained={} reclaimed={}; parcels={}, source-limited ticks={}, outlet-limited ticks={}",
+                rain.injected_microunits,
+                rain.pooled_microunits,
+                rain.in_flight_microunits,
+                rain.drained_microunits,
+                rain.reclaimed_microunits,
+                rain.parcels,
+                rain.source_limited_ticks,
+                rain.water_limited_ticks
+            );
         }
         if let Some(material) = state.meltdown {
             // Older hosts omit these fields and only have uniform full-size cells.
@@ -417,6 +444,20 @@ mod tests {
             ])
             .is_ok()
         );
+        for phase in ["raining", "draining", "clearing"] {
+            assert!(
+                Args::try_parse_from([
+                    "spacewars-cli",
+                    "clock",
+                    "wait",
+                    "--event",
+                    "rain",
+                    "--phase",
+                    phase
+                ])
+                .is_ok()
+            );
+        }
     }
 
     #[test]

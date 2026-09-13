@@ -4,6 +4,12 @@ Use the existing engine-client headless runner for repeatable CPU measurements,
 then use live host timings to find work outside that runner. Neither is a GPU
 profiler. In particular, headless throughput is **not displayed FPS**.
 
+The managed-floor version draws one closed slab and edge in the ordinary
+24-hour face: 101 primitives, down from the 103 in historical measurements below.
+Physical drain events retain their existing geometry and time envelopes; the
+floor manager adds no per-tick physics or water work. Historical timings have not
+been relabeled as measurements of this version.
+
 ## Fixed-workload benchmarks
 
 ```sh
@@ -11,7 +17,7 @@ cargo build --locked --release -p engine-client
 ./benchmark-clock.sh
 ```
 
-The wrapper runs all seven cases at 1024×768, raster scales 1 and 2, three
+The wrapper runs all eight cases at 1024×768, raster scales 1 and 2, three
 independent processes per combination. Each run warms up for two simulated
 seconds, resets the seeded scenario, then measures 15 simulated seconds.
 Each CSV row represents exactly 60 fixed steps and 60 rendered/prepared frames,
@@ -27,6 +33,15 @@ No saved Clock settings or
 launcher choices are changed. `--output DIR` selects another report parent;
 failed runs retain their partial output and show the error log.
 
+Rain baseline (local desktop, Rust 1.89 release, 1024×768 raster at scale 1,
+seed 7, two warm-up seconds, 45 measured simulated seconds, three processes):
+idle averaged 0.144 ms/frame; Heavy Rain averaged 0.246–0.247 ms/frame, including
+construction, flotation, drainage and cleanup. Rain's simulation averaged
+0.006 ms, scene generation 0.009 ms, and raster preparation 0.231–0.232 ms.
+These are CPU-only samples collected while local validation was running, not
+displayed FPS, a Pi measurement, or a CI timing threshold. Raw reports for this
+run were retained locally under `target/clock-benchmarks/run.zhYlok3O/`.
+
 ```sh
 # A smaller comparison; rerun for independent samples.
 ./benchmark-clock.sh --cases idle,digit-slide --repeats 3 --seconds 15
@@ -36,6 +51,10 @@ failed runs retain their partial output and show the error log.
 
 # Fix the recipe explicitly, without borrowing the user's saved text/settings.
 ./benchmark-clock.sh --cases marquee --recipe text-ribbon
+
+# Heavy rain, including duck entry, drainage and cleanup (42-second event).
+# Short default runs sample the shower only; use 45+ seconds for the full cycle.
+./benchmark-clock.sh --cases rain --seconds 45 --repeats 3
 
 # A single raw run, without the wrapper.
 target/release/engine-client --scenario clock --benchmark-headless --seed 7 \
@@ -370,6 +389,13 @@ The instrumented release was fast-deployed to `picade.local`, without rebooting:
 SHA-256 `6f13d9299c4a0556c6d27603af888bfd7917deeddcf80ae3c040e2bdd3056205`.
 The display is 1024×768, XRGB8888, with a 3 MiB mapped output buffer. A scale-2
 host raster image is separately 2048×1536 RGB (9 MiB).
+
+**Correction (2026-09-13):** the Pi software backend's vector `Path` drawing is
+unimplemented. Historical Pi vector measurements in this document measure scene
+management without the Clock geometry being painted; they are **not valid
+visual-throughput comparisons** with raster. Kiosk vector selection is now
+disabled. Raster measurements and explicitly CPU-only conversion benchmarks
+are unaffected.
 
 Clock used profile Off, 24-hour time and 103 primitives. Measurement order was
 raster 2, raster 1, vector, raster 1 again, then raster 2 twice more. Each group

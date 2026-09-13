@@ -259,6 +259,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), None);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 12);
+    key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 3);
     key(&window, Key::Return);
@@ -301,8 +303,12 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 625.0, 222.0);
     assert_eq!(adjusted.get(), Some((11, 1)));
     adjusted.set(None);
-    click(&window, 649.0, 110.0);
+    click(&window, 175.0, 110.0);
     assert_eq!(adjusted.get(), Some((0, 1)));
+    click(&window, 649.0, 110.0);
+    assert_eq!(adjusted.get(), Some((1, 1)));
+    click(&window, 649.0, 166.0);
+    assert_eq!(adjusted.get(), Some((12, 1)));
     click(&window, 175.0, 334.0);
     assert_eq!(adjusted.get(), Some((9, 1)));
     click(&window, 649.0, 334.0);

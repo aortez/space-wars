@@ -14,7 +14,11 @@ use crate::render::{FrameLayout, Viewport};
 
 pub(super) mod benchmark;
 #[cfg(test)]
+mod floor_tests;
+#[cfg(test)]
 mod meridiem_tests;
+#[cfg(test)]
+mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",
@@ -85,6 +89,7 @@ fn create(
             events: settings.clock.events,
             marquee_preset: settings.clock.marquee_preset,
             marquee_message: settings.clock.marquee_message,
+            rain_amount: settings.clock.rain_amount,
         },
         seed,
     );
@@ -207,10 +212,12 @@ impl ClientScenario for ClockClientScenario {
             },
             body_count: self.state.body_count(),
             collider_count: self.state.collider_count(),
+            floor: self.state.floor_mode(),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
+            rain: self.state.rain_state(),
             reading: self
                 .state
                 .reading()
@@ -950,10 +957,12 @@ mod tests {
                 let pixels = image.to_rgb8().unwrap();
                 if water_lab == scenario_clock::ClockWaterLab::Off {
                     if tick == 509 {
-                        final_reforming_pixels = Some(pixels.as_bytes().to_vec());
+                        final_reforming_pixels =
+                            Some(floor_tests::pixels_above_floor(&pixels).to_vec());
                     } else if tick == 510 {
                         assert!(
-                            pixels.as_bytes() == final_reforming_pixels.as_deref().unwrap(),
+                            floor_tests::pixels_above_floor(&pixels)
+                                == final_reforming_pixels.as_deref().unwrap(),
                             "cleanup must not pop to a different face at {viewport:?}"
                         );
                     }

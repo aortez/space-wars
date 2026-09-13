@@ -32,7 +32,8 @@ The local launcher includes the following scenarios and presets:
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
   Off, Calm, or Demo in Settings and enable Falling, Color Cycle, Meltdown, Duck,
-  Marquee, and Digit Slide individually.
+  Marquee, Digit Slide, and Rain individually. Rain has Light/Medium/Heavy/Varied
+  amounts and a passive rubber duck that floats with the current into the drain.
   Events share a deterministic, non-overlapping schedule; Color Cycle changes
   the readable face palette without physics. Meltdown turns individual cells into
   a bounded pool that drains through the floor before the face reforms.

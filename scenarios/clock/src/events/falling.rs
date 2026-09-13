@@ -30,7 +30,7 @@ impl FallingEvent {
         Self::Falling {
             tick: 0,
             world: Box::new(FallingWorld::new(
-                context.layout,
+                context.floor.drain().expect("Falling owns the drain"),
                 context.segments,
                 letters.as_ref().map_or(&[], |letters| letters.as_slice()),
                 &mut StdRng::seed_from_u64(seed),

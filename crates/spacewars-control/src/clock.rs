@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 8;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -40,10 +40,13 @@ pub struct ClockState {
     pub palette_rgb: [u8; 3],
     pub body_count: usize,
     pub collider_count: usize,
+    pub floor: engine_common::ClockFloorMode,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
+    #[serde(default)]
+    pub rain: Option<engine_common::ClockRainState>,
     pub reading: Option<[u8; 3]>,
     /// Latest target digits, including during a fall. Blank 12-hour slots are null.
     pub display_digits: [Option<u8>; 4],
@@ -347,10 +350,12 @@ mod tests {
             palette_rgb: [170, 140, 255],
             body_count: 0,
             collider_count: 0,
+            floor: engine_common::ClockFloorMode::Closed,
             meltdown: None,
             duck: None,
             marquee: None,
             digit_slide: None,
+            rain: None,
             reading: Some([12, 34, 56]),
             display_digits: [Some(1), Some(2), Some(3), Some(4)],
             can_trigger: false,
@@ -358,6 +363,75 @@ mod tests {
             settings_pending: false,
             settings_error: None,
         }
+    }
+
+    #[test]
+    fn floor_modes_round_trip_as_explicit_diagnostics() {
+        for mode in [
+            engine_common::ClockFloorMode::Closed,
+            engine_common::ClockFloorMode::DrainOpen,
+            engine_common::ClockFloorMode::EventOwned,
+        ] {
+            let mut state = clock_state();
+            state.floor = mode;
+            let json = state.to_json().unwrap();
+            assert!(json.contains(&format!("\"floor\":\"{}\"", mode.as_str())));
+            assert_eq!(ClockState::from_json(&json).unwrap(), state);
+        }
+    }
+
+    #[test]
+    fn rain_diagnostics_settings_and_named_trigger_round_trip() {
+        use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
+        let mut state = clock_state();
+        state.event_kind = Some(ClockEventKind::Rain);
+        state.floor = engine_common::ClockFloorMode::DrainOpen;
+        state.phase = Some("raining".into());
+        state.settings.rain_amount = ClockRainAmount::Varied;
+        state.rain = Some(ClockRainState {
+            seed: 42,
+            amount: ClockRainAmount::Heavy,
+            requested_microunits: 10_000_000,
+            scheduled_microunits: 5_000_000,
+            injected_microunits: 5_000_000,
+            pooled_microunits: 3_000_000,
+            in_flight_microunits: 1_000_000,
+            drained_microunits: 1_000_000,
+            reclaimed_microunits: 0,
+            parcels: 126,
+            source_limited_ticks: 2,
+            water_limited_ticks: 0,
+            entry_depth_milli: 21_000,
+            required_depth_milli: 12_000,
+            duck_phase: ClockRainDuckPhase::Floating,
+            duck_spawns: 1,
+            duck_position_milli: Some([100_000, -110_000]),
+            duck_velocity_milli: Some([-20_000, 1000]),
+            duck_angle_milli: Some(32),
+            submerged_milli: 450,
+            door_open_milli: 0,
+        });
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Rain);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        assert_eq!(ClockEventKind::DigitSlide as u8, 5);
+        assert_eq!(ClockEventKind::Rain as u8, 6);
+        let mut value = serde_json::to_value(&state).unwrap();
+        value.as_object_mut().unwrap().remove("rain");
+        assert!(
+            ClockState::from_json(&value.to_string())
+                .unwrap()
+                .rain
+                .is_none()
+        );
+        value["schema_version"] = 8.into();
+        assert!(ClockState::from_json(&value.to_string()).is_err());
     }
 
     #[test]

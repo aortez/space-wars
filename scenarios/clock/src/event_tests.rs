@@ -13,6 +13,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 duck: false,
                 marquee: false,
                 digit_slide: false,
+                rain: false,
             },
             ..ClockConfig::default()
         },

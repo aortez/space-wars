@@ -124,6 +124,27 @@ fn warmup_does_not_shift_the_measured_workload() {
 }
 
 #[test]
+fn rain_fixture_uses_the_public_headless_runner_without_saved_settings() {
+    for renderer in ["raster", "vector"] {
+        let rows = run("rain", renderer, 0);
+        assert!(
+            rows.iter()
+                .all(|r| r["clock_case"] == "rain" && r["event_active_frames"] == "60")
+        );
+        assert!(
+            rows.iter()
+                .all(|r| r["max_scene_items"].parse::<usize>().unwrap() <= 800)
+        );
+        assert!(
+            rows.last().unwrap()["max_scene_items"]
+                .parse::<usize>()
+                .unwrap()
+                > rows[0]["max_scene_items"].parse::<usize>().unwrap()
+        );
+    }
+}
+
+#[test]
 fn invalid_benchmark_arguments_are_rejected_without_a_display() {
     for args in [
         vec!["--clock-benchmark-case", "bogus"],

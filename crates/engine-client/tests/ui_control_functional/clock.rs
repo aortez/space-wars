@@ -52,7 +52,7 @@ fn digit_slide_controls_preview_cleanup_and_persistence() {
             page.selected_control.as_deref(),
             Some("pause.clock.digit-slide")
         );
-        for _ in 0..ClockEventKind::ALL.len() - 1 {
+        for _ in 0..ClockEventKind::DigitSlide as usize {
             page = harness.activate_guarded("pause.clock.preview-event.next", &page);
         }
         assert_eq!(
@@ -136,7 +136,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         // controls and therefore legitimately change its revision.
         let mut page = harness.state();
         // D-pad reaches Marquee and its recipe without triggering gameplay.
-        for _ in 0..4 {
+        for _ in 0..5 {
             page = harness.press_guarded(UiAction::Down, &page);
         }
         assert_eq!(
@@ -186,6 +186,90 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         let restarted = harness.clock_state();
         assert_eq!(restarted.settings, configured.settings);
         assert!(restarted.marquee.is_none());
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.return-to-launcher", &menu);
+        let launcher = harness.wait_clock_screen(UiScreen::LauncherMain, menu.revision);
+        harness.activate_guarded("launcher.start", &launcher);
+        harness.wait_clock_screen(UiScreen::Gameplay, launcher.revision);
+        assert_eq!(harness.clock_state().settings, configured.settings);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn rain_settings_preview_pause_cleanup_and_persistence() {
+    use engine_common::{ClockFloorMode, ClockRainAmount};
+    run_functional_test("clock-rain", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let mut state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        for _ in 0..3 {
+            state = harness.activate_guarded("launcher.settings.clock.rain.next", &state);
+        }
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.rain.next"),
+            Some("Heavy")
+        );
+        harness.capture_screenshot("clock-rain-launcher.png");
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        assert_eq!(initial.settings.rain_amount, ClockRainAmount::Heavy);
+        assert_eq!(initial.floor, ClockFloorMode::Closed);
+        assert_eq!(initial.events.len(), 7);
+        harness.clock_trigger_event(&initial, ClockEventKind::Rain);
+        let raining = harness.clock_wait(&initial, "raining", 1, 300);
+        assert_eq!(raining.floor, ClockFloorMode::DrainOpen);
+        assert!(raining.rain.unwrap().injected_microunits > 0);
+        harness.capture_screenshot("clock-rain-shower.png");
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        let page = harness.change_clock_setting("pause.clock.rain.next", "Off", &page);
+        let configured = harness.clock_state();
+        assert!(!configured.settings.events.rain);
+        assert_eq!(configured.settings.rain_amount, ClockRainAmount::Heavy);
+        assert_eq!(configured.rain, paused.rain);
+        assert_eq!(configured.floor, ClockFloorMode::DrainOpen);
+        harness.capture_screenshot("clock-rain-controls.png");
+        harness.press_guarded(UiAction::Start, &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        harness.clock_wait(&initial, "raining", 1, 720);
+        harness.capture_screenshot("clock-rain-floating.png");
+        let recovered = harness.clock_wait(&initial, "idle", 1, 0);
+        assert!(recovered.rain.is_none());
+        assert_eq!(recovered.floor, ClockFloorMode::Closed);
+        assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
+        assert_eq!(recovered.next_event_tick, None);
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let mut page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        for _ in 0..ClockEventKind::Rain as usize {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        // Explicit preview still works when Rain is disabled.
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let preview = harness.clock_wait(&initial, "raining", 2, 1);
+        assert_eq!(preview.rain.unwrap().amount, ClockRainAmount::Heavy);
+        assert_eq!(preview.floor, ClockFloorMode::DrainOpen);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert!(restarted.rain.is_none());
+        assert_eq!(restarted.floor, ClockFloorMode::Closed);
+        assert_eq!(restarted.settings, configured.settings);
+        assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.return-to-launcher", &menu);
@@ -323,6 +407,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         let configured = harness.clock_state();
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
@@ -369,6 +454,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!(menu.selected_control.as_deref(), Some("pause.clock"));
         let page = harness.press_guarded(UiAction::Confirm, &menu);
         assert_eq!(page.screen, UiScreen::PauseClock);
+        let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
@@ -618,6 +704,9 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             } else if active.event_kind == Some(ClockEventKind::Duck) {
                 assert!(active.body_count <= 5 && active.collider_count <= 5);
                 assert!(active.duck.is_some());
+            } else if active.event_kind == Some(ClockEventKind::Rain) {
+                assert!(active.body_count <= 2 && active.collider_count <= 5);
+                assert!(active.rain.is_some());
             } else {
                 assert!(matches!(
                     active.event_kind,
@@ -658,6 +747,11 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             state = harness.activate_guarded(id, &state);
             assert_eq!(control_value(&state, id), Some("Off"));
         }
+        state = harness.activate_guarded("launcher.settings.clock.rain.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.rain.next"),
+            Some("Off")
+        );
         harness.capture_screenshot("clock-event-switches.png");
         harness.activate_guarded("launcher.settings.start", &state);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
@@ -1042,6 +1136,7 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert_eq!(harness.clock_state().duck, paused.duck);
         // Four event switches and the preview are accessible using a D-pad.
         let mut page = harness.press_guarded(UiAction::Down, &page);
+        page = harness.press_guarded(UiAction::Down, &page);
         page = harness.press_guarded(UiAction::Down, &page);
         for _ in 0..3 {
             page = harness.press_guarded(UiAction::Right, &page);

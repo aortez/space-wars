@@ -61,14 +61,15 @@ pub(super) fn merge(
     extent: Vec2,
     water: &mut WaterWorld,
     area: f64,
-    layout: Layout,
+    drain: DrainGeometry,
 ) -> bool {
+    let layout = drain.layout();
     let left = (cell.position.x - extent.x).max(layout.bounds_min.x) as f64;
     let right = (cell.position.x + extent.x).min(layout.bounds_max.x) as f64;
     if cell.position.y - extent.y > layout.floor_y {
         return false;
     }
-    let lip = layout.drain_half_width() as f64;
+    let lip = drain.half_width() as f64;
     let gap_left = left.max(-lip);
     let gap_right = right.min(lip);
     let gap = (gap_right - gap_left).max(0.0);

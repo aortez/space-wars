@@ -10,12 +10,13 @@ the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
 Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slide.
 The issue's September 6 resume notes predate those deliveries. The current Duck
 upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
-rain/storm, flashlight/glow polish and concurrent events remain future work.
+Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
+flashlight/glow polish and concurrent events remain future work.
 
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, and **Marquee** switches select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Marquee**, and **Rain** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -45,6 +46,107 @@ the Off profile still disables every automatic event.
 | `duck` | Temporary floor course and a physical wall-tag runner | 35 s envelope, exit appears 20 s after spawn | 30 s |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
+| `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
+
+### Managed floor and drain
+
+The ordinary floor is **closed by default**, including unsynchronized startup,
+idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling, normal Meltdown and
+Rain acquire the center drain before creating their temporary material. It stays
+fully open through their recovery/cleanup, then closes after the event's bodies,
+water and remaining visuals have been released. Preview replacement, resize and
+restart use the same ownership boundary. Pausing or disabling a currently running
+event does not close the drain underneath it.
+
+The obstacle-course Duck and development water labs own their custom floors
+instead; they do not also open the ordinary drain. Their physical floor/pit/tank
+geometry is unchanged. The Duck course keeps its entrance/exit fade to the
+ordinary closed floor; water labs return to it on completion.
+
+One small scenario-owned manager is sufficient because events cannot overlap.
+Its shared geometry supplies rendered floor slabs, Falling/Rain floor colliders,
+the Meltdown/Rain pool banks, spill channel and material deposition boundaries.
+It adds no per-tick requests, persistent rigid bodies or fluid work. The initial
+transition is an atomic open/closed change at event boundaries: durations, rain
+amounts and drainage behavior are unchanged. An animated or delayed hatch would
+need coordinated physical/water transitions and is deliberately separate.
+
+`clock state` reports `floor`: `closed`, `drain-open`, or `event-owned` in both
+JSON and text diagnostics. Schema 10 requires a matching client and CLI; this
+does not add another saved setting or change the Clock action payload version.
+
+Focused regressions cover each event's complete ownership lifetime, pause,
+replacement, resize/restart, and matching floor/pool bounds at six aspect ratios:
+
+```sh
+cargo test --locked -p scenario-clock floor_tests
+cargo test --locked -p engine-client --bin engine-client managed_floor
+```
+
+The real-client Rain workflow also checks the floor state through preview,
+paused controls, cleanup and restart. Rendering tests retain exact clock-face
+recovery while allowing the intended drain closure below it.
+
+### Rain and the rubber duck
+
+Choose **Rain: Off / Varied / Light / Medium / Heavy** in the launcher settings
+or live **Clock Controls**. Varied chooses a seeded amount for each visit;
+changing the setting affects the next event, not water already falling. Rain's
+amount is separate from the global Calm/Demo event frequency. Older settings
+default to Varied with Rain enabled, preserving all existing choices.
+Preview **Rain → Preview & Resume** to run it immediately, including when Off.
+
+Rain ramps up and down over 20 simulated seconds. Stratified, jittered drops
+feed the same two finite-volume floor pools used by Meltdown. Local water must
+remain at least 0.65 digit-pitches deep for half a second before the hatch opens;
+depth is checked again before releasing one duck. Light showers normally never
+reach that threshold, so no duck appears. The hatch closes and disappears after
+release. The ordinary jumping **Duck** event and its two brains are unchanged.
+
+The rubber duck is a passive dynamic Rapier box with density 0.45 relative to
+water. Existing `BuoyantBody` integration applies buoyancy, flow-relative drag
+and torque to its actual pose. There is no swimming AI, surface snapping or
+drain attraction. The hull clears either drain lip in every orientation; once
+unsupported it falls under gravity. Its sprite follows the body's rotation.
+This is one-way coupling: the duck does not displace water yet, and falling
+parcels do not directly push it. Future player/bot forces can be applied at the
+same physical-body boundary without replacing the flotation model.
+
+The event uses **128 columns, at most 128 water parcels, and one dynamic body**
+(two total bodies/five colliders while the duck is present). Source admission
+reserves two new parcel slots for this tick's outlets; already airborne outlet
+parcels count toward the same budget. Capacity pressure defers unadmitted rain
+without inventing or deleting liquid. Remaining requested rain is cancelled when
+the source ends. The digits, colon and AM/PM remain anchored and live throughout.
+
+The last two seconds explicitly reclaim remaining water and fade any stranded
+duck. This is bounded cleanup, **not** a successful drain exit. `clock state`
+reports the resolved amount, seed, local/required depth, water accounting,
+capacity counters and duck pose. Its duck phase distinguishes `waiting`,
+`opening`, `floating`, `exited`, `not-spawned`, and `reclaimed`.
+Volumes use full-size digit-cell area equivalents (1,000,000 micro-units per
+cell); injected ≈ pooled + in-flight + drained + reclaimed, allowing independent
+rounding. Requested/scheduled budget is not additional liquid. Rain diagnostics
+are null once the event is over. Pause freezes everything; resize, restart and
+preview replacement release all temporary resources.
+
+Tests cover still-water equilibrium, the same drain run with drag on/off,
+seeded replay, depth-gated entry, source backpressure, conservation, deadline
+cleanup, live time and settings, both render paths, and real-client controls.
+The initial sweep of three display shapes × eight seeds produced 48 physical
+drain exits in Medium/Heavy and 24 no-spawn Light runs. This is a regression
+sample, not a guarantee for every possible seed. See the
+[performance lab](clock-performance-lab.md) for the fixed Heavy Rain benchmark.
+
+Local validation for this slice: 474 selected unit tests and four headless
+binary tests passed; all ten Clock real-client workflows were verified on the
+local X display. Raster/menu captures were checked at device-sized viewports;
+no Pi deployment was performed. Rust 1.89 workspace/all-target checking, formatting,
+and strict scoped Clock/common/control/CLI lint passed. Full-client strict lint
+still reports existing warnings in unrelated host/raster/gamepad/mission code;
+those were left outside this change.
+
+### Digit Slide
 
 Digit Slide is triggered by a forward minute change, not the periodic lottery.
 Only changed slots move: old cells roll out below while new cells enter from
@@ -69,8 +171,8 @@ works even with the switch/profile Off and is reported as `preview: true`.
 
 Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
-with the arena floor, side walls, and each other. The floor's center drain is
-open. Dim anchor cells remain visible behind the action.
+with the arena floor, side walls, and each other. The floor's center drain opens
+for the event and closes after reforming. Dim anchor cells remain visible behind the action.
 In 12-hour mode, AM/PM tumbles with the digits: each letter is one small
 compound body whose pixel colliders match its visible shape. There is no
 second anchored copy of the label.
@@ -205,7 +307,7 @@ next planned jump. The opposite
 door is entirely hidden for 20 simulation seconds after spawn (warm-up included).
 When it appears, the duck finishes its current crossing, turning at the entrance
 if necessary, and leaves through the exit. The course fades away, restoring the
-ordinary floor and center drain; the clock follows live time throughout.
+ordinary closed floor; the clock follows live time throughout.
 
 The duck uses **one dynamic round body** and one fixed body/collider per landing
 surface, including the entrance and exit runways: normally **four to six bodies
@@ -550,11 +652,11 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **8** and reports scenario-instance revision,
+`clock state` uses schema version **10** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
-`exiting`, `resetting`, `presenting`, `sliding`), pause state, profile, schedule, current
-reading/target digits, palette RGB, physics counts, and typed live `settings`.
+`exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
+reading/target digits, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
 or in idle/cooldown when no event is active. The embedded event catalog includes
@@ -615,8 +717,8 @@ landings, not proposed shortcuts or merely passing overhead. A fallback course
 reports its actual Platforms pattern. Older payloads default to Platforms and
 zero skips.
 
-Older schema-8 payloads without `navigation` still decode; this adds no commands
-or action payload changes. Both text and JSON `clock state` show these diagnostics.
+The optional `navigation` fields default when absent. Both text and JSON
+`clock state` show these diagnostics.
 The optional `marquee` object reports the active recipe, content, cell/group
 counts, progress in thousandths, scrolling/waving flags, rotation target and
 lighting mode. `settings.marquee_preset` and `settings.marquee_message` are the
@@ -626,14 +728,14 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 7 and
-older requests are rejected. The internal Clock action payload is version 4;
-event ordinals 0–4 are unchanged and Digit Slide is 5. Configure contains six
-switch bits, a validated recipe byte, and 1–32 message bytes. Version 1–3 actions
+after completion or cancellation. Use matching client/CLI builds: schema 8 and
+older requests are rejected. The internal Clock action payload is version 5;
+event ordinals 0–5 are unchanged and Rain is 6. Configure contains seven
+switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. Version 1–4 actions
 are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 8, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 10, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -650,8 +752,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 8, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, or `digit-slide`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 10, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification
@@ -669,6 +771,55 @@ SPACEWARS_KEEP_FUNCTIONAL_ARTIFACTS=1 xvfb-run -a \
 See [functional tests](functional-tests.md) for display setup, coverage, and
 failure artifacts. The same CLI works on the deployed Pi for phase-aware smoke
 tests and screenshots.
+
+### Rain validation (2026-09-13)
+
+The seeded regression covers 72 complete events: eight seeds for each of Light,
+Medium and Heavy at 1024×768, 800×480 and 480×800 aspect ratios. All 24 Light
+cases leave the hatch closed; all 48 Medium/Heavy cases spawn one duck and record
+an actual drain exit, rather than deadline reclamation. Every tick checks water
+accounting and resource caps, and every event finishes with no bodies, colliders,
+parcels or pooled water. Separate tests cover replay, backpressure, deadline
+reclamation, resize, pause, replacement and rendering.
+
+On `sw-picade-2` (Pi 4, 1024×768, raster scale 2.0), a Heavy preview showed a
+floating duck at 60 FPS / 60 UPS and later returned to an idle, body-free Clock.
+App Settings, restart, launcher return and relaunch were exercised on-device.
+The normal A/B update also installed the restricted log reader; both bounded
+history and live following worked without relying on the application's socket.
+Demo/Varied preferences and the original volume were restored after testing.
+
+![Heavy Rain and a passive floating duck on the Picade](screenshots/clock/picade-rain-floating.png)
+
+### Managed-floor device validation (2026-09-13)
+
+Deployed the matching release client/CLI pair to `sw-picade-2` with a fast update
+(Pi 4, 1024×768, raster scale 2.0; no reboot). Device checks verified:
+
+- Closed floor during Color Cycle and idle; Falling and Meltdown retain their
+  opening through recovery, then return to a closed, body-free arena.
+- The obstacle-course Duck owns its custom floor; previewing Rain replaces it
+  with the managed drain and releases the old course's resources.
+- Heavy Rain spawns a floating duck, preserves the opening and simulation state
+  while paused, records an actual duck drain exit, and closes after cleanup.
+- Restart during Rain begins a new Clock instance with a closed floor and no
+  leftover bodies, colliders or water. The original saved preferences were
+  restored byte-for-byte (Demo/Heavy Rain, existing event switches and volume).
+
+The kiosk remained on the same process after deployment with zero unexpected
+service restarts. A floating-duck sample reported 60 FPS / 60 UPS, 0.170 ms mean
+host step and 7.416 ms mean frame preparation. These are live samples, not a
+performance guarantee. Local validation passed 502 focused all-target tests,
+12 real-client UI workflows on isolated Xvfb, strict Clock/common/control/CLI
+Clippy, formatting, and the Rust 1.89 compatibility check.
+
+The first interaction with an auto-started Clock intentionally returns to the
+launcher. Device automation launched Clock manually before using its controls;
+no auto-start timing or input behavior was changed.
+
+| Ordinary closed floor | Managed drain during Heavy Rain |
+| --- | --- |
+| ![Closed Clock floor on sw-picade-2](screenshots/clock/picade-managed-floor-closed.png) | ![Open drain and floating duck on sw-picade-2](screenshots/clock/picade-managed-floor-rain.png) |
 
 ### Digit Slide verification
 

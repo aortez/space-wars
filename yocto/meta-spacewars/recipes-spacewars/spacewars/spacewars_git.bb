@@ -34,6 +34,7 @@ RDEPENDS:${PN} += " \
     libxkbcommon \
     seatd \
     libudev \
+    sudo \
     util-linux-flock \
     util-linux-setpriv \
     xkeyboard-config \
@@ -54,6 +55,8 @@ python () {
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-kiosk.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-seatd.service:True",
         f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-fast-update.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sh:True",
+        f"{srcroot}/yocto/meta-spacewars/recipes-spacewars/spacewars/files/spacewars-logs.sudoers:True",
     ]
 
     for top in ("crates", "scenarios", "vendor"):
@@ -80,6 +83,9 @@ do_install() {
 
     install -d ${D}${sbindir}
     install -m 0755 ${WORKDIR}/spacewars-fast-update.sh ${D}${sbindir}/spacewars-fast-update
+    install -m 0755 ${WORKDIR}/spacewars-logs.sh ${D}${sbindir}/spacewars-logs
+    install -d -m 0750 ${D}${sysconfdir}/sudoers.d
+    install -m 0440 ${WORKDIR}/spacewars-logs.sudoers ${D}${sysconfdir}/sudoers.d/spacewars-logs
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${WORKDIR}/spacewars-data-init.service ${D}${systemd_system_unitdir}/spacewars-data-init.service
@@ -95,6 +101,8 @@ SRC_URI += " \
     file://spacewars-kiosk.service \
     file://spacewars-seatd.service \
     file://spacewars-fast-update.sh \
+    file://spacewars-logs.sh \
+    file://spacewars-logs.sudoers \
 "
 
 do_install[file-checksums] += "${SPACEWARS_LAYERDIR}/lib/spacewars/fast_update.py:True"
@@ -105,6 +113,7 @@ python write_spacewars_fast_compatibility() {
     assets = [Path(d.getVar("WORKDIR")) / name for name in (
         "spacewars-data-init.sh", "spacewars-data-init.service",
         "spacewars-kiosk.service", "spacewars-seatd.service", "spacewars-fast-update.sh",
+        "spacewars-logs.sh", "spacewars-logs.sudoers",
     )]
     variables = {key: d.getVar(key) or "" for key in (
         "MACHINE", "TARGET_SYS", "TUNE_FEATURES", "DISTRO", "DISTRO_VERSION",
@@ -157,6 +166,8 @@ FILES:${PN} = " \
     ${bindir}/falling-benchmark \
     ${bindir}/spacewars-data-init \
     ${sbindir}/spacewars-fast-update \
+    ${sbindir}/spacewars-logs \
+    ${sysconfdir}/sudoers.d/spacewars-logs \
     ${datadir}/spacewars/fast-update-compat \
     ${systemd_system_unitdir}/spacewars-data-init.service \
     ${systemd_system_unitdir}/spacewars-kiosk.service \

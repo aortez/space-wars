@@ -121,7 +121,7 @@ fn footprint_conversion_partitions_one_cell_across_columns_banks_and_gap() {
             extent,
             &mut event.water,
             event.cell_area,
-            layout
+            event.drain.unwrap()
         ));
         let left = (x - extent.x).max(layout.bounds_min.x) as f64;
         let right = (x + extent.x).min(layout.bounds_max.x) as f64;
@@ -179,7 +179,7 @@ fn full_parcel_queue_defers_the_whole_source_then_accepts_it_once() {
         extent,
         &mut event.water,
         event.cell_area,
-        layout
+        event.drain.unwrap()
     ));
     assert_eq!(before, event.water.stats());
     assert_eq!(drop.position.y, layout.floor_y + extent.y);
@@ -189,7 +189,7 @@ fn full_parcel_queue_defers_the_whole_source_then_accepts_it_once() {
         extent,
         &mut event.water,
         event.cell_area,
-        layout
+        event.drain.unwrap()
     ));
     let s = event.water.stats();
     assert!((s.injected - before.injected - event.cell_area).abs() < 1e-8);
@@ -290,7 +290,7 @@ fn a_full_queue_skips_optional_spray_but_does_not_stall_a_bank_impact() {
         Vec2::new(layout.pitch * 0.4, layout.pitch * 0.4),
         &mut event.water,
         event.cell_area,
-        layout
+        event.drain.unwrap()
     ));
     let after = event.water.stats();
     assert_eq!(after.in_flight, before.in_flight);

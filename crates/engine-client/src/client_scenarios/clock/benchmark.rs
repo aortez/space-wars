@@ -14,11 +14,12 @@ pub enum ClockBenchmarkCase {
     Duck,
     Marquee,
     DigitSlide,
+    Rain,
 }
 
 impl ClockBenchmarkCase {
     #[cfg(test)]
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Idle,
         Self::Falling,
         Self::ColorCycle,
@@ -26,6 +27,7 @@ impl ClockBenchmarkCase {
         Self::Duck,
         Self::Marquee,
         Self::DigitSlide,
+        Self::Rain,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -41,6 +43,7 @@ impl ClockBenchmarkCase {
             Self::Duck => ClockEventKind::Duck,
             Self::Marquee => ClockEventKind::Marquee,
             Self::DigitSlide => ClockEventKind::DigitSlide,
+            Self::Rain => ClockEventKind::Rain,
         })
     }
 
@@ -73,6 +76,7 @@ impl Driver {
                 aspect_ratio: aspect,
                 event_profile: ClockEventProfile::Off,
                 marquee_preset: config.marquee_preset,
+                rain_amount: engine_common::ClockRainAmount::Heavy,
                 ..ClockConfig::default()
             },
             seed,

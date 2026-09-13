@@ -382,6 +382,7 @@ mod tests {
                 duck: false,
                 marquee: false,
                 digit_slide: false,
+                rain: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -436,6 +437,26 @@ mod tests {
             settings.clock.events.digit_slide = enabled;
             let restored: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
             assert_eq!(restored.clock, settings.clock);
+        }
+    }
+
+    #[test]
+    fn rain_defaults_and_round_trips_without_changing_older_clock_choices() {
+        use engine_common::ClockRainAmount;
+        let mut settings: Settings = toml::from_str("[clock]\ntime_format='12-hour'\nevent_profile='off'\nmarquee_message='HELLO'\n[clock.events]\nduck=false\ndigit_slide=false\n").unwrap();
+        assert_eq!(settings.clock.rain_amount, ClockRainAmount::Varied);
+        assert!(settings.clock.events.rain);
+        assert!(!settings.clock.events.duck);
+        assert!(!settings.clock.events.digit_slide);
+        assert_eq!(settings.clock.marquee_message.as_str(), "HELLO");
+        for amount in ClockRainAmount::ALL {
+            for enabled in [false, true] {
+                settings.clock.rain_amount = amount;
+                settings.clock.events.rain = enabled;
+                let restored: Settings =
+                    toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+                assert_eq!(settings.clock, restored.clock);
+            }
         }
     }
 

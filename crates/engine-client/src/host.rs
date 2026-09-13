@@ -1016,6 +1016,7 @@ fn step_scenario_inner(
             }
             ScenarioControlRequest::ClockPreview(event) => {
                 if *paused {
+                    tracing::info!(?event, "previewing Clock event and resuming.");
                     scenario.inner.preview_clock_event(event);
                     *paused = false;
                     *accumulator = Duration::ZERO;

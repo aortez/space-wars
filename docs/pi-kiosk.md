@@ -13,7 +13,7 @@ device has been identified and explicitly confirmed.
 - Persistent settings directory: `/var/lib/spacewars`
 - Persistent settings file: `/var/lib/spacewars/settings.toml`
 - Persistent user ROM library: `/var/lib/spacewars/roms`
-- Recommended renderer: `raster`
+- Renderer: `raster` (fixed in the `pi-kiosk` display build)
 - Raster scale: saved `launch.raster_scale` preference (default `1.0`)
 
 The settings directory must be writable by the user that runs `engine-client`.
@@ -427,6 +427,43 @@ across rootfs-only A/B updates. See [the compatibility boundary](picade.md#updat
 SSH host keys live under `/data/ssh` so reflashes and A/B updates keep a stable
 device identity.
 
+### Read-only application logs
+
+The Pi image installs a small, root-owned journal reader and a sudo rule that
+allows **only that reader**. No general journal, shell, file-read, or service
+control permission is added. From a workstation:
+
+```sh
+ssh spacewars@sw-picade-2.local spacewars-cli logs
+ssh spacewars@sw-picade-2.local spacewars-cli logs --lines 1000
+ssh spacewars@sw-picade-2.local spacewars-cli logs --lines 50 --follow
+```
+
+The default is the latest 200 entries; `--lines` accepts 1–1000. All reads are
+restricted to `spacewars-kiosk.service` and the **current boot**. `--follow`
+streams new entries until interrupted. The CLI replaces itself with the
+noninteractive reader, inheriting output and signals; it neither buffers the
+log nor contacts the application's control socket. It works while the app is
+hung, stopped, or restarting. SSH access to the device is still required.
+
+There is no new log store, polling loop, or per-frame logging. Existing
+journald rotation/retention remains unchanged: this image uses a volatile
+journal, so capture logs before rebooting. Startup and launch logs identify the
+renderer. Renderer selections, fallbacks, Clock setting changes, previews,
+pauses, and restarts provide a small event trail. User-provided marquee text
+is not included in settings-change records.
+
+Installing the helper and its sudo rule requires **one normal rootfs update**;
+`--fast` cannot add them. They are included in the fast-update compatibility
+fingerprint, so an older device is rejected before installing an incompatible
+app-only bundle. No kernel/boot changes are needed for this feature.
+
+The Pi's Slint software backend does not draw vector `Path` items. The kiosk
+now migrates a saved vector preference to raster and fixes the Renderer row to
+raster. Direct and automatic launches also enforce the restriction and log
+any fallback. Desktop vector rendering and CPU-only headless vector benchmarks
+are unchanged.
+
 ### Fast application updates
 
 After **one normal update** installs the fast-update helper and sudoers rule:
@@ -456,7 +493,7 @@ described above. Fast mode does **not** update OS packages, units, boot files,
 user data/ROMs. Use normal updates for those changes and `sync-data.sh` for ROMs.
 The fingerprint is a conservative guard, not a general OS/package upgrade tool.
 
-The only extra sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
+The fast-update sudo permission is `/usr/sbin/spacewars-fast-update`; it accepts
 a fixed pair of binaries from a validated staging directory, reads them as the
 kiosk user, verifies hashes again, and serializes installs with a lock. It keeps
 backups before stopping the app and requires three control-API responses from

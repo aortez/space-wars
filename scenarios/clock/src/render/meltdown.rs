@@ -150,21 +150,21 @@ pub(super) fn render_reforming_face(frame: &mut RenderFrame, state: &ClockState,
     }
 }
 
-pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
-    if let Some(lab) = &event.floats {
-        for (min, max) in &lab.supports {
-            frame.push_primitive(
-                ARENA_LAYER,
-                rectangle(
-                    RenderPoint::new(min.x, min.y),
-                    RenderPoint::new(max.x, max.y),
-                    FLOOR_EDGE_COLOR,
-                    None,
-                ),
-            );
-        }
-    }
-    for pool in event.water.pools() {
+pub(super) fn render_water(
+    frame: &mut RenderFrame,
+    water: &engine_water::WaterWorld,
+    layer: i32,
+    opacity: f32,
+) {
+    let color = RenderColor {
+        a: opacity,
+        ..WATER_COLOR
+    };
+    let edge_color = RenderColor {
+        a: opacity,
+        ..WATER_EDGE
+    };
+    for pool in water.pools() {
         let mut columns = pool.columns().peekable();
         let mut previous = None;
         while let Some(column) = columns.next() {
@@ -177,15 +177,15 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
                     RenderPoint::new(column.left as f32, left as f32),
                 ];
                 frame.push_primitive(
-                    ACTIVE_CELL_LAYER,
-                    RenderPrimitive::Polygon(RenderPolygon::filled(points.to_vec(), WATER_COLOR)),
+                    layer,
+                    RenderPrimitive::Polygon(RenderPolygon::filled(points.to_vec(), color)),
                 );
                 let mut edge = points;
                 edge[0].y = (left - (left - column.bed).min(1.2)) as f32;
                 edge[1].y = (right - (right - column.bed).min(1.2)) as f32;
                 frame.push_primitive(
-                    ACTIVE_CELL_LAYER,
-                    RenderPrimitive::Polygon(RenderPolygon::filled(edge.to_vec(), WATER_EDGE)),
+                    layer,
+                    RenderPrimitive::Polygon(RenderPolygon::filled(edge.to_vec(), edge_color)),
                 );
             }
             previous = Some(column);
@@ -194,7 +194,7 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
     // The ribbons represent water still in flight. Their area is the transported
     // volume: accelerating water stretches and thins rather than retaining a
     // pool-height rectangle down the entire cliff.
-    for parcel in event.water.parcels() {
+    for parcel in water.parcels() {
         if (parcel.volume as f32)
             < 0.05 * (parcel.velocity.length() * parcel.duration as f32).max(0.5)
         {
@@ -213,14 +213,31 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
             continue;
         }
         frame.push_primitive(
-            ACTIVE_CELL_LAYER,
+            layer,
             RenderPrimitive::Polygon(RenderPolygon {
                 points,
-                fill: Some(Fill::new(WATER_COLOR)),
+                fill: Some(Fill::new(color)),
                 stroke: None,
             }),
         );
     }
+}
+
+pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Layout) {
+    if let Some(lab) = &event.floats {
+        for (min, max) in &lab.supports {
+            frame.push_primitive(
+                ARENA_LAYER,
+                rectangle(
+                    RenderPoint::new(min.x, min.y),
+                    RenderPoint::new(max.x, max.y),
+                    FLOOR_EDGE_COLOR,
+                    None,
+                ),
+            );
+        }
+    }
+    render_water(frame, &event.water, ACTIVE_CELL_LAYER, 1.0);
     // Keep solid blocks legible as they pass through the pool to the floor.
     for cell in &event.cells {
         if cell.meridiem {

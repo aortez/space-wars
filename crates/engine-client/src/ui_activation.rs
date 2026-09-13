@@ -167,6 +167,8 @@ fn activation_target(
         "pause.clock.digit-slide" => pause_clock(11, UiAction::Confirm),
         "pause.clock.marquee-preset.previous" => pause_clock(10, UiAction::Left),
         "pause.clock.marquee-preset.next" => pause_clock(10, UiAction::Right),
+        "pause.clock.rain.previous" => pause_clock(12, UiAction::Left),
+        "pause.clock.rain.next" => pause_clock(12, UiAction::Right),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -229,6 +231,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.duck" | "launcher.settings.match.length" => 8,
         "launcher.settings.clock.marquee" => 9,
         "launcher.settings.clock.marquee-preset" => 10,
+        "launcher.settings.clock.rain" => 11,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))
