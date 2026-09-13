@@ -15,7 +15,7 @@ EnvironmentFile=/run/spacewars-hardware/hardware.env
 # Optional per-device overrides; the shared boot partition survives A/B updates.
 EnvironmentFile=-/boot/spacewars-kiosk.env
 WorkingDirectory=/data/spacewars
-ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+ExecStart=/usr/bin/engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
