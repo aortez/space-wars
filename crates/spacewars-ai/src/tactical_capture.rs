@@ -146,7 +146,7 @@ impl TacticalCapturePilot {
             if let Some(s) = &o.landing_objective
                 && s.version == 1
                 && s.actor == p.owner
-                && s.tick == p.tick
+                && s.is_current(p.tick)
                 && LandingObjective::read(p).is_some_and(|target| target.matches(s.objective))
                 && let Some(route) = s.actual.as_ref().filter(|r| r.cost().is_some())
                 && let Some(endpoint) = route.endpoint
@@ -157,7 +157,7 @@ impl TacticalCapturePilot {
                     endpoint,
                     hatch: (hatch - p.planet.motion.position)
                         .rotate_radians(-p.planet.motion.angle),
-                    tick: p.tick,
+                    tick: s.tick,
                     reached: false,
                 });
             }

@@ -303,6 +303,29 @@ impl SurfaceSortieState {
         request: MissionSensorRequest,
         cadence: LandingSurveyCadence,
     ) -> MissionObservationV1 {
+        self.mission_observation_profile(player, request, cadence, true)
+    }
+
+    pub fn mission_observation_for_live_planning(
+        &self,
+        player: usize,
+        request: MissionSensorRequest,
+        cadence: LandingSurveyCadence,
+    ) -> MissionObservationV1 {
+        assert_eq!(
+            request.objective_planning,
+            landing_objective::ObjectivePlanning::JointRoundTrip
+        );
+        self.mission_observation_profile(player, request, cadence, false)
+    }
+
+    fn mission_observation_profile(
+        &self,
+        player: usize,
+        request: MissionSensorRequest,
+        cadence: LandingSurveyCadence,
+        objective_surveys: bool,
+    ) -> MissionObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("mission_observation");
         let current = self.motion_planet_index(player);
@@ -375,10 +398,11 @@ impl SurfaceSortieState {
         MissionObservationV1 {
             version: 1,
             match_rules: self.round.is_some(),
-            local: self.tactical_sortie_observation_with_planning(
+            local: self.tactical_sortie_observation_profile(
                 player,
                 query,
                 request.objective_planning,
+                objective_surveys,
             ),
             planets,
             sun: self.world.sun.map(|sun| MissionObstacle {

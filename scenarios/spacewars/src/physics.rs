@@ -76,6 +76,10 @@ const GROUP_ROVER: u32 = 1 << 9;
 const GROUP_ROVER_SURFACE: u32 = 1 << 10;
 const GROUP_SPACELING: u32 = 1 << 11;
 const GROUP_MATERIAL: u32 = 1 << 12;
+
+pub(super) fn material_ground_groups() -> CollisionGroups {
+    CollisionGroups::new(GROUP_SPACELING, GROUP_MATERIAL)
+}
 // Surface actors exclude legacy circular planet colliders, but still hit the sun.
 const GROUP_SUN: u32 = 1 << 13;
 const GROUP_ALL_SHIPS: u32 = GROUP_SHIP_0 | GROUP_SHIP_1 | GROUP_POD_0 | GROUP_POD_1;

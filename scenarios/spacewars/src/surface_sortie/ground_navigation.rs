@@ -3,7 +3,9 @@
 use super::*;
 
 mod routes;
+mod survey_job;
 pub use routes::{GroundRoundTrip, GroundRoundTripJob, GroundRoutes, GroundTripWork};
+pub(super) use survey_job::GroundSurveyJob;
 
 pub const GROUND_SAMPLES: usize = 512;
 pub const GROUND_NEIGHBOR_SPAN: usize = 6;
@@ -92,6 +94,18 @@ pub(super) fn standing_height() -> f32 {
 }
 
 impl GroundMap {
+    pub(super) fn take_contents(&mut self) -> Self {
+        Self {
+            version: self.version,
+            actor: self.actor,
+            planet: self.planet,
+            revision: self.revision,
+            tick: self.tick,
+            nodes: std::mem::take(&mut self.nodes),
+            edges: std::mem::take(&mut self.edges),
+            rejected: std::mem::take(&mut self.rejected),
+        }
+    }
     /// Join matching surveyed endpoints. The caller must supply a physically
     /// measured corridor; this graph operation performs no world query or move.
     pub fn connect_jetpack(&mut self, start: Vec2, destination: Vec2) -> Option<(u16, u16)> {

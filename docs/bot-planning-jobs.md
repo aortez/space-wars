@@ -1,5 +1,9 @@
 # Resumable v10 graph jobs
 
+Follow-up: [live landing-objective surveys](live-bot-surveys.md) connect this
+scheduler to coherent physical measurements in opt-in test-runner profiles.
+The checkpoint and synchronous/default behavior described below remain available.
+
 This continues [#81](https://github.com/aortez/space-wars/issues/81) after the
 selectable v9/v10 comparison in [#82](https://github.com/aortez/space-wars/pull/82).
 It supplies the first actual resumable job and a shared scheduler. It preserves

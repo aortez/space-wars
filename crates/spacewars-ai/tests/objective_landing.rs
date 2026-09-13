@@ -63,6 +63,7 @@ fn fixture() -> (TacticalCapturePilot, TacticalSortieObservationV1) {
         version: 1,
         actor: p.owner,
         tick: p.tick,
+        validated_tick: None,
         objective: LandingObjective::read(p).unwrap(),
         sites,
         actual: None,
@@ -128,6 +129,68 @@ fn stale_missing_partial_or_malformed_route_evidence_cannot_choose_a_site() {
 }
 
 #[test]
+fn validated_live_evidence_retains_its_source_tick_and_has_a_bounded_age() {
+    for age in [1, 30, 120, 121] {
+        for fault in [
+            "none",
+            "unvalidated",
+            "future_source",
+            "old_validation",
+            "wrong_actor",
+        ] {
+            let (mut pilot, mut o) = fixture();
+            o.combat.recovery.flight.pilot.tick += age;
+            let tick = o.combat.recovery.flight.pilot.tick;
+            let s = o.landing_objective.as_mut().unwrap();
+            s.validated_tick = Some(tick);
+            match fault {
+                "unvalidated" => s.validated_tick = None,
+                "future_source" => s.tick = tick + 1,
+                "old_validation" => s.validated_tick = Some(tick - 1),
+                "wrong_actor" => s.actor = PlayerId::PLAYER_2,
+                _ => (),
+            }
+            let before = o.clone();
+            let action = pilot.intent(&o);
+            assert!(!action.flight.controls.interact_held);
+            assert_eq!(
+                pilot.site_request().is_some(),
+                age <= 120 && fault == "none",
+                "{age} {fault}"
+            );
+            assert_eq!(o, before);
+        }
+    }
+}
+
+#[test]
+fn cancelled_live_work_does_not_spend_the_failed_landing_attempt_budget() {
+    use scenario_spacewars::surface_sortie::live_planning::ObjectiveWorkState;
+    let (mut pilot, mut o) = fixture();
+    pilot.intent(&o);
+    for _ in 0..12 {
+        o.combat.recovery.flight.pilot.tick += 1;
+        o.landing_objective = None;
+        o.objective_work = Some(ObjectiveWorkState::Stale);
+        let action = pilot.intent(&o);
+        assert!(!action.flight.controls.interact_held);
+        assert!(pilot.telemetry().failure.is_none());
+        assert_eq!(pilot.site_request(), None);
+    }
+    assert_eq!(pilot.telemetry().objective_replans, 12);
+    // Once replacement evidence arrives, the same task can choose a site.
+    let (_, fresh) = fixture();
+    o.landing_objective = fresh.landing_objective;
+    o.combat.recovery.flight.pilot.tick += 1;
+    o.landing_objective.as_mut().unwrap().validated_tick =
+        Some(o.combat.recovery.flight.pilot.tick);
+    o.objective_work = Some(ObjectiveWorkState::Ready);
+    pilot.intent(&o);
+    assert!(pilot.site_request().is_some());
+    assert!(pilot.telemetry().failure.is_none());
+}
+
+#[test]
 fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() {
     let (mut pilot, mut o) = fixture();
     pilot.intent(&o);
@@ -147,6 +210,7 @@ fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() 
         version: 1,
         actor: p.owner,
         tick: p.tick,
+        validated_tick: None,
         objective: LandingObjective::read(p).unwrap(),
         sites: vec![],
         actual: Some(LandingObjectiveRoute {

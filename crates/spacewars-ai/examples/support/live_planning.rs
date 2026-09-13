@@ -1,0 +1,108 @@
+//! Optional live objective-planning budgets and diagnostics for both physical runners.
+use engine_core::planning::Work;
+use scenario_spacewars::surface_sortie::{
+    SurfaceSortieState, combat::TacticalSortieObservationV1, live_planning::LiveObjectivePlanner,
+};
+use serde_json::{Value, json};
+use std::{
+    fs,
+    io::{BufWriter, Write},
+    path::Path,
+    time::Instant,
+};
+
+pub struct LivePlanningRun {
+    planner: LiveObjectivePlanner,
+    seats: Vec<usize>,
+    trace: BufWriter<fs::File>,
+    dispatch: Vec<f64>,
+    active_dispatch: Vec<f64>,
+}
+impl LivePlanningRun {
+    pub fn from_args(out: &Path) -> Option<Self> {
+        if super::arg("--live-objective-planning", "false") != "true" {
+            return None;
+        }
+        let work = Work {
+            graph: super::arg("--objective-graph-budget", "16384")
+                .parse()
+                .unwrap(),
+            physics_queries: super::arg("--objective-query-budget", "1024")
+                .parse()
+                .unwrap(),
+        };
+        let seats = match super::arg("--live-objective-seats", "both").as_str() {
+            "both" => vec![0, 1],
+            "0" => vec![0],
+            "1" => vec![1],
+            _ => panic!("--live-objective-seats must be both, 0 or 1"),
+        };
+        fs::create_dir_all(out).unwrap();
+        let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
+        writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,age,graph,queries,phase,dispatch_ms").unwrap();
+        Some(Self {
+            planner: LiveObjectivePlanner::new(2, work),
+            seats,
+            trace,
+            dispatch: Vec::new(),
+            active_dispatch: Vec::new(),
+        })
+    }
+    pub fn enabled_for(&self, seat: usize) -> bool {
+        self.seats.contains(&seat)
+    }
+    pub fn observe(
+        &mut self,
+        state: &SurfaceSortieState,
+        seat: usize,
+        o: &mut TacticalSortieObservationV1,
+    ) {
+        self.planner.observe(state, seat, o);
+    }
+    pub fn advance(&mut self, tick: u64) -> f64 {
+        let start = Instant::now();
+        let report = self.planner.advance(tick).unwrap();
+        let ms = start.elapsed().as_secs_f64() * 1000.0;
+        self.dispatch.push(ms);
+        if report.charged != Work::default() {
+            self.active_dispatch.push(ms);
+        }
+        for job in &report.jobs {
+            writeln!(
+                self.trace,
+                "{tick},{},{},{},{},{},{},{},{},{},{:?},{ms:.6}",
+                report.tick,
+                report.allowance.graph,
+                report.allowance.physics_queries,
+                report.charged.graph,
+                report.charged.physics_queries,
+                job.request.actor,
+                job.age_ticks,
+                job.charged.graph,
+                job.charged.physics_queries,
+                job.phase
+            )
+            .unwrap();
+        }
+        ms
+    }
+    pub fn report(&mut self) -> Value {
+        self.trace.flush().unwrap();
+        let timing = |values: &[f64]| {
+            if values.is_empty() {
+                return Value::Null;
+            }
+            let mut values = values.to_vec();
+            values.sort_by(f64::total_cmp);
+            json!({"count":values.len(),"mean_ms":values.iter().sum::<f64>() / values.len() as f64,
+                "p95_ms":values[values.len()*95/100],"p99_ms":values[values.len()*99/100],
+                "max_ms":values.last()})
+        };
+        json!({"version":1,"sensor_profile":"live_joint_objective_v1",
+            "enabled_seats":self.seats,
+            "scope":"landing-objective ground survey, hull overlay and joint routes; other sensors and controls remain synchronous",
+            "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),
+            "dispatch":timing(&self.dispatch),"active_dispatch":timing(&self.active_dispatch),
+            "timing_scope":"snapshot construction and dependency validation are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; trace IO excluded"})
+    }
+}

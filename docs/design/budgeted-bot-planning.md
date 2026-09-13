@@ -3,9 +3,11 @@
 Status: steps 1–2 are merged. The first selectable
 joint-trip candidate and seat-swapped comparison harness are described in
 [mission policy comparison](../mission-policy-comparison.md). Step 3 now has a
-[resumable graph job and shared scheduler](../bot-planning-jobs.md), exercised
-offline. Live v10 still drains the search synchronously. Scheduling coherent
-physical surveys, live budget integration and strategic planning remain future work.
+[resumable graph job and shared scheduler](../bot-planning-jobs.md) and an
+[opt-in live landing-objective adapter](../live-bot-surveys.md). That adapter
+resumes coherent physical measurements and graph work under one shared
+allowance in the existing comparison runners. Default v10 remains synchronous;
+broader sensor coverage, cross-request reuse and strategic planning remain future work.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
