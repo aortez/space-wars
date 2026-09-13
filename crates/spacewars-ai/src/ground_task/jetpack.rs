@@ -2,7 +2,7 @@
 use super::*;
 use crate::jetpack_crossing::CrossingGoal;
 use scenario_spacewars::surface_sortie::{
-    ground_navigation::GroundRoute,
+    ground_navigation::{GroundRoute, GroundRoutes},
     jetpack::{CrossingAnchor, MAX_TERRAIN_CROSSINGS},
 };
 
@@ -15,13 +15,13 @@ impl GroundNavigationTask {
         range: f32,
         o: &RecoveryTaskObservationV1,
     ) -> (GroundRoute, Option<CrossingPlan>) {
-        let route = |map: &GroundMap| {
+        let route = |routes: &GroundRoutes<'_>| {
             if self.telemetry.destination == GroundDestination::Hatch {
-                map.route_to_hatch(foot, target)
+                routes.route_to_hatch(foot, target)
             } else if self.telemetry.destination == GroundDestination::Flag {
-                map.route_to_actor_target(foot, target, range)
+                routes.route_to_actor_target(foot, target, range)
             } else {
-                map.route(foot, target, range - 0.6)
+                routes.route(foot, target, range - 0.6)
             }
         };
         let cost = |r: &GroundRoute| {
@@ -33,7 +33,7 @@ impl GroundNavigationTask {
                     + r.diagnostics.flights as f32 * 30.0
             }
         };
-        let direct = route(map);
+        let direct = route(&map.routes());
         let Some(jetpack) = &o.jetpack else {
             return (direct, None);
         };
@@ -59,7 +59,8 @@ impl GroundNavigationTask {
                 flights.push((from, to, plan));
             }
         }
-        let mut combined = route(&graph);
+        let routes = graph.routes();
+        let mut combined = route(&routes);
         if combined.path.is_empty()
             && matches!(
                 self.telemetry.destination,
@@ -68,7 +69,7 @@ impl GroundNavigationTask {
         {
             // Only nearby powered crossings are surveyed. Walk/fly through the
             // known portion, then survey again from its end before continuing.
-            combined = graph.route_toward_actor_target(foot, target, range);
+            combined = routes.route_toward_actor_target(foot, target, range);
         }
         if cost(&combined) + 2.0 < cost(&direct) {
             for (i, pair) in combined.path.windows(2).enumerate() {

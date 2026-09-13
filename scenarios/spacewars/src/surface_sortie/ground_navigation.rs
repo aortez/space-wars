@@ -2,6 +2,9 @@
 //! The AI chooses routes. Sensors never edit material or advance physics.
 use super::*;
 
+mod routes;
+pub use routes::GroundRoutes;
+
 pub const GROUND_SAMPLES: usize = 512;
 pub const GROUND_NEIGHBOR_SPAN: usize = 6;
 pub const GROUND_REFRESH_TICKS: u64 = 30;
@@ -88,23 +91,6 @@ pub(super) fn standing_height() -> f32 {
     spec.half_segment + (spec.radius + 0.04) / spec.min_support_alignment + 0.08
 }
 
-fn trace_route(
-    route: &mut GroundRoute,
-    parents: &[Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES],
-    end: usize,
-) {
-    route.path.push(end as u16);
-    let mut cursor = end;
-    while let Some((previous, length, kind)) = parents[cursor] {
-        route.path.push(previous);
-        route.diagnostics.length += length;
-        route.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
-        route.diagnostics.flights += usize::from(kind == GroundEdgeKind::Jetpack);
-        cursor = usize::from(previous);
-    }
-    route.path.reverse();
-}
-
 impl GroundMap {
     /// Join matching surveyed endpoints. The caller must supply a physically
     /// measured corridor; this graph operation performs no world query or move.
@@ -133,167 +119,40 @@ impl GroundMap {
         Some((from, to))
     }
 
+    /// Build reusable lookup for multiple routes on this immutable survey.
+    pub fn routes(&self) -> GroundRoutes<'_> {
+        GroundRoutes::new(self)
+    }
+
     /// Bounded shortest measured route. Absence is evidence about this survey,
     /// not proof that a human cannot traverse the physical terrain.
     pub fn route(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
-        self.route_with_height(start, target, range, 0.0, false)
+        self.routes().route(start, target, range)
     }
 
-    /// Boarding measures the supported actor's center against the hatch. This
-    /// includes nearby lower footing; climbing onto the hatch ray's hit is not
-    /// required by the human transfer rule.
+    /// Boarding measures the supported actor's center against the hatch.
     pub fn route_to_hatch(&self, start: Vec2, target: Vec2) -> GroundRoute {
-        self.route_to_actor_target(start, target, HATCH_APPROACH_RANGE)
+        self.routes().route_to_hatch(start, target)
     }
 
-    /// Route using a standing-center envelope. Hatch transfer measures this
-    /// center; claims still independently check the real supported flag anchor.
+    /// Route using the standing-center envelope for the target region.
     pub fn route_to_actor_target(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
-        self.route_with_height(
-            start,
-            target,
-            range,
-            SurfaceSortieState::spec().half_height(),
-            false,
-        )
+        self.routes().route_to_actor_target(start, target, range)
     }
 
-    /// Advance through measured ground when distant connections are unknown.
     /// A partial route never establishes arrival or authorizes an unmeasured edge.
     pub fn route_toward_actor_target(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
-        self.route_with_height(
-            start,
-            target,
-            range,
-            SurfaceSortieState::spec().half_height(),
-            true,
-        )
-    }
-
-    fn route_with_height(
-        &self,
-        start: Vec2,
-        target: Vec2,
-        range: f32,
-        height: f32,
-        allow_partial: bool,
-    ) -> GroundRoute {
-        let destination_distance = |node: &GroundNode| {
-            (node.position + node.position.normalized() * height).distance_to(target)
-        };
-        let nearest = self.nodes.iter().min_by(|a, b| {
-            a.position
-                .distance_to(start)
-                .total_cmp(&b.position.distance_to(start))
-        });
-        let mut result = GroundRoute {
-            path: Vec::new(),
-            diagnostics: GroundRouteDiagnostics {
-                failure: None,
-                partial: false,
-                start_node: nearest.map(|n| n.id),
-                start_distance: nearest.map(|n| n.position.distance_to(start)),
-                destination_nodes: self
-                    .nodes
-                    .iter()
-                    .filter(|n| destination_distance(n) < range)
-                    .count(),
-                nearest_destination_distance: self
-                    .nodes
-                    .iter()
-                    .map(destination_distance)
-                    .min_by(f32::total_cmp),
-                reachable_nodes: 0,
-                closest_reachable_distance: None,
-                length: 0.0,
-                jumps: 0,
-                flights: 0,
-            },
-        };
-        let Some(initial) = nearest.filter(|n| n.position.distance_to(start) < 3.0) else {
-            result.diagnostics.failure = Some(GroundRouteFailure::NoStartFooting);
-            return result;
-        };
-        if result.diagnostics.destination_nodes == 0 && !allow_partial {
-            result.diagnostics.failure = Some(GroundRouteFailure::NoDestinationFooting);
-            return result;
-        }
-        let mut costs = [f32::INFINITY; GROUND_SAMPLES];
-        let mut parent: [Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES] =
-            [None; GROUND_SAMPLES];
-        let mut visited = [false; GROUND_SAMPLES];
-        // Surface arc distance still measures progress near the opposite side
-        // of a planet, where a useful walk barely changes straight-line distance.
-        let remaining = |point: Vec2| {
-            (point.x * target.y - point.y * target.x)
-                .atan2(point.dot(target))
-                .abs()
-                * target.length()
-        };
-        let mut frontier = usize::from(initial.id);
-        let mut frontier_distance = remaining(initial.position);
-        let initial_distance = frontier_distance;
-        costs[usize::from(initial.id)] = 0.0;
-        for _ in 0..GROUND_SAMPLES {
-            let Some(index) = (0..GROUND_SAMPLES)
-                .filter(|&i| !visited[i] && costs[i].is_finite())
-                .min_by(|&a, &b| costs[a].total_cmp(&costs[b]))
-            else {
-                break;
-            };
-            visited[index] = true;
-            result.diagnostics.reachable_nodes += 1;
-            let node = self
-                .nodes
-                .iter()
-                .find(|n| usize::from(n.id) == index)
-                .unwrap();
-            let distance = destination_distance(node);
-            if remaining(node.position) < frontier_distance {
-                frontier = index;
-                frontier_distance = remaining(node.position);
-            }
-            result.diagnostics.closest_reachable_distance = Some(
-                result
-                    .diagnostics
-                    .closest_reachable_distance
-                    .map_or(distance, |old| old.min(distance)),
-            );
-            if distance < range {
-                trace_route(&mut result, &parent, index);
-                return result;
-            }
-            for edge in self.edges.iter().filter(|e| usize::from(e.from) == index) {
-                let next = usize::from(edge.to);
-                let cost = costs[index]
-                    + edge.length
-                    + match edge.kind {
-                        GroundEdgeKind::Walk => 0.0,
-                        GroundEdgeKind::Jump => 2.0,
-                        GroundEdgeKind::Jetpack => 30.0,
-                    };
-                if cost < costs[next] {
-                    costs[next] = cost;
-                    parent[next] = Some((index as u16, edge.length, edge.kind));
-                }
-            }
-        }
-        if allow_partial && frontier_distance < initial_distance - 1.5 {
-            result.diagnostics.partial = true;
-            trace_route(&mut result, &parent, frontier);
-        } else {
-            result.diagnostics.failure = Some(if result.diagnostics.destination_nodes == 0 {
-                GroundRouteFailure::NoDestinationFooting
-            } else {
-                GroundRouteFailure::Disconnected
-            });
-        }
-        result
+        self.routes()
+            .route_toward_actor_target(start, target, range)
     }
 
     /// Filter a measured route against the proposed ship's real hull and feet.
     pub(super) fn avoiding(&self, gravity: f32, clear: impl Fn(Vec2) -> bool) -> Self {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("ground_avoiding");
         let mut map = self.clone();
+        #[cfg(feature = "sensor-profile")]
+        let _nodes_profile = super::sensor_profile::Scope::new("ground_avoiding_nodes");
         map.nodes.retain(|node| {
             let ok = clear(node.position + node.position.normalized() * standing_height());
             if !ok {
@@ -304,6 +163,12 @@ impl GroundMap {
             }
             ok
         });
+        #[cfg(feature = "sensor-profile")]
+        drop(_nodes_profile);
+        #[cfg(feature = "sensor-profile")]
+        let _edges_profile = super::sensor_profile::Scope::new("ground_avoiding_edges");
+        #[cfg(feature = "sensor-profile")]
+        let edge_samples = super::sensor_profile::Counter::new("ground_avoiding_edge_samples");
         let mut nodes = [None; GROUND_SAMPLES];
         for node in &map.nodes {
             nodes[usize::from(node.id)] = Some(*node);
@@ -315,6 +180,8 @@ impl GroundMap {
                 return false;
             };
             (0..=8).all(|sample| {
+                #[cfg(feature = "sensor-profile")]
+                edge_samples.add(1);
                 let t = sample as f32 / 8.0;
                 let foot = a.position + (b.position - a.position) * t;
                 clear(
@@ -453,6 +320,16 @@ impl SurfaceSortieState {
         drop(_nodes_profile);
         #[cfg(feature = "sensor-profile")]
         let _edges_profile = super::sensor_profile::Scope::new("ground_edges");
+        #[cfg(feature = "sensor-profile")]
+        let candidate_pairs = super::sensor_profile::Counter::new("ground_edge_candidate_pairs");
+        #[cfg(feature = "sensor-profile")]
+        let walk_paths = super::sensor_profile::Counter::new("ground_edge_walk_paths");
+        #[cfg(feature = "sensor-profile")]
+        let jump_paths = super::sensor_profile::Counter::new("ground_edge_jump_paths");
+        #[cfg(feature = "sensor-profile")]
+        let capsule_samples = super::sensor_profile::Counter::new("ground_edge_capsule_samples");
+        #[cfg(feature = "sensor-profile")]
+        let floor_samples = super::sensor_profile::Counter::new("ground_edge_floor_samples");
         let gravity = gravity.max(1.0);
         let jump_height = spec.jump_speed.powi(2) / (2.0 * gravity);
         let mut nodes_by_id = [None; GROUND_SAMPLES];
@@ -468,6 +345,8 @@ impl SurfaceSortieState {
                     let Some(b) = nodes_by_id[usize::from(id)] else {
                         continue;
                     };
+                    #[cfg(feature = "sensor-profile")]
+                    candidate_pairs.add(1);
                     let offset = b.position - a.position;
                     let length = offset.length();
                     let up = (a.position + b.position).normalized();
@@ -476,7 +355,15 @@ impl SurfaceSortieState {
                         continue;
                     }
                     let path_clear = |jump: bool| {
+                        #[cfg(feature = "sensor-profile")]
+                        if jump {
+                            jump_paths.add(1);
+                        } else {
+                            walk_paths.add(1);
+                        }
                         (0..=8).all(|sample| {
+                            #[cfg(feature = "sensor-profile")]
+                            capsule_samples.add(1);
                             let t = sample as f32 / 8.0;
                             let foot = a.position + offset * t;
                             clear(
@@ -492,6 +379,8 @@ impl SurfaceSortieState {
                     };
                     let continuous_floor = || {
                         (1..4).all(|sample| {
+                            #[cfg(feature = "sensor-profile")]
+                            floor_samples.add(1);
                             let point = a.position + offset * (sample as f32 / 4.0);
                             let up = point.normalized().rotate_radians(frame.angle);
                             self.world

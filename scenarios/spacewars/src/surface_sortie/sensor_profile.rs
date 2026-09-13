@@ -2,7 +2,7 @@
 //! absent from normal builds and never enter simulation state or observations.
 use serde::Serialize;
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::BTreeMap,
     time::{Duration, Instant},
 };
@@ -17,8 +17,39 @@ pub struct Stage {
 #[derive(Default, Serialize)]
 pub struct Profile {
     pub stages: BTreeMap<&'static str, Stage>,
+    pub counters: BTreeMap<&'static str, u64>,
     #[serde(skip)]
     children: Vec<Duration>,
+}
+
+/// Accumulate loop work locally, then touch the shared profile once on drop.
+/// In particular, a capsule sample does not perform a map lookup or clock read.
+pub(super) struct Counter {
+    name: &'static str,
+    value: Cell<u64>,
+}
+
+impl Counter {
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name,
+            value: Cell::new(0),
+        }
+    }
+
+    pub fn add(&self, amount: usize) {
+        self.value.set(self.value.get() + amount as u64);
+    }
+}
+
+impl Drop for Counter {
+    fn drop(&mut self) {
+        ACTIVE.with(|p| {
+            if let Some(p) = p.borrow_mut().as_mut() {
+                *p.counters.entry(self.name).or_default() += self.value.get();
+            }
+        });
+    }
 }
 
 thread_local! {

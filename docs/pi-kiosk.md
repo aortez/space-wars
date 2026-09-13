@@ -14,7 +14,7 @@ device has been identified and explicitly confirmed.
 - Persistent settings file: `/var/lib/spacewars/settings.toml`
 - Persistent user ROM library: `/var/lib/spacewars/roms`
 - Recommended renderer: `raster`
-- Initial raster scale: `2.0`
+- Raster scale: saved `launch.raster_scale` preference (default `1.0`)
 
 The settings directory must be writable by the user that runs `engine-client`.
 The Yocto image creates a persistent `/data/spacewars/config` directory and
@@ -76,13 +76,18 @@ display backend.
 The current Pi launch command is:
 
 ```sh
-engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0
+engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster
 ```
 
 `--fullscreen` shows the launcher and requests fullscreen presentation. The
 service sets `SLINT_BACKEND` explicitly so the client uses the image's LinuxKMS
 backend instead of the desktop `winit` backend. Use `--kiosk` instead when the
 saved/default scenario should launch directly.
+
+The service leaves raster scale to the saved preference, for both manual
+launcher starts and automatic activities. An explicit `--raster-scale` still
+overrides that preference when running a diagnostic command. Updating the
+service requires a normal image update; the fast updater copies binaries only.
 
 With the `hyperpixel` profile selected, the Yocto hardware service supplies:
 
@@ -325,7 +330,7 @@ includes output checksum validation, while tail cost is reported separately as
 3. Run the headless Spacewars benchmark command on the Pi with
    `--benchmark-seconds 10`, then run `falling-benchmark 2000 120` and save both
    NES JSON rows.
-4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster --raster-scale 2.0`.
+4. Launch `engine-client --fullscreen --config-dir /var/lib/spacewars --renderer raster`.
 5. Confirm fullscreen display startup.
 6. Confirm `spacewars` belongs to the `input` group and Slint/seatd can read the
    HyperPixel touchscreen and the attached controller under `/dev/input/`.

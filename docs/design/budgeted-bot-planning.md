@@ -1,0 +1,287 @@
+# Budgeted planning for material-match bots
+
+Status: proposed architecture and implementation sequence. This document does
+not introduce a new policy. The measured baseline is `ground-route-profiling`
+at `1e8ce10`; see [ground-route profiling](../ground-route-profile.md).
+The first optimization is now implemented and measured in
+[indexed ground-route queries](../indexed-ground-routes.md). The mission
+selection, policy-comparison and shared-budget architecture below remains
+proposed work.
+
+The goal is better decisions with predictable computation on the Picades. Treat
+navigation results as reusable evidence for choosing a mission, and request
+detailed evidence only when it can affect a decision. Preserve the existing
+flight, combat, capture, ground and recovery controllers as action executors.
+
+The user also wants lightweight comparisons with retained policies, scalable
+budgets for several bots, and a foundation for bot control beyond this specific
+mission. These are design constraints; multiple material-match policies and a
+shared planning scheduler are not implemented by this document.
+
+## Current boundary and missing information
+
+`MaterialMissionPilot` already coordinates persistent mission tasks. Recovery,
+solar avoidance and opportunistic pursuit take precedence; selection among the
+remaining capture destinations largely uses straight-line distance. Tactical
+landing selection already considers cover and a measured ground round trip.
+Its route evaluation first chooses the cheapest outbound arrival, then tests
+the return from that particular arrival.
+
+Much of this planning currently happens synchronously while constructing an
+observation. The slowest measured observations take 51.88 and 53.69 ms, including
+roughly 19 ms of ground connection construction and 14–16 ms of route searches.
+Connections dominate accumulated sensor time; graph searches amplify the worst
+pauses. Improving only Dijkstra will leave substantial work in world queries.
+
+The current mission observation exposes whether match rules apply, but not a
+remaining match time field. Clock-aware strategy therefore needs an explicit
+observation-contract extension. Detailed ground evidence currently concerns
+the approach planet, not every possible destination. A remote planet must
+remain an estimated opportunity until the bot obtains relevant measurements.
+
+## Decision layers
+
+| Layer | Responsibility | When it runs |
+| --- | --- | --- |
+| Safety and controls | React to hazards; validate landing, transfer, footing and other immediate permissions; execute the current action | Every simulation update |
+| Tactical planning | Choose a landing and complete ground trip; plan a measured crossing or recovery approach | On relevant changes or scheduled refresh, with bounded work |
+| Mission planning | Compare capture, intercept, defend, disengage and recovery opportunities | On mission events and a slower periodic review |
+
+The existing two/four-Hz survey cadence is a starting point, not a reason to
+rebuild every map on every scheduled review. Retain useful plans while checking
+the part that is about to be executed. If that part becomes unsafe, the existing
+controller should stop, hold or lift clear as appropriate while replanning.
+Ship loss and imminent hazards can interrupt commitment immediately.
+
+Separate cheap observed facts from expensive planning requests/results. The
+scenario owns physical measurements; pure graph search and plan evaluation can
+operate on the returned data without access to the mutable world. Keep the
+observation-to-canonical-controls authority boundary and one physics/gravity
+step described in [surface AI integration](surface-ai-integration.md).
+
+Planning results need distinct pending, ready, stale and no-measured-route
+states, dependency versions and diagnostic reasons. An unfinished query is not
+a failed route. Absence of an outer-contour route does not establish that caves,
+mining or an unmeasured jetpack crossing cannot provide access.
+
+## Search over missions rather than button presses
+
+Make an extended action such as “capture planet B and return aboard” expose:
+
+- Preconditions and the evidence supporting them.
+- Estimated travel, landing, ground, claim and return time.
+- Exposure, resource demand and remaining escape/recovery options.
+- Expected ownership or opponent-state change.
+- Progress, completion, interruption and failure conditions.
+- Confidence, age and dependencies of the estimates.
+
+Initially, use these records for a one-step utility comparison. Distinguish
+known infeasibility from uncertain estimates. Score survival, ownership and
+time using actual match rules: pilot death ends the round, ship loss alone
+does not; the time limit compares owned planets and equal ownership draws.
+Losing a flag can remove ownership. Asset value must not override terminal
+outcomes. Avoid treating an uncalibrated risk score as a death probability.
+
+This should allow choices such as taking a slightly farther planet with a
+shorter exposed ground trip, delaying descent while an armed opponent can
+interfere, or defending a lead near the time limit. Waiting and disengaging
+need progress conditions and bounded review; caution must not become permanent
+inaction. Preserve commitment unless new evidence materially changes the choice.
+
+Use a cheap estimate to rank all destinations and refine a small shortlist.
+Detailed measurements may initially require approaching the destination. Let
+uncertainty motivate a bounded approach/probe rather than classifying every
+unsurveyed planet as unreachable. Remember why an attempt failed, with relevant
+terrain/obstacle context and an expiry, so changed circumstances permit a retry.
+
+Once estimates predict real executions reasonably well, explore a few actions
+ahead with a bounded beam or best-first search over an approximate mission
+state. Actions have different durations and both players move simultaneously;
+ordinary alternating-ply minimax is not automatically the correct model.
+Consider a small set of plausible opponent responses, such as continuing its
+sortie or intercepting. Use modelled responses as predictions, not privileged
+knowledge of its controller or future inputs. Execute the first action and
+replan from observations. Full physics rollouts and learned control are not
+prerequisites for this architecture.
+
+Planning competence should be independently adjustable from aim, reaction,
+aggression and the existing configurable exhibition breaks. Better mission
+choices should not implicitly remove the human's opportunities to play.
+
+## Lightweight policy comparisons
+
+Reuse the pattern in the existing ship-policy registry and seat-swapped
+comparison profiles. The material mission runner currently instantiates only
+`MaterialMissionPilot`; its policy string is not itself a registry of retained
+implementations. Before introducing changed behavior, retain the current
+implementation and explicitly select the baseline/candidate in each seat.
+Share behavior-preserving helpers; version changed decision rules and planning
+inputs rather than copying an entire engine or silently changing a baseline's
+sensors. Keep defaults separate from concrete evaluation policy IDs.
+
+One existing headless runner, a small set of workload descriptions and JSON
+reports are sufficient. Record engine/build identity, policy identities,
+planning/sensor configuration, total and per-bot work budgets, seeds, seats and
+exhibition settings. First compare policies at equal budgets, then vary budget
+to measure quality versus computation. Report role-based results after swapping
+seats. Frozen historical traces apply to a pinned world/sensor contract; after
+physics changes, old and new policies should also run in the same new world.
+Retain a few useful checkpoints rather than making every experiment a permanent
+production option. No tournament service or new evaluation dependency is needed.
+
+## Navigation improvement that also improves choices
+
+First add direct node lookup and indexed outgoing edges to the measured graph,
+sharing those indexes between queries. Preserve ordering, arithmetic, ties,
+partial-route behavior and diagnostics in this optimization step. Consider a
+priority queue separately after measuring the remaining 512-slot minimum scan.
+
+Then evaluate the complete ground round trip. For a candidate landing graph,
+let `s` be the exit start, `F` the eligible flag-interaction nodes and `H` the
+boarding region. A forward shortest-path search from `s` gives `d_out(f)`.
+A multi-source search from `H` on the reversed graph gives the cost `d_back(f)`
+of returning along the original directed edges. Choose a feasible `f` minimizing
+`d_out(f) + d_back(f)`. Reconstruct both routes and carry the chosen goal into
+execution. Reversing the search graph does not authorize a reversed physical
+jump. This addresses a cheapest outbound endpoint with a poor or impossible
+return when another flag endpoint permits a complete sortie.
+
+Define the optimized cost explicitly. The current edge penalties and landing
+selector's time conversion differ; moving to a common time estimate is a
+separate policy change from indexing or preserving existing shortest paths.
+Exposure and resource margins can remain additional candidate-level terms at
+first. If future jetpack plans depend on energy spent on preceding edges, a
+position-only graph is insufficient for exact feasibility: use a resource-aware
+state or a conservative executable envelope.
+
+Each proposed parked hull changes the candidate graph. Do not reuse a single
+flag distance field as proof for every landing. A shared base index with
+candidate-specific node/edge masks is a possible later representation, provided
+it preserves the real clearance tests and selected-site revalidation.
+
+## Cache dependencies explicitly
+
+Start with immutable, within-survey reuse: graph indexes, query workspaces and
+candidate-independent geometric samples. Profile exactly repeated capsule poses
+and floor rays before adding their lookup cache; reversed geometric paths can
+differ in floating-point details.
+
+For longer-lived reuse, separate:
+
+1. Planet-local material geometry, keyed by body identity and material revision.
+2. Traversal eligibility, which also depends on actor dimensions, mobility and
+   gravity assumptions.
+3. Moving-obstacle and proposed-ship overlays, tied to the relevant body state
+   and candidate pose.
+4. Route/mission estimates, tied to those dependencies and their goal regions.
+
+The current `GroundMap` combines material, gravity and live obstacle checks; it
+cannot safely become a cross-update terrain cache by keying only on revision.
+Rigid planet motion preserves intrinsic geometry while changing world obstacles
+and possibly gravity in the local frame. Compatible geometry can be shared
+between bots; their complete clearances, mobility and plans need not match.
+
+Begin with conservative invalidation and bounded storage. Only add regional
+terrain invalidation after identifying which nodes and crossing edges depend
+on an edit. Stale estimates can guide which option to investigate; they cannot
+authorize landing, jumping, boarding, claiming or rebuilding.
+
+## Bound work and retain determinism
+
+Schedule planning work for both bots under a shared deterministic work quota,
+with urgent revalidation first and fair progress for remaining jobs. Charge
+expansions and world queries separately and calibrate their quotas against Pi
+timings. Record milliseconds, but do not let a wall-clock cutoff choose different
+plans merely because one machine is slower. Spreading work bounds latency;
+reuse and selective queries are still needed to reduce total computation.
+
+The scheduler should accept an active set of bot/job identities rather than
+assuming two seats. Keep one global allowance, configurable per-bot caps/weights,
+and deterministic fair ordering; adding bots must not silently multiply the
+global work allowance. Reallocate unused work according to a recorded rule.
+Low-budget bots keep executing their current valid action as planning takes
+longer. Immediate safety/control work remains separate and still costs time:
+the planning budget does not make an arbitrary number of bots free to simulate.
+
+Extract only the reusable mechanics once there is an actual bounded job:
+identity, reset/cancellation, dependency validity, charged work and pending/ready
+results. Keep Spacewars observations, mission values and movement rules in its
+adapter. This provides a general bot-control boundary without building a generic
+game-state language or a plugin system before a second use case exists.
+
+Incremental graph search can hold an immutable map. Incremental physical surveys
+also need a coherent measurement contract: pin compatible query data where
+possible, or version and restart affected work. Do not silently combine queries
+from changing live physics steps and label them one current survey. Measure the
+largest indivisible physical query as well as job totals before claiming a frame
+budget. Start with indexed synchronous queries before introducing this scheduler.
+
+## Implementation and evaluation sequence
+
+1. **Preserve behavior while indexing routes.** Compare complete routes and
+   diagnostics, then replay both measured Pi seeds with identical non-timing
+   output. Record graph construction separately from lookup savings.
+2. **Improve one complete sortie.** Implement joint outbound/return evaluation,
+   pass the chosen goal through execution, and expose its time/exposure evidence
+   to landing selection. Add directed-route cases with multiple goal nodes and
+   a misleading cheapest outbound endpoint. Version the changed policy.
+3. **Make planning demand explicit.** Introduce request/result dependencies,
+   within-survey reuse and bounded graph jobs. Add cross-update geometry reuse
+   only with tested invalidation for excavation, detached ground, moving ships
+   and debris, gravity and actor mobility changes.
+4. **Choose missions using the same evidence.** Extend match context, implement
+   time/risk-aware selection with cheap estimates and a refined shortlist, then
+   compare predicted and actual sortie outcomes. Add shallow mission search
+   after these estimates are useful.
+
+Keep an optimization-only comparison separate from new-policy comparisons.
+For behavior, run against the previous policy with paired seeds and swapped
+seats, controlled interrupted sorties, generated asteroid matches, and held-out
+worlds. New-vs-new self-play alone cannot establish an improvement. Preserve
+human playtesting and exhibition settings alongside competitive comparisons.
+
+Measure completed sorties and recoveries, exposure during landing/on foot,
+pilot deaths, time without progress, objective switching, wins/draws, prediction
+error, and per-update planner/sensor mean, p95, p99 and maximum. Keep the longer
+known reproductions: the first profiled spike occurs after three minutes.
+Decision traces should include selected and rejected options, cost components,
+estimate age/confidence, invalidations, pending work and actual milestones.
+
+The first deliverable is a cheaper route service plus a better choice of a
+complete capture trip. It supplies evidence and interfaces for strategic search
+without requiring a replacement of the working physical controllers.
+
+## Acceptance gates for the next steps
+
+Before changing sortie behavior, retain a constructible baseline with its
+current sensor/planning semantics and explicit per-seat policy selection in the
+existing runner. Record the concrete policy and configuration that actually
+emits controls. A baseline-vs-baseline run with swapped seats checks the runner
+before using it to compare a candidate. Changed physics requires a new shared
+world comparison; it does not justify silently replacing historical traces.
+
+For the first joint sortie candidate, optimize the existing walk/jump graph
+score: total edge length plus two units per jump, across both legs. Keep the
+existing landing-level cost conversion and cover weights for this comparison.
+Prospective jetpack access, a common time model and changed strategic weights
+are separate behavior experiments. Acceptance requires a directed fixture where
+the cheapest outbound endpoint cannot return but another interaction endpoint
+can, no claimed access when every return is blocked, and execution through the
+selected endpoint to real boarding. Destroying support or obstructing the next
+leg must invalidate execution through the existing controls and permissions.
+
+For the scheduler, test zero and exhausted allowances, cancellation/reset,
+deterministic ordering, unused-work redistribution and sustained progress for
+several active jobs under one fixed total quota. Use lightweight synthetic jobs
+to test more identities than the game's current two seats. Record per-bot
+allocations, job age and charged work, plus separate safety/control time and
+cache memory bounds. Calibrate numerical work quotas on the Pi at that step;
+query counts alone do not guarantee a fixed millisecond cost in every world.
+
+Promote a behavior candidate only after it demonstrates the intended fixture
+improvement, passes the existing physical acceptance cases, and has a recorded
+comparison against its predecessor on paired and held-out worlds. Report
+regressions and stalled cases as well as successes. Keep equal-budget policy
+comparisons separate from budget sweeps and preserve human playtesting with the
+configured exhibition behavior. No universal win-rate threshold or strategic
+weight tuning is needed to publish the current optimization checkpoint.
