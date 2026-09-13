@@ -4,7 +4,9 @@ use engine_core::planning::{
     JobLimits, JobPoll, PlanningJob, PlanningQueue, PlanningReport, RequestToken, Work, WorkKind,
 };
 use engine_rapier::world::{QueryRegion, QuerySnapshot};
-use ground_navigation::{GroundMap, GroundRoundTripJob, GroundSurveyJob};
+use ground_navigation::{
+    GroundMap, GroundMeasurements, GroundRoundTripJob, GroundSurveyJob, ReusedGroundWork,
+};
 use landing_objective::{
     LandingObjective, LandingObjectiveRoute, LandingObjectiveSurvey, ObjectivePlanning,
 };
@@ -55,6 +57,14 @@ pub struct LivePlanningTelemetry {
     pub graph: u64,
     pub physics_queries: u64,
     pub max_ready_age_ticks: u64,
+    pub max_request_completion_ticks: u64,
+    pub reused_requests: u64,
+    pub reused_ground: ReusedGroundWork,
+    pub reuse_rejections: BTreeMap<&'static str, u64>,
+    /// Work in retired requests that never published. Some of their ground
+    /// measurements may have been salvaged, so this is not all wasted work.
+    pub retired_unpublished_graph: u64,
+    pub retired_unpublished_queries: u64,
     pub snapshot_builds: u64,
     pub snapshot_max_bodies: usize,
     pub snapshot_max_colliders: usize,
@@ -70,6 +80,7 @@ struct Request {
     token: RequestToken,
     objective: LandingObjective,
     tick: u64,
+    measurement_tick: u64,
     seen: u64,
     completed: bool,
     position: Vec2,
@@ -77,6 +88,9 @@ struct Request {
     gravity: f32,
     actual: Option<(Vec2, f32, Vec2)>,
     snapshot: Arc<QuerySnapshot>,
+    reused: ReusedGroundWork,
+    graph: u64,
+    physics_queries: u64,
 }
 
 /// Observe each active planner, then call `advance` once before the shared
@@ -89,6 +103,7 @@ pub struct LiveObjectivePlanner {
     requests: BTreeMap<usize, Request>,
     capacity: usize,
     allowance: Work,
+    reuse_ground: bool,
     last_observed: Option<u64>,
     last_advanced: Option<u64>,
     shared: Option<(u64, Weak<QuerySnapshot>)>,
@@ -101,11 +116,21 @@ impl LiveObjectivePlanner {
             requests: BTreeMap::new(),
             capacity,
             allowance,
+            reuse_ground: false,
             last_observed: None,
             last_advanced: None,
             shared: None,
             telemetry: Default::default(),
         }
+    }
+    /// Opt in to retaining footings and walking clearance across compatible
+    /// request restarts. Jump measurements and hull overlays are always rebuilt.
+    pub fn with_ground_reuse(mut self) -> Self {
+        self.reuse_ground = true;
+        self
+    }
+    pub fn reuses_ground(&self) -> bool {
+        self.reuse_ground
     }
     pub fn allowance(&self) -> Work {
         self.allowance
@@ -122,9 +147,17 @@ impl LiveObjectivePlanner {
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
+        self.retire(player);
+    }
+    fn retire(&mut self, player: usize) -> Option<ObjectiveSurveyJob> {
         if let Some(request) = self.requests.remove(&player) {
-            self.queue.cancel(request.token);
+            if !request.completed {
+                self.telemetry.retired_unpublished_graph += request.graph;
+                self.telemetry.retired_unpublished_queries += request.physics_queries;
+            }
+            return self.queue.take(request.token);
         }
+        None
     }
     fn invalidate(&mut self, player: usize, reason: &'static str) {
         self.remove(player);
@@ -155,7 +188,9 @@ impl LiveObjectivePlanner {
         {
             return Err("objective_changed");
         }
-        if request.tick > p.tick || p.tick - request.tick > MAX_SURVEY_AGE_TICKS {
+        if request.measurement_tick > p.tick
+            || p.tick - request.measurement_tick > MAX_SURVEY_AGE_TICKS
+        {
             return Err("expired");
         }
         let actual = Self::actual(p);
@@ -174,10 +209,18 @@ impl LiveObjectivePlanner {
         if (gravity - request.gravity).abs() > 0.01 {
             return Err("gravity_changed");
         }
+        Self::geometry_valid(state, player, p, request, request.gravity)
+    }
+    fn geometry_valid(
+        state: &SurfaceSortieState,
+        player: usize,
+        p: &PilotObservationV1,
+        request: &Request,
+        gravity: f32,
+    ) -> Result<(), &'static str> {
         let spec = SurfaceSortieState::spec();
-        let radius = p.planet.radius
-            + 12.0
-            + spec.jump_speed.powi(2) / (2.0 * request.gravity.max(1.0)) * 0.85;
+        let radius =
+            p.planet.radius + 12.0 + spec.jump_speed.powi(2) / (2.0 * gravity.max(1.0)) * 0.85;
         if !request.snapshot.matches_region(
             &state.world.physics.world,
             QueryRegion {
@@ -199,6 +242,33 @@ impl LiveObjectivePlanner {
             return Err("obstacles_changed");
         }
         Ok(())
+    }
+
+    fn salvage(
+        &mut self,
+        state: &SurfaceSortieState,
+        player: usize,
+        p: &PilotObservationV1,
+    ) -> Option<Box<GroundMeasurements>> {
+        if !self.reuse_ground {
+            self.remove(player);
+            return None;
+        }
+        let request = self.requests.get(&player)?;
+        // Check geometry even when the earlier validity check stopped at a
+        // gravity/hatch change. A lower gravity also expands the jump region.
+        let clock = Instant::now();
+        let valid = Self::geometry_valid(state, player, p, request, state.objective_gravity(p));
+        let ms = clock.elapsed().as_secs_f64() * 1000.0;
+        self.telemetry.validation_total_ms += ms;
+        self.telemetry.validation_max_ms = self.telemetry.validation_max_ms.max(ms);
+        if let Err(reason) = valid {
+            *self.telemetry.reuse_rejections.entry(reason).or_default() += 1;
+            self.remove(player);
+            return None;
+        }
+        self.retire(player)
+            .map(ObjectiveSurveyJob::into_measurements)
     }
 
     pub fn observe(
@@ -229,6 +299,7 @@ impl LiveObjectivePlanner {
             return;
         };
         let mut invalidation = None;
+        let mut measurements = None;
         if let Some(request) = self.requests.get_mut(&player) {
             request.seen = p.tick;
             let clock = Instant::now();
@@ -239,7 +310,15 @@ impl LiveObjectivePlanner {
             match valid {
                 Err(reason) => {
                     invalidation = Some(reason);
-                    self.invalidate(player, reason);
+                    if matches!(
+                        reason,
+                        "gravity_changed" | "touchdown_changed" | "hatch_moved"
+                    ) {
+                        measurements = self.salvage(state, player, p);
+                        *self.telemetry.invalidations.entry(reason).or_default() += 1;
+                    } else {
+                        self.invalidate(player, reason);
+                    }
                 }
                 Ok(()) => match self.queue.poll(request.token, &request.tick) {
                     JobPoll::Ready(survey) => {
@@ -250,6 +329,10 @@ impl LiveObjectivePlanner {
                             self.telemetry.max_ready_age_ticks = self
                                 .telemetry
                                 .max_ready_age_ticks
+                                .max(p.tick - request.measurement_tick);
+                            self.telemetry.max_request_completion_ticks = self
+                                .telemetry
+                                .max_request_completion_ticks
                                 .max(p.tick - request.tick);
                         }
                         if first || p.tick - request.tick < REFRESH_TICKS {
@@ -260,7 +343,7 @@ impl LiveObjectivePlanner {
                             self.telemetry.published += 1;
                             return;
                         }
-                        self.remove(player);
+                        measurements = self.salvage(state, player, p);
                     }
                     JobPoll::Pending => {
                         o.objective_work = Some(ObjectiveWorkState::Pending);
@@ -293,11 +376,15 @@ impl LiveObjectivePlanner {
         if p.sites.is_empty() && Self::actual(p).is_none() {
             return;
         }
-        let snapshot = self
-            .shared
+        let snapshot = measurements
             .as_ref()
-            .filter(|(tick, _)| *tick == p.tick)
-            .and_then(|(_, s)| s.upgrade())
+            .map(|m| Arc::clone(&m.snapshot))
+            .or_else(|| {
+                self.shared
+                    .as_ref()
+                    .filter(|(tick, _)| *tick == p.tick)
+                    .and_then(|(_, s)| s.upgrade())
+            })
             .unwrap_or_else(|| {
                 let clock = Instant::now();
                 let snapshot = Arc::new(state.world.physics.world.query_snapshot());
@@ -312,7 +399,17 @@ impl LiveObjectivePlanner {
                 self.shared = Some((p.tick, Arc::downgrade(&snapshot)));
                 snapshot
             });
-        if let Some(job) = state.objective_job(player, p, &o.cover, Arc::clone(&snapshot)) {
+        let measurement_tick = measurements.as_ref().map_or(p.tick, |m| m.tick);
+        let position = measurements
+            .as_ref()
+            .map_or(p.planet.motion.position, |m| m.position);
+        let angle = measurements
+            .as_ref()
+            .map_or(p.planet.motion.angle, |m| m.angle);
+        let reused = measurements.is_some();
+        if let Some(job) =
+            state.objective_job(player, p, &o.cover, Arc::clone(&snapshot), measurements)
+        {
             let token = self
                 .queue
                 .submit(player as u64, p.tick, JobLimits::default(), job)
@@ -323,16 +420,21 @@ impl LiveObjectivePlanner {
                     token,
                     objective,
                     tick: p.tick,
+                    measurement_tick,
                     seen: p.tick,
                     completed: false,
-                    position: p.planet.motion.position,
-                    angle: p.planet.motion.angle,
+                    position,
+                    angle,
                     gravity: state.objective_gravity(p),
                     actual: Self::actual(p),
                     snapshot,
+                    reused: ReusedGroundWork::default(),
+                    graph: 0,
+                    physics_queries: 0,
                 },
             );
             self.telemetry.submitted += 1;
+            self.telemetry.reused_requests += u64::from(reused);
             self.telemetry.max_retained_requests = self
                 .telemetry
                 .max_retained_requests
@@ -356,6 +458,20 @@ impl LiveObjectivePlanner {
             self.remove(player);
         }
         let report = self.queue.advance(self.allowance);
+        for allocation in &report.jobs {
+            let request = self
+                .requests
+                .get_mut(&(allocation.request.actor as usize))
+                .unwrap();
+            request.graph += u64::from(allocation.charged.graph);
+            request.physics_queries += u64::from(allocation.charged.physics_queries);
+            let reused = self.queue.job(request.token).unwrap().reused();
+            self.telemetry.reused_ground.nodes += reused.nodes - request.reused.nodes;
+            self.telemetry.reused_ground.walks += reused.walks - request.reused.walks;
+            self.telemetry.reused_ground.physics_queries +=
+                reused.physics_queries - request.reused.physics_queries;
+            request.reused = reused;
+        }
         self.telemetry.graph += u64::from(report.charged.graph);
         self.telemetry.physics_queries += u64::from(report.charged.physics_queries);
         self.last_advanced = Some(tick);

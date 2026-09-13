@@ -5,7 +5,8 @@ use super::*;
 mod routes;
 mod survey_job;
 pub use routes::{GroundRoundTrip, GroundRoundTripJob, GroundRoutes, GroundTripWork};
-pub(super) use survey_job::GroundSurveyJob;
+pub use survey_job::ReusedGroundWork;
+pub(super) use survey_job::{GroundMeasurements, GroundSurveyJob};
 
 pub const GROUND_SAMPLES: usize = 512;
 pub const GROUND_NEIGHBOR_SPAN: usize = 6;

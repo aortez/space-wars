@@ -37,11 +37,16 @@ impl LivePlanningRun {
             "1" => vec![1],
             _ => panic!("--live-objective-seats must be both, 0 or 1"),
         };
+        let planner = match super::arg("--reuse-objective-ground", "false").as_str() {
+            "false" => LiveObjectivePlanner::new(2, work),
+            "true" => LiveObjectivePlanner::new(2, work).with_ground_reuse(),
+            _ => panic!("--reuse-objective-ground must be true or false"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
-        writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,age,graph,queries,phase,dispatch_ms").unwrap();
+        writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms").unwrap();
         Some(Self {
-            planner: LiveObjectivePlanner::new(2, work),
+            planner,
             seats,
             trace,
             dispatch: Vec::new(),
@@ -70,13 +75,14 @@ impl LivePlanningRun {
         for job in &report.jobs {
             writeln!(
                 self.trace,
-                "{tick},{},{},{},{},{},{},{},{},{},{:?},{ms:.6}",
+                "{tick},{},{},{},{},{},{},{},{},{},{},{:?},{ms:.6}",
                 report.tick,
                 report.allowance.graph,
                 report.allowance.physics_queries,
                 report.charged.graph,
                 report.charged.physics_queries,
                 job.request.actor,
+                job.request.generation,
                 job.age_ticks,
                 job.charged.graph,
                 job.charged.physics_queries,
@@ -98,7 +104,13 @@ impl LivePlanningRun {
                 "p95_ms":values[values.len()*95/100],"p99_ms":values[values.len()*99/100],
                 "max_ms":values.last()})
         };
-        json!({"version":1,"sensor_profile":"live_joint_objective_v1",
+        let profile = if self.planner.reuses_ground() {
+            "live_joint_objective_v2"
+        } else {
+            "live_joint_objective_v1"
+        };
+        json!({"version":2,"sensor_profile":profile,
+            "reuse_objective_ground":self.planner.reuses_ground(),
             "enabled_seats":self.seats,
             "scope":"landing-objective ground survey, hull overlay and joint routes; other sensors and controls remain synchronous",
             "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),

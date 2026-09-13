@@ -83,12 +83,16 @@ def main():
                         help="use the live objective sensor for the candidate role only")
     parser.add_argument("--objective-graph-budget", type=int, default=16384)
     parser.add_argument("--objective-query-budget", type=int, default=1024)
+    parser.add_argument("--reuse-objective-ground", action="store_true",
+                        help="retain compatible ground measurements in the candidate's live sensor")
     args = parser.parse_args()
     if (len(set(args.seeds)) != len(args.seeds) or any(not 0 <= s < 2**64 for s in args.seeds)
             or args.asteroid_interval < 0 or args.wall_timeout < 1):
         parser.error("seeds must be distinct u64s, interval nonnegative and timeout positive")
     if args.live_objective_planning and args.candidate != "material_mission_v10":
         parser.error("live objective planning currently requires the v10 candidate")
+    if args.reuse_objective_ground and not args.live_objective_planning:
+        parser.error("ground reuse requires --live-objective-planning")
     if any(not 0 <= n < 2**32 for n in (args.objective_graph_budget, args.objective_query_budget)):
         parser.error("objective budgets must be u32s")
     binary = args.binary.resolve(strict=True)
@@ -104,7 +108,9 @@ def main():
                     runs=[])
     if args.live_objective_planning:
         manifest["live_objective_configuration"] = dict(
-            role="candidate", sensor_profile="live_joint_objective_v1",
+            role="candidate",
+            sensor_profile="live_joint_objective_v2" if args.reuse_objective_ground else "live_joint_objective_v1",
+            reuse_objective_ground=args.reuse_objective_ground,
             allowance=dict(graph=args.objective_graph_budget, physics_queries=args.objective_query_budget))
         manifest["budget_comparison"] = "candidate landing-objective quota only; other sensors/policies unbounded"
     summary = []
@@ -126,6 +132,7 @@ def main():
                             "--live-objective-seats", str(roles.index("candidate")),
                             "--objective-graph-budget", str(args.objective_graph_budget),
                             "--objective-query-budget", str(args.objective_query_budget)]
+                command += ["--reuse-objective-ground", str(args.reuse_objective_ground).lower()]
             manifest["runs"].append(dict(command=command, roles=roles))
             write_json(args.out / "manifest.json", manifest)
             started = time.monotonic()

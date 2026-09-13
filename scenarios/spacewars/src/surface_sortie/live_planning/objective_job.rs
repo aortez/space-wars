@@ -11,6 +11,8 @@ enum Phase {
 pub(crate) struct ObjectiveSurveyJob {
     phase: Phase,
     base: Option<Arc<GroundMap>>,
+    measurements: Option<Box<GroundMeasurements>>,
+    reused: ReusedGroundWork,
     candidates: Vec<Candidate>,
     index: usize,
     position: Vec2,
@@ -27,6 +29,7 @@ impl SurfaceSortieState {
         p: &PilotObservationV1,
         cover: &[combat::LandingCover],
         snapshot: Arc<QuerySnapshot>,
+        measurements: Option<Box<GroundMeasurements>>,
     ) -> Option<ObjectiveSurveyJob> {
         let objective = LandingObjective::read(p)?;
         if !p.queries_ready
@@ -39,7 +42,12 @@ impl SurfaceSortieState {
         let flag =
             p.planet.motion.position + objective.position.rotate_radians(p.planet.motion.angle);
         let gravity = self.objective_gravity(p);
-        let ground = self.ground_survey_job(player, p.planet.index, gravity, snapshot)?;
+        let ground = if let Some(measurements) = measurements {
+            GroundSurveyJob::from_measurements(measurements, gravity)
+        } else {
+            self.ground_survey_job(player, p.planet.index, gravity, snapshot)?
+        };
+        let measurement_tick = ground.measurement_tick();
         let ship = self.replacement_ship(player);
         let spec = Self::spec();
         let mut ordered: Vec<_> = p.sites.iter().collect();
@@ -97,6 +105,8 @@ impl SurfaceSortieState {
         Some(ObjectiveSurveyJob {
             phase: Phase::Ground(Box::new(ground)),
             base: None,
+            measurements: None,
+            reused: ReusedGroundWork::default(),
             candidates,
             index: 0,
             position: p.planet.motion.position,
@@ -115,7 +125,7 @@ impl SurfaceSortieState {
                 planning: ObjectivePlanning::JointRoundTrip,
                 version: 1,
                 actor: p.owner,
-                tick: p.tick,
+                tick: measurement_tick,
                 validated_tick: None,
                 objective,
                 sites: Vec::new(),
@@ -141,6 +151,18 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(crate) fn reused(&self) -> ReusedGroundWork {
+        match &self.phase {
+            Phase::Ground(job) => job.reused(),
+            _ => self.reused,
+        }
+    }
+    pub(crate) fn into_measurements(self) -> Box<GroundMeasurements> {
+        match self.phase {
+            Phase::Ground(job) => job.into_measurements(),
+            _ => self.measurements.unwrap(),
+        }
+    }
     fn avoid(&self) -> Phase {
         Phase::Avoid(Box::new(AvoidingJob::new(
             Arc::clone(self.base.as_ref().unwrap()),
@@ -173,6 +195,10 @@ impl PlanningJob for ObjectiveSurveyJob {
                     j.step();
                 } else {
                     self.base = Some(Arc::new(j.take_map()));
+                    self.reused = j.reused();
+                    if let Phase::Ground(job) = std::mem::replace(&mut self.phase, Phase::Done) {
+                        self.measurements = Some(job.into_measurements());
+                    }
                     self.phase = self.avoid();
                 }
             }
