@@ -231,13 +231,17 @@ impl SurfaceSortieState {
         // Rays can miss a step under the hull between the feet. Allow modest
         // sideways drift and settling depth when checking the complete hull.
         if !pod
-            && ![-0.75, 0.0, 0.75].into_iter().all(|offset| {
-                self.world.physics.surface_hull_fits_at(
-                    self.pilots[player].vehicle.0,
-                    vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2,
-                    rotation_for_direction(normal),
-                )
-            })
+            && !{
+                #[cfg(feature = "sensor-profile")]
+                let _profile = super::sensor_profile::Scope::new("landing_hull_placement");
+                [-0.75, 0.0, 0.75].into_iter().all(|offset| {
+                    self.world.physics.surface_hull_fits_at(
+                        self.pilots[player].vehicle.0,
+                        vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2,
+                        rotation_for_direction(normal),
+                    )
+                })
+            }
         {
             return None;
         }
@@ -279,6 +283,8 @@ impl SurfaceSortieState {
         // repeatedly interrupt touchdown. Keep the proposed hull/feet and every
         // other obstacle in the clearance test; this grants no real transfer.
         let vehicle = self.pilots[player].vehicle.0;
+        #[cfg(feature = "sensor-profile")]
+        let _setup_profile = super::sensor_profile::Scope::new("landing_preview_shapes");
         let world_clear = self.world.physics.world.capsule_clearance_test_excluding(
             spec.half_segment,
             spec.radius + 0.04,
@@ -294,16 +300,36 @@ impl SurfaceSortieState {
             spec.half_segment,
             spec.radius + 0.04,
         );
+        #[cfg(feature = "sensor-profile")]
+        drop(_setup_profile);
+        // Floor selection and hatch validation often ask about the same capsule
+        // consecutively. Reuse only an identical query at this proposed pose;
+        // nothing survives this read-only site check.
+        let last_clearance = std::cell::Cell::new(None);
+        let clear_at = |point, rotation, position, angle| {
+            let query = (point, rotation, position, angle);
+            if let Some((previous, clear)) = last_clearance.get() {
+                if query == previous {
+                    return clear;
+                }
+            }
+            let clear =
+                world_clear(point, rotation) && vehicle_clear(point, rotation, position, angle);
+            last_clearance.set(Some((query, clear)));
+            clear
+        };
         let hatch_clear = |hatch: RayHit, position: Vec2, angle: f32| {
             let radial = (position - frame.position).normalized();
             hatch.normal.dot(radial) >= 0.65
                 && [hatch.normal, radial].into_iter().all(|axis| {
                     let point = hatch.point + axis * (spec.half_height() + 0.12);
                     let rotation = rotation_for_direction(axis);
-                    world_clear(point, rotation) && vehicle_clear(point, rotation, position, angle)
+                    clear_at(point, rotation, position, angle)
                 })
         };
         let mut hatch_has_settling_margin = false;
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("landing_hatch_clearance");
         let hatch = if pod {
             let origin = vehicle_position + Vec2::new(normal.y, -normal.x) * 2.8;
             let hatch = ground(origin, -normal, 5.0)?;
@@ -319,10 +345,7 @@ impl SurfaceSortieState {
                     ShipForm::Ship,
                     position,
                     angle,
-                    |point, rotation| {
-                        world_clear(point, rotation)
-                            && vehicle_clear(point, rotation, position, angle)
-                    },
+                    |point, rotation| clear_at(point, rotation, position, angle),
                 )
                 .filter(|hit| hatch_clear(*hit, position, angle))
             };
@@ -333,8 +356,11 @@ impl SurfaceSortieState {
                     angle,
                 )?;
             }
+            let center_hatch = hatch_at(vehicle_position, angle)?;
+            // All three untilted poses have already passed. Only the tilted
+            // poses remain for the combined settling margin.
             hatch_has_settling_margin = [-0.75, 0.0, 0.75].into_iter().all(|offset| {
-                [-0.1, 0.0, 0.1].into_iter().all(|turn| {
+                [-0.1, 0.1].into_iter().all(|turn| {
                     hatch_at(
                         vehicle_position + Vec2::new(normal.y, -normal.x) * offset,
                         angle + turn,
@@ -342,7 +368,7 @@ impl SurfaceSortieState {
                     .is_some()
                 })
             });
-            hatch_at(vehicle_position, angle)?
+            center_hatch
         };
         Some(PilotLandingSite {
             hatch_has_settling_margin,

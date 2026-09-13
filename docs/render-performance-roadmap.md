@@ -109,12 +109,14 @@ through that production path justifies changing the strategy.
 
 Two measured problems now deserve separate, bounded investigations:
 
-- **Control/physics stalls:** the next pre-deployment capture sustains
-  9.55 FPS / 47.74 updates/s for 48.28 seconds, with host-step work averaging
-  82.94 ms per displayed frame. Raw status, settings and a screenshot are saved
-  with the memory experiment. Reopen the
-  [sensor/physics attribution](on-foot-survey-fix.md); the coarse step bucket
-  combines policy and physics and does not identify a specific function.
+- **Bot sensor stalls:** [live per-update attribution](landing-query-profile.md)
+  catches a nine-FPS window with P2 sensors averaging 14.94 ms while the shared
+  simulation step averages 0.63 ms. P2 is surveying all 64 landing candidates
+  every update. Reusing identical hatch checks cuts hatch work by 41% in a paired
+  Pi replay, with unchanged gameplay report and per-tick CSV fields. It reduces
+  the cost of a full survey; repeated surveys and ground graph connections
+  remain separate follow-ups. Actual match seeds and per-seat timing are now
+  available in live status, rather than only the combined host-step bucket.
 - **Remaining glyph display-memory cost:** compare RAM staging through the
   actual LinuxKMS fast image path, including copy cost and clock/launcher
   workloads. Alternatively, measure small glyph/HUD regions in RAM. Keep fonts,

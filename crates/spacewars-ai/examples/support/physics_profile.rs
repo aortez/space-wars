@@ -11,10 +11,18 @@ pub struct PhysicsProfile {
 }
 
 impl PhysicsProfile {
-    pub fn record_pairs(&mut self, tick: u64, same_body: usize, other: usize, active: usize) {
+    pub fn record_pairs(
+        &mut self,
+        tick: u64,
+        same_body: usize,
+        other: usize,
+        removed: usize,
+        active: usize,
+    ) {
         self.pair_samples
             .push(json!({"tick": tick, "same_body_candidates": same_body,
-            "other_candidates": other, "active_contact_pairs": active}));
+            "other_candidates": other, "removed_collider_candidates": removed,
+            "active_contact_pairs": active}));
     }
 
     pub fn record(&mut self, m: SpacewarsStepMetrics, step_ms: f64) {
@@ -91,7 +99,7 @@ impl PhysicsProfile {
                 (name, stats)
             })
             .collect();
-        json!({"version": 1, "timings": times, "populations": counts,
+        json!({"version": 2, "timings": times, "populations": counts,
             "pair_samples": self.pair_samples, "ccd": null,
             "scope": "world_* phases plus sortie_outside_world partition the scenario step; rapier_* are nested backend timers, not additive; world_physics times the raw step only; post-step event collection is in world_workload; CCD total is unavailable in Rapier 0.34"})
     }

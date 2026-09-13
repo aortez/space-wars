@@ -1,5 +1,8 @@
 use super::*;
 use spacewars_ai::mission_pilot::MaterialMissionPilot;
+use std::time::Instant;
+
+mod profiling;
 
 pub(crate) const MATCH_REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "spacewars",
@@ -52,6 +55,8 @@ struct MaterialMissionClientScenario {
     pilots: [MaterialMissionPilot; 2],
     bots: [bool; 2],
     registration: &'static ScenarioRegistration,
+    seed: u64,
+    profile: profiling::Profile,
 }
 fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
     let registration = match (duel, arena) {
@@ -84,6 +89,8 @@ fn create_with_seats(
         sortie: SurfaceSortieClientScenario { state },
         bots,
         registration,
+        seed,
+        profile: profiling::Profile::default(),
         pilots: std::array::from_fn(|seat| {
             MaterialMissionPilot::new(
                 BrainReset {
@@ -162,19 +169,31 @@ impl ClientScenario for MaterialMissionClientScenario {
         if dt.is_zero() || self.is_game_over() {
             return self.sortie.step(&[], dt);
         }
+        let started = Instant::now();
+        let mut sample = profiling::Sample::default();
         let mut actions = human_seat_actions(actions, self.bots);
         for seat in (0..2).filter(|&seat| self.bots[seat]) {
-            let o = self
-                .sortie
-                .state
-                .mission_observation(seat, self.pilots[seat].site_request());
+            let site = self.pilots[seat].site_request();
+            let clock = Instant::now();
+            let o = self.sortie.state.mission_observation(seat, site);
+            sample.sensors[seat] = clock.elapsed();
+            let clock = Instant::now();
             actions.extend(
                 self.pilots[seat]
                     .intent(&o)
                     .encode(PlayerId::from_index(seat).unwrap()),
             );
+            sample.policies[seat] = clock.elapsed();
+            sample.seats[seat] = Some(profiling::Seat::read(&o, site));
         }
-        self.sortie.step(&actions, dt)
+        let clock = Instant::now();
+        let result = self.sortie.step(&actions, dt);
+        sample.scenario = clock.elapsed();
+        sample.total = started.elapsed();
+        sample.world = self.sortie.state.last_step_metrics();
+        sample.tick = self.sortie.state.tick();
+        self.profile.record(sample);
+        result
     }
     fn map_input(&self, input: &mut ClientInput, benchmark: bool) -> Vec<Action> {
         human_seat_actions(&self.sortie.map_input(input, benchmark), self.bots)
@@ -207,7 +226,9 @@ impl ClientScenario for MaterialMissionClientScenario {
             return String::new();
         };
         format!(
-            "match_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}",
+            "match_seed={}\nmatch_tick={}\nmatch_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}\n{}",
+            self.seed,
+            self.sortie.state.tick(),
             if self.bots[0] { "rule_bot" } else { "human" },
             if self.bots[1] { "rule_bot" } else { "human" },
             round
@@ -220,6 +241,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .state
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
+            self.profile.diagnostics(&self.pilots),
         )
     }
     #[cfg(test)]
@@ -399,6 +421,16 @@ mod tests {
             for _ in 0..30 {
                 client.step(&interference, Duration::from_nanos(16_666_667));
             }
+            let diagnostics = client.runtime_diagnostics();
+            assert!(diagnostics.contains("match_seed=42\nmatch_tick=31\n"));
+            assert!(diagnostics.contains("mission_profile_samples=31\n"));
+            for seat in 0..2 {
+                assert!(diagnostics.contains(&format!(
+                    "mission_p{}_bot_observations={}",
+                    seat + 1,
+                    if controllers[seat] == RuleBot { 31 } else { 0 }
+                )));
+            }
             let frames = client.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));
             for seat in 0..2 {
                 let bot = controllers[seat] == RuleBot;
@@ -450,6 +482,61 @@ mod tests {
                     .iter()
                     .all(|p| p.alive() && p.health == 100.0)
             );
+        }
+    }
+
+    #[test]
+    fn mission_timing_is_read_only_and_preserves_unprofiled_controls_and_state() {
+        let settings = Settings::default();
+        let mut measured = create_with_seats(7, &settings, [true; 2], true, &MATCH_REGISTRATION);
+        let mut reference = create_with_seats(7, &settings, [true; 2], true, &MATCH_REGISTRATION);
+        let reference = reference
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap();
+        let dt = Duration::from_nanos(16_666_667);
+        for tick in 1..=300 {
+            let mut actions = Vec::new();
+            for seat in 0..2 {
+                let o = reference
+                    .sortie
+                    .state
+                    .mission_observation(seat, reference.pilots[seat].site_request());
+                actions.extend(
+                    reference.pilots[seat]
+                        .intent(&o)
+                        .encode(PlayerId::from_index(seat).unwrap()),
+                );
+            }
+            reference.sortie.step(&actions, dt);
+            measured.step(&[], dt);
+            let measured = measured
+                .as_any()
+                .downcast_ref::<MaterialMissionClientScenario>()
+                .unwrap();
+            assert_eq!(
+                measured.pilots.each_ref().map(|p| p.telemetry()),
+                reference.pilots.each_ref().map(|p| p.telemetry())
+            );
+            if tick % 30 == 0 {
+                let state = SurfaceSortieScenario::observe(&measured.sortie.state).payload;
+                assert_eq!(
+                    state,
+                    SurfaceSortieScenario::observe(&reference.sortie.state).payload
+                );
+                let diagnostics = measured.runtime_diagnostics();
+                assert_eq!(diagnostics, measured.runtime_diagnostics());
+                assert_eq!(
+                    state,
+                    SurfaceSortieScenario::observe(&measured.sortie.state).payload
+                );
+                for (key, value) in diagnostics.lines().filter_map(|line| line.split_once('=')) {
+                    if key.starts_with("mission_") && key.ends_with("_ms") {
+                        let value: f64 = value.parse().unwrap();
+                        assert!(value.is_finite() && value >= 0.0);
+                    }
+                }
+            }
         }
     }
 

@@ -410,6 +410,8 @@ impl SurfaceSortieState {
         };
         let mut nodes = Vec::new();
         let mut rejected = Vec::new();
+        #[cfg(feature = "sensor-profile")]
+        let _nodes_profile = super::sensor_profile::Scope::new("ground_nodes");
         for id in bearings {
             let up =
                 Vec2::Y.rotate_radians(id as f32 * std::f32::consts::TAU / GROUND_SAMPLES as f32);
@@ -447,6 +449,10 @@ impl SurfaceSortieState {
                 normal: hit.normal.rotate_radians(-frame.angle),
             });
         }
+        #[cfg(feature = "sensor-profile")]
+        drop(_nodes_profile);
+        #[cfg(feature = "sensor-profile")]
+        let _edges_profile = super::sensor_profile::Scope::new("ground_edges");
         let gravity = gravity.max(1.0);
         let jump_height = spec.jump_speed.powi(2) / (2.0 * gravity);
         let mut nodes_by_id = [None; GROUND_SAMPLES];

@@ -556,6 +556,8 @@ pub struct PhysicsStepMetrics {
 pub struct PhysicsPairDiagnostics {
     pub same_body_candidates: usize,
     pub other_candidates: usize,
+    /// Pairs awaiting narrow-phase cleanup after a collider was removed.
+    pub removed_collider_candidates: usize,
     pub active_contact_pairs: usize,
 }
 
@@ -1194,8 +1196,15 @@ impl PhysicsWorld {
     pub fn pair_diagnostics(&self) -> PhysicsPairDiagnostics {
         let mut result = PhysicsPairDiagnostics::default();
         for pair in self.raw.contact_pairs() {
-            let a = self.raw.colliders[pair.collider1].parent();
-            let b = self.raw.colliders[pair.collider2].parent();
+            let (Some(a), Some(b)) = (
+                self.raw.colliders.get(pair.collider1),
+                self.raw.colliders.get(pair.collider2),
+            ) else {
+                result.removed_collider_candidates += 1;
+                continue;
+            };
+            let a = a.parent();
+            let b = b.parent();
             if a.is_some() && a == b {
                 result.same_body_candidates += 1;
             } else {
@@ -2330,6 +2339,28 @@ mod tests {
         );
         assert_eq!(metrics.contact_pairs, pairs.active_contact_pairs);
         assert_eq!(world.snapshot_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn pair_diagnostics_accept_removed_colliders_before_the_next_step() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::ZERO,
+            ..Default::default()
+        });
+        let first = insert_ball(&mut world, 1, Vec2::ZERO);
+        let second = insert_ball(&mut world, 2, Vec2::new(0.2, 0.0));
+        world.step(1.0 / 60.0);
+        assert_eq!(world.pair_diagnostics().active_contact_pairs, 1);
+        assert!(world.remove_entity(second.entity));
+        let before = world.snapshot_bytes().unwrap();
+        let pairs = world.pair_diagnostics();
+        assert_eq!(pairs.removed_collider_candidates, 1);
+        assert_eq!(pairs.active_contact_pairs, 0);
+        assert_eq!(pairs.same_body_candidates + pairs.other_candidates, 0);
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        assert!(world.motion(first).is_some());
+        world.step(1.0 / 60.0);
+        assert_eq!(world.pair_diagnostics().removed_collider_candidates, 0);
     }
 
     #[test]

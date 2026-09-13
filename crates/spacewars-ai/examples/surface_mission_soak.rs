@@ -425,6 +425,7 @@ fn main() {
                     tick + 1,
                     pairs.same_body_candidates,
                     pairs.other_candidates,
+                    pairs.removed_collider_candidates,
                     pairs.active_contact_pairs,
                 );
             }

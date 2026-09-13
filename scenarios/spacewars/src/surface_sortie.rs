@@ -316,6 +316,11 @@ pub struct SurfaceSortieObservation {
 }
 
 impl SurfaceSortieState {
+    /// Current shared simulation tick, without issuing any physical queries.
+    pub fn tick(&self) -> u64 {
+        self.world.tick
+    }
+
     /// Timings from the shared world step, including terrain preparation.
     /// Seat input, support, landing, claim and recovery work in the surrounding
     /// sortie step is not included. Nested Rapier timers must not be summed.
