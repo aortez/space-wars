@@ -130,6 +130,8 @@ cancellations and structural storage counts. Snapshot setup and validation are
 inside normal sensor timing; dispatch is separate and is added to
 `measured_tick` when draw-list construction is measured. CSV/JSON writing is
 excluded from those timings. These are headless measurements, not rendered FPS.
+Instrumented synchronous sensor counters exclude dispatched live work; its
+graph/query counts are in the separate live CSV and telemetry.
 
 ## Validation checkpoint, 2026-09-13
 
@@ -215,6 +217,38 @@ sensors. Paths and capture times differ, including between desktop and Pi,
 so these are workload observations rather than matched-trajectory speedups.
 Dispatch maxima also do not isolate the largest indivisible query. The quota
 controls this planning slice; it does not certify a 16.67 ms total tick.
+
+## Integration with the subsequent ship changes
+
+The branch was then rebased onto `183c2979c426f2a07d15b5316a341a95d9e95b30`,
+including [#86](https://github.com/aortez/space-wars/pull/86) and
+[#88](https://github.com/aortez/space-wars/pull/88). Those changes include missile
+launch positions, so the preceding battle outcomes and Pi measurements remain
+labelled with their original base. A fresh reference executable was built from
+the new main in a separate checkout/target directory. The integration artifacts
+are in the sibling `live-bot-surveys/integrated/` directory:
+
+- All **694** relevant release tests pass, as do the eight live-adapter tests
+  in debug mode with CI's 16 MiB test-thread stack. Client all-targets checking,
+  formatting and Clippy complete without new warnings.
+- The disabled profile retains **121,812** dense player records exactly against
+  this new reference across the same two generated match configurations. Both
+  paired contested-flag fixtures retain their non-timing reports too.
+- All six live controlled captures pass again. The updated quiet two-live-bot
+  match runs the full ten minutes, publishes 724 completed forecasts, and has
+  6,517 dispatches doing work for both actors. All allocation and physical
+  audits pass. There are 724 gravity, 49 obstacle and four objective
+  invalidations, including invalidations of already-published results.
+- The updated asteroid match ends at tick 26,955; all 18 requests are invalidated
+  before publication. Its repeated run checks deterministic controls, reports
+  and allocations. The same limitation under moving obstacles remains.
+- Peak observed snapshot sizes rise to 69 bodies and 178 colliders. The default
+  two-request capacity is never exceeded.
+
+Integrated mission runner hashes:
+
+- Reference: `e4a062b6cba758270c4d0006354a1b7982d67f700de1a2c6eb432aa3be94e3ed`.
+- Candidate: `5c1bf3c9d7e781f5aa7a9551299c0af46b13ac69af75529c4a305e2c7e4f0458`.
 
 ## Next boundary
 
