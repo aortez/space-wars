@@ -1,5 +1,5 @@
 [package]
-name = "scenario-clock"
+name = "engine-water"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -7,8 +7,4 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-engine-common = { workspace = true }
 engine-core = { workspace = true }
-engine-rapier = { workspace = true }
-engine-water = { workspace = true }
-rand = { workspace = true }

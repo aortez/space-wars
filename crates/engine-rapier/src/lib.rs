@@ -4,6 +4,7 @@
 //! supplies stable IDs, gameplay intent, kinematic targets, and external force
 //! fields, then reads authoritative motion and normalized events.
 
+pub mod buoyancy;
 pub mod rover;
 pub mod spaceling;
 pub mod terrain;

@@ -1,13 +1,13 @@
-use std::alloc::System;
-
 use engine_nes::{
     ControllerButtons, MachineConfig, NesMachine,
     test_rom::{AxromBuilder, CnromBuilder, Mmc1Builder, Mmc3Builder, NromBuilder, UxromBuilder},
 };
-use stats_alloc::{INSTRUMENTED_SYSTEM, Region, StatsAlloc};
+#[path = "support/allocation_counter.rs"]
+mod allocation_counter;
+use allocation_counter::{ThreadAlloc, measure};
 
 #[global_allocator]
-static GLOBAL: &StatsAlloc<System> = &INSTRUMENTED_SYSTEM;
+static GLOBAL: ThreadAlloc = ThreadAlloc;
 
 #[test]
 fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
@@ -25,11 +25,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     machine.step_instruction().unwrap(); // reset
     machine.step_instruction().unwrap(); // LDX #0
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        machine.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            machine.step_instruction().unwrap();
+        }
+    });
 
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
@@ -50,11 +50,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
         rendering.clock().unwrap();
     }
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        rendering.clock().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            rendering.clock().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -62,11 +62,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     assert_eq!(stats.bytes_deallocated, 0);
     assert_eq!(stats.bytes_reallocated, 0);
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..3 {
-        rendering.run_frame([ControllerButtons::NONE; 2]).unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..3 {
+            rendering.run_frame([ControllerButtons::NONE; 2]).unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -75,11 +75,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     assert_eq!(stats.bytes_reallocated, 0);
 
     let checkpoint = rendering.checkpoint();
-    let region = Region::new(GLOBAL);
-    for _ in 0..100 {
-        rendering.restore(&checkpoint).unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..100 {
+            rendering.restore(&checkpoint).unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -102,11 +102,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDA #$00.
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        switching.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            switching.step_instruction().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -129,11 +129,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDA #$00.
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        switching.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            switching.step_instruction().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -156,11 +156,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDA #$00.
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        switching.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            switching.step_instruction().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -188,11 +188,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDX #$00.
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        switching.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            switching.step_instruction().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);
@@ -220,11 +220,11 @@ fn cpu_ppu_and_apu_steady_state_do_not_allocate() {
     switching.step_instruction().unwrap(); // Reset.
     switching.step_instruction().unwrap(); // LDX #$00.
 
-    let region = Region::new(GLOBAL);
-    for _ in 0..10_000 {
-        switching.step_instruction().unwrap();
-    }
-    let stats = region.change();
+    let stats = measure(|| {
+        for _ in 0..10_000 {
+            switching.step_instruction().unwrap();
+        }
+    });
     assert_eq!(stats.allocations, 0);
     assert_eq!(stats.deallocations, 0);
     assert_eq!(stats.reallocations, 0);

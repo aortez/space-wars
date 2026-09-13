@@ -174,7 +174,11 @@ impl ActiveEvent {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
-            ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(context, seed))),
+            ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(
+                context,
+                seed,
+                config.water_lab,
+            ))),
             ClockEventKind::Duck => {
                 let mut event =
                     DuckEvent::new_course(context.layout, seed, config.duck_course_pattern);
@@ -240,9 +244,8 @@ impl ActiveEvent {
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
             Self::Falling(event) => event.physics_counts(),
-            Self::ColorCycle(_) | Self::Meltdown(_) | Self::Marquee(_) | Self::DigitSlide(_) => {
-                (0, 0)
-            }
+            Self::Meltdown(event) => event.physics_counts(),
+            Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) => (0, 0),
             Self::Duck(event) => event.physics_counts(),
         }
     }

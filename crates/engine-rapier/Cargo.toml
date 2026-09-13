@@ -10,5 +10,6 @@ rust-version.workspace = true
 bincode = { workspace = true }
 engine-core = { workspace = true }
 engine-terrain = { workspace = true }
+engine-water = { workspace = true }
 rapier2d = { workspace = true }
 serde = { workspace = true }

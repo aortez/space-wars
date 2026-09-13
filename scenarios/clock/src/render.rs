@@ -11,6 +11,7 @@ use engine_core::Vec2;
 mod digit_slide;
 mod duck;
 mod marquee;
+mod meltdown;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -34,7 +35,10 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    render_floor(&mut frame, layout);
+    if !matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event)) if event.lab)
+    {
+        render_floor(&mut frame, layout);
+    }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         let opacity = 1.0 - event.playback().strength;
         if opacity > 0.0 {
@@ -64,7 +68,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     }
     render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
-        render_meltdown(&mut frame, event, layout);
+        meltdown::render(&mut frame, event, layout);
     }
     if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
         duck::render(&mut frame, event, state.config.duck_debug_overlay);
@@ -118,6 +122,12 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         digit_slide::render(frame, event, layout, state.palette());
         return;
     }
+    if matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event))
+        if !event.lab && event.phase() == crate::events::EventPhase::Reforming)
+    {
+        meltdown::render_reforming_face(frame, state, layout);
+        return;
+    }
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
@@ -155,75 +165,6 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                     );
                 }
             }
-        }
-    }
-}
-
-fn render_meltdown(
-    frame: &mut RenderFrame,
-    event: &crate::events::meltdown::MeltdownEvent,
-    layout: Layout,
-) {
-    use crate::events::meltdown::MeltdownEvent;
-    let water_color = RenderColor::rgb(0.08, 0.55, 0.85);
-    let edge_color = RenderColor::rgb(0.36, 0.91, 1.0);
-    for cell in &event.cells {
-        render_square(
-            frame,
-            cell.position,
-            layout.pitch,
-            cell.angle,
-            1.0,
-            DigitPalette::default(),
-        );
-    }
-    let width = MeltdownEvent::column_width(layout);
-    let cell_area = (layout.pitch * 0.8).powi(2);
-    for (index, volume) in event.water.iter().enumerate() {
-        let height = *volume as f32 * cell_area / width;
-        if height < 0.25 {
-            continue;
-        }
-        let left = MeltdownEvent::column_left(layout, index);
-        let top = layout.floor_y + height;
-        frame.push_primitive(
-            ACTIVE_CELL_LAYER,
-            rectangle(
-                RenderPoint::new(left, layout.floor_y),
-                RenderPoint::new(left + width, top),
-                water_color,
-                None,
-            ),
-        );
-        frame.push_primitive(
-            ACTIVE_CELL_LAYER,
-            rectangle(
-                RenderPoint::new(left, top - height.min(1.8)),
-                RenderPoint::new(left + width, top),
-                edge_color,
-                None,
-            ),
-        );
-    }
-    // Bounded visual stream; it represents already-accounted drained volume.
-    // No extra particles are spawned and no water is reintroduced to the pool.
-    if event.stream > 0.005 {
-        let lip = layout.drain_half_width();
-        let thickness = layout.pitch * 0.35 * event.stream.sqrt();
-        for side in [-1.0, 1.0] {
-            let x = side * (lip - thickness * 0.5);
-            frame.push_primitive(
-                ACTIVE_CELL_LAYER,
-                rectangle(
-                    RenderPoint::new(x - thickness * 0.5, layout.bounds_min.y),
-                    RenderPoint::new(x + thickness * 0.5, layout.floor_y),
-                    RenderColor {
-                        a: event.stream.sqrt(),
-                        ..water_color
-                    },
-                    None,
-                ),
-            );
         }
     }
 }
