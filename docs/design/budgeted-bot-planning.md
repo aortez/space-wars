@@ -1,9 +1,11 @@
 # Budgeted planning for material-match bots
 
-Status: steps 1–2 have an implementation checkpoint. The first selectable
+Status: steps 1–2 are merged. The first selectable
 joint-trip candidate and seat-swapped comparison harness are described in
-[mission policy comparison](../mission-policy-comparison.md). The shared work
-scheduler and strategic planning layers below remain future work.
+[mission policy comparison](../mission-policy-comparison.md). Step 3 now has a
+[resumable graph job and shared scheduler](../bot-planning-jobs.md), exercised
+offline. Live v10 still drains the search synchronously. Scheduling coherent
+physical surveys, live budget integration and strategic planning remain future work.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization

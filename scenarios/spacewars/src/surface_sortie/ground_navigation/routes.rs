@@ -2,7 +2,7 @@
 use super::*;
 
 mod round_trip;
-pub use round_trip::GroundRoundTrip;
+pub use round_trip::{GroundRoundTrip, GroundRoundTripJob, GroundTripWork};
 
 /// Reusable node and outgoing-edge lookup for a single map snapshot.
 /// The borrow prevents editing the graph while its indexes are in use. This
@@ -247,5 +247,7 @@ fn trace_route(
 
 #[cfg(test)]
 mod reference;
+#[cfg(test)]
+mod round_trip_reference;
 #[cfg(test)]
 mod tests;

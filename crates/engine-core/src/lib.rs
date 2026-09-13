@@ -8,6 +8,7 @@ pub mod config;
 pub mod constants;
 pub mod math;
 pub mod physics;
+pub mod planning;
 pub mod rng;
 pub mod transform;
 
