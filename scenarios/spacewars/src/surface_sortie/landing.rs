@@ -186,15 +186,19 @@ impl SurfacePilot {
         ship: &ShipState,
         planets: &[PlanetState],
         dt: f32,
-    ) {
-        if ship.dead || (ship.form == ShipForm::EscapePod && self.recovery.is_none()) {
-            return;
+    ) -> thrusters::ThrusterOutput {
+        if dt <= 0.0
+            || !dt.is_finite()
+            || ship.dead
+            || (ship.form == ShipForm::EscapePod && self.recovery.is_none())
+        {
+            return thrusters::ThrusterOutput::default();
         }
         self.select_approach_planet(physics, planets);
         let planet = &planets[self.planet];
         let body = physics.ship_body(self.vehicle.0);
         let Some(motion) = physics.world.motion(body) else {
-            return;
+            return thrusters::ThrusterOutput::default();
         };
         let surface = motion::SurfaceFrame::read(physics, self.planet);
         let mut landing = LandingTelemetry::measure(physics, self.vehicle.0, self.planet, planet);
@@ -271,5 +275,13 @@ impl SurfacePilot {
         physics
             .world
             .set_velocity(body, velocity, motion.angular_velocity + spin_delta, true);
+        thrusters::ThrusterOutput::from_acceleration(
+            acceleration,
+            spin_delta / dt,
+            motion.angle,
+            limits.thrust_acceleration,
+            limits.turn_acceleration,
+            ship.brake > 0.0,
+        )
     }
 }

@@ -1,5 +1,8 @@
 # Surface Sortie
 
+For the shared directional ion jets, low-speed exhaust, yellow-tipped missiles and
+deterministic capture fixtures, see [Ship visuals](ship-thrusters.md).
+
 An opt-in first Spacewars integration for spacelings. Choose **surface-sortie**
 in the launcher, or run:
 
