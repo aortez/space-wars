@@ -37,6 +37,7 @@ const RGB_FILL_BLOCK_PIXELS: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RasterOptions {
+    output_scale: f32,
     pub overview_cache_period: u64,
     pub overview_minimum_object_diameter: f32,
 }
@@ -44,6 +45,7 @@ pub struct RasterOptions {
 impl Default for RasterOptions {
     fn default() -> Self {
         Self {
+            output_scale: 1.0,
             overview_cache_period: DEFAULT_OVERVIEW_CACHE_PERIOD,
             overview_minimum_object_diameter: render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER,
         }
@@ -58,6 +60,7 @@ impl RasterOptions {
             1.0
         };
         Self {
+            output_scale,
             overview_minimum_object_diameter: render::MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER
                 * output_scale,
             ..Self::default()
@@ -80,7 +83,8 @@ pub struct RasterTimings {
     pub player_debris: Duration,
     pub player_particles: Duration,
     pub player_other: Duration,
-    // Nested in player_other; material-match HUD backing/energy bars and sun.
+    // Nested in player_other; in-camera HUD geometry and sun. The compact
+    // full-window HUD is instead included in other_frames.
     pub player_hud: Duration,
     pub player_sun_corona: Duration,
     pub overview_refresh: Duration,
@@ -257,15 +261,25 @@ impl RasterRenderer {
                     starfield_cache,
                     &mut timings,
                 );
-            } else if layout == FrameLayout::PlayerViewsWithMinimaps
-                && matches!(frames.len(), 2 | 4)
-            {
+            } else if let Some(players) = layout.player_count(frames.len()) {
+                // HUD sizes are logical pixels. Compute maps there and scale
+                // once, matching the full-resolution text/vector overlay.
+                let scale = options.output_scale;
                 let viewports = render::frame_viewports(
-                    Viewport::new(width as f32, height as f32),
+                    Viewport::new(width as f32 / scale, height as f32 / scale),
                     frames.len(),
                     layout,
-                );
-                let players = frames.len() / 2;
+                )
+                .into_iter()
+                .map(|v| {
+                    Viewport::with_origin(
+                        v.x * scale,
+                        v.y * scale,
+                        v.width * scale,
+                        v.height * scale,
+                    )
+                })
+                .collect::<Vec<_>>();
                 for player in 0..players {
                     timings +=
                         canvas.draw_player_frame_timed(&frames[player], viewports[player], None);
@@ -279,6 +293,11 @@ impl RasterRenderer {
                         &mut timings,
                     );
                 }
+                let started = Instant::now();
+                for index in players * 2..frames.len() {
+                    canvas.draw_frame(&frames[index], viewports[index]);
+                }
+                timings.other_frames += started.elapsed();
             } else if !frames.is_empty() {
                 let viewports = render::frame_viewports(
                     Viewport::new(width as f32, height as f32),
@@ -2437,6 +2456,65 @@ mod tests {
 
         assert_eq!(left_overview_center, BACKGROUND);
         assert!(right_overview_center.b > BACKGROUND.b);
+    }
+
+    #[test]
+    fn compact_minimap_placement_uses_logical_pixels_at_every_raster_scale() {
+        let filled = |color| {
+            let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, 100.0));
+            frame.push_primitive(
+                0,
+                RenderPrimitive::Circle(RenderCircle::filled(RenderPoint::ZERO, 1000.0, color)),
+            );
+            frame
+        };
+        let viewport = Viewport::new(800.0, 480.0);
+        let layout = FrameLayout::PlayerViewsWithMinimaps;
+        let frames = [
+            filled(RenderColor::RED),
+            filled(RenderColor::RED),
+            filled(RenderColor::GREEN),
+            filled(RenderColor::BLUE),
+            RenderFrame::default(),
+        ];
+        let maps = &render::frame_viewports(viewport, frames.len(), layout)[2..4];
+        let mut baseline = None;
+        for scale in [1.0, 0.5, 2.0, 3.0] {
+            let pixels = RasterRenderer::new()
+                .image_from_frames_with_layout(
+                    &frames,
+                    Viewport::new(viewport.width * scale, viewport.height * scale),
+                    layout,
+                    RasterOptions::for_scale(scale),
+                )
+                .to_rgb8()
+                .unwrap();
+            let centers: Vec<_> = maps
+                .iter()
+                .map(|map| {
+                    let x = ((map.x + map.width * 0.5) * scale).round() as usize;
+                    let y = ((map.y + map.height * 0.5) * scale).round() as usize;
+                    pixels.as_slice()[y * pixels.width() as usize + x]
+                })
+                .collect();
+            assert!(
+                centers[0].g > 150 && centers[1].b > 150,
+                "maps moved at scale {scale}"
+            );
+            if let Some(baseline) = &baseline {
+                assert_eq!(&centers, baseline);
+            } else {
+                baseline = Some(centers);
+            }
+            for map in maps {
+                let x = (map.x * scale) as usize;
+                let y = (map.y * scale) as usize;
+                assert_eq!(
+                    pixels.as_slice()[y * pixels.width() as usize + x],
+                    Rgb8Pixel { r: 255, g: 0, b: 0 }
+                );
+            }
+        }
     }
 
     #[test]

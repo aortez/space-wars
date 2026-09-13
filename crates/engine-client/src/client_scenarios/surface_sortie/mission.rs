@@ -480,9 +480,10 @@ mod tests {
                     client.sortie.state.combat_telemetry(seat).shells_fired > 0,
                     !bot
                 );
-                let has_bot_label = frames[seat].layers.iter().flat_map(|l| &l.primitives)
-                    .any(|p| matches!(p, engine_common::RenderPrimitive::Text(t) if t.text.starts_with("AI: ")));
-                assert_eq!(has_bot_label, bot);
+                assert_eq!(
+                    super::hud::has_bot_diagnostic(&frames, seat),
+                    bot && super::hud::bot_diagnostics_enabled()
+                );
             }
             // Disconnecting the human's pad releases its action stream.
             for seat in 0..2 {
@@ -726,11 +727,9 @@ mod tests {
             }
             assert_eq!(host.sortie.state.combat_telemetry(1).shells_fired, 0);
             let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
-            let expected = format!("AI: {}", host.pilots[1].label());
-            assert!(
-                frames[1].layers.iter().flat_map(|l| &l.primitives).any(
-                    |p| matches!(p,engine_common::RenderPrimitive::Text(t) if t.text==expected)
-                )
+            assert_eq!(
+                super::hud::has_bot_diagnostic(&frames, 1),
+                super::hud::bot_diagnostics_enabled()
             );
             let reset = create(42, &settings, duel, arena);
             let reset = reset

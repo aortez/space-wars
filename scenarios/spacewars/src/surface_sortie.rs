@@ -17,6 +17,7 @@ pub mod compatibility;
 pub mod flight;
 pub mod ground_navigation;
 pub mod ground_posture;
+pub mod hud;
 pub mod impact;
 pub mod jetpack;
 mod landing;
@@ -183,6 +184,8 @@ pub(super) struct SurfacePilot {
     damage: impact::SurfaceDamageObservation,
     transfers: u64,
     last_transfer: TransferResult,
+    /// Presentation-only age of the last transfer attempt; not a gameplay gate.
+    last_transfer_tick: Option<u64>,
     landing: LandingTelemetry,
     landing_gear: landing_gear::LandingGear,
     pod_righting: pod_righting::PodRightingState,
@@ -229,6 +232,7 @@ impl SurfacePilot {
             damage: impact::SurfaceDamageObservation::default(),
             transfers: 0,
             last_transfer: TransferResult::Ready,
+            last_transfer_tick: None,
             landing: LandingTelemetry::default(),
             landing_gear: landing_gear::LandingGear::default(),
             pod_righting: pod_righting::PodRightingState::default(),
@@ -700,6 +704,7 @@ impl Scenario for SurfaceSortieScenario {
                 } else if input.interact_held && !state.pilots[player].interact_was_held {
                     let result = state.try_transfer(player);
                     state.pilots[player].last_transfer = result;
+                    state.pilots[player].last_transfer_tick = Some(state.world.tick);
                     if matches!(result, TransferResult::Exited | TransferResult::Boarded) {
                         state.pilots[player].transfers += 1;
                         state.pilots[player].controls_armed = false;

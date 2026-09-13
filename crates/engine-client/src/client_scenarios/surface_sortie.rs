@@ -472,17 +472,8 @@ fn pilot_hud(frames: &mut [RenderFrame], label: &str) {
     pilot_hud_for(frames, 1, label);
 }
 fn pilot_hud_for(frames: &mut [RenderFrame], player: usize, label: &str) {
-    use engine_common::{RenderColor, RenderPrimitive};
-    // Reuse the control hint so the physical viewport stays clear at 800x480.
-    for layer in &mut frames[player].layers {
-        for primitive in &mut layer.primitives {
-            if let RenderPrimitive::Text(text) = primitive
-                && text.text.starts_with("A: thrust")
-            {
-                text.text = format!("AI: {label}");
-                text.color = RenderColor::rgb(1.0, 0.82, 0.25);
-            }
-        }
+    if hud::bot_diagnostics_enabled() {
+        hud::append_bot_diagnostic(frames, player, label);
     }
 }
 
@@ -732,7 +723,7 @@ impl SurfaceSortieClientScenario {
             viewport.width / count as f32 * crate::MIN_RASTER_SCALE,
             viewport.height * crate::MIN_RASTER_SCALE,
         );
-        let mut frames = Vec::with_capacity(count * 2);
+        let mut frames = Vec::with_capacity(count * 2 + 1);
         for player in 0..count {
             frames.push(if cull {
                 SurfaceSortieScenario::player_frame_in_view(&self.state, player, pane)
@@ -747,6 +738,7 @@ impl SurfaceSortieClientScenario {
                 aspect,
             ));
         }
+        frames.push(hud::frame(&self.state, viewport));
         frames
     }
 }
@@ -776,6 +768,8 @@ fn surface_controls(input: &ClientInput, player: usize) -> (f32, bool, bool) {
 
 #[cfg(test)]
 mod culling_tests;
+
+mod hud;
 
 #[cfg(test)]
 mod tests {
@@ -835,10 +829,10 @@ mod tests {
             assert_eq!(host.sortie.state.combat_telemetry(seat).shells_fired, 0);
             assert_eq!(host.sortie.state.combat_telemetry(seat).laser_hit_ticks, 0);
             let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
-            let expected = format!("AI: {}", host.tactical.as_ref().unwrap().label());
-            assert!(frames[seat].layers.iter().flat_map(|l| &l.primitives).any(
-                |p| matches!(p, engine_common::RenderPrimitive::Text(t) if t.text == expected)
-            ));
+            assert_eq!(
+                hud::has_bot_diagnostic(&frames, seat),
+                hud::bot_diagnostics_enabled()
+            );
             let reset = make();
             let reset = reset
                 .as_any()
@@ -928,7 +922,7 @@ mod tests {
         host.step(&actions, Duration::from_nanos(16_666_667));
         assert_eq!(host.sortie.state.observation(0).tick, 1);
         let frames = host.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));
-        assert_eq!(frames.len(), 4);
+        assert_eq!(frames.len(), 5);
     }
 
     #[test]
@@ -983,8 +977,11 @@ mod tests {
         host.step(&[], Duration::ZERO);
         assert_eq!(host.brain.telemetry(), &before);
         let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
-        assert!(frames[1].layers.iter().flat_map(|l| &l.primitives).any(|p|
-            matches!(p, engine_common::RenderPrimitive::Text(t) if t.text == "AI: recovered / flying again")));
+        assert_eq!(host.brain.label(), "recovered / flying again");
+        assert_eq!(
+            hud::has_bot_diagnostic(&frames, 1),
+            hud::bot_diagnostics_enabled()
+        );
         let fresh = make();
         let fresh = fresh
             .as_any()
@@ -1102,10 +1099,11 @@ mod tests {
             host.brain.telemetry()
         );
         let frames = host.render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0));
-        assert_eq!(frames.len(), 4);
-        assert!(frames[1].layers.iter().flat_map(|l| &l.primitives).any(
-            |p| matches!(p, engine_common::RenderPrimitive::Text(t) if t.text.starts_with("AI: "))
-        ));
+        assert_eq!(frames.len(), 5);
+        assert_eq!(
+            hud::has_bot_diagnostic(&frames, 1),
+            hud::bot_diagnostics_enabled()
+        );
         let restarted = make();
         let restarted = restarted
             .as_any()
@@ -1179,7 +1177,7 @@ mod tests {
             scenario
                 .render_frames(RenderBackend::Raster, Viewport::new(800.0, 480.0))
                 .len(),
-            4
+            5
         );
         pads.borrow_mut().disconnect_seat(1);
         let released = scenario.map_input(&mut input, false);
@@ -1394,7 +1392,7 @@ mod tests {
             }
             for viewport in [Viewport::new(1280.0, 720.0), Viewport::new(800.0, 1280.0)] {
                 let frames = scenario.render_frames(RenderBackend::Vector, viewport);
-                assert_eq!(frames.len(), 4);
+                assert_eq!(frames.len(), 5);
                 assert_ne!(frames[0].camera.center, frames[1].camera.center);
                 let layout = scenario.frame_layout();
                 let panes = crate::render::frame_viewports(viewport, 4, layout);
@@ -1434,9 +1432,9 @@ mod tests {
                 let overlay = crate::render::raster_text_overlay(&frames, viewport, layout);
                 for player in 0..2 {
                     let label = format!(
-                        "P{}  {}",
+                        "P{} · {}",
                         player + 1,
-                        if on_foot { "ON FOOT" } else { "ABOARD" }
+                        if on_foot { "ON FOOT" } else { "SHIP" }
                     );
                     assert!(
                         overlay
@@ -1675,9 +1673,10 @@ mod tests {
                 let overlay =
                     crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
                 assert!(
-                    overlay
+                    !overlay
                         .iter()
-                        .any(|primitive| primitive.text.starts_with("OUTPOST P1"))
+                        .any(|p| p.text == "capturing; stay beside the terminal"),
+                    "completed capture prompt should clear"
                 );
                 assert!(
                     overlay
@@ -1778,12 +1777,17 @@ mod tests {
                     );
                     assert_eq!(presentation.minimaps.len(), players);
                     let overlay = crate::render::raster_text_overlay(&frames, viewport, layout);
-                    assert!(overlay.iter().any(|p| p.text
-                        == if secured {
-                            "Planet 0: P1".to_owned()
-                        } else {
-                            format!("Planet 0: Neutral / raising {:.0}%", claim.progress * 100.0)
-                        }));
+                    assert_eq!(
+                        overlay.iter().any(|p| p.text == "Raising your flag"),
+                        !secured
+                    );
+                    if !secured {
+                        assert!(
+                            overlay
+                                .iter()
+                                .any(|p| p.text == format!("{:.0}%", claim.progress * 100.0))
+                        );
+                    }
                     assert!(
                         overlay
                             .iter()
@@ -1791,7 +1795,7 @@ mod tests {
                                 && !p.text.to_lowercase().contains("repair"))
                     );
                     // Both overviews agree: only the claimed planet changes color.
-                    for map in &frames[players..] {
+                    for map in &frames[players..players * 2] {
                         let planets = map
                             .ordered_layers()
                             .into_iter()
@@ -1960,18 +1964,18 @@ mod tests {
                 let labels =
                     crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
                 assert!(labels.iter().any(|p| p.text.starts_with(if stage == "pod" {
-                    "P1  POD"
+                    "P1 · POD"
                 } else {
-                    "P1  ON FOOT"
+                    "P1 · ON FOOT"
                 })));
-                assert!(labels.iter().any(|p| p.text.starts_with("P2  ABOARD")));
+                assert!(labels.iter().any(|p| p.text.starts_with("P2 · SHIP")));
                 assert!(
                     !labels
                         .iter()
                         .any(|p| p.text.contains("Vehicle lost; restart"))
                 );
                 if stage == "rebuilding" {
-                    assert!(labels.iter().any(|p| p.text.starts_with("Rebuild ")));
+                    assert!(labels.iter().any(|p| p.text == "Rebuilding ship"));
                 }
                 let image = crate::raster::RasterRenderer::new().image_from_frames_with_layout(
                     &frames,
@@ -2088,19 +2092,11 @@ mod tests {
         let overlay =
             crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
         let label = if name.starts_with("on-foot") {
-            "ON FOOT"
+            "P1 · ON FOOT"
         } else {
-            "ABOARD"
+            "P1 · SHIP"
         };
-        let label = if matches!(
-            scenario.registration().id,
-            "surface-expedition" | "spacewars-terrain"
-        ) {
-            format!("P1  {label}")
-        } else {
-            label.to_owned()
-        };
-        assert!(overlay.iter().any(|p| p.text.starts_with(&label)));
+        assert!(overlay.iter().any(|p| p.text.starts_with(label)));
         let image = RasterRenderer::new().image_from_frames_with_layout(
             &frames,
             viewport,

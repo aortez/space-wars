@@ -392,6 +392,7 @@ export component MainWindow inherits Window {
     in property <length> p2-minimap-y: 0px;
     in property <length> p2-minimap-size: 0px;
     in property <bool> raster-visible: false;
+    in property <bool> compact-hud-visible: false;
     in property <image> raster-frame;
     in property <bool> native-video-visible: false;
     in property <image> native-video-frame;
@@ -850,9 +851,9 @@ export component MainWindow inherits Window {
     // Host-submitted frames, not a measurement of physical display scanout.
     if root.performance-overlay-enabled && root.performance-overlay-text != "" && !root.launcher-visible && !root.launcher-busy: Rectangle {
         x: 12px;
-        y: root.spacewars-ui-visible ? 78px : 12px;
-        width: Math.min(184px, parent.width - 24px);
-        height: 32px;
+        y: root.compact-hud-visible ? 8px : root.spacewars-ui-visible ? 78px : 12px;
+        width: root.compact-hud-visible ? Math.min(156px, (parent.width - 184px) / 2) : Math.min(184px, parent.width - 24px);
+        height: root.compact-hud-visible ? 26px : 32px;
         background: #080a12b8;
         border-color: #59627388;
         border-width: 1px;
@@ -862,7 +863,7 @@ export component MainWindow inherits Window {
             height: parent.height;
             text: root.performance-overlay-text;
             color: #e6edf7;
-            font-size: 14px;
+            font-size: root.compact-hud-visible ? 12px : 14px;
             overflow: elide;
             horizontal-alignment: center;
             vertical-alignment: center;
@@ -2690,9 +2691,15 @@ export component MainWindow inherits Window {
     if root.autostart-running && !root.ingame-menu-visible: Rectangle {
         width: parent.width; height: parent.height;
         background: transparent;
+        // Preserve next-round countdowns and failure feedback in full.
+        property <bool> compact-caption: root.compact-hud-visible && !root.game-over-visible
+            && root.scenario-error-text == "" && root.launcher-error-text == "";
         Text {
-            x: 12px; y: parent.height - 24px; width: parent.width - 24px;
-            text: root.autostart-caption; color: #ffffff; font-size: 12px;
+            x: parent.compact-caption ? parent.width / 2 - 120px : 12px;
+            y: parent.height - (parent.compact-caption ? 17px : 24px);
+            width: parent.compact-caption ? 240px : parent.width - 24px;
+            text: parent.compact-caption ? "Autoplay · Press a button for menu" : root.autostart-caption;
+            color: #ffffff; font-size: parent.compact-caption ? 10px : 12px;
             horizontal-alignment: center;
         }
         TouchArea {

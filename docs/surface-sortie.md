@@ -142,6 +142,9 @@ contacts, transfer feedback, ship health, body count, access distance, outpost
 capture progress, and repair eligibility.
 Use raster rendering on software-only backends (including the kiosk).
 
+The [compact gameplay HUD](gameplay-hud.md) groups each player's background-free
+vitals beside a bottom-corner radar, with situational prompts above the world.
+
 ## Model and boundaries
 
 The pilot has a stable spaceling ID and owning player, separate from its vehicle

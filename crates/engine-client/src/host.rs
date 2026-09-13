@@ -570,6 +570,9 @@ pub fn start_scenario_loop(
         });
     }
     let initial_frames = scenario.render_frames(renderer, initial_viewport);
+    window.set_compact_hud_visible(
+        scenario.frame_layout() == render::FrameLayout::PlayerViewsWithMinimaps,
+    );
     let mut input_projections =
         render::frame_projections(&initial_frames, initial_viewport, scenario.frame_layout());
     let mut projection_viewport = initial_viewport;
@@ -1538,7 +1541,7 @@ fn present_frame(
     )
 }
 
-fn present_frames(
+pub(crate) fn present_frames(
     window: &MainWindow,
     frames: Vec<RenderFrame>,
     layout: render::FrameLayout,
@@ -1546,6 +1549,7 @@ fn present_frames(
     raster_scale: f32,
     raster_renderer: &mut raster::RasterRenderer,
 ) -> usize {
+    window.set_compact_hud_visible(layout == render::FrameLayout::PlayerViewsWithMinimaps);
     let viewport = Viewport::from_window(window.window());
     window.set_native_video_visible(false);
     let scene_item_count = match renderer {
@@ -3176,7 +3180,7 @@ mod tests {
         )
         .unwrap();
         let initial = scenario.render_frames(RenderBackend::Vector, TEST_VIEWPORT);
-        assert_eq!(initial.len(), 4);
+        assert_eq!(initial.len(), 5);
         assert_eq!(
             scenario.frame_layout(),
             render::FrameLayout::PlayerViewsWithMinimaps

@@ -558,25 +558,12 @@ fn sustained_real_laser_fire_finishes_a_round_against_either_survivor() {
             Some(MatchOutcome::Winner(PlayerId::PLAYER_1))
         );
         assert_eq!(vitals(&state, 1).health, 0.0);
-        let frame = SurfaceSortieScenario::player_frame(&state, 1);
-        let text: Vec<_> = frame
-            .layers
-            .iter()
-            .flat_map(|l| &l.primitives)
-            .filter_map(|p| {
-                if let RenderPrimitive::Text(t) = p {
-                    Some(t.text.as_str())
-                } else {
-                    None
-                }
-            })
-            .collect();
-        assert!(
-            text.iter()
-                .any(|t| t.contains("DEAD") && t.contains("pilot 0%"))
-        );
-        assert!(text.contains(&"Player 1 wins / opposing pilot lost"));
-        assert!(!text.contains(&"Release controls to continue"));
+        let hud = state.player_hud(1);
+        assert_eq!(hud.mode, "DEAD");
+        assert_eq!(hud.health.fraction, 0.0);
+        let prompt = hud.prompt.unwrap();
+        assert_eq!(prompt.title, "Player 1 wins");
+        assert_eq!(prompt.detail, "opposing pilot lost");
     }
 }
 

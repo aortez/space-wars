@@ -32,8 +32,75 @@ pub(crate) const MIN_SPACEWARS_OVERVIEW_OBJECT_DIAMETER: f32 = 2.0;
 pub enum FrameLayout {
     EqualHorizontal,
     SpacewarsLocalPlay,
-    /// One or two player cameras, followed by their translucent overview frames.
+    /// One or two player cameras, their translucent overviews, and optionally
+    /// one full-window overlay frame (3/5 frames with the overlay, 2/4 without).
     PlayerViewsWithMinimaps,
+}
+
+impl FrameLayout {
+    pub(crate) fn player_count(self, frames: usize) -> Option<usize> {
+        if self != Self::PlayerViewsWithMinimaps {
+            return None;
+        }
+        match frames {
+            2 | 3 => Some(1),
+            4 | 5 => Some(2),
+            _ => None,
+        }
+    }
+
+    fn is_minimap(self, frames: usize, index: usize) -> bool {
+        match self {
+            Self::SpacewarsLocalPlay => frames >= 4 && (2..4).contains(&index),
+            Self::PlayerViewsWithMinimaps => self
+                .player_count(frames)
+                .is_some_and(|players| (players..players * 2).contains(&index)),
+            Self::EqualHorizontal => false,
+        }
+    }
+}
+
+/// Logical-pixel layout shared by the raster/vector maps and the surface HUD.
+/// Vitals sit beside the map, never above it; P2 mirrors the outside corner.
+pub(crate) struct PlayerHudLayout {
+    pub radar: Viewport,
+    pub vitals: Viewport,
+    pub prompt: Viewport,
+}
+
+pub(crate) fn player_hud_layout(pane: Viewport, player: usize) -> PlayerHudLayout {
+    let margin = (pane.width * 0.025).clamp(8.0, 14.0);
+    let gap = 12.0;
+    let size = (pane.height * 0.2)
+        .clamp(96.0, 136.0)
+        .min(pane.width * 0.32);
+    let vitals_width = (pane.width - size - gap - margin * 2.0).clamp(0.0, 164.0);
+    let right = player == 1;
+    let radar_x = if right {
+        pane.x + pane.width - margin - size
+    } else {
+        pane.x + margin
+    };
+    let radar_y = pane.y + pane.height - margin - size;
+    PlayerHudLayout {
+        radar: Viewport::with_origin(radar_x, radar_y, size, size),
+        vitals: Viewport::with_origin(
+            if right {
+                radar_x - gap - vitals_width
+            } else {
+                radar_x + size + gap
+            },
+            (radar_y + (size - 96.0) * 0.5).min(pane.y + pane.height - margin - 96.0),
+            vitals_width,
+            96.0,
+        ),
+        prompt: Viewport::with_origin(
+            pane.x + (pane.width - 244.0_f32.min(pane.width - margin * 2.0)) * 0.5,
+            pane.y + 46.0,
+            244.0_f32.min(pane.width - margin * 2.0),
+            64.0,
+        ),
+    }
 }
 
 pub struct VectorPresentation {
@@ -154,13 +221,7 @@ pub fn scene_presentation_from_frames_with_layout(
         .zip(frame_viewports(viewport, frames.len(), layout))
         .enumerate()
     {
-        let is_minimap = match layout {
-            FrameLayout::SpacewarsLocalPlay => frames.len() >= 4 && (2..4).contains(&index),
-            FrameLayout::PlayerViewsWithMinimaps => {
-                matches!(frames.len(), 2 | 4) && index >= frames.len() / 2
-            }
-            FrameLayout::EqualHorizontal => false,
-        };
+        let is_minimap = layout.is_minimap(frames.len(), index);
         if is_minimap {
             let minimum_object_diameter = (layout == FrameLayout::SpacewarsLocalPlay
                 && (2..4).contains(&index))
@@ -192,25 +253,16 @@ pub(crate) fn frame_viewports(
     match layout {
         FrameLayout::EqualHorizontal => viewport.split_horizontally(count),
         FrameLayout::PlayerViewsWithMinimaps => {
-            if !matches!(count, 2 | 4) {
+            let Some(players) = layout.player_count(count) else {
                 return viewport.split_horizontally(count);
-            }
-            let players = count / 2;
+            };
             let panes = viewport.split_horizontally(players);
             let mut result = panes.clone();
-            for pane in panes {
-                let size = if players == 1 {
-                    pane.height.min(pane.width) * 0.25
-                } else {
-                    (pane.height * 0.25).min(pane.width * 0.4)
-                };
-                let margin = (pane.height * 0.02).clamp(4.0, 16.0).min(size * 0.2);
-                result.push(Viewport::with_origin(
-                    pane.x + pane.width - size - margin,
-                    pane.y + pane.height * 0.25,
-                    size,
-                    size,
-                ));
+            for (player, pane) in panes.into_iter().enumerate() {
+                result.push(player_hud_layout(pane, player).radar);
+            }
+            if count > players * 2 {
+                result.push(viewport);
             }
             result
         }
@@ -282,17 +334,15 @@ pub(crate) fn raster_text_overlay(
         return Vec::new();
     }
     let mut output = Vec::new();
-    for (frame, pane) in frames
+    for (index, (frame, pane)) in frames
         .iter()
         .zip(frame_viewports(viewport, frames.len(), layout))
-        .take(
-            if layout == FrameLayout::PlayerViewsWithMinimaps && matches!(frames.len(), 2 | 4) {
-                frames.len() / 2
-            } else {
-                frames.len()
-            },
-        )
+        .enumerate()
     {
+        if layout == FrameLayout::PlayerViewsWithMinimaps && layout.is_minimap(frames.len(), index)
+        {
+            continue;
+        }
         for layer in frame.ordered_layers() {
             for primitive in &layer.primitives {
                 if let RenderPrimitive::Text(text) = primitive {
@@ -312,6 +362,8 @@ pub(crate) fn frame_projections(
     frames
         .iter()
         .zip(frame_viewports(viewport, frames.len(), layout))
+        // HUD and radar are presentation only; pointer input targets a camera.
+        .take(layout.player_count(frames.len()).unwrap_or(frames.len()))
         .map(|(frame, viewport)| FrameProjection {
             viewport,
             camera: frame.camera,
@@ -928,10 +980,8 @@ mod tests {
             assert_eq!(minimap.viewport.width, minimap.viewport.height);
             assert!(minimap.viewport.x >= viewport.x);
             assert!(minimap.viewport.x + minimap.viewport.width <= viewport.x + viewport.width);
-            assert!(minimap.viewport.y > viewport.y + viewport.height * 0.23);
-            assert!(
-                minimap.viewport.y + minimap.viewport.height < viewport.y + viewport.height * 0.72
-            );
+            assert!(minimap.viewport.y > viewport.y + viewport.height * 0.75);
+            assert!(minimap.viewport.y + minimap.viewport.height < viewport.y + viewport.height);
             assert_eq!(minimap.primitives[0].x, 0.0);
             assert_eq!(minimap.primitives[0].y, 0.0);
             assert_eq!(minimap.primitives[0].width, panes[1].width);
