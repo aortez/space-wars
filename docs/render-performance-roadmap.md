@@ -45,9 +45,10 @@ page. The selected Round lab was briefly started to save the change, then the
 launcher resumed automatic ordinary Spacewars at 1×. Automatic launches read
 saved settings directly, including after restart. The installed kiosk service
 still passes `--raster-scale 2.0`, which affects the initial manual-launcher
-selection; remove that forced argument in a future image/configuration update
-so manual startup also respects the saved choice. Do not silently change CLI
-argument precedence to work around the service configuration.
+selection. The kiosk service now omits that forced argument, so the next normal
+image update makes manual startup respect the saved choice too. Explicit CLI
+arguments retain their existing precedence; a fast binary update does not
+install the service change.
 
 Evidence and collection script:
 `/home/oldman/.codex/visualizations/2026/09/12/rounder-planets/native-scale/`
@@ -122,7 +123,12 @@ Two measured problems now deserve separate, bounded investigations:
   current. Paired measurements on identical physical trajectories save 28–42%
   of all sensor CPU and 85–87% in the busiest two-second survey windows. Ground
   graph construction still causes individual roughly 51 ms calls; it is the
-  next sensor lead.
+  next sensor lead. The [ground-route breakdown](ground-route-profile.md)
+  reproduces both seeds and separates about 19 ms of ground connections,
+  14–16 ms of graph searches and 6 ms of proposed-ship filtering in the slowest
+  calls. Indexed node/edge lookup is the next bounded search optimization;
+  ground connection queries dominate accumulated sensor time and remain a
+  separate follow-up.
 - **Remaining glyph display-memory cost:** compare RAM staging through the
   actual LinuxKMS fast image path, including copy cost and clock/launcher
   workloads. Alternatively, measure small glyph/HUD regions in RAM. Keep fonts,

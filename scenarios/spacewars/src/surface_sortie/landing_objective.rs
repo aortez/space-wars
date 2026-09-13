@@ -134,17 +134,28 @@ impl SurfaceSortieState {
             spec.half_segment,
             spec.radius + 0.02,
         );
+        #[cfg(feature = "sensor-profile")]
+        let clearance_samples = super::sensor_profile::Counter::new("objective_clearance_samples");
+        #[cfg(feature = "sensor-profile")]
+        let hull_tests = super::sensor_profile::Counter::new("objective_hull_tests");
         let measure = |id, vehicle: Vec2, angle: f32, hatch: Vec2| {
+            #[cfg(feature = "sensor-profile")]
+            let _profile = super::sensor_profile::Scope::new("landing_objective_candidate");
             let avoiding = map.avoiding(gravity, |position| {
+                #[cfg(feature = "sensor-profile")]
+                clearance_samples.add(1);
                 let world =
                     p.planet.motion.position + position.rotate_radians(p.planet.motion.angle);
-                world.distance_to(vehicle) > clearance_radius
-                    || preview(
+                world.distance_to(vehicle) > clearance_radius || {
+                    #[cfg(feature = "sensor-profile")]
+                    hull_tests.add(1);
+                    preview(
                         world,
                         rotation_for_direction(position) + p.planet.motion.angle,
                         vehicle,
                         angle,
                     )
+                }
             });
             let hatch = (hatch - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
             measure_route(&avoiding, id, hatch, objective)
@@ -213,6 +224,8 @@ fn measure_route(
     hatch: Vec2,
     objective: LandingObjective,
 ) -> LandingObjectiveRoute {
+    #[cfg(feature = "sensor-profile")]
+    let _profile = super::sensor_profile::Scope::new("landing_objective_routes");
     let outbound = map.route_to_actor_target(hatch, objective.position, objective.range);
     let returning = outbound
         .path

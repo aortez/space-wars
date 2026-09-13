@@ -178,6 +178,12 @@ impl GroundMap {
         height: f32,
         allow_partial: bool,
     ) -> GroundRoute {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("ground_route");
+        #[cfg(feature = "sensor-profile")]
+        let visited_nodes = super::sensor_profile::Counter::new("ground_route_visited_nodes");
+        #[cfg(feature = "sensor-profile")]
+        let scanned_edges = super::sensor_profile::Counter::new("ground_route_scanned_edges");
         let destination_distance = |node: &GroundNode| {
             (node.position + node.position.normalized() * height).distance_to(target)
         };
@@ -242,6 +248,8 @@ impl GroundMap {
                 break;
             };
             visited[index] = true;
+            #[cfg(feature = "sensor-profile")]
+            visited_nodes.add(1);
             result.diagnostics.reachable_nodes += 1;
             let node = self
                 .nodes
@@ -263,6 +271,8 @@ impl GroundMap {
                 trace_route(&mut result, &parent, index);
                 return result;
             }
+            #[cfg(feature = "sensor-profile")]
+            scanned_edges.add(self.edges.len());
             for edge in self.edges.iter().filter(|e| usize::from(e.from) == index) {
                 let next = usize::from(edge.to);
                 let cost = costs[index]
@@ -293,7 +303,11 @@ impl GroundMap {
 
     /// Filter a measured route against the proposed ship's real hull and feet.
     pub(super) fn avoiding(&self, gravity: f32, clear: impl Fn(Vec2) -> bool) -> Self {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("ground_avoiding");
         let mut map = self.clone();
+        #[cfg(feature = "sensor-profile")]
+        let _nodes_profile = super::sensor_profile::Scope::new("ground_avoiding_nodes");
         map.nodes.retain(|node| {
             let ok = clear(node.position + node.position.normalized() * standing_height());
             if !ok {
@@ -304,6 +318,12 @@ impl GroundMap {
             }
             ok
         });
+        #[cfg(feature = "sensor-profile")]
+        drop(_nodes_profile);
+        #[cfg(feature = "sensor-profile")]
+        let _edges_profile = super::sensor_profile::Scope::new("ground_avoiding_edges");
+        #[cfg(feature = "sensor-profile")]
+        let edge_samples = super::sensor_profile::Counter::new("ground_avoiding_edge_samples");
         let mut nodes = [None; GROUND_SAMPLES];
         for node in &map.nodes {
             nodes[usize::from(node.id)] = Some(*node);
@@ -315,6 +335,8 @@ impl GroundMap {
                 return false;
             };
             (0..=8).all(|sample| {
+                #[cfg(feature = "sensor-profile")]
+                edge_samples.add(1);
                 let t = sample as f32 / 8.0;
                 let foot = a.position + (b.position - a.position) * t;
                 clear(
@@ -453,6 +475,16 @@ impl SurfaceSortieState {
         drop(_nodes_profile);
         #[cfg(feature = "sensor-profile")]
         let _edges_profile = super::sensor_profile::Scope::new("ground_edges");
+        #[cfg(feature = "sensor-profile")]
+        let candidate_pairs = super::sensor_profile::Counter::new("ground_edge_candidate_pairs");
+        #[cfg(feature = "sensor-profile")]
+        let walk_paths = super::sensor_profile::Counter::new("ground_edge_walk_paths");
+        #[cfg(feature = "sensor-profile")]
+        let jump_paths = super::sensor_profile::Counter::new("ground_edge_jump_paths");
+        #[cfg(feature = "sensor-profile")]
+        let capsule_samples = super::sensor_profile::Counter::new("ground_edge_capsule_samples");
+        #[cfg(feature = "sensor-profile")]
+        let floor_samples = super::sensor_profile::Counter::new("ground_edge_floor_samples");
         let gravity = gravity.max(1.0);
         let jump_height = spec.jump_speed.powi(2) / (2.0 * gravity);
         let mut nodes_by_id = [None; GROUND_SAMPLES];
@@ -468,6 +500,8 @@ impl SurfaceSortieState {
                     let Some(b) = nodes_by_id[usize::from(id)] else {
                         continue;
                     };
+                    #[cfg(feature = "sensor-profile")]
+                    candidate_pairs.add(1);
                     let offset = b.position - a.position;
                     let length = offset.length();
                     let up = (a.position + b.position).normalized();
@@ -476,7 +510,15 @@ impl SurfaceSortieState {
                         continue;
                     }
                     let path_clear = |jump: bool| {
+                        #[cfg(feature = "sensor-profile")]
+                        if jump {
+                            jump_paths.add(1);
+                        } else {
+                            walk_paths.add(1);
+                        }
                         (0..=8).all(|sample| {
+                            #[cfg(feature = "sensor-profile")]
+                            capsule_samples.add(1);
                             let t = sample as f32 / 8.0;
                             let foot = a.position + offset * t;
                             clear(
@@ -492,6 +534,8 @@ impl SurfaceSortieState {
                     };
                     let continuous_floor = || {
                         (1..4).all(|sample| {
+                            #[cfg(feature = "sensor-profile")]
+                            floor_samples.add(1);
                             let point = a.position + offset * (sample as f32 / 4.0);
                             let up = point.normalized().rotate_radians(frame.angle);
                             self.world
