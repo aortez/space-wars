@@ -100,3 +100,83 @@ fn gravity_and_speed_governor_do_not_pretend_to_be_engine_acceleration() {
     );
     assert_eq!(effects.trail_count(), 0);
 }
+
+#[test]
+fn disembarked_pilots_do_not_light_the_parked_ships_stabilization_jets() {
+    let mut state = parked();
+    interact(&mut state);
+    assert!(state.pilots[0].body.is_some());
+    // A small parked-body disturbance still needs the existing rate damping.
+    // It must not look like the spaceling's controls are operating the ship.
+    state.world.ships[0].omega = 0.4;
+    thrusters::advance(
+        &mut state.world.ships[0],
+        thrusters::ThrusterOutput {
+            linear: Vec2::Y,
+            angular: 1.0,
+            braking: false,
+        },
+        1.0 / 60.0,
+    );
+    tick(&mut state, SurfaceSortieAction::default());
+    let ship = &state.world.ships[0];
+    assert_eq!((ship.thrust, ship.turn, ship.brake), (0.0, 0.0, 0.0));
+    let effects = ship.thrusters.as_ref().unwrap();
+    assert_eq!(effects.output, thrusters::ThrusterOutput::default());
+    assert_eq!(effects.trail_count(), 0);
+    let mut frame = RenderFrame::default();
+    render_exhaust(&mut frame, ship);
+    assert!(frame.layers.is_empty());
+}
+
+#[test]
+fn on_foot_inputs_leave_ship_effects_off_and_reboarding_restores_them() {
+    let mut state = parked();
+    disembark(&mut state);
+    tick(
+        &mut state,
+        SurfaceSortieAction {
+            primary_held: true,
+            horizontal: 1.0,
+            brake_held: true,
+            ..Default::default()
+        },
+    );
+    assert!(state.pilots[0].body.is_some());
+    assert_eq!(
+        state.world.ships[0].thrusters.as_ref().unwrap().output,
+        thrusters::ThrusterOutput::default()
+    );
+
+    // Use a fresh parked session for a clean grounded transfer back aboard.
+    let mut state = parked();
+    disembark(&mut state);
+    interact(&mut state);
+    assert!(state.pilots[0].body.is_none());
+    idle(&mut state, 1); // release-to-arm handoff
+    tick(
+        &mut state,
+        SurfaceSortieAction {
+            primary_held: true,
+            ..Default::default()
+        },
+    );
+    assert!(
+        state.world.ships[0]
+            .thrusters
+            .as_ref()
+            .unwrap()
+            .output
+            .linear
+            .y
+            > 0.99
+    );
+    assert!(
+        state.world.ships[0]
+            .thrusters
+            .as_ref()
+            .unwrap()
+            .trail_count()
+            > 0
+    );
+}

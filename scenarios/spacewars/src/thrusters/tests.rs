@@ -116,6 +116,31 @@ fn dead_and_changed_form_ships_do_not_keep_a_previous_engines_wake() {
 }
 
 #[test]
+fn suspending_an_unoccupied_ship_reuses_storage_and_boarding_gets_a_fresh_wake() {
+    let mut ship = ship();
+    let output = ThrusterOutput {
+        linear: Vec2::Y,
+        ..Default::default()
+    };
+    for _ in 0..30 {
+        advance(&mut ship, output, 1.0 / 60.0);
+    }
+    let storage = ship.thrusters.as_ref().unwrap().trails.as_ptr();
+    let before = (ship.position, ship.velocity, ship.omega);
+    for _ in 0..60 {
+        suspend(&mut ship);
+        let effects = ship.thrusters.as_ref().unwrap();
+        assert_eq!(effects.output, ThrusterOutput::default());
+        assert_eq!(effects.trails.as_ptr(), storage);
+        assert!(effects.trails.is_empty());
+    }
+    assert_eq!((ship.position, ship.velocity, ship.omega), before);
+    advance(&mut ship, output, 1.0 / 60.0);
+    assert_eq!(ship.thrusters.as_ref().unwrap().trail_count(), 1);
+    assert_eq!(ship.thrusters.as_ref().unwrap().output, output);
+}
+
+#[test]
 fn scripted_cases_are_deterministic_and_have_a_fixed_primitive_bound() {
     for case in fixture::Case::ALL {
         let first = fixture::capture(case, 36, 40.0);

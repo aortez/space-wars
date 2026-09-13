@@ -117,6 +117,7 @@ impl SurfacePilot {
         self.controls_armed = false;
         self.control = SpacelingControl::default();
         self.landing = LandingTelemetry::default();
+        self.landing_gear = landing_gear::LandingGear::default();
         if self.body.is_none() {
             // Keep the completed body's origin and physical spin;
             // the legacy mesh pivots/control omega scales differ between forms.

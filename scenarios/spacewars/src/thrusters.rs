@@ -91,6 +91,20 @@ impl ThrusterVisuals {
     }
 }
 
+/// Suppress unoccupied-ship feedback without altering the stabilizing physics.
+/// Keep the opted-in state and its allocation, avoiding the legacy fallback or
+/// a stale wake reappearing when the pilot boards again.
+pub(crate) fn suspend(ship: &mut ShipState) {
+    let effects = ship
+        .thrusters
+        .get_or_insert_with(|| ThrusterVisuals::new(ship.form));
+    effects.output = ThrusterOutput::default();
+    effects.form = ship.form;
+    effects.phase = 0.0;
+    effects.trails.clear();
+    ship.exhaust_trails.clear();
+}
+
 /// Called after the same physics step that produced `output`, so attached jets
 /// use the rendered ship pose. Pause/zero-dt never advance the visual clock.
 pub(crate) fn advance(ship: &mut ShipState, output: ThrusterOutput, dt: f32) {
