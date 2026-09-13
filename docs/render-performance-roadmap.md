@@ -117,6 +117,12 @@ Two measured problems now deserve separate, bounded investigations:
   the cost of a full survey; repeated surveys and ground graph connections
   remain separate follow-ups. Actual match seeds and per-seat timing are now
   available in live status, rather than only the combined host-step bucket.
+  The follow-up [survey cadence experiment](landing-survey-cadence.md) removes
+  full scans between usable planning updates while keeping selected-site checks
+  current. Paired measurements on identical physical trajectories save 28–42%
+  of all sensor CPU and 85–87% in the busiest two-second survey windows. Ground
+  graph construction still causes individual roughly 51 ms calls; it is the
+  next sensor lead.
 - **Remaining glyph display-memory cost:** compare RAM staging through the
   actual LinuxKMS fast image path, including copy cost and clock/launcher
   workloads. Alternatively, measure small glyph/HUD regions in RAM. Keep fonts,

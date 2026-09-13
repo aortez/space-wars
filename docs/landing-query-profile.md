@@ -128,6 +128,7 @@ cargo +1.89.0 build --locked --release -p spacewars-ai \
 target/release/examples/surface_mission_soak \
   --world generated --seed 9216675843324634618 --seat 0 \
   --mode duel --match true --seconds 600 --asteroid-interval 0 \
+  --landing-survey-hz 60 \
   --profile-physics true --timing-csv true --out /tmp/landing-query-replay
 ```
 
@@ -162,6 +163,11 @@ rendered-FPS comparison. The original nine-FPS capture and this fresh match
 have different seeds and phases.
 
 ## Remaining work
+
+The follow-up [survey cadence change](landing-survey-cadence.md) schedules
+repeated searches and preserves immediate selected-site checks. The evidence
+above describes the earlier per-tick baseline; its reproduction command now
+selects that behavior explicitly.
 
 Removing duplication reduces each full survey's cost; it does not remove the
 64-candidate survey on every update while choosing a destination. Repeated full

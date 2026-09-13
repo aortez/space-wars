@@ -307,6 +307,12 @@ impl RulePilotV1 {
                 heading(o, (o.ship.position - o.planet.motion.position).normalized());
             return action;
         }
+        if o.site_query.is_deferred() {
+            action.brake_held = true;
+            action.horizontal =
+                heading(o, (o.ship.position - o.planet.motion.position).normalized());
+            return action;
+        }
         if let Some(site) = self.site {
             if let Some(updated) = o.sites.iter().find(|s| {
                 s.id == site.id

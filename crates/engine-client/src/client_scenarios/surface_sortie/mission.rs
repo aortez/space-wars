@@ -175,7 +175,11 @@ impl ClientScenario for MaterialMissionClientScenario {
         for seat in (0..2).filter(|&seat| self.bots[seat]) {
             let site = self.pilots[seat].site_request();
             let clock = Instant::now();
-            let o = self.sortie.state.mission_observation(seat, site);
+            let o = self.sortie.state.mission_observation_with_cadence(
+                seat,
+                self.pilots[seat].sensor_request(),
+                Default::default(),
+            );
             sample.sensors[seat] = clock.elapsed();
             let clock = Instant::now();
             actions.extend(
@@ -498,10 +502,11 @@ mod tests {
         for tick in 1..=300 {
             let mut actions = Vec::new();
             for seat in 0..2 {
-                let o = reference
-                    .sortie
-                    .state
-                    .mission_observation(seat, reference.pilots[seat].site_request());
+                let o = reference.sortie.state.mission_observation_with_cadence(
+                    seat,
+                    reference.pilots[seat].sensor_request(),
+                    Default::default(),
+                );
                 actions.extend(
                     reference.pilots[seat]
                         .intent(&o)

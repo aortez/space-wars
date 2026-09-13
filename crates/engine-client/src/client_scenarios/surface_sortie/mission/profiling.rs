@@ -2,7 +2,11 @@
 //! window. No nested query clocks or extra physical queries in normal builds.
 use scenario_spacewars::{
     ShipForm, SpacewarsStepMetrics,
-    surface_sortie::{PilotLocation, mission::MissionObservationV1, pilot::LandingSiteId},
+    surface_sortie::{
+        PilotLocation,
+        mission::MissionObservationV1,
+        pilot::{LandingSiteId, LandingSiteQuery},
+    },
 };
 use spacewars_ai::mission_pilot::MaterialMissionPilot;
 use std::{collections::VecDeque, fmt::Write, time::Duration};
@@ -12,6 +16,7 @@ const LIMIT: usize = 120;
 #[derive(Clone, Copy)]
 pub(super) struct Seat {
     requested: Option<LandingSiteId>,
+    query: LandingSiteQuery,
     location: PilotLocation,
     form: ShipForm,
     planet: usize,
@@ -26,6 +31,7 @@ impl Seat {
         let p = &r.flight.pilot;
         Self {
             requested,
+            query: p.site_query,
             location: p.location,
             form: p.ship_form,
             planet: p.planet.index,
@@ -68,7 +74,7 @@ impl Profile {
             return String::new();
         };
         let mut text = format!(
-            "mission_profile_version=1\nmission_profile_samples={}\nmission_profile_first_tick={}\nmission_profile_last_tick={}",
+            "mission_profile_version=2\nmission_profile_samples={}\nmission_profile_first_tick={}\nmission_profile_last_tick={}",
             self.samples.len(),
             self.samples.front().unwrap().tick,
             latest.tick
@@ -123,9 +129,27 @@ impl Profile {
                 .filter(|s| s.seats[seat].is_some())
                 .count();
             let _ = write!(text, "\nmission_p{actor}_bot_observations={count}");
+            for (name, accepts) in [
+                (
+                    "full_survey_requests",
+                    (|q| q == LandingSiteQuery::Survey) as fn(LandingSiteQuery) -> bool,
+                ),
+                ("deferred_surveys", LandingSiteQuery::is_deferred),
+                ("selected_site_requests", |q| {
+                    matches!(q, LandingSiteQuery::Selected(_))
+                }),
+            ] {
+                let count = self
+                    .samples
+                    .iter()
+                    .filter(|s| s.seats[seat].is_some_and(|s| accepts(s.query)))
+                    .count();
+                let _ = write!(text, "\nmission_p{actor}_{name}={count}");
+            }
             let Some(s) = latest.seats[seat] else {
                 continue;
             };
+            let _ = write!(text, "\nmission_p{actor}_site_query={:?}", s.query);
             let _ = write!(
                 text,
                 "\nmission_p{actor}_location={:?}\nmission_p{actor}_form={:?}\nmission_p{actor}_planet={}\nmission_p{actor}_site_request={:?}\nmission_p{actor}_landing_sites={}\nmission_p{actor}_recovery_sites={}\nmission_p{actor}_ground_nodes={}\nmission_p{actor}_objective_survey={}\nmission_p{actor}_task={}",

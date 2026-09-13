@@ -40,6 +40,79 @@ fn standing(player: PlayerId, x: f32) -> Claimant {
 }
 
 #[test]
+fn flag_approach_candidates_arrive_with_routes_on_the_original_decision_ticks() {
+    use crate::surface_sortie::{
+        mission::{LandingSurveyCadence, MissionSensorRequest},
+        pilot::LandingSiteQuery,
+    };
+    for seat in 0..2 {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let p = state.pilot_observation(seat, None);
+        let site = p.sites[0];
+        let planet = p.planet.index;
+        let enemy = PlayerId::from_index(1 - seat).unwrap();
+        // Install a flag fixture on measured material, then read the production
+        // mission sensors. Claim progression is exercised by the tests below.
+        state.world.planets[planet].owner_id = Some(enemy.index());
+        state.claims[planet].flag = Some(PlanetFlag {
+            player: enemy,
+            anchor: FlagAnchor {
+                position: site.local_position,
+                normal: site.normal.rotate_radians(-p.planet.motion.angle),
+                footing: None,
+                surface_revision: p.planet.revision,
+            },
+        });
+        let request = MissionSensorRequest {
+            site: None,
+            last_survey: None,
+        };
+        let mut full = Vec::new();
+        for tick in 1..=60 {
+            state.world.tick = tick;
+            let before = state.world.physics.world.snapshot_bytes().unwrap();
+            let scheduled =
+                state.mission_observation_with_cadence(seat, request, LandingSurveyCadence::FourHz);
+            let mut every = state.mission_observation(seat, None);
+            let p = &scheduled.local.combat.recovery.flight.pilot;
+            if (tick + seat as u64 * 15).is_multiple_of(30) {
+                full.push(tick);
+                assert_eq!(p.site_query, LandingSiteQuery::Survey);
+                assert!(
+                    !scheduled
+                        .local
+                        .landing_objective
+                        .as_ref()
+                        .unwrap()
+                        .sites
+                        .is_empty()
+                );
+                assert_eq!(scheduled, every);
+            } else {
+                assert!(p.site_query.is_deferred());
+                assert!(scheduled.local.landing_objective.is_none());
+                assert!(every.local.landing_objective.is_none());
+                every.local.combat.recovery.flight.pilot.site_query = p.site_query;
+                every.local.combat.recovery.flight.pilot.sites.clear();
+                every.local.combat.recovery.sites.clear();
+                every.local.cover.clear();
+                assert_eq!(scheduled, every);
+            }
+            assert_eq!(before, state.world.physics.world.snapshot_bytes().unwrap());
+        }
+        assert_eq!(
+            full,
+            if seat == 0 {
+                vec![30, 60]
+            } else {
+                vec![15, 45]
+            }
+        );
+    }
+}
+
+#[test]
 fn claim_requires_full_raise_then_nearby_lowering_before_a_fresh_raise() {
     let mut claim = SurfacePlanetClaim::new(0);
     let mut owner = None;

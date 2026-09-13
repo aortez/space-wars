@@ -454,6 +454,11 @@ impl TacticalSortiePilot {
                 ..Default::default()
             };
         }
+        if p.site_query.is_deferred() {
+            // Preserve the existing clearance climb while awaiting usable
+            // candidates, without treating deferred data as rejected ground.
+            return self.guide(o, up * 12.0, Vec2::ZERO);
+        }
         if let Some(site) = self.site {
             if let Some(updated) = p.sites.iter().find(|s| {
                 s.id == site.id
@@ -768,6 +773,40 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], DT);
         state.tactical_sortie_observation(0, None)
     }
+
+    #[test]
+    fn deferred_survey_waits_without_rejecting_ground_and_accepts_the_fresh_scan() {
+        use scenario_spacewars::surface_sortie::pilot::LandingSiteQuery;
+        let mut o = observation();
+        let sites = o.combat.recovery.flight.pilot.sites.clone();
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        let mut waiting = pilot.clone();
+        for tick in 1..15 {
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = tick;
+            p.controls_armed = true;
+            p.site_query = LandingSiteQuery::Deferred { next_tick: 15 };
+            p.sites.clear();
+            let mut no_candidates = o.clone();
+            no_candidates.combat.recovery.flight.pilot.site_query = LandingSiteQuery::Survey;
+            let action = pilot.intent(&o);
+            assert_eq!(action, waiting.intent(&no_candidates));
+            assert!(!action.flight.controls.interact_held);
+            assert_eq!(pilot.site_request(), None);
+            assert_eq!(pilot.telemetry().invalidations, 0);
+            assert_eq!(pilot.telemetry().replans, 0);
+            assert!(pilot.telemetry().failed_tick.is_none());
+            assert!(pilot.rejected_sites.is_empty());
+        }
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick = 15;
+        p.site_query = LandingSiteQuery::Survey;
+        p.sites = sites;
+        pilot.intent(&o);
+        assert!(pilot.site_request().is_some());
+    }
+
     #[test]
     fn current_capture_prefers_nearby_ground_unless_exposed() {
         use scenario_spacewars::surface_sortie::combat::LandingCover;

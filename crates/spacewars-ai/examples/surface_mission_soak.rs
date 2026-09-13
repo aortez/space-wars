@@ -1,6 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
+#[path = "support/landing_cadence_probe.rs"]
+mod landing_cadence_probe;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
 #[path = "support/physics_profile.rs"]
@@ -8,7 +10,12 @@ mod physics_profile;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
-use scenario_spacewars::{PlayerId, surface_sortie::SurfaceSortieScenario};
+use scenario_spacewars::{
+    PlayerId,
+    surface_sortie::{
+        SurfaceSortieScenario, mission::LandingSurveyCadence, pilot::LandingSiteQuery,
+    },
+};
 use serde_json::json;
 use spacewars_ai::{
     BrainReset,
@@ -16,7 +23,7 @@ use spacewars_ai::{
     mission_pilot::{MaterialMissionPilot, MissionGoal},
 };
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::{BufWriter, Write},
     path::PathBuf,
@@ -54,6 +61,18 @@ fn main() {
         .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
     let timing_csv = arg("--timing-csv", "false") == "true";
+    let survey_hz: u8 = arg("--landing-survey-hz", "4").parse().unwrap();
+    let cadence = match survey_hz {
+        4 => LandingSurveyCadence::FourHz,
+        60 => LandingSurveyCadence::EveryTick,
+        _ => panic!("--landing-survey-hz must be 4 or 60"),
+    };
+    let mut landing_query_counts: [BTreeMap<&str, u64>; 2] = Default::default();
+    let compare_landing_surveys = arg("--compare-landing-surveys", "false") == "true";
+    assert!(
+        !compare_landing_surveys || survey_hz == 60,
+        "--compare-landing-surveys needs --landing-survey-hz 60 to retain the reference trajectory"
+    );
     // Compare production observations with the former full on-foot surveys.
     // Reference sensors/policy are outside timings, but may affect CPU caches.
     let verify_on_foot_surveys = arg("--verify-on-foot-surveys", "false") == "true";
@@ -105,11 +124,13 @@ fn main() {
     assert!(["fixed", "generated"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
+    let mut landing_probe = compare_landing_surveys
+        .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
     let mut timing_csv = timing_csv.then(|| {
         let mut file = BufWriter::new(fs::File::create(out.join("timing.csv")).unwrap());
-        writeln!(file, "tick,sensor_p1_ms,sensor_p2_ms,policy_p1_ms,policy_p2_ms,step_ms,physics_ms,lifecycle_ms,workload_ms,active_bodies,candidate_pairs,contact_pairs,goal_p1,goal_p2,location_p1,location_p2,ground_nodes_p1,ground_nodes_p2").unwrap();
+        writeln!(file, "tick,sensor_p1_ms,sensor_p2_ms,policy_p1_ms,policy_p2_ms,step_ms,physics_ms,lifecycle_ms,workload_ms,active_bodies,candidate_pairs,contact_pairs,goal_p1,goal_p2,location_p1,location_p2,ground_nodes_p1,ground_nodes_p2,landing_query_p1,landing_query_p2").unwrap();
         file
     });
     #[cfg(feature = "sensor-profile")]
@@ -223,19 +244,33 @@ fn main() {
         let mut sensor_times = [0.0; 2];
         let mut policy_times = [0.0; 2];
         let mut ground_nodes = [0; 2];
+        let mut landing_queries = ["not_observed"; 2];
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
                 let site = pilots[i].site_request();
+                let request = pilots[i].sensor_request();
+                // Alternate paired measurement order, also flipping each
+                // 30-tick period so route refreshes do not always run first.
+                // Only the reference observation below drives the physical run.
+                let reference_first = (tick + tick / 30 + i as u64).is_multiple_of(2);
+                let scheduled_first = landing_probe.as_mut().and_then(|probe| {
+                    (!reference_first).then(|| probe.observe(&state, i, request))
+                });
                 let clock = Instant::now();
                 #[cfg(not(feature = "sensor-profile"))]
-                let o = state.mission_observation(i, site);
+                let o = state.mission_observation_with_cadence(i, request, cadence);
                 #[cfg(feature = "sensor-profile")]
                 let (o, profile) =
                     scenario_spacewars::surface_sortie::sensor_profile::measure(|| {
-                        state.mission_observation(i, site)
+                        state.mission_observation_with_cadence(i, request, cadence)
                     });
                 let sensor_ms = clock.elapsed().as_secs_f64() * 1000.0;
+                if let Some(probe) = &mut landing_probe {
+                    let scheduled =
+                        scheduled_first.unwrap_or_else(|| probe.observe(&state, i, request));
+                    probe.record(i, &o, sensor_ms, scheduled, reference_first);
+                }
                 sensors.push(sensor_ms);
                 #[cfg(feature = "sensor-profile")]
                 {
@@ -247,6 +282,15 @@ fn main() {
                     writeln!(sensor_profiles).unwrap();
                 }
                 sensor_times[i] = sensor_ms;
+                landing_queries[i] = match o.local.combat.recovery.flight.pilot.site_query {
+                    LandingSiteQuery::Survey => "survey",
+                    LandingSiteQuery::Selected(_) => "selected",
+                    LandingSiteQuery::Deferred { .. } => "deferred",
+                    LandingSiteQuery::NotRequested => "not_requested",
+                };
+                *landing_query_counts[i]
+                    .entry(landing_queries[i])
+                    .or_default() += 1;
                 ground_nodes[i] = o
                     .local
                     .combat
@@ -266,7 +310,11 @@ fn main() {
                     let mut original = if reference_site == site {
                         o.clone()
                     } else {
-                        state.mission_observation(i, reference_site)
+                        state.mission_observation_with_cadence(
+                            i,
+                            reference[i].sensor_request(),
+                            cadence,
+                        )
                     };
                     let p = &original.local.combat.recovery.flight.pilot;
                     let full_survey = reference_site.is_none_or(|id| {
@@ -410,12 +458,12 @@ fn main() {
         if let Some(file) = &mut timing_csv {
             let m = state.last_step_metrics();
             let ms = |time: Duration| time.as_secs_f64() * 1000.0;
-            writeln!(file, "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{:?},{:?},{:?},{:?},{},{}",
+            writeln!(file, "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{},{},{},{:?},{:?},{:?},{:?},{},{},{},{}",
                 tick + 1, sensor_times[0], sensor_times[1], policy_times[0], policy_times[1],
                 steps.last().unwrap(), ms(m.physics_time), ms(m.lifecycle_time), ms(m.workload_time),
                 m.rapier.active_bodies, m.rapier.candidate_pairs, m.rapier.contact_pairs,
                 pilots[0].telemetry().goal, pilots[1].telemetry().goal,
-                state.location(0), state.location(1), ground_nodes[0], ground_nodes[1]).unwrap();
+                state.location(0), state.location(1), ground_nodes[0], ground_nodes[1], landing_queries[0], landing_queries[1]).unwrap();
         }
         if let Some(profile) = &mut physics_profile {
             profile.record(state.last_step_metrics(), *steps.last().unwrap());
@@ -536,6 +584,9 @@ fn main() {
         "sensors":timing(sensors),"policy":timing(policies),"steps":timing(steps),"events":events,"samples":samples,
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
+    report["landing_survey_hz"] = json!(survey_hz);
+    report["landing_queries"] = json!(landing_query_counts);
+    report["landing_cadence_comparison"] = json!(compare_landing_surveys);
     report["objective_refresh"] =
         json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
     report["initial_audit"] = json!(initial_audit);

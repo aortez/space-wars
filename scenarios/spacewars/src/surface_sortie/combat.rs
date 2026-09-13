@@ -1,7 +1,7 @@
 //! Opt-in weapons and read-only tactical sensors for the material flight scale.
 //! Shots, occlusion, damage and ship loss use the shared Spacewars step.
 use super::*;
-use pilot::{LandingSiteId, MaterialFlightStart, PilotMotion};
+use pilot::{LandingSiteId, LandingSiteQuery, MaterialFlightStart, PilotMotion};
 use recovery_sensors::RecoveryTaskObservationV1;
 
 const WEAPON_ACTION: u32 = 0x5355_0005;
@@ -164,9 +164,17 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> TacticalSortieObservationV1 {
+        self.tactical_sortie_observation_with_query(player, site.into())
+    }
+
+    pub(super) fn tactical_sortie_observation_with_query(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
-        let combat = self.combat_observation(player, site);
+        let combat = self.combat_observation_with_query(player, query);
         let cover: Vec<_> = combat
             .recovery
             .flight
@@ -255,9 +263,17 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> CombatObservationV2 {
+        self.combat_observation_with_query(player, site.into())
+    }
+
+    pub(super) fn combat_observation_with_query(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> CombatObservationV2 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("combat_observation");
-        let recovery = self.recovery_task_observation(player, site);
+        let recovery = self.recovery_task_observation_with_query(player, query);
         let p = &recovery.flight.pilot;
         let ship = &self.world.ships[p.vehicle.0];
         let target = self.pilots.iter().enumerate().find_map(|(seat, other)| {

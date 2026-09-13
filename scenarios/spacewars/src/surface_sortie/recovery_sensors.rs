@@ -1,7 +1,7 @@
 //! Additive task sensors. Historical V1/V2 observations retain their semantics.
 use super::*;
 use flight::PilotObservationV2;
-use pilot::{LANDING_SITE_COUNT, LandingSiteId, PilotLandingSite};
+use pilot::{LANDING_SITE_COUNT, LandingSiteId, LandingSiteQuery, PilotLandingSite};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RecoveryTaskObservationV1 {
@@ -25,19 +25,27 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> RecoveryTaskObservationV1 {
+        self.recovery_task_observation_with_query(player, site.into())
+    }
+
+    pub(super) fn recovery_task_observation_with_query(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> RecoveryTaskObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("recovery_task_observation");
-        let flight = self.flight_pilot_observation(player, site);
+        let flight = self.flight_pilot_observation_with_query(player, query);
         let p = &flight.pilot;
         let sites = if !p.queries_ready || !p.ship_available {
             Vec::new()
         } else if p.ship_form == ShipForm::Ship {
             p.sites.clone()
-        } else if let Some(id) = site {
+        } else if let LandingSiteQuery::Selected(id) = query {
             self.vehicle_landing_site(player, id, true)
                 .into_iter()
                 .collect()
-        } else {
+        } else if query == LandingSiteQuery::Survey {
             (0..LANDING_SITE_COUNT)
                 .filter_map(|bearing| {
                     self.vehicle_landing_site(
@@ -50,6 +58,8 @@ impl SurfaceSortieState {
                     )
                 })
                 .collect()
+        } else {
+            Vec::new()
         };
         let ground = self.ground_navigation_map(player);
         let claim_footing = self.claim_footing_survey(p, ground.as_ref());

@@ -13,6 +13,34 @@ pub struct LandingSiteId {
     pub bearing: u8,
 }
 
+/// Echoes the requested candidate work. Deferred lists are absent planning
+/// data, not evidence that no landing ground exists. Returned sites are always
+/// measured at the observation's tick; physical query readiness is separate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LandingSiteQuery {
+    Survey,
+    Selected(LandingSiteId),
+    Deferred { next_tick: u64 },
+    NotRequested,
+}
+
+impl From<Option<LandingSiteId>> for LandingSiteQuery {
+    fn from(site: Option<LandingSiteId>) -> Self {
+        match site {
+            None => Self::Survey,
+            Some(id) if id.bearing < LANDING_SITE_COUNT => Self::Selected(id),
+            Some(_) => Self::NotRequested,
+        }
+    }
+}
+
+impl LandingSiteQuery {
+    pub fn is_deferred(self) -> bool {
+        matches!(self, Self::Deferred { .. })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct PilotMotion {
     pub position: Vec2,
@@ -75,6 +103,9 @@ pub struct PilotObservationV1 {
     pub transfers: u64,
     pub recovery: Option<SurfaceRecoveryObservation>,
     pub planet: PilotPlanetObservation,
+    /// Applies to the current vehicle: full-ship sites are below; escape-pod
+    /// candidates are supplied by the additive recovery observation.
+    pub site_query: LandingSiteQuery,
     /// With a requested ID, revalidates only that site. Otherwise surveys at
     /// most 64 bearings. Empty while queries are dirty does not mean no ground.
     pub sites: Vec<PilotLandingSite>,
@@ -92,6 +123,14 @@ impl SurfaceSortieState {
         &self,
         player: usize,
         requested_site: Option<LandingSiteId>,
+    ) -> PilotObservationV1 {
+        self.pilot_observation_with_query(player, requested_site.into())
+    }
+
+    pub(super) fn pilot_observation_with_query(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
     ) -> PilotObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("pilot_observation");
@@ -111,9 +150,9 @@ impl SurfaceSortieState {
             .map_or(0, |p| p.field.revision());
         let sites = if !ready || !self.has_material_ground() || ship.form != ShipForm::Ship {
             Vec::new()
-        } else if let Some(id) = requested_site {
+        } else if let LandingSiteQuery::Selected(id) = query {
             self.pilot_landing_site(player, id).into_iter().collect()
-        } else {
+        } else if query == LandingSiteQuery::Survey {
             (0..LANDING_SITE_COUNT)
                 .filter_map(|bearing| {
                     self.pilot_landing_site(
@@ -125,6 +164,8 @@ impl SurfaceSortieState {
                     )
                 })
                 .collect()
+        } else {
+            Vec::new()
         };
         PilotObservationV1 {
             version: PILOT_OBSERVATION_VERSION,
@@ -181,6 +222,7 @@ impl SurfaceSortieState {
                 revision,
                 claim: self.claim_observation(index, player),
             },
+            site_query: query,
             sites,
         }
     }

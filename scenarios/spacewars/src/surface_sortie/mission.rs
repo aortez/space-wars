@@ -2,7 +2,64 @@
 //! support, approach frames and every action still belong to the shared world.
 use super::*;
 use combat::TacticalSortieObservationV1;
-use pilot::{LandingSiteId, PilotMotion, PilotPlanetObservation};
+use pilot::{LandingSiteId, LandingSiteQuery, PilotMotion, PilotPlanetObservation};
+
+/// Fixed-tick planning cadence; immediate selected-site and transfer checks
+/// still run on every observation. EveryTick is retained for paired probes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub enum LandingSurveyCadence {
+    EveryTick,
+    #[default]
+    FourHz,
+}
+
+/// Planner-owned history, never a cached collision result. A new planet or
+/// vehicle gets an immediate first scan; subsequent scans use the fixed cadence.
+/// Flag approaches wait for their route survey, which is required to select a site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct LandingSurveyStamp {
+    pub tick: u64,
+    pub planet: usize,
+    pub form: ShipForm,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MissionSensorRequest {
+    pub site: Option<LandingSiteId>,
+    pub last_survey: Option<LandingSurveyStamp>,
+}
+
+impl LandingSurveyCadence {
+    fn query(
+        self,
+        query: LandingSiteQuery,
+        tick: u64,
+        player: usize,
+        context: (usize, ShipForm),
+        last: Option<LandingSurveyStamp>,
+        flag_approach: bool,
+    ) -> LandingSiteQuery {
+        if self == Self::EveryTick || query != LandingSiteQuery::Survey {
+            return query;
+        }
+        // A flag approach cannot select a candidate without a route to the
+        // flag and back. Preserve those decision ticks and skip unused scans.
+        let (period, offset) = if flag_approach {
+            (ground_navigation::GROUND_REFRESH_TICKS, player as u64 * 15)
+        } else {
+            (15, player as u64 * 7)
+        };
+        let phase = (tick + offset) % period;
+        let same_survey = last.is_some_and(|s| (s.planet, s.form) == context && s.tick < tick);
+        if (flag_approach || same_survey) && phase != 0 {
+            LandingSiteQuery::Deferred {
+                next_tick: tick + period - phase,
+            }
+        } else {
+            query
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionObservationV1 {
@@ -221,18 +278,34 @@ impl SurfaceSortieScenario {
 }
 
 impl SurfaceSortieState {
-    /// Without a selected site, survey landing candidates only while aboard.
-    /// On-foot missions retain local physical gates and explicit site checks;
-    /// escape-pod surveys keep their existing recovery semantics.
+    /// Historical uncadenced observation for standalone policies and fixtures.
+    /// Interactive missions supply their planner's history to the cadenced API.
     pub fn mission_observation(
         &self,
         player: usize,
         site: Option<LandingSiteId>,
     ) -> MissionObservationV1 {
+        self.mission_observation_with_cadence(
+            player,
+            MissionSensorRequest {
+                site,
+                last_survey: None,
+            },
+            LandingSurveyCadence::EveryTick,
+        )
+    }
+
+    pub fn mission_observation_with_cadence(
+        &self,
+        player: usize,
+        request: MissionSensorRequest,
+        cadence: LandingSurveyCadence,
+    ) -> MissionObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("mission_observation");
         let current = self.motion_planet_index(player);
-        let site = site
+        let site = request
+            .site
             .map(|mut id| {
                 if id.bearing >= pilot::LANDING_SITE_COUNT {
                     id.planet = current;
@@ -257,7 +330,7 @@ impl SurfaceSortieState {
         } else {
             site
         };
-        let planets = self
+        let planets: Vec<_> = self
             .world
             .planets
             .iter()
@@ -283,10 +356,24 @@ impl SurfaceSortieState {
                 }
             })
             .collect();
+        let form = self.world.ships[self.pilots[player].vehicle.0].form;
+        let flag_approach = form == ShipForm::Ship
+            && matches!(self.location(player), PilotLocation::Aboard(_))
+            && planets[current].claim.as_ref().is_some_and(|claim| {
+                claim.flag.is_some() && claim.owner != Some(self.pilots[player].owner)
+            });
+        let query = cadence.query(
+            site.into(),
+            self.world.tick,
+            player,
+            (current, form),
+            request.last_survey,
+            flag_approach,
+        );
         MissionObservationV1 {
             version: 1,
             match_rules: self.round.is_some(),
-            local: self.tactical_sortie_observation(player, site),
+            local: self.tactical_sortie_observation_with_query(player, query),
             planets,
             sun: self.world.sun.map(|sun| MissionObstacle {
                 position: sun.position,
@@ -326,6 +413,134 @@ mod tests {
     use super::*;
 
     #[test]
+    fn scheduled_surveys_are_staggered_and_keep_selected_sites_and_live_gates_current() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        let dt = Duration::from_nanos(16_666_667);
+        let mut full = [Vec::new(), Vec::new()];
+        let mut last = [None; 2];
+        for tick in 1..=60 {
+            SurfaceSortieScenario::step(&mut state, &[], dt);
+            let before = state.world.physics.world.snapshot_bytes().unwrap();
+            for seat in 0..2 {
+                let request = MissionSensorRequest {
+                    site: None,
+                    last_survey: last[seat],
+                };
+                let scheduled = state.mission_observation_with_cadence(
+                    seat,
+                    request,
+                    LandingSurveyCadence::FourHz,
+                );
+                let mut every = state.mission_observation(seat, None);
+                let p = &scheduled.local.combat.recovery.flight.pilot;
+                assert_eq!(p.tick, tick);
+                let selected = every.local.combat.recovery.flight.pilot.sites[0].id;
+                match p.site_query {
+                    LandingSiteQuery::Survey => {
+                        full[seat].push(tick);
+                        last[seat] = Some(LandingSurveyStamp {
+                            tick,
+                            planet: p.planet.index,
+                            form: p.ship_form,
+                        });
+                        assert_eq!(scheduled, every);
+                    }
+                    LandingSiteQuery::Deferred { next_tick } => {
+                        assert!(next_tick > tick && next_tick - tick < 15);
+                        assert!(p.sites.is_empty());
+                        assert!(scheduled.local.combat.recovery.sites.is_empty());
+                        every.local.combat.recovery.flight.pilot.sites.clear();
+                        every.local.combat.recovery.sites.clear();
+                        every.local.cover.clear();
+                        every.local.combat.recovery.flight.pilot.site_query = p.site_query;
+                        assert_eq!(scheduled, every, "live gates must not be deferred");
+                    }
+                    other => panic!("unexpected query {other:?}"),
+                }
+                let request = MissionSensorRequest {
+                    site: Some(selected),
+                    last_survey: last[seat],
+                };
+                let checked = state.mission_observation_with_cadence(
+                    seat,
+                    request,
+                    LandingSurveyCadence::FourHz,
+                );
+                let p = &checked.local.combat.recovery.flight.pilot;
+                assert_eq!(p.site_query, LandingSiteQuery::Selected(selected));
+                assert_eq!(p.sites.len(), 1);
+                assert_eq!(p.tick, tick);
+                assert_eq!(
+                    checked,
+                    state.mission_observation_with_cadence(
+                        seat,
+                        request,
+                        LandingSurveyCadence::FourHz
+                    )
+                );
+            }
+            assert_eq!(before, state.world.physics.world.snapshot_bytes().unwrap());
+        }
+        assert_eq!(full[0], [1, 15, 30, 45, 60]);
+        assert_eq!(full[1], [1, 8, 23, 38, 53]);
+    }
+
+    #[test]
+    fn a_removed_selected_site_is_rejected_between_full_surveys() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        let dt = Duration::from_nanos(16_666_667);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let site = state.pilot_observation(0, None).sites[0];
+        let mut request = MissionSensorRequest {
+            site: Some(site.id),
+            last_survey: Some(LandingSurveyStamp {
+                tick: 1,
+                planet: site.id.planet,
+                form: ShipForm::Ship,
+            }),
+        };
+        let terrain = &state.world.terrain.planets[&site.id.planet];
+        let center = terrain.field.local_to_cell(site.local_position).unwrap();
+        state
+            .world
+            .queue_planet_edit(
+                site.id.planet,
+                engine_terrain::TerrainEdit {
+                    brush: engine_terrain::Brush::Circle { center, radius: 12 },
+                    mode: engine_terrain::EditMode::Remove,
+                },
+            )
+            .unwrap();
+        SpacewarsScenario::prepare_terrain(&mut state.world, &[]);
+        let dirty =
+            state.mission_observation_with_cadence(0, request, LandingSurveyCadence::FourHz);
+        assert!(!dirty.local.combat.recovery.flight.pilot.queries_ready);
+        assert!(state.world.physics.material_queries_dirty);
+        SurfaceSortieScenario::step(&mut state, &[], dt);
+        let checked =
+            state.mission_observation_with_cadence(0, request, LandingSurveyCadence::FourHz);
+        let p = &checked.local.combat.recovery.flight.pilot;
+        assert_eq!(p.tick, 2);
+        assert_eq!(p.site_query, LandingSiteQuery::Selected(site.id));
+        assert!(p.queries_ready && p.planet.revision > site.revision);
+        assert!(
+            p.sites.is_empty() || p.sites[0].local_position.distance_to(site.local_position) > 1.0
+        );
+        request.site = None;
+        assert!(
+            state
+                .mission_observation_with_cadence(0, request, LandingSurveyCadence::FourHz)
+                .local
+                .combat
+                .recovery
+                .flight
+                .pilot
+                .site_query
+                .is_deferred()
+        );
+    }
+
+    #[test]
     fn on_foot_missions_skip_landing_candidates_but_keep_local_gates_and_selected_sites() {
         let mut state = SurfaceSortieScenario::init_material_surface(
             42,
@@ -357,6 +572,7 @@ mod tests {
         let selected = original.sites[0].id;
         original.sites.clear();
         original.flight.pilot.sites.clear();
+        original.flight.pilot.site_query = LandingSiteQuery::NotRequested;
         let observation = state.mission_observation(0, None);
         assert_eq!(observation.local.combat.recovery, original);
         assert!(observation.local.cover.is_empty());
@@ -391,6 +607,21 @@ mod tests {
         state.world.ships[0].translate_life(-health);
         SurfaceSortieScenario::step(&mut state, &[], dt);
         assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
+        let request = MissionSensorRequest {
+            site: None,
+            last_survey: Some(LandingSurveyStamp {
+                tick: 1,
+                planet: 0,
+                form: ShipForm::Ship,
+            }),
+        };
+        let first_pod =
+            state.mission_observation_with_cadence(0, request, LandingSurveyCadence::FourHz);
+        assert_eq!(
+            first_pod.local.combat.recovery.flight.pilot.site_query,
+            LandingSiteQuery::Survey
+        );
+        assert!(!first_pod.local.combat.recovery.sites.is_empty());
         let expected = state.tactical_sortie_observation(0, None);
         assert!(!expected.combat.recovery.sites.is_empty());
         for request in [
