@@ -871,6 +871,8 @@ mod tests {
             scenario_clock::ClockWaterLab::RotatingControl,
             scenario_clock::ClockWaterLab::Multiple,
             scenario_clock::ClockWaterLab::MultipleControl,
+            scenario_clock::ClockWaterLab::Spilling,
+            scenario_clock::ClockWaterLab::SpillingControl,
         ] {
             check_meltdown_rendering(mode);
         }
@@ -906,11 +908,15 @@ mod tests {
                 benchmark: None,
             };
             let mut renderer = crate::raster::RasterRenderer::new();
+            let mut final_reforming_pixels = None;
             for tick in 0..=510 {
                 if tick > 0 {
                     scenario.step(&[], Duration::from_nanos(16_666_667));
                 }
-                if ![0, 30, 75, 125, 210, 360, 450, 510].contains(&tick) {
+                let capture_tick = [0, 30, 75, 125, 210, 360, 450, 510].contains(&tick)
+                    || (water_lab == scenario_clock::ClockWaterLab::Off
+                        && [12, 45, 90, 150, 300, 420, 435, 465, 480, 495, 509].contains(&tick));
+                if !capture_tick {
                     continue;
                 }
                 let frames = scenario.render_frames(RenderBackend::Raster, viewport);
@@ -940,6 +946,16 @@ mod tests {
                     crate::raster::RasterOptions::default(),
                 );
                 let pixels = image.to_rgb8().unwrap();
+                if water_lab == scenario_clock::ClockWaterLab::Off {
+                    if tick == 509 {
+                        final_reforming_pixels = Some(pixels.as_bytes().to_vec());
+                    } else if tick == 510 {
+                        assert!(
+                            pixels.as_bytes() == final_reforming_pixels.as_deref().unwrap(),
+                            "cleanup must not pop to a different face at {viewport:?}"
+                        );
+                    }
+                }
                 let blue = pixels
                     .as_slice()
                     .iter()

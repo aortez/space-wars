@@ -16,7 +16,11 @@ fn summary(label: &str, values: &mut [f64]) {
 }
 
 fn main() {
-    let water_lab = if std::env::args().any(|a| a == "--multiple-control") {
+    let water_lab = if std::env::args().any(|a| a == "--spilling-control") {
+        scenario_clock::ClockWaterLab::SpillingControl
+    } else if std::env::args().any(|a| a == "--spilling") {
+        scenario_clock::ClockWaterLab::Spilling
+    } else if std::env::args().any(|a| a == "--multiple-control") {
         scenario_clock::ClockWaterLab::MultipleControl
     } else if std::env::args().any(|a| a == "--multiple") {
         scenario_clock::ClockWaterLab::Multiple

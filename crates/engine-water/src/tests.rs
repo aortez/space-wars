@@ -186,7 +186,8 @@ fn capacity_backpressure_holds_water_upstream_and_sources_fail_without_mutation(
             position: Vec2::Y * 100.0,
             velocity: Vec2::ZERO,
             volume: 50.0,
-            duration: DT
+            duration: DT,
+            horizontal_bounds: None,
         }),
         Err(WaterError::Capacity)
     );
@@ -214,6 +215,7 @@ fn swept_deposition_catches_a_thin_pool_crossed_within_one_tick() {
             velocity: Vec2::new(600.0, -120.0),
             volume: 0.5,
             duration: DT,
+            horizontal_bounds: None,
         })
         .unwrap();
     world.step(DT).unwrap();
@@ -236,6 +238,7 @@ fn both_exact_pool_edges_collect_vertical_parcels_symmetrically() {
                 velocity: Vec2::new(0.0, -100.0),
                 volume: 5.0,
                 duration: DT,
+                horizontal_bounds: None,
             })
             .unwrap();
         world.step(DT).unwrap();
@@ -301,6 +304,7 @@ fn channel_walls_stop_horizontal_motion_without_losing_water() {
                 velocity: Vec2::ZERO,
                 volume: 1.0,
                 duration: DT,
+                horizontal_bounds: config.spill_channel,
             }),
             Err(WaterError::InvalidInput)
         );
@@ -311,6 +315,7 @@ fn channel_walls_stop_horizontal_motion_without_losing_water() {
                 velocity: Vec2::new(200.0 * direction, 0.0),
                 volume: 20.0,
                 duration: DT,
+                horizontal_bounds: config.spill_channel,
             })
             .unwrap();
         world.step(DT).unwrap();
@@ -359,6 +364,7 @@ fn sideways_entry_below_a_pool_surface_is_collected() {
                 velocity: Vec2::new(600.0 * direction, -60.0),
                 volume: 1.0,
                 duration: DT,
+                horizontal_bounds: None,
             })
             .unwrap();
         world.step(DT).unwrap();
@@ -366,6 +372,107 @@ fn sideways_entry_below_a_pool_surface_is_collected() {
         assert_eq!(world.stats().parcels, 0);
         assert_accounting(&world);
     }
+}
+
+#[test]
+fn splash_sources_keep_their_own_bounds_and_rejoin_water_without_duplicating_volume() {
+    for bounds in [None, Some([-100.0, 100.0])] {
+        let mut world = WaterWorld::new(
+            WaterConfig {
+                spill_channel: Some([-10.0, 10.0]),
+                ..WaterConfig::default()
+            },
+            vec![
+                spec(
+                    -100.0,
+                    90.0,
+                    vec![0.0; 32],
+                    [Boundary::Closed, Boundary::Spill { lip: 0.0 }],
+                ),
+                spec(
+                    10.0,
+                    90.0,
+                    vec![0.0; 32],
+                    [Boundary::Spill { lip: 0.0 }, Boundary::Closed],
+                ),
+            ],
+        )
+        .unwrap();
+        world
+            .add_falling(Parcel {
+                position: Vec2::new(-50.0, 0.1),
+                velocity: Vec2::new(0.0, 120.0),
+                volume: 20.0,
+                duration: DT,
+                horizontal_bounds: bounds,
+            })
+            .unwrap();
+        world.step(DT).unwrap();
+        assert_eq!(
+            world.stats().pooled,
+            0.0,
+            "rising splash is still in flight"
+        );
+        assert_eq!(
+            world.parcels[0].position.x, -50.0,
+            "not teleported into the drain"
+        );
+        assert!(world.parcels[0].position.y > 0.1);
+        let mut collected = false;
+        let mut spilled = false;
+        for _ in 0..900 {
+            world.step(DT).unwrap();
+            collected |= world.stats().pooled > 0.0;
+            for p in &world.parcels {
+                if p.horizontal_bounds == Some([-10.0, 10.0]) {
+                    spilled = true;
+                    assert!((-10.0..=10.0).contains(&p.position.x));
+                }
+            }
+            assert_accounting(&world);
+        }
+        assert!(collected && spilled);
+        assert_eq!(world.stats().injected, 20.0);
+    }
+}
+
+#[test]
+fn source_bounds_are_validated_without_mutation_and_share_the_parcel_budget() {
+    let mut world = WaterWorld::new(
+        WaterConfig {
+            max_parcels: 1,
+            ..WaterConfig::default()
+        },
+        vec![spec(-100.0, 200.0, vec![0.0; 10], [Boundary::Closed; 2])],
+    )
+    .unwrap();
+    let mut source = Parcel {
+        position: Vec2::new(0.0, 10.0),
+        velocity: Vec2::Y * 100.0,
+        volume: 2.0,
+        duration: DT,
+        horizontal_bounds: None,
+    };
+    for bounds in [
+        [1.0, 2.0],
+        [10.0, -10.0],
+        [0.0, 0.0],
+        [f64::NAN, 1.0],
+        [-1.0, f64::INFINITY],
+    ] {
+        source.horizontal_bounds = Some(bounds);
+        let before = world.stats();
+        assert_eq!(world.add_falling(source), Err(WaterError::InvalidInput));
+        assert_eq!(world.stats(), before);
+    }
+    source.horizontal_bounds = None;
+    world.add_falling(source).unwrap();
+    source.horizontal_bounds = Some([-20.0, 20.0]);
+    let before = world.stats();
+    assert_eq!(world.add_falling(source), Err(WaterError::Capacity));
+    assert_eq!(world.stats(), before);
+    world.reclaim();
+    assert_accounting(&world);
 }
 
 #[test]
@@ -382,6 +489,7 @@ fn partial_reclamation_is_explicit_conservative_and_validated() {
             velocity: Vec2::ZERO,
             volume: 20.0,
             duration: DT,
+            horizontal_bounds: None,
         })
         .unwrap();
     let before = world.stats();

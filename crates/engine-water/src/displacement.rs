@@ -1,9 +1,9 @@
 //! Conservative, hydrostatic-reference displacement for bounded solid unions
-//! in closed flat basins. Occupancy raises local pressure heads; existing
-//! level-driven fluxes spread the disturbance without adding/removing liquid.
+//! in flat basins, including spill edges. Occupancy raises local pressure heads;
+//! existing level-driven fluxes spread the disturbance without creating liquid.
 //! This is not a solid flow barrier or a general moving-boundary fluid solver.
 use crate::{
-    Boundary, Pool, WaterError, WaterWorld,
+    Pool, WaterError, WaterWorld,
     immersion::{HullShape, clip},
 };
 use engine_core::Vec2;
@@ -94,7 +94,7 @@ impl DisplacementBox {
 impl WaterWorld {
     /// Replace the complete occupancy input for this pool, or remove it with
     /// None. One-way mode is simply no occupancy input. Rejections are atomic.
-    /// Supported: closed flat basins, box diagonal <= 75% of basin width. The
+    /// Supported: flat basins, box diagonal <= 75% of basin width. The
     /// orientation-independent bound keeps free capacity positive at every
     /// angle and prevents an accepted body rotating into an unsupported pose.
     pub fn set_displacer(
@@ -113,7 +113,7 @@ impl WaterWorld {
     /// Submit once per pool, not separately for each body. Call before stepping
     /// water and again after mechanics to align rendering with the final poses.
     ///
-    /// Up to MAX_DISPLACERS boxes/circles, in closed flat basins. The SUM of box
+    /// Up to MAX_DISPLACERS boxes/circles, in flat basins. The SUM of box
     /// diagonals/circle diameters must fit within 75% of basin width, including
     /// bodies currently dry or outside it. This conservative, pose-independent
     /// bound guarantees positive free capacity even as bodies move/rotate.
@@ -158,10 +158,7 @@ impl WaterWorld {
         if diameter > pool.spec.column_width * pool.volume.len() as f64 * 0.75 {
             return Err(WaterError::InvalidInput);
         }
-        if !bodies.is_empty()
-            && (pool.spec.boundaries != [Boundary::Closed; 2]
-                || pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0]))
-        {
+        if !bodies.is_empty() && pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0]) {
             return Err(WaterError::InvalidGeometry);
         }
         if pool.displacement.bodies != bodies {
@@ -331,3 +328,6 @@ fn polygon_area(points: &[[f64; 2]]) -> f64 {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod spill_tests;

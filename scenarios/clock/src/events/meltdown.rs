@@ -14,20 +14,15 @@ pub const MAX_SPILL_PARCELS: usize = 128;
 pub const MELTING_TICKS: u64 = 180;
 pub const DRAINING_TICKS: u64 = 240;
 const SIDE_COLUMNS: usize = WATER_COLUMNS / 2;
+const LAB_INITIAL_CELLS: usize = 24;
 const DT: f32 = 1.0 / 60.0;
 
+mod material;
 #[cfg(test)]
 mod tests;
 mod water_lab;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct MeltCell {
-    pub position: Vec2,
-    velocity: Vec2,
-    pub angle: f32,
-    spin: f32,
-    release_tick: u64,
-}
+pub(crate) use material::{MeltCell, soften};
 
 pub(crate) struct MeltdownEvent {
     pub tick: u64,
@@ -37,7 +32,6 @@ pub(crate) struct MeltdownEvent {
     pub floats: Option<water_lab::WaterLab>,
     initial_cells: usize,
     cell_area: f64,
-    bypassed: f64,
     reclaimed_cells: f64,
 }
 
@@ -53,22 +47,22 @@ impl MeltdownEvent {
                         assert!(cells.len() < MAX_MELTDOWN_CELLS);
                         cells.push(MeltCell {
                             position: context.layout.cell_center(segment.id, *cell),
-                            velocity: Vec2::new(
-                                rng.random_range(-0.8..0.8),
-                                rng.random_range(0.0..1.3),
-                            ) * context.layout.pitch,
+                            velocity: Vec2::new(rng.random_range(-0.25..0.25), 0.0)
+                                * context.layout.pitch,
                             angle: 0.0,
-                            spin: rng.random_range(-2.5..2.5),
-                            release_tick: rng.random_range(0..60) + (8 - cell.y) as u64 * 3,
+                            spin: rng.random_range(-0.4..0.4),
+                            // Release solid blocks bottom-up with small seeded
+                            // variation. Only floor contact changes the material.
+                            release_tick: 24 + cell.y as u64 * 4 + rng.random_range(0..24),
                         });
                     }
                 }
                 segment.representation = SegmentRepresentation::Disintegrated;
             }
         }
-        let cell_area = (context.layout.pitch as f64 * 0.8).powi(2);
+        let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
         let mut water = Self::water_world(context.layout, mode);
-        let initial_cells = if lab { 24 } else { cells.len() };
+        let initial_cells = if lab { LAB_INITIAL_CELLS } else { cells.len() };
         if lab {
             let spec = water.pools()[0].spec().clone();
             for i in 0..spec.bed.len() {
@@ -90,16 +84,48 @@ impl MeltdownEvent {
             lab,
             floats,
             cell_area,
-            bypassed: 0.0,
             reclaimed_cells: 0.0,
         }
+    }
+
+    fn water_pitch(layout: Layout, mode: ClockWaterLab) -> f64 {
+        // Fit a two-level fixture below the readable face, even on wide screens.
+        // These are lab cell-equivalent units; normal digit melting is unchanged.
+        f64::from(if mode.is_spilling_tank() {
+            layout.pitch.min(20.0)
+        } else {
+            layout.pitch
+        })
     }
 
     fn water_world(layout: Layout, mode: ClockWaterLab) -> WaterWorld {
         let half = layout.bounds_max.x as f64;
         let lip = layout.drain_half_width() as f64;
         let floor = layout.floor_y as f64;
-        let specs = if mode.is_tank() {
+        let specs = if mode.is_spilling_tank() {
+            let pitch = Self::water_pitch(layout, mode);
+            let width = pitch * 9.6;
+            let depth = LAB_INITIAL_CELLS as f64 * (pitch * 0.8).powi(2) / width;
+            vec![
+                PoolSpec {
+                    left: -width * 0.5,
+                    column_width: width / SIDE_COLUMNS as f64,
+                    bed: vec![-184.0; SIDE_COLUMNS],
+                    boundaries: [
+                        Boundary::Closed,
+                        Boundary::Spill {
+                            lip: -184.0 + depth,
+                        },
+                    ],
+                },
+                PoolSpec {
+                    left: -width * 0.5,
+                    column_width: width * 1.6 / SIDE_COLUMNS as f64,
+                    bed: vec![-230.0; SIDE_COLUMNS],
+                    boundaries: [Boundary::Closed; 2],
+                },
+            ]
+        } else if mode.is_tank() {
             let width = layout.pitch as f64 * 9.6;
             vec![PoolSpec {
                 left: -width * 0.5,
@@ -200,7 +226,16 @@ impl MeltdownEvent {
             if remaining > 0 {
                 self.water.step(1.0 / 60.0).expect("fixed water step");
                 self.water
-                    .reclaim_fraction(1.0 / remaining as f64)
+                    .reclaim_fraction(if self.lab {
+                        1.0 / remaining as f64
+                    } else {
+                        // Ease the visible recovery, but keep it explicit
+                        // reclamation rather than pretending this drained.
+                        let before = self.phase_tick() as f64 / REFORMING_TICKS as f64;
+                        let after = (self.phase_tick() + 1) as f64 / REFORMING_TICKS as f64;
+                        let ease = |t: f64| t * t * (3.0 - 2.0 * t);
+                        ((ease(after) - ease(before)) / (1.0 - ease(before))).clamp(0.0, 1.0)
+                    })
                     .expect("bounded reform fraction");
             }
         }
@@ -218,7 +253,8 @@ impl MeltdownEvent {
 
     fn step_material(&mut self, layout: Layout) {
         self.water.step(1.0 / 60.0).expect("fixed water step");
-        let half = layout.pitch * 0.4;
+        let water = &mut self.water;
+        let cell_area = self.cell_area;
         self.cells.retain_mut(|cell| {
             if self.tick <= cell.release_tick {
                 return true;
@@ -226,56 +262,16 @@ impl MeltdownEvent {
             cell.velocity.y -= 400.0 * DT;
             cell.position += cell.velocity * DT;
             cell.angle += cell.spin * DT;
-            let extent = half * (cell.angle.sin().abs() + cell.angle.cos().abs());
-            let x = cell
-                .position
-                .x
-                .clamp(layout.bounds_min.x + extent, layout.bounds_max.x - extent);
+            let extent = cell.extent(layout.pitch);
+            let x = cell.position.x.clamp(
+                layout.bounds_min.x + extent.x,
+                layout.bounds_max.x - extent.x,
+            );
             if x != cell.position.x {
                 cell.position.x = x;
                 cell.velocity.x *= -0.35;
             }
-            if cell.position.y - extent <= layout.floor_y
-                && cell.position.x.abs() + extent >= layout.drain_half_width()
-            {
-                let footprint =
-                    [-0.6, -0.2, 0.2, 0.6].map(|offset| cell.position.x + offset * half);
-                let spills = footprint
-                    .iter()
-                    .filter(|x| x.abs() < layout.drain_half_width())
-                    .count();
-                if self.water.parcels().len() + spills > MAX_SPILL_PARCELS {
-                    // Source backpressure too: keep the original cell's mass
-                    // while waiting for spill capacity; do not partially inject.
-                    cell.position.y = layout.floor_y + extent;
-                    cell.velocity.y = 0.0;
-                    return true;
-                }
-                for x in footprint {
-                    let volume = self.cell_area * 0.25;
-                    if x.abs() < layout.drain_half_width() {
-                        self.water
-                            .add_falling(Parcel {
-                                position: Vec2::new(x, layout.floor_y),
-                                velocity: Vec2::new(cell.velocity.x, cell.velocity.y.max(-800.0)),
-                                volume,
-                                duration: 1.0 / 60.0,
-                            })
-                            .expect("reserved spill capacity");
-                    } else {
-                        let pool = usize::from(x > 0.0);
-                        self.water
-                            .add_to_pool(pool, x as f64, volume)
-                            .expect("impact inside floor");
-                    }
-                }
-                false
-            } else if cell.position.y + extent < layout.bounds_min.y {
-                self.bypassed += 1.0;
-                false
-            } else {
-                true
-            }
+            !material::merge(cell, extent, water, cell_area, layout)
         });
     }
 
@@ -297,7 +293,7 @@ impl MeltdownEvent {
             displaced_microunits: micro(water.displaced),
             spill_parcels: water.parcels,
             capacity_limited_ticks: water.capacity_limited_ticks,
-            drained_microunits: micro(water.drained) + (self.bypassed * 1_000_000.0).round() as u64,
+            drained_microunits: micro(water.drained),
             reclaimed_microunits: micro(water.reclaimed)
                 + (self.reclaimed_cells * 1_000_000.0).round() as u64,
         }

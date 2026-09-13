@@ -76,11 +76,20 @@ Color Cycle eases the illuminated cells and colon through violet, pink, gold,
 and green, returning to the normal cyan palette. Digits remain anchored and
 follow live time throughout; the event creates no physics objects.
 
-Meltdown releases the lit digit cells individually, with seeded release delays,
-gravity, spin and side-wall reflection. On first floor contact a cell becomes
-water, which pools and spills through the existing center opening.
-The colon and dim face outline stay visible. After seven seconds, the latest
-time fades back in over 1.5 seconds while remaining water is gradually reclaimed.
+Meltdown releases the lit digit cells roughly bottom-up, with small seeded
+delays. They stay cyan, square and solid-looking while falling, including through
+existing water. Gravity, slight rotation and side-wall reflection remain cheap
+ballistic motion, without rigid bodies or block-block collisions. Reaching the
+floor or drain-opening elevation converts each block once: normally 70% of its
+area goes directly into the pool/drain across its footprint, while 30% sprays
+upward as three small water drops. The drops use the same volume ledger and
+parcel budget as spills; they rejoin a pool on descent or leave through the drain.
+When parcel capacity is tight, optional spray is reduced and that volume goes
+directly into the pool/drain instead. This replaces the earlier in-air softening
+effect, following dirtsim's solid-block → floor impact → water sequence.
+Water pools and spills through the existing center opening. The colon and dim
+face outline stay visible. After seven seconds, the latest time rebuilds bottom-up
+over 1.5 seconds while remaining water is explicitly reclaimed with eased timing.
 The reusable `engine-water` model drives flow from surface-level differences,
 with damping and conservative donor limits. There is no forced inward current;
 flat basins retain more water than the original Clock-local effect did.
@@ -93,6 +102,14 @@ model can collect them in a lower basin. Water is counted as drained only after
 leaving the lower world boundary, not upon crossing a ledge. Full parcel capacity
 holds water upstream. This is a fixed-down, unit-depth approximation, not a general
 fluid solver; cells/parcels do not collide with one another.
+Shared surface-edge heights replace the staircase with connected trapezoids,
+preserving total area over each continuous wet, flat run. Dry gaps and bed steps
+are not bridged. Ribbons taper with acceleration and are clipped to the drain
+channel instead of having their corners pushed onto the banks. Splash drops use
+the outer screen walls instead of the narrow drain channel. Compact water parcels
+have area-preserving rounded outlines, including at the top of their flight.
+These are bounded
+convex polygons supported by both existing render paths, not a new fluid solver.
 
 Reform cleanup is accounted separately from drainage. Preview replacement,
 resize and restart drop the entire event-local representation. This does not
@@ -140,6 +157,21 @@ feedback. The original locked modes stay available for comparison. Small rocking
 can remain during this short preview; longer settling and off-center-impulse
 tests are described in [rotating box feedback](design/water.md#rotating-box-feedback).
 These remain single-box, closed-tank experiments, not sealed flow barriers.
+
+`SPACEWARS_CLOCK_WATER_LAB=multiple` adds a second box and enables displacement
+for all three bodies, including the ball. Overlapping hulls count their combined
+occupied area only once; Rapier still handles their contact and rotation.
+`multiple-control` retains the same bodies without water-level feedback.
+
+`SPACEWARS_CLOCK_WATER_LAB=spilling` puts those three dynamic bodies in an upper
+basin filled to a lowered right-hand rim, with an empty collecting pool below.
+Entry raises the surface and pushes water over the rim; that liquid stays in the
+collector even as the bodies rise again. The red box sinks, while the orange
+box and yellow ball float. `spilling-control` has identical initial geometry and
+motion but no displacement, so it does not overflow. It uses four bodies/nine
+colliders and 128 columns in total. These are still environment-only Meltdown
+previews, not new scenarios; normal Clock startup is unchanged. See
+[spilling displacement and verification](design/water.md#displacement-driven-spills).
 
 Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
@@ -517,7 +549,8 @@ These diagnostics do not affect `ui state` revisions. The optional `meltdown`
 object is present only during Meltdown (including its reform phase). It reports
 initial/waiting/airborne cells, occupied water columns, active spill parcels,
 capacity-limited ticks, and pooled, in-flight (`spilling_microunits`), drained and
-reclaimed volume. One original cell equals 1,000,000 micro-units; independently
+reclaimed volume. In-flight volume and parcel counts include both impact spray
+and drain spills. One original cell equals 1,000,000 micro-units; independently
 rounded totals can differ by two units. Waiting plus airborne cell volume plus
 the four volume aggregates must equal the initial material. Reclaimed volume
 is explicit reform cleanup, not drainage. Idle and other events report null.

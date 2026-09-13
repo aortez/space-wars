@@ -7,6 +7,12 @@ narrow displacement experiment: a prescribed box entering/leaving a closed tank.
 The fourth closes that feedback loop for a freely moving, rotation-locked box.
 The fifth extends that same single-body feedback to a rotating box.
 The sixth adds bounded, overlap-aware batches of boxes and circles.
+The seventh lets those bodies displace water over a flat basin's spill lip,
+with a collecting pool and changing-volume regressions.
+The eighth returns to the normal Clock event: softening cells, surface-aware
+conversion, area-preserving presentation and bottom-up recovery.
+A subsequent impact pass replaces that source behavior with solid falling blocks
+that become water and splash at floor contact, following the dirtsim reference.
 
 ## Model and boundaries
 
@@ -24,11 +30,15 @@ solver. Closed edges retain water; open edges have explicit spill lips.
 Overflow becomes finite ballistic parcels. They accelerate downward, deposit
 into the first pool surface crossed, or leave through the world lower boundary.
 An upper pool can feed a separate lower pool. Parcels are not colliding particles
-and do not simulate splashes, mixing, pressure, or breaking waves. On capacity
+and do not automatically generate impact splashes, mixing, pressure, or breaking
+waves. A caller may inject upward-moving splash parcels. On capacity
 exhaustion, outflow is held in the pool; it is never silently deleted.
-An optional vertical channel stops parcels' horizontal motion at its walls.
-Normal Meltdown uses this for the central drain, matching the drawn banks;
-the open collecting-pool fixture does not. The channel is not a general solid
+Each parcel carries optional `horizontal_bounds` that stop horizontal motion at
+vertical walls. Automatic spills inherit `WaterConfig::spill_channel`; explicit
+`add_falling` sources must supply their own bounds (or `None` for free flight).
+Normal Meltdown uses the central drain channel for outflow and the outer screen
+walls for its impact spray; the open collecting-pool fixture is unconfined.
+The channel is not a general solid
 collision system, and ballistic parcels still pass through one another.
 
 The accounting contract is:
@@ -234,7 +244,8 @@ basin**. The current API also accepts an `angle`, as described under
 [rotating box feedback](#rotating-box-feedback). The box's diagonal must fit
 within 75% of basin width. Box/tank intersections are clipped to basin width
 and bed. The later [multiple-body slice](#multiple-body-displacement) adds batches
-of boxes/circles; open edges and uneven beds still reject displacement inputs.
+of boxes/circles. The [spilling slice](#displacement-driven-spills) admits open
+edges; uneven beds still reject displacement inputs.
 Invalid submissions leave the existing input unchanged.
 
 For basin width `W`, bed `z`, liquid area `V`, and box area below a candidate level
@@ -575,7 +586,8 @@ omitted bodies are removed. It never accumulates last frame's input or adds a
 solid's area to the liquid ledger. `set_displacer` remains a one-box convenience;
 existing analytic/rotated single-box paths are retained.
 
-This slice admits at most **eight** centered boxes/circles per closed, flat basin.
+This slice initially admitted at most **eight** centered boxes/circles per closed,
+flat basin; the spilling extension below keeps the same limits for open basins.
 The **sum** of box diagonals and circle diameters must be <=75% of basin width,
 even for dry/outside bodies. This conservative orientation-independent budget
 keeps free reference capacity monotone as all the bodies move. It is not a claim
@@ -715,16 +727,361 @@ Saved settings/data and other devices were not changed. As with the preceding
 lab previews, the environment override is a temporary same-user session; reboot
 restores normal managed startup.
 
+## Displacement-driven spills
+
+Flat basins now accept the same complete displacement snapshot with either
+closed edges or explicit spill lips. Body count, collective-width limits,
+polygon union, caller-owned membership and approximate buoyancy contracts are
+unchanged. Uneven beds still return `InvalidGeometry`, without altering the
+previous input. This is not support for watertight moving barriers or containers.
+
+The reference capacity must use **remaining liquid**, not the amount initially
+injected. A pool refreshes occupancy after each substep that emits water,
+including the final substep, before another flux calculation or an external
+query. The cached hull union is reused; only the level solve and per-column
+areas are refreshed. Closed pools retain their existing step path, and ordinary
+body-free spilling pools skip the occupancy solve. Existing source/deposition
+and reclaim paths also refresh it.
+
+Body motion changes occupied space, but only liquid is emitted. Removing a body
+lowers the surface without refilling the pool; water already in flight, collected
+below, drained or explicitly reclaimed remains in its corresponding ledger.
+If parcel capacity is exhausted, liquid stays upstream until capacity is free.
+Each pool clips its own submitted shapes against its sides/bed and water level.
+A caller can submit the same bodies to vertically separated basins, without
+giving an empty lower basin phantom water or displaced area.
+
+The regression was written before the outflow refresh: admitting open basins
+alone left 50 units of displaced area after the first step, while the remaining
+liquid required about 49.983. Both the single-box and cached multi-body paths
+now satisfy the independent capacity equation at 30/60/120 Hz. For a 100-wide
+basin, lip at 20 and a 20-wide box with its bottom at 18:
+
+`remaining liquid = 100 * level - 20 * (level - 18)`
+
+Tests check that relation after every emitting step, asymptotic settling,
+withdrawal without refilling, and removal of all ghost occupancy on reclaim.
+A separate slowly inserted, fully submerged 200-area box approaches a source
+capacity of 1,800 (from 2,000), with every lost unit accounted for in flight or
+in the collector. It exercises left and right outlets at 30/60/120 Hz and
+32/128/512 total columns. Free outfall decays with head to the 3/2 power; after
+240 simulated seconds, retained amounts are 1,802.59–1,802.69, not exactly the
+asymptotic limit. Those are deterministic simulation results, not wall timing.
+Mixed overlapping/rotating inputs also replay exactly through spill, collection
+and partial reclaim. A full parcel queue tests backpressure and later resumption.
+
+### Spilling preview and benchmarks
+
+```sh
+SPACEWARS_CLOCK_WATER_LAB=spilling cargo run --release -p engine-client -- --scenario clock
+SPACEWARS_CLOCK_WATER_LAB=spilling-control cargo run --release -p engine-client -- --scenario clock
+cargo test --locked -p engine-water spill_tests
+cargo test --locked -p scenario-clock spilling
+cargo run --locked --release -p engine-water --example spilling_displacement_benchmark
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --spilling
+cargo run --locked --release -p scenario-clock --example meltdown_benchmark -- --spilling-control
+```
+
+Choose **Clock Controls → Preview Event: Meltdown → Preview & Resume**. The
+upper basin starts exactly at its right-hand lip; the collector starts empty.
+An orange floating box, yellow floating ball and red sinking box all move through
+Rapier, with no prescribed piston motion. Their complete poses are submitted to
+both pools. Raised spill rims and floors share drawing/collider geometry.
+The dashed guide marks the initial water level. `spilling-control` disables only
+occupancy feedback, keeping the same geometry, density and initial motion.
+
+The fixture uses four bodies/nine colliders, two flat pools/128 columns and the
+existing 128-parcel cap. It fits below the readable face at both device aspects;
+lab cell-equivalent area is capped on wide layouts to keep this two-level rig
+inside the viewport. Normal digit melting still uses the actual pixel-cell area
+and remains body-free. Both previews use the existing event, pause, replacement,
+resize and cleanup lifecycle, with no extra scenario or persistent setting.
+
+At six seconds, the collector contains about 8–10% of the original upper liquid
+across the tested aspect ratios, with another 0.25–0.40% still in flight. The
+matched control retains everything in the upper basin. Tests verify the full
+ledger, genuine body-body contacts, finite motion, exact replay, paused frames
+and zero bodies/water state after cleanup. Small residual outflow is expected
+in this short preview; it does not establish steady-state settling.
+
+The water-only benchmark separates pose submission from stepping for matched
+open/closed and feedback/no-feedback fixtures. It uses 1/4/8 separated moving
+box/circle inputs and 32/128/512 total columns. Each ten-second cycle starts with
+a newly filled upper basin and an empty collector, outside the timer, so the
+measured workload continues exercising outflow rather than eventually drying
+below all hulls. One cycle warms up; ten cycles (6,000 ticks) are measured.
+Statistics and motion generation are outside the timer. Output includes emitting
+ticks, collected volume, parcel count and accounting error; the benchmark asserts
+these correctness properties, never timing thresholds. It is not a crowded-union
+stress test or a general fluid-accuracy benchmark.
+
+### Seventh-slice measurements and validation (2026-09-12)
+
+Desktop Rust 1.94.1 release, three serial runs of 24 events at each of 800×480,
+480×800 and 1280×720. Ranges are the median per-run p95 at each size:
+
+| Mode | Step p95 | Draw-list p95 |
+| --- | ---: | ---: |
+| Spilling, feedback on | 28.0–29.0 µs | 4.8–5.0 µs |
+| Spilling, feedback off | 7.9–8.0 µs | 3.4 µs |
+| Closed mixed-body feedback | 19.3–19.8 µs | 4.8 µs |
+| Normal Meltdown | 4.6 µs | 6.4–6.5 µs |
+
+All individual spilling-feedback step p95s ranged 27.8–29.5 µs, with a peak of
+405 draw primitives. The new control has no stream or lower water surface to
+draw, so its draw-list cost is lower too. These are simulation and draw-list
+measurements, not raster/presentation or Pi CPU measurements.
+
+The water-only fixture's three-run median submit-plus-step p95s were:
+
+| Bodies | Closed, 128 columns | Spilling, 128 columns | Spilling, 512 columns |
+| --- | ---: | ---: | ---: |
+| 1 | 5.11 µs | 12.64 µs | 20.67 µs |
+| 4 | 11.69 µs | 28.54 µs | 36.97 µs |
+| 8 | 21.11 µs | 51.53 µs | 62.13 µs |
+
+At 128 columns, 63–80% of measured ticks emitted water; at 512, 60–75% did.
+Those figures matter: this is an active-outflow workload, not only the closed
+basin code with an unused outlet. It includes parcel movement/collection and
+per-emitting-substep reference solves. Empty-input controls stayed about 1.94 µs
+at 128 columns and 7.44 µs at 512. Largest accounting error across all runs was
+3.18e-12 on 2,000 initial area units. No liquid drained out of the fixture and
+no parcel-capacity stalls occurred; the peak was 135 of the benchmark's 512
+available parcels. The Clock preview retains its separate 128-parcel limit.
+
+Validation: 40 water tests, 67 Rapier tests, 85 Clock tests and 298 client tests
+pass (four pre-existing ignored tests remain ignored). Both render paths pass
+at four device sizes; portrait/landscape and real-client captures were inspected.
+Real-client workflows under private Xvfb pass for `spilling`, `spilling-control`
+and normal Meltdown, including preview, pause, recovery, restart and launcher
+return. Workspace/all-target check, Rust 1.89 core/scenario all-target check,
+formatting and scoped strict Clippy pass (with the previously documented
+unrelated `collapsible_else_if` lint allowed). This spilling slice has not yet
+been deployed to a Pi; the device remains on the multiple-body preview above.
+
+## Normal Meltdown presentation pass
+
+This records the first presentation pass. Its softening and water-surface source
+conversion were superseded by the floor-impact pass below; pool smoothing and
+bottom-up recovery are retained.
+
+The engine model is now sufficient for the normal event. This pass changes its
+source animation, conversion and presentation; it does not add rigid bodies,
+splashes, pressure or a new launcher scenario. The existing resource caps and
+8.5-second duration remain: three seconds melting, four draining, 1.5 reforming.
+
+Cells soften for 18 ticks before their seeded release, working roughly bottom-up.
+The original cyan square becomes a blue beveled drop, squashes slightly while
+softening and stretches with falling speed. Its eight-point outline is normalized
+to preserve the original square area, even as bevel, stretch and angle change.
+The same outline supplies the motion bounds. Horizontal variation and spin are
+small; the old upward impulse is removed. Cells remain cheap scenario-owned
+animated sources, not Rapier bodies or displacement inputs.
+
+A source converts at its first contact with the existing water surface or a dry
+bank. The preceding regression deliberately places a cell above the floor but
+intersecting a filled pool: previously it stayed solid. Conversion now removes
+that cell and transfers its entire area once. The area is distributed by overlap
+of its projected horizontal footprint with each pool column and the central gap,
+rather than four point samples. A gap portion reserves one ballistic parcel;
+if capacity is unavailable, the **whole** source stays pending with no partial
+injection. A cell falling wholly through the opening can still leave as an
+airborne source, accounted as bypass drainage. This is a cheap contact/footprint
+approximation, not polygon-water collision or impact-momentum coupling.
+
+The drawing layer smooths adjacent wet, equal-bed columns by sharing the average
+of their surface heights at the common face; run endpoints keep their old height.
+Integrating the resulting trapezoids preserves the run's total displayed area
+(liquid plus solid occupancy in labs). It does not change simulation samples or
+invent liquid. Dry spots, sub-visibility-depth columns, bed steps and separate
+pools end a run. Each fill and surface highlight is a convex quadrilateral:
+the software rasterizer only supports convex polygons, so a single concave
+polygon spanning all the waves would incorrectly fill their valleys.
+
+Falling ribbons retain their transported area while tapering toward the faster
+leading end. Normal-event ribbons are geometrically intersected with the drain
+strip rather than shearing their vertices onto its walls. The visible area may
+be reduced by that clip; the point-parcel simulation and its volume ledger are
+unchanged. Sub-visibility-width ribbons are omitted as before. The lab fixtures
+also use the new pool/ribbon presentation, while their dynamics are unchanged.
+
+Reformation staggers the nine cell rows by four ticks each. Each currently lit
+cell fills upward and fades in; the final pre-cleanup frame reaches full size and
+brightness. Live time corrections still choose the current digits, even during
+paused reformation, without advancing the water. Normal-event reclamation uses
+a smoothstep schedule; lab controls retain their previous linear schedule.
+Reclaimed liquid is reported separately from material that actually drained.
+
+Focused tests cover outline area and extents across sizes/rotations/speeds,
+surface contact, footprint partitioning at both banks and screen edges, whole-
+source backpressure, source completion before the draining phase, smooth-surface
+area/continuity, dry/bed-step boundaries, ribbon area/taper and convex clipping,
+bottom-up recovery and paused live-time corrections. Existing deterministic
+replay, conservation, lifecycle and normal/experimental preview tests remain.
+
+### Eighth-slice measurements and validation (2026-09-12)
+
+Desktop Rust 1.94.1 release. The existing headless client measured two complete
+Meltdown/cooldown/idle cycles per run: seed 7, two simulated warm-up seconds,
+23 measured seconds, three independent processes for each viewport/scale.
+Before/after batches ran serially, without overlapping tests or compilation.
+The table reports the median **per-run mean** CPU frame cost, including scripted
+actions, simulation, draw-list generation, raster preparation and bookkeeping:
+
+| Viewport | Raster scale | Before | After |
+| --- | ---: | ---: | ---: |
+| 1024×768 | 1 | 0.197 ms | 0.194 ms |
+| 1024×768 | 2 (2048×1536 internal) | 0.466 ms | 0.444 ms |
+| 480×800 | 1 | 0.106 ms | 0.108 ms |
+
+This is a visual-quality pass, not a demonstrated general renderer speedup.
+The source animation changes which geometry is present on each frame; the small
+mean changes include that workload difference and run-to-run noise. Median
+worst-row p95 was 0.340→0.263 ms at landscape scale 1, 0.826→0.625 ms at scale 2,
+and 0.168→0.151 ms in portrait. These are 60-frame row percentiles, not whole-run
+percentiles, and exclude Slint drawing, upload, composition and vsync.
+
+The separate 24-events-per-size scenario benchmark (three runs at 800×480,
+480×800 and 1280×720) makes the additional CPU work visible: median simulation
+step p95 rises from 4.6 µs to 6.3–6.8 µs; draw-list p95 rises from 6.4–6.5 µs to
+9.0–9.2 µs. Eight-point drop outlines and connected surface geometry are not free.
+Normal Meltdown still creates zero physics bodies/colliders; the measured peak
+was 525 draw primitives and 84 spill parcels, within its existing bounds.
+
+Reproduce the end-to-end measurements with a built release client:
+
+```sh
+./benchmark-clock.sh --cases meltdown --scales 1,2 --repeats 3 --seconds 23 \
+  --width 1024 --height 768 --output /tmp/meltdown-landscape
+./benchmark-clock.sh --cases meltdown --scales 1 --repeats 3 --seconds 23 \
+  --width 480 --height 800 --output /tmp/meltdown-portrait
+```
+
+The wrapper preserves the raw CSVs, binary hash, workload and environment
+metadata. Visual fixtures now capture softening, falling drops, pooled water,
+and additional points through recovery at four device sizes. They compare the
+last reforming frame with the first cleaned-up frame **pixel for pixel**, avoiding
+a last-tick snap to the normal face.
+
+Validation: **500 unit tests pass** across water (40), Rapier (67), Clock (95)
+and the client (298); the same four pre-existing ignored tests remain ignored.
+The real-client workflow passes under private Xvfb for normal Meltdown,
+`spilling` and `spilling-control`, including preview, pause, recovery, restart
+and launcher return. Both render paths and portrait/landscape plus real-client
+captures were checked. Workspace/all-target and Rust 1.89 core/scenario checks,
+formatting and scoped strict Clippy pass, with the previously documented
+unrelated `collapsible_else_if` lint allowed.
+
+On 2026-09-12 this working tree passed the Yocto ARM release build and was
+fast-deployed to `sw-picade-2` (client SHA-256
+`f0a1ac55449dd2bfad003e2cb2d59c492698528e3f6eb6e65c8b5f78b3fb50e9`).
+A reboot cleared the earlier temporary `multiple` lab session and restored
+managed normal Clock startup. Installed binary hashes matched the bundle; the
+saved settings file was unchanged, including the Demo profile and 5% volume.
+A scripted normal Meltdown cycle completed through melting, draining, reforming
+and idle, with native screenshots of all four states visually inspected. It
+started with 63 digit cells, used zero physics bodies/colliders, reported no
+capacity-limited ticks in the samples, and released its event state at idle.
+The draining sample reported 60 FPS/UPS at 1024×768, raster scale 2; host step,
+scene and callback p95 were 0.086, 0.189 and 6.568 ms respectively. This is a
+single-cycle device smoke check, not a sustained benchmark or user playtest
+approval. Normal Clock was left running for playtesting.
+
+## Floor-impact Meltdown pass
+
+Following comparison with dirtsim's `clock_scenario/MeltdownEvent.cpp`, the
+normal event now keeps falling cells square and cyan instead of pre-melting
+them into blue drops. The release schedule, gravity and low-cost ballistic
+motion are unchanged. Cells pass through existing pools and convert only at the
+floor/drain elevation. The old solid-source bypass-drainage path is removed:
+even a block wholly over the opening becomes water at that elevation.
+
+At impact, up to 30% of the cell's area becomes three small upward-moving water
+parcels. The remainder is partitioned across columns and the central gap by the
+same horizontal-footprint calculation. Splash volume is not also credited to
+the pool. Spray is scenario-authored, not a pressure response or momentum-conserving
+solid/fluid solver; the falling solids still have no buoyancy or mutual collisions.
+The spray may emerge through existing water and is collected on descent.
+Keeping solids in front of the pool makes their continued fall visible.
+
+Spray and drain parcels share the existing 128-parcel ceiling. Optional spray
+leaves a 64-slot reserve for drain flow; under pressure, fewer drops are emitted
+and that volume is deposited directly. If a required gap parcel cannot fit, the
+whole source waits at the floor with no partial conversion. No new event,
+settings, rigid bodies or displacement solve are introduced.
+
+The reusable engine change is per-parcel horizontal bounds. Automatically emitted
+spills retain the configured narrow channel, while Clock's splash sources use
+the full arena width. Source bounds are validated before mutation; both source
+types share collection, drainage, reclamation and capacity accounting. The
+renderer clips against each parcel's own bounds. Compact parcels use a normalized
+eight-point drop instead of a widening ribbon near zero speed, preserving area
+before clipping. The existing convex rendering and pool/reformation paths remain.
+
+Validation (2026-09-12): **506 unit tests pass** across water (42), Rapier (67),
+Clock (99) and the client (298), with four pre-existing ignored tests. The changed
+water-surface regression first failed against the earlier source implementation,
+then passed with floor-only conversion. Tests cover rigid square geometry/color,
+floor and drain impacts, one-time volume transfer, upward splash collection,
+per-source bounds, shared capacity, reduced spray under pressure, conservation,
+replay and cleanup. Both render paths were checked at four device sizes, including
+the pixel-identical transition from final reformation to the cleaned-up face.
+
+Real-client workflows pass for normal Meltdown, `spilling` and `spilling-control`,
+including pause, preview replacement, recovery, restart and launcher return.
+One repeat failed before startup with an X-display authentication error; the
+normal workflow passed again on a separate isolated display. The normal client
+capture was visually inspected alongside the landscape/portrait render fixtures.
+Workspace/all-target and Rust 1.89 core/scenario checks, formatting and scoped
+strict Clippy pass with the previously documented unrelated lint allowance.
+Client-wide Clippy still reports pre-existing unrelated warnings; it is not a
+strict-clean target.
+
+The same local CPU-only workload (1024×768, seed 7, 23 measured simulated seconds,
+two warm-up seconds, three independent processes per scale) gave median mean
+frame costs of **0.192 ms at scale 1** and **0.442 ms at scale 2**, versus reference
+samples of 0.194 and 0.452 ms. The reference batch overlapped unit-test work, so
+these support only an absence of an obvious regression, not a speedup claim.
+The after batch ran without overlapping builds/tests. Both exclude Slint drawing,
+display upload and vsync, and are not Pi measurements. Raw reports retain binary
+hashes and workload/environment metadata in
+`/tmp/spacewars-meltdown-impact-before/run.WqxHvfCj` and
+`/tmp/spacewars-meltdown-impact-after/run.0vKwZeSR`.
+
+The standalone 24-event benchmark at each of three sizes measured step p95 of
+5.0–5.1 µs and draw-list p95 of 9.8–10.0 µs. The peaks were 95 water parcels and
+526 draw primitives, with zero physics bodies/colliders and conservation checked
+every tick.
+
+Deployed to `sw-picade-2` on 2026-09-12 as an ARM release fast update, without a
+reboot. The installed client SHA-256 is
+`459fb1aa7bf05c8f06a1facf7f5f8d9ac73d54f234f75970cd007786cf2a4dcc`.
+Normal Clock auto-started with no water-lab override; the settings file remained
+byte-identical, including the Demo profile and 5% volume. A scripted Meltdown
+cycle completed through falling cells, floor impacts, draining, reformation and
+idle. Device screenshots confirmed the square cyan blocks, blue impact spray and
+restored clock face. All five active-phase samples conserved the initial 76
+cells' volume, reported zero physics bodies/colliders and no capacity-limited
+ticks. Event state was released at idle, with no app errors or service restarts.
+The draining sample reported 59 FPS / 60 UPS at 1024×768, raster scale 2; host
+step, scene and callback p95 were 0.086, 0.187 and 6.709 ms. This is a single-cycle
+smoke check, not a sustained benchmark or user playtest approval. Normal Clock
+was left running unpaused. Logs and captures are retained locally under
+`/tmp/spacewars-sw-picade-2-impact-*` and `/tmp/sw-picade-2-impact*.png`.
+
 ## Later slices
 
-Next is displacement in spilling basins, with changing-volume conservation and
-stability tests, followed by Clock's actual melting/spilling/drainage/recovery
-polish. Uneven beds need an explicit reference-capacity treatment. Solid-to-liquid
-conversion should transfer material once, without counting both occupancy and
-liquid. Use the prescribed, dynamic and one-way controls for comparisons.
+The user playtested normal Meltdown on `sw-picade-2` after the floor-impact update
+and accepted its current behavior. This slice is ready for integration; the
+single-cycle telemetry above is not a long-running mixed-event soak. A pressure
+solver is not a prerequisite. Uneven-bed displacement still needs an explicit
+reference-capacity treatment. General solid-to-liquid conversion should transfer material once,
+without counting both occupancy and liquid; the Clock's sources do not claim
+that general binding. Use the prescribed, dynamic and one-way controls for comparisons.
 More aggressive impact or very light-body workloads need separate accuracy/
 stability limits before generalizing this binding. It does not support arbitrary
-rigid bodies, sealed moving obstructions, momentum-conserving coupling or splashes.
+rigid bodies, sealed moving obstructions, momentum-conserving coupling or
+automatically generated physical impact splashes.
 
 Arbitrary enclosed cavities, inverted vessels, planetary gravity, and free
 floating liquid require a richer representation. Keep body coupling separate

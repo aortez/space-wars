@@ -41,8 +41,8 @@ pub struct WaterConfig {
     /// velocity magnitude is also checked against this limit.
     pub max_speed: f64,
     pub max_parcels: usize,
-    /// Optional vertical channel for falling parcels only, [left, right].
-    /// Wall impacts remove horizontal motion, without deleting volume.
+    /// Optional vertical channel for automatically emitted spills, [left, right].
+    /// Explicit sources carry their own horizontal bounds.
     pub spill_channel: Option<[f64; 2]>,
 }
 
@@ -221,6 +221,13 @@ impl Pool {
         }
         emitted[0].volume = -self.flux[0];
         emitted[1].volume = self.flux[n];
+        // An open basin's reference occupancy depends on REMAINING liquid.
+        // Refresh after every emitting substep, including the final one, so
+        // neither the next flux calculation nor callers see stale pressure
+        // heads. Closed pools need no extra solve; body-free pools skip it.
+        if emitted.iter().any(|e| e.volume > 0.0) {
+            self.refresh_displacement();
+        }
         emitted
     }
 }
@@ -240,6 +247,9 @@ pub struct Parcel {
     /// Time slice carried by this parcel; rendering can use speed * duration
     /// for ribbon length, then volume / length for its cross-section.
     pub duration: f64,
+    /// Optional vertical walls, [left, right]. Wall contact removes horizontal
+    /// motion without deleting volume. None permits unrestricted free flight.
+    pub horizontal_bounds: Option<[f64; 2]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -386,8 +396,12 @@ impl WaterWorld {
             || parcel.duration <= 0.0
             || parcel.duration > 1.0
             || parcel.velocity.length() as f64 > self.config.max_speed
-            || self.config.spill_channel.is_some_and(|[left, right]| {
-                (parcel.position.x as f64) < left || parcel.position.x as f64 > right
+            || parcel.horizontal_bounds.is_some_and(|[left, right]| {
+                !finite_coordinate(left)
+                    || !finite_coordinate(right)
+                    || left >= right
+                    || (parcel.position.x as f64) < left
+                    || parcel.position.x as f64 > right
             })
         {
             return Err(WaterError::InvalidInput);
@@ -446,7 +460,7 @@ impl WaterWorld {
                 + Vec2::new(0.0, (-0.5 * self.config.gravity * dt * dt) as f32);
             parcel.velocity.y = (parcel.velocity.y - (self.config.gravity * dt) as f32)
                 .max(-self.config.max_speed as f32);
-            if let Some([left, right]) = self.config.spill_channel {
+            if let Some([left, right]) = parcel.horizontal_bounds {
                 let x = parcel.position.x.clamp(left as f32, right as f32);
                 if x != parcel.position.x {
                     parcel.position.x = x;
@@ -503,6 +517,7 @@ impl WaterWorld {
                         velocity: Vec2::new((emission.speed / emission.volume) as f32, 0.0),
                         volume: emission.volume,
                         duration: dt,
+                        horizontal_bounds: self.config.spill_channel,
                     });
                 }
             }

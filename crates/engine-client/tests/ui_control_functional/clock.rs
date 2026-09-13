@@ -899,7 +899,9 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
             assert_eq!(melting.meltdown.unwrap().initial_cells, 24);
             assert_eq!(
                 (melting.body_count, melting.collider_count),
-                if mode.is_multiple_tank() {
+                if mode.is_spilling_tank() {
+                    (4, 9)
+                } else if mode.is_multiple_tank() {
                     (4, 6)
                 } else if mode.is_tank() {
                     (3, 5)

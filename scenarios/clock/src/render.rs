@@ -11,6 +11,7 @@ use engine_core::Vec2;
 mod digit_slide;
 mod duck;
 mod marquee;
+mod meltdown;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -67,7 +68,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     }
     render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
-        render_meltdown(&mut frame, event, layout);
+        meltdown::render(&mut frame, event, layout);
     }
     if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
         duck::render(&mut frame, event, state.config.duck_debug_overlay);
@@ -121,6 +122,12 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
         digit_slide::render(frame, event, layout, state.palette());
         return;
     }
+    if matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event))
+        if !event.lab && event.phase() == crate::events::EventPhase::Reforming)
+    {
+        meltdown::render_reforming_face(frame, state, layout);
+        return;
+    }
     let palette = state.palette();
     let t = (state.phase_tick() as f32 / REFORMING_TICKS as f32).clamp(0.0, 1.0);
     let progress = t * t * (3.0 - 2.0 * t);
@@ -158,184 +165,6 @@ fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) 
                     );
                 }
             }
-        }
-    }
-}
-
-fn render_meltdown(
-    frame: &mut RenderFrame,
-    event: &crate::events::meltdown::MeltdownEvent,
-    layout: Layout,
-) {
-    let water_color = RenderColor::rgb(0.08, 0.55, 0.85);
-    let edge_color = RenderColor::rgb(0.36, 0.91, 1.0);
-    for cell in &event.cells {
-        render_square(
-            frame,
-            cell.position,
-            layout.pitch,
-            cell.angle,
-            1.0,
-            DigitPalette::default(),
-        );
-    }
-    if let Some(lab) = &event.floats {
-        for (min, max) in &lab.supports {
-            frame.push_primitive(
-                ARENA_LAYER,
-                rectangle(
-                    RenderPoint::new(min.x, min.y),
-                    RenderPoint::new(max.x, max.y),
-                    FLOOR_EDGE_COLOR,
-                    None,
-                ),
-            );
-        }
-    }
-    for column in event.water.pools().iter().flat_map(|pool| pool.columns()) {
-        let height = (column.surface - column.bed) as f32;
-        if height < 0.25 || column.volume <= 0.0 {
-            continue;
-        }
-        let left = column.left as f32;
-        let width = column.width as f32;
-        let top = column.surface as f32;
-        frame.push_primitive(
-            ACTIVE_CELL_LAYER,
-            rectangle(
-                RenderPoint::new(left, column.bed as f32),
-                RenderPoint::new(left + width, top),
-                water_color,
-                None,
-            ),
-        );
-        frame.push_primitive(
-            ACTIVE_CELL_LAYER,
-            rectangle(
-                RenderPoint::new(left, top - height.min(1.8)),
-                RenderPoint::new(left + width, top),
-                edge_color,
-                None,
-            ),
-        );
-    }
-    // The ribbons represent water still in flight. Their area is the transported
-    // volume: accelerating water stretches and thins rather than retaining a
-    // pool-height rectangle down the entire cliff.
-    for parcel in event.water.parcels() {
-        let speed = parcel.velocity.length();
-        let direction = if speed > 0.001 {
-            parcel.velocity / speed
-        } else {
-            Vec2::new(0.0, -1.0)
-        };
-        let length = (speed * parcel.duration as f32).max(0.5);
-        let half_width = (parcel.volume as f32 / length) * 0.5;
-        if half_width < 0.025 {
-            continue;
-        }
-        let along = direction * (length * 0.5);
-        let across = Vec2::new(-direction.y, direction.x) * half_width;
-        let points = [
-            parcel.position - along - across,
-            parcel.position + along - across,
-            parcel.position + along + across,
-            parcel.position - along + across,
-        ]
-        .into_iter()
-        .map(|p| {
-            // Point parcels stop at the channel wall; trim the ribbon's
-            // finite width too so it does not paint through the bank.
-            let x = if !event.lab && p.y < layout.floor_y {
-                p.x.clamp(-layout.drain_half_width(), layout.drain_half_width())
-            } else {
-                p.x
-            };
-            RenderPoint::new(x, p.y)
-        })
-        .collect();
-        frame.push_primitive(
-            ACTIVE_CELL_LAYER,
-            RenderPrimitive::Polygon(RenderPolygon {
-                points,
-                fill: Some(Fill::new(water_color)),
-                stroke: None,
-            }),
-        );
-    }
-    if let Some(lab) = &event.floats {
-        if let Some(y) = lab.reference_y {
-            let spec = event.water.pools()[0].spec();
-            let width = spec.column_width * spec.bed.len() as f64;
-            for i in 0..24 {
-                let x = (spec.left + width * i as f64 / 24.0) as f32;
-                frame.push_primitive(
-                    ACTIVE_CELL_LAYER,
-                    rectangle(
-                        RenderPoint::new(x, y - 0.35),
-                        RenderPoint::new(x + width as f32 / 48.0, y + 0.35),
-                        RenderColor::rgb(0.58, 0.65, 0.8),
-                        None,
-                    ),
-                );
-            }
-        }
-        let bodies = lab
-            .bodies
-            .iter()
-            .map(|b| (b.body.body(), b.body.shape(), b.palette))
-            .chain(lab.piston.iter().map(|p| {
-                (
-                    p.body,
-                    engine_water::immersion::HullShape::Box {
-                        half_width: p.half_extents.x,
-                        half_height: p.half_extents.y,
-                    },
-                    0,
-                )
-            }));
-        for (body, shape, index) in bodies {
-            let motion = lab.world.motion(body).expect("live water-lab body");
-            let color = match index {
-                0 => RenderColor::rgb(1.0, 0.62, 0.18),
-                1 => RenderColor::rgb(1.0, 0.91, 0.28),
-                _ => RenderColor::rgb(0.85, 0.32, 0.4),
-            };
-            let (sides, radius, half_width, half_height) = match shape {
-                engine_water::immersion::HullShape::Circle { radius } => (32, radius, 0.0, 0.0),
-                engine_water::immersion::HullShape::Box {
-                    half_width,
-                    half_height,
-                } => (4, 0.0, half_width, half_height),
-            };
-            let (sin, cos) = motion.angle.sin_cos();
-            let points = (0..sides)
-                .map(|i| {
-                    let p = if sides == 4 {
-                        [
-                            Vec2::new(-half_width, -half_height),
-                            Vec2::new(half_width, -half_height),
-                            Vec2::new(half_width, half_height),
-                            Vec2::new(-half_width, half_height),
-                        ][i]
-                    } else {
-                        let a = std::f32::consts::TAU * i as f32 / sides as f32;
-                        Vec2::new(a.cos() * radius, a.sin() * radius)
-                    };
-                    RenderPoint::new(
-                        motion.position.x + p.x * cos - p.y * sin,
-                        motion.position.y + p.x * sin + p.y * cos,
-                    )
-                })
-                .collect();
-            frame.push_primitive(
-                ACTIVE_CELL_LAYER,
-                RenderPrimitive::Polygon(RenderPolygon {
-                    points,
-                    fill: Some(Fill::new(color)),
-                    stroke: Some(Stroke::new(RenderColor::rgb(1.0, 0.95, 0.8), 0.6)),
-                }),
-            );
         }
     }
 }

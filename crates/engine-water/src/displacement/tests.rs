@@ -1,5 +1,5 @@
 use super::*;
-use crate::{PoolSpec, WaterConfig};
+use crate::{Boundary, PoolSpec, WaterConfig};
 
 const DT: f64 = 1.0 / 60.0;
 
@@ -189,15 +189,15 @@ fn invalid_geometry_is_atomic_and_empty_or_reclaimed_water_has_no_ghost_height()
     for spec in [
         PoolSpec {
             left: -50.0,
-            column_width: 10.0,
-            bed: vec![0.0; 10],
-            boundaries: [Boundary::Spill { lip: 0.0 }; 2],
+            column_width: 50.0,
+            bed: vec![0.0, 1.0],
+            boundaries: [Boundary::Closed; 2],
         },
         PoolSpec {
             left: -50.0,
             column_width: 50.0,
             bed: vec![0.0, 1.0],
-            boundaries: [Boundary::Closed; 2],
+            boundaries: [Boundary::Spill { lip: 1.0 }; 2],
         },
     ] {
         let mut invalid = WaterWorld::new(WaterConfig::default(), vec![spec]).unwrap();

@@ -41,15 +41,18 @@ pub(crate) struct WaterLab {
     dynamic_displacer: Option<usize>,
     /// The mixed fixture submits ALL bodies together, never last-body-wins.
     multiple_displacers: bool,
+    /// Spilling fixtures submit the same poses to both vertically separated basins.
+    displacement_pools: usize,
 }
 
 impl WaterLab {
     pub fn new(water: &WaterWorld, layout: Layout, mode: ClockWaterLab) -> Self {
         let displacement = mode.is_tank();
+        let spilling = mode.is_spilling_tank();
         let initial_level = water.pools()[0].columns().next().unwrap().surface as f32;
         let initial_depth = initial_level - water.pools()[0].spec().bed[0] as f32;
         let mut supports = Vec::with_capacity(7);
-        for pool in water.pools() {
+        for (pool_index, pool) in water.pools().iter().enumerate() {
             let spec = pool.spec();
             let mut first = 0;
             for end in 1..=spec.bed.len() {
@@ -68,26 +71,31 @@ impl WaterLab {
                 }
             }
             for edge in 0..2 {
-                if spec.boundaries[edge] == Boundary::Closed {
-                    let (x, bed) = if edge == 0 {
-                        (spec.left, spec.bed[0])
-                    } else {
-                        (
-                            spec.left + spec.bed.len() as f64 * spec.column_width,
-                            *spec.bed.last().unwrap(),
-                        )
-                    };
+                let (x, bed) = if edge == 0 {
+                    (spec.left, spec.bed[0])
+                } else {
+                    (
+                        spec.left + spec.bed.len() as f64 * spec.column_width,
+                        *spec.bed.last().unwrap(),
+                    )
+                };
+                let top = match spec.boundaries[edge] {
+                    Boundary::Closed => {
+                        bed as f32
+                            + if spilling && pool_index == 1 {
+                                initial_depth * 1.1
+                            } else if displacement {
+                                initial_depth * 2.4
+                            } else {
+                                layout.pitch * 2.0
+                            }
+                    }
+                    Boundary::Spill { lip } => lip as f32,
+                };
+                if top > bed as f32 {
                     supports.push((
                         Vec2::new(x as f32 - 2.0, bed as f32 - 4.0),
-                        Vec2::new(
-                            x as f32 + 2.0,
-                            bed as f32
-                                + if displacement {
-                                    initial_depth * 2.4
-                                } else {
-                                    layout.pitch * 2.0
-                                },
-                        ),
+                        Vec2::new(x as f32 + 2.0, top),
                     ));
                 }
             }
@@ -130,7 +138,7 @@ impl WaterLab {
                 body: BodyId::new(PhysicsId::new(10), BodyRole::PRIMARY),
                 half_extents,
                 x: -width * 0.20,
-                raised_y: spec.bed[0] as f32 + initial_depth * 1.85,
+                raised_y: spec.bed[0] as f32 + initial_depth * if spilling { 1.75 } else { 1.85 },
                 lowered_y: spec.bed[0] as f32 + initial_depth * 0.45,
             };
             if !mode.is_dynamic_tank() {
@@ -213,8 +221,9 @@ impl WaterLab {
                         PhysicsId::new(11),
                         BodySpec {
                             position: Vec2::new(
-                                -width * 0.12,
-                                spec.bed[0] as f32 + initial_depth * 3.0,
+                                width * if spilling { 0.25 } else { -0.12 },
+                                spec.bed[0] as f32
+                                    + initial_depth * if spilling { 2.0 } else { 3.0 },
                             ),
                             linear_velocity: Vec2::new(width * 0.02, 0.0),
                             angle: -0.45,
@@ -244,6 +253,7 @@ impl WaterLab {
                 dynamic_displacer: (mode.is_dynamic_tank() && !mode.is_multiple_tank())
                     .then_some(1),
                 multiple_displacers: mode.is_multiple_tank(),
+                displacement_pools: if spilling { 2 } else { 1 },
             };
         }
         let pitch = layout.pitch.max(12.0);
@@ -320,6 +330,7 @@ impl WaterLab {
             displacement_enabled: false,
             dynamic_displacer: None,
             multiple_displacers: false,
+            displacement_pools: 0,
         }
     }
 
@@ -371,9 +382,11 @@ impl WaterLab {
                     .displacement(&self.world)
                     .expect("live mixed water-lab body");
             }
-            water
-                .set_displacers(0, &inputs[..count])
-                .expect("bounded mixed bodies in a closed tank");
+            for pool in 0..self.displacement_pools {
+                water
+                    .set_displacers(pool, &inputs[..count])
+                    .expect("bounded mixed bodies in flat basins");
+            }
         }
         if let Some(index) = self.dynamic_displacer {
             if self.displacement_enabled {

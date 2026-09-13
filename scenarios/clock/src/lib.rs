@@ -199,6 +199,8 @@ pub enum ClockWaterLab {
     RotatingControl,
     Multiple,
     MultipleControl,
+    Spilling,
+    SpillingControl,
 }
 
 impl ClockWaterLab {
@@ -214,6 +216,8 @@ impl ClockWaterLab {
             Some("rotating-control") => Self::RotatingControl,
             Some("multiple") => Self::Multiple,
             Some("multiple-control") => Self::MultipleControl,
+            Some("spilling") => Self::Spilling,
+            Some("spilling-control") => Self::SpillingControl,
             _ => Self::Off,
         }
     }
@@ -230,6 +234,8 @@ impl ClockWaterLab {
             Self::RotatingControl => "rotating-control",
             Self::Multiple => "multiple",
             Self::MultipleControl => "multiple-control",
+            Self::Spilling => "spilling",
+            Self::SpillingControl => "spilling-control",
         }
     }
     pub const fn is_tank(self) -> bool {
@@ -244,12 +250,20 @@ impl ClockWaterLab {
         matches!(self, Self::Rotating | Self::RotatingControl)
     }
     pub const fn is_multiple_tank(self) -> bool {
-        matches!(self, Self::Multiple | Self::MultipleControl)
+        matches!(self, Self::Multiple | Self::MultipleControl) || self.is_spilling_tank()
+    }
+    pub const fn is_spilling_tank(self) -> bool {
+        matches!(self, Self::Spilling | Self::SpillingControl)
     }
     pub const fn has_displacement(self) -> bool {
         matches!(
             self,
-            Self::Displacement | Self::Floating | Self::Sinking | Self::Rotating | Self::Multiple
+            Self::Displacement
+                | Self::Floating
+                | Self::Sinking
+                | Self::Rotating
+                | Self::Multiple
+                | Self::Spilling
         )
     }
 }
@@ -636,6 +650,8 @@ mod tests {
             ("rotating-control", ClockWaterLab::RotatingControl),
             ("multiple", ClockWaterLab::Multiple),
             ("multiple-control", ClockWaterLab::MultipleControl),
+            ("spilling", ClockWaterLab::Spilling),
+            ("spilling-control", ClockWaterLab::SpillingControl),
         ] {
             assert_eq!(ClockWaterLab::from_override(Some(value)), expected);
         }

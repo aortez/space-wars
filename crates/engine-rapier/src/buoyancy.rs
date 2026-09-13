@@ -106,7 +106,7 @@ impl BuoyantBody {
 
     /// Submit this body's authoritative pose as the pool's sole displacer.
     /// Dynamic boxes/circles, including rotating boxes, are supported. The water
-    /// model validates the closed/flat basin and footprint. Failure is atomic.
+    /// model validates the flat basin and footprint. Failure is atomic.
     ///
     /// Submit before water stepping/force sampling and after physics stepping
     /// so rendering sees the final pose. The caller owns the pool's occupancy
