@@ -262,11 +262,25 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             println!("Settings warning: {error}");
         }
         if let Some(material) = state.meltdown {
+            // Older hosts omit these fields and only have uniform full-size cells.
+            let (initial, solid) = if material.initial_microunits == 0 {
+                (
+                    (material.initial_cells as u64).saturating_mul(1_000_000),
+                    (material
+                        .waiting_cells
+                        .saturating_add(material.airborne_cells) as u64)
+                        .saturating_mul(1_000_000),
+                )
+            } else {
+                (material.initial_microunits, material.solid_microunits)
+            };
             println!(
-                "Meltdown: {} waiting, {} airborne, {} wet columns; water {:.3}, spilling {:.3} ({} parcels), drained {:.3}, reclaimed {:.3} cell-volumes; capacity-limited ticks={}; displaced body space={:.3} (not water)",
+                "Meltdown: {} waiting, {} airborne, {} wet columns; initial {:.3}, solid {:.3}, water {:.3}, spilling {:.3} ({} parcels), drained {:.3}, reclaimed {:.3} cell-volumes; capacity-limited ticks={}; displaced body space={:.3} (not water)",
                 material.waiting_cells,
                 material.airborne_cells,
                 material.water_columns,
+                initial as f64 / 1_000_000.0,
+                solid as f64 / 1_000_000.0,
                 material.pooled_microunits as f64 / 1_000_000.0,
                 material.spilling_microunits as f64 / 1_000_000.0,
                 material.spill_parcels,

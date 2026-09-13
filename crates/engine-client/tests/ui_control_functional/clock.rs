@@ -964,8 +964,8 @@ fn meltdown_pools_drains_previews_and_cleans_up_through_the_real_client() {
                 + material.spilling_microunits
                 + material.drained_microunits
                 + material.reclaimed_microunits)
-                .abs_diff(material.initial_cells as u64 * 1_000_000)
-                <= 2
+                .abs_diff(material.initial_microunits)
+                <= 3
         );
         assert!(material.spill_parcels <= scenario_clock::MAX_SPILL_PARCELS);
         harness.capture_screenshot("clock-melt-reforming.png");

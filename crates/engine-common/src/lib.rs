@@ -489,11 +489,18 @@ impl ClockEvents {
     }
 }
 
-/// Bounded Clock-local material, not Rapier bodies. One original square is
-/// 1,000,000 volume units. Rounding the four water aggregates can differ by two units.
+/// Bounded Clock-local material, not Rapier bodies. One full-size digit square is
+/// 1,000,000 volume units; AM/PM pixels contribute their smaller area. The sum of
+/// rounded solid/water aggregates can differ from the initial volume by three units.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockMeltdownState {
     pub initial_cells: usize,
+    /// Initial material volume; cell counts alone cannot describe mixed sizes.
+    #[serde(default)]
+    pub initial_microunits: u64,
+    /// Material still in waiting or airborne solid cells.
+    #[serde(default)]
+    pub solid_microunits: u64,
     pub waiting_cells: usize,
     pub airborne_cells: usize,
     pub water_columns: usize,

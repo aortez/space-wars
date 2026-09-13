@@ -347,6 +347,13 @@ impl DuckEvent {
         }
     }
 
+    pub fn entrance_visible(&self) -> bool {
+        // Finish closing behind the spawned duck, then keep this door hidden
+        // for the rest of the visit, including return trips to the entrance wall.
+        self.phase == EventPhase::Opening
+            || (self.phase == EventPhase::Running && self.door_openness().0 > 0.0)
+    }
+
     pub fn exit_visible(&self) -> bool {
         self.tick >= OPENING_TICKS + EXIT_DELAY_TICKS
     }

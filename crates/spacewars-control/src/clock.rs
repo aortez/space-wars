@@ -495,6 +495,8 @@ mod tests {
         state.phase = Some("draining".into());
         state.meltdown = Some(engine_common::ClockMeltdownState {
             initial_cells: 70,
+            initial_microunits: 70_000_000,
+            solid_microunits: 0,
             water_columns: 60,
             pooled_microunits: 30_000_000,
             spilling_microunits: 5_000_000,
@@ -516,6 +518,8 @@ mod tests {
         let mut legacy = serde_json::to_value(&state).unwrap();
         let material = legacy["meltdown"].as_object_mut().unwrap();
         for field in [
+            "initial_microunits",
+            "solid_microunits",
             "spilling_microunits",
             "displaced_microunits",
             "spill_parcels",
@@ -525,6 +529,8 @@ mod tests {
         }
         let restored: ClockState = serde_json::from_value(legacy).unwrap();
         let material = restored.meltdown.unwrap();
+        assert_eq!(material.initial_microunits, 0);
+        assert_eq!(material.solid_microunits, 0);
         assert_eq!(material.spilling_microunits, 0);
         assert_eq!(material.displaced_microunits, 0);
         assert_eq!(material.spill_parcels, 0);

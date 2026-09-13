@@ -109,7 +109,7 @@ fn clip_channel<const N: usize>(points: [Vec2; N], bounds: Option<[f64; 2]>) -> 
         .collect()
 }
 
-fn reform_progress(phase_tick: u64, row: i8) -> f32 {
+pub(super) fn reform_progress(phase_tick: u64, row: i8) -> f32 {
     let delay = row.max(0) as u64 * 4;
     soften(phase_tick.saturating_sub(delay) as f32 / (REFORMING_TICKS - 1 - 32) as f32)
 }
@@ -223,6 +223,16 @@ pub(super) fn render(frame: &mut RenderFrame, event: &MeltdownEvent, layout: Lay
     }
     // Keep solid blocks legible as they pass through the pool to the floor.
     for cell in &event.cells {
+        if cell.meridiem {
+            super::meridiem::pixel(
+                frame,
+                cell.position,
+                layout.pitch * crate::meridiem::PIXEL_SIZE,
+                cell.angle,
+                1.0,
+            );
+            continue;
+        }
         render_square(
             frame,
             cell.position,

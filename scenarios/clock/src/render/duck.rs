@@ -126,8 +126,11 @@ pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
         }
     }
     let (entrance, exit) = event.door_openness();
-    for (x, open) in [(radius * 2.0, entrance), (event.width - radius * 2.0, exit)] {
-        if x > event.width * 0.5 && !event.exit_visible() {
+    for (x, open, visible) in [
+        (radius * 2.0, entrance, event.entrance_visible()),
+        (event.width - radius * 2.0, exit, event.exit_visible()),
+    ] {
+        if !visible {
             continue;
         }
         let bottom = layout.floor_y;
@@ -261,4 +264,96 @@ fn rect(
             None,
         ),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::events::{EventPhase, duck::DUCK_TICKS};
+
+    fn door_counts(event: &DuckEvent) -> [usize; 2] {
+        let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
+        render(&mut frame, event, false);
+        let mut counts = [0; 2];
+        for layer in &frame.layers {
+            if layer.z != ARENA_LAYER && layer.z != LABEL_LAYER {
+                continue;
+            }
+            for primitive in &layer.primitives {
+                let RenderPrimitive::Polygon(polygon) = primitive else {
+                    continue;
+                };
+                if !polygon.points.iter().any(|p| p.y > event.layout.floor_y) {
+                    continue;
+                }
+                for (side, count) in counts.iter_mut().enumerate() {
+                    if polygon.points.iter().all(|p| {
+                        let x = p.x * event.direction + event.width * 0.5;
+                        if side == 0 {
+                            x < event.radius * 4.0
+                        } else {
+                            x > event.width - event.radius * 4.0
+                        }
+                    }) {
+                        *count += 1;
+                    }
+                }
+            }
+        }
+        counts
+    }
+
+    #[test]
+    fn entrance_door_disappears_after_closing_and_stays_gone() {
+        for aspect in [1024.0 / 768.0, 800.0 / 480.0] {
+            for direction in [-1.0, 1.0] {
+                let mut event = DuckEvent::new_platforms(Layout::new(aspect), 42);
+                event.direction = direction;
+                event.step();
+                assert_eq!(door_counts(&event), [3, 0], "entrance opens alone");
+                while event.phase == EventPhase::Opening {
+                    assert!(!event.step(), "opening must finish within the event");
+                }
+                assert_eq!(door_counts(&event), [2, 0], "entrance is fully open");
+                while event.door_openness().0 == 1.0 {
+                    assert!(
+                        !event.step(),
+                        "entrance must begin closing within the event"
+                    );
+                }
+                assert_eq!(door_counts(&event), [3, 0], "keep the closing panel");
+                while event.door_openness().0 > 0.0 {
+                    assert!(
+                        !event.step(),
+                        "entrance must finish closing within the event"
+                    );
+                }
+                assert!(event.position().is_some(), "remove the door, not the duck");
+                assert_eq!(door_counts(&event), [0, 0], "closed entrance disappears");
+
+                let mut saw_exit = false;
+                while event.tick < DUCK_TICKS {
+                    let exit_count = if event.exit_visible() && event.course_opacity() > 0.0 {
+                        saw_exit = true;
+                        if event.door_openness().1 < 1.0 { 3 } else { 2 }
+                    } else {
+                        0
+                    };
+                    assert_eq!(
+                        door_counts(&event),
+                        [0, exit_count],
+                        "aspect={aspect} direction={direction} tick={}",
+                        event.tick
+                    );
+                    event.step();
+                }
+                assert!(saw_exit, "the later exit door must still appear");
+                assert_eq!(
+                    event.diagnostics().outcome,
+                    Some(engine_common::ClockDuckOutcome::Exited)
+                );
+                assert_eq!(door_counts(&event), [0, 0]);
+            }
+        }
+    }
 }
