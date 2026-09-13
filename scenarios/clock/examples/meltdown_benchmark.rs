@@ -91,12 +91,12 @@ fn main() {
                         .sum::<usize>(),
                 );
                 if let Some(m) = state.meltdown_state() {
-                    let accounted = ((m.waiting_cells + m.airborne_cells) as u64) * 1_000_000
+                    let accounted = m.solid_microunits
                         + m.pooled_microunits
                         + m.spilling_microunits
                         + m.drained_microunits
                         + m.reclaimed_microunits;
-                    assert!(accounted.abs_diff(m.initial_cells as u64 * 1_000_000) <= 2);
+                    assert!(accounted.abs_diff(m.initial_microunits) <= 3);
                     peak_cells = peak_cells.max(m.waiting_cells + m.airborne_cells);
                     peak_columns = peak_columns.max(m.water_columns);
                     peak_spills = peak_spills.max(m.spill_parcels);

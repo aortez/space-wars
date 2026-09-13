@@ -3,6 +3,7 @@ use super::*;
 fn cell(position: Vec2) -> MeltCell {
     MeltCell {
         position,
+        meridiem: false,
         velocity: Vec2::ZERO,
         angle: 0.0,
         spin: 0.0,
@@ -13,36 +14,84 @@ fn cell(position: Vec2) -> MeltCell {
 #[test]
 fn falling_blocks_keep_square_edges_area_and_matching_collision_extents() {
     for pitch in [2.0, 8.0, 32.0] {
-        let area = (pitch * 0.8_f32).powi(2) as f64;
-        for angle in [0.0, 0.4, 1.7] {
-            for speed in [0.0, 100.0, 1000.0] {
-                let cell = MeltCell {
-                    angle,
-                    velocity: Vec2::new(0.0, -speed),
-                    ..cell(Vec2::ZERO)
-                };
-                let outline = cell.outline(pitch);
-                let actual = outline
-                    .iter()
-                    .zip(outline.iter().cycle().skip(1))
-                    .map(|(a, b)| a.x as f64 * b.y as f64 - a.y as f64 * b.x as f64)
-                    .sum::<f64>()
-                    .abs()
-                    * 0.5;
-                assert!(
-                    (actual - area).abs() < area * 1e-6,
-                    "{pitch} {angle} {speed}: {actual} vs {area}"
-                );
-                for (a, b) in outline.iter().zip(outline.iter().cycle().skip(1)) {
-                    assert!(((*b - *a).length() - pitch * 0.8).abs() < pitch * 1e-6);
-                }
-                let extent = cell.extent(pitch);
-                assert!(
-                    outline
+        for (meridiem, side_scale) in [(false, 0.8), (true, crate::meridiem::PIXEL_SIZE)] {
+            let area = (pitch * side_scale).powi(2) as f64;
+            for angle in [0.0, 0.4, 1.7] {
+                for speed in [0.0, 100.0, 1000.0] {
+                    let cell = MeltCell {
+                        meridiem,
+                        angle,
+                        velocity: Vec2::new(0.0, -speed),
+                        ..cell(Vec2::ZERO)
+                    };
+                    let outline = cell.outline(pitch);
+                    let actual = outline
                         .iter()
-                        .all(|p| p.x.abs() <= extent.x && p.y.abs() <= extent.y)
-                );
+                        .zip(outline.iter().cycle().skip(1))
+                        .map(|(a, b)| a.x as f64 * b.y as f64 - a.y as f64 * b.x as f64)
+                        .sum::<f64>()
+                        .abs()
+                        * 0.5;
+                    assert!(
+                        (actual - area).abs() < area * 1e-6,
+                        "{pitch} {angle} {speed}: {actual} vs {area}"
+                    );
+                    for (a, b) in outline.iter().zip(outline.iter().cycle().skip(1)) {
+                        assert!(((*b - *a).length() - pitch * side_scale).abs() < pitch * 1e-6);
+                    }
+                    assert!(
+                        (actual / (pitch as f64 * 0.8).powi(2) - cell.area_scale()).abs() < 1e-6
+                    );
+                    let extent = cell.extent(pitch);
+                    assert!(
+                        outline
+                            .iter()
+                            .all(|p| p.x.abs() <= extent.x && p.y.abs() <= extent.y)
+                    );
+                }
             }
+        }
+    }
+}
+
+#[test]
+fn meridiem_floor_impacts_and_unmelted_cleanup_credit_only_the_small_pixel_area() {
+    let aspect = 800.0 / 480.0;
+    let layout = Layout::new(aspect);
+    let half = layout.pitch * crate::meridiem::PIXEL_SIZE * 0.5;
+    for x in [-100.0, 0.0, 100.0] {
+        for reclaim_solid in [false, true] {
+            let mut state = ready(aspect, 42);
+            let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
+                panic!()
+            };
+            let pixel = MeltCell {
+                meridiem: true,
+                position: Vec2::new(x, layout.floor_y + half + 0.25),
+                velocity: Vec2::new(0.0, -1.0),
+                release_tick: 0,
+                ..cell(Vec2::ZERO)
+            };
+            event.initial_cells = 1;
+            event.initial_area = event.cell_area * pixel.area_scale();
+            event.cells = vec![pixel];
+            if reclaim_solid {
+                event.tick = MELTING_TICKS + DRAINING_TICKS - 1;
+                tick(&mut state);
+                let m = state.meltdown_state().unwrap();
+                assert_eq!((m.solid_microunits, m.reclaimed_microunits), (0, 32_400));
+            } else {
+                event.tick = 100;
+                event.step_material(layout);
+                assert_eq!(event.cells.len(), 1, "no water before floor contact");
+                assert_eq!(event.water.stats().injected, 0.0);
+                event.step_material(layout);
+                assert!(event.cells.is_empty());
+                assert!((event.water.stats().injected - event.initial_area).abs() < 1e-8);
+                assert_eq!(event.diagnostics().solid_microunits, 0);
+            }
+            assert_eq!(state.meltdown_state().unwrap().initial_microunits, 32_400);
+            assert_volume(&state);
         }
     }
 }
@@ -65,6 +114,7 @@ fn footprint_conversion_partitions_one_cell_across_columns_banks_and_gap() {
         };
         event.cells.clear();
         event.initial_cells = 1;
+        event.initial_area = event.cell_area;
         let mut drop = cell(Vec2::new(x, layout.floor_y));
         assert!(material::merge(
             &mut drop,
@@ -188,6 +238,7 @@ fn floor_and_drain_impacts_splash_once_and_conserve_the_entire_source() {
             ..cell(Vec2::ZERO)
         }];
         event.initial_cells = 1;
+        event.initial_area = event.cell_area;
         event.tick = 100;
         event.step_material(layout);
         assert_eq!(event.cells.len(), 1);
@@ -286,6 +337,7 @@ fn a_falling_block_passes_through_existing_water_and_converts_only_at_the_floor(
     };
     event.cells.clear();
     event.initial_cells = 25;
+    event.initial_area = 25.0 * event.cell_area;
     let spec = event.water.pools()[0].spec().clone();
     for i in 0..spec.bed.len() {
         event
@@ -299,6 +351,7 @@ fn a_falling_block_passes_through_existing_water_and_converts_only_at_the_floor(
     }
     let surface = event.water.pools()[0].columns().nth(24).unwrap();
     event.cells.push(MeltCell {
+        meridiem: false,
         position: Vec2::new(
             (surface.left + surface.width * 0.5) as f32,
             surface.surface as f32 + layout.pitch * 0.2,
