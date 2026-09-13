@@ -9,6 +9,11 @@ pub(super) fn run(
     width: u32,
     height: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(not(target_os = "linux"))]
+    if options.presentation_cpu_clocks {
+        return Err("--presentation-cpu-clocks requires Linux".into());
+    }
+    PROBE_CPU_CLOCKS.set(options.presentation_cpu_clocks);
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(ProbePlatform(windows.clone())))?;
     let uis = [crate::MainWindow::new()?, crate::MainWindow::new()?];
@@ -48,7 +53,7 @@ pub(super) fn run(
         vec![Xrgb::default(); (width * height) as usize],
     ];
     println!(
-        "fixture,model,width,height,rows,repeat,frames,publish_ms,draw_ms,dirty_ms,text_ms,checksum"
+        "fixture,model,width,height,rows,repeat,frames,cpu_clocks,publish_ms,draw_ms,dirty_ms,text_ms,font_ms,glyph_run_ms,text_texture_ms,text_fallback_ms,font_calls,glyph_run_calls,glyph_texture_calls,checksum"
     );
     for changing in [false, true] {
         for repeat in 0..options.presentation_repeats {
@@ -56,6 +61,13 @@ pub(super) fn run(
             let mut draw_times = [Duration::ZERO; 2];
             let mut dirty_times = [Duration::ZERO; 2];
             let mut text_times = [Duration::ZERO; 2];
+            let mut font_times = [Duration::ZERO; 2];
+            let mut glyph_times = [Duration::ZERO; 2];
+            let mut texture_times = [Duration::ZERO; 2];
+            let mut fallback_times = [Duration::ZERO; 2];
+            let mut font_calls = [0; 2];
+            let mut glyph_calls = [0; 2];
+            let mut texture_calls = [0; 2];
             for frame in 0..options.presentation_frames + 10 {
                 let mut next = rows.clone();
                 if changing {
@@ -97,6 +109,15 @@ pub(super) fn run(
                             let m = m.borrow();
                             dirty_times[index] += m[DrawDiagnostic::DirtyRegion as usize].elapsed;
                             text_times[index] += m[DrawDiagnostic::Text as usize].elapsed;
+                            font_times[index] += m[DrawDiagnostic::TextFont as usize].elapsed;
+                            glyph_times[index] += m[DrawDiagnostic::TextGlyphRun as usize].elapsed;
+                            texture_times[index] +=
+                                m[DrawDiagnostic::Texture as usize].text_elapsed;
+                            fallback_times[index] +=
+                                m[DrawDiagnostic::TextureFallback as usize].text_elapsed;
+                            font_calls[index] += m[DrawDiagnostic::TextFont as usize].calls;
+                            glyph_calls[index] += m[DrawDiagnostic::TextGlyphRun as usize].calls;
+                            texture_calls[index] += m[DrawDiagnostic::Texture as usize].text_calls;
                         });
                     }
                 }
@@ -113,15 +134,23 @@ pub(super) fn run(
                 let ms =
                     |d: Duration| d.as_secs_f64() * 1000.0 / f64::from(options.presentation_frames);
                 println!(
-                    "{},{},{width},{height},{},{repeat},{},{:.6},{:.6},{:.6},{:.6},{checksum:016x}",
+                    "{},{},{width},{height},{},{repeat},{},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.3},{:.3},{:.3},{checksum:016x}",
                     if changing { "changing" } else { "frozen" },
                     if index == 0 { "replace" } else { "retain" },
                     rows.len(),
                     options.presentation_frames,
+                    options.presentation_cpu_clocks,
                     ms(publish_times[index]),
                     ms(draw_times[index]),
                     ms(dirty_times[index]),
-                    ms(text_times[index])
+                    ms(text_times[index]),
+                    ms(font_times[index]),
+                    ms(glyph_times[index]),
+                    ms(texture_times[index]),
+                    ms(fallback_times[index]),
+                    font_calls[index] as f64 / f64::from(options.presentation_frames),
+                    glyph_calls[index] as f64 / f64::from(options.presentation_frames),
+                    texture_calls[index] as f64 / f64::from(options.presentation_frames),
                 );
             }
         }

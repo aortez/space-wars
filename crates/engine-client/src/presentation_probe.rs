@@ -10,7 +10,7 @@ use i_slint_core::software_renderer::{
 use slint::platform::{Platform, PlatformError, WindowAdapter};
 use slint::{ComponentHandle, Image, PhysicalSize};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     hint::black_box,
     rc::Rc,
     time::{Duration, Instant},
@@ -43,6 +43,9 @@ pub struct Options {
         conflicts_with = "presentation_republish"
     )]
     presentation_text: bool,
+    /// Reproduce the former LinuxKMS per-operation CPU clock reads in the RAM text probe.
+    #[arg(long, requires_all = ["presentation_text", "presentation_detail"])]
+    presentation_cpu_clocks: bool,
     /// Compare frozen material-match rasterization at scales 1 and 2.
     #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_republish"])]
     presentation_raster: bool,
@@ -141,29 +144,49 @@ struct Measurement {
     depth: usize,
     calls: u64,
     elapsed: Duration,
+    text_elapsed: Duration,
+    text_calls: u64,
 }
 thread_local! {
+    static PROBE_CPU_CLOCKS: Cell<bool> = const { Cell::new(false) };
     static MEASUREMENTS: RefCell<[Measurement; DRAW_DIAGNOSTIC_COUNT]> =
         RefCell::new([Measurement::default(); DRAW_DIAGNOSTIC_COUNT]);
 }
 fn observe(operation: DrawDiagnostic, begin: bool) {
     MEASUREMENTS.with(|measurements| {
         let mut measurements = measurements.borrow_mut();
+        let inside_text = measurements[DrawDiagnostic::Text as usize].depth > 0;
         let m = &mut measurements[operation as usize];
         if begin {
             m.calls += 1;
+            m.text_calls += u64::from(inside_text);
             if m.depth == 0 {
                 m.start = Some(Instant::now());
+                probe_cpu_clock();
             }
             m.depth += 1;
         } else {
             assert!(m.depth > 0, "unbalanced diagnostic span");
             m.depth -= 1;
             if m.depth == 0 {
-                m.elapsed += m.start.take().unwrap().elapsed();
+                let elapsed = m.start.take().unwrap().elapsed();
+                probe_cpu_clock();
+                m.elapsed += elapsed;
+                if inside_text {
+                    m.text_elapsed += elapsed;
+                }
             }
         }
     });
+}
+
+fn probe_cpu_clock() {
+    // Match the backend Stamp order: monotonic first, CPU second. The outer
+    // operation includes its children's clock-read cost, as the former backend did.
+    #[cfg(target_os = "linux")]
+    if PROBE_CPU_CLOCKS.get() {
+        black_box(nix::time::clock_gettime(nix::time::ClockId::CLOCK_THREAD_CPUTIME_ID).ok());
+    }
 }
 
 struct Fixture {
@@ -325,6 +348,8 @@ pub fn run(options: &Options, width: u32, height: u32) -> Result<(), Box<dyn std
         "text",
         "path",
         "background",
+        "text_font",
+        "text_glyph_run",
     ] {
         print!(",{name}_calls_per_frame,{name}_wall_ms");
     }

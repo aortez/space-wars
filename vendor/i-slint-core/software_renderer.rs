@@ -1972,6 +1972,8 @@ impl<'a, T: ProcessScene> SceneBuilder<'a, T> {
         paragraph
             .layout_lines::<()>(
                 |glyphs, line_x, line_y, _, sel| {
+                    let _glyph_run = DiagnosticSpan::new(
+                        self.processor.diagnostic_observer(), Diagnostic::TextGlyphRun);
                     let baseline_y = line_y + paragraph.layout.font.ascent();
                     if let (Some(sel), Some(selection)) = (sel, &selection) {
                         let geometry = euclid::rect(
@@ -2337,7 +2339,11 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
         };
         let offset = self.current_state.offset.to_vector().cast() * self.scale_factor;
 
-        let font = fonts::match_font(&font_request, self.scale_factor);
+        let font = {
+            let _font = DiagnosticSpan::new(
+                self.processor.diagnostic_observer(), Diagnostic::TextFont);
+            fonts::match_font(&font_request, self.scale_factor)
+        };
 
         match font {
             fonts::Font::PixelFont(pf) => {
@@ -2406,7 +2412,11 @@ impl<T: ProcessScene> crate::item_rendering::ItemRenderer for SceneBuilder<'_, T
         };
         let offset = self.current_state.offset.to_vector().cast() * self.scale_factor;
 
-        let font = fonts::match_font(&font_request, self.scale_factor);
+        let font = {
+            let _font = DiagnosticSpan::new(
+                self.processor.diagnostic_observer(), Diagnostic::TextFont);
+            fonts::match_font(&font_request, self.scale_factor)
+        };
 
         let text_visual_representation = text_input.visual_representation(None);
         let color = self.alpha_color(text_visual_representation.text_color.color());

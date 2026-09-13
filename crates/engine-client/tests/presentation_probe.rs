@@ -238,3 +238,70 @@ fn terrain_culling_probe_preserves_pixels_and_settings() {
     assert_eq!(rows[0]["variant"], "complete");
     assert_eq!(rows[4]["variant"], "unculled", "pair order must alternate");
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn text_probe_separates_glyph_work_and_cpu_clock_cost_without_changing_pixels() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let mut checksums = BTreeMap::new();
+    for cpu in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_engine-client"));
+        command
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .env("SLINT_BACKEND", "nonexistent-backend")
+            .arg("--config-dir")
+            .arg(directory.path())
+            .args([
+                "--benchmark-presentation",
+                "--presentation-text",
+                "--presentation-detail",
+                "--benchmark-width",
+                "320",
+                "--benchmark-height",
+                "240",
+                "--presentation-frames",
+                "2",
+                "--presentation-repeats",
+                "2",
+            ]);
+        if cpu {
+            command.arg("--presentation-cpu-clocks");
+        }
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let csv = String::from_utf8(output.stdout).unwrap();
+        let mut lines = csv.lines();
+        let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+        let rows: Vec<BTreeMap<_, _>> = lines
+            .map(|line| columns.iter().copied().zip(line.split(',')).collect())
+            .collect();
+        assert_eq!(rows.len(), 8);
+        for row in rows {
+            assert_eq!(row["cpu_clocks"], cpu.to_string());
+            if let Some(old) =
+                checksums.insert(row["fixture"].to_owned(), row["checksum"].to_owned())
+            {
+                assert_eq!(old, row["checksum"]);
+            }
+            let time = |key| row[key].parse::<f64>().unwrap();
+            assert!(time("font_calls") > 0.0 && time("glyph_texture_calls") > 0.0);
+            assert!(time("text_ms") >= time("font_ms") + time("glyph_run_ms") - 0.000002);
+            assert!(time("glyph_run_ms") >= time("text_texture_ms") - 0.000002);
+            for (key, value) in row {
+                if key.ends_with("_ms") {
+                    let value: f64 = value.parse().unwrap();
+                    assert!(value.is_finite() && value >= 0.0);
+                }
+            }
+        }
+    }
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}

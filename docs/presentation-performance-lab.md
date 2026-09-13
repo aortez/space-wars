@@ -75,6 +75,11 @@ repeats to 1–20. Default output size is the shared benchmark default, 1280×72
 
 ## Live draw attribution
 
+Follow-up: [profiler version 6 and the text-drawing investigation](text-drawing-profile.md)
+use monotonic clocks for nested `kms_core_*` spans and add text substages. The
+version-5 CPU timings described below are historical; coarse presentation CPU
+timings remain available.
+
 LinuxKMS profiler version 5 adds `kms_draw_detail` and `kms_core_*` timings and
 call counts to `spacewars-cli status`. Detailed observation follows the existing
 profiler by default; set `SPACEWARS_KMS_DRAW_DETAIL=0` before application startup

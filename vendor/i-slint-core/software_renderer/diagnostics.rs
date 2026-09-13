@@ -29,10 +29,14 @@ pub enum DrawDiagnostic {
     Path,
     /// Window background fill (accelerated or software fallback).
     Background,
+    /// Font matching during a text draw (excludes item-bound measurements).
+    TextFont,
+    /// One laid-out line's glyph lookup, positioning and painting.
+    TextGlyphRun,
 }
 
 /// Number of diagnostic operation kinds.
-pub const DRAW_DIAGNOSTIC_COUNT: usize = 11;
+pub const DRAW_DIAGNOSTIC_COUNT: usize = 13;
 
 /// Receives balanced begin (`true`) and end (`false`) events on the rendering
 /// thread. Observers must not re-enter rendering or panic. No observer is installed

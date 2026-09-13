@@ -73,30 +73,43 @@ the same image and text, while gameplay can still have expensive simulation
 windows. Per-cell culling or persistent terrain meshes remain possible follow-ups
 if measurements justify them; whole chunks already provide a useful saving.
 
+## Implemented: reduce text-profiler overhead
+
+The [text-drawing investigation](text-drawing-profile.md) found that repeated
+thread-CPU clock reads add **1.5–1.8 ms per draw** in paired Pi RAM fixtures.
+Nested renderer hooks now use monotonic time; the larger presentation stages
+retain CPU measurements. The deployed profiler also separates font matching,
+glyph work, text textures and fallback painting.
+
+The latest live capture averages 14.49 ms in KMS/Slint, including 6.41 ms of text.
+Only 0.10 ms is font matching; glyph lookup/placement/painting takes 4.70 ms, of
+which 4.39 ms is texture fallback. The previous live captures include the more
+expensive clock policy and different gameplay phases; do not treat their total
+FPS as a controlled comparison.
+
 ## Remaining work in this optimization pass
 
-The deployed native build averages **38.08 FPS / 59.56 updates/s** over 47.90 s,
-with most rolling samples around 35–45 FPS and two below 30. The earlier native
-capture averaged 27.92 FPS, but match phases differ. The frozen pairs establish
-the rendering savings; the live sample shows the current operating range.
+Two measured problems now deserve separate, bounded investigations:
 
-The next bounded investigation should be **live HUD text/presentation**:
+- **Glyph blending into display memory:** compare the exact same frozen glyph
+  workload in RAM and a private mapped DRM buffer. The live fallback costs
+  roughly five times as much per glyph as the RAM fixture, but glyph sizes and
+  content differ. If destination memory explains it, measure transparent/opaque
+  blend shortcuts or small-region RAM compositing with transfer cost included.
+  Keep fonts, layout and output pixels equivalent.
+- **Control/physics stalls:** the latest 48.15-second match sample averages
+  36.51 FPS / 58.11 updates/s, but one rolling window drops to 9.1 FPS. That window
+  has host-step p95 76.93 ms and max 120.15 ms while drawing stays around 14 ms.
+  Reopen the [sensor/physics attribution](on-foot-survey-fix.md) with the saved
+  capture; the coarse step bucket does not identify the specific function.
 
-- KMS/Slint still averages 16.64 ms, including 7.80 ms of text drawing. Separate
-  glyph drawing, layout and invalidation under the changing HUD. Frozen text is
-  about 2.4 ms, so the frozen probe alone cannot explain the live cost.
-- Scene construction is now 1.06 ms. Host preparation is 5.71 ms, with only
-  0.74 ms outside the disjoint raster timers. Disposal/text extraction may still
-  be improved, but they have a smaller remaining budget than presentation.
-- Keep periodic simulation/ground-map spikes visible in the measurements;
-  they still cause slow windows and are tracked in the
-  [on-foot survey notes](on-foot-survey-fix.md).
-- Native HUD/background/minimap blending and finer terrain culling remain
-  possible later work if their measured cost justifies another change.
+Scene construction is now about 1.16 ms in that live sample. Finer terrain
+culling and native HUD/minimap blending remain candidates when measurements
+justify them, but neither addresses the large simulation stalls.
 
-Keep the measured improvements, reference pixel checks, Pi playtesting and
-reproduction notes together. A remaining architectural performance project
-should not become an unbounded requirement for finishing the terrain work.
+Keep improvements, reference pixel checks, Pi playtesting and reproduction
+notes together. A remaining architectural performance project should not
+become an unbounded requirement for finishing the terrain work.
 
 ## Later: sustained 60 Hz, then higher-refresh support
 
@@ -106,9 +119,9 @@ The Pi's boot configuration explicitly requests
 The game uses a 60 Hz fixed simulation step, and the host's render callback has
 a fixed 16 ms interval. Merely reducing raster scale does not change either.
 
-60 FPS permits 16.67 ms for a complete frame; 120 FPS permits 8.33 ms. Current
-native KMS presentation alone averages 17.40 ms, so neither target follows from
-culling terrain alone. First pursue steady 60 FPS on this cabinet. Higher-refresh
+60 FPS permits 16.67 ms for a complete frame; 120 FPS permits 8.33 ms. The latest
+native KMS presentation alone averages 14.49 ms, leaving little of a 60 Hz budget
+for simulation and scene preparation. First pursue steady 60 FPS on this cabinet. Higher-refresh
 work then includes confirming a suitable display mode, refresh-aware scheduling,
 input latency, and whether to interpolate rendering between existing simulation
 steps. Do not double physics frequency by default: it changes CPU demand and
