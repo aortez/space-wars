@@ -8,7 +8,7 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use super::{EventContext, EventPhase, REFORMING_TICKS};
 use crate::{ClockWaterLab, SegmentRepresentation, digits, layout::Layout};
 
-pub const MAX_MELTDOWN_CELLS: usize = 96;
+pub const MAX_MELTDOWN_CELLS: usize = 96 + crate::meridiem::MAX_CELLS;
 pub const WATER_COLUMNS: usize = 128;
 pub const MAX_SPILL_PARCELS: usize = 128;
 pub const MELTING_TICKS: u64 = 180;
@@ -31,8 +31,9 @@ pub(crate) struct MeltdownEvent {
     pub lab: bool,
     pub floats: Option<water_lab::WaterLab>,
     initial_cells: usize,
+    initial_area: f64,
     cell_area: f64,
-    reclaimed_cells: f64,
+    reclaimed_area: f64,
 }
 
 impl MeltdownEvent {
@@ -47,6 +48,7 @@ impl MeltdownEvent {
                         assert!(cells.len() < MAX_MELTDOWN_CELLS);
                         cells.push(MeltCell {
                             position: context.layout.cell_center(segment.id, *cell),
+                            meridiem: false,
                             velocity: Vec2::new(rng.random_range(-0.25..0.25), 0.0)
                                 * context.layout.pitch,
                             angle: 0.0,
@@ -59,10 +61,32 @@ impl MeltdownEvent {
                 }
                 segment.representation = SegmentRepresentation::Disintegrated;
             }
+            if let Some(label) = context.display.meridiem {
+                for glyph in crate::meridiem::Glyph::for_label(label) {
+                    for cell in glyph.cells() {
+                        assert!(cells.len() < MAX_MELTDOWN_CELLS);
+                        cells.push(MeltCell {
+                            position: glyph.cell_center(context.layout, cell),
+                            meridiem: true,
+                            velocity: Vec2::new(rng.random_range(-0.25..0.25), 0.0)
+                                * context.layout.pitch,
+                            angle: 0.0,
+                            spin: rng.random_range(-0.4..0.4),
+                            release_tick: 24 + cell.y as u64 * 4 + rng.random_range(0..24),
+                        });
+                    }
+                }
+            }
         }
         let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
         let mut water = Self::water_world(context.layout, mode);
         let initial_cells = if lab { LAB_INITIAL_CELLS } else { cells.len() };
+        let initial_area = cell_area
+            * if lab {
+                initial_cells as f64
+            } else {
+                cells.iter().map(MeltCell::area_scale).sum()
+            };
         if lab {
             let spec = water.pools()[0].spec().clone();
             for i in 0..spec.bed.len() {
@@ -79,12 +103,13 @@ impl MeltdownEvent {
         Self {
             tick: 0,
             initial_cells,
+            initial_area,
             cells,
             water,
             lab,
             floats,
             cell_area,
-            reclaimed_cells: 0.0,
+            reclaimed_area: 0.0,
         }
     }
 
@@ -208,7 +233,11 @@ impl MeltdownEvent {
             self.step_material(context.layout);
         } else {
             if self.tick == MELTING_TICKS + DRAINING_TICKS {
-                self.reclaimed_cells = self.cells.len() as f64;
+                self.reclaimed_area = self
+                    .cells
+                    .iter()
+                    .map(|cell| self.cell_area * cell.area_scale())
+                    .sum();
                 self.cells = Vec::new();
                 if !self.lab {
                     for segment in context.segments.iter_mut() {
@@ -271,20 +300,23 @@ impl MeltdownEvent {
                 cell.position.x = x;
                 cell.velocity.x *= -0.35;
             }
-            !material::merge(cell, extent, water, cell_area, layout)
+            !material::merge(cell, extent, water, cell_area * cell.area_scale(), layout)
         });
     }
 
     pub fn diagnostics(&self) -> ClockMeltdownState {
-        let waiting = self
-            .cells
-            .iter()
-            .filter(|cell| self.tick <= cell.release_tick)
-            .count();
+        let (waiting, solid_area) = self.cells.iter().fold((0, 0.0), |(waiting, area), cell| {
+            (
+                waiting + usize::from(self.tick <= cell.release_tick),
+                area + self.cell_area * cell.area_scale(),
+            )
+        });
         let water = self.water.stats();
         let micro = |area: f64| (area / self.cell_area * 1_000_000.0).round() as u64;
         ClockMeltdownState {
             initial_cells: self.initial_cells,
+            initial_microunits: micro(self.initial_area),
+            solid_microunits: micro(solid_area),
             waiting_cells: waiting,
             airborne_cells: self.cells.len() - waiting,
             water_columns: water.wet_columns,
@@ -294,8 +326,7 @@ impl MeltdownEvent {
             spill_parcels: water.parcels,
             capacity_limited_ticks: water.capacity_limited_ticks,
             drained_microunits: micro(water.drained),
-            reclaimed_microunits: micro(water.reclaimed)
-                + (self.reclaimed_cells * 1_000_000.0).round() as u64,
+            reclaimed_microunits: micro(water.reclaimed + self.reclaimed_area),
         }
     }
 }

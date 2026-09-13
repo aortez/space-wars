@@ -19,6 +19,10 @@ that become water and splash at floor contact, following the dirtsim reference.
 `engine-water` owns fixed-down, 2D unit-depth water. Volumes therefore have units
 of world area; the Clock converts one melted square into its actual area.
 It knows nothing about digits, event deadlines, rendering, or Rapier.
+Clock's AM/PM pixels use this same path at their actual smaller area: 0.0324
+full-size digit-cell volumes each. Clock reports both raw cell counts and
+area-weighted initial/remaining-solid volume, so mixed-size material and
+unmelted cleanup remain conserved without changing the engine-water model.
 
 Each pool has regularly spaced columns with explicit bed elevations, water
 amounts, and horizontal face velocities. Surface-level differences accelerate

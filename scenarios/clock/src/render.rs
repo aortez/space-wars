@@ -4,7 +4,7 @@ use engine_common::{
 
 use crate::{
     ClockState, DigitPalette, REFORMING_TICKS, SegmentRepresentation, digits,
-    layout::{CAMERA_HEIGHT, FACE_WIDTH_UNITS, Layout},
+    layout::{CAMERA_HEIGHT, Layout},
 };
 use engine_core::Vec2;
 
@@ -12,6 +12,7 @@ mod digit_slide;
 mod duck;
 mod marquee;
 mod meltdown;
+mod meridiem;
 
 const BACKGROUND_LAYER: i32 = 0;
 const ARENA_LAYER: i32 = 1;
@@ -185,41 +186,7 @@ fn render_colon(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
 }
 
 fn render_meridiem(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
-    let Some(meridiem) = state.display().meridiem else {
-        return;
-    };
-    // Use pixel glyphs so the label is identical in the vector and raster
-    // backends (the raster backend intentionally does not draw RenderText).
-    let first = if meridiem == "AM" {
-        ["010", "101", "111", "101", "101"]
-    } else {
-        ["110", "101", "110", "100", "100"]
-    };
-    let m = ["10001", "11011", "10101", "10001", "10001"];
-    let size = layout.pitch * 0.16;
-    let left = layout.face_origin.x + FACE_WIDTH_UNITS * layout.pitch - size * 9.0;
-    let top = layout.face_origin.y - layout.pitch * 0.35;
-    for (offset, glyph) in [(0.0, first), (4.0, m)] {
-        for (row, pixels) in glyph.iter().enumerate() {
-            for (column, pixel) in pixels.bytes().enumerate() {
-                if pixel == b'1' {
-                    let min = RenderPoint::new(
-                        left + (offset + column as f32) * size,
-                        top - (row + 1) as f32 * size,
-                    );
-                    frame.push_primitive(
-                        LABEL_LAYER,
-                        rectangle(
-                            min,
-                            RenderPoint::new(min.x + size * 0.9, min.y + size * 0.9),
-                            LABEL_COLOR,
-                            None,
-                        ),
-                    );
-                }
-            }
-        }
-    }
+    meridiem::render(frame, state, layout);
 }
 
 fn render_cell(

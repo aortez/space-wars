@@ -9,6 +9,7 @@ mod events;
 mod layout;
 #[cfg(test)]
 mod live_tests;
+mod meridiem;
 mod physics;
 mod presentation;
 mod render;

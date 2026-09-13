@@ -607,13 +607,13 @@ fn buoyancy_lab_replays_without_changing_water_and_replacement_drops_bodies() {
 
 fn assert_volume(state: &ClockState) {
     let stats = state.meltdown_state().unwrap();
-    let accounted = ((stats.waiting_cells + stats.airborne_cells) as u64) * 1_000_000
+    let accounted = stats.solid_microunits
         + stats.pooled_microunits
         + stats.spilling_microunits
         + stats.drained_microunits
         + stats.reclaimed_microunits;
     assert!(
-        accounted.abs_diff(stats.initial_cells as u64 * 1_000_000) <= 2,
+        accounted.abs_diff(stats.initial_microunits) <= 3,
         "{stats:?}"
     );
     assert!(stats.initial_cells <= MAX_MELTDOWN_CELLS);
@@ -742,6 +742,7 @@ fn pool_passes_are_symmetric_nonnegative_and_conservative() {
         .add_to_pool(1, -x, 48.0 * event.cell_area)
         .unwrap();
     event.initial_cells = 96;
+    event.initial_area = 96.0 * event.cell_area;
     for _ in 0..300 {
         event.step_material(Layout::new(800.0 / 480.0));
         let left: Vec<_> = event.water.pools()[0].columns().collect();

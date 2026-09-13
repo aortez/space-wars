@@ -13,6 +13,8 @@ use crate::input::ClientInput;
 use crate::render::{FrameLayout, Viewport};
 
 pub(super) mod benchmark;
+#[cfg(test)]
+mod meridiem_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
     id: "clock",

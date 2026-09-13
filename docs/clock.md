@@ -71,6 +71,9 @@ Falling releases the illuminated seven-segment bars as compound rigid
 bodies: their square cells stay together while the bars tumble and collide
 with the arena floor, side walls, and each other. The floor's center drain is
 open. Dim anchor cells remain visible behind the action.
+In 12-hour mode, AM/PM tumbles with the digits: each letter is one small
+compound body whose pixel colliders match its visible shape. There is no
+second anchored copy of the label.
 
 Color Cycle eases the illuminated cells and colon through violet, pink, gold,
 and green, returning to the normal cyan palette. Digits remain anchored and
@@ -94,7 +97,16 @@ The reusable `engine-water` model drives flow from surface-level differences,
 with damping and conservative donor limits. There is no forced inward current;
 flat basins retain more water than the original Clock-local effect did.
 
-The Clock resource ceiling is **96 cells, 128 columns and 128 spill parcels**,
+In 12-hour mode, AM/PM also breaks into its individual pixels. These retain
+their smaller size and label color until floor impact; each supplies 0.0324 of
+a full digit cell's water volume. Both effects latch the original letters while
+material is falling, then recover to the **latest** AM/PM. Format changes during
+an event take effect at recovery too: 12→24 fades/removes the old label, while
+24→12 introduces the new label as the face reforms. The water-lab previews keep
+their live, anchored face and fixed source volume.
+
+The normal Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
+AM/PM pixels), **128 columns and 128 spill parcels**,
 with no Rapier bodies. The two floor halves meet the existing drain lips exactly.
 Each 60 Hz tick uses four bounded pool substeps. Overflow travels as ballistic
 parcels: the renderer stretches/thins their ribbons with falling speed, and the
@@ -173,7 +185,8 @@ colliders and 128 columns in total. These are still environment-only Meltdown
 previews, not new scenarios; normal Clock startup is unchanged. See
 [spilling displacement and verification](design/water.md#displacement-driven-spills).
 
-Duck opens a side door and spawns a yellow pixel duck. It makes two vertical
+Duck opens a side door and spawns a yellow pixel duck. The entrance door closes
+behind it, then disappears for the rest of the visit. The duck makes two vertical
 warm-up jumps, measures its sustained running speed along the entrance runway,
 then plays wall-tag across raised platforms and gaps. Each visit independently
 selects a seeded course pattern and movement personality. The patterns are:
@@ -377,7 +390,8 @@ The face reforms using the **latest** reading, even across minute/hour changes
 or a host-time correction. Resizing during an event restores the current face
 and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Rapier
 exists only during Falling's falling phase or Duck's running/exiting phases:
-at most 28 moving bars plus four arena bodies and 100 colliders for Falling,
+at most 28 moving bars plus two AM/PM letters and four arena bodies, with
+123 colliders for Falling (32 bodies / 100 colliders without AM/PM),
 or eight bodies/colliders at the Duck course ceiling, with no accumulating debris.
 
 ## Extending the event system
@@ -550,13 +564,16 @@ object is present only during Meltdown (including its reform phase). It reports
 initial/waiting/airborne cells, occupied water columns, active spill parcels,
 capacity-limited ticks, and pooled, in-flight (`spilling_microunits`), drained and
 reclaimed volume. In-flight volume and parcel counts include both impact spray
-and drain spills. One original cell equals 1,000,000 micro-units; independently
-rounded totals can differ by two units. Waiting plus airborne cell volume plus
-the four volume aggregates must equal the initial material. Reclaimed volume
+and drain spills. One full-size digit cell equals 1,000,000 micro-units; an
+AM/PM pixel is 32,400. `initial_microunits` reports the total source volume and
+`solid_microunits` reports the volume still in waiting/airborne cells. Use these
+area-weighted values rather than multiplying cell counts by 1,000,000.
+`solid_microunits` plus the four water aggregates must equal
+`initial_microunits`, within three micro-units of independent rounding. Reclaimed volume
 is explicit reform cleanup, not drainage. Idle and other events report null.
 `displaced_microunits` reports occupied body space in the displacement lab,
 in cell-equivalent area units; it is **not water** and is excluded from that
-accounting sum. This field and the added spill fields default to zero when
+accounting sum. The added volume, displacement and spill fields default to zero when
 reading older payloads.
 The optional `duck` object reports entrance side, position in thousandths of
 render world units, grounded state, jumps, cleared/total obstacles, door openness
@@ -736,9 +753,66 @@ draw primitives, with at most 0.000028 cell-volumes reclaimed at the deadline.
 The injected `08:08` face is deliberately dense. These timings exclude
 rasterization, presentation and host work; they are not device FPS measurements.
 
-**Meltdown has not been deployed or tested on the Pi.** Coordinate with the
-other task using `spacewars.local` and obtain confirmation before deployment.
-The device captures below document the earlier events, not Meltdown.
+At that original validation date, Meltdown had not been deployed to a Pi.
+The AM/PM validation below records the later Picade deployment; it does not
+retroactively validate the original inward-current timings.
+
+### AM/PM event validation
+
+The AM/PM regressions exercise both letters in Falling and Meltdown at portrait,
+Picade and HyperPixel aspect ratios, plus a very wide layout. They verify shared
+pixel geometry, two compound letter bodies, real motion/rotation, floor-only
+conversion, area-weighted water conservation and reclamation, and exact final
+face recovery. Noon/midnight and both 12/24-hour format transitions are tested
+during the falling/material phase and during reformation. Zero-duration pause,
+seeded replay, preview replacement, resize and restart retain no stale label.
+The development water-lab source budget and live label are unchanged.
+
+The real client rendering test exercises raster and vector paths at 800×480,
+1024×768 and 480×800, including noon/midnight changes and pixel-exact recovery.
+Its optional captures are local test-renderer artifacts, not a Pi deployment:
+
+```sh
+cargo test --locked -p scenario-clock meridiem
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-meridiem-captures \
+  cargo test --locked -p engine-client --bin engine-client meridiem_events_reach
+```
+
+For manual testing, select **Clock Controls → 12-hour**, then preview **Falling**
+and **Meltdown**. Change time format during the event to check its recovery.
+
+Local validation (2026-09-12, after integrating main's rendering changes):
+**463 selected tests passed**, with four existing ignored tests, across
+Clock/common/control/CLI and the client unit suite. Rust 1.89 workspace/all-target
+checking, formatting and strict Clock/common/control/CLI Clippy also passed.
+All **nine real-client Clock UI workflows** passed on the workstation's X display.
+
+Pi 4 validation (2026-09-12): application-only deployment to `sw-picade-2`,
+1024×768 with raster scale 2.0. Matching client/CLI checksums were verified;
+the kiosk remained active with no automatic service restarts. Phase-aware CLI
+captures show the two PM letters tumbling, their small Meltdown pixels falling,
+the water phase without an anchored duplicate, and the recovered face. Falling
+used 27 bodies / 95 colliders for the captured reading and released them before
+reformation. Normal Meltdown used no bodies/colliders; sampled volume sums
+differed from the initial material by at most one micro-unit. Duck's entrance
+disappeared while the duck stayed active, and the event later reported `exited`
+before returning to idle with no bodies/colliders.
+
+These are actual device screenshots, captured through `spacewars-cli screenshot`,
+not test-renderer artifacts. They are phase samples, not exact-tick captures or
+a performance benchmark:
+
+- [Falling PM letters](screenshots/clock/picade-meridiem-falling.png)
+  and [reformation](screenshots/clock/picade-meridiem-reforming.png).
+- [Meltdown pixels](screenshots/clock/picade-meridiem-melting.png),
+  [water phase](screenshots/clock/picade-meridiem-water.png), and
+  [recovered PM face](screenshots/clock/picade-meridiem-recovered.png).
+- [Duck entrance opening](screenshots/clock/picade-duck-entrance-opening.png)
+  and [entrance gone while the duck continues](screenshots/clock/picade-duck-entrance-gone.png).
+
+The device was left running the **12-hour Demo** profile with all six events
+enabled. Volume remained 5%, unmuted; autostart and the performance overlay were
+left enabled. No other Pi was updated.
 
 ### Duck local validation
 

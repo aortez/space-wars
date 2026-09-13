@@ -16,6 +16,8 @@ pub(crate) fn soften(t: f32) -> f32 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct MeltCell {
     pub position: Vec2,
+    /// AM/PM pixels retain their smaller geometry and corresponding water volume.
+    pub meridiem: bool,
     pub(super) velocity: Vec2,
     pub angle: f32,
     pub(super) spin: f32,
@@ -23,8 +25,20 @@ pub(crate) struct MeltCell {
 }
 
 impl MeltCell {
+    pub(super) fn area_scale(&self) -> f64 {
+        if self.meridiem {
+            (0.16_f64 * 0.9 / 0.8).powi(2)
+        } else {
+            1.0
+        }
+    }
+
     pub(crate) fn outline(&self, pitch: f32) -> [Vec2; 4] {
-        let half = pitch * 0.4;
+        let half = if self.meridiem {
+            pitch * crate::meridiem::PIXEL_SIZE * 0.5
+        } else {
+            pitch * 0.4
+        };
         let (sin, cos) = self.angle.sin_cos();
         [
             Vec2::new(-half, -half),

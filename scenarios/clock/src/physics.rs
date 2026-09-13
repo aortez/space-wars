@@ -5,7 +5,11 @@ use engine_rapier::world::{
 };
 use rand::{Rng, rngs::StdRng};
 
-use crate::{SegmentId, SegmentRepresentation, SegmentState, digits, layout::Layout};
+use crate::{
+    SegmentId, SegmentRepresentation, SegmentState, digits,
+    layout::Layout,
+    meridiem::{LetterState, PIXEL_SIZE},
+};
 
 pub(crate) struct FallingWorld {
     world: PhysicsWorld,
@@ -18,8 +22,17 @@ fn body_id(id: SegmentId) -> BodyId {
     )
 }
 
+fn letter_body_id(slot: usize) -> BodyId {
+    BodyId::new(PhysicsId::new(32 + slot as u64), BodyRole::PRIMARY)
+}
+
 impl FallingWorld {
-    pub fn new(layout: Layout, segments: &mut [SegmentState], rng: &mut StdRng) -> Self {
+    pub fn new(
+        layout: Layout,
+        segments: &mut [SegmentState],
+        letters: &[LetterState],
+        rng: &mut StdRng,
+    ) -> Self {
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -400.0),
             length_unit: layout.pitch,
@@ -27,7 +40,11 @@ impl FallingWorld {
             collect_events: false,
             ..PhysicsWorldConfig::default()
         });
-        world.reserve(32, 100, 0);
+        let letter_colliders = letters
+            .iter()
+            .map(|letter| letter.glyph.cells().count())
+            .sum::<usize>();
+        world.reserve(32 + letters.len(), 100 + letter_colliders, 0);
         let drain = layout.drain_half_width();
         for (index, (min, max)) in [
             (
@@ -104,10 +121,47 @@ impl FallingWorld {
                 angle: 0.0,
             };
         }
+        for (slot, letter) in letters.iter().enumerate() {
+            let id = letter_body_id(slot);
+            let half = layout.pitch * PIXEL_SIZE * 0.5;
+            let colliders = letter
+                .glyph
+                .cells()
+                .enumerate()
+                .map(|(part, cell)| {
+                    let mut collider = ColliderSpec::cuboid(
+                        ColliderId::new(id.entity, ColliderRole::PRIMARY, part as u16),
+                        half,
+                        half,
+                    );
+                    collider.local_position =
+                        letter.glyph.cell_center(layout, cell) - letter.position;
+                    collider.friction = 0.65;
+                    collider.restitution = 0.35;
+                    collider
+                })
+                .collect::<Vec<_>>();
+            assert!(world.insert_body(
+                id,
+                BodySpec {
+                    position: letter.position,
+                    linear_velocity: Vec2::new(
+                        rng.random_range(-45.0..45.0),
+                        rng.random_range(15.0..70.0)
+                    ),
+                    angular_velocity: rng.random_range(-2.8..2.8),
+                    linear_damping: 0.1,
+                    angular_damping: 0.25,
+                    ccd_enabled: true,
+                    ..BodySpec::default()
+                },
+                &colliders
+            ));
+        }
         Self { world }
     }
 
-    pub fn step(&mut self, segments: &mut [SegmentState]) {
+    pub fn step(&mut self, segments: &mut [SegmentState], letters: &mut [LetterState]) {
         self.world.step(1.0 / 60.0);
         for segment in segments {
             if let Some(motion) = self.world.motion(body_id(segment.id)) {
@@ -116,6 +170,14 @@ impl FallingWorld {
                     angle: motion.angle,
                 };
             }
+        }
+        for (slot, letter) in letters.iter_mut().enumerate() {
+            let motion = self
+                .world
+                .motion(letter_body_id(slot))
+                .expect("live falling letter");
+            letter.position = motion.position;
+            letter.angle = motion.angle;
         }
     }
 

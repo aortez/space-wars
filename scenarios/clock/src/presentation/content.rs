@@ -76,27 +76,16 @@ impl Content {
         }
         // Include AM/PM in the content transform, not as an orphaned screen label.
         if let Some(meridiem) = display.meridiem {
-            let first = if meridiem == "AM" {
-                [2, 5, 7, 5, 5]
-            } else {
-                [6, 5, 6, 4, 4]
-            };
-            for (origin, width, rows) in [(0.0, 3, first), (4.0, 5, [17, 27, 21, 17, 17])] {
-                for (row, bits) in rows.into_iter().enumerate() {
-                    for col in 0..width {
-                        if bits & (1 << (width - col - 1)) != 0 {
-                            self.cells.push(Cell {
-                                center: Vec2::new(
-                                    30.0 - 9.0 * 0.16 + (origin + col as f32 + 0.5) * 0.16,
-                                    -0.35 - (row as f32 + 0.5) * 0.16,
-                                ),
-                                size: 0.16,
-                                glyph_pivot: Vec2::new(29.28, -0.75),
-                                group: 5,
-                                path: row as f32 / 5.0,
-                            });
-                        }
-                    }
+            for glyph in crate::meridiem::Glyph::for_label(meridiem) {
+                for cell in glyph.cells() {
+                    self.cells.push(Cell {
+                        center: glyph.cell_min(cell)
+                            + Vec2::splat(crate::meridiem::PIXEL_PITCH * 0.5),
+                        size: crate::meridiem::PIXEL_PITCH,
+                        glyph_pivot: Vec2::new(29.28, -0.75),
+                        group: 5,
+                        path: f32::from(4 - cell.y) / 5.0,
+                    });
                 }
             }
         }
