@@ -1,5 +1,5 @@
 use super::*;
-use spacewars_ai::mission_pilot::MaterialMissionPilot;
+use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
 use std::time::Instant;
 
 mod profiling;
@@ -52,7 +52,7 @@ pub(crate) const ARENA_DUEL_REGISTRATION: ScenarioRegistration = ScenarioRegistr
 
 struct MaterialMissionClientScenario {
     sortie: SurfaceSortieClientScenario,
-    pilots: [MaterialMissionPilot; 2],
+    pilots: [MissionBot; 2],
     bots: [bool; 2],
     registration: &'static ScenarioRegistration,
     seed: u64,
@@ -92,7 +92,18 @@ fn create_with_seats(
         seed,
         profile: profiling::Profile::default(),
         pilots: std::array::from_fn(|seat| {
-            MaterialMissionPilot::new(
+            MissionBot::new(
+                if registration.id == MATCH_REGISTRATION.id
+                    && [
+                        settings.spacewars.player_1_controller,
+                        settings.spacewars.player_2_controller,
+                    ][seat]
+                        == engine_common::SpacewarsController::PlannerBot
+                {
+                    MissionPolicy::Planner
+                } else {
+                    MissionPolicy::Legacy
+                },
                 BrainReset {
                     actor: PlayerId::from_index(seat).unwrap(),
                     episode_seed: seed,
@@ -117,7 +128,7 @@ fn create_match(
             settings.spacewars.player_1_controller,
             settings.spacewars.player_2_controller,
         ]
-        .map(|controller| controller == engine_common::SpacewarsController::RuleBot),
+        .map(|controller| controller != engine_common::SpacewarsController::Human),
         true,
         &MATCH_REGISTRATION,
     ))
@@ -233,8 +244,16 @@ impl ClientScenario for MaterialMissionClientScenario {
             "match_seed={}\nmatch_tick={}\nmatch_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}\n{}",
             self.seed,
             self.sortie.state.tick(),
-            if self.bots[0] { "rule_bot" } else { "human" },
-            if self.bots[1] { "rule_bot" } else { "human" },
+            if self.bots[0] {
+                self.pilots[0].telemetry().policy
+            } else {
+                "human"
+            },
+            if self.bots[1] {
+                self.pilots[1].telemetry().policy
+            } else {
+                "human"
+            },
             round
                 .remaining_seconds
                 .map_or_else(|| "unlimited".into(), |n| format!("{n:.3}")),
@@ -262,7 +281,7 @@ impl ClientScenario for MaterialMissionClientScenario {
 mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
-    use engine_common::SpacewarsController::{Human, RuleBot};
+    use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
     use std::{cell::RefCell, rc::Rc};
 
     #[test]
@@ -348,6 +367,11 @@ mod tests {
             [Human, RuleBot],
             [RuleBot, Human],
             [RuleBot, RuleBot],
+            [Human, PlannerBot],
+            [PlannerBot, Human],
+            [PlannerBot, PlannerBot],
+            [PlannerBot, RuleBot],
+            [RuleBot, PlannerBot],
         ] {
             let mut settings = Settings::default();
             settings.spacewars.player_1_controller = controllers[0];
@@ -377,6 +401,18 @@ mod tests {
                     .len(),
                 3
             );
+            for (seat, controller) in controllers.iter().enumerate() {
+                let policy = if *controller == PlannerBot {
+                    MissionPolicy::Planner
+                } else {
+                    MissionPolicy::Legacy
+                };
+                assert_eq!(client.pilots[seat].telemetry().policy, policy.id());
+                assert_eq!(
+                    client.pilots[seat].sensor_request().objective_planning,
+                    policy.objective_planning()
+                );
+            }
             let before = client.pilots.each_ref().map(|p| p.telemetry().clone());
             let pads = Rc::new(RefCell::new(GamepadInput::default()));
             for seat in 0..2 {
@@ -432,12 +468,12 @@ mod tests {
                 assert!(diagnostics.contains(&format!(
                     "mission_p{}_bot_observations={}",
                     seat + 1,
-                    if controllers[seat] == RuleBot { 31 } else { 0 }
+                    if controllers[seat] != Human { 31 } else { 0 }
                 )));
             }
             let frames = client.render_frames(RenderBackend::Vector, Viewport::new(800.0, 480.0));
             for seat in 0..2 {
-                let bot = controllers[seat] == RuleBot;
+                let bot = controllers[seat] != Human;
                 assert_eq!(client.pilots[seat].telemetry() != &before[seat], bot);
                 assert_eq!(
                     client.sortie.state.combat_telemetry(seat).shells_fired > 0,

@@ -8,7 +8,7 @@ use scenario_spacewars::{
         pilot::{LandingSiteId, LandingSiteQuery},
     },
 };
-use spacewars_ai::mission_pilot::MaterialMissionPilot;
+use spacewars_ai::mission_policy::MissionBot;
 use std::{collections::VecDeque, fmt::Write, time::Duration};
 
 const LIMIT: usize = 120;
@@ -69,7 +69,7 @@ impl Profile {
         self.samples.push_back(sample);
     }
 
-    pub fn diagnostics(&self, pilots: &[MaterialMissionPilot; 2]) -> String {
+    pub fn diagnostics(&self, pilots: &[MissionBot; 2]) -> String {
         let Some(latest) = self.samples.back() else {
             return String::new();
         };

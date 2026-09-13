@@ -14,7 +14,10 @@ controls prevent expiry. Settings, Info, Controls, paused sessions, and manual
 games suspend it. Returning to the root launcher starts the full delay again.
 
 Clock uses the saved Clock configuration. Spacewars bots starts the ordinary
-destructible match with two rule bots and a fresh world. Each result remains
+destructible match with a fresh world. Each player uses its saved Legacy or
+Planner bot selection; a Human selection becomes a Legacy bot for automatic
+play. Choose the two brains in **Spacewars → Scenario Settings** and launch a
+world to save them. Each result remains
 visible for eight seconds before another fresh world starts. The match's own
 time-limit rule applies; automatic play adds no separate deadline. Unlimited
 matches can therefore continue indefinitely until a pilot dies.

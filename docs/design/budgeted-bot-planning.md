@@ -1,12 +1,14 @@
 # Budgeted planning for material-match bots
 
-Status: proposed architecture and implementation sequence. This document does
-not introduce a new policy. The measured baseline is `ground-route-profiling`
-at `1e8ce10`; see [ground-route profiling](../ground-route-profile.md).
-The first optimization is now implemented and measured in
-[indexed ground-route queries](../indexed-ground-routes.md). The mission
-selection, policy-comparison and shared-budget architecture below remains
-proposed work.
+Status: steps 1–2 have an implementation checkpoint. The first selectable
+joint-trip candidate and seat-swapped comparison harness are described in
+[mission policy comparison](../mission-policy-comparison.md). The shared work
+scheduler and strategic planning layers below remain future work.
+
+The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
+see [ground-route profiling](../ground-route-profile.md). The first optimization
+is implemented and measured in [indexed ground-route queries](../indexed-ground-routes.md).
+The comparison checkpoint retains the subsequently merged v9 behavior at `d574b8d`.
 
 The goal is better decisions with predictable computation on the Picades. Treat
 navigation results as reusable evidence for choosing a mission, and request
@@ -15,8 +17,8 @@ flight, combat, capture, ground and recovery controllers as action executors.
 
 The user also wants lightweight comparisons with retained policies, scalable
 budgets for several bots, and a foundation for bot control beyond this specific
-mission. These are design constraints; multiple material-match policies and a
-shared planning scheduler are not implemented by this document.
+mission. These remain design constraints for extending the initial comparison
+registry and implementing the shared planning scheduler.
 
 ## Current boundary and missing information
 

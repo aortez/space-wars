@@ -16,7 +16,11 @@ impl GroundNavigationTask {
         o: &RecoveryTaskObservationV1,
     ) -> (GroundRoute, Option<CrossingPlan>) {
         let route = |routes: &GroundRoutes<'_>| {
-            if self.telemetry.destination == GroundDestination::Hatch {
+            if let Some(plan) = self.telemetry.flag_approach.filter(|plan| !plan.reached) {
+                // A narrow footing target preserves the selected node even if
+                // another footing is already in the flag's interaction radius.
+                routes.route(foot, plan.endpoint.position, 0.01)
+            } else if self.telemetry.destination == GroundDestination::Hatch {
                 routes.route_to_hatch(foot, target)
             } else if self.telemetry.destination == GroundDestination::Flag {
                 routes.route_to_actor_target(foot, target, range)

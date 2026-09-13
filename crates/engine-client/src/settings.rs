@@ -597,14 +597,17 @@ mod tests {
 
     #[test]
     fn legacy_player_selection_defaults_p1_to_human_and_new_bot_choices_roundtrip() {
-        use engine_common::SpacewarsController::{Human, RuleBot};
+        use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
         fs::write(&path, "[spacewars]\nplayer_2_controller = \"rule-bot\"\n").unwrap();
         let mut loaded = load_settings(&path).unwrap().settings;
         assert_eq!(loaded.spacewars.player_1_controller, Human);
         assert_eq!(loaded.spacewars.player_2_controller, RuleBot);
-        loaded.spacewars.player_1_controller = RuleBot;
+        assert_eq!(Human.automatic_bot(), RuleBot);
+        assert_eq!(RuleBot.automatic_bot(), RuleBot);
+        assert_eq!(PlannerBot.automatic_bot(), PlannerBot);
+        loaded.spacewars.player_1_controller = PlannerBot;
         save_settings(&loaded, &path).unwrap();
         assert_eq!(
             load_settings(&path).unwrap().settings.spacewars,

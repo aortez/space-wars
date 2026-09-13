@@ -172,6 +172,16 @@ impl SurfaceSortieState {
         player: usize,
         query: LandingSiteQuery,
     ) -> TacticalSortieObservationV1 {
+        self.tactical_sortie_observation_with_planning(player, query, Default::default())
+    }
+
+    /// Explicit policy sensor profile; the historical observation API remains legacy.
+    pub fn tactical_sortie_observation_with_planning(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        planning: landing_objective::ObjectivePlanning,
+    ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
         let combat = self.combat_observation_with_query(player, query);
@@ -222,6 +232,7 @@ impl SurfaceSortieState {
                 player,
                 &combat.recovery.flight.pilot,
                 &cover,
+                planning,
             ),
             combat,
             cover,

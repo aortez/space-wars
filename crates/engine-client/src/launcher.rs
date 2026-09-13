@@ -193,8 +193,10 @@ impl Launcher {
         launch.scenario = activity.scenario.into();
         if activity.repeat_matches {
             launch.seed = crate::match_world::fresh_seed(launch.seed);
-            effective.spacewars.player_1_controller = engine_common::SpacewarsController::RuleBot;
-            effective.spacewars.player_2_controller = engine_common::SpacewarsController::RuleBot;
+            effective.spacewars.player_1_controller =
+                effective.spacewars.player_1_controller.automatic_bot();
+            effective.spacewars.player_2_controller =
+                effective.spacewars.player_2_controller.automatic_bot();
         }
         self.begin(launch, effective, false, false, true);
     }

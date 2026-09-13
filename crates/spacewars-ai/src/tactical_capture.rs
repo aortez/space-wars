@@ -2,14 +2,19 @@
 use crate::{
     BrainReset,
     combat_pilot::CombatIntent,
-    ground_task::{GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry},
+    ground_task::{
+        FlagApproach, GroundDestination, GroundGoal, GroundNavigationTask, GroundTelemetry,
+    },
     tactical_sortie::{TacticalSortiePilot, TacticalTelemetry},
 };
 use engine_common::CombatBreakSettings;
 use scenario_spacewars::{
     ShipForm,
     surface_sortie::{
-        PilotLocation, TransferResult, combat::TacticalSortieObservationV1, pilot::LandingSiteId,
+        PilotLocation, TransferResult,
+        combat::TacticalSortieObservationV1,
+        landing_objective::{LandingObjective, ObjectivePlanning},
+        pilot::LandingSiteId,
     },
 };
 use serde::Serialize;
@@ -19,6 +24,8 @@ pub struct CaptureTelemetry {
     #[serde(flatten)]
     pub sortie: TacticalTelemetry,
     pub ground: Option<GroundTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flag_approach: Option<FlagApproach>,
 }
 impl std::ops::Deref for CaptureTelemetry {
     type Target = TacticalTelemetry;
@@ -28,6 +35,7 @@ impl std::ops::Deref for CaptureTelemetry {
 }
 #[derive(Debug, Clone)]
 pub struct TacticalCapturePilot {
+    planning: ObjectivePlanning,
     context: BrainReset,
     base: TacticalSortiePilot,
     ground: Option<GroundNavigationTask>,
@@ -37,19 +45,34 @@ pub struct TacticalCapturePilot {
 }
 impl TacticalCapturePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
+        Self::with_planning(context, breaks, ObjectivePlanning::Legacy)
+    }
+    pub fn with_planning(
+        context: BrainReset,
+        breaks: CombatBreakSettings,
+        planning: ObjectivePlanning,
+    ) -> Self {
         let base = TacticalSortiePilot::with_committed_descent(context, breaks);
         let mut sortie = base.telemetry().clone();
-        sortie.policy = "tactical_sortie_v10";
+        sortie.policy = Self::policy(planning);
         Self {
+            planning,
             context,
             base,
             ground: None,
             telemetry: CaptureTelemetry {
                 sortie,
                 ground: None,
+                flag_approach: None,
             },
             previous_tick: None,
             previous_intent: CombatIntent::default(),
+        }
+    }
+    fn policy(planning: ObjectivePlanning) -> &'static str {
+        match planning {
+            ObjectivePlanning::Legacy => "tactical_sortie_v10",
+            ObjectivePlanning::JointRoundTrip => "tactical_sortie_v11",
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -57,8 +80,9 @@ impl TacticalCapturePilot {
         self.context = context;
         self.ground = None;
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v10";
+        self.telemetry.sortie.policy = Self::policy(self.planning);
         self.telemetry.ground = None;
+        self.telemetry.flag_approach = None;
         self.previous_tick = None;
         self.previous_intent = CombatIntent::default();
     }
@@ -74,7 +98,7 @@ impl TacticalCapturePilot {
     pub(crate) fn reject_solar_approach(&mut self, tick: u64) {
         self.base.reject_solar_approach(tick);
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v10";
+        self.telemetry.sortie.policy = Self::policy(self.planning);
     }
     pub fn label(&self) -> &'static str {
         if let Some(ground) = &self.telemetry.ground
@@ -99,12 +123,51 @@ impl TacticalCapturePilot {
         if self.previous_tick == Some(p.tick) {
             return self.previous_intent;
         }
+        if self.planning == ObjectivePlanning::JointRoundTrip {
+            if o.landing_objective.as_ref().is_some_and(|s| {
+                s.planning != self.planning
+                    || s.sites.iter().chain(s.actual.iter()).any(|route| {
+                        route.cost().is_some()
+                            && route.endpoint.is_none_or(|node| {
+                                usize::from(node.id)
+                            >= scenario_spacewars::surface_sortie::ground_navigation::GROUND_SAMPLES
+                            || !node.position.x.is_finite()
+                            || !node.position.y.is_finite()
+                            || !node.normal.x.is_finite()
+                            || !node.normal.y.is_finite()
+                            || (node.position + node.position.normalized() * 0.9)
+                                .distance_to(s.objective.position)
+                                >= s.objective.range
+                            })
+                    })
+            }) {
+                return CombatIntent::default();
+            }
+            if let Some(s) = &o.landing_objective
+                && s.version == 1
+                && s.actor == p.owner
+                && s.tick == p.tick
+                && LandingObjective::read(p).is_some_and(|target| target.matches(s.objective))
+                && let Some(route) = s.actual.as_ref().filter(|r| r.cost().is_some())
+                && let Some(endpoint) = route.endpoint
+                && let Some(hatch) = p.hatch
+            {
+                self.telemetry.flag_approach = Some(FlagApproach {
+                    objective: s.objective,
+                    endpoint,
+                    hatch: (hatch - p.planet.motion.position)
+                        .rotate_radians(-p.planet.motion.angle),
+                    tick: p.tick,
+                    reached: false,
+                });
+            }
+        }
         // V1 receives only the real observation, retaining flight and observed
         // claim/boarding milestones. Its on-foot intent is replaced by this
         // version's traversal while outside the destination's interaction range.
         let mut intent = self.base.intent(o);
         self.telemetry.sortie = self.base.telemetry().clone();
-        self.telemetry.sortie.policy = "tactical_sortie_v10";
+        self.telemetry.sortie.policy = Self::policy(self.planning);
         if self.telemetry.completed_tick.is_none()
             && self.telemetry.failed_tick.is_none()
             && o.combat.recovery.flight.flight.enabled
@@ -133,7 +196,16 @@ impl TacticalCapturePilot {
                 {
                     ground.retarget(destination);
                 } else {
-                    self.ground = Some(GroundNavigationTask::new(self.context, destination));
+                    self.ground = Some(
+                        if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
+                            GroundNavigationTask::with_flag_approach(
+                                self.context,
+                                self.telemetry.flag_approach,
+                            )
+                        } else {
+                            GroundNavigationTask::new(self.context, destination)
+                        },
+                    );
                 }
             }
             let ground = self.ground.as_mut().unwrap();
@@ -144,11 +216,14 @@ impl TacticalCapturePilot {
             {
                 intent.flight.controls = controls;
             }
+            if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
+                self.telemetry.flag_approach = ground.telemetry().flag_approach;
+            }
             self.telemetry.ground = Some(ground.telemetry().clone());
             if ground.telemetry().goal == GroundGoal::Blocked {
                 self.base.abort(p.tick, ground.telemetry().reason.unwrap());
                 self.telemetry.sortie = self.base.telemetry().clone();
-                self.telemetry.sortie.policy = "tactical_sortie_v10";
+                self.telemetry.sortie.policy = Self::policy(self.planning);
             }
         } else {
             self.telemetry.ground = None;

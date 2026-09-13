@@ -107,6 +107,7 @@ pub struct MissionAvoidance {
 
 #[derive(Debug, Clone)]
 pub struct MaterialMissionPilot {
+    policy: crate::mission_policy::MissionPolicy,
     context: BrainReset,
     breaks: CombatBreakSettings,
     telemetry: MissionTelemetry,
@@ -132,11 +133,23 @@ pub struct MaterialMissionPilot {
 
 impl MaterialMissionPilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
+        Self::with_policy(
+            context,
+            breaks,
+            crate::mission_policy::MissionPolicy::Legacy,
+        )
+    }
+    pub(crate) fn with_policy(
+        context: BrainReset,
+        breaks: CombatBreakSettings,
+        policy: crate::mission_policy::MissionPolicy,
+    ) -> Self {
         Self {
+            policy,
             context,
             breaks,
             telemetry: MissionTelemetry {
-                policy: MISSION_POLICY,
+                policy: policy.id(),
                 goal: MissionGoal::Select,
                 goal_since: 0,
                 target: None,
@@ -174,7 +187,7 @@ impl MaterialMissionPilot {
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
-        *self = Self::new(context, self.breaks);
+        *self = Self::with_policy(context, self.breaks, self.policy);
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry
@@ -215,6 +228,7 @@ impl MaterialMissionPilot {
 
     pub fn sensor_request(&self) -> MissionSensorRequest {
         MissionSensorRequest {
+            objective_planning: self.policy.objective_planning(),
             site: self.site_request(),
             last_survey: self.last_survey,
         }
@@ -535,7 +549,11 @@ impl MaterialMissionPilot {
             && (p.ship.velocity - target.motion.velocity).length() < 18.0
             && p.queries_ready
         {
-            self.capture = Some(TacticalCapturePilot::new(self.context, self.breaks));
+            self.capture = Some(TacticalCapturePilot::with_planning(
+                self.context,
+                self.breaks,
+                self.policy.objective_planning(),
+            ));
             self.solar_detour = None;
             self.event(p.tick, "arrived", None);
             self.goal(MissionGoal::Capture, p.tick);

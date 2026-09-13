@@ -86,6 +86,71 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
     }
 }
 
+#[test]
+fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
+    use scenario_spacewars::surface_sortie::landing_objective::LandingObjective;
+    use spacewars_ai::ground_task::FlagApproach;
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    let p = &mut o.flight.pilot;
+    p.hatch = Some(Vec2::new(0.0, 60.9));
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(PlayerId::PLAYER_2);
+    claim.flag = Some(PlanetFlagObservation {
+        player: PlayerId::PLAYER_2,
+        position: Vec2::new(4.0, 60.9),
+        normal: Vec2::Y,
+        raised_fraction: 1.0,
+    });
+    let map = o.ground.as_mut().unwrap();
+    map.edges = [(0, 2, 4.0), (0, 3, 6.0), (3, 0, 6.0)]
+        .map(|(from, to, length)| GroundEdge {
+            from,
+            to,
+            length,
+            kind: GroundEdgeKind::Walk,
+        })
+        .to_vec();
+    let plan = FlagApproach {
+        objective: LandingObjective::read(p).unwrap(),
+        endpoint: map.nodes[3],
+        hatch: p.hatch.unwrap(),
+        tick: p.tick,
+        reached: false,
+    };
+    let mut task = GroundNavigationTask::with_flag_approach(context, Some(plan));
+    task.step(&o); // Consume the supported start waypoint.
+    assert_eq!(task.telemetry().path.last(), Some(&3));
+    // Already inside the flag region, but the selected returnable endpoint is
+    // further along. Ordinary destination proximity must not finish the walk.
+    advance(&mut o, 1);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(4.0, 60.9);
+    assert!(task.step(&o).horizontal > 0.0);
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    advance(&mut o, 2);
+    o.flight.pilot.actor.as_mut().unwrap().position = plan.actor_position();
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().flag_approach.unwrap().reached);
+    let mut returning = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    returning.step(&o);
+    assert_eq!(returning.telemetry().path, [3, 0]);
+    advance(&mut o, 3);
+    assert!(returning.step(&o).horizontal < 0.0);
+
+    // A moving obstruction removes the directed return edge without changing
+    // terrain revision. The next measured map revokes arrival and the plan.
+    advance(&mut o, 30);
+    o.ground.as_mut().unwrap().edges.retain(|e| e.from != 3);
+    assert_eq!(task.step(&o), SurfaceSortieAction::default());
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert!(task.telemetry().flag_approach.is_none());
+    assert!(task.telemetry().invalidations > 0);
+    advance(&mut o, 331);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+}
+
 fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
     use scenario_spacewars::surface_sortie::ground_posture::{
         CrawlStep, GroundPostureObservation, SpacelingBalance, SpacelingGetUpResult,

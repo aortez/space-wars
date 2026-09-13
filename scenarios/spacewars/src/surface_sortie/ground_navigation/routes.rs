@@ -1,6 +1,9 @@
 //! Pure route queries over one immutable measured map.
 use super::*;
 
+mod round_trip;
+pub use round_trip::GroundRoundTrip;
+
 /// Reusable node and outgoing-edge lookup for a single map snapshot.
 /// The borrow prevents editing the graph while its indexes are in use. This
 /// does not extend the lifetime of the physical measurements in the map.
