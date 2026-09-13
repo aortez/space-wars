@@ -6,6 +6,8 @@ on merged main `ba916aa`, using `sw-picade.local` on 2026-09-12/13.
 
 The retained changes add opt-in diagnostics and fix the kiosk's forced raster
 scale. They do not optimize the routing algorithm yet.
+The subsequent [indexed-route implementation](indexed-ground-routes.md) preserves
+the measured behavior and reduces the routing contribution to the slowest calls.
 
 ## Findings
 

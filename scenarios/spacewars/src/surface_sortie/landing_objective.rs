@@ -226,12 +226,13 @@ fn measure_route(
 ) -> LandingObjectiveRoute {
     #[cfg(feature = "sensor-profile")]
     let _profile = super::sensor_profile::Scope::new("landing_objective_routes");
-    let outbound = map.route_to_actor_target(hatch, objective.position, objective.range);
+    let routes = map.routes();
+    let outbound = routes.route_to_actor_target(hatch, objective.position, objective.range);
     let returning = outbound
         .path
         .last()
         .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
-        .map(|node| map.route_to_hatch(node.position, hatch).diagnostics);
+        .map(|node| routes.route_to_hatch(node.position, hatch).diagnostics);
     LandingObjectiveRoute {
         site,
         outbound: outbound.diagnostics,

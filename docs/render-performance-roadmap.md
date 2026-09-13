@@ -126,9 +126,13 @@ Two measured problems now deserve separate, bounded investigations:
   next sensor lead. The [ground-route breakdown](ground-route-profile.md)
   reproduces both seeds and separates about 19 ms of ground connections,
   14–16 ms of graph searches and 6 ms of proposed-ship filtering in the slowest
-  calls. Indexed node/edge lookup is the next bounded search optimization;
-  ground connection queries dominate accumulated sensor time and remain a
-  separate follow-up.
+  calls. The [indexed-route implementation](indexed-ground-routes.md) preserves
+  the gameplay records and reduces that routing contribution by 55–56%, including
+  index construction. Worst complete sensor calls fall to 43–44 ms, but calls
+  above 16.67 ms remain equally frequent. Ground connection queries dominate
+  accumulated sensor time and remain a separate follow-up. The
+  [planning design](design/budgeted-bot-planning.md) connects further query reuse
+  and bounded work with improved sortie and mission decisions.
 - **Remaining glyph display-memory cost:** compare RAM staging through the
   actual LinuxKMS fast image path, including copy cost and clock/launcher
   workloads. Alternatively, measure small glyph/HUD regions in RAM. Keep fonts,
