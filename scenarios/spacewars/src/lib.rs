@@ -7,6 +7,7 @@
 mod physics;
 pub mod surface_sortie;
 mod terrain;
+pub mod thrusters;
 pub mod weapons;
 pub use terrain::{
     TerrainDiagnostics, TerrainMotionAnomaly, TerrainMotionBody, TerrainMotionFrame,
@@ -725,6 +726,8 @@ pub struct ShipState {
     pub cannon_firing: bool,
     pub laser_beam: Option<LaserBeamState>,
     pub exhaust_trails: Vec<ExhaustTrailState>,
+    /// Surface-controller feedback only; legacy exhaust stays independent.
+    pub thrusters: Option<thrusters::ThrusterVisuals>,
     pub life: f32,
     pub life_max: f32,
     pub dead: bool,
@@ -1387,16 +1390,8 @@ impl SpacewarsScenario {
                 if ship.dead {
                     continue;
                 }
-                // The fixture's bounded flight controller owns control impulses;
-                // retain visual exhaust without the legacy brake/turn velocity edits.
-                ship.update_exhaust_trails(dt);
-                if ship.thrust > 0.0 {
-                    ship.fire_exhaust(
-                        ship.direction,
-                        &mut exhaust_rng_for_tick(state.seed, state.tick, index),
-                        state.tick,
-                    );
-                }
+                // The surface controller publishes visual actuation after its
+                // force calculation; do not run legacy control/exhaust here.
             } else {
                 ship.update(dt, state.seed, state.tick);
             }
@@ -1455,8 +1450,9 @@ impl SpacewarsScenario {
         let gravity_time = gravity_started.elapsed();
         motion_diagnostics_time += terrain::capture_motion(state, TerrainMotionStage::AfterGravity);
 
+        let mut thruster_outputs = [thrusters::ThrusterOutput::default(); SPACEWARS_PLAYER_COUNT];
         for pilot in surface_pilots.iter_mut() {
-            pilot.control_vehicle(
+            thruster_outputs[pilot.vehicle_index()] = pilot.control_vehicle(
                 &mut state.physics,
                 &state.ships[pilot.vehicle_index()],
                 &state.planets,
@@ -1469,6 +1465,10 @@ impl SpacewarsScenario {
         state
             .physics
             .synchronize_motion(&mut state.ships, &mut state.debris);
+        for pilot in surface_pilots.iter() {
+            let index = pilot.vehicle_index();
+            thrusters::advance(&mut state.ships[index], thruster_outputs[index], dt);
+        }
 
         let collision_started = Instant::now();
         update_ship_lasers(state, dt);
@@ -5273,6 +5273,7 @@ impl ShipState {
             cannon_firing: false,
             laser_beam: None,
             exhaust_trails: Vec::new(),
+            thrusters: None,
             life,
             life_max: life,
             dead: false,
@@ -5773,6 +5774,7 @@ impl ShipState {
         self.wing_behavior = WingBehavior::None;
         self.turn_power = POD_TURN_FORCE / POD_MASS * self.delta_time;
         self.thrust_power = POD_THRUST_FORCE / POD_MASS * self.delta_time;
+        self.thrusters = None;
         self.current_max_omega = BASE_MAX_OMEGA;
     }
 
@@ -5798,6 +5800,7 @@ impl ShipState {
         };
         self.turn_power = SHIP_TURN_FORCE / SHIP_MASS * self.delta_time;
         self.thrust_power = SHIP_THRUST_FORCE / SHIP_MASS * self.delta_time;
+        self.thrusters = None;
         self.current_max_omega = BASE_MAX_OMEGA;
     }
 }
@@ -6221,6 +6224,10 @@ fn star_point_radius(star: &StarState) -> f32 {
 }
 
 fn render_exhaust(frame: &mut RenderFrame, ship: &ShipState) {
+    if ship.thrusters.is_some() {
+        thrusters::render(frame, ship);
+        return;
+    }
     for trail in &ship.exhaust_trails {
         frame.push_primitive(
             EXHAUST_LAYER,
@@ -6273,7 +6280,8 @@ fn render_debris(frame: &mut RenderFrame, debris: &DebrisState) {
                     translation: debris.position,
                     // Shell collision geometry/spin is shared; the round's nose
                     // follows its flight direction for readability at this scale.
-                    rotation_radians: debris.velocity.angle_radians()
+                    // Vec2::angle_radians is clockwise; transforms are CCW.
+                    rotation_radians: -debris.velocity.angle_radians()
                         - core::f32::consts::FRAC_PI_2,
                     ..Transform2::IDENTITY
                 },
@@ -10140,6 +10148,47 @@ mod tests {
                 .all(|collision| collision.ship != 0),
             "owner shell should not collide with firing ship on spawn tick"
         );
+    }
+
+    #[test]
+    fn fuselage_mounted_missiles_clear_the_owner_after_spawn_grace() {
+        for angle in [0.0, 0.65, 1.7, -2.4] {
+            for sweep in [0.0, MAX_WING_THETA] {
+                for speed in [0.0, 200.0] {
+                    let mut state = init_deathmatch_no_asteroids();
+                    let ship = &mut state.ships[0];
+                    ship.position = Vec2::new(1_000.0, 1_000.0);
+                    ship.rotation_radians = angle;
+                    ship.direction = direction_from_rotation(angle);
+                    ship.velocity = ship.direction * speed;
+                    ship.wing_theta = sweep;
+                    ship.wings_closed = sweep > 0.0;
+                    ship.enable_weapon_supply();
+                    let start_life = ship.life;
+
+                    for round in 0..weapons::ROUND_CAPACITY {
+                        state.ships[0].cannon_cooldown_remaining = 0.0;
+                        step(&mut state, &[SpacewarsAction::set_cannon(0, true)]);
+                        // Continue beyond the one-tick owner collision grace:
+                        // body-mounted launch origins must still safely clear.
+                        for _ in 0..6 {
+                            step(&mut state, &[SpacewarsAction::set_cannon(0, false)]);
+                            assert_eq!(state.ships[0].life, start_life);
+                            assert!(state.ship_debris_collisions.is_empty());
+                            assert_eq!(
+                                state
+                                    .debris
+                                    .iter()
+                                    .filter(|item| item.rail_launched)
+                                    .count(),
+                                round + 1,
+                                "round {round}, angle {angle}, sweep {sweep}, speed {speed}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]

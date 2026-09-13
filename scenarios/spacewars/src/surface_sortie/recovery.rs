@@ -150,6 +150,7 @@ impl SurfacePilot {
         ship.set_cannon(false);
         ship.laser_beam = None;
         ship.exhaust_trails.clear();
+        ship.thrusters = None;
     }
 }
 

@@ -27,6 +27,8 @@ mod renderer_policy;
 mod settings;
 mod settings_writer;
 mod sound_controls;
+#[cfg(test)]
+mod thruster_visual_tests;
 mod ui_activation;
 mod ui_inventory;
 mod ui_navigation;

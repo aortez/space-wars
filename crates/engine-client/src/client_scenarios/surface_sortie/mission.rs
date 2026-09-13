@@ -282,6 +282,7 @@ mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
     use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
+    use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
 
     #[test]
@@ -583,8 +584,8 @@ mod tests {
 
     #[test]
     fn physical_finished_match_supplies_menu_result_freezes_bots_and_restarts_healthy() {
-        // A recorded lethal laser encounter exercises the terminal UI. The
-        // former fixture relied on a missile flinging a pod into the boundary.
+        // Physical combat exercises the terminal UI, not a prescribed winner:
+        // changes such as missile mount placement can alter the fight's result.
         let mut state = SurfaceSortieScenario::init_material_combat(7);
         state.enable_match_rules();
         let mut fighters = [0, 1].map(|seat| {
@@ -610,10 +611,15 @@ mod tests {
                 break;
             }
         }
-        assert!(
-            state.match_outcome().is_some(),
-            "physical match did not finish"
-        );
+        let Some(MatchOutcome::Winner(winner)) = state.match_outcome() else {
+            panic!("physical match did not finish with a winner");
+        };
+        let round = state.match_observation().unwrap();
+        assert_eq!(round.reason, Some(MatchEndReason::PilotDeath));
+        for (seat, pilot) in round.pilots.iter().enumerate() {
+            assert_eq!(pilot.alive(), seat == winner.index());
+        }
+        let expected_message = format!("Player {} wins / opposing pilot lost", winner.index() + 1);
         let mut settings = Settings::default();
         settings.spacewars.player_1_controller = RuleBot;
         settings.spacewars.player_2_controller = RuleBot;
@@ -633,7 +639,7 @@ mod tests {
         assert!(client.is_game_over());
         assert_eq!(
             client.game_over_message().as_deref(),
-            Some("Player 2 wins / opposing pilot lost")
+            Some(expected_message.as_str())
         );
         let before = SurfaceSortieScenario::observe(&client.sortie.state);
         let brains_before = client.pilots.each_ref().map(|p| p.telemetry().clone());
