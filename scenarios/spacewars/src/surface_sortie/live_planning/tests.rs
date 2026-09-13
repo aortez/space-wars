@@ -54,7 +54,9 @@ fn complete_incremental_forecast_matches_synchronous_v10() {
             Work::UNLIMITED,
         ] {
             let snapshot = Arc::new(state.world.physics.world.query_snapshot());
-            let job = state.objective_job(seat, p, &o.cover, snapshot).unwrap();
+            let job = state
+                .objective_job(seat, p, &o.cover, snapshot, None)
+                .unwrap();
             let mut queue = PlanningQueue::new(2);
             let token = queue.submit(33, (), JobLimits::default(), job).unwrap();
             for _ in 0..100_000 {
@@ -153,7 +155,7 @@ fn both_surveys_make_progress_across_real_physics_steps() {
 fn real_terrain_edits_revoke_pending_and_ready_forecasts() {
     for complete in [false, true] {
         let mut state = state();
-        let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED);
+        let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_ground_reuse();
         let mut o = target(&state, 0);
         let planet = o.combat.recovery.flight.pilot.planet.index;
         planner.observe(&state, 0, &mut o);
@@ -182,11 +184,182 @@ fn real_terrain_edits_revoke_pending_and_ready_forecasts() {
         assert_eq!(o.objective_work, Some(ObjectiveWorkState::Stale));
         assert!(o.landing_objective.is_none());
         assert_eq!(planner.queue.poll(token, &tick), JobPoll::Stale);
+        assert_eq!(planner.telemetry.reused_requests, 0);
         assert_eq!(
             planner.telemetry.invalidations.get("objective_changed"),
             Some(&1)
         );
     }
+}
+
+#[test]
+fn gravity_and_own_hatch_changes_salvage_partial_or_complete_ground() {
+    for complete in [false, true] {
+        let mut state = state();
+        let mut planner = LiveObjectivePlanner::new(
+            1,
+            if complete {
+                Work::UNLIMITED
+            } else {
+                Work {
+                    graph: 16384,
+                    physics_queries: 512,
+                }
+            },
+        )
+        .with_ground_reuse();
+        let mut o = target(&state, 0);
+        planner.observe(&state, 0, &mut o);
+        let source_tick = state.world.tick;
+        let old_token = planner.requests[&0].token;
+        let weak = Arc::downgrade(&planner.requests[&0].snapshot);
+        planner.advance(state.world.tick);
+        // Dependency fixture advances the observation clock with frozen geometry,
+        // changing only gravity. Physical moving-world runs cover normal stepping.
+        state.world.tick += REFRESH_TICKS;
+        let planet = o.combat.recovery.flight.pilot.planet.index;
+        state.world.planets[planet].mass *= 2.0;
+        let mut o = target(&state, 0);
+        planner.observe(&state, 0, &mut o);
+        assert_eq!(o.objective_work, Some(ObjectiveWorkState::Stale));
+        assert!(o.landing_objective.is_none());
+        assert_eq!(
+            planner.telemetry.invalidations.get("gravity_changed"),
+            Some(&1)
+        );
+        assert_eq!(planner.telemetry.reused_requests, 1);
+        assert_eq!(planner.requests[&0].measurement_tick, source_tick);
+        assert!(Weak::ptr_eq(
+            &weak,
+            &Arc::downgrade(&planner.requests[&0].snapshot)
+        ));
+        assert_eq!(planner.queue.poll(old_token, &source_tick), JobPoll::Stale);
+        planner.allowance = Work::UNLIMITED;
+        planner.advance(state.world.tick);
+        planner.observe(&state, 0, &mut o);
+        let mut expected = state
+            .landing_objective_survey(
+                0,
+                &o.combat.recovery.flight.pilot,
+                &o.cover,
+                ObjectivePlanning::JointRoundTrip,
+            )
+            .unwrap();
+        expected.tick = source_tick;
+        expected.validated_tick = Some(state.world.tick);
+        assert_eq!(o.landing_objective, Some(expected));
+        assert!(planner.telemetry.reused_ground.nodes > 0);
+        if complete {
+            assert!(planner.telemetry.reused_ground.walks > 0);
+        }
+
+        for moved in [false, true] {
+            state.world.tick += REFRESH_TICKS;
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.tick = state.world.tick;
+            p.landing.phase = LandingPhase::Landed;
+            p.hatch =
+                Some(p.sites[0].hatch_position + if moved { Vec2::X * 0.2 } else { Vec2::ZERO });
+            planner.observe(&state, 0, &mut o);
+            assert!(o.landing_objective.is_none());
+            assert_eq!(planner.requests[&0].measurement_tick, source_tick);
+            planner.advance(state.world.tick);
+            planner.observe(&state, 0, &mut o);
+            let mut expected = state
+                .landing_objective_survey(
+                    0,
+                    &o.combat.recovery.flight.pilot,
+                    &o.cover,
+                    ObjectivePlanning::JointRoundTrip,
+                )
+                .unwrap();
+            expected.tick = source_tick;
+            expected.validated_tick = Some(state.world.tick);
+            assert_eq!(o.landing_objective, Some(expected));
+        }
+        assert_eq!(planner.telemetry.reused_requests, 3);
+        assert_eq!(planner.telemetry.snapshot_builds, 1);
+        planner.reset();
+        assert!(weak.upgrade().is_none());
+    }
+}
+
+#[test]
+fn reuse_cannot_hide_geometry_changes_behind_gravity_invalidation() {
+    let mut state = state();
+    let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_ground_reuse();
+    let mut o = target(&state, 0);
+    let p = &o.combat.recovery.flight.pilot;
+    let planet = p.planet.index;
+    let near = p.planet.motion.position + Vec2::Y * (p.planet.radius + 5.0);
+    planner.observe(&state, 0, &mut o);
+    let weak = Arc::downgrade(&planner.requests[&0].snapshot);
+    planner.advance(state.world.tick);
+    state.world.ships[1].position = near;
+    state.world.ships[1].velocity = Vec2::ZERO;
+    state.world.planets[planet].mass *= 2.0;
+    SurfaceSortieScenario::step(&mut state, &[], DT);
+    let mut o = target(&state, 0);
+    planner.observe(&state, 0, &mut o);
+    assert!(o.landing_objective.is_none());
+    assert_eq!(
+        planner.telemetry.invalidations.get("gravity_changed"),
+        Some(&1)
+    );
+    assert_eq!(
+        planner.telemetry.reuse_rejections.get("obstacles_changed"),
+        Some(&1)
+    );
+    assert_eq!(planner.telemetry.reused_requests, 0);
+    assert_eq!(planner.telemetry.snapshot_builds, 2);
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn repeated_reuse_keeps_original_age_and_clone_reset_releases_it() {
+    let mut state = state();
+    let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_ground_reuse();
+    let mut o = target(&state, 0);
+    planner.observe(&state, 0, &mut o);
+    let source_tick = state.world.tick;
+    let weak = Arc::downgrade(&planner.requests[&0].snapshot);
+    planner.advance(state.world.tick);
+    planner.observe(&state, 0, &mut o);
+    for age in [30, 60, 90, 120] {
+        // Keep physics frozen to isolate refresh/expiry from moving obstacles.
+        state.world.tick = source_tick + age;
+        let mut o = target(&state, 0);
+        planner.observe(&state, 0, &mut o);
+        assert_eq!(planner.requests[&0].measurement_tick, source_tick);
+        assert_eq!(planner.requests[&0].tick, state.world.tick);
+        let mut clone = planner.clone();
+        assert_eq!(
+            clone.advance(state.world.tick),
+            planner.advance(state.world.tick)
+        );
+        let mut copy = o.clone();
+        clone.observe(&state, 0, &mut copy);
+        planner.observe(&state, 0, &mut o);
+        assert_eq!(copy, o);
+        let survey = o.landing_objective.unwrap();
+        assert_eq!(survey.tick, source_tick);
+        assert_eq!(survey.validated_tick, Some(state.world.tick));
+        clone.reset();
+    }
+    assert_eq!(planner.telemetry.snapshot_builds, 1);
+    assert_eq!(planner.telemetry.reused_requests, 4);
+    assert_eq!(planner.telemetry.max_ready_age_ticks, 120);
+    state.world.tick += 1;
+    let mut o = target(&state, 0);
+    planner.observe(&state, 0, &mut o);
+    assert!(o.landing_objective.is_none());
+    assert_eq!(planner.telemetry.invalidations.get("expired"), Some(&1));
+    assert_eq!(planner.requests[&0].measurement_tick, state.world.tick);
+    assert_eq!(planner.telemetry.snapshot_builds, 2);
+    assert!(weak.upgrade().is_none());
+    let new = Arc::downgrade(&planner.requests[&0].snapshot);
+    planner.remove(0);
+    assert!(new.upgrade().is_none());
 }
 
 #[test]

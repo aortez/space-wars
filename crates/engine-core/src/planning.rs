@@ -192,18 +192,33 @@ impl<D: PartialEq, J: PlanningJob> PlanningQueue<D, J> {
     }
 
     pub fn cancel(&mut self, token: RequestToken) -> bool {
+        self.take(token).is_some()
+    }
+
+    /// Inspect retained state without advancing it or accepting its output.
+    /// Dependency validation remains the adapter's responsibility.
+    pub fn job(&self, token: RequestToken) -> Option<&J> {
+        self.slots
+            .get(&token.actor)
+            .filter(|s| s.token == token)
+            .map(|s| &s.job)
+    }
+
+    /// Cancel and move out a continuation so an adapter can salvage compatible
+    /// measurements without copying a whole workspace. The token becomes stale.
+    pub fn take(&mut self, token: RequestToken) -> Option<J> {
         if !self
             .slots
             .get(&token.actor)
             .is_some_and(|s| s.token == token)
         {
-            return false;
+            return None;
         }
-        self.slots.remove(&token.actor);
+        let slot = self.slots.remove(&token.actor)?;
         if self.cursor == Some(token.actor) {
             self.turn_left = 0;
         }
-        true
+        Some(slot.job)
     }
 
     pub fn reset(&mut self) {

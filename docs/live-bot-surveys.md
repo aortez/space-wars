@@ -5,7 +5,9 @@ This continues [#81](https://github.com/aortez/space-wars/issues/81) after the
 measurements to that queue while the bot continues emitting ordinary controls.
 The existing v9 and synchronous v10 profiles remain available. The new
 `live_joint_objective_v1` sensor profile is opt-in in the physical test runners;
-the launcher and Picade autoplay continue using their existing profiles.
+the launcher and Picade autoplay continue using their existing profiles. The
+follow-up [ground-reuse experiment](bot-ground-reuse.md) adds an independently
+selectable `live_joint_objective_v2` profile in the same runners.
 
 ## The first request
 
@@ -58,8 +60,10 @@ Requests expire after 120 physics ticks. A ready result is reused until its
 source is 30 ticks old, provided it passes the live checks. A slower successful
 request is published once before refresh, rather than being discarded because
 it missed that refresh period. At 60 updates/s these ages are two seconds and
-half a second. There is no base-map cache across requests yet: cancellation or
-refresh rebuilds the complete measurement.
+half a second. In the retained v1 profile, cancellation or refresh rebuilds the
+complete measurement. The opt-in v2 profile retains compatible footing and walk
+measurements with their original snapshot, frame and age; it remeasures jumps
+and proposed-hull clearance on each request.
 
 The host observes all active actors, advances the shared queue once, then runs
 one ordinary physics step. Repeating `advance` for the same tick cannot double
@@ -252,11 +256,10 @@ Integrated mission runner hashes:
 
 ## Next boundary
 
-Use completion delays and cancellation reasons to decide where reuse helps.
-The strongest next candidates are retaining the validated base measurement
-when only our proposed/actual hull changes, avoiding full geometric rebuilds
-for small gravity changes, and narrowing moving-obstacle dependencies without
-overlooking a crossing edge. Do not loosen freshness checks
-merely to make a completion counter look better. Reduce wasted requests before
-promoting the live profile to cabinet defaults or extending it to more sensors.
-Mission-level utility and strategic lookahead remain the following phase.
+The [ground-reuse follow-up](bot-ground-reuse.md) addresses gravity and our own
+hull changes. Moving-obstacle dependencies remain conservative: narrowing them
+must account for every affected footing and crossing edge. Do not loosen
+freshness checks merely to make a completion counter look better. Reduce wasted
+requests before promoting the live profile to cabinet defaults or extending it
+to more sensors. Mission-level utility and strategic lookahead remain the
+following phase.

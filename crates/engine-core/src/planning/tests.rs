@@ -265,3 +265,31 @@ fn capacity_and_changing_active_set_keep_progress_bounded() {
         Err(QueueFull)
     );
 }
+
+#[test]
+fn taking_a_continuation_revokes_its_token_and_preserves_remaining_work() {
+    let trace = Trace::default();
+    let mut q = PlanningQueue::new(1);
+    let old = q
+        .submit(4, (), JobLimits::default(), job(4, 5, 2, &trace))
+        .unwrap();
+    q.advance(graph(2));
+    assert_eq!(q.job(old).unwrap().steps.len(), 5);
+    let saved = q.take(old).unwrap();
+    assert!(q.job(old).is_none());
+    assert!(q.take(old).is_none());
+    assert_eq!(q.poll(old, &()), JobPoll::Stale);
+    assert_eq!(q.advance(Work::UNLIMITED).charged, Work::default());
+    let fresh = q.submit(4, (), JobLimits::default(), saved).unwrap();
+    assert_ne!(old, fresh);
+    assert!(q.take(old).is_none());
+    assert_eq!(
+        q.advance(Work::UNLIMITED).charged,
+        Work {
+            graph: 3,
+            physics_queries: 2
+        }
+    );
+    assert!(q.take(fresh).unwrap().output().is_some());
+    assert_eq!(Rc::strong_count(&trace), 1);
+}

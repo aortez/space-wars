@@ -6,8 +6,10 @@ joint-trip candidate and seat-swapped comparison harness are described in
 [resumable graph job and shared scheduler](../bot-planning-jobs.md) and an
 [opt-in live landing-objective adapter](../live-bot-surveys.md). That adapter
 resumes coherent physical measurements and graph work under one shared
-allowance in the existing comparison runners. Default v10 remains synchronous;
-broader sensor coverage, cross-request reuse and strategic planning remain future work.
+allowance in the existing comparison runners. An optional
+[ground-reuse profile](../bot-ground-reuse.md) retains compatible footing and
+walk measurements across requests. Default v10 remains synchronous; moving-obstacle
+dependency refinement, broader sensor coverage and strategic planning remain future work.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
