@@ -179,7 +179,9 @@ Both policies remain cadence-limited and **unbounded in planning work**.
 Reports explicitly record a null work quota. Timings are instrumented desktop
 diagnostics on different trajectories, not equal-budget scores or Pi frame-time
 guarantees. Ground-connection physics still dominates expensive observations.
-The next slice is the shared incremental planning budget and instrumentation
-described in #81, followed by broader strategic choice. Prospective jetpack
+The next [graph-job checkpoint](bot-planning-jobs.md) adds a resumable v10 solver,
+shared scheduler and offline quota probe while preserving synchronous live
+behavior. Coherent physical surveys and the live budget adapter still precede
+broader strategic choice. Prospective jetpack
 resource planning, cross-update sensor caches and improved combat stay separate
 experiments. Keep v9 selectable and the default while those comparisons grow.

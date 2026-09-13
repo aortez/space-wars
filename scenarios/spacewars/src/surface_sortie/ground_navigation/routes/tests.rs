@@ -1,5 +1,7 @@
 use super::*;
+use engine_core::planning::{JobLimits, JobPoll, PlanningJob, PlanningQueue, Work};
 use reference::reference_route;
+use std::sync::Arc;
 
 fn map(nodes: Vec<GroundNode>, edges: Vec<GroundEdge>) -> GroundMap {
     GroundMap {
@@ -294,6 +296,10 @@ fn sparse_directed_surveys_match_complete_reference_routes() {
                 })
                 .min_by(f32::total_cmp);
             let actual = routes.round_trip_to_actor_target(start, target, 4.0, hatch);
+            assert_eq!(
+                actual,
+                routes.reference_round_trip_to_actor_target(start, target, 4.0, hatch)
+            );
             assert_eq!(expected.is_some(), actual.endpoint.is_some());
             if let Some(expected) = expected {
                 let back = actual.returning.as_ref().unwrap();
@@ -312,4 +318,188 @@ fn sparse_directed_surveys_match_complete_reference_routes() {
             }
         }
     }
+}
+
+fn busy_round_trip_map() -> Arc<GroundMap> {
+    let nodes: Vec<_> = (0..GROUND_SAMPLES as u16)
+        .map(|id| {
+            let angle = f32::from(id) * std::f32::consts::TAU / GROUND_SAMPLES as f32;
+            node(id, angle.sin() * 60.0, angle.cos() * 60.0)
+        })
+        .collect();
+    let mut edges = vec![];
+    for a in &nodes {
+        for id in [(a.id + 1) % 512, (a.id + 511) % 512] {
+            let b = nodes[usize::from(id)];
+            edges.push(edge(
+                a.id,
+                id,
+                a.position.distance_to(b.position),
+                GroundEdgeKind::Walk,
+            ));
+        }
+        if a.id != 0 {
+            let kind = if a.id.is_multiple_of(7) {
+                GroundEdgeKind::Jetpack
+            } else {
+                GroundEdgeKind::Jump
+            };
+            let length = a.position.distance_to(nodes[0].position);
+            edges.push(edge(0, a.id, length, kind));
+            edges.push(edge(a.id, 0, length, kind));
+        }
+    }
+    edges.reverse();
+    Arc::new(map(nodes, edges))
+}
+
+#[test]
+fn shared_budget_resumes_real_searches_without_changing_v10_results() {
+    let map = busy_round_trip_map();
+    let start = map.nodes[0].position;
+    let hatch = start + start.normalized() * SurfaceSortieState::spec().half_height();
+    let targets = [-hatch, Vec2::ZERO, hatch];
+    let expected: Vec<_> = targets
+        .iter()
+        .map(|&target| {
+            map.routes()
+                .reference_round_trip_to_actor_target(start, target, 4.0, hatch)
+        })
+        .collect();
+    assert!(expected[0].endpoint.is_some());
+    assert!(expected[1].endpoint.is_none());
+    for quota in [1, 7, 64, 4096] {
+        let mut queue = PlanningQueue::new(3);
+        let tokens: Vec<_> = targets
+            .iter()
+            .enumerate()
+            .map(|(actor, &target)| {
+                queue
+                    .submit(
+                        actor as u64,
+                        (map.revision, map.tick),
+                        JobLimits::default(),
+                        GroundRoundTripJob::new(Arc::clone(&map), start, target, 4.0, hatch),
+                    )
+                    .unwrap()
+            })
+            .collect();
+        assert_eq!(queue.advance(Work::default()).charged, Work::default());
+        assert!(tokens.iter().all(|&token| matches!(
+            queue.poll(token, &(map.revision, map.tick)),
+            JobPoll::Pending
+        )));
+        let mut ticks = 0;
+        loop {
+            let report = queue.advance(Work {
+                graph: quota,
+                physics_queries: 11,
+            });
+            ticks += 1;
+            assert!(ticks < 100_000);
+            assert!(report.charged.graph <= quota);
+            assert_eq!(report.charged.physics_queries, 0);
+            assert_eq!(
+                report.charged.graph,
+                report.jobs.iter().map(|j| j.charged.graph).sum::<u32>()
+            );
+            let mut complete = 0;
+            for (i, &token) in tokens.iter().enumerate() {
+                match queue.poll(token, &(map.revision, map.tick)) {
+                    JobPoll::Ready(result) => {
+                        assert_eq!(result, &expected[i]);
+                        complete += 1;
+                    }
+                    JobPoll::Pending => {}
+                    JobPoll::Stale => panic!("unchanged snapshot became stale"),
+                }
+            }
+            if complete == tokens.len() {
+                break;
+            }
+        }
+    }
+}
+
+#[test]
+fn high_degree_search_charges_individual_edges_and_clone_keeps_frontier() {
+    let map = busy_round_trip_map();
+    let start = map.nodes[0].position;
+    let hatch = start + start.normalized() * SurfaceSortieState::spec().half_height();
+    let mut job = GroundRoundTripJob::new(Arc::clone(&map), start, -hatch, 4.0, hatch);
+    while job.work().scanned_edges < 17 {
+        let before = job.work();
+        job.step();
+        let after = job.work();
+        assert_eq!(after.operations, before.operations + 1);
+        assert!(after.scanned_edges - before.scanned_edges <= 1);
+        assert!(after.indexed_edges - before.indexed_edges <= 1);
+        assert!(after.queue_pops - before.queue_pops <= 1);
+    }
+    let mut clone = job.clone();
+    while job.next_work().is_some() {
+        job.step();
+    }
+    while clone.next_work().is_some() {
+        clone.step();
+    }
+    assert_eq!(job.output(), clone.output());
+    assert_eq!(job.work(), clone.work());
+    assert_eq!(
+        job.output().unwrap(),
+        &map.routes()
+            .reference_round_trip_to_actor_target(start, -hatch, 4.0, hatch)
+    );
+    assert!(job.work().queue_pops >= job.work().expanded_nodes);
+    let work = job.work();
+    job.step();
+    assert_eq!(job.work(), work);
+}
+
+#[test]
+fn changed_measurements_cannot_publish_a_pending_or_ready_trip() {
+    let mut map = busy_round_trip_map();
+    let start = map.nodes[0].position;
+    let hatch = start + start.normalized() * SurfaceSortieState::spec().half_height();
+    let mut queue = PlanningQueue::new(1);
+    // Include a separate overlay generation: terrain revision alone is not
+    // enough when a ship moves across otherwise unchanged ground.
+    let context = (map.actor, map.planet, map.revision, map.tick, 5_u64);
+    let pending = queue
+        .submit(
+            0,
+            context,
+            JobLimits::default(),
+            GroundRoundTripJob::new(Arc::clone(&map), start, -hatch, 4.0, hatch),
+        )
+        .unwrap();
+    queue.advance(Work {
+        graph: 17,
+        physics_queries: 0,
+    });
+    assert_eq!(
+        queue.poll(pending, &(context.0, context.1, context.2, context.3, 6)),
+        JobPoll::Stale
+    );
+    assert_eq!(Arc::strong_count(&map), 1);
+    let ready = queue
+        .submit(
+            0,
+            context,
+            JobLimits::default(),
+            GroundRoundTripJob::new(Arc::clone(&map), start, -hatch, 4.0, hatch),
+        )
+        .unwrap();
+    queue.advance(Work::UNLIMITED);
+    assert!(matches!(queue.poll(ready, &context), JobPoll::Ready(_)));
+    Arc::make_mut(&mut map).revision += 1;
+    Arc::make_mut(&mut map).edges.clear();
+    assert_eq!(
+        queue.poll(
+            ready,
+            &(context.0, context.1, map.revision, context.3, context.4)
+        ),
+        JobPoll::Stale
+    );
+    assert_eq!(queue.advance(Work::UNLIMITED).charged, Work::default());
 }

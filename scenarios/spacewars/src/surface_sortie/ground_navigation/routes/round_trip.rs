@@ -1,12 +1,38 @@
-//! Joint walk/jump access to an interaction region and back to the hatch.
+//! Resumable joint walk/jump search over one immutable measurement.
 use super::*;
-use std::{cmp::Ordering, collections::BinaryHeap};
+use engine_core::planning::{PlanningJob, WorkKind};
+use std::{cmp::Ordering, collections::BinaryHeap, sync::Arc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroundRoundTrip {
     pub outbound: GroundRoute,
     pub returning: Option<GroundRoute>,
     pub endpoint: Option<GroundNode>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct GroundTripWork {
+    pub operations: u64,
+    pub indexed_edges: u64,
+    pub queue_pops: u64,
+    pub expanded_nodes: u64,
+    pub scanned_edges: u64,
+    pub peak_frontier: usize,
+}
+
+#[derive(Clone)]
+enum Snapshot<'a> {
+    Borrowed(&'a GroundMap),
+    Shared(Arc<GroundMap>),
+}
+impl std::ops::Deref for Snapshot<'_> {
+    type Target = GroundMap;
+    fn deref(&self) -> &GroundMap {
+        match self {
+            Self::Borrowed(map) => map,
+            Self::Shared(map) => map,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -34,15 +60,445 @@ impl Ord for Entry {
     }
 }
 
-struct Distances {
+#[derive(Clone)]
+struct Search {
     costs: [f32; GROUND_SAMPLES],
     parents: [Option<(u16, f32, GroundEdgeKind)>; GROUND_SAMPLES],
+    queue: BinaryHeap<Entry>,
+    active: Option<(Entry, usize, usize)>,
     visited: usize,
+}
+impl Search {
+    fn new() -> Self {
+        Self {
+            costs: [f32::INFINITY; GROUND_SAMPLES],
+            parents: [None; GROUND_SAMPLES],
+            queue: BinaryHeap::new(),
+            active: None,
+            visited: 0,
+        }
+    }
+    fn seed(&mut self, node: usize) {
+        self.costs[node] = 0.0;
+        self.queue.push(Entry { cost: 0.0, node });
+    }
+    // One queue pop or directed edge inspection. High-degree vertices and
+    // obsolete heap entries cannot hide arbitrary work in one expansion.
+    fn step(
+        &mut self,
+        map: &GroundMap,
+        offsets: &[usize; GROUND_SAMPLES + 1],
+        edges: &[usize],
+        reversed: bool,
+        work: &mut GroundTripWork,
+    ) -> bool {
+        if let Some((entry, index, end)) = self.active {
+            let edge = map.edges[edges[index]];
+            work.scanned_edges += 1;
+            self.active = (index + 1 < end).then_some((entry, index + 1, end));
+            if edge.kind != GroundEdgeKind::Jetpack {
+                let next = usize::from(if reversed { edge.from } else { edge.to });
+                let candidate = entry.cost
+                    + edge.length
+                    + if edge.kind == GroundEdgeKind::Jump {
+                        2.0
+                    } else {
+                        0.0
+                    };
+                if candidate < self.costs[next] {
+                    self.costs[next] = candidate;
+                    self.parents[next] = Some((entry.node as u16, edge.length, edge.kind));
+                    self.queue.push(Entry {
+                        cost: candidate,
+                        node: next,
+                    });
+                }
+            }
+        } else if let Some(entry) = self.queue.pop() {
+            work.queue_pops += 1;
+            if entry.cost == self.costs[entry.node] {
+                self.visited += 1;
+                work.expanded_nodes += 1;
+                let (start, end) = (offsets[entry.node], offsets[entry.node + 1]);
+                self.active = (start < end).then_some((entry, start, end));
+            }
+        } else {
+            return true;
+        }
+        work.peak_frontier = work.peak_frontier.max(self.queue.len());
+        false
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Nodes(usize),
+    CountEdges(usize),
+    Prefix(usize),
+    IndexEdges(usize),
+    Forward,
+    ReturnSources(usize),
+    Reverse,
+    Endpoint(usize),
+    ReturnDiagnostics(usize),
+    TraceOut(usize),
+    ReverseOut(usize),
+    TraceBack(usize),
+    Done,
+}
+
+/// Retains an immutable measurement, never live physics. Completion describes
+/// that snapshot only; the adapter must revalidate dependencies and execution.
+/// Each step charges a node/edge/index inspection, queue pop, path operation or
+/// constant-size transition. Initial fixed 512-slot arrays/buffer reservations
+/// are outside dispatch; variable index filling and path tracing are resumable.
+/// Heap operations and buffer growth still depend on graph size; operation
+/// quotas are not time limits and do not include allocator/scheduler overhead.
+#[derive(Clone)]
+pub struct GroundRoundTripJob<'a> {
+    map: Snapshot<'a>,
+    start: Vec2,
+    target: Vec2,
+    range: f32,
+    hatch: Vec2,
+    height: f32,
+    nodes: [Option<GroundNode>; GROUND_SAMPLES],
+    offsets: [usize; GROUND_SAMPLES + 1],
+    reverse_offsets: [usize; GROUND_SAMPLES + 1],
+    next: [usize; GROUND_SAMPLES + 1],
+    reverse_next: [usize; GROUND_SAMPLES + 1],
+    outgoing: Vec<usize>,
+    incoming: Vec<usize>,
+    forward: Search,
+    backward: Search,
+    best: Option<(GroundNode, f32)>,
+    phase: Phase,
+    result: GroundRoundTrip,
+    work: GroundTripWork,
+}
+impl GroundRoundTripJob<'static> {
+    pub fn new(map: Arc<GroundMap>, start: Vec2, target: Vec2, range: f32, hatch: Vec2) -> Self {
+        Self::create(Snapshot::Shared(map), start, target, range, hatch)
+    }
+}
+impl<'a> GroundRoundTripJob<'a> {
+    fn create(map: Snapshot<'a>, start: Vec2, target: Vec2, range: f32, hatch: Vec2) -> Self {
+        assert!(map.nodes.len() <= GROUND_SAMPLES);
+        let edges = map.edges.len();
+        Self {
+            map,
+            start,
+            target,
+            range,
+            hatch,
+            height: SurfaceSortieState::spec().half_height(),
+            nodes: [None; GROUND_SAMPLES],
+            offsets: [0; GROUND_SAMPLES + 1],
+            reverse_offsets: [0; GROUND_SAMPLES + 1],
+            next: [0; GROUND_SAMPLES + 1],
+            reverse_next: [0; GROUND_SAMPLES + 1],
+            outgoing: Vec::with_capacity(edges),
+            incoming: Vec::with_capacity(edges),
+            forward: Search::new(),
+            backward: Search::new(),
+            best: None,
+            phase: Phase::Nodes(0),
+            result: GroundRoundTrip {
+                outbound: GroundRoute {
+                    path: vec![],
+                    diagnostics: empty_diagnostics(),
+                },
+                returning: None,
+                endpoint: None,
+            },
+            work: GroundTripWork::default(),
+        }
+    }
+    pub fn work(&self) -> GroundTripWork {
+        self.work
+    }
+    /// Compatibility path. Existing v10 callers still finish synchronously;
+    /// hosts that spread work over updates must use the explicit queue API.
+    pub fn finish(mut self) -> GroundRoundTrip {
+        while self.next_work().is_some() {
+            self.step();
+        }
+        // Aggregate once for synchronous observation profiling. Touching the
+        // thread-local profile on every edge would distort the measured cost.
+        #[cfg(feature = "sensor-profile")]
+        if self.work.queue_pops > 0 {
+            use super::super::super::sensor_profile::Counter;
+            Counter::new("ground_round_trip_scanned_edges").add(self.work.scanned_edges as usize);
+            Counter::new("ground_round_trip_visited_nodes").add(self.work.expanded_nodes as usize);
+            Counter::new("ground_round_trip_index_scanned_edges")
+                .add(self.work.indexed_edges as usize);
+        }
+        self.result
+    }
+    fn fail(&mut self, failure: GroundRouteFailure) {
+        self.result.outbound.diagnostics.failure = Some(failure);
+        self.phase = Phase::Done;
+    }
+    fn distance(&self, node: GroundNode, target: Vec2) -> f32 {
+        (node.position + node.position.normalized() * self.height).distance_to(target)
+    }
+}
+fn empty_diagnostics() -> GroundRouteDiagnostics {
+    GroundRouteDiagnostics {
+        failure: None,
+        partial: false,
+        start_node: None,
+        start_distance: None,
+        destination_nodes: 0,
+        nearest_destination_distance: None,
+        reachable_nodes: 0,
+        closest_reachable_distance: None,
+        length: 0.0,
+        jumps: 0,
+        flights: 0,
+    }
+}
+fn measure_node(
+    d: &mut GroundRouteDiagnostics,
+    node: GroundNode,
+    start: Vec2,
+    distance: f32,
+    range: f32,
+) {
+    let from_start = node.position.distance_to(start);
+    if d.start_distance
+        .is_none_or(|old| from_start.total_cmp(&old).is_lt())
+    {
+        d.start_node = Some(node.id);
+        d.start_distance = Some(from_start);
+    }
+    d.destination_nodes += usize::from(distance < range);
+    if d.nearest_destination_distance
+        .is_none_or(|old| distance.total_cmp(&old).is_lt())
+    {
+        d.nearest_destination_distance = Some(distance);
+    }
+}
+impl PlanningJob for GroundRoundTripJob<'_> {
+    type Output = GroundRoundTrip;
+    fn next_work(&self) -> Option<WorkKind> {
+        (self.phase != Phase::Done).then_some(WorkKind::Graph)
+    }
+    fn output(&self) -> Option<&GroundRoundTrip> {
+        (self.phase == Phase::Done).then_some(&self.result)
+    }
+    fn step(&mut self) {
+        if self.phase == Phase::Done {
+            return;
+        }
+        self.work.operations += 1;
+        match self.phase {
+            Phase::Nodes(i) => {
+                if let Some(&node) = self.map.nodes.get(i) {
+                    self.nodes[usize::from(node.id)].get_or_insert(node);
+                    let distance = self.distance(node, self.target);
+                    measure_node(
+                        &mut self.result.outbound.diagnostics,
+                        node,
+                        self.start,
+                        distance,
+                        self.range,
+                    );
+                    self.phase = Phase::Nodes(i + 1);
+                } else if !self
+                    .result
+                    .outbound
+                    .diagnostics
+                    .start_distance
+                    .is_some_and(|d| d < 3.0)
+                {
+                    self.fail(GroundRouteFailure::NoStartFooting);
+                } else if self.result.outbound.diagnostics.destination_nodes == 0 {
+                    self.fail(GroundRouteFailure::NoDestinationFooting);
+                } else {
+                    self.forward.seed(usize::from(
+                        self.result.outbound.diagnostics.start_node.unwrap(),
+                    ));
+                    self.work.peak_frontier = 1;
+                    self.phase = Phase::CountEdges(0);
+                }
+            }
+            Phase::CountEdges(i) => {
+                if let Some(edge) = self.map.edges.get(i) {
+                    assert!(edge.length.is_finite() && edge.length >= 0.0);
+                    self.offsets[usize::from(edge.from) + 1] += 1;
+                    self.reverse_offsets[usize::from(edge.to) + 1] += 1;
+                    self.outgoing.push(0);
+                    self.incoming.push(0);
+                    self.work.indexed_edges += 1;
+                    self.phase = Phase::CountEdges(i + 1);
+                } else {
+                    self.phase = Phase::Prefix(1);
+                }
+            }
+            Phase::Prefix(i) => {
+                if i <= GROUND_SAMPLES {
+                    self.offsets[i] += self.offsets[i - 1];
+                    self.reverse_offsets[i] += self.reverse_offsets[i - 1];
+                    self.next[i] = self.offsets[i];
+                    self.reverse_next[i] = self.reverse_offsets[i];
+                    self.phase = Phase::Prefix(i + 1);
+                } else {
+                    self.phase = Phase::IndexEdges(0);
+                }
+            }
+            Phase::IndexEdges(i) => {
+                if let Some(edge) = self.map.edges.get(i) {
+                    let from = usize::from(edge.from);
+                    let to = usize::from(edge.to);
+                    self.outgoing[self.next[from]] = i;
+                    self.next[from] += 1;
+                    self.incoming[self.reverse_next[to]] = i;
+                    self.reverse_next[to] += 1;
+                    self.work.indexed_edges += 1;
+                    self.phase = Phase::IndexEdges(i + 1);
+                } else {
+                    self.phase = Phase::Forward;
+                }
+            }
+            Phase::Forward => {
+                if self.forward.step(
+                    &self.map,
+                    &self.offsets,
+                    &self.outgoing,
+                    false,
+                    &mut self.work,
+                ) {
+                    self.result.outbound.diagnostics.reachable_nodes = self.forward.visited;
+                    self.phase = Phase::ReturnSources(0);
+                }
+            }
+            Phase::ReturnSources(i) => {
+                if let Some(&node) = self.map.nodes.get(i) {
+                    if self.distance(node, self.hatch) < HATCH_APPROACH_RANGE {
+                        self.backward.seed(usize::from(node.id));
+                        self.work.peak_frontier =
+                            self.work.peak_frontier.max(self.backward.queue.len());
+                    }
+                    self.phase = Phase::ReturnSources(i + 1);
+                } else {
+                    self.phase = Phase::Reverse;
+                }
+            }
+            Phase::Reverse => {
+                if self.backward.step(
+                    &self.map,
+                    &self.reverse_offsets,
+                    &self.incoming,
+                    true,
+                    &mut self.work,
+                ) {
+                    self.phase = Phase::Endpoint(0);
+                }
+            }
+            Phase::Endpoint(i) => {
+                if let Some(&node) = self.map.nodes.get(i) {
+                    let id = usize::from(node.id);
+                    let distance = self.distance(node, self.target);
+                    if self.forward.costs[id].is_finite() {
+                        let d = &mut self.result.outbound.diagnostics.closest_reachable_distance;
+                        if d.is_none_or(|old| distance.total_cmp(&old).is_lt()) {
+                            *d = Some(distance);
+                        }
+                    }
+                    let cost = self.forward.costs[id] + self.backward.costs[id];
+                    if distance < self.range
+                        && cost.is_finite()
+                        && self.best.is_none_or(|(best, old)| {
+                            cost.total_cmp(&old)
+                                .then_with(|| node.id.cmp(&best.id))
+                                .is_lt()
+                        })
+                    {
+                        self.best = Some((node, cost));
+                    }
+                    self.phase = Phase::Endpoint(i + 1);
+                } else if let Some((node, _)) = self.best {
+                    self.result.endpoint = Some(node);
+                    self.result.returning = Some(GroundRoute {
+                        path: vec![node.id],
+                        diagnostics: empty_diagnostics(),
+                    });
+                    self.phase = Phase::ReturnDiagnostics(0);
+                } else {
+                    self.fail(GroundRouteFailure::Disconnected);
+                }
+            }
+            Phase::ReturnDiagnostics(i) => {
+                let endpoint = self.result.endpoint.unwrap();
+                if let Some(&node) = self.map.nodes.get(i) {
+                    let distance = self.distance(node, self.hatch);
+                    measure_node(
+                        &mut self.result.returning.as_mut().unwrap().diagnostics,
+                        node,
+                        endpoint.position,
+                        distance,
+                        HATCH_APPROACH_RANGE,
+                    );
+                    self.phase = Phase::ReturnDiagnostics(i + 1);
+                } else {
+                    let distance = self.distance(endpoint, self.hatch);
+                    let d = &mut self.result.returning.as_mut().unwrap().diagnostics;
+                    d.reachable_nodes = self.backward.visited;
+                    d.closest_reachable_distance = Some(distance);
+                    self.result.outbound.path.push(endpoint.id);
+                    self.phase = Phase::TraceOut(usize::from(endpoint.id));
+                }
+            }
+            Phase::TraceOut(cursor) => {
+                if let Some((previous, length, kind)) = self.forward.parents[cursor] {
+                    self.result.outbound.path.push(previous);
+                    self.result.outbound.diagnostics.length += length;
+                    self.result.outbound.diagnostics.jumps +=
+                        usize::from(kind == GroundEdgeKind::Jump);
+                    self.phase = Phase::TraceOut(usize::from(previous));
+                } else {
+                    self.phase = Phase::ReverseOut(0);
+                }
+            }
+            Phase::ReverseOut(i) => {
+                let path = &mut self.result.outbound.path;
+                if i < path.len() / 2 {
+                    let end = path.len() - 1 - i;
+                    path.swap(i, end);
+                    self.phase = Phase::ReverseOut(i + 1);
+                } else {
+                    self.phase = Phase::TraceBack(usize::from(self.result.endpoint.unwrap().id));
+                }
+            }
+            Phase::TraceBack(cursor) => {
+                if let Some((next, length, kind)) = self.backward.parents[cursor] {
+                    let distance =
+                        self.nodes[usize::from(next)].map(|node| self.distance(node, self.hatch));
+                    let back = self.result.returning.as_mut().unwrap();
+                    back.path.push(next);
+                    back.diagnostics.length += length;
+                    back.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
+                    if let Some(distance) = distance {
+                        back.diagnostics.closest_reachable_distance = Some(
+                            back.diagnostics
+                                .closest_reachable_distance
+                                .unwrap()
+                                .min(distance),
+                        );
+                    }
+                    self.phase = Phase::TraceBack(usize::from(next));
+                } else {
+                    self.phase = Phase::Done;
+                }
+            }
+            Phase::Done => {}
+        }
+    }
 }
 
 impl GroundRoutes<'_> {
-    /// Optimize both legs together, retaining the original direction of every
-    /// measured edge. Jetpack resource planning is outside this walk/jump query.
+    /// Retains v10's synchronous behavior while sharing the resumable solver.
     pub fn round_trip_to_actor_target(
         &self,
         start: Vec2,
@@ -52,204 +508,7 @@ impl GroundRoutes<'_> {
     ) -> GroundRoundTrip {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::super::super::sensor_profile::Scope::new("ground_round_trip");
-        let height = SurfaceSortieState::spec().half_height();
-        let distance = |node: &GroundNode, target: Vec2| {
-            (node.position + node.position.normalized() * height).distance_to(target)
-        };
-        let diagnostics = |start: Vec2, target: Vec2, range: f32| {
-            let nearest = self.map.nodes.iter().min_by(|a, b| {
-                a.position
-                    .distance_to(start)
-                    .total_cmp(&b.position.distance_to(start))
-            });
-            GroundRouteDiagnostics {
-                failure: None,
-                partial: false,
-                start_node: nearest.map(|n| n.id),
-                start_distance: nearest.map(|n| n.position.distance_to(start)),
-                destination_nodes: self
-                    .map
-                    .nodes
-                    .iter()
-                    .filter(|n| distance(n, target) < range)
-                    .count(),
-                nearest_destination_distance: self
-                    .map
-                    .nodes
-                    .iter()
-                    .map(|n| distance(n, target))
-                    .min_by(f32::total_cmp),
-                reachable_nodes: 0,
-                closest_reachable_distance: None,
-                length: 0.0,
-                jumps: 0,
-                flights: 0,
-            }
-        };
-        let mut result = GroundRoundTrip {
-            outbound: GroundRoute {
-                path: vec![],
-                diagnostics: diagnostics(start, target, range),
-            },
-            returning: None,
-            endpoint: None,
-        };
-        if !result
-            .outbound
-            .diagnostics
-            .start_distance
-            .is_some_and(|d| d < 3.0)
-        {
-            result.outbound.diagnostics.failure = Some(GroundRouteFailure::NoStartFooting);
-            return result;
-        }
-        if result.outbound.diagnostics.destination_nodes == 0 {
-            result.outbound.diagnostics.failure = Some(GroundRouteFailure::NoDestinationFooting);
-            return result;
-        }
-        let initial = usize::from(result.outbound.diagnostics.start_node.unwrap());
-        let forward = self.distances([initial], &self.offsets, &self.outgoing, false);
-        result.outbound.diagnostics.reachable_nodes = forward.visited;
-        result.outbound.diagnostics.closest_reachable_distance = self
-            .map
-            .nodes
-            .iter()
-            .filter(|n| forward.costs[usize::from(n.id)].is_finite())
-            .map(|n| distance(n, target))
-            .min_by(f32::total_cmp);
-
-        // Incoming entries preserve original edge order. A reversed search
-        // follows an edge from its destination to its source, never vice versa
-        // during physical execution.
-        let mut offsets = [0; GROUND_SAMPLES + 1];
-        for edge in &self.map.edges {
-            offsets[usize::from(edge.to) + 1] += 1;
-        }
-        for i in 1..=GROUND_SAMPLES {
-            offsets[i] += offsets[i - 1];
-        }
-        let mut incoming = vec![0; self.map.edges.len()];
-        let mut next = offsets;
-        for (i, edge) in self.map.edges.iter().enumerate() {
-            let to = usize::from(edge.to);
-            incoming[next[to]] = i;
-            next[to] += 1;
-        }
-        #[cfg(feature = "sensor-profile")]
-        super::super::super::sensor_profile::Counter::new("ground_round_trip_index_scanned_edges")
-            .add(2 * self.map.edges.len());
-        let returning = self.distances(
-            self.map
-                .nodes
-                .iter()
-                .filter(|n| distance(n, hatch) < HATCH_APPROACH_RANGE)
-                .map(|n| usize::from(n.id)),
-            &offsets,
-            &incoming,
-            true,
-        );
-        let endpoint = self
-            .map
-            .nodes
-            .iter()
-            .filter(|n| distance(n, target) < range)
-            .filter_map(|n| {
-                let id = usize::from(n.id);
-                let cost = forward.costs[id] + returning.costs[id];
-                cost.is_finite().then_some((n, cost))
-            })
-            .min_by(|(a, ac), (b, bc)| ac.total_cmp(bc).then_with(|| a.id.cmp(&b.id)))
-            .map(|(node, _)| *node);
-        let Some(endpoint) = endpoint else {
-            result.outbound.diagnostics.failure = Some(GroundRouteFailure::Disconnected);
-            return result;
-        };
-        trace_route(
-            &mut result.outbound,
-            &forward.parents,
-            usize::from(endpoint.id),
-        );
-        let mut back = GroundRoute {
-            path: vec![endpoint.id],
-            diagnostics: diagnostics(endpoint.position, hatch, HATCH_APPROACH_RANGE),
-        };
-        back.diagnostics.reachable_nodes = returning.visited;
-        back.diagnostics.closest_reachable_distance = Some(distance(&endpoint, hatch));
-        let mut cursor = usize::from(endpoint.id);
-        while let Some((next, length, kind)) = returning.parents[cursor] {
-            back.path.push(next);
-            back.diagnostics.length += length;
-            back.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
-            cursor = usize::from(next);
-            if let Some(node) = self.nodes[cursor] {
-                back.diagnostics.closest_reachable_distance = Some(
-                    back.diagnostics
-                        .closest_reachable_distance
-                        .unwrap()
-                        .min(distance(node, hatch)),
-                );
-            }
-        }
-        result.endpoint = Some(endpoint);
-        result.returning = Some(back);
-        result
-    }
-
-    fn distances(
-        &self,
-        sources: impl IntoIterator<Item = usize>,
-        offsets: &[usize; GROUND_SAMPLES + 1],
-        edges: &[usize],
-        reversed: bool,
-    ) -> Distances {
-        #[cfg(feature = "sensor-profile")]
-        let scanned =
-            super::super::super::sensor_profile::Counter::new("ground_round_trip_scanned_edges");
-        #[cfg(feature = "sensor-profile")]
-        let visited =
-            super::super::super::sensor_profile::Counter::new("ground_round_trip_visited_nodes");
-        let mut result = Distances {
-            costs: [f32::INFINITY; GROUND_SAMPLES],
-            parents: [None; GROUND_SAMPLES],
-            visited: 0,
-        };
-        let mut queue = BinaryHeap::new();
-        for node in sources {
-            result.costs[node] = 0.0;
-            queue.push(Entry { cost: 0.0, node });
-        }
-        while let Some(Entry { cost, node }) = queue.pop() {
-            if cost != result.costs[node] {
-                continue;
-            }
-            result.visited += 1;
-            #[cfg(feature = "sensor-profile")]
-            visited.add(1);
-            for &index in &edges[offsets[node]..offsets[node + 1]] {
-                #[cfg(feature = "sensor-profile")]
-                scanned.add(1);
-                let edge = &self.map.edges[index];
-                if edge.kind == GroundEdgeKind::Jetpack {
-                    continue;
-                }
-                let next = usize::from(if reversed { edge.from } else { edge.to });
-                let candidate = cost
-                    + edge.length
-                    + if edge.kind == GroundEdgeKind::Jump {
-                        2.0
-                    } else {
-                        0.0
-                    };
-                if candidate < result.costs[next] {
-                    result.costs[next] = candidate;
-                    result.parents[next] = Some((node as u16, edge.length, edge.kind));
-                    queue.push(Entry {
-                        cost: candidate,
-                        node: next,
-                    });
-                }
-            }
-        }
-        result
+        GroundRoundTripJob::create(Snapshot::Borrowed(self.map), start, target, range, hatch)
+            .finish()
     }
 }

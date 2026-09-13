@@ -7,6 +7,8 @@ mod landing_cadence_probe;
 mod mission_metrics;
 #[path = "support/physics_profile.rs"]
 mod physics_profile;
+#[path = "support/planning_probe.rs"]
+mod planning_probe;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -62,6 +64,8 @@ fn main() {
         .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
     let timing_csv = arg("--timing-csv", "false") == "true";
+    let mut planning_probe = (arg("--probe-planning-budget", "false") == "true")
+        .then(planning_probe::PlanningProbe::default);
     let survey_hz: u8 = arg("--landing-survey-hz", "4").parse().unwrap();
     let cadence = match survey_hz {
         4 => LandingSurveyCadence::FourHz,
@@ -306,6 +310,9 @@ fn main() {
                     .ground
                     .as_ref()
                     .map_or(0, |g| g.nodes.len());
+                if let Some(probe) = &mut planning_probe {
+                    probe.observe(i, o.local.combat.recovery.ground.as_ref());
+                }
                 if o.local.landing_objective.is_some() {
                     objective_sensors.push(sensor_ms);
                 }
@@ -558,6 +565,9 @@ fn main() {
     }
     #[cfg(feature = "sensor-profile")]
     sensor_profiles.flush().unwrap();
+    if let Some(probe) = planning_probe {
+        probe.finish(&out);
+    }
     let final_audit = state.terrain_diagnostics();
     if !final_audit.issues.is_empty()
         || final_audit.occupied_cells + final_audit.removed_cells != initial
