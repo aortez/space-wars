@@ -7,7 +7,7 @@ use rand::{Rng, rngs::StdRng};
 
 use crate::{
     SegmentId, SegmentRepresentation, SegmentState, digits,
-    layout::Layout,
+    floor::DrainGeometry,
     meridiem::{LetterState, PIXEL_SIZE},
 };
 
@@ -28,11 +28,12 @@ fn letter_body_id(slot: usize) -> BodyId {
 
 impl FallingWorld {
     pub fn new(
-        layout: Layout,
+        drain: DrainGeometry,
         segments: &mut [SegmentState],
         letters: &[LetterState],
         rng: &mut StdRng,
     ) -> Self {
+        let layout = drain.layout();
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -400.0),
             length_unit: layout.pitch,
@@ -45,27 +46,19 @@ impl FallingWorld {
             .map(|letter| letter.glyph.cells().count())
             .sum::<usize>();
         world.reserve(32 + letters.len(), 100 + letter_colliders, 0);
-        let drain = layout.drain_half_width();
-        for (index, (min, max)) in [
-            (
-                Vec2::new(layout.bounds_min.x, layout.bounds_min.y),
-                Vec2::new(-drain, layout.floor_y),
-            ),
-            (
-                Vec2::new(drain, layout.bounds_min.y),
-                Vec2::new(layout.bounds_max.x, layout.floor_y),
-            ),
-            (
-                Vec2::new(layout.bounds_min.x - 20.0, layout.bounds_min.y),
-                Vec2::new(layout.bounds_min.x, layout.bounds_max.y + 100.0),
-            ),
-            (
-                Vec2::new(layout.bounds_max.x, layout.bounds_min.y),
-                Vec2::new(layout.bounds_max.x + 20.0, layout.bounds_max.y + 100.0),
-            ),
-        ]
-        .into_iter()
-        .enumerate()
+        for (index, (min, max)) in drain
+            .slabs()
+            .chain([
+                (
+                    Vec2::new(layout.bounds_min.x - 20.0, layout.bounds_min.y),
+                    Vec2::new(layout.bounds_min.x, layout.bounds_max.y + 100.0),
+                ),
+                (
+                    Vec2::new(layout.bounds_max.x, layout.bounds_min.y),
+                    Vec2::new(layout.bounds_max.x + 20.0, layout.bounds_max.y + 100.0),
+                ),
+            ])
+            .enumerate()
         {
             let entity = PhysicsId::new(100 + index as u64);
             assert!(world.insert_body(

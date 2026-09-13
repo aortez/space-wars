@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 9;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -40,6 +40,7 @@ pub struct ClockState {
     pub palette_rgb: [u8; 3],
     pub body_count: usize,
     pub collider_count: usize,
+    pub floor: engine_common::ClockFloorMode,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     pub marquee: Option<engine_common::ClockMarqueeState>,
@@ -349,6 +350,7 @@ mod tests {
             palette_rgb: [170, 140, 255],
             body_count: 0,
             collider_count: 0,
+            floor: engine_common::ClockFloorMode::Closed,
             meltdown: None,
             duck: None,
             marquee: None,
@@ -364,10 +366,26 @@ mod tests {
     }
 
     #[test]
+    fn floor_modes_round_trip_as_explicit_diagnostics() {
+        for mode in [
+            engine_common::ClockFloorMode::Closed,
+            engine_common::ClockFloorMode::DrainOpen,
+            engine_common::ClockFloorMode::EventOwned,
+        ] {
+            let mut state = clock_state();
+            state.floor = mode;
+            let json = state.to_json().unwrap();
+            assert!(json.contains(&format!("\"floor\":\"{}\"", mode.as_str())));
+            assert_eq!(ClockState::from_json(&json).unwrap(), state);
+        }
+    }
+
+    #[test]
     fn rain_diagnostics_settings_and_named_trigger_round_trip() {
         use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
         let mut state = clock_state();
         state.event_kind = Some(ClockEventKind::Rain);
+        state.floor = engine_common::ClockFloorMode::DrainOpen;
         state.phase = Some("raining".into());
         state.settings.rain_amount = ClockRainAmount::Varied;
         state.rain = Some(ClockRainState {

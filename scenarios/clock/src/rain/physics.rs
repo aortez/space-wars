@@ -6,9 +6,9 @@ use engine_rapier::{
         PhysicsWorld, PhysicsWorldConfig,
     },
 };
-use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld, immersion::HullShape};
+use engine_water::{WaterWorld, immersion::HullShape};
 
-use crate::layout::Layout;
+use crate::{floor::DrainGeometry, layout::Layout};
 
 pub(super) const DT: f64 = 1.0 / 60.0;
 pub(super) const COLUMNS: usize = 128;
@@ -17,35 +17,6 @@ pub(super) const DENSITY: f32 = 0.45;
 
 pub(super) fn half_extents(layout: Layout) -> Vec2 {
     Vec2::new(layout.pitch * 0.45, layout.pitch * 0.18)
-}
-
-pub(super) fn water(layout: Layout) -> WaterWorld {
-    let half = f64::from(layout.bounds_max.x);
-    let drain = f64::from(layout.drain_half_width());
-    let floor = f64::from(layout.floor_y);
-    WaterWorld::new(
-        WaterConfig {
-            exit_y: f64::from(layout.bounds_min.y),
-            max_parcels: PARCELS,
-            spill_channel: Some([-drain, drain]),
-            ..WaterConfig::default()
-        },
-        vec![
-            PoolSpec {
-                left: -half,
-                column_width: (half - drain) / (COLUMNS / 2) as f64,
-                bed: vec![floor; COLUMNS / 2],
-                boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
-            },
-            PoolSpec {
-                left: drain,
-                column_width: (half - drain) / (COLUMNS / 2) as f64,
-                bed: vec![floor; COLUMNS / 2],
-                boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
-            },
-        ],
-    )
-    .expect("bounded rain arena")
 }
 
 /// A passive dynamic hull. No path following, surface snapping or drain attraction.
@@ -58,7 +29,8 @@ pub(super) struct FloatWorld {
 }
 
 impl FloatWorld {
-    pub fn new(layout: Layout) -> Self {
+    pub fn new(drain: DrainGeometry) -> Self {
+        let layout = drain.layout();
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -400.0),
             length_unit: layout.pitch,
@@ -67,14 +39,10 @@ impl FloatWorld {
             ..PhysicsWorldConfig::default()
         });
         world.reserve(2, 5, 0);
-        let drain = layout.drain_half_width();
         let bottom = layout.bounds_min.y;
         let half = layout.bounds_max.x;
-        let floor = layout.floor_y;
         // Exact visible floor halves; in particular no collider bridges the drain.
-        let supports = [
-            (Vec2::new(-half, bottom), Vec2::new(-drain, floor)),
-            (Vec2::new(drain, bottom), Vec2::new(half, floor)),
+        let supports = drain.slabs().chain([
             (
                 Vec2::new(-half - 4.0, bottom),
                 Vec2::new(-half, layout.bounds_max.y),
@@ -83,10 +51,9 @@ impl FloatWorld {
                 Vec2::new(half, bottom),
                 Vec2::new(half + 4.0, layout.bounds_max.y),
             ),
-        ];
+        ]);
         let id = PhysicsId::new(1000);
         let colliders: Vec<_> = supports
-            .into_iter()
             .enumerate()
             .map(|(part, (min, max))| {
                 let mut collider = ColliderSpec::cuboid(
@@ -173,6 +140,8 @@ impl FloatWorld {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::floor::test_drain;
+    use engine_water::{Boundary, PoolSpec, WaterConfig};
 
     fn fill(water: &mut WaterWorld, depth: f64) {
         for pool in 0..water.pools().len() {
@@ -203,7 +172,7 @@ mod tests {
         )
         .unwrap();
         fill(&mut water, 30.0);
-        let mut physics = FloatWorld::new(layout);
+        let mut physics = FloatWorld::new(test_drain(layout));
         physics.spawn(Vec2::new(-100.0, layout.floor_y + 40.0), 0.12);
         for _ in 0..1200 {
             water.step(DT).unwrap();
@@ -230,9 +199,9 @@ mod tests {
             for side in [-1.0, 1.0] {
                 for drag in [0.0, 5.0] {
                     let layout = Layout::new(aspect);
-                    let mut water = water(layout);
+                    let mut water = test_drain(layout).water_world(COLUMNS, PARCELS);
                     fill(&mut water, f64::from(layout.pitch));
-                    let mut physics = FloatWorld::new(layout);
+                    let mut physics = FloatWorld::new(test_drain(layout));
                     let start = side * layout.bounds_max.x * 0.80;
                     physics.spawn(Vec2::new(start, layout.floor_y + layout.pitch * 1.4), 0.0);
                     let mut exit_tick = None;

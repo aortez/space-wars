@@ -114,16 +114,18 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
                             "no anchored label while its material is water"
                         );
                     }
-                    if tick == duration
-                        || (kind == ClockEventKind::Meltdown && tick == duration - 1)
-                    {
-                        assert_eq!(
-                            pixels.as_bytes(),
-                            normal_pixels.as_bytes(),
+                    if kind == ClockEventKind::Meltdown && tick == duration - 1 {
+                        assert!(
+                            floor_tests::pixels_above_floor(&pixels)
+                                == floor_tests::pixels_above_floor(&normal_pixels),
                             "latest label must recover exactly"
                         );
                     }
                     if tick == duration {
+                        assert!(
+                            pixels.as_bytes() == normal_pixels.as_bytes(),
+                            "completed event must restore the face and closed floor exactly"
+                        );
                         assert_eq!(frames[0], normal);
                     }
                     if let Some(directory) = std::env::var_os("SPACEWARS_CLOCK_ARTIFACTS") {

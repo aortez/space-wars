@@ -37,9 +37,17 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    if !matches!(&state.active_event, Some(crate::events::ActiveEvent::Meltdown(event)) if event.lab)
-    {
-        render_floor(&mut frame, layout);
+    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+        // The custom course owns its floor, including the entrance/exit fade.
+        // This backdrop never adds a collider across the course's physical pit.
+        render_floor(
+            &mut frame,
+            crate::floor::FloorGeometry::closed(layout),
+            layout.pitch,
+            1.0 - event.course_opacity(),
+        );
+    } else {
+        render_floor(&mut frame, state.floor.geometry(layout), layout.pitch, 1.0);
     }
     if let Some(crate::events::ActiveEvent::Marquee(event)) = &state.active_event {
         let opacity = 1.0 - event.playback().strength;
@@ -83,43 +91,42 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     frame
 }
 
-fn render_floor(frame: &mut RenderFrame, layout: Layout) {
-    let drain_half_width = layout.drain_half_width();
-    let left_max = RenderPoint::new(-drain_half_width, layout.floor_y);
-    let right_min = RenderPoint::new(drain_half_width, layout.bounds_min.y);
-    frame.push_primitive(
-        ARENA_LAYER,
-        rectangle(layout.bounds_min, left_max, FLOOR_COLOR, None),
-    );
-    frame.push_primitive(
-        ARENA_LAYER,
-        rectangle(
-            right_min,
-            RenderPoint::new(layout.bounds_max.x, layout.floor_y),
-            FLOOR_COLOR,
-            None,
-        ),
-    );
-
-    let edge_height = (layout.pitch * 0.10).clamp(1.5, 3.0);
-    frame.push_primitive(
-        ARENA_LAYER,
-        rectangle(
-            RenderPoint::new(layout.bounds_min.x, layout.floor_y - edge_height),
-            RenderPoint::new(-drain_half_width, layout.floor_y),
-            FLOOR_EDGE_COLOR,
-            None,
-        ),
-    );
-    frame.push_primitive(
-        ARENA_LAYER,
-        rectangle(
-            RenderPoint::new(drain_half_width, layout.floor_y - edge_height),
-            RenderPoint::new(layout.bounds_max.x, layout.floor_y),
-            FLOOR_EDGE_COLOR,
-            None,
-        ),
-    );
+fn render_floor(
+    frame: &mut RenderFrame,
+    floor: crate::floor::FloorGeometry,
+    pitch: f32,
+    opacity: f32,
+) {
+    if opacity <= 0.0 {
+        return;
+    }
+    let edge_height = (pitch * 0.10).clamp(1.5, 3.0);
+    for (min, max) in floor.slabs() {
+        frame.push_primitive(
+            ARENA_LAYER,
+            rectangle(
+                RenderPoint::new(min.x, min.y),
+                RenderPoint::new(max.x, max.y),
+                RenderColor {
+                    a: opacity,
+                    ..FLOOR_COLOR
+                },
+                None,
+            ),
+        );
+        frame.push_primitive(
+            ARENA_LAYER,
+            rectangle(
+                RenderPoint::new(min.x, max.y - edge_height),
+                RenderPoint::new(max.x, max.y),
+                RenderColor {
+                    a: opacity,
+                    ..FLOOR_EDGE_COLOR
+                },
+                None,
+            ),
+        );
+    }
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
@@ -333,7 +340,8 @@ mod tests {
             .iter()
             .map(|layer| layer.primitives.len())
             .sum::<usize>();
-        assert_eq!(primitive_count, 103);
+        // One background, one closed floor slab and edge, 96 cells, two dots.
+        assert_eq!(primitive_count, 101);
     }
 
     #[test]

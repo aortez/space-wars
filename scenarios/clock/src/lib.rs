@@ -6,6 +6,9 @@ mod digits;
 #[cfg(test)]
 mod event_tests;
 mod events;
+mod floor;
+#[cfg(test)]
+mod floor_tests;
 mod layout;
 #[cfg(test)]
 mod live_tests;
@@ -335,6 +338,7 @@ pub struct ClockState {
     segments: Vec<SegmentState>,
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
+    floor: floor::FloorManager,
 }
 
 impl ClockState {
@@ -381,6 +385,10 @@ impl ClockState {
 
     pub fn aspect_ratio(&self) -> f32 {
         self.config.aspect_ratio
+    }
+
+    pub fn floor_mode(&self) -> engine_common::ClockFloorMode {
+        self.floor.mode()
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
@@ -505,12 +513,14 @@ impl ClockState {
     ) {
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
+        self.floor.acquire(kind, self.config.water_lab);
         self.active_event = Some(ActiveEvent::new(
             kind,
             EventContext {
                 segments: &mut self.segments,
                 display: self.display,
                 layout,
+                floor: self.floor.geometry(layout),
             },
             seed,
             self.config,
@@ -522,6 +532,8 @@ impl ClockState {
         if let Some(event) = self.active_event.take() {
             self.schedule.finish(event.kind());
         }
+        // The event and its bodies/water have been dropped before closing.
+        self.floor.release();
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
@@ -536,6 +548,7 @@ impl ClockState {
                 segments: &mut self.segments,
                 display: self.display,
                 layout,
+                floor: self.floor.geometry(layout),
             }) {
                 self.finish_event();
             }
@@ -597,6 +610,7 @@ impl Scenario for ClockScenario {
             segments: digits::create_segments(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
+            floor: floor::FloorManager::default(),
         }
     }
 

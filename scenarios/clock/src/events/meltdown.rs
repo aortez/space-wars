@@ -6,7 +6,7 @@ use engine_water::{Boundary, Parcel, PoolSpec, WaterConfig, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS};
-use crate::{ClockWaterLab, SegmentRepresentation, digits, layout::Layout};
+use crate::{ClockWaterLab, SegmentRepresentation, digits, floor::DrainGeometry, layout::Layout};
 
 pub const MAX_MELTDOWN_CELLS: usize = 96 + crate::meridiem::MAX_CELLS;
 pub const WATER_COLUMNS: usize = 128;
@@ -30,6 +30,7 @@ pub(crate) struct MeltdownEvent {
     pub water: WaterWorld,
     pub lab: bool,
     pub floats: Option<water_lab::WaterLab>,
+    drain: Option<DrainGeometry>,
     initial_cells: usize,
     initial_area: f64,
     cell_area: f64,
@@ -79,7 +80,14 @@ impl MeltdownEvent {
             }
         }
         let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
-        let mut water = Self::water_world(context.layout, mode);
+        let drain = context.floor.drain();
+        let mut water = if lab {
+            Self::lab_water_world(context.layout, mode)
+        } else {
+            drain
+                .expect("Meltdown owns the drain")
+                .water_world(WATER_COLUMNS, MAX_SPILL_PARCELS)
+        };
         let initial_cells = if lab { LAB_INITIAL_CELLS } else { cells.len() };
         let initial_area = cell_area
             * if lab {
@@ -108,6 +116,7 @@ impl MeltdownEvent {
             water,
             lab,
             floats,
+            drain,
             cell_area,
             reclaimed_area: 0.0,
         }
@@ -123,9 +132,8 @@ impl MeltdownEvent {
         })
     }
 
-    fn water_world(layout: Layout, mode: ClockWaterLab) -> WaterWorld {
+    fn lab_water_world(layout: Layout, mode: ClockWaterLab) -> WaterWorld {
         let half = layout.bounds_max.x as f64;
-        let lip = layout.drain_half_width() as f64;
         let floor = layout.floor_y as f64;
         let specs = if mode.is_spilling_tank() {
             let pitch = Self::water_pitch(layout, mode);
@@ -178,26 +186,12 @@ impl MeltdownEvent {
                 },
             ]
         } else {
-            vec![
-                PoolSpec {
-                    left: -half,
-                    column_width: (half - lip) / SIDE_COLUMNS as f64,
-                    bed: vec![floor; SIDE_COLUMNS],
-                    boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
-                },
-                PoolSpec {
-                    left: lip,
-                    column_width: (half - lip) / SIDE_COLUMNS as f64,
-                    bed: vec![floor; SIDE_COLUMNS],
-                    boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
-                },
-            ]
+            unreachable!("normal Meltdown uses the managed drain")
         };
         WaterWorld::new(
             WaterConfig {
                 exit_y: layout.bounds_min.y as f64,
                 max_parcels: MAX_SPILL_PARCELS,
-                spill_channel: (mode == ClockWaterLab::Off).then_some([-lip, lip]),
                 ..WaterConfig::default()
             },
             specs,
@@ -300,7 +294,13 @@ impl MeltdownEvent {
                 cell.position.x = x;
                 cell.velocity.x *= -0.35;
             }
-            !material::merge(cell, extent, water, cell_area * cell.area_scale(), layout)
+            !material::merge(
+                cell,
+                extent,
+                water,
+                cell_area * cell.area_scale(),
+                self.drain.expect("normal melting cells own the drain"),
+            )
         });
     }
 

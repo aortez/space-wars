@@ -1,4 +1,5 @@
 use super::*;
+use crate::floor::test_drain;
 use crate::{
     ClockAction, ClockConfig, ClockReading, ClockScenario, SegmentRepresentation,
     events::ActiveEvent,
@@ -16,7 +17,7 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
         ] {
             for seed in 0..8 {
                 let layout = Layout::new(aspect);
-                let mut event = RainEvent::new(layout, seed, amount);
+                let mut event = RainEvent::new(test_drain(layout), seed, amount);
                 let mut spawn_tick = None;
                 let mut exit_tick = None;
                 let mut max_depth = 0.0_f32;
@@ -68,8 +69,8 @@ fn seeded_variety_is_replayable_and_does_not_change_mid_event() {
     let mut seen = [false; 4];
     for seed in 0..12 {
         let layout = Layout::new(4.0 / 3.0);
-        let mut a = RainEvent::new(layout, seed, ClockRainAmount::Varied);
-        let mut b = RainEvent::new(layout, seed, ClockRainAmount::Varied);
+        let mut a = RainEvent::new(test_drain(layout), seed, ClockRainAmount::Varied);
+        let mut b = RainEvent::new(test_drain(layout), seed, ClockRainAmount::Varied);
         seen[a.amount as usize] = true;
         for _ in 0..900 {
             a.step();
@@ -84,7 +85,7 @@ fn seeded_variety_is_replayable_and_does_not_change_mid_event() {
 #[test]
 fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
     let layout = Layout::new(4.0 / 3.0);
-    let mut event = RainEvent::new(layout, 0, ClockRainAmount::Heavy);
+    let mut event = RainEvent::new(test_drain(layout), 0, ClockRainAmount::Heavy);
     for _ in 0..SOURCE_LIMIT {
         event
             .water
@@ -108,7 +109,7 @@ fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
     assert_eq!(event.source_limited, 1);
     assert!((event.water.stats().injected - event.scheduled).abs() < 1e-6);
 
-    let mut floats = FloatWorld::new(layout);
+    let mut floats = FloatWorld::new(test_drain(layout));
     floats.spawn(Vec2::new(event.entry_x, 0.0), 0.5);
     event.floats = Some(floats);
     event.phase = ClockRainDuckPhase::Floating;
@@ -131,7 +132,7 @@ fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
 #[test]
 fn extreme_aspects_keep_finite_bounded_physics_and_clean_up() {
     for aspect in [0.25, 4.0] {
-        let mut event = RainEvent::new(Layout::new(aspect), 42, ClockRainAmount::Heavy);
+        let mut event = RainEvent::new(test_drain(Layout::new(aspect)), 42, ClockRainAmount::Heavy);
         for _ in 0..RAIN_TICKS {
             event.step();
             if let Some((p, angle)) = event.duck_pose() {

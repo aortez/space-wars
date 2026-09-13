@@ -253,7 +253,8 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             state.can_trigger
         );
         println!(
-            "Configured marquee: {} / {:?}; settings pending={}",
+            "Floor: {}\nConfigured marquee: {} / {:?}; settings pending={}",
+            state.floor.as_str(),
             state.settings.marquee_preset.label(),
             state.settings.marquee_message.as_str(),
             state.settings_pending

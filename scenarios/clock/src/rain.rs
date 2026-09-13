@@ -6,7 +6,7 @@ use engine_core::Vec2;
 use engine_water::{Parcel, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{events::EventPhase, layout::Layout};
+use crate::{events::EventPhase, floor::DrainGeometry, layout::Layout};
 use physics::{DT, FloatWorld};
 
 pub const RAINING_TICKS: u64 = 20 * 60;
@@ -26,6 +26,7 @@ pub(crate) struct RainEvent {
     pub tick: u64,
     pub entry_x: f32,
     pub facing: f32,
+    drain: DrainGeometry,
     seed: u64,
     rng: StdRng,
     amount: ClockRainAmount,
@@ -43,7 +44,8 @@ pub(crate) struct RainEvent {
 }
 
 impl RainEvent {
-    pub fn new(layout: Layout, seed: u64, amount: ClockRainAmount) -> Self {
+    pub fn new(drain: DrainGeometry, seed: u64, amount: ClockRainAmount) -> Self {
+        let layout = drain.layout();
         let mut rng = StdRng::seed_from_u64(seed);
         let amount = if amount == ClockRainAmount::Varied {
             ClockRainAmount::ALL[rng.random_range(1..4)]
@@ -59,10 +61,11 @@ impl RainEvent {
         let facing = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
         Self {
             layout,
-            water: physics::water(layout),
+            water: drain.water_world(physics::COLUMNS, physics::PARCELS),
             tick: 0,
             entry_x: -facing * layout.bounds_max.x * 0.8,
             facing,
+            drain,
             seed,
             rng,
             amount,
@@ -158,7 +161,7 @@ impl RainEvent {
     fn emit_rain(&mut self) {
         let t = self.tick.min(RAINING_TICKS) as f64 / RAINING_TICKS as f64;
         self.scheduled = self.budget * (t * t * (3.0 - 2.0 * t));
-        if self.tick > RAINING_TICKS || self.tick % 2 != 0 {
+        if self.tick > RAINING_TICKS || !self.tick.is_multiple_of(2) {
             return;
         }
         let pending = (self.scheduled - self.water.stats().injected).max(0.0);
@@ -215,7 +218,7 @@ impl RainEvent {
                 self.depth_ticks = 0;
                 self.door_started = None;
             } else {
-                let mut floats = FloatWorld::new(self.layout);
+                let mut floats = FloatWorld::new(self.drain);
                 // Start just above the water, not intersecting a floor or pinned
                 // to its moving surface. Buoyancy takes over during integration.
                 floats.spawn(

@@ -8,16 +8,6 @@ pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
     }
     let layout = event.layout;
     let radius = event.radius;
-    // Replace the ordinary center drain with this event's physical floor/pit.
-    rect(
-        frame,
-        event,
-        Vec2::new(0.0, layout.bounds_min.y),
-        Vec2::new(event.width, layout.floor_y),
-        BACKGROUND_COLOR,
-        ARENA_LAYER,
-        opacity,
-    );
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if let Some(course) = &event.course {
         for surface in &course.surfaces {

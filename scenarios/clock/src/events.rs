@@ -161,6 +161,7 @@ pub(super) struct EventContext<'a> {
     pub segments: &'a mut [SegmentState],
     pub display: DisplaySnapshot,
     pub layout: Layout,
+    pub floor: crate::floor::FloorGeometry,
 }
 
 /// An event owns its local phase and temporary resources. Dropping the variant
@@ -206,7 +207,7 @@ impl ActiveEvent {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
             ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
-                context.layout,
+                context.floor.drain().expect("Rain owns the drain"),
                 seed,
                 config.rain_amount,
             ))),

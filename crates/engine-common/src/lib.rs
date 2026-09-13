@@ -340,6 +340,26 @@ impl ClockRainAmount {
     }
 }
 
+/// Ownership of Clock's ordinary floor, not the geometry of a custom event arena.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockFloorMode {
+    #[default]
+    Closed,
+    DrainOpen,
+    EventOwned,
+}
+
+impl ClockFloorMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Closed => "closed",
+            Self::DrainOpen => "drain-open",
+            Self::EventOwned => "event-owned",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ClockRainDuckPhase {
