@@ -257,6 +257,10 @@ pub trait ClientScenario {
     fn step(&mut self, actions: &[Action], dt: Duration) -> StepResult;
     fn map_input(&self, input: &mut ClientInput, benchmark_active: bool) -> Vec<Action>;
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame>;
+    /// Optional uncropped reference for paired scene-construction/pixel checks.
+    fn render_frames_reference(&self, _viewport: Viewport) -> Option<Vec<RenderFrame>> {
+        None
+    }
     fn frame_layout(&self) -> FrameLayout;
 
     fn clock_state(&self) -> Option<spacewars_control::ClockState> {

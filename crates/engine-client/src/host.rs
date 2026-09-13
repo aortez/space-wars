@@ -15,7 +15,8 @@ use engine_common::{
 };
 use engine_core::Color as CoreColor;
 use slint::{
-    Brush, Color as SlintColor, ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel,
+    Brush, Color as SlintColor, ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode,
+    VecModel,
 };
 
 use crate::MainWindow;
@@ -810,6 +811,11 @@ pub fn start_scenario_loop(
                     step: step_cpu,
                     scene: scene_cpu,
                     prepare: prepare_started.elapsed(),
+                    raster: if renderer == RenderBackend::Raster {
+                        raster_renderer.last_timings()
+                    } else {
+                        raster::RasterTimings::default()
+                    },
                     total: now.elapsed(),
                     updates,
                 }, [viewport.width as u32, viewport.height as u32,
@@ -1558,9 +1564,10 @@ fn present_frames(
                 layout,
                 raster::RasterOptions::for_scale(raster_scale),
             );
-            window.set_primitives(ModelRc::new(VecModel::from(render::raster_text_overlay(
-                &frames, viewport, layout,
-            ))));
+            update_raster_text_overlay(
+                window,
+                render::raster_text_overlay(&frames, viewport, layout),
+            );
             window.set_vector_minimaps_visible(false);
             window.set_raster_frame(image);
             window.set_raster_visible(true);
@@ -1569,6 +1576,30 @@ fn present_frames(
     };
     window.window().request_redraw();
     scene_item_count
+}
+
+/// Keep unchanged text items and their layout caches alive between frames.
+pub(crate) fn update_raster_text_overlay(window: &MainWindow, rows: Vec<crate::ScenePrimitive>) {
+    let current = window.get_primitives();
+    let Some(model) = current
+        .as_any()
+        .downcast_ref::<VecModel<crate::ScenePrimitive>>()
+    else {
+        window.set_primitives(ModelRc::new(VecModel::from(rows)));
+        return;
+    };
+    let common = model.row_count().min(rows.len());
+    for (index, row) in rows.iter().take(common).enumerate() {
+        if model.row_data(index).as_ref() != Some(row) {
+            model.set_row_data(index, row.clone());
+        }
+    }
+    while model.row_count() > rows.len() {
+        model.remove(model.row_count() - 1);
+    }
+    for row in rows.into_iter().skip(common) {
+        model.push(row);
+    }
 }
 
 fn present_native_video(
@@ -2341,6 +2372,10 @@ impl HostedScenario {
 
     pub(crate) fn native_video_frame(&self) -> Option<NativeVideoFrame<'_>> {
         self.inner.native_video_frame()
+    }
+
+    pub(crate) fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
+        self.inner.render_frames_reference(viewport)
     }
 
     fn realtime_video_consumer(&self) -> Option<RealtimeVideoConsumer> {

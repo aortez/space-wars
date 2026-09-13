@@ -9,6 +9,29 @@ use std::{cell::RefCell, rc::Rc};
 
 mod texture;
 
+#[test]
+fn xrgb_blend_shortcuts_match_reference_for_every_alpha_and_destination_byte() {
+    use i_slint_core::software_renderer::PremultipliedRgbaColor;
+    for alpha in 0..=255u8 {
+        for destination in 0..=255u8 {
+            for channel in [0, alpha / 2, alpha] {
+                let color = PremultipliedRgbaColor {
+                    alpha, red: channel, green: alpha - channel, blue: alpha / 3,
+                };
+                let mut reference = PremultipliedRgbaColor {
+                    alpha: destination, red: 255 - destination,
+                    green: destination.wrapping_mul(79), blue: destination,
+                };
+                let mut actual = DumbBufferPixelXrgb888::from(reference);
+                reference.blend(color);
+                actual.blend(color);
+                assert_eq!(actual.0, DumbBufferPixelXrgb888::from(reference).0,
+                    "alpha={alpha}, destination={destination}");
+            }
+        }
+    }
+}
+
 thread_local! {
     static WINDOW: RefCell<Option<Rc<MinimalSoftwareWindow>>> = const { RefCell::new(None) };
 }

@@ -24,6 +24,8 @@ impl SurfaceSortieState {
         p: &pilot::PilotObservationV1,
         ground: Option<&GroundMap>,
     ) -> Option<ClaimFootingSurvey> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("claim_footing_survey");
         if self.world.physics.material_queries_dirty
             || !p.queries_ready
             || p.location != PilotLocation::OnFoot

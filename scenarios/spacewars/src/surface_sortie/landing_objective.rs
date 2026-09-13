@@ -92,6 +92,8 @@ impl SurfaceSortieState {
         p: &PilotObservationV1,
         cover: &[combat::LandingCover],
     ) -> Option<LandingObjectiveSurvey> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("landing_objective_survey");
         let objective = LandingObjective::read(p)?;
         if !p.queries_ready
             || !matches!(p.location, PilotLocation::Aboard(_))

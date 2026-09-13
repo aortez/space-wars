@@ -262,3 +262,62 @@ fn cell_coordinates_round_trip_for_even_odd_and_rectangular_fields() {
     assert!(Terrain::generate(5, 2, f32::INFINITY, vec![], |_| MaterialId::VOID).is_err());
     assert!(Terrain::generate(5, 2, 0.5, vec![], |_| ROCK).is_err());
 }
+
+#[test]
+fn cached_chunk_bounds_follow_surface_geometry_and_edits() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let mut terrain = field(97, 65);
+        let mut geometry = TerrainGeometry::with_surface(&terrain, surface);
+        for edit in [
+            circle(32, 32, 3, EditMode::Remove),
+            circle(64, 32, 20, EditMode::Remove),
+            circle(33, 33, 8, EditMode::Damage(1)),
+            circle(48, 32, 100, EditMode::Remove),
+        ] {
+            terrain.apply(edit).unwrap();
+            geometry.refresh(&terrain);
+            let rebuilt = TerrainGeometry::with_surface(&terrain, surface);
+            for (chunk, fresh) in geometry.chunks().iter().zip(rebuilt.chunks()) {
+                assert_eq!(chunk.local_bounds(), fresh.local_bounds());
+                let vertices = chunk
+                    .rectangles
+                    .iter()
+                    .flat_map(|rect| {
+                        let c = rect.local_center(&terrain);
+                        let h = rect.half_extents(&terrain);
+                        [c - h, c + h]
+                    })
+                    .chain(
+                        chunk
+                            .polygons
+                            .iter()
+                            .flat_map(|p| p.vertices.iter().copied()),
+                    );
+                let vertices: Vec<_> = vertices.collect();
+                if vertices.is_empty() {
+                    assert!(chunk.local_bounds().is_none());
+                    continue;
+                }
+                let (min, max) = chunk.local_bounds().expect("nonempty chunk has bounds");
+                assert!(
+                    vertices
+                        .iter()
+                        .all(|p| p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y)
+                );
+                // Tight bounds must shrink after removal, not merely remain a
+                // conservative union with geometry from earlier revisions.
+                for coordinate in [min.x, max.x] {
+                    assert!(vertices.iter().any(|p| p.x == coordinate));
+                }
+                for coordinate in [min.y, max.y] {
+                    assert!(vertices.iter().any(|p| p.y == coordinate));
+                }
+            }
+        }
+        assert!(geometry.chunks().iter().all(|c| c.local_bounds().is_none()));
+    }
+}

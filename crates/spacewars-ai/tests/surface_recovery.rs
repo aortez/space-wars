@@ -93,6 +93,39 @@ fn rejected_pod_site() -> (RecoverShipTask, RecoveryTaskObservationV1) {
 }
 
 #[test]
+fn deferred_pod_survey_keeps_stabilizing_and_does_not_report_missing_ground() {
+    use scenario_spacewars::surface_sortie::pilot::LandingSiteQuery;
+    let (mut task, mut o) = airborne_pod();
+    let sites = o.sites.clone();
+    o.sites.clear();
+    for tick in 0..30 {
+        o.flight.pilot.tick = tick;
+        o.flight.pilot.site_query = LandingSiteQuery::Deferred { next_tick: 30 };
+        let action = task.step(&o);
+        assert!(action.controls.brake_held);
+        assert!(!action.controls.interact_held);
+        assert_eq!(task.telemetry().status, TaskStatus::Running);
+        assert_eq!(task.telemetry().invalidations, 0);
+        assert_eq!(task.telemetry().landing_retries, 0);
+        assert_eq!(task.telemetry().site_search_since, None);
+    }
+    assert!(
+        task.telemetry()
+            .stabilization
+            .as_ref()
+            .unwrap()
+            .settled_tick
+            .is_some()
+    );
+    o.flight.pilot.tick = 30;
+    o.flight.pilot.site_query = LandingSiteQuery::Survey;
+    o.sites = sites;
+    task.step(&o);
+    assert!(task.site_request().is_some());
+    assert_eq!(task.telemetry().goal, RecoveryGoal::LandPod);
+}
+
+#[test]
 fn landing_retry_reuses_pod_righting_and_accepts_actual_hatch_access() {
     use scenario_spacewars::surface_sortie::{
         TransferResult, pod_righting::PodRightingObservation,

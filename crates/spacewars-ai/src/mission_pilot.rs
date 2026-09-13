@@ -13,8 +13,8 @@ use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
         PilotLocation, SurfaceSortieAction,
-        mission::MissionObservationV1,
-        pilot::{LANDING_SITE_COUNT, LandingSiteId, PilotPlanetObservation},
+        mission::{LandingSurveyStamp, MissionObservationV1, MissionSensorRequest},
+        pilot::{LANDING_SITE_COUNT, LandingSiteId, LandingSiteQuery, PilotPlanetObservation},
     },
 };
 use serde::Serialize;
@@ -127,6 +127,7 @@ pub struct MaterialMissionPilot {
     previous_tick: Option<u64>,
     previous_intent: CombatIntent,
     next_pursuit_tick: u64,
+    last_survey: Option<LandingSurveyStamp>,
 }
 
 impl MaterialMissionPilot {
@@ -169,6 +170,7 @@ impl MaterialMissionPilot {
             previous_tick: None,
             previous_intent: CombatIntent::default(),
             next_pursuit_tick: 0,
+            last_survey: None,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -209,6 +211,13 @@ impl MaterialMissionPilot {
             planet: self.telemetry.target.unwrap_or(0),
             bearing: LANDING_SITE_COUNT,
         })
+    }
+
+    pub fn sensor_request(&self) -> MissionSensorRequest {
+        MissionSensorRequest {
+            site: self.site_request(),
+            last_survey: self.last_survey,
+        }
     }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
@@ -264,6 +273,13 @@ impl MaterialMissionPilot {
             self.telemetry.frame_changes += 1;
         }
         self.last_frame = Some(p.planet.index);
+        if p.queries_ready && p.site_query == LandingSiteQuery::Survey {
+            self.last_survey = Some(LandingSurveyStamp {
+                tick: p.tick,
+                planet: p.planet.index,
+                form: p.ship_form,
+            });
+        }
         let result = self.choose(o);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());

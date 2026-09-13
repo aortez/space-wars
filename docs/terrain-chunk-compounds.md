@@ -216,3 +216,7 @@ Artifacts are kept outside the repository at
 `/home/oldman/.codex/visualizations/2026/09/11/rounder-planets/chunk-compounds/`.
 They include the original executable, failed prototype traces, final executables,
 source patch, command lines and JSON reports. No Pi was deployed for this work.
+
+The subsequent [Pi match profile](material-match-pi-profile.md) separates the
+remaining live slowdown into bot observation costs and rendering, with a paired
+experiment identifying unused on-foot landing surveys as the first target.

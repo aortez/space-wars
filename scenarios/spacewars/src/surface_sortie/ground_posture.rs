@@ -37,6 +37,8 @@ impl SurfaceSortieState {
         player: usize,
         p: &pilot::PilotObservationV1,
     ) -> Option<GroundPostureObservation> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("ground_posture_observation");
         if !p.queries_ready || p.location != PilotLocation::OnFoot {
             return None;
         }

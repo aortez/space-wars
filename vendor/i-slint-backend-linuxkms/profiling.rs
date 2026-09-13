@@ -14,7 +14,7 @@ use std::{
 };
 
 const SAMPLE_LIMIT: usize = 120;
-const STAGE_COUNT: usize = 26;
+const STAGE_COUNT: usize = 30;
 const COUNTER_COUNT: usize = 8;
 
 #[derive(Clone, Copy)]
@@ -45,6 +45,10 @@ pub(crate) enum Stage {
     CoreText,
     CorePath,
     CoreBackground,
+    CoreTextFont,
+    CoreTextGlyphRun,
+    CoreTextTexture,
+    CoreTextFallback,
 }
 
 const STAGES: [(Stage, &str); STAGE_COUNT] = [
@@ -74,6 +78,10 @@ const STAGES: [(Stage, &str); STAGE_COUNT] = [
     (Stage::CoreText, "core_text"),
     (Stage::CorePath, "core_path"),
     (Stage::CoreBackground, "core_background"),
+    (Stage::CoreTextFont, "core_text_font"),
+    (Stage::CoreTextGlyphRun, "core_text_glyph_run"),
+    (Stage::CoreTextTexture, "core_text_texture"),
+    (Stage::CoreTextFallback, "core_text_fallback"),
 ];
 
 #[derive(Clone, Copy)]
@@ -114,8 +122,12 @@ impl Stamp {
         Self { wall, cpu }
     }
 
+    fn wall_only() -> Self {
+        Self { wall: Instant::now(), cpu: None }
+    }
+
     fn elapsed(self) -> Elapsed {
-        let end = Self::now();
+        let end = if self.cpu.is_some() { Self::now() } else { Self::wall_only() };
         Elapsed {
             wall: end.wall.duration_since(self.wall),
             cpu: self.cpu.zip(end.cpu).and_then(|(start, end)| end.checked_sub(start)),
@@ -229,7 +241,7 @@ impl Profile {
             return String::new();
         }
         let mut text = format!(
-            "\nkms_profile_version=5\nkms_profile_enabled={}\nkms_loop_samples={}\nkms_loops_total={}\nkms_output_width={}\nkms_output_height={}\nkms_pixel_format={}\nkms_buffer_bytes={}\nkms_buffer_age={}\nkms_buffer_mode={}\nkms_shadow_bytes={}\nkms_texture_mode={}\nkms_draw_detail={}",
+            "\nkms_profile_version=6\nkms_profile_enabled={}\nkms_loop_samples={}\nkms_loops_total={}\nkms_output_width={}\nkms_output_height={}\nkms_pixel_format={}\nkms_buffer_bytes={}\nkms_buffer_age={}\nkms_buffer_mode={}\nkms_shadow_bytes={}\nkms_texture_mode={}\nkms_draw_detail={}",
             self.enabled, self.samples.len(), self.loops_total, self.size.0, self.size.1,
             self.format, self.buffer_bytes, self.buffer_age, self.buffer_mode, self.shadow_bytes, self.texture_mode, self.draw_detail,
         );
@@ -404,13 +416,19 @@ fn draw_event(operation: i_slint_core::software_renderer::DrawDiagnostic, begin:
         D::Text => Stage::CoreText,
         D::Path => Stage::CorePath,
         D::Background => Stage::CoreBackground,
+        D::TextFont => Stage::CoreTextFont,
+        D::TextGlyphRun => Stage::CoreTextGlyphRun,
     };
     ACTIVE.with(|active| {
         let mut active = active.borrow_mut();
+        let inside_text = active[D::Text as usize].depth > 0;
         let active = &mut active[operation as usize];
         if begin {
             if active.depth == 0 {
-                active.start = Some(Stamp::now());
+                // Glyph painting has nested texture and fallback spans. CPU
+                // clock reads distort the measurement; keep CPU clocks on the
+                // coarser Scope stages and use monotonic time for core hooks.
+                active.start = Some(Stamp::wall_only());
             }
             active.depth += 1;
         } else if active.depth > 0 {
@@ -418,7 +436,19 @@ fn draw_event(operation: i_slint_core::software_renderer::DrawDiagnostic, begin:
             if active.depth == 0 {
                 if let Some(start) = active.start.take() {
                     let elapsed = start.elapsed();
-                    PROFILE.with(|p| p.borrow_mut().record(stage, elapsed));
+                    PROFILE.with(|p| {
+                        let mut p = p.borrow_mut();
+                        p.record(stage, elapsed);
+                        // Reuse the same elapsed span, without another clock
+                        // pair per glyph, to separate text from image textures.
+                        if inside_text {
+                            match operation {
+                                D::Texture => p.record(Stage::CoreTextTexture, elapsed),
+                                D::TextureFallback => p.record(Stage::CoreTextFallback, elapsed),
+                                _ => {}
+                            }
+                        }
+                    });
                 }
             }
         }
@@ -538,13 +568,49 @@ mod tests {
         p.add(Counter::RgbPixels, 1024 * 768);
         p.finish_loop(elapsed(6, Some(6)));
         let text = p.diagnostics();
-        assert!(text.contains("kms_profile_version=5"));
+        assert!(text.contains("kms_profile_version=6"));
         assert!(text.contains("kms_texture_mode=rgb"));
         assert!(text.contains("kms_rgb_blit_cpu_avg_ms=1.000"));
         assert!(text.contains("kms_draw_cpu_avg_ms=4.000"));
         assert!(text.contains("kms_rgb_blits_window=1"));
         assert!(text.contains("kms_rgb_pixels_window=786432"));
         assert!(text.contains("kms_copy_bytes_window=0"));
+    }
+
+    #[cfg(feature = "renderer-software")]
+    #[test]
+    fn text_substages_exclude_image_textures_and_reuse_outer_spans() {
+        use i_slint_core::software_renderer::DrawDiagnostic as D;
+        activate_for_test((64, 64));
+        {
+            let _iteration = Scope::new(Stage::Loop);
+            for (op, begin) in [
+                (D::Image, true), (D::Texture, true),
+                (D::Texture, false), (D::Image, false),
+                (D::Text, true), (D::TextFont, true), (D::TextFont, false),
+                (D::TextGlyphRun, true), (D::Texture, true),
+                (D::Texture, true), (D::Texture, false),
+                (D::TextureFallback, true), (D::TextureFallback, false),
+                (D::Texture, false), (D::TextGlyphRun, false), (D::Text, false),
+            ] {
+                draw_event(op, begin);
+            }
+        }
+        PROFILE.with(|p| {
+            let p = p.borrow();
+            let s = &p.samples[0].stages;
+            assert_eq!(s[Stage::CoreTexture as usize].calls, 2);
+            for stage in [Stage::CoreText, Stage::CoreTextFont, Stage::CoreTextGlyphRun,
+                Stage::CoreTextTexture, Stage::CoreTextFallback] {
+                assert_eq!(s[stage as usize].calls, 1);
+                assert!(s[stage as usize].elapsed.cpu.is_none());
+            }
+            assert!(s[Stage::CoreText as usize].elapsed.wall >=
+                s[Stage::CoreTextFont as usize].elapsed.wall + s[Stage::CoreTextGlyphRun as usize].elapsed.wall);
+            assert!(s[Stage::CoreTextGlyphRun as usize].elapsed.wall >= s[Stage::CoreTextTexture as usize].elapsed.wall);
+            assert_eq!(s[Stage::CoreTextFallback as usize].elapsed.wall, s[Stage::CoreFallback as usize].elapsed.wall);
+        });
+        PROFILE.with(|p| *p.borrow_mut() = Profile::default());
     }
 
     #[test]

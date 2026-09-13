@@ -618,7 +618,14 @@ fn large_moving_planets_land_exit_claim_and_depart_in_both_reflections() {
 
 #[test]
 fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
-    for seed in [2, 3] {
+    use scenario_spacewars::surface_sortie::mission::LandingSurveyCadence;
+    for (seed, cadence) in [2, 3].into_iter().flat_map(|seed| {
+        [
+            LandingSurveyCadence::EveryTick,
+            LandingSurveyCadence::FourHz,
+        ]
+        .map(move |cadence| (seed, cadence))
+    }) {
         let mut state = SurfaceSortieScenario::init_material_arena(seed);
         state.set_asteroid_pressure(engine_common::MaterialAsteroidSettings {
             interval_seconds: 3,
@@ -637,7 +644,8 @@ fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
         for tick in 0..180 * 60 {
             let mut actions = Vec::new();
             for (seat, pilot) in pilots.iter_mut().enumerate() {
-                let observation = state.mission_observation(seat, pilot.site_request());
+                let observation =
+                    state.mission_observation_with_cadence(seat, pilot.sensor_request(), cadence);
                 actions.extend(
                     pilot
                         .intent(&observation)
@@ -660,7 +668,8 @@ fn generated_asteroid_duels_keep_live_debris_physical_for_three_minutes() {
         assert!(
             pilots
                 .iter()
-                .any(|pilot| pilot.telemetry().completed_sorties > 0)
+                .any(|pilot| pilot.telemetry().completed_sorties > 0),
+            "seed {seed}, cadence {cadence:?}: no completed sortie"
         );
     }
 }

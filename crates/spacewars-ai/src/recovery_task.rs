@@ -532,6 +532,11 @@ impl RecoverShipTask {
             action.horizontal = heading(p, up);
             return action;
         }
+        if p.site_query.is_deferred() {
+            action.brake_held = true;
+            action.horizontal = heading(p, up);
+            return action;
+        }
         if let Some(old) = self.site {
             if let Some(site) = o.sites.iter().find(|s| {
                 s.id == old.id

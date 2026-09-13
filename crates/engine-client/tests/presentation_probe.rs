@@ -114,3 +114,278 @@ fn invalid_probe_limits_are_rejected_before_opening_a_display() {
         assert!(!output.status.success());
     }
 }
+
+#[test]
+fn frozen_material_scales_are_repeatable_without_settings_or_devices() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let mut checksums = BTreeMap::new();
+    for detail in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_engine-client"));
+        command
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .env("SLINT_BACKEND", "nonexistent-backend")
+            .arg("--config-dir")
+            .arg(directory.path())
+            .args([
+                "--benchmark-presentation",
+                "--presentation-raster",
+                "--presentation-match-ticks",
+                "0",
+                "--presentation-raster-ablation",
+                "--benchmark-width",
+                "128",
+                "--benchmark-height",
+                "96",
+                "--presentation-frames",
+                "2",
+                "--presentation-repeats",
+                "2",
+            ]);
+        if detail {
+            command.arg("--presentation-detail");
+        }
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).unwrap();
+        let mut lines = text.lines();
+        let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+        let rows: Vec<_> = lines.collect();
+        assert_eq!(rows.len(), 24);
+        for line in rows {
+            let values: Vec<_> = line.split(',').collect();
+            assert_eq!(values.len(), columns.len());
+            let row: BTreeMap<_, _> = columns.iter().copied().zip(values).collect();
+            let key = (row["variant"].to_owned(), row["scale"].to_owned());
+            if let Some(previous) = checksums.insert(key, row["checksum"].to_owned()) {
+                assert_eq!(previous, row["checksum"]);
+            }
+            for (key, value) in row {
+                if key.ends_with("_ms") {
+                    let value: f64 = value.parse().unwrap();
+                    assert!(value.is_finite() && value >= 0.0);
+                }
+            }
+        }
+    }
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn terrain_culling_probe_preserves_pixels_and_settings() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+        .env_remove("DISPLAY")
+        .env_remove("WAYLAND_DISPLAY")
+        .env("SLINT_BACKEND", "nonexistent-backend")
+        .arg("--config-dir")
+        .arg(directory.path())
+        .args([
+            "--benchmark-presentation",
+            "--presentation-raster",
+            "--presentation-terrain-culling",
+            "--presentation-match-ticks",
+            "0",
+            "--benchmark-width",
+            "128",
+            "--benchmark-height",
+            "96",
+            "--presentation-frames",
+            "2",
+            "--presentation-repeats",
+            "2",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    let csv = String::from_utf8(output.stdout).unwrap();
+    let mut lines = csv.lines();
+    let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+    let rows: Vec<BTreeMap<_, _>> = lines
+        .map(|line| columns.iter().copied().zip(line.split(',')).collect())
+        .collect();
+    assert_eq!(rows.len(), 8);
+    let mut checksums = BTreeMap::new();
+    let mut counts = BTreeMap::new();
+    for row in &rows {
+        if let Some(previous) = checksums.insert(row["scale"], row["checksum"]) {
+            assert_eq!(previous, row["checksum"]);
+        }
+        counts.insert(row["variant"], row["primitives"].parse::<usize>().unwrap());
+        for (key, value) in row {
+            if key.ends_with("_ms") {
+                let ms = value.parse::<f64>().unwrap();
+                assert!(ms.is_finite() && ms >= 0.0);
+            }
+        }
+    }
+    assert!(counts["complete"] < counts["unculled"]);
+    assert_eq!(rows[0]["variant"], "complete");
+    assert_eq!(rows[4]["variant"], "unculled", "pair order must alternate");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn text_probe_separates_glyph_work_and_cpu_clock_cost_without_changing_pixels() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    let mut checksums = BTreeMap::new();
+    for cpu in [false, true] {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_engine-client"));
+        command
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .env("SLINT_BACKEND", "nonexistent-backend")
+            .arg("--config-dir")
+            .arg(directory.path())
+            .args([
+                "--benchmark-presentation",
+                "--presentation-text",
+                "--presentation-detail",
+                "--benchmark-width",
+                "320",
+                "--benchmark-height",
+                "240",
+                "--presentation-frames",
+                "2",
+                "--presentation-repeats",
+                "2",
+            ]);
+        if cpu {
+            command.arg("--presentation-cpu-clocks");
+        }
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let csv = String::from_utf8(output.stdout).unwrap();
+        let mut lines = csv.lines();
+        let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+        let rows: Vec<BTreeMap<_, _>> = lines
+            .map(|line| columns.iter().copied().zip(line.split(',')).collect())
+            .collect();
+        assert_eq!(rows.len(), 8);
+        for row in rows {
+            assert_eq!(row["cpu_clocks"], cpu.to_string());
+            if let Some(old) =
+                checksums.insert(row["fixture"].to_owned(), row["checksum"].to_owned())
+            {
+                assert_eq!(old, row["checksum"]);
+            }
+            let time = |key| row[key].parse::<f64>().unwrap();
+            assert!(time("font_calls") > 0.0 && time("glyph_texture_calls") > 0.0);
+            assert!(time("text_ms") >= time("font_ms") + time("glyph_run_ms") - 0.000002);
+            assert!(time("glyph_run_ms") >= time("text_texture_ms") - 0.000002);
+            for (key, value) in row {
+                if key.ends_with("_ms") {
+                    let value: f64 = value.parse().unwrap();
+                    assert!(value.is_finite() && value >= 0.0);
+                }
+            }
+        }
+    }
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn memory_probe_preserves_pixels_padding_and_settings_across_rotations() {
+    let directory = tempfile::tempdir().unwrap();
+    let settings = directory.path().join("settings.toml");
+    fs::write(&settings, "not valid toml {{").unwrap();
+    for size in [(320, 240), (237, 181)] {
+        for rotation in ["0", "90", "180", "270"] {
+            let output = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+                .env_remove("DISPLAY")
+                .env_remove("WAYLAND_DISPLAY")
+                .env("SLINT_BACKEND", "nonexistent-backend")
+                .arg("--config-dir")
+                .arg(directory.path())
+                .args([
+                    "--benchmark-presentation",
+                    "--presentation-memory",
+                    "--presentation-detail",
+                    "--presentation-frames",
+                    "2",
+                    "--presentation-repeats",
+                    "2",
+                    "--presentation-rotation",
+                    rotation,
+                    "--benchmark-width",
+                    &size.0.to_string(),
+                    "--benchmark-height",
+                    &size.1.to_string(),
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let csv = String::from_utf8(output.stdout).unwrap();
+            let mut lines = csv.lines();
+            let columns: Vec<_> = lines.next().unwrap().split(',').collect();
+            let rows: Vec<BTreeMap<_, _>> = lines
+                .map(|line| {
+                    let values: Vec<_> = line.split(',').collect();
+                    assert_eq!(values.len(), columns.len());
+                    columns.iter().copied().zip(values).collect()
+                })
+                .collect();
+            assert_eq!(rows.len(), 8);
+            assert_eq!(rows[0]["blend"], "reference");
+            assert_eq!(rows[4]["blend"], "shortcut", "alternate paired block order");
+            for row in &rows {
+                assert_eq!(row["checksum"], rows[0]["checksum"]);
+                assert_eq!(row["memory"], "ram");
+                assert_eq!(row["rotation"], rotation);
+                assert!(row["glyph_calls"].parse::<f64>().unwrap() > 0.0);
+                let number = |key| row[key].parse::<f64>().unwrap();
+                assert!(
+                    (number("total_ms") - number("draw_ms") - number("copy_ms")).abs() < 0.000002
+                );
+                assert!(number("text_ms") >= number("glyph_run_ms"));
+                for (key, value) in row {
+                    if key.ends_with("_ms") {
+                        let value: f64 = value.parse().unwrap();
+                        assert!(value.is_finite() && value >= 0.0);
+                    }
+                }
+            }
+        }
+    }
+    // Device access is explicit, and a regular file must never become a buffer.
+    let rejected = Command::new(env!("CARGO_BIN_EXE_engine-client"))
+        .args([
+            "--benchmark-presentation",
+            "--presentation-memory",
+            "--presentation-drm-device",
+        ])
+        .arg(&settings)
+        .output()
+        .unwrap();
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("DRM character device"));
+    assert_eq!(fs::read_to_string(settings).unwrap(), "not valid toml {{");
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}

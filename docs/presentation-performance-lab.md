@@ -1,9 +1,21 @@
 # Software presentation performance lab
 
+For the current material match, see [the raster and resolution profile](material-match-raster-profile.md),
+including paired Pi measurements, HUD costs and the actual 2× sampling behavior.
+
 This lab separates software-renderer bookkeeping from pixel drawing. It builds
 on the [Clock measurements](clock-performance-lab.md), but also uses Falling's
 native-video image path. No graphics algorithm or repaint policy is changed by
 the diagnostic hooks.
+
+The later [Spacewars text-model comparison](raster-text-reuse.md) uses
+`--presentation-text` to measure model replacement versus updating retained
+labels, with per-frame pixel comparisons and live cabinet validation.
+
+The [matched text-memory comparison](text-memory-profile.md) adds
+`--presentation-memory`, with an explicit `--presentation-drm-device` option
+for a private, never-presented buffer. It compares identical text in RAM and
+mapped DRM memory, alpha shortcuts, and whole-frame staging with copy cost.
 
 ## Frozen-image comparison
 
@@ -67,6 +79,11 @@ The viewport is bounded to 64–2048 pixels per axis, frames to 1–10000, and
 repeats to 1–20. Default output size is the shared benchmark default, 1280×720.
 
 ## Live draw attribution
+
+Follow-up: [profiler version 6 and the text-drawing investigation](text-drawing-profile.md)
+use monotonic clocks for nested `kms_core_*` spans and add text substages. The
+version-5 CPU timings described below are historical; coarse presentation CPU
+timings remain available.
 
 LinuxKMS profiler version 5 adds `kms_draw_detail` and `kms_core_*` timings and
 call counts to `spacewars-cli status`. Detailed observation follows the existing
@@ -346,3 +363,8 @@ The [final Clock matrix](clock-performance-lab.md#final-performance-batch-checkp
 records all seven effects on both machines after the combined changes. Final
 matrix and test logs are retained under
 `target/clock-benchmarks/final-performance-picade-20260910/`.
+
+The [terrain scene-culling follow-up](terrain-scene-culling.md) adds a paired
+`--presentation-raster --presentation-terrain-culling` check. It compares the
+normal adapter with its uncropped reference in one frozen world and requires
+identical full-UI pixels, while measuring construction/disposal and raster work.

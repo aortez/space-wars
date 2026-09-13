@@ -1,5 +1,6 @@
-//! Fixed-image software presentation lab. No display, real-time simulation,
-//! input, settings, frame pacing, or scanout memory participates in these draws.
+//! Fixed-image software presentation lab. No real-time simulation, input,
+//! settings or frame pacing. Only the explicit memory probe opens a DRM device;
+//! its private allocation is never presented.
 
 use engine_common::{ClockEventProfile, Scenario};
 use i_slint_core::software_renderer::{
@@ -10,11 +11,16 @@ use i_slint_core::software_renderer::{
 use slint::platform::{Platform, PlatformError, WindowAdapter};
 use slint::{ComponentHandle, Image, PhysicalSize};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     hint::black_box,
     rc::Rc,
     time::{Duration, Instant},
 };
+
+#[cfg(target_os = "linux")]
+mod memory;
+mod raster;
+mod text;
 
 #[derive(Debug, Default, clap::Args)]
 pub struct Options {
@@ -33,6 +39,44 @@ pub struct Options {
     /// Publish a fresh identical image before every draw, outside the draw timer.
     #[arg(long)]
     presentation_republish: bool,
+    /// Compare replaced and retained Spacewars text models with identical pixels.
+    #[arg(
+        long,
+        requires = "benchmark_presentation",
+        conflicts_with = "presentation_republish"
+    )]
+    presentation_text: bool,
+    /// Reproduce the former LinuxKMS per-operation CPU clock reads in the RAM text probe.
+    #[arg(long, requires_all = ["presentation_text", "presentation_detail"])]
+    presentation_cpu_clocks: bool,
+    /// Compare frozen text drawing with reference/shortcut blending and RAM staging.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_raster", "presentation_republish"])]
+    presentation_memory: bool,
+    /// Also draw into a private DRM dumb buffer on this device; never present it.
+    #[arg(long, requires = "presentation_memory")]
+    presentation_drm_device: Option<std::path::PathBuf>,
+    /// Rotate the memory-probe output to exercise clipping and transposed strides.
+    #[arg(long, requires = "presentation_memory", default_value = "0", value_parser = ["0", "90", "180", "270"])]
+    presentation_rotation: String,
+    /// Compare frozen material-match rasterization at scales 1 and 2.
+    #[arg(long, requires = "benchmark_presentation", conflicts_with_all = ["presentation_text", "presentation_republish"])]
+    presentation_raster: bool,
+    /// Simulation ticks at which to freeze seed 42; simulation is outside timing.
+    #[arg(long, requires = "presentation_raster", value_delimiter = ',', default_value = "120,1800,7200", value_parser = clap::value_parser!(u32).range(0..=10800))]
+    presentation_match_ticks: Vec<u32>,
+    /// Also measure diagnostic removals of terrain fills/strokes, HUD backing and corona.
+    #[arg(long, requires = "presentation_raster")]
+    presentation_raster_ablation: bool,
+    /// Pair chunk culling with the uncropped reference and require identical pixels.
+    #[arg(
+        long,
+        requires = "presentation_raster",
+        conflicts_with = "presentation_raster_ablation"
+    )]
+    presentation_terrain_culling: bool,
+    /// Save frozen geometry and output PNGs, outside all measurement timers.
+    #[arg(long, requires = "presentation_raster")]
+    presentation_output: Option<std::path::PathBuf>,
 }
 
 slint::slint! {
@@ -64,7 +108,9 @@ impl Platform for ProbePlatform {
     }
 }
 
+#[repr(transparent)]
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(target_os = "linux", derive(bytemuck::Pod, bytemuck::Zeroable))]
 struct Xrgb(u32);
 impl TargetPixel for Xrgb {
     fn blend(&mut self, color: PremultipliedRgbaColor) {
@@ -112,29 +158,49 @@ struct Measurement {
     depth: usize,
     calls: u64,
     elapsed: Duration,
+    text_elapsed: Duration,
+    text_calls: u64,
 }
 thread_local! {
+    static PROBE_CPU_CLOCKS: Cell<bool> = const { Cell::new(false) };
     static MEASUREMENTS: RefCell<[Measurement; DRAW_DIAGNOSTIC_COUNT]> =
         RefCell::new([Measurement::default(); DRAW_DIAGNOSTIC_COUNT]);
 }
 fn observe(operation: DrawDiagnostic, begin: bool) {
     MEASUREMENTS.with(|measurements| {
         let mut measurements = measurements.borrow_mut();
+        let inside_text = measurements[DrawDiagnostic::Text as usize].depth > 0;
         let m = &mut measurements[operation as usize];
         if begin {
             m.calls += 1;
+            m.text_calls += u64::from(inside_text);
             if m.depth == 0 {
                 m.start = Some(Instant::now());
+                probe_cpu_clock();
             }
             m.depth += 1;
         } else {
             assert!(m.depth > 0, "unbalanced diagnostic span");
             m.depth -= 1;
             if m.depth == 0 {
-                m.elapsed += m.start.take().unwrap().elapsed();
+                let elapsed = m.start.take().unwrap().elapsed();
+                probe_cpu_clock();
+                m.elapsed += elapsed;
+                if inside_text {
+                    m.text_elapsed += elapsed;
+                }
             }
         }
     });
+}
+
+fn probe_cpu_clock() {
+    // Match the backend Stamp order: monotonic first, CPU second. The outer
+    // operation includes its children's clock-read cost, as the former backend did.
+    #[cfg(target_os = "linux")]
+    if PROBE_CPU_CLOCKS.get() {
+        black_box(nix::time::clock_gettime(nix::time::ClockId::CLOCK_THREAD_CPUTIME_ID).ok());
+    }
 }
 
 struct Fixture {
@@ -261,6 +327,18 @@ pub fn run(options: &Options, width: u32, height: u32) -> Result<(), Box<dyn std
     if width > 2048 || height > 2048 {
         return Err("presentation viewport must be at most 2048×2048".into());
     }
+    if options.presentation_memory {
+        #[cfg(target_os = "linux")]
+        return memory::run(options, width, height);
+        #[cfg(not(target_os = "linux"))]
+        return Err("--presentation-memory requires Linux".into());
+    }
+    if options.presentation_text {
+        return text::run(options, width, height);
+    }
+    if options.presentation_raster {
+        return raster::run(options, width, height);
+    }
     let windows = Rc::new(RefCell::new(Vec::new()));
     slint::platform::set_platform(Box::new(ProbePlatform(windows.clone())))?;
     let bare = ImageOnlyWindow::new()?;
@@ -290,6 +368,8 @@ pub fn run(options: &Options, width: u32, height: u32) -> Result<(), Box<dyn std
         "text",
         "path",
         "background",
+        "text_font",
+        "text_glyph_run",
     ] {
         print!(",{name}_calls_per_frame,{name}_wall_ms");
     }

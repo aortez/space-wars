@@ -135,6 +135,8 @@ impl SurfaceSortieState {
         up: Vec2,
         map: Option<&GroundMap>,
     ) -> (Option<RebuildPose>, RebuildPlacementReport) {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("find_rebuild_placement");
         let frame = motion::SurfaceFrame::read(&self.world.physics, planet);
         let local = |point: Vec2| (point - frame.position).rotate_radians(-frame.angle);
         let world_point = |point: Vec2| frame.position + point.rotate_radians(frame.angle);
@@ -328,6 +330,8 @@ impl SurfaceSortieState {
         &self,
         player: usize,
     ) -> Option<RebuildRelocationSurvey> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("rebuild_relocation_survey");
         // Alternate with the full ground survey. A relocation only needs this
         // local patch, keeping the two expensive observations off the same frame.
         if !(self.world.tick + player as u64 * 15 + 15)

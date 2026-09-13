@@ -167,6 +167,8 @@ impl SurfaceSortieState {
         player: usize,
         ground: Option<&GroundMap>,
     ) -> Option<JetpackNavigationObservation> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("jetpack_navigation_with_ground");
         let pilot = &self.pilots[player];
         let pack = pilot.body.as_ref().and_then(|body| body.jetpack());
         let charge = pack.map(|p| p.charge).or(pilot.jetpack_charge)?;
@@ -244,6 +246,8 @@ impl SurfaceSortieState {
         player: usize,
         direction: CrossingDirection,
     ) -> Option<CrossingPlan> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("crossing_plan");
         let pilot = &self.pilots[player];
         if pilot.jetpack_charge.is_none()
             || self.world.physics.material_queries_dirty
@@ -339,6 +343,8 @@ impl SurfaceSortieState {
     }
 
     pub(super) fn terrain_crossings(&self, player: usize, map: &GroundMap) -> Vec<CrossingPlan> {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("terrain_crossings");
         let Some(actor) = self.spaceling_snapshot(player) else {
             return Vec::new();
         };

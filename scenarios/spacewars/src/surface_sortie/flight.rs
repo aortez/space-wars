@@ -1,7 +1,7 @@
 //! Physical swept-wing flight. Wing animation changes the collision silhouette
 //! and control envelope, never the body's pose or an instantaneous speed cap.
 use super::*;
-use pilot::{LandingSiteId, PilotObservationV1};
+use pilot::{LandingSiteId, LandingSiteQuery, PilotObservationV1};
 
 const WING_ACTION: u32 = 0x5355_0003;
 pub const WING_TRANSITION_SECONDS: f32 = 0.45;
@@ -153,9 +153,19 @@ impl SurfaceSortieState {
         player: usize,
         site: Option<LandingSiteId>,
     ) -> PilotObservationV2 {
+        self.flight_pilot_observation_with_query(player, site.into())
+    }
+
+    pub(super) fn flight_pilot_observation_with_query(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+    ) -> PilotObservationV2 {
+        #[cfg(feature = "sensor-profile")]
+        let _profile = super::sensor_profile::Scope::new("flight_pilot_observation");
         PilotObservationV2 {
             version: 2,
-            pilot: self.pilot_observation(player, site),
+            pilot: self.pilot_observation_with_query(player, query),
             flight: self.flight_observation(player),
         }
     }

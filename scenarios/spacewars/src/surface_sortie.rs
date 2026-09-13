@@ -35,6 +35,8 @@ mod recovery;
 pub mod recovery_sensors;
 mod render;
 pub mod return_trial;
+#[cfg(feature = "sensor-profile")]
+pub mod sensor_profile;
 pub(crate) mod solar;
 mod travel;
 pub use claim::{
@@ -314,6 +316,11 @@ pub struct SurfaceSortieObservation {
 }
 
 impl SurfaceSortieState {
+    /// Current shared simulation tick, without issuing any physical queries.
+    pub fn tick(&self) -> u64 {
+        self.world.tick
+    }
+
     /// Timings from the shared world step, including terrain preparation.
     /// Seat input, support, landing, claim and recovery work in the surrounding
     /// sortie step is not included. Nested Rapier timers must not be summed.
@@ -866,6 +873,17 @@ impl SurfaceSortieScenario {
 
     pub fn player_frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
         render::frame(state, player)
+    }
+
+    /// Omit terrain chunks outside this player's pixel viewport before creating
+    /// draw primitives. Pass the smallest raster viewport that may display it;
+    /// this keeps conservative stroke padding when the image is downscaled.
+    pub fn player_frame_in_view(
+        state: &SurfaceSortieState,
+        player: usize,
+        viewport: engine_common::RenderPoint,
+    ) -> RenderFrame {
+        render::frame_in_view(state, player, Some(viewport))
     }
 
     /// Fixed-scale north-up world context; the client overlays this second frame.

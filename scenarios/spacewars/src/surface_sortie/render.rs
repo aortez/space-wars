@@ -67,6 +67,14 @@ fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
 }
 
 pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
+    frame_in_view(state, player, None)
+}
+
+pub(super) fn frame_in_view(
+    state: &SurfaceSortieState,
+    player: usize,
+    viewport: Option<RenderPoint>,
+) -> RenderFrame {
     let observation = state.observation(player);
     let snapshot = state.spaceling_snapshot(player);
     let ship = &state.world.ships[state.pilots[player].vehicle.0];
@@ -74,6 +82,20 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
     let camera = camera(state, player);
     let center = Vec2::new(camera.center.x, camera.center.y);
     let height = camera.height;
+    let view = viewport
+        .filter(|v| v.x.is_finite() && v.y.is_finite() && v.x > 0.0 && v.y > 0.0)
+        .map(|v| {
+            let mut bounds = camera.world_bounds(v.x / v.y);
+            // Keep border pixels/strokes even at very small raster resolutions.
+            // Extra world-coordinate slack absorbs inverse-transform rounding.
+            let padding = height * 6.0 / v.y.max(1.0)
+                + (center.x.abs() + center.y.abs() + height) * 32.0 * f32::EPSILON;
+            bounds.min.x -= padding;
+            bounds.min.y -= padding;
+            bounds.max.x += padding;
+            bounds.max.y += padding;
+            bounds
+        });
     let mut frame = RenderFrame::new(camera);
     if let Some(sun) = state.world.sun {
         draw_corona(&mut frame, state, sun, -22);
@@ -89,12 +111,13 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
         let radius = planet.radius * BODY_BOUNDS_RADIUS_SCALE;
         if let Some(material) = state.world.terrain.planets.get(&planet_index) {
             let motion = motion::SurfaceFrame::read(&state.world.physics, planet_index);
-            terrain::render_body(
+            terrain::render_body_in_view(
                 &mut frame,
                 &material.field,
                 &material.geometry,
                 motion.position,
                 motion.angle,
+                view,
             );
         } else {
             circle(
@@ -135,12 +158,13 @@ pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
     }
     for fragment in state.world.terrain.fragments.values() {
         if let Some(body) = state.world.physics.world.motion(fragment.assembly.body()) {
-            terrain::render_body(
+            terrain::render_body_in_view(
                 &mut frame,
                 &fragment.terrain,
                 &fragment.geometry,
                 body.position,
                 body.angle,
+                view,
             );
         }
     }
