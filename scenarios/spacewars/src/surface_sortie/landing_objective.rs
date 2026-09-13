@@ -104,6 +104,10 @@ pub struct LandingObjectiveSurvey {
     /// Publication after live dependency checks; `tick` remains the source tick.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub validated_tick: Option<u64>,
+    /// Only the returned successful paths were revalidated. Omitted candidates
+    /// are unknown; optimality and negative results from the old map may be stale.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub validated_routes_only: bool,
     pub objective: LandingObjective,
     pub sites: Vec<LandingObjectiveRoute>,
     pub actual: Option<LandingObjectiveRoute>,
@@ -247,6 +251,7 @@ impl SurfaceSortieState {
             actor: p.owner,
             tick: p.tick,
             validated_tick: None,
+            validated_routes_only: false,
             objective,
             sites,
             actual,

@@ -170,6 +170,10 @@ v1; this slice has not been installed or timed on the cabinet.
 
 ## Next boundary
 
+The follow-up [local route dependency profile](bot-route-dependencies.md) now
+implements positive-path validation and records what remains unresolved in the
+asteroid reproduction. The v2 checkpoint above retains its original semantics.
+
 Keep this optional while investigating moving-obstacle invalidation. The next
 useful split is persistent retained-material evidence versus local obstruction
 checks for footings and crossing edges. An obstacle entering an edge's corridor

@@ -1,6 +1,8 @@
 use super::*;
 use pilot::LandingSiteQuery;
 
+mod route_dependencies;
+
 const DT: Duration = Duration::from_nanos(16_666_667);
 fn state() -> SurfaceSortieState {
     let mut state = SurfaceSortieScenario::init_material_combat(42);
@@ -42,20 +44,35 @@ fn complete_incremental_forecast_matches_synchronous_v10() {
             .landing_objective_survey(seat, p, &o.cover, ObjectivePlanning::JointRoundTrip)
             .unwrap();
         let before = state.world.physics.world.snapshot_bytes().unwrap();
-        for allowance in [
-            Work {
-                graph: 17,
-                physics_queries: 11,
-            },
-            Work {
-                graph: 1024,
-                physics_queries: 1024,
-            },
-            Work::UNLIMITED,
-        ] {
+        for (allowance, local) in [
+            (
+                Work {
+                    graph: 17,
+                    physics_queries: 11,
+                },
+                true,
+            ),
+            (Work::UNLIMITED, true),
+        ]
+        .into_iter()
+        .chain(
+            [
+                Work {
+                    graph: 17,
+                    physics_queries: 11,
+                },
+                Work {
+                    graph: 1024,
+                    physics_queries: 1024,
+                },
+                Work::UNLIMITED,
+            ]
+            .into_iter()
+            .map(|work| (work, false)),
+        ) {
             let snapshot = Arc::new(state.world.physics.world.query_snapshot());
             let job = state
-                .objective_job(seat, p, &o.cover, snapshot, None)
+                .objective_job(seat, p, &o.cover, snapshot, None, local)
                 .unwrap();
             let mut queue = PlanningQueue::new(2);
             let token = queue.submit(33, (), JobLimits::default(), job).unwrap();
@@ -521,7 +538,7 @@ fn capacity_and_expiry_defer_without_reporting_an_impossible_route() {
     let mut p = o.combat.recovery.flight.pilot.clone();
     p.tick = old.tick + MAX_SURVEY_AGE_TICKS + 1;
     assert_eq!(
-        LiveObjectivePlanner::valid(&state, 0, &p, &old, old.objective),
+        LiveObjectivePlanner::valid(&state, 0, &p, &old, old.objective, false),
         Err("expired")
     );
     // Reset scopes the new episode even when it starts at the same physics tick.

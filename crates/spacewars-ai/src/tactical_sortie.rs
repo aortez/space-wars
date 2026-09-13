@@ -406,11 +406,21 @@ impl TacticalSortiePilot {
                 && survey.sites.len()
                     <= scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
         });
+        let selected_route_revoked = self.site.is_some_and(|site| {
+            survey.is_some_and(|s| {
+                s.validated_routes_only
+                    && !s
+                        .sites
+                        .iter()
+                        .any(|r| r.site == Some(site.id) && r.cost().is_some())
+                    && s.actual.as_ref().and_then(|r| r.cost()).is_none()
+            })
+        });
         if objective.is_some()
-            && o.objective_work
+            && (selected_route_revoked || o.objective_work
                 == Some(
                     scenario_spacewars::surface_sortie::live_planning::ObjectiveWorkState::Stale,
-                )
+                ))
         {
             self.telemetry.objective_replans += 1;
             self.telemetry.live_invalidations += 1;

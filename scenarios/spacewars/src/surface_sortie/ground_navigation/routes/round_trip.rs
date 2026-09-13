@@ -217,6 +217,35 @@ impl<'a> GroundRoundTripJob<'a> {
     pub fn work(&self) -> GroundTripWork {
         self.work
     }
+    /// One selected path node and its preceding directed edge. Constant-time
+    /// access reuses the search's indexes/parents for dependency construction.
+    pub(crate) fn measured_path_step(
+        &self,
+        returning: bool,
+        index: usize,
+    ) -> Option<(GroundNode, Option<(GroundNode, GroundEdgeKind)>)> {
+        assert_eq!(self.phase, Phase::Done);
+        let path = if returning {
+            &self.result.returning.as_ref()?.path
+        } else {
+            &self.result.outbound.path
+        };
+        let id = usize::from(*path.get(index)?);
+        let node = self.nodes[id]?;
+        let previous = if index == 0 {
+            None
+        } else {
+            let previous = usize::from(path[index - 1]);
+            let parent = if returning {
+                self.backward.parents[previous]?
+            } else {
+                self.forward.parents[id]?
+            };
+            assert_eq!(usize::from(parent.0), if returning { id } else { previous });
+            Some((self.nodes[previous]?, parent.2))
+        };
+        Some((node, previous))
+    }
     /// Compatibility path. Existing v10 callers still finish synchronously;
     /// hosts that spread work over updates must use the explicit queue API.
     pub fn finish(mut self) -> GroundRoundTrip {

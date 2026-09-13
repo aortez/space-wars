@@ -3,7 +3,7 @@ use super::*;
 use engine_core::planning::{
     JobLimits, JobPoll, PlanningJob, PlanningQueue, PlanningReport, RequestToken, Work, WorkKind,
 };
-use engine_rapier::world::{QueryRegion, QuerySnapshot};
+use engine_rapier::world::{QueryArea, QueryFrame, QueryRegion, QuerySnapshot};
 use ground_navigation::{
     GroundMap, GroundMeasurements, GroundRoundTripJob, GroundSurveyJob, ReusedGroundWork,
 };
@@ -19,8 +19,10 @@ use std::{
 
 mod avoiding;
 mod objective_job;
+mod route_dependencies;
 use avoiding::{AvoidingJob, HullPreview};
 use objective_job::ObjectiveSurveyJob;
+use route_dependencies::RouteDependenciesJob;
 
 #[cfg(test)]
 mod tests;
@@ -73,6 +75,15 @@ pub struct LivePlanningTelemetry {
     pub snapshot_max_ms: f64,
     pub validation_total_ms: f64,
     pub validation_max_ms: f64,
+    pub region_area_tests: u64,
+    pub route_checks: u64,
+    pub route_area_tests: u64,
+    pub route_unrelated_changes: u64,
+    pub withheld_route_entries: u64,
+    pub local_publications: u64,
+    pub max_route_areas: usize,
+    pub parked_restarts: u64,
+    pub max_parked_requests: usize,
 }
 
 #[derive(Clone)]
@@ -93,6 +104,13 @@ struct Request {
     physics_queries: u64,
 }
 
+#[derive(Clone)]
+struct Parked {
+    objective: LandingObjective,
+    measurements: Box<GroundMeasurements>,
+    seen: u64,
+}
+
 /// Observe each active planner, then call `advance` once before the shared
 /// physics step. All jobs share one allowance. Reset on a new match/episode.
 /// The budget covers only landing-objective work; immediate observations and
@@ -101,9 +119,11 @@ struct Request {
 pub struct LiveObjectivePlanner {
     queue: PlanningQueue<u64, ObjectiveSurveyJob>,
     requests: BTreeMap<usize, Request>,
+    parked: BTreeMap<usize, Parked>,
     capacity: usize,
     allowance: Work,
     reuse_ground: bool,
+    local_dependencies: bool,
     last_observed: Option<u64>,
     last_advanced: Option<u64>,
     shared: Option<(u64, Weak<QuerySnapshot>)>,
@@ -114,9 +134,11 @@ impl LiveObjectivePlanner {
         Self {
             queue: PlanningQueue::new(capacity),
             requests: BTreeMap::new(),
+            parked: BTreeMap::new(),
             capacity,
             allowance,
             reuse_ground: false,
+            local_dependencies: false,
             last_observed: None,
             last_advanced: None,
             shared: None,
@@ -132,6 +154,17 @@ impl LiveObjectivePlanner {
     pub fn reuses_ground(&self) -> bool {
         self.reuse_ground
     }
+    /// Allow a coherent survey to finish while obstacles move, then validate
+    /// successful directed paths locally. Negative results still require the
+    /// complete region to match. This also enables compatible ground reuse.
+    pub fn with_route_dependencies(mut self) -> Self {
+        self.reuse_ground = true;
+        self.local_dependencies = true;
+        self
+    }
+    pub fn uses_route_dependencies(&self) -> bool {
+        self.local_dependencies
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -141,12 +174,14 @@ impl LiveObjectivePlanner {
     pub fn reset(&mut self) {
         self.queue.reset();
         self.requests.clear();
+        self.parked.clear();
         self.shared = None;
         self.last_observed = None;
         self.last_advanced = None;
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
+        self.parked.remove(&player);
         self.retire(player);
     }
     fn retire(&mut self, player: usize) -> Option<ObjectiveSurveyJob> {
@@ -175,17 +210,20 @@ impl LiveObjectivePlanner {
             local(p.hatch?),
         ))
     }
+    fn same_objective(old: LandingObjective, new: LandingObjective) -> bool {
+        old.matches(new)
+            && old.position.distance_to(new.position) <= 0.002
+            && (old.range - new.range).abs() <= 0.0001
+    }
     fn valid(
         state: &SurfaceSortieState,
         player: usize,
         p: &PilotObservationV1,
         request: &Request,
         objective: LandingObjective,
+        local_dependencies: bool,
     ) -> Result<(), &'static str> {
-        if !request.objective.matches(objective)
-            || request.objective.position.distance_to(objective.position) > 0.002
-            || (request.objective.range - objective.range).abs() > 0.0001
-        {
+        if !Self::same_objective(request.objective, objective) {
             return Err("objective_changed");
         }
         if request.measurement_tick > p.tick
@@ -209,7 +247,11 @@ impl LiveObjectivePlanner {
         if (gravity - request.gravity).abs() > 0.01 {
             return Err("gravity_changed");
         }
-        Self::geometry_valid(state, player, p, request, request.gravity)
+        if local_dependencies {
+            Ok(())
+        } else {
+            Self::geometry_valid(state, player, p, request, request.gravity)
+        }
     }
     fn geometry_valid(
         state: &SurfaceSortieState,
@@ -254,6 +296,14 @@ impl LiveObjectivePlanner {
             self.remove(player);
             return None;
         }
+        if self.local_dependencies {
+            // This remains one coherent, possibly stale, world hypothesis.
+            // Publication must certify the selected paths in the live world;
+            // negative answers still require the complete region to match.
+            return self
+                .retire(player)
+                .map(ObjectiveSurveyJob::into_measurements);
+        }
         let request = self.requests.get(&player)?;
         // Check geometry even when the earlier validity check stopped at a
         // gravity/hatch change. A lower gravity also expands the jump region.
@@ -269,6 +319,83 @@ impl LiveObjectivePlanner {
         }
         self.retire(player)
             .map(ObjectiveSurveyJob::into_measurements)
+    }
+
+    fn locally_validated(
+        state: &SurfaceSortieState,
+        player: usize,
+        p: &PilotObservationV1,
+        request: &Request,
+        job: &ObjectiveSurveyJob,
+        mut survey: LandingObjectiveSurvey,
+        telemetry: &mut LivePlanningTelemetry,
+    ) -> Option<LandingObjectiveSurvey> {
+        let excluded = [
+            pilot_physics_id(p.owner),
+            state
+                .world
+                .physics
+                .surface_vehicle_entity(state.pilots[player].vehicle.0),
+        ];
+        let region = QueryFrame {
+            previous_position: request.position,
+            previous_angle: request.angle,
+            current_position: p.planet.motion.position,
+            current_angle: p.planet.motion.angle,
+            excluded: &excluded,
+        };
+        // The full-survey shortcut must use the same conservative transform
+        // bound as the selected paths, including long colliders with distant
+        // origins. Keep the circular region to avoid unmeasured box corners.
+        let spec = SurfaceSortieState::spec();
+        let radius = p.planet.radius
+            + 12.0
+            + spec.jump_speed.powi(2) / (2.0 * request.gravity.max(1.0)) * 0.85;
+        let whole = request.snapshot.validate_region(
+            &state.world.physics.world,
+            QueryRegion {
+                previous_position: request.position,
+                previous_angle: request.angle,
+                current_position: p.planet.motion.position,
+                current_angle: p.planet.motion.angle,
+                radius,
+                groups: spec.collision_groups,
+                excluded: &excluded,
+            },
+        );
+        telemetry.region_area_tests += whole.area_tests;
+        if whole.valid {
+            return Some(survey);
+        }
+        let mut valid = Vec::new();
+        for (site, areas) in job.dependencies() {
+            telemetry.route_checks += 1;
+            telemetry.max_route_areas = telemetry.max_route_areas.max(areas.len());
+            let check = request
+                .snapshot
+                .validate_areas(&state.world.physics.world, region, areas);
+            telemetry.route_area_tests += check.area_tests;
+            telemetry.route_unrelated_changes += check.unrelated_changes;
+            if check.valid {
+                valid.push(*site);
+            }
+        }
+        let before = survey.sites.len() + usize::from(survey.actual.is_some());
+        survey
+            .sites
+            .retain(|r| r.cost().is_some() && valid.contains(&r.site));
+        survey.actual = survey
+            .actual
+            .filter(|r| r.cost().is_some() && valid.contains(&None));
+        telemetry.withheld_route_entries +=
+            (before - survey.sites.len() - usize::from(survey.actual.is_some())) as u64;
+        if (survey.sites.is_empty() && survey.actual.is_none())
+            || (request.actual.is_some() && survey.actual.is_none())
+        {
+            return None;
+        }
+        survey.validated_routes_only = true;
+        Some(survey)
     }
 
     pub fn observe(
@@ -300,10 +427,32 @@ impl LiveObjectivePlanner {
         };
         let mut invalidation = None;
         let mut measurements = None;
+        let was_parked = self.parked.contains_key(&player);
+        if let Some(parked) = self.parked.remove(&player) {
+            if !Self::same_objective(parked.objective, objective) {
+                invalidation = Some("objective_changed");
+            } else if parked.measurements.tick > p.tick
+                || p.tick - parked.measurements.tick > MAX_SURVEY_AGE_TICKS
+            {
+                invalidation = Some("expired");
+            } else {
+                measurements = Some(parked.measurements);
+            }
+            if let Some(reason) = invalidation {
+                *self.telemetry.invalidations.entry(reason).or_default() += 1;
+            }
+        }
         if let Some(request) = self.requests.get_mut(&player) {
             request.seen = p.tick;
             let clock = Instant::now();
-            let valid = Self::valid(state, player, p, request, objective);
+            let valid = Self::valid(
+                state,
+                player,
+                p,
+                request,
+                objective,
+                self.local_dependencies,
+            );
             let ms = clock.elapsed().as_secs_f64() * 1000.0;
             self.telemetry.validation_total_ms += ms;
             self.telemetry.validation_max_ms = self.telemetry.validation_max_ms.max(ms);
@@ -322,28 +471,54 @@ impl LiveObjectivePlanner {
                 }
                 Ok(()) => match self.queue.poll(request.token, &request.tick) {
                     JobPoll::Ready(survey) => {
-                        let first = !request.completed;
-                        if first {
-                            request.completed = true;
-                            self.telemetry.completed += 1;
-                            self.telemetry.max_ready_age_ticks = self
-                                .telemetry
-                                .max_ready_age_ticks
-                                .max(p.tick - request.measurement_tick);
-                            self.telemetry.max_request_completion_ticks = self
-                                .telemetry
-                                .max_request_completion_ticks
-                                .max(p.tick - request.tick);
+                        let survey = survey.clone();
+                        let survey = if self.local_dependencies {
+                            let clock = Instant::now();
+                            let result = Self::locally_validated(
+                                state,
+                                player,
+                                p,
+                                request,
+                                self.queue.job(request.token).unwrap(),
+                                survey,
+                                &mut self.telemetry,
+                            );
+                            let ms = clock.elapsed().as_secs_f64() * 1000.0;
+                            self.telemetry.validation_total_ms += ms;
+                            self.telemetry.validation_max_ms =
+                                self.telemetry.validation_max_ms.max(ms);
+                            result
+                        } else {
+                            Some(survey)
+                        };
+                        if let Some(mut survey) = survey {
+                            let first = !request.completed;
+                            if first {
+                                request.completed = true;
+                                self.telemetry.completed += 1;
+                                self.telemetry.max_ready_age_ticks = self
+                                    .telemetry
+                                    .max_ready_age_ticks
+                                    .max(p.tick - request.measurement_tick);
+                                self.telemetry.max_request_completion_ticks = self
+                                    .telemetry
+                                    .max_request_completion_ticks
+                                    .max(p.tick - request.tick);
+                            }
+                            if first || p.tick - request.tick < REFRESH_TICKS {
+                                survey.validated_tick = Some(p.tick);
+                                self.telemetry.local_publications +=
+                                    u64::from(survey.validated_routes_only);
+                                o.landing_objective = Some(survey);
+                                o.objective_work = Some(ObjectiveWorkState::Ready);
+                                self.telemetry.published += 1;
+                                return;
+                            }
+                            measurements = self.salvage(state, player, p);
+                        } else {
+                            invalidation = Some("routes_changed");
+                            self.invalidate(player, "routes_changed");
                         }
-                        if first || p.tick - request.tick < REFRESH_TICKS {
-                            let mut survey = survey.clone();
-                            survey.validated_tick = Some(p.tick);
-                            o.landing_objective = Some(survey);
-                            o.objective_work = Some(ObjectiveWorkState::Ready);
-                            self.telemetry.published += 1;
-                            return;
-                        }
-                        measurements = self.salvage(state, player, p);
                     }
                     JobPoll::Pending => {
                         o.objective_work = Some(ObjectiveWorkState::Pending);
@@ -363,7 +538,7 @@ impl LiveObjectivePlanner {
                 ObjectiveWorkState::Pending
             },
         );
-        if self.requests.len() == self.capacity {
+        if self.requests.len() + self.parked.len() == self.capacity {
             self.telemetry.deferred_capacity += 1;
             return;
         }
@@ -374,6 +549,21 @@ impl LiveObjectivePlanner {
             return;
         }
         if p.sites.is_empty() && Self::actual(p).is_none() {
+            if self.local_dependencies
+                && let Some(measurements) = measurements
+            {
+                self.parked.insert(
+                    player,
+                    Parked {
+                        objective,
+                        measurements,
+                        seen: p.tick,
+                    },
+                );
+                self.telemetry.parked_restarts += u64::from(!was_parked);
+                self.telemetry.max_parked_requests =
+                    self.telemetry.max_parked_requests.max(self.parked.len());
+            }
             return;
         }
         let snapshot = measurements
@@ -407,9 +597,14 @@ impl LiveObjectivePlanner {
             .as_ref()
             .map_or(p.planet.motion.angle, |m| m.angle);
         let reused = measurements.is_some();
-        if let Some(job) =
-            state.objective_job(player, p, &o.cover, Arc::clone(&snapshot), measurements)
-        {
+        if let Some(job) = state.objective_job(
+            player,
+            p,
+            &o.cover,
+            Arc::clone(&snapshot),
+            measurements,
+            self.local_dependencies,
+        ) {
             let token = self
                 .queue
                 .submit(player as u64, p.tick, JobLimits::default(), job)
@@ -438,7 +633,7 @@ impl LiveObjectivePlanner {
             self.telemetry.max_retained_requests = self
                 .telemetry
                 .max_retained_requests
-                .max(self.requests.len());
+                .max(self.requests.len() + self.parked.len());
         }
     }
 
@@ -453,6 +648,12 @@ impl LiveObjectivePlanner {
             .iter()
             .filter(|(_, r)| r.seen != tick)
             .map(|(&p, _)| p)
+            .chain(
+                self.parked
+                    .iter()
+                    .filter(|(_, p)| p.seen != tick)
+                    .map(|(&p, _)| p),
+            )
             .collect();
         for player in removed {
             self.remove(player);

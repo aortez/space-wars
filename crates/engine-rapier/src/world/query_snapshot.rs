@@ -2,6 +2,9 @@
 use super::*;
 use rapier2d::{parry::query::DefaultQueryDispatcher, prelude::QueryPipeline};
 
+mod areas;
+pub use areas::{AreaValidation, QueryArea, QueryFrame};
+
 #[derive(Clone)]
 pub struct QuerySnapshot {
     bodies: RigidBodySet,
@@ -11,6 +14,7 @@ pub struct QuerySnapshot {
 
 /// The same region expressed in the snapshot and current rigid-body frames.
 /// Exclusions and groups must cover all queries used to build the plan.
+#[derive(Clone, Copy)]
 pub struct QueryRegion<'a> {
     pub previous_position: Vec2,
     pub previous_angle: f32,

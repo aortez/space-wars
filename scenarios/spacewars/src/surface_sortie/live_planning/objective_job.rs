@@ -5,6 +5,7 @@ enum Phase {
     Ground(Box<GroundSurveyJob>),
     Avoid(Box<AvoidingJob>),
     Trip(Box<GroundRoundTripJob<'static>>),
+    Dependencies(Box<RouteDependenciesJob>),
     Done,
 }
 #[derive(Clone)]
@@ -13,6 +14,9 @@ pub(crate) struct ObjectiveSurveyJob {
     base: Option<Arc<GroundMap>>,
     measurements: Option<Box<GroundMeasurements>>,
     reused: ReusedGroundWork,
+    local_dependencies: bool,
+    radius: f32,
+    dependencies: Vec<(Option<LandingSiteId>, Vec<QueryArea>)>,
     candidates: Vec<Candidate>,
     index: usize,
     position: Vec2,
@@ -30,6 +34,7 @@ impl SurfaceSortieState {
         cover: &[combat::LandingCover],
         snapshot: Arc<QuerySnapshot>,
         measurements: Option<Box<GroundMeasurements>>,
+        local_dependencies: bool,
     ) -> Option<ObjectiveSurveyJob> {
         let objective = LandingObjective::read(p)?;
         if !p.queries_ready
@@ -107,6 +112,9 @@ impl SurfaceSortieState {
             base: None,
             measurements: None,
             reused: ReusedGroundWork::default(),
+            local_dependencies,
+            radius: p.planet.radius,
+            dependencies: Vec::new(),
             candidates,
             index: 0,
             position: p.planet.motion.position,
@@ -127,6 +135,7 @@ impl SurfaceSortieState {
                 actor: p.owner,
                 tick: measurement_tick,
                 validated_tick: None,
+                validated_routes_only: false,
                 objective,
                 sites: Vec::new(),
                 actual: None,
@@ -151,6 +160,9 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
+        &self.dependencies
+    }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
         match &self.phase {
             Phase::Ground(job) => job.reused(),
@@ -174,6 +186,19 @@ impl ObjectiveSurveyJob {
             Arc::clone(&self.preview),
         )))
     }
+    fn finish_route(&mut self, route: LandingObjectiveRoute) {
+        if route.site.is_some() {
+            self.result.sites.push(route);
+        } else {
+            self.result.actual = Some(route);
+        }
+        self.index += 1;
+        self.phase = if self.index < self.candidates.len() {
+            self.avoid()
+        } else {
+            Phase::Done
+        };
+    }
 }
 impl PlanningJob for ObjectiveSurveyJob {
     type Output = LandingObjectiveSurvey;
@@ -182,6 +207,7 @@ impl PlanningJob for ObjectiveSurveyJob {
             Phase::Ground(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Avoid(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Trip(j) => j.next_work().or(Some(WorkKind::Graph)),
+            Phase::Dependencies(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Done => None,
         }
     }
@@ -222,23 +248,38 @@ impl PlanningJob for ObjectiveSurveyJob {
                     j.step();
                 } else {
                     let result = j.output().unwrap();
+                    if self.local_dependencies && result.endpoint.is_some() {
+                        if let Phase::Trip(trip) = std::mem::replace(&mut self.phase, Phase::Done) {
+                            self.phase = Phase::Dependencies(Box::new(RouteDependenciesJob::new(
+                                trip,
+                                self.radius,
+                                self.gravity,
+                            )));
+                        }
+                        return;
+                    }
                     let route = LandingObjectiveRoute {
                         site: self.candidates[self.index].site,
                         outbound: result.outbound.diagnostics.clone(),
                         returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
                         endpoint: result.endpoint,
                     };
-                    if route.site.is_some() {
-                        self.result.sites.push(route);
-                    } else {
-                        self.result.actual = Some(route);
-                    }
-                    self.index += 1;
-                    self.phase = if self.index < self.candidates.len() {
-                        self.avoid()
-                    } else {
-                        Phase::Done
+                    self.finish_route(route);
+                }
+            }
+            Phase::Dependencies(j) => {
+                if j.next_work().is_some() {
+                    j.step();
+                } else {
+                    let result = j.trip.output().unwrap();
+                    let route = LandingObjectiveRoute {
+                        site: self.candidates[self.index].site,
+                        outbound: result.outbound.diagnostics.clone(),
+                        returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
+                        endpoint: result.endpoint,
                     };
+                    self.dependencies.push((route.site, j.take_areas()));
+                    self.finish_route(route);
                 }
             }
             Phase::Done => {}

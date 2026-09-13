@@ -8,8 +8,12 @@ joint-trip candidate and seat-swapped comparison harness are described in
 resumes coherent physical measurements and graph work under one shared
 allowance in the existing comparison runners. An optional
 [ground-reuse profile](../bot-ground-reuse.md) retains compatible footing and
-walk measurements across requests. Default v10 remains synchronous; moving-obstacle
-dependency refinement, broader sensor coverage and strategic planning remain future work.
+walk measurements across requests. A further opt-in
+[local route dependency profile](../bot-route-dependencies.md) validates successful
+paths despite unrelated obstacle motion and preserves partial measurements while
+waiting for candidate refresh. Default v10 remains synchronous; failed routes
+under asteroid pressure, broader sensor coverage and strategic planning remain
+future work.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
