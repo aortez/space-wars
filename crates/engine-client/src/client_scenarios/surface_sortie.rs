@@ -14,6 +14,11 @@ use spacewars_ai::{
     tactical_capture::TacticalCapturePilot,
 };
 
+mod comparison;
+pub(super) use comparison::{
+    SURFACE_BLOCKS_REGISTRATION, SURFACE_CONTOUR_REGISTRATION, SURFACE_ROUND_REGISTRATION,
+};
+
 mod mission;
 pub(super) use mission::{
     ARENA_DUEL_REGISTRATION, ARENA_REGISTRATION, MATCH_REGISTRATION, TRAVEL_DUEL_REGISTRATION,
@@ -612,6 +617,19 @@ fn create_world(
 
 impl ClientScenario for SurfaceSortieClientScenario {
     fn registration(&self) -> &'static ScenarioRegistration {
+        if let Some(surface) = self.state.surface_comparison() {
+            return match surface {
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Blocks => {
+                    &SURFACE_BLOCKS_REGISTRATION
+                }
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Contour => {
+                    &SURFACE_CONTOUR_REGISTRATION
+                }
+                scenario_spacewars::surface_sortie::comparison::TerrainSurface::Interpolated => {
+                    &SURFACE_ROUND_REGISTRATION
+                }
+            };
+        }
         if self.state.has_material_ground() {
             return &TERRAIN_REGISTRATION;
         }

@@ -3,6 +3,8 @@
 mod ground_start_probe;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
+#[path = "support/physics_profile.rs"]
+mod physics_profile;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -29,8 +31,14 @@ fn arg(name: &str, default: &str) -> String {
         .map_or_else(|| default.to_owned(), |p| p[1].clone())
 }
 fn timing(mut values: Vec<f64>) -> serde_json::Value {
+    if values.is_empty() {
+        return serde_json::Value::Null;
+    }
     values.sort_by(f64::total_cmp);
-    json!({"p95_ms": values[(values.len() * 95 / 100).min(values.len()-1)], "max_ms":values.last()})
+    let percentile = |p: usize| values[(values.len() * p / 100).min(values.len() - 1)];
+    json!({"count":values.len(), "mean_ms":values.iter().sum::<f64>() / values.len() as f64,
+        "p50_ms":percentile(50), "p95_ms":percentile(95), "p99_ms":percentile(99),
+        "max_ms":values.last(), "over_16_67_ms":values.iter().filter(|&&v|v > 1000.0 / 60.0).count()})
 }
 fn main() {
     let seed = arg("--seed", "42").parse().unwrap();
@@ -41,7 +49,14 @@ fn main() {
     let mode = arg("--mode", "quiet");
     let interval = arg("--asteroid-interval", "0").parse().unwrap();
     let frames = arg("--frames", "false") == "true";
+    let measure_draw = arg("--measure-draw", "false") == "true";
+    let mut physics_profile = (arg("--profile-physics", "false") == "true")
+        .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
+    // Optional dense, half-open physics-tick window; ordinary traces stay sparse.
+    let trace_start: u64 = arg("--trace-start-tick", "0").parse().unwrap();
+    let trace_end: u64 = arg("--trace-end-tick", "0").parse().unwrap();
+    assert!(trace_end == 0 || (trace && trace_start < trace_end));
     let match_rules = arg("--match", "false") == "true";
     let require_finish = arg("--require-finish", "false") == "true";
     assert!(
@@ -56,6 +71,15 @@ fn main() {
     let strike = arg("--strike-after-departure", "false") == "true";
     let bearing: f32 = arg("--bearing", "0").parse().unwrap();
     let world_kind = arg("--world", "fixed");
+    let surface = arg("--surface", "default");
+    let colliders = arg("--terrain-colliders", "default");
+    assert!(["default", "separate", "compound"].contains(&colliders.as_str()));
+    assert!(colliders == "default" || world_kind == "generated");
+    assert!(["default", "blocks", "round"].contains(&surface.as_str()));
+    assert!(
+        surface == "default" || world_kind == "generated",
+        "--surface needs --world generated"
+    );
     let defaults = CombatBreakSettings::default();
     let breaks = CombatBreakSettings {
         interval_seconds: arg("--break-interval", &defaults.interval_seconds.to_string())
@@ -76,7 +100,28 @@ fn main() {
     let mut trace =
         trace.then(|| BufWriter::new(fs::File::create(out.join("trace.jsonl")).unwrap()));
     let mut state = if world_kind == "generated" {
-        SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
+        if surface == "default" && colliders == "default" {
+            SurfaceSortieScenario::init_material_arena_trial(seed, mirror, bearing)
+        } else {
+            use scenario_spacewars::surface_sortie::comparison::{
+                TerrainColliders, TerrainSurface,
+            };
+            SurfaceSortieScenario::init_material_arena_collision_trial(
+                seed,
+                mirror,
+                bearing,
+                if surface == "blocks" {
+                    TerrainSurface::Blocks
+                } else {
+                    TerrainSurface::Interpolated
+                },
+                match colliders.as_str() {
+                    "separate" => TerrainColliders::Separate,
+                    "compound" => TerrainColliders::ChunkCompound,
+                    _ => TerrainColliders::default(),
+                },
+            )
+        }
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
@@ -105,11 +150,14 @@ fn main() {
         },
         breaks,
     );
-    let initial = state.terrain_diagnostics().occupied_cells;
+    let initial_audit = state.terrain_diagnostics();
+    let initial = initial_audit.occupied_cells;
     let mut sensors = Vec::new();
     let mut objective_sensors = Vec::new();
     let mut policies = Vec::new();
     let mut steps = Vec::new();
+    let mut draws = Vec::new();
+    let mut measured_ticks = Vec::new();
     let mut samples = Vec::new();
     let mut events = Vec::new();
     let mut asteroid_events = Vec::new();
@@ -152,6 +200,8 @@ fn main() {
             strike_tick = Some(tick);
         }
         let mut actions = Vec::new();
+        let sensor_start = sensors.len();
+        let policy_start = policies.len();
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
@@ -224,7 +274,8 @@ fn main() {
                 let posture = trace.as_ref().and_then(|_| state.spaceling_snapshot(i));
                 let posture_key = posture.map(|s| (s.get_up_attempts, s.get_up_result, s.balance));
                 if let Some(trace) = &mut trace
-                    && (tick % 60 == 0
+                    && ((trace_start..trace_end).contains(&tick)
+                        || tick % 60 == 0
                         || label != last[i]
                         || posture_key != last_posture[i]
                         || o.local.landing_objective.is_some())
@@ -234,6 +285,9 @@ fn main() {
                         &json!({
                             "version": 1, "tick": tick, "seat": i,
                             "observation": o, "actions": intent.encode(owner),
+                            "controls": {"turn": intent.flight.controls.horizontal,
+                                "thrust": intent.flight.controls.primary_held,
+                                "brake": intent.flight.controls.brake_held},
                             "mission": pilots[i].telemetry(),
                             "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
                             "posture": posture.map(|s| json!({
@@ -275,6 +329,33 @@ fn main() {
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
+        if let Some(profile) = &mut physics_profile {
+            profile.record(state.last_step_metrics(), *steps.last().unwrap());
+            if tick % 60 == 59 || state.match_outcome().is_some() {
+                let pairs = state.physics_pair_diagnostics();
+                profile.record_pairs(
+                    tick + 1,
+                    pairs.same_body_candidates,
+                    pairs.other_candidates,
+                    pairs.active_contact_pairs,
+                );
+            }
+        }
+        if measure_draw {
+            let clock = Instant::now();
+            for player in 0..2 {
+                std::hint::black_box(SurfaceSortieScenario::player_frame(&state, player));
+                std::hint::black_box(SurfaceSortieScenario::minimap_frame(&state, player, 1.0));
+            }
+            let draw_ms = clock.elapsed().as_secs_f64() * 1000.0;
+            draws.push(draw_ms);
+            measured_ticks.push(
+                steps.last().unwrap()
+                    + sensors[sensor_start..].iter().sum::<f64>()
+                    + policies[policy_start..].iter().sum::<f64>()
+                    + draw_ms,
+            );
+        }
         elapsed_ticks = tick + 1;
         if let Some(round) = state.match_observation() {
             for (seat, vitals) in round.pilots.iter().enumerate() {
@@ -363,6 +444,21 @@ fn main() {
         "claim_footing_recoveries":claim_footing_recoveries});
     report["objective_refresh"] =
         json!((!objective_sensors.is_empty()).then(|| timing(objective_sensors)));
+    report["initial_audit"] = json!(initial_audit);
+    report["terrain_surface"] = json!(if initial_audit.surface_sample_bytes > 0 {
+        "round"
+    } else {
+        "blocks"
+    });
+    report["dense_trace_ticks"] = json!([trace_start, trace_end]);
+    report["draw_lists"] = timing(draws);
+    report["measured_tick"] = timing(measured_ticks);
+    report["physics_profile"] = physics_profile.map_or(serde_json::Value::Null, |p| p.report());
+    report["terrain_colliders"] = json!(format!("{:?}", state.terrain_collider_layout()));
+    report["measurement_scope"] = json!({"draw_enabled":measure_draw,
+        "draw_frames_per_tick":if measure_draw {4} else {0},
+        "includes":"mission sensors + policies + scenario step + optional two player frames and two minimaps",
+        "excludes":"audit, trace, metrics bookkeeping, file IO, rasterization and presentation"});
     if frames && state.match_outcome().is_some() {
         for seat in 0..2 {
             fs::write(

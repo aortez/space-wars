@@ -160,7 +160,7 @@ impl SurfaceSortieState {
         let replacement = self.replacement_ship(player);
         let radius = physics::SpacewarsPhysics::surface_vehicle_clearance_radius(&replacement);
         let spec = Self::spec();
-        let preview_clear = self.world.physics.replacement_capsule_clearance(
+        let preview_clear = self.world.physics.surface_vehicle_capsule_clearance(
             self.pilots[player].vehicle.0,
             &replacement,
             spec.half_segment,

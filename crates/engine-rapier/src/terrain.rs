@@ -2,15 +2,27 @@
 //! replaces derived shapes in the canonical mechanics world.
 
 use engine_core::Vec2;
-use engine_terrain::{ChunkId, DetachedTerrain, SolidRect, Terrain, TerrainGeometry};
+use engine_terrain::{
+    ChunkGeometry, ChunkId, DetachedTerrain, SolidPolygon, SolidRect, Terrain, TerrainGeometry,
+    TerrainSurface,
+};
 
 use crate::world::{
-    BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
-    CollisionGroups, PhysicsId, PhysicsWorld,
+    BodyId, BodyMotion, BodyRole, BodySpec, ColliderId, ColliderMassProperties, ColliderRole,
+    ColliderShape, ColliderSpec, CollisionGroups, CompoundChild, PhysicsId, PhysicsWorld,
 };
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum TerrainColliders {
+    Separate,
+    #[default]
+    ChunkCompound,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct TerrainSpec {
+    pub surface: TerrainSurface,
+    pub colliders: TerrainColliders,
     /// Reserve one consecutive role per chunk; other roles may hold sensors.
     pub first_chunk_role: u32,
     pub friction: f32,
@@ -21,6 +33,8 @@ pub struct TerrainSpec {
 impl Default for TerrainSpec {
     fn default() -> Self {
         Self {
+            surface: TerrainSurface::Blocks,
+            colliders: TerrainColliders::default(),
             first_chunk_role: 1000,
             friction: 0.9,
             restitution: 0.0,
@@ -34,7 +48,7 @@ pub struct TerrainAssembly {
     body: BodyId,
     spec: TerrainSpec,
     revisions: Vec<Option<u64>>,
-    shapes: Vec<Vec<SolidRect>>,
+    shapes: Vec<(Vec<SolidRect>, Vec<SolidPolygon>)>,
 }
 
 impl TerrainAssembly {
@@ -65,7 +79,7 @@ impl TerrainAssembly {
             body,
             spec,
             revisions: vec![None; terrain.chunk_count()],
-            shapes: vec![Vec::new(); terrain.chunk_count()],
+            shapes: vec![(Vec::new(), Vec::new()); terrain.chunk_count()],
         };
         if assembly.synchronize(world, terrain, geometry).is_none() {
             world.remove_entity(id);
@@ -85,6 +99,17 @@ impl TerrainAssembly {
         self.body
     }
 
+    /// Expected physical identities, independent of the number of child shapes.
+    pub fn chunk_collider_ids(&self, chunk: &ChunkGeometry) -> impl Iterator<Item = ColliderId> {
+        let count = match self.spec.colliders {
+            TerrainColliders::Separate => chunk.shape_count(),
+            TerrainColliders::ChunkCompound => usize::from(chunk.shape_count() > 0),
+        };
+        let body = self.body;
+        let role = ColliderRole::new(self.spec.first_chunk_role + chunk.id.0);
+        (0..count).map(move |part| ColliderId::new(body.entity, role, part as u16))
+    }
+
     /// Reconcile only changed chunks. An empty chunk removes its previous shapes.
     /// The geometry cache must have been refreshed from this terrain first.
     pub fn synchronize(
@@ -96,10 +121,8 @@ impl TerrainAssembly {
         if !world.contains_body(self.body)
             || self.revisions.len() != terrain.chunk_count()
             || geometry.chunks().len() != terrain.chunk_count()
-            || geometry
-                .chunks()
-                .iter()
-                .any(|chunk| terrain.chunk_revision(chunk.id) != Some(chunk.revision))
+            || !geometry.is_current(terrain)
+            || geometry.surface() != self.spec.surface
         {
             return None;
         }
@@ -107,18 +130,18 @@ impl TerrainAssembly {
         let motion = world.motion(self.body)?;
         let old_center = world.center_of_mass(self.body)?;
         for chunk in geometry.chunks() {
-            if self.revisions[chunk.id.0 as usize] == Some(chunk.revision) {
+            if self.revisions[chunk.id.0 as usize] == Some(chunk.generation) {
                 continue;
             }
             let index = chunk.id.0 as usize;
             // Durability is material state, not a collider change. Keep existing
-            // handles and solver contacts when the rectangle cover is unchanged.
-            if self.shapes[index] == chunk.rectangles {
-                self.revisions[index] = Some(chunk.revision);
+            // handles and solver contacts when the derived shapes are unchanged.
+            if self.shapes[index].0 == chunk.rectangles && self.shapes[index].1 == chunk.polygons {
+                self.revisions[index] = Some(chunk.generation);
                 continue;
             }
             let role = ColliderRole::new(self.spec.first_chunk_role + chunk.id.0);
-            let colliders: Vec<_> = chunk
+            let mut colliders: Vec<_> = chunk
                 .rectangles
                 .iter()
                 .enumerate()
@@ -137,11 +160,68 @@ impl TerrainAssembly {
                     collider
                 })
                 .collect();
+            for polygon in &chunk.polygons {
+                let mut collider = ColliderSpec::convex_polygon(
+                    ColliderId::new(self.body.entity, role, u16::try_from(colliders.len()).ok()?),
+                    polygon.vertices.clone(),
+                );
+                collider.friction = self.spec.friction;
+                collider.restitution = self.spec.restitution;
+                collider.collision_groups = self.spec.collision_groups;
+                collider.solver_groups = self.spec.collision_groups;
+                collider.density = 0.0;
+                if polygon.owns_cell {
+                    let area = terrain.cell_size().powi(2);
+                    collider.mass_properties = Some(ColliderMassProperties {
+                        center: terrain.cell_center(polygon.source),
+                        mass: area,
+                        inertia: area * area / 6.0,
+                    });
+                }
+                colliders.push(collider);
+            }
+            if self.spec.colliders == TerrainColliders::ChunkCompound && colliders.len() > 1 {
+                let mut compound = colliders[0].clone();
+                let mass = chunk_mass(terrain, chunk);
+                compound.local_position = mass.center;
+                compound.local_angle = 0.0;
+                compound.density = 0.0;
+                compound.mass_properties = Some(ColliderMassProperties {
+                    center: Vec2::ZERO,
+                    ..mass
+                });
+                compound.shape = ColliderShape::Compound {
+                    children: colliders
+                        .into_iter()
+                        .map(|mut c| {
+                            // Keep GJK's small convex shapes near their own
+                            // origins instead of subtracting planet-sized
+                            // coordinates when resolving thin surface patches.
+                            if let ColliderShape::ConvexPolygon { vertices } = &mut c.shape {
+                                let center =
+                                    vertices.iter().copied().fold(Vec2::ZERO, |a, b| a + b)
+                                        / vertices.len() as f32;
+                                for vertex in vertices {
+                                    *vertex -= center;
+                                }
+                                c.local_position += center.rotate_radians(c.local_angle);
+                            }
+                            CompoundChild {
+                                shape: c.shape,
+                                position: c.local_position - mass.center,
+                                angle: c.local_angle,
+                            }
+                        })
+                        .collect(),
+                };
+                colliders = vec![compound];
+            }
             if !world.replace_colliders(self.body, role, &colliders) {
                 return None;
             }
-            self.revisions[chunk.id.0 as usize] = Some(chunk.revision);
-            self.shapes[index].clone_from(&chunk.rectangles);
+            self.revisions[chunk.id.0 as usize] = Some(chunk.generation);
+            self.shapes[index].0.clone_from(&chunk.rectangles);
+            self.shapes[index].1.clone_from(&chunk.polygons);
             rebuilt += 1;
         }
         if rebuilt > 0 {
@@ -154,6 +234,47 @@ impl TerrainAssembly {
             world.set_velocity(self.body, velocity, motion.angular_velocity, true);
         }
         Some(rebuilt)
+    }
+}
+
+fn chunk_mass(terrain: &Terrain, chunk: &ChunkGeometry) -> ColliderMassProperties {
+    let cell_area = f64::from(terrain.cell_size()).powi(2);
+    let parts = || {
+        chunk
+            .rectangles
+            .iter()
+            .map(|rect| {
+                let half = rect.half_extents(terrain);
+                let mass = f64::from(rect.width) * f64::from(rect.height) * cell_area;
+                (
+                    rect.local_center(terrain),
+                    mass,
+                    mass * (f64::from(half.x).powi(2) + f64::from(half.y).powi(2)) / 3.0,
+                )
+            })
+            .chain(chunk.polygons.iter().filter(|p| p.owns_cell).map(|p| {
+                (
+                    terrain.cell_center(p.source),
+                    cell_area,
+                    cell_area * cell_area / 6.0,
+                )
+            }))
+    };
+    let (mass, x, y) = parts().fold((0.0, 0.0, 0.0), |(mass, x, y), (p, m, _)| {
+        (mass + m, x + f64::from(p.x) * m, y + f64::from(p.y) * m)
+    });
+    let center = Vec2::new((x / mass) as f32, (y / mass) as f32);
+    let inertia = parts()
+        .map(|(p, m, i)| {
+            i + m
+                * ((f64::from(p.x) - f64::from(center.x)).powi(2)
+                    + (f64::from(p.y) - f64::from(center.y)).powi(2))
+        })
+        .sum::<f64>();
+    ColliderMassProperties {
+        center,
+        mass: mass as f32,
+        inertia: inertia as f32,
     }
 }
 
@@ -187,7 +308,7 @@ impl TerrainFragment {
         spec: TerrainSpec,
     ) -> Option<Self> {
         let terrain = detached.terrain;
-        let geometry = TerrainGeometry::new(&terrain);
+        let geometry = TerrainGeometry::with_surface(&terrain, spec.surface);
         let assembly = TerrainAssembly::insert(
             world,
             id,

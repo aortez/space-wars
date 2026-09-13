@@ -2,7 +2,7 @@ use super::*;
 use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
-use engine_terrain::{CellCoord, MaterialId};
+use engine_terrain::{CellCoord, MaterialId, TerrainSurface};
 
 const DT: Duration = Duration::from_nanos(16_666_667);
 
@@ -26,7 +26,11 @@ fn idle(state: &mut SurfaceSortieState, ticks: usize) {
 }
 
 fn parked(players: usize) -> SurfaceSortieState {
-    let mut state = SurfaceSortieScenario::init_material(42, players);
+    parked_surface(players, TerrainSurface::Blocks)
+}
+
+fn parked_surface(players: usize, surface: TerrainSurface) -> SurfaceSortieState {
+    let mut state = SurfaceSortieScenario::init_material_surface(42, players, surface);
     state.world.planets[0].wrapper_omega = 0.0;
     idle(&mut state, 240);
     for p in 0..players {
@@ -54,7 +58,11 @@ fn transfer(state: &mut SurfaceSortieState, player: usize) {
 }
 
 fn claimed() -> SurfaceSortieState {
-    let mut state = parked(1);
+    claimed_surface(TerrainSurface::Blocks)
+}
+
+fn claimed_surface(surface: TerrainSurface) -> SurfaceSortieState {
+    let mut state = parked_surface(1, surface);
     transfer(&mut state, 0);
     assert_eq!(
         state.location(0),
@@ -75,10 +83,13 @@ fn claimed() -> SurfaceSortieState {
 fn flag_cell(state: &SurfaceSortieState) -> CellCoord {
     let flag = state.observation(0).planet_claim.unwrap().flag.unwrap();
     let frame = motion::SurfaceFrame::read(&state.world.physics, 0);
-    state.world.terrain.planets[&0]
-        .field
-        .local_to_cell(
-            (flag.position - flag.normal * 0.08 - frame.position).rotate_radians(-frame.angle),
+    let terrain = &state.world.terrain.planets[&0];
+    terrain
+        .geometry
+        .contact_cell(
+            &terrain.field,
+            (flag.position - frame.position).rotate_radians(-frame.angle),
+            flag.normal.rotate_radians(-frame.angle),
         )
         .unwrap()
 }
@@ -141,7 +152,21 @@ fn material_ships_land_without_berths_and_only_the_spaceling_claims() {
 
 #[test]
 fn flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker() {
-    let mut state = claimed();
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker_on(
+            surface,
+        );
+    }
+}
+
+fn flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker_on(
+    surface: TerrainSurface,
+) {
+    let mut state = claimed_surface(surface);
     let cell = flag_cell(&state);
     // A durability-only edit replaces a chunk's colliders without removing support.
     state
@@ -571,7 +596,19 @@ fn aimed_mining_removes_material_and_clone_continuation_preserves_physics() {
 
 #[test]
 fn detached_flag_footing_does_not_carry_planet_ownership_with_the_fragment() {
-    let mut state = claimed();
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        detached_flag_footing_does_not_carry_planet_ownership_with_the_fragment_on(surface);
+    }
+}
+
+fn detached_flag_footing_does_not_carry_planet_ownership_with_the_fragment_on(
+    surface: TerrainSurface,
+) {
+    let mut state = claimed_surface(surface);
     let cell = flag_cell(&state);
     assert!(cell.x > 100, "controlled north surface is local +X");
     let point = state.world.terrain.planets[&0].field.cell_center(cell);
@@ -730,7 +767,19 @@ fn two_material_claimants_contest_without_seat_order_ownership() {
 
 #[test]
 fn material_recovery_rebuilds_once_and_flag_loss_interrupts_construction() {
-    let mut state = claimed();
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        material_recovery_rebuilds_once_and_flag_loss_interrupts_construction_on(surface);
+    }
+}
+
+fn material_recovery_rebuilds_once_and_flag_loss_interrupts_construction_on(
+    surface: TerrainSurface,
+) {
+    let mut state = claimed_surface(surface);
     let identity = state.observation(0).spaceling;
     let health = state.world.ships[0].life_max;
     state.world.ships[0].translate_life(-health);
@@ -773,7 +822,17 @@ fn material_recovery_rebuilds_once_and_flag_loss_interrupts_construction() {
 
 #[test]
 fn material_escape_pod_can_land_and_disembark() {
-    let mut state = parked(1);
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        material_escape_pod_can_land_and_disembark_on(surface);
+    }
+}
+
+fn material_escape_pod_can_land_and_disembark_on(surface: TerrainSurface) {
+    let mut state = parked_surface(1, surface);
     let identity = state.observation(0).spaceling;
     let health = state.world.ships[0].life_max;
     state.world.ships[0].translate_life(-health);
@@ -800,7 +859,14 @@ fn material_escape_pod_can_land_and_disembark() {
 
 #[test]
 fn corner_contacts_only_preserve_an_earned_landing_with_two_live_feet() {
-    let mut state = SurfaceSortieScenario::init_material_arena_trial(0, true, 0.0);
+    // Preserve the actual block corner from the original replay. The rounded
+    // default deliberately removes this corner and changes its contact normals.
+    let mut state = SurfaceSortieScenario::init_material_arena_surface_trial(
+        0,
+        true,
+        0.0,
+        TerrainSurface::Blocks,
+    );
     step(&mut state, &[]);
     let planet = 2;
     let frame = motion::SurfaceFrame::read(&state.world.physics, planet);

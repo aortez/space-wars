@@ -1345,6 +1345,11 @@ impl SpacewarsScenario {
             return StepResult::default();
         }
         let step_started = Instant::now();
+        // The sortie prepares terrain before entering this shared step. Include
+        // that external time in the total before subtracting the measured phases.
+        let prepared_time = prepared_terrain.map_or(Duration::ZERO, |(terrain, diagnostics)| {
+            terrain + diagnostics
+        });
         let (terrain_time, mut motion_diagnostics_time) =
             prepared_terrain.unwrap_or_else(|| Self::prepare_terrain(state, actions));
 
@@ -1511,7 +1516,7 @@ impl SpacewarsScenario {
             + motion_diagnostics_time;
         state.last_step_metrics = SpacewarsStepMetrics {
             motion_diagnostics_time,
-            workload_time: step_started.elapsed().saturating_sub(accounted),
+            workload_time: (step_started.elapsed() + prepared_time).saturating_sub(accounted),
             lifecycle_time,
             gravity_time,
             collision_time,

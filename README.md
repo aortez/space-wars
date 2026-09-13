@@ -16,6 +16,8 @@ The local launcher includes the following scenarios and presets:
   Each player can be human or a mission bot, including bot versus bot. A living
   pilot can recover after losing every ship and flag; pilot death ends the round.
   See [Spacewars match](docs/spacewars-match.md) for controls and settings.
+  Planets now use round terrain boundaries; the
+  [before/after measurements](docs/rounder-planets-matches.md) track their cost.
   The [fresh-world survey](docs/fresh-world-survey.md) records current match
   reliability and the remaining AI follow-ups before merging.
 - **Spacewars Classic** — the previous berth-based game and historical visual
@@ -84,6 +86,12 @@ The local launcher includes the following scenarios and presets:
   **spacewars-terrain-combat** adds a human-versus-bot dogfight with the shared
   laser/cannon and physical ship recovery. **spacewars-terrain-duel** lets both
   bots run the same loop. See [Material combat](docs/material-combat-ai.md).
+- **Surface comparison** — `spacewars-surface-blocks` and
+  `spacewars-surface-contour` compare steps and slopes on the same destructible
+  planet, with collision outlines and the real landing, mining and recovery loop.
+  `spacewars-surface-round` retains finer boundary positions to follow the circle
+  and mining cuts more closely; see [Interpolated surfaces](docs/rounder-planets-interpolated.md).
+  See [Rounder planets](docs/rounder-planets.md) for controls and measured results.
 - **Falling** — the pinned MIT-licensed NES homebrew running on this repository's
   Rust-native mapper-0 emulator, with pixel-perfect native video, exact-rational
   realtime pacing, and bounded 48 kHz device audio.

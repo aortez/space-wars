@@ -8,7 +8,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "0749ccc2080814814cfa8c515191078b71fb2989e3f13300c4773fd3da42a7c1"
+      "trace_sha256": "e3921a658c394c2787291fc0951f0b1cc70a8a3006df3f3f4ceee643e5e20194"
     },
     {
       "seed": 1,
@@ -16,7 +16,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "66de7c36eba80a9e3eb797f60ad70234ef61febe96d6e5345e644db738714dad"
+      "trace_sha256": "e68e4e532490bda3305beb9f8eabe116a325bcb18b0d02afd0466da3bf0c76b5"
     },
     {
       "seed": 2,
@@ -24,7 +24,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "ffca9d8f0cdc0fcb4f15700cee4cd14de7df23f3090342c86d2cd8937fab8fae"
+      "trace_sha256": "b0d186f7cbbe27df1b3045c545f62dbe0e44a201d76279beb7d7443a9129df09"
     },
     {
       "seed": 3,
@@ -32,7 +32,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "cb6400c8c8f20a03013ce3ca8158422089bd305fea13b5d0329bf746e1aa5046"
+      "trace_sha256": "ff1ac369aed6ddbcf5e2c36f47759cde9d63dd249e9246b41155e92af8093f80"
     },
     {
       "seed": 4,
@@ -40,7 +40,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "b7cb73c0c90cf051c97b304abc959275f2d99a6fc9259225760be82c914c8982"
+      "trace_sha256": "9c79410a1e294b5d329c046f80446e6493226ff87f1c7e6ed1c2ffa548161147"
     },
     {
       "seed": 5,
@@ -48,7 +48,7 @@
       "controllers": ["rule_ship_v5", "rule_ship_v5"],
       "max_ticks": 36000,
       "ticks": 36000,
-      "trace_sha256": "9cf860c0b60c2c9500fc5f15f264799aeb97cdfeb914c1c2817fe0e02228e225"
+      "trace_sha256": "9170ebcde35702a7c09b38d7629286fecea9c5b3d022086ba20489c7ceadda71"
     }
   ]
 }

@@ -19,10 +19,11 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
-pub const MISSION_POLICY: &str = "material_mission_v8";
+pub const MISSION_POLICY: &str = "material_mission_v9";
 const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
 const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
 const PURSUIT_LOST_SIGHT_TICKS: u64 = 6 * 60;
+const PURSUIT_CLIMB_CLEARANCE: f32 = 140.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -645,18 +646,30 @@ impl MaterialMissionPilot {
         let altitude = p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius;
         let relative = p.ship.velocity - p.planet.motion.velocity;
         let falling = (-relative.dot(up)).max(0.0);
-        if self.pursuit_climb != Some(p.planet.index)
-            || opponent.motion.position.distance_to(p.ship.position) > 300.0
-            || altitude > 140.0 && falling < 4.0
-        {
-            self.pursuit_climb = None;
+        if let Some(index) = self.pursuit_climb {
+            let anchor = o.planets.iter().find(|planet| planet.index == index);
+            let cleared = anchor.is_none_or(|planet| {
+                let radial = p.ship.position - planet.motion.position;
+                let relative = p.ship.velocity - planet.motion.velocity;
+                radial.length() > planet.radius + PURSUIT_CLIMB_CLEARANCE
+                    && -relative.dot(radial.normalized()) < 4.0
+                    && o.planets.iter().all(|other| {
+                        p.ship.position.distance_to(other.motion.position)
+                            > other.radius + PURSUIT_CLIMB_CLEARANCE
+                    })
+            });
+            if cleared || opponent.motion.position.distance_to(p.ship.position) > 300.0 {
+                self.pursuit_climb = None;
+            }
         }
-        if self.pursuit_climb.is_some() {
+        if let Some(index) = self.pursuit_climb {
             self.telemetry.reason = Some("climbing for a firing pass");
-            return self.guide(o, p.planet.motion.velocity + up * 18.0);
+            return self.guide(o, self.pursuit_climb_velocity(o, index));
         }
         if altitude < 70.0 + falling * falling / 50.0 {
-            return self.guide(o, p.planet.motion.velocity + up * 18.0);
+            self.pursuit_climb = Some(p.planet.index);
+            self.telemetry.reason = Some("climbing for a firing pass");
+            return self.guide(o, self.pursuit_climb_velocity(o, p.planet.index));
         }
         if let Some(target) = c.target
             && !target.ground_occluded
@@ -698,12 +711,51 @@ impl MaterialMissionPilot {
                 + delta.normalized() * (delta.length() * 0.7).min(55.0),
         )
     }
+    fn pursuit_climb_velocity(&self, o: &MissionObservationV1, index: usize) -> Vec2 {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let anchor = o
+            .planets
+            .iter()
+            .find(|planet| planet.index == index)
+            .unwrap_or(&p.planet);
+        let up = (p.ship.position - anchor.motion.position).normalized();
+        let other = o
+            .planets
+            .iter()
+            .filter(|planet| planet.index != anchor.index)
+            .filter(|planet| {
+                p.ship.position.distance_to(planet.motion.position)
+                    < planet.radius + PURSUIT_CLIMB_CLEARANCE
+            })
+            .min_by(|a, b| {
+                (p.ship.position.distance_to(a.motion.position) - a.radius)
+                    .total_cmp(&(p.ship.position.distance_to(b.motion.position) - b.radius))
+            });
+        let Some(other) = other else {
+            return anchor.motion.velocity + up * 18.0;
+        };
+        // Keep the climb's original frame across nearest-planet changes. In a
+        // gap, lifting from just one body can push the ship toward the other.
+        let sum = up + (p.ship.position - other.motion.position).normalized();
+        let velocity = (anchor.motion.velocity + other.motion.velocity) * 0.5;
+        let tangent = Vec2::new(-up.y, up.x);
+        let direction = if sum.length_squared() > 0.01 {
+            sum.normalized()
+        } else if (p.ship.velocity - velocity).dot(tangent) < 0.0 {
+            -tangent
+        } else {
+            tangent
+        };
+        velocity + direction * 18.0
+    }
     fn detour_velocity(&self, o: &MissionObservationV1, destination_velocity: Vec2) -> Vec2 {
-        // Pursuit can pass several moving obstacles before reaching the
-        // opponent. While circling one, follow its frame instead of adding
-        // the distant opponent's velocity to this local waypoint.
-        if matches!(self.telemetry.goal, MissionGoal::Hunt | MissionGoal::Watch)
-            && let Some(avoidance) = self.telemetry.avoidance
+        // Transfers and pursuit can pass several moving obstacles. Follow
+        // the local waypoint's frame instead of adding a distant destination's
+        // velocity while circling a planet or the stationary sun.
+        if matches!(
+            self.telemetry.goal,
+            MissionGoal::Hunt | MissionGoal::Watch | MissionGoal::Transfer
+        ) && let Some(avoidance) = self.telemetry.avoidance
         {
             match avoidance.obstacle {
                 MissionObstacleId::Sun => return Vec2::ZERO,
@@ -733,7 +785,7 @@ impl MaterialMissionPilot {
         destination: Option<usize>,
     ) -> Vec2 {
         let p = &o.local.combat.recovery.flight.pilot;
-        let mut obstacles: Vec<_> = o
+        let obstacles: Vec<_> = o
             .planets
             .iter()
             .filter(|planet| Some(planet.index) != destination)
@@ -749,65 +801,64 @@ impl MaterialMissionPilot {
                     .map(|sun| (MissionObstacleId::Sun, sun.position, sun.radius)),
             )
             .collect();
-        if matches!(self.telemetry.goal, MissionGoal::Hunt | MissionGoal::Watch) {
-            // A distant opponent's planet must not hide a nearer obstacle.
-            // The old world-index order could route its arc straight through
-            // the departure planet or sun, then repeatedly trigger an escape.
-            let delta = entry - p.ship.position;
+        // Recheck each detour, since avoiding one body can obstruct a line
+        // that was clear of another. Visit each body at most once per decision.
+        let mut destination_point = entry;
+        let mut selected = None;
+        let mut visited = Vec::new();
+        for _ in 0..obstacles.len() {
+            let delta = destination_point - p.ship.position;
             let direction = delta.normalized();
-            let first_contact = |position: Vec2, radius: f32| {
-                if crate::landing_safety::distance_to_segment(position, p.ship.position, entry)
-                    >= radius + 65.0
+            let encounter = |center: Vec2, radius: f32| {
+                let offset = center - p.ship.position;
+                // Inside a flight margin, an outward leg is already escaping
+                // that body. Do not turn back merely to get around its margin.
+                if offset.length() < radius + 65.0 && offset.dot(delta) <= 0.0 {
+                    return f32::INFINITY;
+                }
+                if crate::landing_safety::distance_to_segment(
+                    center,
+                    p.ship.position,
+                    destination_point,
+                ) >= radius + 65.0
                 {
                     return f32::INFINITY;
                 }
-                let offset = position - p.ship.position;
                 let along = offset.dot(direction);
                 let perpendicular = (offset.length_squared() - along * along).max(0.0);
                 (along - ((radius + 65.0).powi(2) - perpendicular).max(0.0).sqrt()).max(0.0)
             };
-            // Keep an already clear local leg. A nearer body on the eventual
-            // route need not interrupt it unless this waypoint also crosses
-            // that body's flight clearance.
-            let unsafe_leg = obstacles
+            let mut candidates = obstacles
                 .iter()
-                .find(|a| first_contact(a.1, a.2).is_finite())
-                .is_some_and(|(id, position, radius)| {
-                    let (waypoint, _) = self.obstacle_waypoint(o, entry, *id, *position, *radius);
-                    obstacles.iter().any(|(other, center, radius)| {
-                        other != id
-                            && crate::landing_safety::distance_to_segment(
-                                *center,
-                                p.ship.position,
-                                waypoint,
-                            ) < radius + 40.0
-                    })
-                });
-            if unsafe_leg {
-                obstacles
-                    .sort_by(|a, b| first_contact(a.1, a.2).total_cmp(&first_contact(b.1, b.2)));
+                .filter(|(id, _, _)| !visited.contains(id))
+                .filter(|(_, center, radius)| encounter(*center, *radius).is_finite());
+            // Preserve an already clear local leg. If a detour crosses another
+            // body, route around the first obstruction on that actual leg.
+            let obstacle = if selected.is_none() {
+                candidates.next()
+            } else {
+                candidates.min_by(|a, b| encounter(a.1, a.2).total_cmp(&encounter(b.1, b.2)))
+            };
+            let Some(&(id, position, radius)) = obstacle else {
+                break;
+            };
+            let (waypoint, detour) =
+                self.obstacle_waypoint(o, destination_point, id, position, radius);
+            if detour.is_some() {
+                self.solar_detour = detour;
             }
+            selected = Some(MissionAvoidance {
+                obstacle: id,
+                waypoint,
+            });
+            visited.push(id);
+            destination_point = waypoint;
         }
-        for (id, position, radius) in obstacles {
-            let delta = entry - p.ship.position;
-            let along = ((position - p.ship.position).dot(delta)
-                / delta.length_squared().max(0.01))
-            .clamp(0.0, 1.0);
-            let clearance = position.distance_to(p.ship.position + delta * along);
-            if clearance < radius + 65.0 {
-                let (waypoint, detour) = self.obstacle_waypoint(o, entry, id, position, radius);
-                if detour.is_some() {
-                    self.solar_detour = detour;
-                }
-                self.telemetry.avoidance = Some(MissionAvoidance {
-                    obstacle: id,
-                    waypoint,
-                });
-                return waypoint;
-            }
+        self.telemetry.avoidance = selected;
+        if selected.is_none() {
+            self.solar_detour = None;
         }
-        self.solar_detour = None;
-        entry
+        destination_point
     }
     fn obstacle_waypoint(
         &self,
@@ -909,11 +960,138 @@ mod solar_route_tests {
     use std::time::Duration;
 
     #[test]
-    fn pursuit_routes_around_the_first_obstacle_independent_of_world_order() {
+    fn a_clear_destination_line_does_not_make_its_planet_detour_clear() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        o.local.combat.recovery.flight.pilot.ship.position = Vec2::ZERO;
+        o.planets.truncate(1);
+        o.planets[0].motion.position = Vec2::new(200.0, 100.0);
+        o.planets[0].radius = 60.0;
+        o.sun = Some(MissionObstacle {
+            position: Vec2::new(60.0, -90.0),
+            radius: 10.0,
+        });
+        let entry = Vec2::new(1000.0, 0.0);
+        let clearance = |center, waypoint| {
+            crate::landing_safety::distance_to_segment(center, Vec2::ZERO, waypoint)
+        };
+        let sun = o.sun.unwrap();
+        assert!(clearance(sun.position, entry) > sun.radius + 65.0);
+        let mut brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            CombatBreakSettings::default(),
+        );
+        brain.telemetry.goal = MissionGoal::Transfer;
+        let (unchecked, _) = brain.obstacle_waypoint(
+            &o,
+            entry,
+            MissionObstacleId::Planet(0),
+            o.planets[0].motion.position,
+            60.0,
+        );
+        assert!(clearance(sun.position, unchecked) < sun.radius + 65.0);
+        let waypoint = brain.route_waypoint(&o, entry, None);
+        assert_eq!(
+            brain.telemetry.avoidance.unwrap().obstacle,
+            MissionObstacleId::Sun
+        );
+        assert!(clearance(sun.position, waypoint) > sun.radius + 65.0);
+        assert!(clearance(o.planets[0].motion.position, waypoint) > 125.0);
+        assert_eq!(brain.detour_velocity(&o, Vec2::X * 20.0), Vec2::ZERO);
+    }
+
+    #[test]
+    fn pursuit_climbs_clear_of_both_planets_across_approach_frame_changes() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        o.sun = None;
+        o.local.combat.target = None;
+        for (planet, x) in o.planets.iter_mut().zip([-115.0, 115.0]) {
+            planet.motion.position = Vec2::new(x, 0.0);
+            planet.motion.velocity = Vec2::new(2.0, 3.0);
+            planet.motion.spin = 0.0;
+            planet.radius = 60.0;
+        }
+        let position = Vec2::new(0.0, 20.0);
+        o.local.combat.recovery.flight.pilot.ship.position = position;
+        o.local.combat.recovery.flight.pilot.ship.velocity = Vec2::new(2.0, 3.0);
+        o.opponent.as_mut().unwrap().motion.position = position + Vec2::Y * 100.0;
+        let context = BrainReset {
+            actor: PlayerId::PLAYER_1,
+            episode_seed: 42,
+        };
+        let mut brain = MaterialMissionPilot::new(context, CombatBreakSettings::default());
+        for frame in [0, 1, 0, 1] {
+            o.local.combat.recovery.flight.pilot.planet = o.planets[frame].clone();
+            let before = o.clone();
+            let mut copy = brain.clone();
+            let intent = brain.hunt(&o);
+            assert_eq!(intent, copy.hunt(&o));
+            assert_eq!(o, before);
+            assert_eq!(brain.pursuit_climb, Some(0));
+            assert_eq!(brain.telemetry.reason, Some("climbing for a firing pass"));
+            assert_eq!(intent.weapons, Default::default());
+            let velocity = brain.pursuit_climb_velocity(&o, 0);
+            assert!((velocity - Vec2::new(2.0, 21.0)).length() < 0.001);
+            for planet in &o.planets {
+                assert!(
+                    (velocity - planet.motion.velocity)
+                        .dot((position - planet.motion.position).normalized())
+                        > 0.0
+                );
+            }
+            o.local.combat.recovery.flight.pilot.tick += 1;
+        }
+        // Once both bodies are clear, pursuit may resume without a new timer.
+        o.local.combat.recovery.flight.pilot.ship.position = Vec2::Y * 300.0;
+        o.local.combat.recovery.flight.pilot.ship.velocity = Vec2::new(2.0, 21.0);
+        o.opponent.as_mut().unwrap().motion.position = Vec2::Y * 400.0;
+        brain.hunt(&o);
+        assert_eq!(brain.pursuit_climb, None);
+        brain.pursuit_climb = Some(0);
+        brain.reset(context);
+        assert_eq!(brain.pursuit_climb, None);
+    }
+
+    #[test]
+    fn pursuit_midpoint_escape_keeps_tangential_motion() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        for (planet, x) in o.planets.iter_mut().zip([-115.0, 115.0]) {
+            planet.motion.position = Vec2::new(x, 0.0);
+            planet.motion.velocity = Vec2::ZERO;
+            planet.radius = 60.0;
+        }
+        o.local.combat.recovery.flight.pilot.ship.position = Vec2::ZERO;
+        let brain = MaterialMissionPilot::new(
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
+            CombatBreakSettings::default(),
+        );
+        for side in [-1.0, 1.0] {
+            o.local.combat.recovery.flight.pilot.ship.velocity = Vec2::Y * side;
+            assert_eq!(brain.pursuit_climb_velocity(&o, 0), Vec2::Y * (18.0 * side));
+            assert_eq!(brain.pursuit_climb_velocity(&o, 1), Vec2::Y * (18.0 * side));
+        }
+    }
+
+    #[test]
+    fn travel_routes_around_the_first_obstacle_independent_of_world_order() {
         let mut state = SurfaceSortieScenario::init_material_travel(42, false);
         SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         let original = state.mission_observation(0, None);
-        for sun in [false, true] {
+        for (goal, sun) in [MissionGoal::Hunt, MissionGoal::Watch, MissionGoal::Transfer]
+            .into_iter()
+            .flat_map(|goal| [false, true].map(|sun| (goal, sun)))
+        {
             let mut o = original.clone();
             o.local.combat.recovery.flight.pilot.ship.position = Vec2::ZERO;
             for (planet, x) in o.planets.iter_mut().zip([800.0, 200.0]) {
@@ -938,7 +1116,7 @@ mod solar_route_tests {
                 },
                 CombatBreakSettings::default(),
             );
-            brain.telemetry.goal = MissionGoal::Hunt;
+            brain.telemetry.goal = goal;
             let entry = Vec2::new(1000.0, 0.0);
             let waypoint = brain.route_waypoint(&o, entry, None);
             assert_eq!(brain.telemetry.avoidance.unwrap().obstacle, expected);
@@ -994,20 +1172,24 @@ mod solar_route_tests {
         let clear = o.local.combat.recovery.flight.pilot.ship.position + Vec2::X * 100.0;
         assert_eq!(brain.route_waypoint(&o, clear, Some(1)), clear);
         assert_eq!(brain.solar_detour, None);
-        brain.telemetry.goal = MissionGoal::Hunt;
-        brain.telemetry.avoidance = Some(MissionAvoidance {
-            obstacle: MissionObstacleId::Planet(0),
-            waypoint: first,
-        });
-        assert_eq!(
-            brain.detour_velocity(&o, Vec2::X * -50.0),
-            Vec2::new(4.0, 3.0)
-        );
-        brain.telemetry.avoidance = Some(MissionAvoidance {
-            obstacle: MissionObstacleId::Sun,
-            waypoint: first,
-        });
-        assert_eq!(brain.detour_velocity(&o, Vec2::X * -50.0), Vec2::ZERO);
+        for goal in [MissionGoal::Hunt, MissionGoal::Watch, MissionGoal::Transfer] {
+            brain.telemetry.goal = goal;
+            brain.telemetry.avoidance = Some(MissionAvoidance {
+                obstacle: MissionObstacleId::Planet(0),
+                waypoint: first,
+            });
+            assert_eq!(
+                brain.detour_velocity(&o, Vec2::X * -50.0),
+                Vec2::new(4.0, 3.0)
+            );
+            brain.telemetry.avoidance = Some(MissionAvoidance {
+                obstacle: MissionObstacleId::Sun,
+                waypoint: first,
+            });
+            assert_eq!(brain.detour_velocity(&o, Vec2::X * -50.0), Vec2::ZERO);
+            brain.telemetry.avoidance = None;
+            assert_eq!(brain.detour_velocity(&o, Vec2::X * -50.0), Vec2::X * -50.0);
+        }
         brain.reset(context);
         assert_eq!(brain.solar_detour, None);
     }

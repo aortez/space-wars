@@ -31,6 +31,7 @@ fn standing(player: PlayerId, x: f32) -> Claimant {
         planet: Some(0),
         status: PlanetClaimStatus::Ready,
         anchor: Some(FlagAnchor {
+            surface_revision: 0,
             footing: None,
             position: Vec2::new(x, 10.0),
             normal: Vec2::Y,

@@ -126,108 +126,134 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
 #[test]
 #[ignore = "requires an explicit display and a bounded physical match; run under Xvfb"]
 fn normal_spacewars_physical_round_reaches_result_and_play_again() {
-    run_functional_test_with_seed("spacewars-finished-match", "winit-femtovg", 7, |harness| {
-        let mut state = harness.wait_until_ready();
-        state = harness.activate_guarded("launcher.settings", &state);
-        for control in [
-            "launcher.settings.match.player-1.next",
-            "launcher.settings.match.player-2.next",
-        ] {
-            state = harness.activate_guarded(control, &state);
-            assert_eq!(control_value(&state, control), Some("rule bot"));
-        }
-        harness.activate_guarded("launcher.settings.start", &state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            TRANSITION_TIMEOUT,
-        );
-        let first_instance = state.scenario_revision;
-        // Both ordinary mission bots play this recorded seed. No damage, pose,
-        // ownership or outcome is injected to make the result screen appear.
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::GameOver),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            Duration::from_secs(180),
-        );
-        assert_eq!(
-            control_ids(&state),
-            [
-                "game-over.play-again",
-                "game-over.new-match",
-                "game-over.return-to-launcher"
-            ]
-        );
-        assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
-        harness.capture_screenshot("physical-result.png");
-        harness.activate_guarded("game-over.play-again", &state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            TRANSITION_TIMEOUT,
-        );
-        assert_ne!(state.scenario_revision, first_instance);
-        assert!(!state.paused);
-        harness.pause_guarded(&state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            TRANSITION_TIMEOUT,
-        );
-        assert_eq!(control_value(&state, "pause.restart"), Some("7"));
-        harness.capture_screenshot("play-again-paused.png");
-        harness.activate_guarded("pause.resume", &state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::GameOver),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            Duration::from_secs(180),
-        );
-        assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
-        harness.activate_guarded("game-over.new-match", &state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::Gameplay),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            TRANSITION_TIMEOUT,
-        );
-        harness.pause_guarded(&state);
-        state = harness.wait_for(
-            UiStatePredicate {
-                screen: Some(UiScreen::PauseMain),
-                scenario: Some("spacewars".into()),
-                revision_after: None,
-            },
-            TRANSITION_TIMEOUT,
-        );
-        assert_ne!(control_value(&state, "pause.restart"), Some("7"));
-        harness.capture_screenshot("new-match-after-result.png");
-        state = harness.activate_guarded("pause.return-to-launcher", &state);
-        assert_launcher_main(&state);
-        state = harness.activate_guarded("launcher.settings", &state);
-        for control in [
-            "launcher.settings.match.player-1.next",
-            "launcher.settings.match.player-2.next",
-        ] {
-            assert_eq!(control_value(&state, control), Some("rule bot"));
-        }
-    });
+    let mut settings = engine_common::Settings::default();
+    settings.spacewars_match.time_limit_seconds = 60;
+    run_functional_test_with_settings(
+        "spacewars-finished-match",
+        "winit-femtovg",
+        7,
+        Some(settings),
+        |harness| {
+            let mut state = harness.wait_until_ready();
+            state = harness.activate_guarded("launcher.settings", &state);
+            assert_eq!(
+                control_value(&state, "launcher.settings.match.length.next"),
+                Some("1 min")
+            );
+            for control in [
+                "launcher.settings.match.player-1.next",
+                "launcher.settings.match.player-2.next",
+            ] {
+                state = harness.activate_guarded(control, &state);
+                assert_eq!(control_value(&state, control), Some("rule bot"));
+            }
+            harness.activate_guarded("launcher.settings.start", &state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                TRANSITION_TIMEOUT,
+            );
+            let first_instance = state.scenario_revision;
+            // Both ordinary mission bots play a real, timed match. A particular
+            // seed's accidental pilot death is not a stable result-screen fixture.
+            // No damage, pose, ownership or outcome is injected. Keep the wall-time
+            // allowance separate from the game's simulation-time limit.
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::GameOver),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                Duration::from_secs(180),
+            );
+            assert_timed_match_result(harness);
+            assert_eq!(
+                control_ids(&state),
+                [
+                    "game-over.play-again",
+                    "game-over.new-match",
+                    "game-over.return-to-launcher"
+                ]
+            );
+            assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
+            harness.capture_screenshot("physical-result.png");
+            harness.activate_guarded("game-over.play-again", &state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                TRANSITION_TIMEOUT,
+            );
+            assert_ne!(state.scenario_revision, first_instance);
+            assert!(!state.paused);
+            harness.pause_guarded(&state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                TRANSITION_TIMEOUT,
+            );
+            assert_eq!(control_value(&state, "pause.restart"), Some("7"));
+            harness.capture_screenshot("play-again-paused.png");
+            harness.activate_guarded("pause.resume", &state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::GameOver),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                Duration::from_secs(180),
+            );
+            assert_timed_match_result(harness);
+            assert_eq!(control_value(&state, "game-over.play-again"), Some("7"));
+            harness.activate_guarded("game-over.new-match", &state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::Gameplay),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                TRANSITION_TIMEOUT,
+            );
+            harness.pause_guarded(&state);
+            state = harness.wait_for(
+                UiStatePredicate {
+                    screen: Some(UiScreen::PauseMain),
+                    scenario: Some("spacewars".into()),
+                    revision_after: None,
+                },
+                TRANSITION_TIMEOUT,
+            );
+            assert_ne!(control_value(&state, "pause.restart"), Some("7"));
+            harness.capture_screenshot("new-match-after-result.png");
+            state = harness.activate_guarded("pause.return-to-launcher", &state);
+            assert_launcher_main(&state);
+            state = harness.activate_guarded("launcher.settings", &state);
+            for control in [
+                "launcher.settings.match.player-1.next",
+                "launcher.settings.match.player-2.next",
+            ] {
+                assert_eq!(control_value(&state, control), Some("rule bot"));
+            }
+        },
+    );
+}
+
+fn assert_timed_match_result(harness: &FunctionalHarness) {
+    let status = harness.client.request("status\n").unwrap();
+    assert!(
+        status.contains("match_finish_reason=Some(TimeLimit)"),
+        "{status}"
+    );
+    assert!(status.contains("match_remaining_seconds=0.000"), "{status}");
+    assert!(status.contains("autostart_session=manual"), "{status}");
 }
 
 fn wait_match(harness: &mut FunctionalHarness) -> UiState {

@@ -616,7 +616,7 @@ impl SpacewarsPhysics {
         )(center, 0.0)
     }
 
-    pub(super) fn replacement_capsule_clearance(
+    pub(super) fn surface_vehicle_capsule_clearance(
         &self,
         player: usize,
         ship: &ShipState,
