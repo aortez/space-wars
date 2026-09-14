@@ -306,3 +306,108 @@ fn invalid_balance_tuning_does_not_insert_a_partial_body() {
         assert_eq!(world.collider_count(), 0);
     }
 }
+
+#[test]
+fn running_jump_preserves_the_launch_frame_when_the_platform_changes_speed() {
+    let (mut world, mut spaceling) = floor_fixture(0.0, Vec2::new(3.0, 0.0));
+    settle(&mut world, &mut spaceling);
+    for _ in 0..90 {
+        tick(
+            &mut world,
+            &mut spaceling,
+            SpacelingControl {
+                walk: 1.0,
+                jump_held: false,
+            },
+            GRAVITY,
+        );
+    }
+    tick(
+        &mut world,
+        &mut spaceling,
+        SpacelingControl {
+            walk: 1.0,
+            jump_held: true,
+        },
+        GRAVITY,
+    );
+    let takeoff = spaceling.snapshot(&world).unwrap();
+    assert_eq!(takeoff.jumps, 1);
+    assert!((takeoff.motion.linear_velocity.x - 8.0).abs() < 0.1);
+    // Once airborne, later platform motion cannot carry the pilot with it.
+    world.set_velocity(
+        BodyId::new(FLOOR, BodyRole::PRIMARY),
+        Vec2::new(-3.0, 0.0),
+        0.0,
+        true,
+    );
+    for _ in 0..20 {
+        tick(
+            &mut world,
+            &mut spaceling,
+            SpacelingControl {
+                walk: 1.0,
+                jump_held: false,
+            },
+            GRAVITY,
+        );
+        let airborne = spaceling.snapshot(&world).unwrap();
+        assert!(!airborne.grounded());
+        assert!(
+            (airborne.motion.linear_velocity.x - takeoff.motion.linear_velocity.x).abs() < 0.1,
+            "{airborne:?}"
+        );
+    }
+}
+
+#[test]
+fn small_pilot_runs_both_ways_on_modest_slopes_and_lands_upright() {
+    for angle in [-0.35, 0.35] {
+        for direction in [-1.0, 1.0] {
+            let (mut world, _) = floor_fixture(angle, Vec2::ZERO);
+            world.remove_entity(SPACELING);
+            let mut pilot = SpacelingAssembly::insert(
+                &mut world,
+                SPACELING,
+                Vec2::Y * 0.48,
+                0.0,
+                SpacelingSpec {
+                    radius: 0.15,
+                    half_segment: 0.3,
+                    max_angular_speed: 10.0,
+                    angular_acceleration: 240.0,
+                    balance: SpacelingBalanceSpec {
+                        knockdown_angular_speed: 16.0,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            settle(&mut world, &mut pilot);
+            let start = pilot.snapshot(&world).unwrap().motion.position;
+            let mut airborne = false;
+            for frame in 0..600 {
+                tick(
+                    &mut world,
+                    &mut pilot,
+                    SpacelingControl {
+                        walk: direction,
+                        jump_held: frame == 180,
+                    },
+                    GRAVITY,
+                );
+                let snapshot = pilot.snapshot(&world).unwrap();
+                airborne |= !snapshot.grounded();
+                assert!(
+                    !snapshot.needs_get_up(),
+                    "angle={angle} direction={direction} frame={frame}: {snapshot:?}"
+                );
+            }
+            let snapshot = pilot.snapshot(&world).unwrap();
+            assert_eq!(snapshot.jumps, 1);
+            assert!(airborne && snapshot.grounded());
+            assert!((snapshot.motion.position - start).x * direction > 35.0);
+        }
+    }
+}

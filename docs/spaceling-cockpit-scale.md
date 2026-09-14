@@ -25,8 +25,9 @@ Walk, jump and jetpack speeds, fuel, mining reach and claim/boarding rules are
 unchanged. At constant density, the resized pilot's mass is one quarter of its
 previous mass. Its angular knockdown threshold scales inversely with size:
 16 rad/s instead of 8, preserving the former speed at the capsule extremity.
-Linear knockdown and damage thresholds stay unchanged. This avoids new false
-tumbles while walking uneven contour ground at the same travel speed.
+Linear knockdown and damage thresholds stay unchanged. This addresses the
+impact threshold only; the full-speed running investigation below shows that
+upright control also needs adjustment after resizing.
 
 The flight-corridor endpoint height now derives from the smaller capsule,
 including the existing 0.20-unit flight margin and allowed support slope.
@@ -168,11 +169,11 @@ Down+Jump is an explicit recovery chord for the pod; on foot, only Jump enters
 the get-up controller. Down may incidentally release horizontal movement.
 Pitch still targets gravity-relative upright with bounded angular velocity and
 acceleration. Open-slope diagnostics expose cases that get up and then tip back;
-they are distinct from the rejected request fixed here. A next slice should
-compare damped upright control and a smoothly limited ground-normal lean,
-preserving physical knockdowns and verifying stable touchdown after recovery.
-Keep ordinary jump height for that comparison. The outstanding CI idle-separation
-discrepancy is not resolved by this get-up change.
+they are distinct from the rejected request fixed here. The running follow-up
+below improves motor authority and contact transitions while retaining the
+gravity-relative target, ordinary jump height and physical knockdowns. The
+outstanding CI idle-separation discrepancy is not resolved by the narrow
+get-up change.
 
 Reproduce the focused checks with:
 
@@ -184,3 +185,106 @@ RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked -p scenario-spacewars \
 
 Local before/after logs, exploratory slope fixtures and Pi captures are retained
 under `target/issue-95/get-up-*` and `target/issue-95/pitch-pi*`.
+
+
+## Playtest follow-up: full-speed running
+
+Full movement should keep the pilot upright on ordinary ground. The player
+reported frequent falls just by holding Right. The regression reproduced a
+45-degree tip after about 1.1 seconds on a radius-15 round planet, while the
+controller still reported `Balanced` and no impact knockdown. The impact
+threshold was not the cause.
+
+The Spacewars suit now uses a maximum angular rate of 10 rad/s and angular
+acceleration of 240 rad/s², compared with 5 and 60 before this follow-up. Rate
+scales inversely with suit size, with additional acceleration reserve for
+ordinary contacts across the tested gravity range. The existing bounded
+angular-velocity servo still targets gravity-relative upright and damps spin;
+there is no pose snap or new spatial query. Standalone labs retain their
+existing motor limits.
+
+Upright authority now fades from full to 15% over 0.15 seconds without support,
+instead of dropping immediately during a tiny hop. An intentional jump clears
+that retained authority. Knockdown or zero gravity also clears it. Real contact
+is still required for traction and jumping; the retained weight supplies only
+angular assistance, with no ground adhesion or extra lift.
+
+Unpowered air steering retains the velocity of the supporting surface at
+launch. Previously it pursued a world-frame running speed during a hop,
+braking inherited motion on rotating ground. The cached launch velocity is
+inertial: later platform movement does not carry the airborne pilot. Existing
+jetpack steering keeps its own launch reference. Run/jump speeds, gravity,
+impact thresholds, get-up clearance and damage remain unchanged.
+
+### Acceptance evidence
+
+`surface_sortie/tests/running_tests.rs` runs 34 cases for 180 seconds each:
+
+- Radii 15/30/60/100/150, both directions, gravity 18, stationary ground.
+- Radii 15/60/150, both directions, gravity 9 and 36, spin ±0.04 rad/s.
+
+Each uses seed 42 and untouched `Interpolated` terrain, with no ship, pod or
+debris. Every tick must remain upright and balanced, with no jump input. Travel
+is measured from actual displacement relative to planet motion; a case must
+cover at least 85% of the nominal 900 units. All 34 cases pass in both debug and release, covering
+102 simulated minutes per build. Measured travel is 849.7–906.8 units; maximum tilt is
+12.2 degrees. This is controlled terrain coverage, not a guarantee for all
+excavated or moving-fragment geometry.
+
+A separate radius-15 case at gravity 0.5 requires running to leave the curved
+surface without jumping, confirming that assistance does not attach the body
+to terrain. Engine tests cover uphill/downhill running and touchdown on
+20-degree slopes, and a running jump from a moving platform that changes
+velocity after takeoff. Existing tests cover impact knockdowns, zero-gravity
+momentum, support removal, blocked get-up and recovery.
+
+The previous explicit round-ground get-up fixture waited long enough for the
+new motor to stand automatically. It now presses Jump after contacts settle
+but before automatic recovery begins. The crawl-under-roof fixture still
+requires a blocked attempt, physical crawling, grounded standing and no jump;
+it accepts automatic completion once clear instead of requiring the last
+explicit attempt to report success.
+
+An early fixture mistake marked the ship dead without suppressing breakup.
+That released a pod and debris, which later obstructed the running path. Earlier
+exploratory long-duration motor comparisons are therefore not clean evidence.
+The regression marks the fixture ship fragmented as well as dead and asserts
+that both its body and debris are absent. The collider radius is reconciled
+before material terrain is enabled, preventing replacement by a stale legacy
+planet collider.
+
+Reproduce the running matrix and the physical/controller regressions with:
+
+```sh
+RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --release \
+  -p scenario-spacewars running -- --nocapture
+RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked --release \
+  -p engine-rapier -p scenario-spacewars -p scenario-spaceling-lab \
+  -p spacewars-ai --lib --tests
+```
+
+Final validation: 698 engine/lab/scenario/AI release tests pass, together with
+26 focused client tests (one existing opt-in test ignored). The 34-case running
+matrix also passes in debug. Formatting and diff checks pass. The full scenario
+rerun is in `upright-scenario-final.log`; the earlier integration log retains the
+two outdated recovery-fixture expectations described above.
+
+Raw running observations are in `target/issue-95/running-final-matrix.log`;
+integration results are in `target/issue-95/upright-*`. These artifacts are
+local; the regression fixtures and these reproduction instructions are tracked.
+
+
+### Pi deployment
+
+Fast deployed this slice to `sw-picade.local` on 2026-09-13. The updater's
+runtime compatibility and installed SHA-256 checks passed, and the kiosk
+restarted without a reboot. The control CLI responded and the existing
+Spacewars autoplay countdown resumed. Client SHA-256:
+
+```
+a974297ffe875a991d380d754a070836225cea9f7789676afc9b1aec0ce1e354
+```
+
+The deployment log and post-install status are retained locally as
+`target/issue-95/upright-deploy.log` and `upright-deployed-status.txt`.
+Controller playtesting is still needed to assess the feel of running and jumps.

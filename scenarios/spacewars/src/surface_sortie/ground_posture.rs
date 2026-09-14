@@ -202,7 +202,9 @@ mod tests {
                     .set_velocity(body.body(), Vec2::ZERO, 0.0, true);
                 state.pilots[0].body = Some(body);
                 state.pilots[0].controls_armed = true;
-                for _ in 0..120 {
+                // Establish settled contacts before automatic recovery starts;
+                // this case specifically exercises an explicit get-up press.
+                for _ in 0..12 {
                     SurfaceSortieScenario::step(&mut state, &[], dt);
                 }
                 let before = state.spaceling_snapshot(0).unwrap();
@@ -355,6 +357,8 @@ mod tests {
         assert!(standing.grounded());
         assert_eq!(standing.jumps, 0);
         assert!(standing.get_up_attempts > 1);
-        assert_eq!(standing.get_up_result, SpacelingGetUpResult::Succeeded);
+        // The stronger upright motor can finish automatic recovery once clear,
+        // including after a retry during a brief unsupported phase.
+        assert!(standing.recoveries > 0);
     }
 }

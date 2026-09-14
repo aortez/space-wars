@@ -12,6 +12,7 @@ mod motion_tests;
 mod multiplayer_tests;
 mod outpost_tests;
 mod recovery_tests;
+mod running_tests;
 mod solar_tests;
 mod thruster_tests;
 mod travel_tests;

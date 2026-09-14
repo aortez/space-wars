@@ -467,6 +467,10 @@ impl SurfaceSortieState {
             collision_groups: physics::spaceling_collision_groups(),
             radius: spaceling_geometry::RADIUS,
             half_segment: spaceling_geometry::HALF_SEGMENT,
+            // Scale turning with the suit and reserve enough acceleration for
+            // ordinary contacts across the playable range of surface gravity.
+            max_angular_speed: defaults.max_angular_speed / spaceling_geometry::SCALE,
+            angular_acceleration: defaults.angular_acceleration * 2.0 / spaceling_geometry::SCALE,
             // The smaller body spins faster over the same uneven ground.
             // Keep the same peripheral speed threshold for a tumbling impact.
             balance: engine_rapier::spaceling::SpacelingBalanceSpec {
