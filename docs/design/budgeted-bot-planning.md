@@ -245,6 +245,14 @@ budget. Start with indexed synchronous queries before introducing this scheduler
    compare predicted and actual sortie outcomes. Add shallow mission search
    after these estimates are useful.
 
+The [asteroid route-failure investigation](../bot-objective-route-failures.md)
+identifies the next bounded behavior extension alongside step 3: a prospective
+crossing over the parked ship, measured in both directions and carried through
+joint-trip execution. Fresh walk/jump surveys fail for all current landing sites
+in that saved state, but an existing jetpack controller physically captures and
+returns from one of them. This gives the flight extension a positive fixture and
+a nearby placement that must remain rejected before broadening mission search.
+
 Keep an optimization-only comparison separate from new-policy comparisons.
 For behavior, run against the previous policy with paired seeds and swapped
 seats, controlled interrupted sorties, generated asteroid matches, and held-out

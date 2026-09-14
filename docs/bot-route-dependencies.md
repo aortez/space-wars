@@ -231,10 +231,16 @@ Gravity tolerance and source lifetime were not relaxed to make the counts rise.
 
 ## Next boundary
 
-Keep this profile optional. Use the saved negative-route reproduction to decide
-whether the next useful work is candidate choice, prospective jetpack evidence,
-or planning only the next necessary portion of a sortie. Local checks deliberately
-permit feasible snapshot routes without establishing current best-route costs.
+The [follow-up route-failure investigation](bot-objective-route-failures.md)
+compares all 88 failed candidate checks with fresh measurements and exercises
+cloned physical continuations. It identifies a successful capture/return over a
+parked ship using the existing jetpack controller, while every current landing
+site still fails the walk/jump-only forecast. This makes a measured prospective
+vehicle crossing the next bounded behavior slice.
+
+Keep this profile optional while adding and checking that flight evidence.
+Local checks deliberately permit feasible snapshot routes without establishing
+current best-route costs.
 If validation cost becomes significant, share changed-collider classification
 across candidates or schedule that work explicitly before broadening sensor
 coverage. Mission-level utility and clock-aware strategy remain subsequent steps.
