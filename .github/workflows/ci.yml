@@ -102,7 +102,7 @@ jobs:
             vendor/i-slint-backend-linuxkms -> target
       - name: Install native client dependencies
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
-      - name: Test CI timing reporter
+      - name: Test CI reports and build-identity regression fixtures
         run: python3 -m unittest discover -s .github/ci -p 'test_*.py'
       - name: Build optimized Linux test executables
         id: build
@@ -110,7 +110,14 @@ jobs:
           mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/build.seconds" \
             cargo test --locked --workspace --all-targets --profile ci --no-run --timings
+      - name: Verify unchanged builds reuse compiled artifacts
+        run: |
+          set -o pipefail
+          CARGO_LOG=cargo::core::compiler::fingerprint=info \
+            cargo test --locked --workspace --all-targets --profile ci --no-run --message-format=json | \
+            python3 .github/ci/assert_fresh_build.py
       - name: Run Linux workspace tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
             cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail

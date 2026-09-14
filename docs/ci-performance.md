@@ -7,6 +7,12 @@ headless and rendered UI tests reuse this profile and the same workspace/target
 selection. The production `release` profile is unchanged, including fat LTO for
 the NES scheduler. The separate NES release benchmark and AI baseline jobs remain.
 
+After compilation, CI repeats the same Cargo build and requires every reported
+compiler artifact to be `fresh`, including the client binary. This checks reuse
+directly rather than imposing a machine-dependent timing limit. If it fails,
+Cargo fingerprint diagnostics identify the invalidated inputs. Headless, UI and
+LinuxKMS tests still run when compilation succeeded, even if this guard fails.
+
 `Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts
 for the Linux workspace and the excluded LinuxKMS vendor manifest. It saves even
 when a test fails. The action's keys include the toolchain and Cargo configuration;
@@ -61,6 +67,8 @@ export RUST_MIN_STACK=16777216
 mkdir -p target/ci-timings
 /usr/bin/time -f '%e' -o target/ci-timings/build.seconds \
   cargo +1.89.0 test --locked --workspace --all-targets --profile ci --no-run --timings
+cargo +1.89.0 test --locked --workspace --all-targets --profile ci --no-run --message-format=json | \
+  python3 .github/ci/assert_fresh_build.py
 /usr/bin/time -f '%e' -o target/ci-timings/workspace.seconds \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
 /usr/bin/time -f '%e' -o target/ci-timings/ui.seconds \
@@ -77,11 +85,24 @@ nextest command. A filtered run replaces that profile's JUnit report; only compa
 complete-suite reports when assessing coverage. Ordinary `cargo test --profile ci`
 still works without installing nextest.
 
-Validate the small, standard-library-only report generator with:
+Validate the standard-library-only report/reuse checks and build-identity fixtures
+with Rust, Cargo, Git, and Python available:
 
 ```sh
 python3 -m unittest discover -s .github/ci -p 'test_*.py'
 ```
+
+The build-identity fixtures compile the actual client build script in disposable
+Git repositories with a dependency-free Slint stand-in. They verify Cargo's
+artifact freshness and the executable's embedded revision, not elapsed-time
+thresholds. Coverage includes fresh/packed refs, detached HEAD, linked worktrees,
+dirty/staged/restored sources, annotated tags, explicit revisions, and archives
+inside unrelated checkouts. They do not touch the real checkout's Git metadata.
+Packed-ref cases advance commits using `commit-tree` and `update-ref`, asserting
+that the index contents and modification time stay unchanged. This prevents an
+incidental index refresh from hiding a missing ref watch. Ordinary and nested
+branches, including linked worktrees, must rebuild when a loose ref first appears
+and reuse artifacts on the following unchanged build.
 
 Future work should follow these measurements: profile remaining computational
 hotspots, split large internal parameter loops into individually scheduled cases,
@@ -114,3 +135,32 @@ comparisons remain necessary after pushing the workflow.
 After isolating the CI changes onto `main`, the full headless suite also passed:
 1,537 tests in 23.21 seconds, with the same 46 ignores. The 11-test difference is
 the camera coverage belonging to PR #93, not a reduction in CI coverage.
+
+## First hosted results and build-reuse follow-up
+
+[PR #96's cold-cache Linux run](https://github.com/aortez/space-wars/actions/runs/34796351943/job/103830104311)
+passed all 1,537 headless tests, 42 UI workflows, and 21 LinuxKMS tests. It took
+20m37s, compared with the previous main run's 39m10s. The headless runner itself
+took 93.80s; the serial UI runner took 531.63s. The initial optimized build took
+386.09s and LinuxKMS compilation/tests took 51.91s. A roughly 0.95 GB dependency
+cache was saved; warm-cache savings were not measured in that run.
+
+The phase reports also exposed two unnecessary client recompilations, each about
+a minute, before headless and UI execution. Reproduction with Cargo's fingerprint
+logs identified two build-script problems:
+
+- `git describe --dirty` refreshed the watched Git index, invalidating the build
+  script's own output. The identity now combines read-only `describe` and `status`
+  queries, with optional Git index writes disabled.
+- Absent optional inputs, such as `packed-refs` or a packed branch's loose ref,
+  were registered as watched paths. Cargo documents that
+  [nonexistent watched files cause repeated rebuilds](https://doc.rust-lang.org/cargo/faq.html#why-is-cargo-rebuilding-my-code).
+  Only existing inputs are now registered; HEAD, the index and the `refs` directory
+  still invalidate the identity when real changes occur. The directory watch
+  detects new loose refs when packed branches advance without any index update;
+  watching only an already-existing branch file would miss that transition.
+
+The unchanged-build guard prevents a recurrence in the full workspace; the small
+fixtures exercise Git layouts that the developer's existing checkout may not have.
+Subsequent hosted measurements should distinguish the effect of this fix from a
+warm dependency-cache restore. The real-time UI workflows remain unchanged.
