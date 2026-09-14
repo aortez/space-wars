@@ -193,7 +193,7 @@ pub(super) fn wait_for_terrain_frame(
         }
         assert!(
             Instant::now() < deadline,
-            "terrain frame did not appear: {terrain_pixels} material pixels, {text_pixels} title/control pixels"
+            "terrain frame did not appear: {terrain_pixels} material pixels, {text_pixels} title/vitals pixels"
         );
         thread::sleep(POLL_INTERVAL);
     }
@@ -214,7 +214,15 @@ fn terrain_pixel_counts(path: &Path) -> (usize, usize) {
         .chunks_exact(4)
         .enumerate()
         .filter(|(index, p)| {
-            *index / (info.width as usize) < info.height as usize / 8
+            let width = info.width as usize;
+            let height = info.height as usize;
+            let x = *index % width;
+            let y = *index / width;
+            // Terrain Lab retains its title. Gameplay instead places the
+            // persistent labels beside the bottom radars; prompts may be absent.
+            (y < height / 8
+                || hud_regions::vitals(x, y, width, height, 0)
+                || hud_regions::vitals(x, y, width, height, 1))
                 && p[0] > 170
                 && p[1] > 170
                 && p[2] > 170

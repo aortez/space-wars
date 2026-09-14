@@ -38,6 +38,9 @@ mod performance;
 #[path = "ui_control_functional/compact_hud.rs"]
 mod compact_hud;
 
+#[path = "ui_control_functional/hud_regions.rs"]
+mod hud_regions;
+
 #[path = "ui_control_functional/spaceling_lab.rs"]
 mod spaceling_lab;
 

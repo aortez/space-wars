@@ -150,7 +150,11 @@ manual check.
 All four Surface Sortie presets (stationary center, orbital, untuned generated
 world, and experimental Surface V1 generated world), plus **surface-expedition**, use the same
 launcher/pause/restart workflow with both renderers;
-their raster checks require the ship, capture/landing HUD, and minimap planet.
+their raster checks require the ship, top-center landing/transfer prompt,
+bottom vitals, and outside-bottom minimap planet. The old permanent capture row
+is no longer part of the gameplay HUD. Shared screenshot regions explicitly
+exclude cyan energy meters from the minimap checks; mask tests run without a
+display.
 Only the pinned Sortie fixtures require an amber outpost; Expedition explicitly
 has none. Client unit tests render the disembarked spaceling, capture progress
 and flag in landscape/portrait and Pi-sized frames, and verify that raising
@@ -212,19 +216,23 @@ Run the suite under an isolated X display:
 
 ```sh
 xvfb-run -a -s "-screen 0 1280x1024x24" \
-  cargo test -p engine-client --test ui_control_functional -- \
+  cargo test --profile ci -p engine-client --test ui_control_functional -- \
   --ignored --test-threads=1
 ```
 
 To watch the workflows on an existing X display, omit `xvfb-run`:
 
 ```sh
-cargo test -p engine-client --test ui_control_functional -- \
+cargo test --profile ci -p engine-client --test ui_control_functional -- \
   --ignored --test-threads=1 --nocapture
 ```
 
 The tests are marked ignored so the ordinary cross-platform workspace command
 does not require a display. Linux CI runs them explicitly under Xvfb.
+Its optimized `ci` Cargo profile retains debug assertions and overflow checks.
+The application still runs at real-time speed; no animation waits or simulation
+budgets are shortened. See [CI performance](ci-performance.md) for the pinned
+nextest runner, matching CI commands, per-test reports, and build reuse.
 
 ## Failure artifacts
 

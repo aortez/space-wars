@@ -1,0 +1,16 @@
+[profile.ci]
+fail-fast = false
+retries = 0
+
+[profile.ci.junit]
+path = "junit.xml"
+
+# These tests share an X display. Keep them serial until display/focus isolation
+# is explicit; a virtual display does not make real-time scenarios run faster.
+[profile.ui]
+fail-fast = false
+retries = 0
+test-threads = 1
+
+[profile.ui.junit]
+path = "junit.xml"

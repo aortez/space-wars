@@ -52,16 +52,17 @@ fn compact_hud_renders_with_bottom_instruments_in_both_backends() {
                     .filter(|(index, p)| {
                         let x = *index as u32 % width;
                         let y = *index as u32 / width;
-                        y > height - 145
-                            && y < height - 25
-                            && x / (width / 2) == player
-                            && x > 155
-                            && x < width - 155
-                            && if player == 0 {
-                                p[0] > 200 && p[1] < 80
-                            } else {
-                                p[1] > 200 && p[0] < 80
-                            }
+                        hud_regions::vitals(
+                            x as usize,
+                            y as usize,
+                            width as usize,
+                            height as usize,
+                            player as usize,
+                        ) && if player == 0 {
+                            p[0] > 200 && p[1] < 80
+                        } else {
+                            p[1] > 200 && p[0] < 80
+                        }
                     })
                     .count();
                 assert!(
