@@ -139,3 +139,48 @@ the new binary finds only that hash different (apart from wall-clock timings).
 The same player wins on tick 12359 with the same metrics. The changed terminal
 state keeps the surviving pod at the destroyed ship's cockpit instead of
 shifting it by the legacy pivot offset. Only that manifest hash is updated.
+
+## Playtest follow-up: getting upright in a notch
+
+A physical reproduction found a settled, prone pilot braced between two
+60-degree slopes. Neither contact meets the walking support threshold, so
+Jump was rejected as `NoSupport` without starting a lift. This occurs at both
+body sizes; the smaller pilot can enter smaller notches. It is a confirmed
+edge case, not yet a reconstruction of the player's exact playtest position.
+
+Getting up now accepts a real contact below the body with an upward-facing
+normal (dot product at least 0.1) when ordinary walking support is absent.
+The existing velocity, spin, gravity, swept-clearance, upright-fit and duration
+checks still apply. Walking support, jump height, angular tuning and jetpack
+controls are unchanged. Pure vertical walls, ceilings and airborne bodies do
+not grant a get-up boost. Contact selection uses deterministic ties.
+
+The added tests reproduce the previous half-size `NoSupport` rejection, require
+both sizes to physically stand in the notch, reject ceiling/wall boosts, and
+exercise both prone orientations at 12 bearings around a round material
+planet. All 686 engine/scenario/AI release tests and 326 client tests pass.
+The control CLI now includes each on-foot pilot's balance, contact count,
+get-up result/attempts, pose and support in `spacewars-cli status`, including
+human seats. These are read-only snapshots, also available while paused.
+
+The player subsequently found Down+Jump helpful and asked to discuss pitch.
+Down+Jump is an explicit recovery chord for the pod; on foot, only Jump enters
+the get-up controller. Down may incidentally release horizontal movement.
+Pitch still targets gravity-relative upright with bounded angular velocity and
+acceleration. Open-slope diagnostics expose cases that get up and then tip back;
+they are distinct from the rejected request fixed here. A next slice should
+compare damped upright control and a smoothly limited ground-normal lean,
+preserving physical knockdowns and verifying stable touchdown after recovery.
+Keep ordinary jump height for that comparison. The outstanding CI idle-separation
+discrepancy is not resolved by this get-up change.
+
+Reproduce the focused checks with:
+
+```sh
+cargo +1.89.0 test --locked -p engine-rapier --lib spaceling::tests::get_up
+RUST_MIN_STACK=16777216 cargo +1.89.0 test --locked -p scenario-spacewars \
+  --lib small_pilot_gets_up_on_material_ground
+```
+
+Local before/after logs, exploratory slope fixtures and Pi captures are retained
+under `target/issue-95/get-up-*` and `target/issue-95/pitch-pi*`.

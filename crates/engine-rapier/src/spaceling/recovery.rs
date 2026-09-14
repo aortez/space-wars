@@ -26,7 +26,34 @@ impl SpacelingAssembly {
             self.get_up_result = SpacelingGetUpResult::NoGravity;
             return;
         }
-        let Some(contact) = snapshot.support else {
+        // A prone body can be braced between steep walls without either wall
+        // qualifying as walkable ground. Permit a short get-up from an actual
+        // upward-facing contact, without granting grounded movement or jumping.
+        let contact = snapshot.support.or_else(|| {
+            physics
+                .surface_contacts(self.collider)
+                .filter(|contact| {
+                    contact.separation <= 0.04
+                        && contact.normal.dot(self.up) >= 0.1
+                        && (contact.position - snapshot.motion.position).dot(self.up)
+                            <= -self.spec.radius * 0.25
+                        && contact_relative_velocity(snapshot.motion, *contact).dot(contact.normal)
+                            <= 1.0
+                })
+                .min_by(|a, b| {
+                    b.normal
+                        .dot(self.up)
+                        .total_cmp(&a.normal.dot(self.up))
+                        .then_with(|| {
+                            (a.collider, a.position.x.to_bits(), a.position.y.to_bits()).cmp(&(
+                                b.collider,
+                                b.position.x.to_bits(),
+                                b.position.y.to_bits(),
+                            ))
+                        })
+                })
+        });
+        let Some(contact) = contact else {
             self.get_up_result = SpacelingGetUpResult::NoSupport;
             return;
         };

@@ -241,7 +241,7 @@ impl ClientScenario for MaterialMissionClientScenario {
             return String::new();
         };
         format!(
-            "match_seed={}\nmatch_tick={}\nmatch_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}\n{}",
+            "match_seed={}\nmatch_tick={}\nmatch_player_1={}\nmatch_player_2={}\nmatch_remaining_seconds={}\nmatch_owned_planets={},{}\nmatch_finish_reason={:?}\nmatch_result={}\n{}{}",
             self.seed,
             self.sortie.state.tick(),
             if self.bots[0] {
@@ -265,6 +265,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             self.profile.diagnostics(&self.pilots),
+            self.sortie.runtime_diagnostics(),
         )
     }
     #[cfg(test)]

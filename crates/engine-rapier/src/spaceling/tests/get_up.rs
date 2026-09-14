@@ -309,6 +309,135 @@ fn get_up_does_not_provide_an_airborne_or_zero_gravity_boost() {
 }
 
 #[test]
+fn a_prone_pilot_can_get_up_when_braced_in_a_steep_notch() {
+    for scale in [0.5, 1.0] {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        for (index, side) in [-1.0_f32, 1.0].into_iter().enumerate() {
+            let id = PhysicsId::new(10 + index as u64);
+            let angle = side * std::f32::consts::FRAC_PI_3;
+            let normal = Vec2::Y.rotate_radians(angle);
+            world.insert_body(
+                BodyId::new(id, BodyRole::PRIMARY),
+                BodySpec {
+                    kind: BodyKind::Fixed,
+                    position: -normal * 0.5,
+                    angle,
+                    ..Default::default()
+                },
+                &[ColliderSpec::cuboid(
+                    ColliderId::new(id, ColliderRole::PRIMARY, 0),
+                    10.0,
+                    0.5,
+                )],
+            );
+        }
+        let spec = SpacelingSpec {
+            radius: 0.3 * scale,
+            half_segment: 0.6 * scale,
+            balance: SpacelingBalanceSpec {
+                knockdown_angular_speed: 8.0 / scale,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut pilot = SpacelingAssembly::insert(
+            &mut world,
+            SPACELING,
+            Vec2::Y * (spec.radius * 2.0 + spec.half_segment * 3.0_f32.sqrt() + 0.02),
+            std::f32::consts::FRAC_PI_2,
+            spec,
+        )
+        .unwrap();
+        pilot.set_balance(&mut world, SpacelingBalance::KnockedDown);
+        for _ in 0..60 {
+            tick(&mut world, &mut pilot, SpacelingControl::default(), GRAVITY);
+        }
+        let before = pilot.snapshot(&world).unwrap();
+        assert!(before.needs_get_up(), "{before:?}");
+        assert!(
+            !before.grounded(),
+            "steep walls are not walking support: {before:?}"
+        );
+        assert!(before.contacts >= 2, "{before:?}");
+        assert!(before.motion.linear_velocity.length() < 0.1, "{before:?}");
+        pilot.apply_control(
+            &mut world,
+            SpacelingControl {
+                jump_held: true,
+                ..Default::default()
+            },
+            GRAVITY,
+            DT,
+        );
+        assert_eq!(
+            pilot.get_up_result,
+            SpacelingGetUpResult::Started,
+            "scale={scale}: {before:?}"
+        );
+        for _ in 0..120 {
+            tick(
+                &mut world,
+                &mut pilot,
+                SpacelingControl {
+                    jump_held: true,
+                    ..Default::default()
+                },
+                GRAVITY,
+            );
+        }
+        let after = pilot.snapshot(&world).unwrap();
+        assert_eq!(
+            after.get_up_result,
+            SpacelingGetUpResult::Succeeded,
+            "{after:?}"
+        );
+        assert!(!after.needs_get_up(), "{after:?}");
+        assert_eq!(after.jumps, 0);
+    }
+}
+
+#[test]
+fn ceiling_and_vertical_wall_contacts_do_not_grant_a_get_up_boost() {
+    for angle in [std::f32::consts::PI, std::f32::consts::FRAC_PI_2] {
+        let (mut world, _) = floor_fixture(angle, Vec2::ZERO);
+        world.remove_entity(SPACELING);
+        let normal = Vec2::Y.rotate_radians(angle);
+        let mut pilot = SpacelingAssembly::insert(
+            &mut world,
+            SPACELING,
+            normal * 0.16,
+            angle + std::f32::consts::FRAC_PI_2,
+            SpacelingSpec {
+                radius: 0.15,
+                half_segment: 0.3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        pilot.set_balance(&mut world, SpacelingBalance::KnockedDown);
+        for _ in 0..30 {
+            world.apply_velocity_delta(pilot.body(), -normal * (18.0 * DT), true);
+            world.step(DT);
+        }
+        let before = world.motion(pilot.body()).unwrap();
+        assert!(world.surface_contacts(pilot.collider()).count() > 0);
+        pilot.apply_control(
+            &mut world,
+            SpacelingControl {
+                jump_held: true,
+                ..Default::default()
+            },
+            GRAVITY,
+            DT,
+        );
+        let after = pilot.snapshot(&world).unwrap();
+        assert_eq!(after.get_up_result, SpacelingGetUpResult::NoSupport);
+        assert_eq!(after.motion, before);
+        assert_eq!(after.jumps, 0);
+    }
+}
+
+#[test]
 fn removing_support_gravity_or_balance_interrupts_an_active_get_up() {
     for expected in [
         SpacelingGetUpResult::NoSupport,

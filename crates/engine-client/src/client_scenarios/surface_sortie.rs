@@ -699,6 +699,22 @@ impl ClientScenario for SurfaceSortieClientScenario {
     fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
         Some(self.frames_for_view(viewport, false))
     }
+    fn runtime_diagnostics(&self) -> String {
+        let mut text = String::new();
+        for player in 0..self.state.player_count() {
+            let seat = player + 1;
+            let Some(pilot) = self.state.spaceling_snapshot(player) else {
+                text.push_str(&format!("spaceling_p{seat}_present=false\n"));
+                continue;
+            };
+            text.push_str(&format!(
+                "spaceling_p{seat}_present=true\nspaceling_p{seat}_balance={:?}\nspaceling_p{seat}_grounded={}\nspaceling_p{seat}_contacts={}\nspaceling_p{seat}_needs_get_up={}\nspaceling_p{seat}_get_up_attempts={}\nspaceling_p{seat}_get_up_result={:?}\nspaceling_p{seat}_motion={:?}\nspaceling_p{seat}_up={:?}\nspaceling_p{seat}_support={:?}\n",
+                pilot.balance, pilot.grounded(), pilot.contacts, pilot.needs_get_up(),
+                pilot.get_up_attempts, pilot.get_up_result, pilot.motion, pilot.up, pilot.support,
+            ));
+        }
+        text
+    }
     fn frame_layout(&self) -> FrameLayout {
         FrameLayout::PlayerViewsWithMinimaps
     }
