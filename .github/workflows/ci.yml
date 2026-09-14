@@ -79,20 +79,72 @@ jobs:
   linux-workspace:
     name: Linux workspace
     runs-on: ubuntu-latest
-    # Includes unoptimized three-minute simulations and a separate cold release
-    # build for the rendered UI suite. Individual simulation caps stay unchanged.
+    # Keep the cold-run ceiling while collecting optimized, cached timings.
+    # Simulation budgets and the real-time UI workflows are unchanged.
     timeout-minutes: 60
     env:
-      # Unoptimized material-world fixtures exceed the default test-thread stack.
+      # Material-world fixtures can exceed the default test-thread stack.
       RUST_MIN_STACK: 16777216
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Restore Rust dependencies
+        id: rust-cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-on-failure: true
+          workspaces: |
+            . -> target
+            vendor/i-slint-backend-linuxkms -> target
       - name: Install native client dependencies
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
-      - run: cargo test --locked --workspace --all-targets
+      - name: Test CI timing reporter
+        run: python3 -m unittest discover -s .github/ci -p 'test_*.py'
+      - name: Build optimized Linux test executables
+        id: build
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ci-timings"
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/build.seconds" \
+            cargo test --locked --workspace --all-targets --profile ci --no-run --timings
+      - name: Run Linux workspace tests
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
+            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
       - name: Run black-box UI functional tests
-        run: xvfb-run -a -s "-screen 0 1280x1024x24" cargo test --locked --release -p engine-client --test ui_control_functional -- --ignored --test-threads=1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        # Retain workspace target/feature selection so this reuses the build.
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
+            xvfb-run -a -s "-screen 0 1280x1024x24" \
+            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui \
+              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
+      - name: Test vendored LinuxKMS input and software rendering
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/kms.seconds" \
+            cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software --lib
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
+            --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
+            target/nextest/ci/junit.xml target/nextest/ui/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload build and per-test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ci-timings/
+            target/cargo-timings/
+            target/nextest/ci/junit.xml
+            target/nextest/ui/junit.xml
+          if-no-files-found: ignore
       - name: Upload functional-test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -100,8 +152,6 @@ jobs:
           name: ui-functional-test-artifacts
           path: target/functional-test-artifacts
           if-no-files-found: ignore
-      - name: Test vendored LinuxKMS input and software rendering
-        run: cargo test --locked --manifest-path vendor/i-slint-backend-linuxkms/Cargo.toml --features renderer-software --lib
 
   spacewars-ai-regression:
     name: Spacewars AI deterministic baselines

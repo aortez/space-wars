@@ -350,13 +350,15 @@ The public control API is exercised by black-box integration tests that launch
 the real client with isolated settings and socket paths:
 
 ```sh
-xvfb-run -a cargo test -p engine-client --test ui_control_functional -- \
+xvfb-run -a cargo test --profile ci -p engine-client --test ui_control_functional -- \
   --ignored --test-threads=1
 ```
 
 The dedicated CI step runs these tests under the software renderer. See
 [Functional UI tests](docs/functional-tests.md) for local display options,
 current workflow coverage, and failure artifacts.
+The [CI performance guide](docs/ci-performance.md) covers the optimized test
+profile, matching headless/UI commands, caching, and per-test timing reports.
 
 Pause active gameplay and wait until the pause menu is observable:
 

@@ -100,3 +100,16 @@ i-slint-backend-linuxkms = { path = "vendor/i-slint-backend-linuxkms" }
 # CPU/PPU/APU scheduler on the Raspberry Pi 5.
 lto = "fat"
 codegen-units = 1
+
+# Run the same assertions and simulation budgets at useful speeds in CI. Both
+# workspace and rendered UI tests use this profile to share compiled artifacts;
+# production builds retain the NES scheduler's release/LTO settings above.
+[profile.ci]
+inherits = "dev"
+opt-level = 2
+debug = "line-tables-only"
+debug-assertions = true
+overflow-checks = true
+incremental = false
+lto = "off"
+codegen-units = 16
