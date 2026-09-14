@@ -98,6 +98,11 @@ artifact freshness and the executable's embedded revision, not elapsed-time
 thresholds. Coverage includes fresh/packed refs, detached HEAD, linked worktrees,
 dirty/staged/restored sources, annotated tags, explicit revisions, and archives
 inside unrelated checkouts. They do not touch the real checkout's Git metadata.
+Packed-ref cases advance commits using `commit-tree` and `update-ref`, asserting
+that the index contents and modification time stay unchanged. This prevents an
+incidental index refresh from hiding a missing ref watch. Ordinary and nested
+branches, including linked worktrees, must rebuild when a loose ref first appears
+and reuse artifacts on the following unchanged build.
 
 Future work should follow these measurements: profile remaining computational
 hotspots, split large internal parameter loops into individually scheduled cases,
@@ -150,8 +155,10 @@ logs identified two build-script problems:
 - Absent optional inputs, such as `packed-refs` or a packed branch's loose ref,
   were registered as watched paths. Cargo documents that
   [nonexistent watched files cause repeated rebuilds](https://doc.rust-lang.org/cargo/faq.html#why-is-cargo-rebuilding-my-code).
-  Only existing inputs are now registered; HEAD, the index and active ref storage
-  still invalidate the identity when real changes occur.
+  Only existing inputs are now registered; HEAD, the index and the `refs` directory
+  still invalidate the identity when real changes occur. The directory watch
+  detects new loose refs when packed branches advance without any index update;
+  watching only an already-existing branch file would miss that transition.
 
 The unchanged-build guard prevents a recurrence in the full workspace; the small
 fixtures exercise Git layouts that the developer's existing checkout may not have.

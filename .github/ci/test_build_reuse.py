@@ -94,6 +94,15 @@ class BuildReuseTests(unittest.TestCase):
     def revision(self):
         return self.git("rev-parse", "--short=12", "HEAD")
 
+    def advance_head_without_index_update(self):
+        # A normal `git commit` can refresh the index and accidentally mask a
+        # missing ref watch. Advance the same source tree through refs alone.
+        index = self.root / self.git("rev-parse", "--git-path", "index")
+        before = index.read_bytes(), index.stat().st_mtime_ns
+        commit = self.git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "Advance ref")
+        self.git("update-ref", "HEAD", commit)
+        self.assertEqual((index.read_bytes(), index.stat().st_mtime_ns), before)
+
     def test_consecutive_builds_reuse_artifacts_without_packed_refs(self):
         self.assertFalse((self.root / ".git/packed-refs").exists())
         artifact, _ = self.build()
@@ -127,12 +136,24 @@ class BuildReuseTests(unittest.TestCase):
         self.assert_build(True, self.revision())
 
     def test_packed_and_loose_branch_refs_both_reuse_and_update(self):
+        self.assert_packed_branch_reuses_and_updates()
+
+    def test_nested_packed_branch_detects_new_loose_ref(self):
+        self.git("branch", "-m", "topic/nested/main")
+        self.assert_packed_branch_reuses_and_updates()
+
+    def assert_packed_branch_reuses_and_updates(self):
+        reference = self.git("symbolic-ref", "HEAD")
+        loose_ref = self.root / self.git("rev-parse", "--git-path", reference)
         self.git("pack-refs", "--all", "--prune")
-        self.assertFalse((self.root / ".git/refs/heads/main").exists())
+        self.assertFalse(loose_ref.exists())
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
-        self.git("commit", "--allow-empty", "-m", "Advance packed branch")
-        self.assertTrue((self.root / ".git/refs/heads/main").exists())
+        self.advance_head_without_index_update()
+        self.assertTrue(loose_ref.exists())
+        self.assert_build(False, self.revision())
+        self.assert_build(True, self.revision())
+        self.advance_head_without_index_update()
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
         self.git("pack-refs", "--all", "--prune")
@@ -143,7 +164,7 @@ class BuildReuseTests(unittest.TestCase):
         self.git("switch", "--detach")
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
-        self.git("commit", "--allow-empty", "-m", "Advance detached HEAD")
+        self.advance_head_without_index_update()
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
 
@@ -154,9 +175,16 @@ class BuildReuseTests(unittest.TestCase):
         self.assertTrue((self.root / ".git").is_file())
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
-        self.git("commit", "--allow-empty", "-m", "Advance linked worktree")
+        self.advance_head_without_index_update()
         self.assert_build(False, self.revision())
         self.assert_build(True, self.revision())
+
+    def test_linked_worktree_detects_new_shared_loose_ref(self):
+        linked = self.root / "linked-checkout"
+        self.git("worktree", "add", "-b", "topic/nested/linked", str(linked))
+        self.root = linked
+        self.assertTrue((self.root / ".git").is_file())
+        self.assert_packed_branch_reuses_and_updates()
 
     def test_annotated_tag_updates_identity_without_source_changes(self):
         self.assert_build(False, self.revision())

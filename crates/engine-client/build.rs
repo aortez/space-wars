@@ -18,8 +18,11 @@ fn main() {
             .and_then(|output| String::from_utf8(output.stdout).ok())
             .map(|text| text.trim().to_owned())
     };
-    // Resolve these via git as .git can be a worktree indirection file.
-    for path in ["HEAD", "index", "packed-refs", "refs/tags"] {
+    // Resolve these via git as .git can be a worktree indirection file. Watch
+    // refs recursively: advancing a packed branch creates a loose ref without
+    // necessarily changing HEAD, the index, or packed-refs. This also covers
+    // newly created nested branch/tag paths without watching all Git objects.
+    for path in ["HEAD", "index", "packed-refs", "refs"] {
         if let Some(path) = git(&["rev-parse", "--git-path", path]) {
             watch_existing(root.join(path));
         }
@@ -58,8 +61,8 @@ fn main() {
 fn watch_existing(path: impl AsRef<std::path::Path>) {
     let path = path.as_ref();
     // Cargo treats a missing watched path as stale on every invocation. Git's
-    // packed refs and loose current-branch ref are both optional; existing HEAD,
-    // index and ref storage still invalidate the identity when commits change.
+    // packed refs and loose current-branch ref are both optional; the existing
+    // refs directory detects creation of a loose ref when a packed branch moves.
     if path.exists() {
         println!("cargo:rerun-if-changed={}", path.display());
     }
