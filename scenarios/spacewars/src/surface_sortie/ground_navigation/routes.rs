@@ -70,6 +70,27 @@ impl<'a> GroundRoutes<'a> {
         self.route_to_actor_target(start, target, HATCH_APPROACH_RANGE)
     }
 
+    /// One shortest-path search to the union of both boarding envelopes.
+    pub fn route_to_hatches(&self, start: Vec2, hatches: [Option<Vec2>; 2]) -> GroundRoute {
+        self.route_with_targets(
+            start,
+            hatches,
+            HATCH_APPROACH_RANGE,
+            SurfaceSortieState::spec().half_height(),
+            false,
+        )
+    }
+
+    pub fn route_toward_hatches(&self, start: Vec2, hatches: [Option<Vec2>; 2]) -> GroundRoute {
+        self.route_with_targets(
+            start,
+            hatches,
+            HATCH_APPROACH_RANGE,
+            SurfaceSortieState::spec().half_height(),
+            true,
+        )
+    }
+
     /// Route using a standing-center envelope. Hatch transfer measures this
     /// center; claims still independently check the real supported flag anchor.
     pub fn route_to_actor_target(&self, start: Vec2, target: Vec2, range: f32) -> GroundRoute {
@@ -102,6 +123,17 @@ impl<'a> GroundRoutes<'a> {
         height: f32,
         allow_partial: bool,
     ) -> GroundRoute {
+        self.route_with_targets(start, [Some(target), None], range, height, allow_partial)
+    }
+
+    fn route_with_targets(
+        &self,
+        start: Vec2,
+        targets: [Option<Vec2>; 2],
+        range: f32,
+        height: f32,
+        allow_partial: bool,
+    ) -> GroundRoute {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::super::sensor_profile::Scope::new("ground_route");
         #[cfg(feature = "sensor-profile")]
@@ -111,7 +143,13 @@ impl<'a> GroundRoutes<'a> {
         let scanned_edges =
             super::super::sensor_profile::Counter::new("ground_route_scanned_edges");
         let destination_distance = |node: &GroundNode| {
-            (node.position + node.position.normalized() * height).distance_to(target)
+            let center = node.position + node.position.normalized() * height;
+            targets
+                .into_iter()
+                .flatten()
+                .map(|target| center.distance_to(target))
+                .min_by(f32::total_cmp)
+                .unwrap_or(f32::INFINITY)
         };
         let nearest = self.map.nodes.iter().min_by(|a, b| {
             a.position
@@ -159,10 +197,17 @@ impl<'a> GroundRoutes<'a> {
         // Surface arc distance still measures progress near the opposite side
         // of a planet, where a useful walk barely changes straight-line distance.
         let remaining = |point: Vec2| {
-            (point.x * target.y - point.y * target.x)
-                .atan2(point.dot(target))
-                .abs()
-                * target.length()
+            targets
+                .into_iter()
+                .flatten()
+                .map(|target| {
+                    (point.x * target.y - point.y * target.x)
+                        .atan2(point.dot(target))
+                        .abs()
+                        * target.length()
+                })
+                .min_by(f32::total_cmp)
+                .unwrap_or(f32::INFINITY)
         };
         let mut frontier = usize::from(initial.id);
         let mut frontier_distance = remaining(initial.position);

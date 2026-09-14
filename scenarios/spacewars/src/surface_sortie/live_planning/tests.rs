@@ -456,6 +456,37 @@ fn publication_preserves_measurement_tick_and_pending_is_not_a_failed_route() {
 }
 
 #[test]
+fn changing_either_boarding_entrance_invalidates_a_landed_request() {
+    let state = state();
+    for side in 0..2 {
+        for removed in [false, true] {
+            let mut planner =
+                LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+            let mut o = target(&state, 0);
+            let p = &mut o.combat.recovery.flight.pilot;
+            let site = p.sites[0];
+            p.landing.phase = LandingPhase::Landed;
+            p.hatch = Some(site.hatch_position);
+            p.boarding_hatches = [
+                Some(site.hatch_position),
+                Some(site.hatch_position + Vec2::X * 12.0),
+            ];
+            planner.observe(&state, 0, &mut o);
+            planner.advance(state.world.tick);
+            let hatch = &mut o.combat.recovery.flight.pilot.boarding_hatches[side];
+            *hatch = if removed {
+                None
+            } else {
+                hatch.map(|h| h + Vec2::X)
+            };
+            planner.observe(&state, 0, &mut o);
+            assert!(o.landing_objective.is_none());
+            assert_eq!(planner.telemetry.invalidations.get("hatch_moved"), Some(&1));
+        }
+    }
+}
+
+#[test]
 fn clone_resume_death_goal_change_and_missing_actor_release_work() {
     let mut state = state();
     let mut planner = LiveObjectivePlanner::new(

@@ -362,6 +362,7 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
     let survey = o.landing_objective.as_mut().unwrap();
     survey.tick = p.tick;
     p.hatch = Some(p.sites[1].hatch_position);
+    p.boarding_hatches = [p.hatch, None];
     let actual = GroundNode {
         id: 8,
         position: endpoint.position * 1.001,

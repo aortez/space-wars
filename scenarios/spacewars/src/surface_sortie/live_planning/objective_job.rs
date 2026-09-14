@@ -92,6 +92,7 @@ impl SurfaceSortieState {
                 vehicle: site.vehicle_position,
                 angle: rotation_for_direction(site.normal),
                 hatch: local(site.hatch_position),
+                boarding_hatches: site.boarding_hatches.map(|h| h.map(local)),
             })
             .collect();
         if p.landing.phase == LandingPhase::Landed
@@ -102,6 +103,7 @@ impl SurfaceSortieState {
                 vehicle: p.ship.position,
                 angle: p.ship.angle,
                 hatch: local(hatch),
+                boarding_hatches: p.boarding_hatches.map(|h| h.map(local)),
             });
         }
         if candidates.is_empty() {
@@ -199,6 +201,39 @@ impl ObjectiveSurveyJob {
             Phase::Done
         };
     }
+
+    // Boarding floor/clearance probes are distinct from the last path node:
+    // a route may stop within boarding range rather than at the probe itself.
+    // Include both bounded probe corridors in positive-result validation.
+    fn entrance_dependencies(&self) -> [QueryArea; 2] {
+        let c = self.candidates[self.index];
+        let local = |point: Vec2| (point - self.position).rotate_radians(-self.angle);
+        let up = (c.vehicle - self.position).normalized();
+        let right = Vec2::new(up.y, -up.x);
+        let margin = SurfaceSortieState::spec().half_height() * 2.0 + 0.2;
+        [0, 1].map(|side| {
+            let hatch = c.vehicle + hatch_offset(ShipForm::Ship, side).rotate_radians(c.angle);
+            let corners = [-1.0, 1.0].map(|offset| {
+                [
+                    local(hatch + right * offset + up * 2.0),
+                    local(hatch + right * offset - up * 3.0),
+                ]
+            });
+            let mut minimum = corners[0][0];
+            let mut maximum = minimum;
+            for point in corners.into_iter().flatten() {
+                minimum.x = minimum.x.min(point.x);
+                minimum.y = minimum.y.min(point.y);
+                maximum.x = maximum.x.max(point.x);
+                maximum.y = maximum.y.max(point.y);
+            }
+            QueryArea {
+                minimum: minimum - Vec2::new(margin, margin),
+                maximum: maximum + Vec2::new(margin, margin),
+                groups: SurfaceSortieState::spec().collision_groups,
+            }
+        })
+    }
 }
 impl PlanningJob for ObjectiveSurveyJob {
     type Output = LandingObjectiveSurvey;
@@ -234,12 +269,12 @@ impl PlanningJob for ObjectiveSurveyJob {
                 } else {
                     let map = Arc::new(j.take_map());
                     let hatch = self.candidates[self.index].hatch;
-                    self.phase = Phase::Trip(Box::new(GroundRoundTripJob::new(
+                    self.phase = Phase::Trip(Box::new(GroundRoundTripJob::with_hatches(
                         map,
                         hatch,
                         self.result.objective.position,
                         self.result.objective.range,
-                        hatch,
+                        self.candidates[self.index].boarding_hatches,
                     )));
                 }
             }
@@ -278,7 +313,9 @@ impl PlanningJob for ObjectiveSurveyJob {
                         returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
                         endpoint: result.endpoint,
                     };
-                    self.dependencies.push((route.site, j.take_areas()));
+                    let mut areas = j.take_areas();
+                    areas.extend(self.entrance_dependencies());
+                    self.dependencies.push((route.site, areas));
                     self.finish_route(route);
                 }
             }

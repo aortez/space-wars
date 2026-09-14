@@ -33,6 +33,7 @@ struct Candidate {
     vehicle: Vec2,
     angle: f32,
     hatch: Vec2,
+    boarding_hatches: [Option<Vec2>; 2],
 }
 
 pub const MAX_SURVEY_AGE_TICKS: u64 = 120;
@@ -86,6 +87,14 @@ pub struct LivePlanningTelemetry {
     pub max_parked_requests: usize,
 }
 
+#[derive(Clone, Copy)]
+struct ActualLanding {
+    vehicle: Vec2,
+    angle: f32,
+    exit: Vec2,
+    boarding_hatches: [Option<Vec2>; 2],
+}
+
 #[derive(Clone)]
 struct Request {
     token: RequestToken,
@@ -97,7 +106,7 @@ struct Request {
     position: Vec2,
     angle: f32,
     gravity: f32,
-    actual: Option<(Vec2, f32, Vec2)>,
+    actual: Option<ActualLanding>,
     snapshot: Arc<QuerySnapshot>,
     reused: ReusedGroundWork,
     graph: u64,
@@ -198,17 +207,18 @@ impl LiveObjectivePlanner {
         self.remove(player);
         *self.telemetry.invalidations.entry(reason).or_default() += 1;
     }
-    fn actual(p: &PilotObservationV1) -> Option<(Vec2, f32, Vec2)> {
+    fn actual(p: &PilotObservationV1) -> Option<ActualLanding> {
         if p.landing.phase != LandingPhase::Landed {
             return None;
         }
         let local =
             |point: Vec2| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
-        Some((
-            local(p.ship.position),
-            p.ship.angle - p.planet.motion.angle,
-            local(p.hatch?),
-        ))
+        Some(ActualLanding {
+            vehicle: local(p.ship.position),
+            angle: p.ship.angle - p.planet.motion.angle,
+            exit: local(p.hatch?),
+            boarding_hatches: p.boarding_hatches.map(|h| h.map(local)),
+        })
     }
     fn same_objective(old: LandingObjective, new: LandingObjective) -> bool {
         old.matches(new)
@@ -235,11 +245,19 @@ impl LiveObjectivePlanner {
         if actual.is_some() != request.actual.is_some() {
             return Err("touchdown_changed");
         }
-        if let (Some((old, angle, hatch)), Some((new, new_angle, new_hatch))) =
-            (request.actual, actual)
-            && (old.distance_to(new) > 0.002
-                || hatch.distance_to(new_hatch) > 0.002
-                || ((angle - new_angle) * 0.5).sin().abs() > 0.0001)
+        if let (Some(old), Some(new)) = (request.actual, actual)
+            && (old.vehicle.distance_to(new.vehicle) > 0.002
+                || old.exit.distance_to(new.exit) > 0.002
+                || old
+                    .boarding_hatches
+                    .into_iter()
+                    .zip(new.boarding_hatches)
+                    .any(|(old, new)| match (old, new) {
+                        (Some(a), Some(b)) => a.distance_to(b) > 0.002,
+                        (None, None) => false,
+                        _ => true,
+                    })
+                || ((old.angle - new.angle) * 0.5).sin().abs() > 0.0001)
         {
             return Err("hatch_moved");
         }

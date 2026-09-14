@@ -43,6 +43,7 @@ fn fixture() -> (BrainReset, RecoveryTaskObservationV1) {
         spin: 0.0,
     });
     p.hatch = Some(Vec2::new(6.0, 60.0));
+    p.boarding_hatches = [p.hatch, None];
     // This fixture isolates traversal to an already landed ship. Tests for an
     // unsettled hatch explicitly replace these observed boarding conditions.
     p.landing.phase = scenario_spacewars::surface_sortie::LandingPhase::Landed;
@@ -88,6 +89,39 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
 }
 
 #[test]
+fn return_selects_reachable_entrance_and_replans_when_it_disappears() {
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    let p = &mut o.flight.pilot;
+    // The nearer entrance has isolated floor. Walking right reaches the other.
+    p.hatch = Some(Vec2::new(-4.0, 60.0));
+    p.boarding_hatches = [p.hatch, Some(Vec2::new(8.0, 60.0))];
+    o.ground.as_mut().unwrap().nodes.push(GroundNode {
+        id: 4,
+        position: p.hatch.unwrap(),
+        normal: Vec2::Y,
+    });
+    let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+    task.step(&o);
+    assert_eq!(task.telemetry().path, [0, 1, 2, 3]);
+    assert_eq!(task.telemetry().target, Some(Vec2::new(8.0, 60.0)));
+    advance(&mut o, 1);
+    assert!(task.step(&o).horizontal > 0.0);
+    assert_eq!(
+        task.telemetry().target,
+        Some(Vec2::new(8.0, 60.0)),
+        "keep the reachable entrance while following its route"
+    );
+
+    advance(&mut o, 2);
+    o.flight.pilot.boarding_hatches[1] = None;
+    task.step(&o);
+    assert!(task.telemetry().path.is_empty());
+    assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
+    assert_eq!(task.telemetry().target, o.flight.pilot.hatch);
+}
+
+#[test]
 fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     use scenario_spacewars::surface_sortie::landing_objective::LandingObjective;
     use spacewars_ai::ground_task::FlagApproach;
@@ -95,6 +129,7 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     o.jetpack = None;
     let p = &mut o.flight.pilot;
     p.hatch = Some(Vec2::new(0.0, 60.0 + HALF_HEIGHT));
+    p.boarding_hatches = [p.hatch, None];
     let claim = p.planet.claim.as_mut().unwrap();
     claim.owner = Some(PlayerId::PLAYER_2);
     claim.flag = Some(PlanetFlagObservation {
@@ -115,7 +150,7 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     let plan = FlagApproach {
         objective: LandingObjective::read(p).unwrap(),
         endpoint: map.nodes[3],
-        hatch: p.hatch.unwrap(),
+        boarding_hatches: p.boarding_hatches,
         tick: p.tick,
         reached: false,
     };
@@ -192,6 +227,7 @@ fn cramped_supported_start_uses_fresh_sweeps_then_rejoins_without_jumping() {
         node.position.x += 5.0;
     }
     o.flight.pilot.hatch.as_mut().unwrap().x = 11.0;
+    o.flight.pilot.boarding_hatches = [o.flight.pilot.hatch, None];
     blocked_posture(&mut o);
     o.flight.pilot.balanced = true;
     let posture = o.posture.as_mut().unwrap();
@@ -253,6 +289,7 @@ fn cramped_start_with_no_clear_corridor_has_a_fixed_deadline() {
         node.position.x += 5.0;
     }
     o.flight.pilot.hatch.as_mut().unwrap().x = 11.0;
+    o.flight.pilot.boarding_hatches = [o.flight.pilot.hatch, None];
     blocked_posture(&mut o);
     o.flight.pilot.balanced = true;
     o.posture.as_mut().unwrap().balance =
@@ -714,6 +751,7 @@ fn traversal_replay_clone_reset_and_local_frame_contract() {
     p.actor.as_mut().unwrap().position = shift + p.actor.unwrap().position.rotate_radians(0.7);
     p.actor_up = Vec2::Y.rotate_radians(0.7);
     p.hatch = p.hatch.map(|v| shift + v.rotate_radians(0.7));
+    p.boarding_hatches = [p.hatch, None];
     advance(&mut o, 2);
     assert_eq!(task.step(&o), copy.step(&o));
     assert_eq!(task.telemetry(), copy.telemetry());
@@ -1165,6 +1203,7 @@ fn a_displaced_hatch_gets_a_fresh_settling_wait_within_the_original_task_budget(
     task.step(&o);
     advance(&mut o, 300);
     o.flight.pilot.hatch = None;
+    o.flight.pilot.boarding_hatches = [o.flight.pilot.hatch, None];
     task.step(&o);
     advance(&mut o, 901);
     task.step(&o);
@@ -1202,6 +1241,7 @@ fn a_visible_unsettled_hatch_waits_without_renewing_progress_then_reports_return
         advance(&mut o, tick);
         o.flight.pilot.planet.motion.position.x += 10.0;
         o.flight.pilot.hatch.as_mut().unwrap().x += 11.0;
+        o.flight.pilot.boarding_hatches = [o.flight.pilot.hatch, None];
         o.flight.pilot.actor.as_mut().unwrap().position.x += 11.0;
         o.flight.pilot.supported_planet = (tick != 600).then_some(o.flight.pilot.planet.index);
         assert_eq!(task.step(&o), copy.step(&o));

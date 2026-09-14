@@ -152,13 +152,17 @@ impl TacticalCapturePilot {
                 && LandingObjective::read(p).is_some_and(|target| target.matches(s.objective))
                 && let Some(route) = s.actual.as_ref().filter(|r| r.cost().is_some())
                 && let Some(endpoint) = route.endpoint
-                && let Some(hatch) = p.hatch
+                && p.boarding_hatches.iter().any(Option::is_some)
             {
                 self.telemetry.flag_approach = Some(FlagApproach {
                     objective: s.objective,
                     endpoint,
-                    hatch: (hatch - p.planet.motion.position)
-                        .rotate_radians(-p.planet.motion.angle),
+                    boarding_hatches: p.boarding_hatches.map(|h| {
+                        h.map(|point| {
+                            (point - p.planet.motion.position)
+                                .rotate_radians(-p.planet.motion.angle)
+                        })
+                    }),
                     tick: s.tick,
                     reached: false,
                 });

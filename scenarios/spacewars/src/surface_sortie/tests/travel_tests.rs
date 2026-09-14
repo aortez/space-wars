@@ -361,13 +361,16 @@ fn boarding_requires_support_from_the_landed_planet_not_a_nearby_platform() {
     assert!(state.vehicle_settled(0));
     let up = state.access_up(0);
     let hatch = state.access_position(0);
+    // Stay inside boarding range without obstructing the entrance capsule.
+    // The pilot must be rejected for foreign support, independently of clearance.
+    let beside = Vec2::new(up.y, -up.x) * 1.5;
     let platform = PhysicsId::new(45_123);
     let body = PhysicsBodyId::new(platform, BodyRole::PRIMARY);
     assert!(state.world.physics.world.insert_body(
         body,
         BodySpec {
             kind: engine_rapier::world::BodyKind::Fixed,
-            position: hatch + up * 0.5,
+            position: hatch + beside + up * 0.5,
             angle: rotation_for_direction(up),
             ..BodySpec::default()
         },
@@ -380,7 +383,7 @@ fn boarding_requires_support_from_the_landed_planet_not_a_nearby_platform() {
     state.pilots[0].body = SpacelingAssembly::insert(
         &mut state.world.physics.world,
         pilot_physics_id(PlayerId::PLAYER_1),
-        hatch + up * 1.65,
+        hatch + beside + up * 1.65,
         rotation_for_direction(up),
         SurfaceSortieState::spec(),
     );
@@ -395,6 +398,7 @@ fn boarding_requires_support_from_the_landed_planet_not_a_nearby_platform() {
             .distance_to(state.access_position(0))
             < BOARDING_RANGE
     );
+    assert!(state.boarding_access(0)[0].is_some());
     assert_eq!(state.pilot_support_planet(0), None);
     assert_eq!(state.try_transfer(0), TransferResult::MustBeSupported);
     state.world.physics.world.remove_entity(platform);

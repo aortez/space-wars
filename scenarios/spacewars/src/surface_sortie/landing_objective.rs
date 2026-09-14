@@ -176,7 +176,7 @@ impl SurfaceSortieState {
         let clearance_samples = super::sensor_profile::Counter::new("objective_clearance_samples");
         #[cfg(feature = "sensor-profile")]
         let hull_tests = super::sensor_profile::Counter::new("objective_hull_tests");
-        let measure = |id, vehicle: Vec2, angle: f32, hatch: Vec2| {
+        let measure = |id, vehicle: Vec2, angle: f32, hatch: Vec2, hatches: [Option<Vec2>; 2]| {
             #[cfg(feature = "sensor-profile")]
             let _profile = super::sensor_profile::Scope::new("landing_objective_candidate");
             let avoiding = map.avoiding(gravity, |position| {
@@ -196,7 +196,12 @@ impl SurfaceSortieState {
                 }
             });
             let hatch = (hatch - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
-            measure_route(&avoiding, id, hatch, objective, planning)
+            let hatches = hatches.map(|h| {
+                h.map(|point| {
+                    (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle)
+                })
+            });
+            measure_route(&avoiding, id, hatch, hatches, objective, planning)
         };
         let mut candidates: Vec<_> = p.sites.iter().collect();
         candidates.sort_by(|a, b| {
@@ -236,12 +241,20 @@ impl SurfaceSortieState {
                     site.vehicle_position,
                     rotation_for_direction(site.normal),
                     site.hatch_position,
+                    site.boarding_hatches,
                 )
             })
             .collect();
         let actual = if p.landing.phase == LandingPhase::Landed {
-            p.hatch
-                .map(|hatch| measure(None, p.ship.position, p.ship.angle, hatch))
+            p.hatch.map(|hatch| {
+                measure(
+                    None,
+                    p.ship.position,
+                    p.ship.angle,
+                    hatch,
+                    p.boarding_hatches,
+                )
+            })
         } else {
             None
         };
@@ -263,6 +276,7 @@ fn measure_route(
     map: &GroundMap,
     site: Option<LandingSiteId>,
     hatch: Vec2,
+    hatches: [Option<Vec2>; 2],
     objective: LandingObjective,
     planning: ObjectivePlanning,
 ) -> LandingObjectiveRoute {
@@ -271,7 +285,7 @@ fn measure_route(
     let routes = map.routes();
     if planning == ObjectivePlanning::JointRoundTrip {
         let trip =
-            routes.round_trip_to_actor_target(hatch, objective.position, objective.range, hatch);
+            routes.round_trip_to_hatches(hatch, objective.position, objective.range, hatches);
         return LandingObjectiveRoute {
             site,
             outbound: trip.outbound.diagnostics,
@@ -284,7 +298,7 @@ fn measure_route(
         .path
         .last()
         .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
-        .map(|node| routes.route_to_hatch(node.position, hatch).diagnostics);
+        .map(|node| routes.route_to_hatches(node.position, hatches).diagnostics);
     LandingObjectiveRoute {
         endpoint: None,
         site,
@@ -331,7 +345,14 @@ mod tests {
             range: 1.0,
         };
         let start = Vec2::new(0.0, 60.0);
-        let one_way = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
+        let one_way = measure_route(
+            &map,
+            None,
+            start,
+            [Some(start), None],
+            objective,
+            ObjectivePlanning::Legacy,
+        );
         assert!(one_way.outbound.failure.is_none());
         assert_eq!(
             one_way.returning.as_ref().unwrap().failure,
@@ -345,12 +366,26 @@ mod tests {
             length: 2.0,
         }));
         assert!(
-            measure_route(&map, None, start, objective, ObjectivePlanning::Legacy)
-                .cost()
-                .is_some()
+            measure_route(
+                &map,
+                None,
+                start,
+                [Some(start), None],
+                objective,
+                ObjectivePlanning::Legacy
+            )
+            .cost()
+            .is_some()
         );
         map.edges.clear();
-        let disconnected = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
+        let disconnected = measure_route(
+            &map,
+            None,
+            start,
+            [Some(start), None],
+            objective,
+            ObjectivePlanning::Legacy,
+        );
         assert!(disconnected.cost().is_none());
         assert!(disconnected.returning.is_none());
     }

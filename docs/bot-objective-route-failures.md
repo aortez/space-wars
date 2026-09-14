@@ -4,6 +4,11 @@ Investigation of the remaining negative surveys in
 [local route dependencies](bot-route-dependencies.md), on
 `de0142d4f7b1411c2878c095b2f1e151433e3ebc` (PR #92).
 
+Follow-up: [two-sided boarding](two-sided-boarding.md) now allows returning to
+either clear entrance, while preserving the original exit. The measurements
+below predate that change and the cockpit resize; reproduce them in the current
+world before using their route counts or two-flight timings as a baseline.
+
 The reproduced failure is a movement-model limitation. Fresh measurements of
 the same landing poses fail too. One adjacent landing supports a real capture
 and return using the existing jetpack controller, but both the prospective

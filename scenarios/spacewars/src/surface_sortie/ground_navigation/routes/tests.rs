@@ -192,6 +192,65 @@ fn joint_trip_returns_to_any_boarding_node_without_using_jetpack_edges() {
 }
 
 #[test]
+fn two_entrances_share_one_search_and_do_not_change_the_exit() {
+    let exit = Vec2::new(0.0, 60.0);
+    let opposite = Vec2::new(12.0, 60.0);
+    let flag = Vec2::new(6.0, 70.0);
+    let map = Arc::new(map(
+        vec![
+            node(0, exit.x, exit.y),
+            node(1, flag.x, flag.y),
+            node(2, opposite.x, opposite.y),
+        ],
+        vec![
+            edge(0, 1, 12.0, GroundEdgeKind::Walk),
+            edge(1, 2, 12.0, GroundEdgeKind::Jump),
+        ],
+    ));
+    let routes = map.routes();
+    assert!(
+        routes
+            .round_trip_to_actor_target(exit, flag, 1.0, exit)
+            .endpoint
+            .is_none()
+    );
+    let hatches = [Some(exit), Some(opposite)];
+    let expected = routes.round_trip_to_hatches(exit, flag, 1.0, hatches);
+    assert_eq!(expected.outbound.path, [0, 1]);
+    assert_eq!(expected.returning.as_ref().unwrap().path, [1, 2]);
+    assert_eq!(routes.route_to_hatches(flag, hatches).path, [1, 2]);
+    assert!(
+        routes
+            .route_to_hatches(flag, [None; 2])
+            .diagnostics
+            .failure
+            .is_some()
+    );
+    assert!(
+        routes
+            .round_trip_to_hatches(opposite, flag, 1.0, hatches)
+            .endpoint
+            .is_none(),
+        "entry does not supply an outbound edge"
+    );
+    for batch in [1, 7, 64] {
+        let mut job = GroundRoundTripJob::with_hatches(Arc::clone(&map), exit, flag, 1.0, hatches);
+        while job.next_work().is_some() {
+            let before = job.work().operations;
+            for _ in 0..batch {
+                if job.next_work().is_none() {
+                    break;
+                }
+                job.step();
+            }
+            assert!(job.work().operations - before <= batch);
+        }
+        assert_eq!(job.output(), Some(&expected));
+        assert_eq!(job.work().indexed_edges, 2 * map.edges.len() as u64);
+    }
+}
+
+#[test]
 fn sparse_directed_surveys_match_complete_reference_routes() {
     let height = SurfaceSortieState::spec().half_height();
     for variant in 0..4_u16 {

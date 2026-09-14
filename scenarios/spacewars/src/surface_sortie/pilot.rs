@@ -61,7 +61,10 @@ pub struct PilotLandingSite {
     pub velocity: Vec2,
     /// Suggested body origin with both rear feet on the measured surface.
     pub vehicle_position: Vec2,
+    /// Normal exit, unchanged by the choice of return entrance.
     pub hatch_position: Vec2,
+    /// Clear return entrances at this proposed pose, in world coordinates.
+    pub boarding_hatches: [Option<Vec2>; 2],
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -97,7 +100,10 @@ pub struct PilotObservationV1 {
     pub balanced: bool,
     pub relative_speed: f32,
     pub landing: LandingTelemetry,
+    /// Normal exit floor. A blocked capsule can still leave this observable.
     pub hatch: Option<Vec2>,
+    /// Independently measured clear entrances; neither grants transfer permission.
+    pub boarding_hatches: [Option<Vec2>; 2],
     pub transfer: TransferResult,
     pub last_transfer: TransferResult,
     pub transfers: u64,
@@ -109,6 +115,15 @@ pub struct PilotObservationV1 {
     /// With a requested ID, revalidates only that site. Otherwise surveys at
     /// most 64 bearings. Empty while queries are dirty does not mean no ground.
     pub sites: Vec<PilotLandingSite>,
+}
+
+impl PilotObservationV1 {
+    pub fn nearest_boarding_hatch(&self, point: Vec2) -> Option<Vec2> {
+        self.boarding_hatches
+            .into_iter()
+            .flatten()
+            .min_by(|a, b| a.distance_to(point).total_cmp(&b.distance_to(point)))
+    }
 }
 
 impl PilotPlanetObservation {
@@ -202,6 +217,9 @@ impl SurfaceSortieState {
             relative_speed: snapshot.map_or(0.0, |s| s.relative_speed),
             landing: pilot.landing,
             hatch: self.material_access(player).map(|hit| hit.point),
+            boarding_hatches: self
+                .boarding_access(player)
+                .map(|entry| entry.map(|(point, _)| point)),
             transfer: if ready {
                 self.transfer_readiness(player)
             } else {
@@ -422,6 +440,26 @@ impl SurfaceSortieState {
             velocity: motion::point_velocity(frame, vehicle_position),
             vehicle_position,
             hatch_position: hatch.point,
+            boarding_hatches: self
+                .material_boarding_with_clearance(
+                    id.planet,
+                    if pod {
+                        ShipForm::EscapePod
+                    } else {
+                        ShipForm::Ship
+                    },
+                    vehicle_position,
+                    rotation_for_direction(normal),
+                    |point, rotation| {
+                        clear_at(
+                            point,
+                            rotation,
+                            vehicle_position,
+                            rotation_for_direction(normal),
+                        )
+                    },
+                )
+                .map(|hit| hit.map(|h| h.point)),
         })
     }
 }

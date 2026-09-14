@@ -150,6 +150,166 @@ fn material_ships_land_without_berths_and_only_the_spaceling_claims() {
     assert_eq!(state.world.physics.world.body_count(), bodies);
 }
 
+fn stand_at_entrance(state: &mut SurfaceSortieState, player: usize, side: usize) {
+    let (point, up) = state.boarding_access(player)[side].expect("clear entrance");
+    let body = state.pilots[player].body.as_ref().unwrap().body();
+    assert!(state.world.physics.world.set_pose(
+        body,
+        point + up * (SurfaceSortieState::spec().half_height() + 0.12),
+        rotation_for_direction(up),
+        true,
+    ));
+    assert!(
+        state
+            .world
+            .physics
+            .world
+            .set_velocity(body, Vec2::ZERO, 0.0, true)
+    );
+    idle(state, 120);
+    assert_eq!(state.pilot_support_planet(player), Some(0));
+}
+
+#[test]
+fn both_boarding_entrances_preserve_identity_exit_side_and_shared_physics() {
+    for surface in [
+        TerrainSurface::Blocks,
+        TerrainSurface::Contour,
+        TerrainSurface::Interpolated,
+    ] {
+        let mut state = parked_surface(2, surface);
+        for player in 0..2 {
+            for side in 0..2 {
+                let identity = state.observation(player).spaceling;
+                let vehicle = state.pilots[player].vehicle;
+                let bodies = state.world.physics.world.body_count();
+                let exit = state.access_position(player);
+                transfer(&mut state, player);
+                assert_eq!(state.location(player), PilotLocation::OnFoot);
+                assert!(
+                    state
+                        .spaceling_snapshot(player)
+                        .unwrap()
+                        .motion
+                        .position
+                        .distance_to(exit)
+                        < 1.0
+                );
+                stand_at_entrance(&mut state, player, side);
+                let p = state
+                    .pilot_observation_with_query(player, pilot::LandingSiteQuery::NotRequested);
+                assert!(p.boarding_hatches.iter().all(Option::is_some));
+                if side == 1 {
+                    assert!(
+                        p.actor.unwrap().position.distance_to(p.hatch.unwrap())
+                            > BOARDING_RANGE * 2.0
+                    );
+                }
+                assert_eq!(p.transfer, TransferResult::Ready);
+                let tick = state.world.tick;
+                transfer(&mut state, player);
+                assert_eq!(state.world.tick, tick + 3);
+                assert_eq!(state.location(player), PilotLocation::Aboard(vehicle));
+                assert_eq!(state.observation(player).spaceling, identity);
+                assert_eq!(state.world.physics.world.body_count(), bodies);
+            }
+        }
+    }
+}
+
+#[test]
+fn obstructing_or_excavating_one_entrance_leaves_the_other_boardable() {
+    for blocked_side in 0..2 {
+        for excavate in [false, true] {
+            let mut state = parked_surface(1, TerrainSurface::Interpolated);
+            transfer(&mut state, 0);
+            stand_at_entrance(&mut state, 0, 1 - blocked_side);
+            let (point, up) = state.boarding_access(0)[blocked_side].unwrap();
+            if excavate {
+                let frame = motion::SurfaceFrame::read(&state.world.physics, 0);
+                let cell = state.world.terrain.planets[&0]
+                    .field
+                    .local_to_cell(
+                        (point - up * 0.08 - frame.position).rotate_radians(-frame.angle),
+                    )
+                    .unwrap();
+                state
+                    .world
+                    .queue_planet_edit(
+                        0,
+                        TerrainEdit {
+                            brush: Brush::Circle {
+                                center: cell,
+                                radius: 3,
+                            },
+                            mode: EditMode::Remove,
+                        },
+                    )
+                    .unwrap();
+                // Terrain edits invalidate both entrances until the shared step
+                // publishes the new query geometry.
+                step(
+                    &mut state,
+                    &[SurfaceSortieAction {
+                        interact_held: true,
+                        ..Default::default()
+                    }
+                    .encode(PlayerId::PLAYER_1)],
+                );
+                assert_eq!(state.location(0), PilotLocation::OnFoot);
+                assert_eq!(state.pilots[0].last_transfer, TransferResult::ExitBlocked);
+            } else {
+                let entity = PhysicsId::new(45_210);
+                assert!(state.world.physics.world.insert_body(
+                    PhysicsBodyId::new(entity, BodyRole::PRIMARY),
+                    BodySpec {
+                        kind: engine_rapier::world::BodyKind::Fixed,
+                        position: point + up * 1.0,
+                        ..Default::default()
+                    },
+                    &[ColliderSpec::ball(
+                        ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                        1.4
+                    )],
+                ));
+            }
+            idle(&mut state, 90);
+            assert!(state.vehicle_settled(0));
+            let entrances = state.boarding_access(0);
+            assert!(
+                entrances[blocked_side].is_none(),
+                "side={blocked_side} excavate={excavate}: {entrances:?}"
+            );
+            assert!(entrances[1 - blocked_side].is_some());
+            assert_eq!(state.transfer_readiness(0), TransferResult::Ready);
+            transfer(&mut state, 0);
+            assert_eq!(state.location(0), PilotLocation::Aboard(VehicleId(0)));
+            if blocked_side == 0 {
+                // Returning on the left must not silently move the normal exit.
+                assert_eq!(state.transfer_readiness(0), TransferResult::ExitBlocked);
+            }
+        }
+    }
+}
+
+#[test]
+fn escape_cockpit_supports_both_boarding_entrances() {
+    for side in 0..2 {
+        let mut state = parked_surface(1, TerrainSurface::Interpolated);
+        // Isolate cockpit access from random wreckage obstructing an entrance.
+        state.world.ships[0].change_to_escape_pod();
+        idle(&mut state, 240);
+        assert!(state.vehicle_settled(0));
+        transfer(&mut state, 0);
+        assert_eq!(state.location(0), PilotLocation::OnFoot);
+        stand_at_entrance(&mut state, 0, side);
+        assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
+        assert_eq!(state.transfer_readiness(0), TransferResult::Ready);
+        transfer(&mut state, 0);
+        assert_eq!(state.location(0), PilotLocation::Aboard(VehicleId(0)));
+    }
+}
+
 #[test]
 fn flag_survives_remeshing_but_destroyed_footing_neutralizes_without_awarding_attacker() {
     for surface in [
@@ -365,7 +525,7 @@ fn hatch_prefers_a_clear_neighbor_when_the_central_floor_is_obstructed() {
         .motion(state.world.physics.ship_body(0))
         .unwrap();
     let first = state
-        .material_access_candidates_at(0, ShipForm::Ship, body.position, body.angle)
+        .material_hatch_candidates_at(0, ShipForm::Ship, body.position, body.angle, 0)
         .next()
         .expect("central floor still exists");
     assert!(first.point.distance_to(before.point) < 0.1);

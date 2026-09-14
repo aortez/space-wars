@@ -160,7 +160,7 @@ pub struct GroundRoundTripJob<'a> {
     start: Vec2,
     target: Vec2,
     range: f32,
-    hatch: Vec2,
+    hatches: [Option<Vec2>; 2],
     height: f32,
     nodes: [Option<GroundNode>; GROUND_SAMPLES],
     offsets: [usize; GROUND_SAMPLES + 1],
@@ -178,11 +178,29 @@ pub struct GroundRoundTripJob<'a> {
 }
 impl GroundRoundTripJob<'static> {
     pub fn new(map: Arc<GroundMap>, start: Vec2, target: Vec2, range: f32, hatch: Vec2) -> Self {
-        Self::create(Snapshot::Shared(map), start, target, range, hatch)
+        Self::with_hatches(map, start, target, range, [Some(hatch), None])
+    }
+
+    /// A single reverse search seeded from either entrance's usable footings.
+    /// Two fixed slots keep each budgeted node inspection bounded.
+    pub fn with_hatches(
+        map: Arc<GroundMap>,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        hatches: [Option<Vec2>; 2],
+    ) -> Self {
+        Self::create(Snapshot::Shared(map), start, target, range, hatches)
     }
 }
 impl<'a> GroundRoundTripJob<'a> {
-    fn create(map: Snapshot<'a>, start: Vec2, target: Vec2, range: f32, hatch: Vec2) -> Self {
+    fn create(
+        map: Snapshot<'a>,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        hatches: [Option<Vec2>; 2],
+    ) -> Self {
         assert!(map.nodes.len() <= GROUND_SAMPLES);
         let edges = map.edges.len();
         Self {
@@ -190,7 +208,7 @@ impl<'a> GroundRoundTripJob<'a> {
             start,
             target,
             range,
-            hatch,
+            hatches,
             height: SurfaceSortieState::spec().half_height(),
             nodes: [None; GROUND_SAMPLES],
             offsets: [0; GROUND_SAMPLES + 1],
@@ -267,6 +285,14 @@ impl<'a> GroundRoundTripJob<'a> {
     fn fail(&mut self, failure: GroundRouteFailure) {
         self.result.outbound.diagnostics.failure = Some(failure);
         self.phase = Phase::Done;
+    }
+    fn hatch_distance(&self, node: GroundNode) -> f32 {
+        self.hatches
+            .into_iter()
+            .flatten()
+            .map(|h| self.distance(node, h))
+            .min_by(f32::total_cmp)
+            .unwrap_or(f32::INFINITY)
     }
     fn distance(&self, node: GroundNode, target: Vec2) -> f32 {
         (node.position + node.position.normalized() * self.height).distance_to(target)
@@ -404,7 +430,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
             }
             Phase::ReturnSources(i) => {
                 if let Some(&node) = self.map.nodes.get(i) {
-                    if self.distance(node, self.hatch) < HATCH_APPROACH_RANGE {
+                    if self.hatch_distance(node) < HATCH_APPROACH_RANGE {
                         self.backward.seed(usize::from(node.id));
                         self.work.peak_frontier =
                             self.work.peak_frontier.max(self.backward.queue.len());
@@ -461,7 +487,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
             Phase::ReturnDiagnostics(i) => {
                 let endpoint = self.result.endpoint.unwrap();
                 if let Some(&node) = self.map.nodes.get(i) {
-                    let distance = self.distance(node, self.hatch);
+                    let distance = self.hatch_distance(node);
                     measure_node(
                         &mut self.result.returning.as_mut().unwrap().diagnostics,
                         node,
@@ -471,7 +497,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                     );
                     self.phase = Phase::ReturnDiagnostics(i + 1);
                 } else {
-                    let distance = self.distance(endpoint, self.hatch);
+                    let distance = self.hatch_distance(endpoint);
                     let d = &mut self.result.returning.as_mut().unwrap().diagnostics;
                     d.reachable_nodes = self.backward.visited;
                     d.closest_reachable_distance = Some(distance);
@@ -503,7 +529,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
             Phase::TraceBack(cursor) => {
                 if let Some((next, length, kind)) = self.backward.parents[cursor] {
                     let distance =
-                        self.nodes[usize::from(next)].map(|node| self.distance(node, self.hatch));
+                        self.nodes[usize::from(next)].map(|node| self.hatch_distance(node));
                     let back = self.result.returning.as_mut().unwrap();
                     back.path.push(next);
                     back.diagnostics.length += length;
@@ -535,9 +561,17 @@ impl GroundRoutes<'_> {
         range: f32,
         hatch: Vec2,
     ) -> GroundRoundTrip {
-        #[cfg(feature = "sensor-profile")]
-        let _profile = super::super::super::sensor_profile::Scope::new("ground_round_trip");
-        GroundRoundTripJob::create(Snapshot::Borrowed(self.map), start, target, range, hatch)
+        self.round_trip_to_hatches(start, target, range, [Some(hatch), None])
+    }
+
+    pub fn round_trip_to_hatches(
+        &self,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        hatches: [Option<Vec2>; 2],
+    ) -> GroundRoundTrip {
+        GroundRoundTripJob::create(Snapshot::Borrowed(self.map), start, target, range, hatches)
             .finish()
     }
 }

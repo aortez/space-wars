@@ -192,7 +192,10 @@ impl JetpackCrossingPilot {
         if self.telemetry.goal == CrossingGoal::Board {
             if p.transfer == TransferResult::Ready {
                 a.interact_held = true;
-            } else if let (Some(actor), Some(hatch)) = (p.actor, p.hatch) {
+            } else if let (Some(actor), Some(hatch)) = (
+                p.actor,
+                p.actor.and_then(|a| p.nearest_boarding_hatch(a.position)),
+            ) {
                 let right = Vec2::new(p.actor_up.y, -p.actor_up.x);
                 a.horizontal = ((hatch - actor.position).dot(right) * 1.5 / 5.0).clamp(-1.0, 1.0);
             }

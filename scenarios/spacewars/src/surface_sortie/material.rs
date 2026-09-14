@@ -299,9 +299,40 @@ impl SurfaceSortieState {
         angle: f32,
         clear: impl Fn(Vec2, f32) -> bool,
     ) -> Option<RayHit> {
+        Self::select_hatch_floor(
+            self.material_hatch_candidates_at(planet, form, position, angle, 0),
+            &clear,
+            true,
+        )
+    }
+
+    /// Each entrance needs surviving floor and room for an upright pilot.
+    /// Unlike the legacy exit sensor, blocked floor is not a boarding target.
+    pub(super) fn material_boarding_with_clearance(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+        clear: impl Fn(Vec2, f32) -> bool,
+    ) -> [Option<RayHit>; 2] {
+        [0, 1].map(|side| {
+            Self::select_hatch_floor(
+                self.material_hatch_candidates_at(planet, form, position, angle, side),
+                &clear,
+                false,
+            )
+        })
+    }
+
+    fn select_hatch_floor(
+        candidates: impl Iterator<Item = RayHit>,
+        clear: &impl Fn(Vec2, f32) -> bool,
+        retain_blocked_floor: bool,
+    ) -> Option<RayHit> {
         let spec = Self::spec();
         let mut first = None;
-        for hit in self.material_access_candidates_at(planet, form, position, angle) {
+        for hit in candidates {
             first.get_or_insert(hit);
             if clear(
                 hit.point + hit.normal * (spec.half_height() + 0.12),
@@ -312,21 +343,18 @@ impl SurfaceSortieState {
         }
         // Keep the nearby floor observable when every capsule pose is blocked;
         // the authoritative transfer gate must still reject the actual exit.
-        first
+        first.filter(|_| retain_blocked_floor)
     }
 
-    pub(super) fn material_access_candidates_at(
+    fn material_hatch_candidates_at(
         &self,
         planet: usize,
         form: ShipForm,
         position: Vec2,
         angle: f32,
+        side: usize,
     ) -> impl Iterator<Item = RayHit> + '_ {
-        let local = if form == ShipForm::Ship {
-            Vec2::new(8.0, -5.0)
-        } else {
-            Vec2::new(2.8, -0.65)
-        };
+        let local = hatch_offset(form, side);
         let hatch = position + local.rotate_radians(angle);
         let surface = motion::SurfaceFrame::read(&self.world.physics, planet);
         let up = (position - surface.position).normalized();

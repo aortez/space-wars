@@ -323,7 +323,9 @@ impl GroundNavigationTask {
             }
             return action;
         }
-        if self.telemetry.destination == GroundDestination::Hatch && p.hatch.is_some() {
+        if self.telemetry.destination == GroundDestination::Hatch
+            && p.boarding_hatches.iter().any(Option::is_some)
+        {
             self.hatch_missing_since = None;
         }
         let mut target = match self.telemetry.destination {
@@ -334,7 +336,20 @@ impl GroundNavigationTask {
                 .filter(|c| c.owner != Some(p.owner))
                 .and_then(|c| c.flag)
                 .map(|flag| flag.position),
-            GroundDestination::Hatch => p.hatch,
+            GroundDestination::Hatch => {
+                // Keep a selected entrance while following its route. If it is
+                // lost, the next plan searches both remaining entrances again.
+                let retained = self
+                    .telemetry
+                    .target
+                    .filter(|_| !self.telemetry.path.is_empty())
+                    .map(|t| p.planet.motion.position + t.rotate_radians(p.planet.motion.angle))
+                    .and_then(|t| {
+                        p.nearest_boarding_hatch(t)
+                            .filter(|h| h.distance_to(t) <= 0.5)
+                    });
+                retained.or_else(|| p.nearest_boarding_hatch(actor.position))
+            }
             GroundDestination::Rebuild { planet, position } => {
                 if planet != p.planet.index {
                     self.block("rebuild footing is on another planet");
@@ -534,8 +549,9 @@ impl GroundNavigationTask {
             }
             self.last_plan_tick = Some(map.tick);
             self.telemetry.replans += 1;
-            let (route, crossing) =
+            let (route, crossing, selected_target) =
                 self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
+            self.telemetry.target = Some(selected_target);
             self.crossing_plan = crossing;
             self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {

@@ -14,14 +14,34 @@ impl GroundNavigationTask {
         target: Vec2,
         range: f32,
         o: &RecoveryTaskObservationV1,
-    ) -> (GroundRoute, Option<CrossingPlan>) {
+    ) -> (GroundRoute, Option<CrossingPlan>, Vec2) {
+        let p = &o.flight.pilot;
+        let hatches = p.boarding_hatches.map(|h| {
+            h.map(|point| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle))
+        });
+        let selected_target = |r: &GroundRoute| {
+            if self.telemetry.destination != GroundDestination::Hatch {
+                return target;
+            }
+            r.path
+                .last()
+                .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
+                .and_then(|node| {
+                    let center = node.position + node.position.normalized() * HALF_HEIGHT;
+                    hatches
+                        .into_iter()
+                        .flatten()
+                        .min_by(|a, b| a.distance_to(center).total_cmp(&b.distance_to(center)))
+                })
+                .unwrap_or(target)
+        };
         let route = |routes: &GroundRoutes<'_>| {
             if let Some(plan) = self.telemetry.flag_approach.filter(|plan| !plan.reached) {
                 // A narrow footing target preserves the selected node even if
                 // another footing is already in the flag's interaction radius.
                 routes.route(foot, plan.endpoint.position, 0.01)
             } else if self.telemetry.destination == GroundDestination::Hatch {
-                routes.route_to_hatch(foot, target)
+                routes.route_to_hatches(foot, hatches)
             } else if self.telemetry.destination == GroundDestination::Flag {
                 routes.route_to_actor_target(foot, target, range)
             } else {
@@ -38,15 +58,16 @@ impl GroundNavigationTask {
             }
         };
         let direct = route(&map.routes());
+        let direct_target = selected_target(&direct);
         let Some(jetpack) = &o.jetpack else {
-            return (direct, None);
+            return (direct, None, direct_target);
         };
         if !jetpack.surveyed
             || !jetpack.charge.is_finite()
             || !(0.0..=1.0).contains(&jetpack.charge)
             || jetpack.terrain_crossings.len() > MAX_TERRAIN_CROSSINGS
         {
-            return (direct, None);
+            return (direct, None, direct_target);
         }
         let mut graph = map.clone();
         let mut flights = Vec::new();
@@ -73,9 +94,14 @@ impl GroundNavigationTask {
         {
             // Only nearby powered crossings are surveyed. Walk/fly through the
             // known portion, then survey again from its end before continuing.
-            combined = routes.route_toward_actor_target(foot, target, range);
+            combined = if self.telemetry.destination == GroundDestination::Hatch {
+                routes.route_toward_hatches(foot, hatches)
+            } else {
+                routes.route_toward_actor_target(foot, target, range)
+            };
         }
         if cost(&combined) + 2.0 < cost(&direct) {
+            let combined_target = selected_target(&combined);
             for (i, pair) in combined.path.windows(2).enumerate() {
                 if let Some((_, _, plan)) = flights
                     .iter()
@@ -83,12 +109,12 @@ impl GroundNavigationTask {
                 {
                     let plan = plan.clone();
                     combined.path.truncate(i + 1);
-                    return (combined, Some(plan));
+                    return (combined, Some(plan), combined_target);
                 }
             }
-            return (combined, None);
+            return (combined, None, combined_target);
         }
-        (direct, None)
+        (direct, None, direct_target)
     }
 
     pub(super) fn follow_crossing(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
