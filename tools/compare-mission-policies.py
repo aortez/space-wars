@@ -85,6 +85,7 @@ def main():
     parser.add_argument("--objective-query-budget", type=int, default=1024)
     parser.add_argument("--reuse-objective-ground", action="store_true",
                         help="retain compatible ground measurements in the candidate's live sensor")
+    parser.add_argument("--objective-dependencies", choices=("region", "routes"), default="region")
     args = parser.parse_args()
     if (len(set(args.seeds)) != len(args.seeds) or any(not 0 <= s < 2**64 for s in args.seeds)
             or args.asteroid_interval < 0 or args.wall_timeout < 1):
@@ -93,6 +94,8 @@ def main():
         parser.error("live objective planning currently requires the v10 candidate")
     if args.reuse_objective_ground and not args.live_objective_planning:
         parser.error("ground reuse requires --live-objective-planning")
+    if args.objective_dependencies == "routes" and not args.reuse_objective_ground:
+        parser.error("route dependencies require --reuse-objective-ground")
     if any(not 0 <= n < 2**32 for n in (args.objective_graph_budget, args.objective_query_budget)):
         parser.error("objective budgets must be u32s")
     binary = args.binary.resolve(strict=True)
@@ -109,8 +112,10 @@ def main():
     if args.live_objective_planning:
         manifest["live_objective_configuration"] = dict(
             role="candidate",
-            sensor_profile="live_joint_objective_v2" if args.reuse_objective_ground else "live_joint_objective_v1",
+            sensor_profile=("live_joint_objective_v3" if args.objective_dependencies == "routes" else
+                            "live_joint_objective_v2" if args.reuse_objective_ground else "live_joint_objective_v1"),
             reuse_objective_ground=args.reuse_objective_ground,
+            objective_dependencies=args.objective_dependencies,
             allowance=dict(graph=args.objective_graph_budget, physics_queries=args.objective_query_budget))
         manifest["budget_comparison"] = "candidate landing-objective quota only; other sensors/policies unbounded"
     summary = []
@@ -133,6 +138,7 @@ def main():
                             "--objective-graph-budget", str(args.objective_graph_budget),
                             "--objective-query-budget", str(args.objective_query_budget)]
                 command += ["--reuse-objective-ground", str(args.reuse_objective_ground).lower()]
+                command += ["--objective-dependencies", args.objective_dependencies]
             manifest["runs"].append(dict(command=command, roles=roles))
             write_json(args.out / "manifest.json", manifest)
             started = time.monotonic()
@@ -151,6 +157,9 @@ def main():
             if args.live_objective_planning:
                 live = report["live_objective_planning"]
                 assert live["enabled_seats"] == [roles.index("candidate")]
+                assert live["sensor_profile"] == manifest["live_objective_configuration"]["sensor_profile"]
+                assert live["reuse_objective_ground"] == args.reuse_objective_ground
+                assert live["objective_dependencies"] == args.objective_dependencies
                 assert live["allowance"] == manifest["live_objective_configuration"]["allowance"]
             if args.baseline == args.candidate and not args.live_objective_planning:
                 deterministic = {key: report[key] for key in (

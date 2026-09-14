@@ -10,6 +10,9 @@ use crate::world::{
 pub mod jetpack;
 mod recovery;
 
+const AIR_BALANCE_STRENGTH: f32 = 0.15;
+const BALANCE_CONTACT_FADE_SECONDS: f32 = 0.15;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpacelingSpec {
     pub collision_groups: CollisionGroups,
@@ -186,6 +189,10 @@ pub struct SpacelingAssembly {
     settled_seconds: f32,
     recovery_seconds: f32,
     unsupported_seconds: f32,
+    /// Upright authority fades across short contact gaps; this grants no traction.
+    balance_support_weight: f32,
+    /// Inertial velocity inherited at takeoff, not ongoing transport by terrain.
+    air_reference_velocity: Vec2,
     recovery_support: Option<BodyId>,
     get_up_assist: Option<recovery::GetUpAssist>,
     get_up_attempts: u64,
@@ -249,6 +256,8 @@ impl SpacelingAssembly {
             settled_seconds: 0.0,
             recovery_seconds: 0.0,
             unsupported_seconds: 0.0,
+            balance_support_weight: 0.0,
+            air_reference_velocity: Vec2::ZERO,
             recovery_support: None,
             get_up_assist: None,
             get_up_attempts: 0,
@@ -344,19 +353,24 @@ impl SpacelingAssembly {
             }
         }
         if self.balance == SpacelingBalance::KnockedDown || !has_gravity {
+            self.balance_support_weight = 0.0;
             self.expected_velocity = Some(motion.linear_velocity + gravity * dt);
             return false;
         }
 
+        self.balance_support_weight = if let Some(support) = snapshot.support {
+            self.air_reference_velocity = support.velocity;
+            1.0
+        } else {
+            (self.balance_support_weight - dt / BALANCE_CONTACT_FADE_SECONDS).max(0.0)
+        };
         let recovering = self.balance == SpacelingBalance::Recovering;
         let strength = if self.get_up_assist.is_some() {
             1.0
         } else if recovering {
             (self.recovery_seconds / self.spec.balance.recovery_seconds).clamp(0.1, 1.0)
-        } else if snapshot.grounded() {
-            1.0
         } else {
-            0.15
+            AIR_BALANCE_STRENGTH + (1.0 - AIR_BALANCE_STRENGTH) * self.balance_support_weight
         };
         let desired_rate = (angle_error(self.up, motion.angle) * 12.0)
             .clamp(-self.spec.max_angular_speed, self.spec.max_angular_speed);
@@ -404,8 +418,12 @@ impl SpacelingAssembly {
             let relative_speed = if powered_steering {
                 (motion.linear_velocity - self.jetpack.as_ref().unwrap().reference_velocity)
                     .dot(tangent)
-            } else {
+            } else if snapshot.grounded() {
                 snapshot.relative_speed
+            } else {
+                // Holding Run through a hop must not brake toward a world-frame
+                // speed. Keep the takeoff frame without following the platform.
+                (motion.linear_velocity - self.air_reference_velocity).dot(tangent)
             };
             let delta =
                 (walk * speed - relative_speed).clamp(-acceleration * dt, acceleration * dt);
@@ -414,6 +432,9 @@ impl SpacelingAssembly {
         self.drive_get_up(physics, gravity, dt);
         let jump = jump_pressed && !get_up_pressed && !recovering && snapshot.grounded();
         if jump {
+            // A deliberate launch enters air control directly. Contact grace
+            // is only angular assistance, never coyote time or ground adhesion.
+            self.balance_support_weight = 0.0;
             let support_velocity = snapshot.support.unwrap().velocity;
             let outward_speed = (motion.linear_velocity - support_velocity).dot(self.up);
             physics.apply_velocity_delta(

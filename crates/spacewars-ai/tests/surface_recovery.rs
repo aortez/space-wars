@@ -1,5 +1,6 @@
 use engine_common::Scenario;
 use engine_core::Vec2;
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::{
     PlayerId, ShipForm,
     surface_sortie::{
@@ -324,7 +325,7 @@ fn rebuild_relocation_fixture() -> (RecoverShipTask, RecoveryTaskObservationV1) 
     p.planet.motion.position = Vec2::ZERO;
     p.planet.motion.angle = 0.0;
     p.actor = Some(PilotMotion {
-        position: Vec2::new(0.0, 60.9),
+        position: Vec2::new(0.0, 60.0 + HALF_HEIGHT),
         velocity: Vec2::ZERO,
         angle: 0.0,
         spin: 0.0,
@@ -865,7 +866,7 @@ fn cramped_return() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     p.planet.motion.angle = 0.0;
     p.planet.motion.spin = 0.0;
     p.ship.position = Vec2::new(0.0, 65.0);
-    p.actor.as_mut().unwrap().position = Vec2::new(0.0, 60.9);
+    p.actor.as_mut().unwrap().position = Vec2::new(0.0, 60.0 + HALF_HEIGHT);
     p.actor.as_mut().unwrap().velocity = Vec2::ZERO;
     p.actor_up = Vec2::Y;
     p.hatch = Some(Vec2::new(10.0, 60.0));

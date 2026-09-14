@@ -2,6 +2,7 @@
 //! verifies traversal, capture, destruction and recovery in shared physics.
 use engine_common::Scenario;
 use engine_core::Vec2;
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{
@@ -36,7 +37,7 @@ fn fixture() -> (BrainReset, RecoveryTaskObservationV1) {
         spin: 0.0,
     };
     p.actor = Some(PilotMotion {
-        position: Vec2::new(0.0, 60.9),
+        position: Vec2::new(0.0, 60.0 + HALF_HEIGHT),
         velocity: Vec2::ZERO,
         angle: 0.0,
         spin: 0.0,
@@ -93,12 +94,12 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     let (context, mut o) = fixture();
     o.jetpack = None;
     let p = &mut o.flight.pilot;
-    p.hatch = Some(Vec2::new(0.0, 60.9));
+    p.hatch = Some(Vec2::new(0.0, 60.0 + HALF_HEIGHT));
     let claim = p.planet.claim.as_mut().unwrap();
     claim.owner = Some(PlayerId::PLAYER_2);
     claim.flag = Some(PlanetFlagObservation {
         player: PlayerId::PLAYER_2,
-        position: Vec2::new(4.0, 60.9),
+        position: Vec2::new(4.0, 60.0 + HALF_HEIGHT),
         normal: Vec2::Y,
         raised_fraction: 1.0,
     });
@@ -124,7 +125,7 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     // Already inside the flag region, but the selected returnable endpoint is
     // further along. Ordinary destination proximity must not finish the walk.
     advance(&mut o, 1);
-    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(4.0, 60.9);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(4.0, 60.0 + HALF_HEIGHT);
     assert!(task.step(&o).horizontal > 0.0);
     assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
     advance(&mut o, 2);
@@ -173,7 +174,7 @@ fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
         crawl: [
             Some(CrawlStep {
                 direction: -1.0,
-                position: Vec2::new(-0.6, 60.9),
+                position: Vec2::new(-0.6, 60.0 + HALF_HEIGHT),
             }),
             None,
         ],
@@ -307,7 +308,7 @@ fn blocked_get_up_backs_out_then_resurveys_before_resuming_the_hatch_route() {
     );
     assert_ne!(task.telemetry().goal, GroundGoal::Arrived);
     assert!(task.telemetry().crawl_direction.is_none());
-    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(5.0, 60.9);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(5.0, 60.0 + HALF_HEIGHT);
     advance(&mut o, 91);
     assert!(!task.step(&o).interact_held);
     assert_eq!(
@@ -507,7 +508,7 @@ fn knockback_waits_for_contact_then_replans_with_the_original_deadline() {
     assert_eq!(task.step(&o), SurfaceSortieAction::default());
     assert_eq!(task.telemetry().goal, GroundGoal::Settle);
     let mut replay = task.clone();
-    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(2.0, 60.9);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(2.0, 60.0 + HALF_HEIGHT);
     o.flight.pilot.supported_planet = Some(o.flight.pilot.planet.index);
     advance(&mut o, 601);
     assert_eq!(task.step(&o), replay.step(&o));
@@ -594,7 +595,7 @@ fn flag_route_uses_the_supported_actor_center_and_the_real_interaction_range() {
     task.step(&o);
     assert!(!task.telemetry().path.is_empty());
     assert_eq!(task.telemetry().route.as_ref().unwrap().failure, None);
-    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.9);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.0 + HALF_HEIGHT);
     advance(&mut o, 1);
     task.step(&o);
     assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
@@ -783,7 +784,7 @@ fn jump_edges_pulse_once_and_arrival_requires_planet_support() {
     advance(&mut o, 2);
     assert!(!task.step(&o).primary_held);
     assert_eq!(task.telemetry().jumps, 1);
-    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.9);
+    o.flight.pilot.actor.as_mut().unwrap().position = Vec2::new(6.0, 60.0 + HALF_HEIGHT);
     o.flight.pilot.supported_planet = None;
     advance(&mut o, 3);
     task.step(&o);
@@ -980,7 +981,7 @@ fn invalid_claim(o: &mut RecoveryTaskObservationV1) {
         planet: p.planet.index,
         revision: p.planet.revision,
         tick: p.tick,
-        positions: vec![node.position + node.position.normalized() * 0.9],
+        positions: vec![node.position + node.position.normalized() * HALF_HEIGHT],
     });
 }
 
@@ -1096,7 +1097,7 @@ fn claim_relocation_exhausts_four_proposals_and_airborne_wait_keeps_task_deadlin
         .unwrap()
         .nodes
         .iter()
-        .map(|n| n.position + n.position.normalized() * 0.9)
+        .map(|n| n.position + n.position.normalized() * HALF_HEIGHT)
         .collect();
     o.claim_footing.as_mut().unwrap().positions = positions.clone();
     let mut task = GroundNavigationTask::new(context, GroundDestination::Flag);
@@ -1183,7 +1184,7 @@ fn a_visible_unsettled_hatch_waits_without_renewing_progress_then_reports_return
     use spacewars_ai::ground_task::ShipReturnFailure;
     let (context, mut o) = fixture();
     let p = &mut o.flight.pilot;
-    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * 0.9;
+    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * HALF_HEIGHT;
     p.landing.phase = LandingPhase::Settling;
     p.landing.supported_feet = 1;
     p.transfer = TransferResult::ShipNotSettled;
@@ -1227,7 +1228,7 @@ fn a_hatch_that_settles_in_time_remains_an_ordinary_return() {
     use scenario_spacewars::surface_sortie::{LandingPhase, TransferResult};
     let (context, mut o) = fixture();
     let p = &mut o.flight.pilot;
-    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * 0.9;
+    p.actor.as_mut().unwrap().position = p.hatch.unwrap() + Vec2::Y * HALF_HEIGHT;
     p.landing.phase = LandingPhase::Settling;
     p.transfer = TransferResult::ShipNotSettled;
     let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);

@@ -1,0 +1,235 @@
+use super::*;
+
+fn frame() -> QueryFrame<'static> {
+    QueryFrame {
+        previous_position: Vec2::ZERO,
+        previous_angle: 0.0,
+        current_position: Vec2::ZERO,
+        current_angle: 0.0,
+        excluded: &[],
+    }
+}
+fn region() -> QueryRegion<'static> {
+    QueryRegion {
+        previous_position: Vec2::ZERO,
+        previous_angle: 0.0,
+        current_position: Vec2::ZERO,
+        current_angle: 0.0,
+        radius: 10.0,
+        groups: CollisionGroups::ALL,
+        excluded: &[],
+    }
+}
+fn area() -> QueryArea {
+    QueryArea {
+        minimum: Vec2::new(-5.0, 4.0),
+        maximum: Vec2::new(5.0, 6.0),
+        groups: CollisionGroups::ALL,
+    }
+}
+fn world(position: Vec2) -> (PhysicsWorld, BodyId, ColliderId) {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+    let entity = PhysicsId::new(1);
+    let body = BodyId::new(entity, BodyRole::PRIMARY);
+    let collider = ColliderId::new(entity, ColliderRole::PRIMARY, 0);
+    assert!(world.insert_body(
+        body,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position,
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(collider, 0.3)]
+    ));
+    world.step(1.0 / 60.0);
+    (world, body, collider)
+}
+
+#[test]
+fn unrelated_motion_is_allowed_but_crossing_the_middle_of_an_edge_is_not() {
+    let (mut world, body, _) = world(Vec2::new(0.0, 20.0));
+    let snapshot = world.query_snapshot();
+    world.set_pose(body, Vec2::new(0.0, 18.0), 0.0, true);
+    world.step(1.0 / 60.0);
+    let check = snapshot.validate_areas(&world, frame(), &[area()]);
+    assert!(check.valid);
+    assert_eq!(check.unrelated_changes, 1);
+    world.set_pose(body, Vec2::new(0.0, 5.0), 0.0, true);
+    world.step(1.0 / 60.0);
+    let check = snapshot.validate_areas(&world, frame(), &[area()]);
+    assert!(!check.valid);
+    assert!(check.area_tests > 0);
+    let old = world.query_snapshot();
+    world.set_pose(body, Vec2::Y * 20.0, 0.0, true);
+    world.step(1.0 / 60.0);
+    assert!(!old.validate_areas(&world, frame(), &[area()]).valid);
+}
+
+#[test]
+fn new_colliders_and_rotation_about_a_distant_origin_revoke_local_evidence() {
+    let (mut world, body, collider) = world(Vec2::new(0.0, -9995.0));
+    let snapshot = world.query_snapshot();
+    let added = BodyId::new(PhysicsId::new(2), BodyRole::PRIMARY);
+    assert!(world.insert_body(
+        added,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: Vec2::Y * 5.0,
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(
+            ColliderId::new(added.entity, ColliderRole::PRIMARY, 0),
+            0.3,
+        )]
+    ));
+    world.step(1.0 / 60.0);
+    assert!(!snapshot.validate_areas(&world, frame(), &[area()]).valid);
+
+    world.remove_entity(added.entity);
+    assert!(world.replace_colliders(
+        body,
+        collider.role,
+        &[ColliderSpec::cuboid(collider, 0.3, 10000.0)]
+    ));
+    world.step(1.0 / 60.0);
+    let snapshot = world.query_snapshot();
+    // The origin stays still, but this tiny angle moves the route-facing tip
+    // by about 0.1 units. Using only the route area's radius would miss it.
+    world.set_pose(body, Vec2::new(0.0, -9995.0), 0.00001, true);
+    world.step(1.0 / 60.0);
+    let check = snapshot.validate_areas(&world, frame(), &[area()]);
+    assert!(!check.valid);
+    assert!(check.area_tests > 0);
+    assert!(!snapshot.validate_region(&world, region()).valid);
+}
+
+#[test]
+fn circular_validation_ignores_unmeasured_box_corners() {
+    let (mut world, body, _) = world(Vec2::new(9.0, 9.0));
+    let snapshot = world.query_snapshot();
+    world.set_pose(body, Vec2::new(8.0, 8.0), 0.0, true);
+    world.step(1.0 / 60.0);
+    assert!(snapshot.validate_region(&world, region()).valid);
+    assert!(
+        !snapshot
+            .validate_areas(
+                &world,
+                frame(),
+                &[QueryArea {
+                    minimum: Vec2::new(-10.0, -10.0),
+                    maximum: Vec2::new(10.0, 10.0),
+                    groups: CollisionGroups::ALL,
+                }]
+            )
+            .valid
+    );
+}
+
+#[test]
+fn rigid_frame_clone_filters_removal_and_shape_replacement_keep_their_contracts() {
+    let (world, body, collider) = world(Vec2::Y * 5.0);
+    let snapshot = world.query_snapshot();
+    let mut clone = world.clone();
+    assert!(snapshot.validate_areas(&clone, frame(), &[area()]).valid);
+    let position = Vec2::new(100.0, -20.0);
+    let angle = 0.3;
+    clone.set_pose(
+        body,
+        position + (Vec2::Y * 5.0).rotate_radians(angle),
+        angle,
+        true,
+    );
+    clone.step(1.0 / 60.0);
+    assert!(
+        snapshot
+            .validate_areas(
+                &clone,
+                QueryFrame {
+                    current_position: position,
+                    current_angle: angle,
+                    ..frame()
+                },
+                &[area()]
+            )
+            .valid
+    );
+    for fault in 0..4 {
+        let mut clone = world.clone();
+        if fault == 0 {
+            clone.remove_entity(body.entity);
+        } else {
+            let mut shape = ColliderSpec::ball(collider, if fault == 1 { 0.4 } else { 0.3 });
+            if fault == 2 {
+                shape.sensor = true;
+            }
+            if fault == 3 {
+                shape.collision_groups = CollisionGroups::new(1, 0);
+            }
+            assert!(clone.replace_colliders(body, collider.role, &[shape]));
+        }
+        clone.step(1.0 / 60.0);
+        assert!(
+            !snapshot.validate_areas(&clone, frame(), &[area()]).valid,
+            "fault {fault}"
+        );
+        assert!(
+            snapshot
+                .validate_areas(
+                    &clone,
+                    QueryFrame {
+                        excluded: &[body.entity],
+                        ..frame()
+                    },
+                    &[area()]
+                )
+                .valid
+        );
+    }
+    assert!(!snapshot.validate_areas(&world, frame(), &[]).valid);
+    assert!(
+        !snapshot
+            .validate_areas(
+                &world,
+                frame(),
+                &[QueryArea {
+                    minimum: Vec2::new(f32::NAN, 0.0),
+                    ..area()
+                }]
+            )
+            .valid
+    );
+}
+
+#[test]
+fn hollow_boundary_and_query_groups_do_not_fill_unmeasured_space() {
+    let (mut world, body, collider) = world(Vec2::ZERO);
+    let mut boundary = ColliderSpec::polyline(
+        collider,
+        vec![
+            Vec2::new(-20.0, -20.0),
+            Vec2::new(-20.0, 20.0),
+            Vec2::new(20.0, 20.0),
+            Vec2::new(20.0, -20.0),
+            Vec2::new(-20.0, -20.0),
+        ],
+    );
+    boundary.collision_groups = CollisionGroups::new(2, 1);
+    assert!(world.replace_colliders(body, collider.role, &[boundary]));
+    world.step(1.0 / 60.0);
+    let snapshot = world.query_snapshot();
+    world.set_pose(body, Vec2::X, 0.01, true);
+    world.step(1.0 / 60.0);
+    let check = snapshot.validate_areas(&world, frame(), &[area()]);
+    assert!(check.valid);
+    assert!(
+        check.area_tests > 0,
+        "exercise actual hollow geometry, not only its AABB"
+    );
+    assert!(snapshot.validate_region(&world, region()).valid);
+    let separate = QueryArea {
+        minimum: Vec2::new(-30.0, -30.0),
+        maximum: Vec2::new(30.0, 30.0),
+        groups: CollisionGroups::new(1, 4),
+    };
+    assert!(snapshot.validate_areas(&world, frame(), &[separate]).valid);
+}

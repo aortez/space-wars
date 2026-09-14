@@ -88,6 +88,50 @@ fn crossing_replay_clone_reset_and_identity_are_bounded() {
 }
 
 #[test]
+fn getting_up_during_takeoff_releases_the_consumed_press_before_launching_again() {
+    let mut state = SurfaceSortieScenario::init_material_jetpack(42, 1);
+    let mut bot = JetpackCrossingPilot::new(BrainReset {
+        actor: PlayerId::PLAYER_1,
+        episode_seed: 42,
+    });
+    for _ in 0..600 {
+        let o = state.jetpack_crossing_observation(0, bot.direction());
+        let action = bot.step(&o);
+        SurfaceSortieScenario::step(
+            &mut state,
+            &[action.encode(PlayerId::PLAYER_1)],
+            Duration::from_nanos(16_666_667),
+        );
+        if bot.telemetry().goal == CrossingGoal::Lift {
+            break;
+        }
+    }
+    assert_eq!(bot.telemetry().goal, CrossingGoal::Lift);
+    let mut o = state.jetpack_crossing_observation(0, bot.direction());
+    assert_eq!(o.pilot.supported_planet, Some(o.pilot.planet.index));
+    o.surveyed = false;
+    o.pilot.balanced = false;
+    assert!(bot.step(&o).primary_held, "request getting up");
+    o.pilot.tick += 1;
+    o.pilot.balanced = true;
+    assert!(
+        !bot.step(&o).primary_held,
+        "release the consumed get-up press"
+    );
+    o.pilot.tick += 1;
+    assert!(
+        bot.step(&o).primary_held,
+        "a fresh press can jump and arm the pack"
+    );
+    o.pilot.tick += 1;
+    o.pilot.supported_planet = None;
+    assert!(
+        bot.step(&o).primary_held,
+        "airborne thrust is not pulsed by this retry"
+    );
+}
+
+#[test]
 fn physical_trial_crosses_both_directions_and_preserves_remaining_charge_on_boarding() {
     for seat in 0..2 {
         let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);

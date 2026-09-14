@@ -505,7 +505,7 @@ fn draw_outpost(
     );
 }
 
-fn draw_spaceling(
+pub(super) fn draw_spaceling(
     frame: &mut RenderFrame,
     snapshot: SpacelingSnapshot,
     facing: f32,
@@ -513,7 +513,8 @@ fn draw_spaceling(
     color: RenderColor,
 ) {
     let center = snapshot.motion.position;
-    let local = |x, y| center + Vec2::new(x, y).rotate_radians(snapshot.motion.angle);
+    let scale = spaceling_geometry::SCALE;
+    let local = |x, y| center + (Vec2::new(x, y) * scale).rotate_radians(snapshot.motion.angle);
     let suit = match snapshot.balance {
         SpacelingBalance::Balanced => color,
         SpacelingBalance::KnockedDown => RenderColor::rgb(1.0, 0.25, 0.25),
@@ -532,14 +533,14 @@ fn draw_spaceling(
             local(side * 0.1, -0.15),
             local(side * 0.12 + swing * 0.25, -0.8),
             LIGHT,
-            0.13,
+            0.13 * scale,
         );
         limb(
             frame,
             local(side * 0.2, 0.3),
             local(side * 0.36 - swing * 0.12, -0.12),
             suit,
-            0.12,
+            0.12 * scale,
         );
     }
     frame.push_primitive(
@@ -552,12 +553,12 @@ fn draw_spaceling(
             stroke: Some(Stroke::new(LIGHT, 1.0)),
         }),
     );
-    circle(frame, 4, local(0.0, 0.63), 0.25, LIGHT);
+    circle(frame, 4, local(0.0, 0.63), 0.25 * scale, LIGHT);
     circle(
         frame,
         5,
         local(facing * 0.1, 0.65),
-        0.14,
+        0.14 * scale,
         RenderColor::rgb(0.09, 0.16, 0.23),
     );
 }
@@ -691,12 +692,27 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
         {
             let position = snapshot.motion.position;
             let right = Vec2::new(snapshot.up.y, -snapshot.up.x);
+            let scale = spaceling_geometry::SCALE;
             for side in [-1.0, 1.0] {
-                let nozzle = position + right * side * 0.28 - snapshot.up * 0.2;
-                circle(frame, 5, nozzle, 0.15, CYAN);
+                let nozzle = position + (right * side * 0.28 - snapshot.up * 0.2) * scale;
+                circle(frame, 5, nozzle, 0.15 * scale, CYAN);
                 if pack.active {
-                    line(frame, 4, nozzle, nozzle - snapshot.up * 1.3, ORANGE, 3.0);
-                    line(frame, 5, nozzle, nozzle - snapshot.up * 0.65, LIGHT, 1.5);
+                    line(
+                        frame,
+                        4,
+                        nozzle,
+                        nozzle - snapshot.up * (1.3 * scale),
+                        ORANGE,
+                        3.0 * scale,
+                    );
+                    line(
+                        frame,
+                        5,
+                        nozzle,
+                        nozzle - snapshot.up * (0.65 * scale),
+                        LIGHT,
+                        1.5 * scale,
+                    );
                 }
             }
         }
@@ -705,9 +721,9 @@ fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize
                 frame,
                 6,
                 support.position,
-                support.position + support.normal,
+                support.position + support.normal * spaceling_geometry::SCALE,
                 CYAN,
-                2.0,
+                2.0 * spaceling_geometry::SCALE,
             );
         }
     }

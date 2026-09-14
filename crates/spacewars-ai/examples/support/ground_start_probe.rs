@@ -27,7 +27,9 @@ pub fn run(state: &SurfaceSortieState, seat: usize, out: &Path) {
                 let o = world.recovery_task_observation(seat, None);
                 let p = &o.flight.pilot;
                 let actor = p.actor.unwrap();
-                let foot = (actor.position - p.actor_up * 0.9 - p.planet.motion.position)
+                let foot = (actor.position
+                    - p.actor_up * scenario_spacewars::spaceling_geometry::HALF_HEIGHT
+                    - p.planet.motion.position)
                     .rotate_radians(-p.planet.motion.angle);
                 let distance = o.ground.as_ref().and_then(|m| {
                     m.nodes

@@ -2,6 +2,7 @@
 use crate::BrainReset;
 use crate::jetpack_crossing::{CrossingTelemetry, JetpackCrossingPilot};
 use engine_core::Vec2;
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::surface_sortie::jetpack::CrossingPlan;
 use scenario_spacewars::surface_sortie::{
     LandingPhase, PilotLocation, SurfaceSortieAction, TransferResult,
@@ -345,7 +346,7 @@ impl GroundNavigationTask {
         let local =
             |point: Vec2| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
         let mut target_local = target.map(local);
-        let foot = local(actor.position - p.actor_up * 0.9);
+        let foot = local(actor.position - p.actor_up * HALF_HEIGHT);
         if let Some(map) = &self.map
             && !self.telemetry.path.is_empty()
             && self

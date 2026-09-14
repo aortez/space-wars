@@ -8,8 +8,17 @@ joint-trip candidate and seat-swapped comparison harness are described in
 resumes coherent physical measurements and graph work under one shared
 allowance in the existing comparison runners. An optional
 [ground-reuse profile](../bot-ground-reuse.md) retains compatible footing and
-walk measurements across requests. Default v10 remains synchronous; moving-obstacle
-dependency refinement, broader sensor coverage and strategic planning remain future work.
+walk measurements across requests. A further opt-in
+[local route dependency profile](../bot-route-dependencies.md) validates successful
+paths despite unrelated obstacle motion and preserves partial measurements while
+waiting for candidate refresh. Default v10 remains synchronous; failed routes
+under asteroid pressure, broader sensor coverage and strategic planning remain
+future work.
+
+Before extending the powered-route model, the
+[cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates
+#95's smaller physical pilot with both existing bot policies. New route
+measurements and comparisons must use that shared geometry.
 
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
@@ -240,6 +249,14 @@ budget. Start with indexed synchronous queries before introducing this scheduler
    time/risk-aware selection with cheap estimates and a refined shortlist, then
    compare predicted and actual sortie outcomes. Add shallow mission search
    after these estimates are useful.
+
+The [asteroid route-failure investigation](../bot-objective-route-failures.md)
+identifies the next bounded behavior extension alongside step 3: a prospective
+crossing over the parked ship, measured in both directions and carried through
+joint-trip execution. Fresh walk/jump surveys fail for all current landing sites
+in that saved state, but an existing jetpack controller physically captures and
+returns from one of them. This gives the flight extension a positive fixture and
+a nearby placement that must remain rejected before broadening mission search.
 
 Keep an optimization-only comparison separate from new-policy comparisons.
 For behavior, run against the previous policy with paired seeds and swapped

@@ -5,6 +5,7 @@
 //! escape pods. Sounds, scoring, and final HUD polish land in later slices.
 
 mod physics;
+pub mod spaceling_geometry;
 pub mod surface_sortie;
 mod terrain;
 pub mod thrusters;
@@ -327,15 +328,17 @@ const SHELL_BODY: [Vec2; 3] = [
     Vec2::new(1.0, -1.7320508),
     Vec2::new(1.0, 1.7320508),
 ];
-const POD_BODY: [Vec2; 3] = [
-    Vec2::new(0.0, 1.0),
+// The cabin surrounds the window and fits inside the full ship's fuselage.
+const POD_BODY: [Vec2; 4] = [
     Vec2::new(-1.0, 0.0),
     Vec2::new(1.0, 0.0),
+    Vec2::new(0.5, 1.1),
+    Vec2::new(-0.5, 1.1),
 ];
 const POD_THRUSTER: [Vec2; 3] = [
-    Vec2::new(0.0, 1.1),
-    Vec2::new(-1.0, 0.0),
-    Vec2::new(1.0, 0.0),
+    Vec2::new(-0.8, 0.0),
+    Vec2::new(0.8, 0.0),
+    Vec2::new(0.0, 0.15),
 ];
 const POD_LASER: [Vec2; 3] = [
     Vec2::new(-0.5, 0.5),
@@ -345,7 +348,13 @@ const POD_LASER: [Vec2; 3] = [
 const SHIP_PIVOT: Vec2 = Vec2::new(2.5, 3.5);
 const SHIP_WING_PIVOT: Vec2 = Vec2::new(2.5, 2.0);
 const POD_PIVOT: Vec2 = Vec2::new(0.0, 1.0 / 3.0);
-const POD_COCKPIT_CENTER: Vec2 = POD_PIVOT;
+const POD_COCKPIT_CENTER: Vec2 = Vec2::new(0.0, 0.55);
+const POD_TRIANGLES: [[Vec2; 3]; 4] = [
+    POD_LASER,
+    POD_THRUSTER,
+    [POD_BODY[0], POD_BODY[1], POD_BODY[2]],
+    [POD_BODY[0], POD_BODY[2], POD_BODY[3]],
+];
 
 pub struct SpacewarsScenario;
 
@@ -4852,11 +4861,9 @@ fn ship_high_bounds(triangles: &[[Vec2; 3]]) -> BoundsList {
 fn ship_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     let transform = ship_transform(ship);
     if ship.form == ShipForm::EscapePod {
-        return vec![
-            transform_points(transform, POD_LASER),
-            transform_points(transform, POD_THRUSTER),
-            transform_points(transform, POD_BODY),
-        ];
+        return POD_TRIANGLES
+            .map(|triangle| transform_points(transform, triangle))
+            .to_vec();
     }
 
     vec![
@@ -5757,7 +5764,9 @@ impl ShipState {
     }
 
     fn change_to_escape_pod(&mut self) {
+        let origin = self.position + physics::ship_pivot(self.form);
         self.form = ShipForm::EscapePod;
+        self.position = origin - POD_PIVOT;
         self.dead = false;
         self.life = 0.0;
         self.velocity += self.death_impulse;
@@ -5789,7 +5798,9 @@ impl ShipState {
             return;
         }
 
+        let origin = self.position + POD_PIVOT;
         self.form = ShipForm::Ship;
+        self.position = origin - SHIP_PIVOT;
         self.dead = false;
         self.fragmented = false;
         self.life = self.life_max;
@@ -6818,7 +6829,7 @@ fn render_rover_build_marker(
 
 fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
     if ship.form == ShipForm::EscapePod {
-        render_escape_pod(frame, ship);
+        render_cockpit(frame, ship);
         return;
     }
 
@@ -6870,13 +6881,25 @@ fn render_ship(frame: &mut RenderFrame, ship: &ShipState) {
         outline,
     );
     weapons::render_mounts(frame, ship);
+    render_cockpit(frame, ship);
 }
 
-fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
-    let transform = ship_transform(ship);
+// Both forms draw the same pod around the physical body's origin. Destruction
+// removes the surrounding hull without moving or rotating this cabin.
+fn cockpit_transform(ship: &ShipState) -> Transform2 {
+    Transform2 {
+        translation: ship.position + physics::ship_pivot(ship.form) - POD_PIVOT,
+        pivot: POD_PIVOT,
+        ..ship_transform(ship)
+    }
+}
+
+fn render_cockpit(frame: &mut RenderFrame, ship: &ShipState) {
+    let transform = cockpit_transform(ship);
     let base = render_color(ship.color);
     let outline = RenderColor::rgba(0.02, 0.02, 0.03, 0.9);
 
+    push_filled_polygon(frame, SHIP_LAYER, transform, &POD_BODY, base, outline);
     push_filled_polygon(
         frame,
         SHIP_LAYER,
@@ -6885,7 +6908,6 @@ fn render_escape_pod(frame: &mut RenderFrame, ship: &ShipState) {
         dim(base, 0.72),
         outline,
     );
-    push_filled_polygon(frame, SHIP_LAYER, transform, &POD_BODY, base, outline);
     push_filled_polygon(
         frame,
         SHIP_LAYER,
@@ -7757,7 +7779,7 @@ mod tests {
         let low = render_ship_bounds_debug_frame(&state.ships[0], BoundsDrawMode::Low);
 
         assert!(circle_primitive_count(&high) > 1);
-        assert_eq!(circle_primitive_count(&low), 1);
+        assert_eq!(circle_primitive_count(&low), 2);
         assert_eq!(
             circle_primitive_count(&low_high),
             circle_primitive_count(&high) + 1
@@ -10441,6 +10463,7 @@ mod tests {
     fn dead_ship_spawns_original_primitive_breakup_fragments_once() {
         let mut state = init_deathmatch_no_asteroids();
         let mut replay = init_deathmatch_no_asteroids();
+        let original_position = state.ships[0].position;
         state.ships[0].velocity = Vec2::new(3.0, -4.0);
         replay.ships[0].velocity = state.ships[0].velocity;
         let life = state.ships[0].life;
@@ -10462,7 +10485,7 @@ mod tests {
                 && fragment.damage_scalar == BREAKUP_FRAGMENT_DAMAGE_SCALAR
         }));
         for fragment in &state.debris {
-            assert_eq!(fragment.position, state.ships[0].position);
+            assert_eq!(fragment.position, original_position);
             assert_close(fragment.omega, BREAKUP_FRAGMENT_OMEGA);
             assert_close(
                 (fragment.velocity - state.ships[0].velocity).length(),
@@ -10600,6 +10623,37 @@ mod tests {
     }
 
     #[test]
+    fn destruction_and_rebuild_keep_the_visible_cockpit_at_the_same_pose() {
+        for angle in [0.0, 0.7, std::f32::consts::PI, 4.2] {
+            let mut ship = ShipState::new_with_default_life(
+                0,
+                Vec2::new(37.25, -18.5),
+                Color::WHITE,
+                1.0 / 60.0,
+            );
+            ship.rotation_radians = angle;
+            let mut attached = RenderFrame::default();
+            render_cockpit(&mut attached, &ship);
+            let mut full = RenderFrame::default();
+            render_ship(&mut full, &ship);
+            assert!(
+                full.layers[0]
+                    .primitives
+                    .ends_with(&attached.layers[0].primitives)
+            );
+
+            ship.change_to_escape_pod();
+            let mut ejected = RenderFrame::default();
+            render_ship(&mut ejected, &ship);
+            assert_eq!(ejected, attached);
+            ship.restore_from_escape_pod();
+            let mut rebuilt = RenderFrame::default();
+            render_cockpit(&mut rebuilt, &ship);
+            assert_eq!(rebuilt, attached);
+        }
+    }
+
+    #[test]
     fn render_frame_draws_escape_pod_geometry() {
         let mut state = init_deathmatch();
         state.ships[0].change_to_escape_pod();
@@ -10612,8 +10666,8 @@ mod tests {
 
         let frame = SpacewarsScenario::render_frame(&state);
 
-        assert_eq!(circle_primitive_count(&frame), 2 + star_count);
-        assert_eq!(polygon_primitive_count(&frame), 9);
+        assert_eq!(circle_primitive_count(&frame), 3 + star_count);
+        assert_eq!(polygon_primitive_count(&frame), 12);
     }
 
     #[test]
@@ -10895,8 +10949,8 @@ mod tests {
         let labels = text_values(&frame);
 
         assert_eq!(frame.camera.center, RenderPoint::new(300.0, 300.0));
-        assert_eq!(circles, 1 + star_count);
-        assert_eq!(polygons, 12);
+        assert_eq!(circles, 3 + star_count);
+        assert_eq!(polygons, 18);
         assert_eq!(text, 2);
         assert_eq!(
             labels,
@@ -10936,7 +10990,7 @@ mod tests {
             .stars
             .len();
 
-        assert_eq!(circles, 2 + star_count);
+        assert_eq!(circles, 4 + star_count);
         assert_eq!(debris_layer.primitives.len(), 1);
     }
 
@@ -11135,8 +11189,8 @@ mod tests {
         let polygons = polygon_primitive_count(&frame);
 
         assert_eq!(frame.camera.center, RenderPoint::new(1200.0, 1200.0));
-        assert_eq!(circles, 2 + state.planets.len() + star_count);
-        assert_eq!(polygons, 12 + state.planets.len());
+        assert_eq!(circles, 4 + state.planets.len() + star_count);
+        assert_eq!(polygons, 18 + state.planets.len());
     }
 
     #[test]

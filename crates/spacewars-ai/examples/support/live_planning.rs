@@ -42,6 +42,17 @@ impl LivePlanningRun {
             "true" => LiveObjectivePlanner::new(2, work).with_ground_reuse(),
             _ => panic!("--reuse-objective-ground must be true or false"),
         };
+        let planner = match super::arg("--objective-dependencies", "region").as_str() {
+            "region" => planner,
+            "routes" => {
+                assert!(
+                    planner.reuses_ground(),
+                    "route dependencies require --reuse-objective-ground true"
+                );
+                planner.with_route_dependencies()
+            }
+            _ => panic!("--objective-dependencies must be region or routes"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms").unwrap();
@@ -104,12 +115,15 @@ impl LivePlanningRun {
                 "p95_ms":values[values.len()*95/100],"p99_ms":values[values.len()*99/100],
                 "max_ms":values.last()})
         };
-        let profile = if self.planner.reuses_ground() {
+        let profile = if self.planner.uses_route_dependencies() {
+            "live_joint_objective_v3"
+        } else if self.planner.reuses_ground() {
             "live_joint_objective_v2"
         } else {
             "live_joint_objective_v1"
         };
         json!({"version":2,"sensor_profile":profile,
+            "objective_dependencies":if self.planner.uses_route_dependencies() { "routes" } else { "region" },
             "reuse_objective_ground":self.planner.reuses_ground(),
             "enabled_seats":self.seats,
             "scope":"landing-objective ground survey, hull overlay and joint routes; other sensors and controls remain synchronous",

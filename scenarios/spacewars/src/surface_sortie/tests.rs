@@ -13,6 +13,7 @@ mod motion_tests;
 mod multiplayer_tests;
 mod outpost_tests;
 mod recovery_tests;
+mod running_tests;
 mod solar_tests;
 mod thruster_tests;
 mod travel_tests;
@@ -278,6 +279,73 @@ fn disembark(state: &mut SurfaceSortieState) {
         "{:?}",
         state.observation(0)
     );
+}
+
+#[test]
+fn resized_pilot_physically_fits_a_cockpit_sized_clearance() {
+    let mut state = parked();
+    disembark(&mut state);
+    let collider = state.pilots[0].body.as_ref().unwrap().collider();
+    let center = state.world.planets[0].position + Vec2::Y * 200.0;
+    // A one-unit-high passage admits the actual new actor but not the old
+    // engine-lab capsule. Querying the actor's collider catches a visual-only
+    // resize or a spawn path that still uses the old specification.
+    for (i, sign) in [-1.0, 1.0].into_iter().enumerate() {
+        let entity = PhysicsId::new(45_200 + i as u64);
+        state.world.physics.world.insert_body(
+            PhysicsBodyId::new(entity, BodyRole::PRIMARY),
+            BodySpec {
+                kind: engine_rapier::world::BodyKind::Fixed,
+                position: center + Vec2::Y * sign * (POD_COCKPIT_RADIUS + 0.1),
+                ..Default::default()
+            },
+            &[ColliderSpec::cuboid(
+                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                2.0,
+                0.1,
+            )],
+        );
+    }
+    state.world.physics.world.step(1.0 / 60.0);
+    assert_eq!(
+        state
+            .world
+            .physics
+            .world
+            .collider_fits_at(collider, center, 0.0),
+        Some(true)
+    );
+    let old = SpacelingSpec::default();
+    assert!(!state.world.physics.world.capsule_is_clear_except(
+        center,
+        0.0,
+        old.half_segment,
+        old.radius,
+        old.collision_groups,
+        None,
+    ));
+    let mut frame = RenderFrame::default();
+    let mut snapshot = state.spaceling_snapshot(0).unwrap();
+    snapshot.motion.position = center;
+    snapshot.motion.angle = 0.0;
+    super::render::draw_spaceling(&mut frame, snapshot, 1.0, 0.0, RenderColor::RED);
+    for primitive in frame.layers.iter().flat_map(|layer| &layer.primitives) {
+        match primitive {
+            RenderPrimitive::Polygon(polygon) => assert!(
+                polygon
+                    .points
+                    .iter()
+                    .all(|p| Vec2::new(p.x, p.y).distance_to(center) < POD_COCKPIT_RADIUS)
+            ),
+            RenderPrimitive::Circle(circle) => {
+                assert!(
+                    Vec2::new(circle.center.x, circle.center.y).distance_to(center) + circle.radius
+                        < POD_COCKPIT_RADIUS
+                )
+            }
+            _ => panic!("unexpected suit primitive"),
+        }
+    }
 }
 
 #[test]

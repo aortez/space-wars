@@ -1,5 +1,6 @@
 //! Controller contracts; physical contested approaches run in surface_flag_soak.
 use engine_common::{CombatBreakSettings, Scenario};
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{
@@ -64,6 +65,7 @@ fn fixture() -> (TacticalCapturePilot, TacticalSortieObservationV1) {
         actor: p.owner,
         tick: p.tick,
         validated_tick: None,
+        validated_routes_only: false,
         objective: LandingObjective::read(p).unwrap(),
         sites,
         actual: None,
@@ -191,6 +193,31 @@ fn cancelled_live_work_does_not_spend_the_failed_landing_attempt_budget() {
 }
 
 #[test]
+fn a_locally_invalidated_selected_route_replans_without_spending_landing_attempts() {
+    let (mut pilot, mut o) = fixture();
+    for _ in 0..12 {
+        o.combat.recovery.flight.pilot.tick += 1;
+        let tick = o.combat.recovery.flight.pilot.tick;
+        let (_, fresh) = fixture();
+        o.landing_objective = fresh.landing_objective;
+        o.landing_objective.as_mut().unwrap().validated_tick = Some(tick);
+        pilot.intent(&o);
+        assert!(pilot.site_request().is_some());
+        o.combat.recovery.flight.pilot.tick += 1;
+        let s = o.landing_objective.as_mut().unwrap();
+        s.validated_tick = Some(o.combat.recovery.flight.pilot.tick);
+        s.validated_routes_only = true;
+        s.sites.truncate(1);
+        // Another route remains usable, but the selected route was withheld.
+        s.sites[0].returning = Some(diagnostics(4.0));
+        assert!(!pilot.intent(&o).flight.controls.interact_held);
+        assert!(pilot.site_request().is_none());
+        assert!(pilot.telemetry().failure.is_none());
+    }
+    assert_eq!(pilot.telemetry().objective_replans, 12);
+}
+
+#[test]
 fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() {
     let (mut pilot, mut o) = fixture();
     pilot.intent(&o);
@@ -211,6 +238,7 @@ fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() 
         actor: p.owner,
         tick: p.tick,
         validated_tick: None,
+        validated_routes_only: false,
         objective: LandingObjective::read(p).unwrap(),
         sites: vec![],
         actual: Some(LandingObjectiveRoute {
@@ -312,7 +340,7 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
     let objective = LandingObjective::read(p).unwrap();
     let endpoint = GroundNode {
         id: 7,
-        position: objective.position - objective.position.normalized() * 0.9,
+        position: objective.position - objective.position.normalized() * HALF_HEIGHT,
         normal: objective.position.normalized(),
     };
     let survey = o.landing_objective.as_mut().unwrap();

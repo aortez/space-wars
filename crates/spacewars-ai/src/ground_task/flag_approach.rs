@@ -15,7 +15,7 @@ pub struct FlagApproach {
 }
 impl FlagApproach {
     pub fn actor_position(self) -> Vec2 {
-        self.endpoint.position + self.endpoint.position.normalized() * 0.9
+        self.endpoint.position + self.endpoint.position.normalized() * HALF_HEIGHT
     }
 }
 

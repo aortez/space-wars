@@ -1,9 +1,12 @@
 //! One measured out-and-back ship crossing using ordinary shared pilot actions.
 use crate::BrainReset;
 use engine_core::Vec2;
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::surface_sortie::{
     PilotLocation, SurfaceSortieAction, TransferResult,
-    jetpack::{CrossingDirection, CrossingPlan, JetpackCrossingObservation},
+    jetpack::{
+        CROSSING_ARRIVAL_RANGE, CrossingDirection, CrossingPlan, JetpackCrossingObservation,
+    },
 };
 use serde::Serialize;
 
@@ -293,7 +296,7 @@ impl JetpackCrossingPilot {
             && p.supported_planet == Some(plan.planet)
             && p.balanced
             && relative.length() < 1.0
-            && error.abs() < 1.0
+            && error.abs() < CROSSING_ARRIVAL_RANGE
         {
             self.telemetry.crossings += 1;
             if self.traversal {
@@ -311,19 +314,28 @@ impl JetpackCrossingPilot {
         let target_radius = if self.telemetry.goal == CrossingGoal::Descend {
             // Aim slightly into the standing envelope so contact, rather than
             // a hovering equilibrium just above it, ends the descent.
-            plan.destination.length() + 0.55
+            plan.destination.length() + HALF_HEIGHT * 0.6
         } else {
             plan.cruise_radius
         };
         let desired_rise = ((target_radius - local.length()) * 1.8).clamp(-6.0, 7.0);
         a.primary_held = radial_speed < desired_rise;
         if self.telemetry.goal == CrossingGoal::Descend
-            && local.length() < plan.destination.length() + 1.5
-            && error.abs() < 1.0
+            && local.length() < plan.destination.length() + HALF_HEIGHT + 0.6
+            && error.abs() < CROSSING_ARRIVAL_RANGE
         {
             // Once aligned just above the measured footing, commit to contact.
             // Trying to hover at capsule height wastes the landing reserve on
             // stepped/sloping terrain. Charged lateral steering still brakes.
+            a.primary_held = false;
+        }
+        if self.telemetry.goal == CrossingGoal::Lift
+            && p.supported_planet.is_some()
+            && self.previous_action.primary_held
+        {
+            // Getting up consumes a jump press and disarms the pack. Release
+            // before retrying takeoff so standing up cannot leave Lift holding
+            // a spent press forever. Once airborne the burn control is unchanged.
             a.primary_held = false;
         }
         // The motor retains the takeoff velocity, while the destination keeps
