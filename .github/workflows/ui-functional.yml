@@ -1,0 +1,82 @@
+name: UI functional tests
+
+# Full regression suite, including four long-running cases omitted on PRs.
+# The other UI workflows also run in normal CI with the ui-pr profile.
+on:
+  schedule:
+    - cron: '29 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-functional-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ui-functional:
+    name: Full UI workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUST_MIN_STACK: 16777216
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Restore Rust dependencies
+        id: rust-cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-on-failure: true
+          # Keep the same cache configuration as the normal Linux job.
+          workspaces: |
+            . -> target
+            vendor/i-slint-backend-linuxkms -> target
+      - name: Install native client and virtual display dependencies
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
+      - name: Build optimized Linux test executables
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewars-ui-timings"
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ui-timings/build.seconds" \
+            cargo test --locked --workspace --all-targets --profile ci --no-run --timings
+      - name: Run black-box UI functional tests
+        # Retain workspace target/feature selection so this reuses the build.
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ui-timings/ui.seconds" \
+            xvfb-run -a -s "-screen 0 1280x1024x24" \
+            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui \
+              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
+      - name: Summarize build and test timings
+        if: always()
+        run: |
+          python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ui-timings" \
+            --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
+            --phase build --phase ui \
+            target/nextest/ui/junit.xml >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload build and per-test timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-timings
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/spacewars-ui-timings/
+            target/cargo-timings/
+            target/nextest/ui/junit.xml
+          if-no-files-found: ignore
+      - name: Upload functional-test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-functional-test-artifacts
+          retention-days: 14
+          path: target/functional-test-artifacts
+          if-no-files-found: ignore

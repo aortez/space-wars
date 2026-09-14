@@ -32,7 +32,7 @@ def cell(value):
     )
 
 
-def summarize(timings_dir, reports, cache_hit="", limit=20):
+def summarize(timings_dir, reports, cache_hit="", limit=20, *, phases=tuple(PHASES)):
     lines = ["## Linux build and test timings", ""]
     if cache_hit:
         lines += [
@@ -41,7 +41,8 @@ def summarize(timings_dir, reports, cache_hit="", limit=20):
             "",
         ]
     lines += ["| Phase | Wall time |", "|---|---:|"]
-    for phase, label in PHASES.items():
+    for phase in phases:
+        label = PHASES[phase]
         path = timings_dir / f"{phase}.seconds"
         # On failure GNU time prefixes the duration with an exit-status line.
         elapsed = "Not recorded"
@@ -107,9 +108,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timings-dir", type=Path, required=True)
     parser.add_argument("--cache-hit", default="")
+    parser.add_argument(
+        "--phase", choices=PHASES, action="append",
+        help="Phase expected in this workflow; repeat as needed (default: all).",
+    )
     parser.add_argument("reports", type=Path, nargs="+")
     args = parser.parse_args()
-    print(summarize(args.timings_dir, args.reports, args.cache_hit), end="")
+    print(summarize(
+        args.timings_dir, args.reports, args.cache_hit,
+        phases=args.phase if args.phase is not None else tuple(PHASES),
+    ), end="")
 
 
 if __name__ == "__main__":
