@@ -3,6 +3,7 @@ use engine_rapier::world::{
     BodyId as PhysicsBodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec,
 };
 
+mod camera_tests;
 mod compatibility_tests;
 mod flight_tests;
 mod impact_tests;

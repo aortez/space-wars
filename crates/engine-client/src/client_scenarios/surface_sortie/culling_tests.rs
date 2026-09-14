@@ -24,7 +24,7 @@ fn chunk_culling_matches_reference_pixels_across_surfaces_edits_and_resizes() {
                 SurfaceSortieScenario::init_surface_comparison(42, 1, surface),
             ),
         ] {
-            let mut scenario = SurfaceSortieClientScenario { state };
+            let mut scenario = SurfaceSortieClientScenario::new(state);
             scenario.step(&[], Duration::from_nanos(16_666_667));
             let players = scenario.state.player_count();
             let mut full_raster = RasterRenderer::new();

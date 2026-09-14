@@ -7,63 +7,7 @@ const ORANGE: RenderColor = RenderColor::rgb(1.0, 0.58, 0.23);
 const AMBER: RenderColor = RenderColor::rgb(1.0, 0.82, 0.25);
 
 fn camera(state: &SurfaceSortieState, player: usize) -> Camera2 {
-    let snapshot = state.spaceling_snapshot(player);
-    let ship = &state.world.ships[state.pilots[player].vehicle.0];
-    let parked = state.vehicle_settled(player);
-    let (center, height) = if let Some(snapshot) = snapshot {
-        let pilot = snapshot.motion.position;
-        let ship_center = ship.position + physics::ship_pivot(ship.form);
-        if parked && pilot.distance_to(ship_center) < 32.0 {
-            // North-up framing must work on the sides/underside too. Keep the
-            // nearby ship and pilot together in the central area;
-            // walk farther away and the camera follows only the active pilot.
-            let separation = ship_center - pilot;
-            let height = 44.0_f32.max((separation.y.abs() + 12.0) / 0.48);
-            ((pilot + ship_center) * 0.5, height)
-        } else {
-            (pilot + snapshot.up * 7.0, 44.0)
-        }
-    } else if parked {
-        (
-            (ship.position + state.access_position(player)) * 0.5 + state.access_up(player) * 2.0,
-            44.0,
-        )
-    } else {
-        let target = state
-            .combat_enabled()
-            .then(|| {
-                state.pilots.iter().enumerate().find_map(|(seat, pilot)| {
-                    let target = &state.world.ships[pilot.vehicle.0];
-                    (seat != player
-                        && pilot.body.is_none()
-                        && !target.dead
-                        && target.form == ShipForm::Ship
-                        && target.position.distance_to(ship.position) < 260.0)
-                        .then_some(target.position)
-                })
-            })
-            .flatten();
-        if let Some(target) = target {
-            let separation = target - ship.position;
-            (
-                (ship.position + target) * 0.5,
-                (180.0_f32
-                    .max(separation.x.abs() / 0.6)
-                    .max(separation.y.abs() / 0.35))
-                .min(440.0),
-            )
-        } else {
-            (
-                ship.position,
-                if state.combat_enabled() && ship.form == ShipForm::Ship {
-                    260.0
-                } else {
-                    100.0
-                },
-            )
-        }
-    };
-    Camera2::new(render_point(center), height)
+    super::camera::target(state, player, false).camera
 }
 
 pub(super) fn frame(state: &SurfaceSortieState, player: usize) -> RenderFrame {
@@ -75,8 +19,16 @@ pub(super) fn frame_in_view(
     player: usize,
     viewport: Option<RenderPoint>,
 ) -> RenderFrame {
+    frame_with_camera(state, player, camera(state, player), viewport)
+}
+
+pub(super) fn frame_with_camera(
+    state: &SurfaceSortieState,
+    player: usize,
+    camera: Camera2,
+    viewport: Option<RenderPoint>,
+) -> RenderFrame {
     let observation = state.observation(player);
-    let camera = camera(state, player);
     let center = Vec2::new(camera.center.x, camera.center.y);
     let height = camera.height;
     let view = viewport
@@ -227,6 +179,15 @@ pub(super) fn minimap(
     player: usize,
     viewport_aspect: f32,
 ) -> RenderFrame {
+    minimap_with_camera(state, player, viewport_aspect, camera(state, player))
+}
+
+pub(super) fn minimap_with_camera(
+    state: &SurfaceSortieState,
+    player: usize,
+    viewport_aspect: f32,
+    camera: Camera2,
+) -> RenderFrame {
     let radius = state.world.config.universe_radius as f32;
     let mut map = RenderFrame::new(Camera2::new(
         render_point(Vec2::splat(radius)),
@@ -328,8 +289,7 @@ pub(super) fn minimap(
             }),
         );
     }
-    // The footprint follows the actual full-window camera, including resizes.
-    let camera = camera(state, player);
+    // Use exactly the displayed camera, including smoothing and resizes.
     let aspect = if viewport_aspect.is_finite() && viewport_aspect > 0.0 {
         viewport_aspect
     } else {

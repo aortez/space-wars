@@ -154,9 +154,9 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         std::fs::create_dir_all(path).unwrap();
     }
     let dt = Duration::from_nanos(16_666_667);
-    let mut sortie = super::super::SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init_expedition(0, 2),
-    };
+    let mut sortie = super::super::SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init_expedition(0, 2),
+    );
     for _ in 0..240 {
         sortie.step(&[], dt);
     }
@@ -175,9 +175,9 @@ fn hud_visual_fixture_captures_production_ui_at_device_sizes() {
         );
     }
     assert_eq!(sortie.state.player_hud(0).mode, "ON FOOT");
-    let mut flight = super::super::SurfaceSortieClientScenario {
-        state: SurfaceSortieScenario::init_material_match(42),
-    };
+    let mut flight = super::super::SurfaceSortieClientScenario::new(
+        SurfaceSortieScenario::init_material_match(42),
+    );
     flight.step(&[], dt);
     for (profile, viewport) in [
         ("picade", Viewport::new(1024.0, 768.0)),

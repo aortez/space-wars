@@ -9,6 +9,7 @@ use engine_rapier::{
 };
 
 pub mod asteroids;
+pub mod camera;
 mod claim;
 pub mod claim_footing;
 pub mod combat;
@@ -887,6 +888,26 @@ impl SurfaceSortieScenario {
         render::frame(state, player)
     }
 
+    /// Stateless framing intent; the client owns smoothing and hysteresis history.
+    pub fn camera_target(
+        state: &SurfaceSortieState,
+        player: usize,
+        hold_combat_frame: bool,
+    ) -> camera::CameraTarget {
+        camera::target(state, player, hold_combat_frame)
+    }
+
+    /// Cull and draw against the displayed camera, not the unsmoothed target.
+    /// `None` requests an uncropped reference frame with the same camera.
+    pub fn player_frame_with_camera(
+        state: &SurfaceSortieState,
+        player: usize,
+        camera: Camera2,
+        viewport: Option<engine_common::RenderPoint>,
+    ) -> RenderFrame {
+        render::frame_with_camera(state, player, camera, viewport)
+    }
+
     /// Omit terrain chunks outside this player's pixel viewport before creating
     /// draw primitives. Pass the smallest raster viewport that may display it;
     /// this keeps conservative stroke padding when the image is downscaled.
@@ -905,5 +926,14 @@ impl SurfaceSortieScenario {
         viewport_aspect: f32,
     ) -> RenderFrame {
         render::minimap(state, player, viewport_aspect)
+    }
+
+    pub fn minimap_frame_with_camera(
+        state: &SurfaceSortieState,
+        player: usize,
+        viewport_aspect: f32,
+        camera: Camera2,
+    ) -> RenderFrame {
+        render::minimap_with_camera(state, player, viewport_aspect, camera)
     }
 }
