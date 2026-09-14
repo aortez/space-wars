@@ -48,6 +48,9 @@ sleeps on a channel when not requested. Hidden Info has no instantiated item tre
 The build revision comes from the **build-time** Git checkout (with `-dirty`
 when tracked files differ), not an installed machine's checkout. Archive builds
 can set `SPACEWARS_BUILD_REVISION`; otherwise the revision is explicitly unknown.
+An archive nested inside another checkout does not inherit that checkout's
+identity. Build-time Git queries do not refresh the index; see the
+[build-reuse checks](ci-performance.md) for regression coverage.
 
 ## Automation
 
