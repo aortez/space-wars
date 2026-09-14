@@ -598,7 +598,7 @@ fn walking_jumping_and_knockdown_interrupt_a_physically_started_claim() {
                 state.world.physics.world.set_velocity(
                     body,
                     snapshot.motion.linear_velocity,
-                    10.0,
+                    SurfaceSortieState::spec().balance.knockdown_angular_speed * 1.25,
                     true,
                 );
                 idle(&mut state, 1);

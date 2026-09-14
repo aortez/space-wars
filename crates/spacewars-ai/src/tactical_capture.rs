@@ -135,7 +135,9 @@ impl TacticalCapturePilot {
                             || !node.position.y.is_finite()
                             || !node.normal.x.is_finite()
                             || !node.normal.y.is_finite()
-                            || (node.position + node.position.normalized() * 0.9)
+                            || (node.position
+                                + node.position.normalized()
+                                    * scenario_spacewars::spaceling_geometry::HALF_HEIGHT)
                                 .distance_to(s.objective.position)
                                 >= s.objective.range
                             })

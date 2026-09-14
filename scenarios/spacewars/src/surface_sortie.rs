@@ -462,9 +462,19 @@ impl SurfaceSortieState {
     }
 
     fn spec() -> SpacelingSpec {
+        let defaults = SpacelingSpec::default();
         SpacelingSpec {
             collision_groups: physics::spaceling_collision_groups(),
-            ..SpacelingSpec::default()
+            radius: spaceling_geometry::RADIUS,
+            half_segment: spaceling_geometry::HALF_SEGMENT,
+            // The smaller body spins faster over the same uneven ground.
+            // Keep the same peripheral speed threshold for a tumbling impact.
+            balance: engine_rapier::spaceling::SpacelingBalanceSpec {
+                knockdown_angular_speed: defaults.balance.knockdown_angular_speed
+                    / spaceling_geometry::SCALE,
+                ..defaults.balance
+            },
+            ..defaults
         }
     }
 

@@ -267,7 +267,7 @@ fn interrupted_outpost_capture_resets_when_walking_away_jumping_or_knocked_down(
                 state.world.physics.world.set_velocity(
                     body,
                     snapshot.motion.linear_velocity,
-                    10.0,
+                    SurfaceSortieState::spec().balance.knockdown_angular_speed * 1.25,
                     true,
                 );
                 idle(&mut state, 1);

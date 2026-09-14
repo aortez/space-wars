@@ -1390,7 +1390,11 @@ mod tests {
                     );
                 }
             }
-            for viewport in [Viewport::new(1280.0, 720.0), Viewport::new(800.0, 1280.0)] {
+            for viewport in [
+                Viewport::new(1280.0, 720.0),
+                Viewport::new(800.0, 480.0),
+                Viewport::new(800.0, 1280.0),
+            ] {
                 let frames = scenario.render_frames(RenderBackend::Vector, viewport);
                 assert_eq!(frames.len(), 5);
                 assert_ne!(frames[0].camera.center, frames[1].camera.center);
@@ -1478,8 +1482,8 @@ mod tests {
                     let directory = std::path::PathBuf::from(directory);
                     std::fs::create_dir_all(&directory).unwrap();
                     let file = std::fs::File::create(directory.join(format!(
-                        "expedition-pair-{}-foot-{on_foot}.png",
-                        viewport.width
+                        "expedition-pair-{}x{}-foot-{on_foot}.png",
+                        viewport.width, viewport.height
                     )))
                     .unwrap();
                     let mut encoder = png::Encoder::new(file, pixels.width(), pixels.height());
@@ -2163,7 +2167,13 @@ mod tests {
                         && p.b < 100
                 })
                 .count();
-            assert!(suit_pixels > 20, "missing on-foot actor: {suit_pixels}");
+            // This checks suit fill, not its white limbs/helmet. At half size
+            // its projected area is a quarter of the original fixture's suit.
+            let minimum = (20.0 * scenario_spacewars::spaceling_geometry::SCALE.powi(2)) as usize;
+            assert!(
+                suit_pixels >= minimum,
+                "missing on-foot actor: {suit_pixels}"
+            );
         }
     }
 }

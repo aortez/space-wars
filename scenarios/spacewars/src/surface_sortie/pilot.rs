@@ -514,7 +514,7 @@ mod tests {
         // airborne. The ship will occupy a different pose after touchdown.
         state.world.physics.world.set_pose(
             body,
-            site.vehicle_position + right * 8.0,
+            site.vehicle_position + right * 8.0 - site.normal * 0.5,
             rotation_for_direction(site.normal),
             true,
         );

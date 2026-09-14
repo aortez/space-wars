@@ -1,5 +1,6 @@
 //! Controller contracts; physical contested approaches run in surface_flag_soak.
 use engine_common::{CombatBreakSettings, Scenario};
+use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
 use scenario_spacewars::{
     PlayerId,
     surface_sortie::{
@@ -339,7 +340,7 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
     let objective = LandingObjective::read(p).unwrap();
     let endpoint = GroundNode {
         id: 7,
-        position: objective.position - objective.position.normalized() * 0.9,
+        position: objective.position - objective.position.normalized() * HALF_HEIGHT,
         normal: objective.position.normalized(),
     };
     let survey = o.landing_objective.as_mut().unwrap();

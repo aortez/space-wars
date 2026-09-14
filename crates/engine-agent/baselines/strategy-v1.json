@@ -64,7 +64,7 @@
       "controllers": ["idle_v1", "rule_ship_v5"],
       "max_ticks": 18000,
       "ticks": 12359,
-      "trace_sha256": "cacc2718f59a2285110111d1155c49254773e352ac7d81287ec0fd4b17424e70"
+      "trace_sha256": "8300b95c2eee1b010f51cb972056aae0f69208e0c669bdcb224c0f213299ad40"
     },
     {
       "seed": 2,

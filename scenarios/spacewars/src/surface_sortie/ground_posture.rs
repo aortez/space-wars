@@ -155,7 +155,7 @@ mod tests {
     };
 
     #[test]
-    fn crawl_survey_is_read_only_and_ordinary_controls_escape_a_low_roof() {
+    fn crawl_survey_is_read_only_and_ordinary_controls_crawl_clear_then_get_up() {
         let dt = Duration::from_nanos(16_666_667);
         let mut state = SurfaceSortieScenario::init_material(42, 1);
         state.world.planets[0].wrapper_omega = 0.0;
@@ -167,11 +167,12 @@ mod tests {
             .material_ground_ray(0, state.world.planets[0].position + up * 80.0, -up, 100.0)
             .unwrap();
         let roof = PhysicsId::new(45_123);
+        let spec = SurfaceSortieState::spec();
         assert!(state.world.physics.world.insert_body(
             BodyId::new(roof, BodyRole::PRIMARY),
             BodySpec {
                 kind: BodyKind::Fixed,
-                position: hit.point + up * 1.05,
+                position: hit.point + up * (spec.half_height() + 0.15),
                 angle: rotation_for_direction(up),
                 ..Default::default()
             },
@@ -184,16 +185,17 @@ mod tests {
         let mut body = SpacelingAssembly::insert(
             &mut state.world.physics.world,
             pilot_physics_id(PlayerId::PLAYER_1),
-            hit.point + up * 0.32,
+            hit.point + up * (spec.radius + 0.02),
             std::f32::consts::FRAC_PI_2,
             SurfaceSortieState::spec(),
         )
         .unwrap();
-        state
-            .world
-            .physics
-            .world
-            .set_velocity(body.body(), Vec2::ZERO, 10.0, true);
+        state.world.physics.world.set_velocity(
+            body.body(),
+            Vec2::ZERO,
+            spec.balance.knockdown_angular_speed * 1.25,
+            true,
+        );
         body.apply_control(
             &mut state.world.physics.world,
             SpacelingControl::default(),
@@ -250,20 +252,29 @@ mod tests {
                 .crawl,
             [None, None]
         );
-        for _ in 0..360 {
+        for tick in 0..360 {
+            let posture = state.recovery_task_observation(0, None).posture.unwrap();
             SurfaceSortieScenario::step(
                 &mut state,
                 &[SurfaceSortieAction {
                     horizontal: step.direction,
+                    // A blocked get-up request is not buffered. Like the live
+                    // ground controller, try again once there is room to stand.
+                    primary_held: posture.standing_clear && tick % 30 == 0,
                     ..Default::default()
                 }
                 .encode(PlayerId::PLAYER_1)],
                 dt,
             );
+            if state.spaceling_snapshot(0).unwrap().balance == SpacelingBalance::Balanced {
+                break;
+            }
         }
         let standing = state.spaceling_snapshot(0).unwrap();
         assert_eq!(standing.balance, SpacelingBalance::Balanced, "{standing:?}");
         assert!(standing.grounded());
         assert_eq!(standing.jumps, 0);
+        assert!(standing.get_up_attempts > 1);
+        assert_eq!(standing.get_up_result, SpacelingGetUpResult::Succeeded);
     }
 }

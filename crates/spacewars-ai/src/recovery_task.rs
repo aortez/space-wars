@@ -12,6 +12,7 @@ use crate::{
 use engine_core::Vec2;
 use scenario_spacewars::{
     ShipForm,
+    spaceling_geometry::HALF_HEIGHT,
     surface_sortie::{
         LandingPhase, PilotLocation, PlanetClaimPhase, SurfaceRecoveryStatus, SurfaceSortieAction,
         TransferResult,
@@ -817,7 +818,7 @@ impl RecoverShipTask {
                 self.return_route_checked = None;
                 return None;
             }
-            let foot = (actor.position - p.actor_up * 0.9 - p.planet.motion.position)
+            let foot = (actor.position - p.actor_up * HALF_HEIGHT - p.planet.motion.position)
                 .rotate_radians(-p.planet.motion.angle);
             let blocked = map
                 .nodes

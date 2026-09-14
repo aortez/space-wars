@@ -4,6 +4,8 @@ use engine_rapier::spaceling::jetpack as motor;
 use ground_navigation::GroundMap;
 
 pub const MAX_TERRAIN_CROSSINGS: usize = 8;
+/// The executor's final horizontal landing window, in world units.
+pub const CROSSING_ARRIVAL_RANGE: f32 = 1.0;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum CrossingAnchor {
@@ -39,6 +41,7 @@ pub struct CrossingPlan {
 
 impl CrossingPlan {
     pub fn same_corridor(&self, other: &Self) -> bool {
+        let mut endpoint_tolerance = 0.5;
         let anchor_matches = match (&self.anchor, &other.anchor) {
             (
                 CrossingAnchor::Vehicle {
@@ -65,14 +68,25 @@ impl CrossingPlan {
             (
                 CrossingAnchor::GroundGap { from: a, to: b },
                 CrossingAnchor::GroundGap { from: c, to: d },
-            ) => a == c && b == d,
+            ) => {
+                // A small capsule can alternately clear adjacent samples at a
+                // rocking pod's edge. These IDs mark a walk-graph gap, not a
+                // persistent obstacle. A freshly measured neighboring corridor
+                // may continue the flight within its existing landing window.
+                let neighboring = |a: u16, b: u16| {
+                    let span = ground_navigation::GROUND_SAMPLES as u16;
+                    a < span && b < span && (a.abs_diff(b) <= 1 || a.abs_diff(b) == span - 1)
+                };
+                endpoint_tolerance = CROSSING_ARRIVAL_RANGE;
+                neighboring(*a, *c) && neighboring(*b, *d)
+            }
             _ => false,
         };
         anchor_matches
             && self.planet == other.planet
             && self.direction == other.direction
-            && self.start.distance_to(other.start) <= 0.5
-            && self.destination.distance_to(other.destination) <= 0.5
+            && self.start.distance_to(other.start) <= endpoint_tolerance
+            && self.destination.distance_to(other.destination) <= endpoint_tolerance
             && (self.cruise_radius - other.cruise_radius).abs() <= 0.25
     }
 
@@ -313,7 +327,7 @@ impl SurfaceSortieState {
                 )?;
                 let point = local(hit.point);
                 (hit.normal.dot(ray_up.rotate_radians(frame.angle)) >= spec.min_support_alignment
-                    && point_clear(point + ray_up * 1.25))
+                    && point_clear(point + ray_up * corridor_endpoint_height()))
                 .then_some(point)
             })
         };
@@ -436,6 +450,12 @@ impl SurfaceSortieState {
     }
 }
 
+fn corridor_endpoint_height() -> f32 {
+    let spec = SurfaceSortieState::spec();
+    // Include the flight capsule's extra clearance on supported slopes.
+    spec.half_segment + (spec.radius + 0.20) / spec.min_support_alignment + 0.08
+}
+
 fn corridor_clear(
     start: Vec2,
     destination: Vec2,
@@ -448,8 +468,9 @@ fn corridor_clear(
         let count = (a.distance_to(b) / 0.20).ceil() as usize;
         count <= 128 && (0..=count).all(|i| clear(a + (b - a) * (i as f32 / count.max(1) as f32)))
     };
-    if !segment(start + start.normalized() * 1.25, top_start)
-        || !segment(top_end, destination + destination.normalized() * 1.25)
+    let height = corridor_endpoint_height();
+    if !segment(start + start.normalized() * height, top_start)
+        || !segment(top_end, destination + destination.normalized() * height)
     {
         return false;
     }
@@ -467,6 +488,53 @@ fn corridor_clear(
 mod tests {
     use super::*;
     const DT: Duration = Duration::from_nanos(16_666_667);
+
+    #[test]
+    fn fresh_adjacent_gap_measurement_can_continue_a_flight_within_its_landing_window() {
+        let original = CrossingPlan {
+            planet: 0,
+            revision: 0,
+            direction: CrossingDirection::Left,
+            start: Vec2::new(-1.46, -59.5),
+            destination: Vec2::new(2.19, -59.5),
+            cruise_radius: 64.54,
+            anchor: CrossingAnchor::GroundGap { from: 254, to: 259 },
+        };
+        let mut fresh = original.clone();
+        fresh.anchor = CrossingAnchor::GroundGap { from: 255, to: 259 };
+        fresh.destination.x = 2.92;
+        assert!(original.same_corridor(&fresh));
+        assert!(original.reversed().same_corridor(&fresh.reversed()));
+        let accepted = fresh.clone();
+        fresh.destination.x += 0.4;
+        assert!(
+            !original.same_corridor(&fresh),
+            "endpoint moved outside the landing window"
+        );
+        fresh = accepted.clone();
+        fresh.anchor = CrossingAnchor::GroundGap { from: 256, to: 259 };
+        assert!(
+            !original.same_corridor(&fresh),
+            "a different gap needs a new route"
+        );
+        fresh = accepted.clone();
+        fresh.cruise_radius += 0.3;
+        assert!(
+            !original.same_corridor(&fresh),
+            "a higher flight needs a new route"
+        );
+        fresh = accepted;
+        fresh.revision += 1;
+        assert!(
+            original.same_corridor(&fresh),
+            "a fresh physical survey can revalidate the same corridor after an edit"
+        );
+        fresh.planet += 1;
+        assert!(
+            !original.same_corridor(&fresh),
+            "another planet cannot revalidate the flight"
+        );
+    }
 
     #[test]
     fn crossing_survey_is_read_only_and_requires_a_clear_real_corridor() {

@@ -15,6 +15,11 @@ waiting for candidate refresh. Default v10 remains synchronous; failed routes
 under asteroid pressure, broader sensor coverage and strategic planning remain
 future work.
 
+Before extending the powered-route model, the
+[cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates
+#95's smaller physical pilot with both existing bot policies. New route
+measurements and comparisons must use that shared geometry.
+
 The earlier measurement baseline is `ground-route-profiling` at `1e8ce10`;
 see [ground-route profiling](../ground-route-profile.md). The first optimization
 is implemented and measured in [indexed ground-route queries](../indexed-ground-routes.md).

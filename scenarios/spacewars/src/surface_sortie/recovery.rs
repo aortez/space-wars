@@ -119,16 +119,14 @@ impl SurfacePilot {
         self.landing = LandingTelemetry::default();
         self.landing_gear = landing_gear::LandingGear::default();
         if self.body.is_none() {
-            // Keep the completed body's origin and physical spin;
-            // the legacy mesh pivots/control omega scales differ between forms.
-            let origin = ship.position + physics::ship_pivot(ship.form);
+            // Changing form retains the cockpit's origin. Preserve physical
+            // spin too: the control omega scales differ between forms.
             let velocity = ship.velocity;
             let spin = physics::physical_angular_velocity(ship);
             ship.change_to_escape_pod();
             if let Some(vitals) = &mut self.vitals {
                 vitals.protect_ejection(tick);
             }
-            ship.position = origin - physics::ship_pivot(ship.form);
             // Combat uses Rapier's resolved velocity: the contact impulse has
             // already been applied. Keep the older asteroid/recovery fixtures'
             // ejection behavior until their landing policy is adapted as well.

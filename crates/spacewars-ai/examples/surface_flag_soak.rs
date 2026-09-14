@@ -355,7 +355,9 @@ fn main() {
                 .is_some_and(|r| r.rebuild_progress > 0.3)
             && let Some(actor) = p.actor
         {
-            let foot = (actor.position - p.actor_up * 0.9 - p.planet.motion.position)
+            let foot = (actor.position
+                - p.actor_up * scenario_spacewars::spaceling_geometry::HALF_HEIGHT
+                - p.planet.motion.position)
                 .rotate_radians(-p.planet.motion.angle);
             let bearing = ((-foot.x).atan2(foot.y) * GROUND_SAMPLES as f32 / std::f32::consts::TAU)
                 .round() as i32;

@@ -14,11 +14,11 @@ use engine_rapier::{
 
 use super::{
     BODY_BOUNDS_RADIUS_SCALE, BodyId, CANNON_SHELL_RADIUS, DEFAULT_ELASTICITY, DebrisKind,
-    DebrisState, PLANET_ELASTICITY, POD_BODY, POD_LASER, POD_PIVOT, POD_THRUSTER, PlanetState,
-    PlayerId, RoverState, SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT,
-    SHIP_RIGHT_WING, SHIP_THRUSTER, SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE,
-    SPACEWARS_PLAYER_COUNT, ShipForm, ShipState, SunState, planet_surface_velocity, rotate_points,
-    spaceport_docking_anchor, spaceport_local_points,
+    DebrisState, PLANET_ELASTICITY, POD_PIVOT, POD_TRIANGLES, PlanetState, PlayerId, RoverState,
+    SHELL_BODY, SHIP_BODY, SHIP_LASER, SHIP_LEFT_WING, SHIP_PIVOT, SHIP_RIGHT_WING, SHIP_THRUSTER,
+    SHIP_WING_MOUNT, SHIP_WING_PIVOT, SPACEPORT_PULL_SCALE, SPACEWARS_PLAYER_COUNT, ShipForm,
+    ShipState, SunState, planet_surface_velocity, rotate_points, spaceport_docking_anchor,
+    spaceport_local_points,
 };
 
 const WORLD_ENTITY_VALUE: u64 = 1;
@@ -1557,11 +1557,7 @@ fn ship_local_triangles(ship: &ShipState) -> Vec<[Vec2; 3]> {
     let pivot = ship_pivot(ship.form);
     let centered = |points: [Vec2; 3]| points.map(|point| point - pivot);
     if ship.form == ShipForm::EscapePod {
-        return vec![
-            centered(POD_LASER),
-            centered(POD_THRUSTER),
-            centered(POD_BODY),
-        ];
+        return POD_TRIANGLES.map(centered).to_vec();
     }
 
     vec![
@@ -1932,6 +1928,31 @@ mod tests {
         let local_center = super::super::ship_low_bounds(&triangles).center;
 
         assert!(rendered_center.distance_to(local_center + SHIP_PIVOT) < 1.0e-5);
+    }
+
+    #[test]
+    fn cockpit_window_and_pilot_fit_inside_the_shared_vehicle_geometry() {
+        use super::super::{POD_BODY, POD_COCKPIT_CENTER, POD_COCKPIT_RADIUS, spaceling_geometry};
+        let inside = |point: Vec2, polygon: &[Vec2], margin: f32| {
+            polygon
+                .iter()
+                .zip(polygon.iter().cycle().skip(1))
+                .all(|(&a, &b)| cross(b - a, point - a) / (b - a).length() >= margin - 1.0e-5)
+        };
+        assert!(inside(POD_COCKPIT_CENTER, &POD_BODY, POD_COCKPIT_RADIUS));
+        for end in [-1.0, 1.0] {
+            for i in 0..32 {
+                let point = Vec2::Y * (end * spaceling_geometry::HALF_SEGMENT)
+                    + Vec2::from_radians(i as f32 * std::f32::consts::TAU / 32.0)
+                        * spaceling_geometry::RADIUS;
+                assert!(point.length() < POD_COCKPIT_RADIUS);
+            }
+        }
+        // The attached cockpit is already enclosed by the full ship's hull;
+        // it must not need an overlapping extra physical body or collider.
+        for point in POD_TRIANGLES.into_iter().flatten() {
+            assert!(inside(point - POD_PIVOT + SHIP_PIVOT, &SHIP_BODY, 0.0));
+        }
     }
 
     #[test]

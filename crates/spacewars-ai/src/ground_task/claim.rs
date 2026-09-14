@@ -132,7 +132,7 @@ impl GroundNavigationTask {
                         || !position.y.is_finite()
                         || position.distance_to(local(actor.position)) > CLAIM_SEARCH_RADIUS + 0.1
                         || !map.nodes.iter().any(|node| {
-                            (node.position + node.position.normalized() * 0.9)
+                            (node.position + node.position.normalized() * HALF_HEIGHT)
                                 .distance_to(*position)
                                 < 0.01
                         })
