@@ -5,6 +5,7 @@ retries = 0
 [profile.ci.junit]
 path = "junit.xml"
 
+# Nightly/manual UI workflow, separate from ordinary PR checks.
 # These tests share an X display. Keep them serial until display/focus isolation
 # is explicit; a virtual display does not make real-time scenarios run faster.
 [profile.ui]

@@ -1,5 +1,11 @@
 # Functional UI tests
 
+These full-application workflows run in the separate **UI functional tests**
+GitHub Actions workflow, nightly and on demand. They are not part of ordinary
+PR checks. Normal CI still compiles them and runs the display-free unit,
+simulation, rendering, and control-protocol tests. See
+[CI coverage and manual dispatch](ci-performance.md#running-the-full-ui-suite-on-github).
+
 The `autostart_` workflows exercise persistent launcher-idle Clock and bot
 activities, settings suspension, input reset, client restart, Off, pause/resume,
 and preservation of manual preferences. Three short real bot matches expire
@@ -228,8 +234,8 @@ cargo test --profile ci -p engine-client --test ui_control_functional -- \
 ```
 
 The tests are marked ignored so the ordinary cross-platform workspace command
-does not require a display. Linux CI runs them explicitly under Xvfb.
-Its optimized `ci` Cargo profile retains debug assertions and overflow checks.
+does not require a display. The nightly/manual UI workflow runs them explicitly
+under Xvfb. Its optimized `ci` Cargo profile retains debug assertions and overflow checks.
 The application still runs at real-time speed; no animation waits or simulation
 budgets are shortened. See [CI performance](ci-performance.md) for the pinned
 nextest runner, matching CI commands, per-test reports, and build reuse.
@@ -250,7 +256,7 @@ command-history.json
 summary.json
 ```
 
-CI uploads that directory when the functional step fails. `summary.json` and
+The UI workflow uploads that directory when the functional step fails. `summary.json` and
 `command-history.json` are versioned JSON; test and engine diagnostics remain on
 stderr or in the log, keeping control output out of stdout.
 

@@ -1,55 +1,89 @@
 # CI performance and test timings
 
-The Linux workspace job builds all test targets once using Cargo's `ci` profile:
+The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
+workspace job builds all test targets, but executes only the non-ignored,
+headless tests and the vendored LinuxKMS tests. Display-driven end-to-end UI tests
+run separately in `UI functional tests` (`ui-functional.yml`), on a nightly
+schedule and manual dispatch, not as ordinary PR checks. The UI tests still
+compile on every PR, so compile errors in those tests are caught immediately.
+
+Both workflows use Cargo's `ci` profile:
 optimization level 2, line-table debug information, debug assertions and overflow
 checks enabled, no incremental compilation, no LTO, and 16 codegen units. Both
-headless and rendered UI tests reuse this profile and the same workspace/target
-selection. The production `release` profile is unchanged, including fat LTO for
-the NES scheduler. The separate NES release benchmark and AI baseline jobs remain.
+headless and rendered UI tests use the same workspace/target selection. Each
+workflow builds on its own runner and reuses that build for execution; it does
+not transfer a complete test build between jobs. The production `release`
+profile is unchanged, including fat LTO for the NES scheduler. The separate
+NES release benchmark and AI baseline jobs remain.
 
-After compilation, CI repeats the same Cargo build and requires every reported
-compiler artifact to be `fresh`, including the client binary. This checks reuse
+After compilation, the normal Linux job repeats the same Cargo build and requires
+every reported compiler artifact to be `fresh`, including the client binary. This checks reuse
 directly rather than imposing a machine-dependent timing limit. If it fails,
-Cargo fingerprint diagnostics identify the invalidated inputs. Headless, UI and
+Cargo fingerprint diagnostics identify the invalidated inputs. Headless and
 LinuxKMS tests still run when compilation succeeded, even if this guard fails.
 
 `Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts
 for the Linux workspace and the excluded LinuxKMS vendor manifest. It saves even
 when a test fails. The action's keys include the toolchain and Cargo configuration;
 the first run with a new profile/toolchain may be cold. PR caches are scoped by
-GitHub; main's cache supplies future branches. Other jobs do not receive duplicate
-large caches in this first pass. An exact cache-key miss is not proof of an empty
+GitHub; main's cache supplies future branches. The UI workflow uses the same
+Rust cache configuration. An exact cache-key miss is not proof of an empty
 cache: the restore step may reuse a compatible older dependency cache.
 
 ## Coverage and execution
 
-Nextest 0.9.144 is installed as a pinned prebuilt tool. It runs all existing
-non-ignored workspace tests, then all ignored `ui_control_functional` tests under
-Xvfb. Neither test set nor any seed, scenario length, timeout, or assertion budget
-has been reduced. Fail-fast and retries are disabled so results include every
-selected case without concealing a failure behind a retry. Nextest schedules
+Nextest 0.9.144 is installed as a pinned prebuilt tool. The normal workflow runs
+all existing non-ignored workspace tests, including display-free UI/HUD checks.
+The separate UI workflow runs all ignored `ui_control_functional` tests under
+Xvfb. No test has been deleted, and no seed, scenario length, timeout, or assertion
+budget has been reduced. Fail-fast and retries are disabled so results include
+every selected case without concealing a failure behind a retry. Nextest schedules
 headless tests in separate processes; shared-display UI tests remain serial.
-UI and LinuxKMS checks still run after a workspace-test failure if compilation
-succeeded. Any failed command still fails the job.
+LinuxKMS checks still run after a workspace-test failure if compilation succeeded.
+Any failed command still fails its job; UI failures are visible on the independent
+nightly/manual run rather than blocking every PR.
 
 Physics/AI/water scenarios advance simulated ticks as fast as the CPU allows.
 The full-client UI scenarios use real-time scheduling, including the two one-minute
 match-result/rematch workflows. Xvfb supplies a display, not accelerated time.
-The job's 60-minute ceiling remains a cold-run safety limit, not a performance goal.
+Both Linux jobs retain a 60-minute cold-run safety limit, not a performance goal.
+
+## Running the full UI suite on GitHub
+
+The full suite is scheduled daily at 09:29 UTC on the default branch. GitHub's
+[scheduled runs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+can be delayed; the schedule is not an exact-time guarantee.
+To validate a UI-related branch before merging, use Actions → **UI functional
+tests** → **Run workflow**, select the branch, or run:
+
+```sh
+gh workflow run ui-functional.yml --ref main
+# Replace main with a pushed branch name to test that branch.
+gh run list --workflow ui-functional.yml
+gh run watch RUN_ID --exit-status
+```
+
+The workflow file must first be merged into the default branch for
+[manual dispatch](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+to be available. Keep **Full UI workflows** out of required PR status checks:
+it intentionally has no pull-request trigger. Local full-suite execution remains
+available using the commands below.
 
 ## Reading CI results
 
 Open the Actions run's summary for:
 
-- separate wall durations for compilation, headless tests, UI tests, and the
-  vendored LinuxKMS build/tests;
+- wall durations for the phases belonging to that workflow: compilation plus
+  headless/LinuxKMS tests in normal CI, or compilation plus UI tests in the UI run;
 - pass/failure counts for each nextest report; and
 - the 20 slowest executed tests, with their binary, name, status, and duration.
 
-Download `linux-test-timings` for every per-test result in JUnit XML, Cargo's HTML
-compilation timeline, and the phase durations. It is retained for 14 days, on
-success or failure. Missing phases/reports are explicit, not shown as passing.
-Existing failed-UI screenshot and protocol-history artifacts remain separate.
+Download `linux-test-timings` from normal CI or `ui-test-timings` from the UI
+workflow for per-test results in JUnit XML, Cargo's HTML compilation timeline,
+and phase durations. Both are retained for 14 days, on success or failure.
+Each summary lists only its expected phases; an expected but missing phase/report
+remains explicit, not shown as passing. Failed-UI screenshots, app logs and
+protocol histories are retained separately as `ui-functional-test-artifacts`.
 
 Per-test durations overlap under parallel execution; do not sum them as job wall
 time. Timed execution commands include cached build checks and discovery. Cache
@@ -71,6 +105,7 @@ cargo +1.89.0 test --locked --workspace --all-targets --profile ci --no-run --me
   python3 .github/ci/assert_fresh_build.py
 /usr/bin/time -f '%e' -o target/ci-timings/workspace.seconds \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
+# Optional full UI suite (nightly/manual workflow, not ordinary PR checks):
 /usr/bin/time -f '%e' -o target/ci-timings/ui.seconds \
   xvfb-run -a -s "-screen 0 1280x1024x24" \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui \
@@ -106,8 +141,8 @@ and reuse artifacts on the following unchanged build.
 
 Future work should follow these measurements: profile remaining computational
 hotspots, split large internal parameter loops into individually scheduled cases,
-and isolate UI displays or add explicit controlled-time support. This change does
-not move tests to a nightly job or change the application clock.
+and isolate UI displays or add explicit controlled-time support if faster full
+UI runs are needed. Separating the workflow does not change the application clock.
 
 ## Initial local measurements (2026-09-13)
 
@@ -162,5 +197,13 @@ logs identified two build-script problems:
 
 The unchanged-build guard prevents a recurrence in the full workspace; the small
 fixtures exercise Git layouts that the developer's existing checkout may not have.
-Subsequent hosted measurements should distinguish the effect of this fix from a
-warm dependency-cache restore. The real-time UI workflows remain unchanged.
+
+[PR #97's warm-cache run](https://github.com/aortez/space-wars/actions/runs/34804048328)
+passed all six jobs. Linux took 14m00s: workspace compilation 155.02s, headless
+execution command 96.24s, UI execution command 528.09s, and LinuxKMS 9.03s.
+All 732 compiler artifacts were fresh; Cargo's build checks before headless and
+UI execution took 0.36s and 0.37s. The improvement combines warm dependency caches
+and removal of redundant client builds, not an isolated measurement of either.
+
+That 8m48s real-time UI phase motivated the nightly/manual separation. These
+figures precede the split; new PR durations still need hosted measurement.
