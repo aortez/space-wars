@@ -80,7 +80,7 @@ jobs:
     name: Linux workspace
     runs-on: ubuntu-latest
     # Keep the cold-run ceiling while collecting optimized, cached timings.
-    # Real-time UI workflows run separately in ui-functional.yml.
+    # Only four long-running UI scenarios are deferred to ui-functional.yml.
     timeout-minutes: 60
     env:
       # Material-world fixtures can exceed the default test-thread stack.
@@ -101,7 +101,7 @@ jobs:
             . -> target
             vendor/i-slint-backend-linuxkms -> target
       - name: Install native client dependencies
-        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0
+        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports and build-identity regression fixtures
         run: python3 -m unittest discover -s .github/ci -p 'test_*.py'
       - name: Build optimized Linux test executables
@@ -121,6 +121,25 @@ jobs:
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
             cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
+      - name: Verify PR UI selection
+        id: ui-selection
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          for profile in ui ui-pr; do
+            cargo nextest list --locked --workspace --all-targets --cargo-profile ci --profile "$profile" \
+              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --message-format json \
+              > "$RUNNER_TEMP/spacewars-ci-timings/$profile-list.json"
+          done
+          python3 .github/ci/assert_ui_selection.py \
+            "$RUNNER_TEMP/spacewars-ci-timings/ui-list.json" \
+            "$RUNNER_TEMP/spacewars-ci-timings/ui-pr-list.json"
+      - name: Run PR UI functional tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.ui-selection.outcome == 'success' }}
+        run: |
+          /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/ui.seconds" \
+            xvfb-run -a -s "-screen 0 1280x1024x24" \
+            cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
+              -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
       - name: Test vendored LinuxKMS input and software rendering
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
@@ -131,8 +150,8 @@ jobs:
         run: |
           python3 .github/ci/test_report.py --timings-dir "$RUNNER_TEMP/spacewars-ci-timings" \
             --cache-hit '${{ steps.rust-cache.outputs.cache-hit }}' \
-            --phase build --phase workspace --phase kms \
-            target/nextest/ci/junit.xml >> "$GITHUB_STEP_SUMMARY"
+            --phase build --phase workspace --phase ui --phase kms \
+            target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml >> "$GITHUB_STEP_SUMMARY"
       - name: Upload build and per-test timings
         if: always()
         uses: actions/upload-artifact@v4
@@ -143,6 +162,15 @@ jobs:
             ${{ runner.temp }}/spacewars-ci-timings/
             target/cargo-timings/
             target/nextest/ci/junit.xml
+            target/nextest/ui-pr/junit.xml
+          if-no-files-found: ignore
+      - name: Upload functional-test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-functional-test-artifacts
+          retention-days: 14
+          path: target/functional-test-artifacts
           if-no-files-found: ignore
 
   spacewars-ai-regression:

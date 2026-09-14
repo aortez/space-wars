@@ -1,6 +1,7 @@
 name: UI functional tests
 
-# These real-time, display-driven workflows are intentionally not PR checks.
+# Full regression suite, including four long-running cases omitted on PRs.
+# The other UI workflows also run in normal CI with the ui-pr profile.
 on:
   schedule:
     - cron: '29 9 * * *'

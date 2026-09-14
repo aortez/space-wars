@@ -1,10 +1,12 @@
 # Functional UI tests
 
-These full-application workflows run in the separate **UI functional tests**
-GitHub Actions workflow, nightly and on demand. They are not part of ordinary
-PR checks. Normal CI still compiles them and runs the display-free unit,
-simulation, rendering, and control-protocol tests. See
-[CI coverage and manual dispatch](ci-performance.md#running-the-full-ui-suite-on-github).
+Normal PR CI runs 38 of these full-application workflows using nextest's `ui-pr`
+profile. Only four long-running scenarios (two full matches, automatic Clock demo,
+rain, and duck traversal) are deferred. The separate **UI functional tests**
+workflow runs all 42 nightly/on demand using the `ui` profile. Normal CI also
+compiles every test and runs the display-free unit, simulation, rendering and
+control-protocol tests. See the [selection rationale and guard](ci-performance.md#deferred-ui-scenarios)
+and [manual dispatch instructions](ci-performance.md#running-the-full-ui-suite-on-github).
 
 The `autostart_` workflows exercise persistent launcher-idle Clock and bot
 activities, settings suspension, input reset, client restart, Off, pause/resume,
@@ -218,7 +220,7 @@ On Debian or Ubuntu, install the virtual display tools once:
 sudo apt-get install xvfb xauth
 ```
 
-Run the suite under an isolated X display:
+Run the complete suite under an isolated X display:
 
 ```sh
 xvfb-run -a -s "-screen 0 1280x1024x24" \
@@ -234,8 +236,9 @@ cargo test --profile ci -p engine-client --test ui_control_functional -- \
 ```
 
 The tests are marked ignored so the ordinary cross-platform workspace command
-does not require a display. The nightly/manual UI workflow runs them explicitly
-under Xvfb. Its optimized `ci` Cargo profile retains debug assertions and overflow checks.
+does not require a display. Both normal CI's `ui-pr` subset and the complete
+nightly/manual `ui` suite run explicitly under Xvfb. Their optimized `ci` Cargo
+profile retains debug assertions and overflow checks.
 The application still runs at real-time speed; no animation waits or simulation
 budgets are shortened. See [CI performance](ci-performance.md) for the pinned
 nextest runner, matching CI commands, per-test reports, and build reuse.
@@ -256,7 +259,7 @@ command-history.json
 summary.json
 ```
 
-The UI workflow uploads that directory when the functional step fails. `summary.json` and
+Both CI workflows upload that directory when their functional step fails. `summary.json` and
 `command-history.json` are versioned JSON; test and engine diagnostics remain on
 stderr or in the log, keeping control output out of stdout.
 

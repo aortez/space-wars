@@ -1,11 +1,11 @@
 # CI performance and test timings
 
 The normal `CI` workflow runs on pull requests and pushes to `main`. Its Linux
-workspace job builds all test targets, but executes only the non-ignored,
-headless tests and the vendored LinuxKMS tests. Display-driven end-to-end UI tests
-run separately in `UI functional tests` (`ui-functional.yml`), on a nightly
-schedule and manual dispatch, not as ordinary PR checks. The UI tests still
-compile on every PR, so compile errors in those tests are caught immediately.
+workspace job builds all test targets and runs the non-ignored headless tests,
+38 display-driven UI workflows, and vendored LinuxKMS tests. Only four explicitly
+named long-running UI scenarios are deferred from PR execution. The complete
+42-workflow suite runs in `UI functional tests` (`ui-functional.yml`), nightly
+and on manual dispatch. All tests still compile on every PR.
 
 Both workflows use Cargo's `ci` profile:
 optimization level 2, line-table debug information, debug assertions and overflow
@@ -17,9 +17,9 @@ profile is unchanged, including fat LTO for the NES scheduler. The separate
 NES release benchmark and AI baseline jobs remain.
 
 After compilation, the normal Linux job repeats the same Cargo build and requires
-every reported compiler artifact to be `fresh`, including the client binary. This checks reuse
-directly rather than imposing a machine-dependent timing limit. If it fails,
-Cargo fingerprint diagnostics identify the invalidated inputs. Headless and
+every reported compiler artifact to be `fresh`, including the client binary.
+This checks reuse directly rather than imposing a machine-dependent timing limit.
+If it fails, Cargo fingerprint diagnostics identify the invalidated inputs. Headless, UI and
 LinuxKMS tests still run when compilation succeeded, even if this guard fails.
 
 `Swatinem/rust-cache` retains Cargo dependencies and compiled dependency artifacts
@@ -34,14 +34,43 @@ cache: the restore step may reuse a compatible older dependency cache.
 
 Nextest 0.9.144 is installed as a pinned prebuilt tool. The normal workflow runs
 all existing non-ignored workspace tests, including display-free UI/HUD checks.
-The separate UI workflow runs all ignored `ui_control_functional` tests under
-Xvfb. No test has been deleted, and no seed, scenario length, timeout, or assertion
+It also runs the `ui-pr` profile under Xvfb: all ignored `ui_control_functional`
+tests except the four listed below. The nightly/manual workflow uses the `ui`
+profile to run the complete suite, including those four. No test has been
+deleted, and no seed, scenario length, timeout, or assertion
 budget has been reduced. Fail-fast and retries are disabled so results include
 every selected case without concealing a failure behind a retry. Nextest schedules
 headless tests in separate processes; shared-display UI tests remain serial.
 LinuxKMS checks still run after a workspace-test failure if compilation succeeded.
-Any failed command still fails its job; UI failures are visible on the independent
-nightly/manual run rather than blocking every PR.
+Any failed command still fails its job. Failures in the 38 retained UI workflows
+still fail normal PR CI; the four deferred cases are checked nightly/on demand.
+
+### Deferred UI scenarios
+
+These are useful extended checks, not tests deemed worthless. Their long waits
+make them a more expensive PR gate than the shorter end-to-end coverage retained.
+The durations below come from [PR #97's hosted run](https://github.com/aortez/space-wars/actions/runs/34804048328).
+
+| Test (within `ui_control_functional`) | Time | Reason for deferral |
+|---|---:|---|
+| `spacewars_match::normal_spacewars_physical_round_reaches_result_and_play_again` | 121.464s | Plays two real one-minute matches before checking result/rematch transitions. |
+| `clock::demo_profile_automatically_runs_multiple_bounded_events` | 59.488s | Waits through multiple seeded automatic events and recovery intervals. |
+| `clock::rain_settings_preview_pause_cleanup_and_persistence` | 47.640s | Waits for the full rain/floating/drain lifecycle before cleanup checks. |
+| `clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup` | 45.234s | Completes calibration, obstacle traversal, exit and repeated preview/restart. |
+
+PRs retain launcher/scenario lifecycle, both rendering paths, HUD placement,
+Device Info, sound/save-failure recovery, player settings, both autostart workflows,
+and shorter Clock falling, color-cycle, meltdown, marquee and live-controls tests.
+Autostart remains despite its 33s/43s durations because it checks important kiosk
+scheduling, automatic results/repeat, pause and input-boundary behavior.
+
+The `ui-pr` default filter in `.config/nextest.toml` excludes only exact names;
+new UI tests are included on PRs automatically. CI compares nextest's full and PR
+discovery reports using `assert_ui_selection.py`: stale exclusion names, missing
+new tests, or unexpected selected tests fail the selection guard. Changing this
+policy requires deliberately updating both the filter and its guard. A failing
+guard stops the UI execution step but still fails CI and retains the lists for
+inspection; it does not masquerade as successful UI coverage.
 
 Physics/AI/water scenarios advance simulated ticks as fast as the CPU allows.
 The full-client UI scenarios use real-time scheduling, including the two one-minute
@@ -74,16 +103,19 @@ available using the commands below.
 Open the Actions run's summary for:
 
 - wall durations for the phases belonging to that workflow: compilation plus
-  headless/LinuxKMS tests in normal CI, or compilation plus UI tests in the UI run;
+  headless/PR-UI/LinuxKMS tests in normal CI, or compilation plus full UI tests in
+  the nightly/manual run;
 - pass/failure counts for each nextest report; and
 - the 20 slowest executed tests, with their binary, name, status, and duration.
 
 Download `linux-test-timings` from normal CI or `ui-test-timings` from the UI
 workflow for per-test results in JUnit XML, Cargo's HTML compilation timeline,
 and phase durations. Both are retained for 14 days, on success or failure.
-Each summary lists only its expected phases; an expected but missing phase/report
-remains explicit, not shown as passing. Failed-UI screenshots, app logs and
-protocol histories are retained separately as `ui-functional-test-artifacts`.
+Normal CI uses `target/nextest/ui-pr/junit.xml`; the complete run uses
+`target/nextest/ui/junit.xml`. Each summary lists only its expected phases; an
+expected but missing phase/report remains explicit, not shown as passing.
+Both workflows retain failed-UI screenshots, app logs and protocol histories
+separately as `ui-functional-test-artifacts`.
 
 Per-test durations overlap under parallel execution; do not sum them as job wall
 time. Timed execution commands include cached build checks and discovery. Cache
@@ -105,14 +137,26 @@ cargo +1.89.0 test --locked --workspace --all-targets --profile ci --no-run --me
   python3 .github/ci/assert_fresh_build.py
 /usr/bin/time -f '%e' -o target/ci-timings/workspace.seconds \
   cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
-# Optional full UI suite (nightly/manual workflow, not ordinary PR checks):
+# PR UI coverage (all but four named long-running scenarios):
 /usr/bin/time -f '%e' -o target/ci-timings/ui.seconds \
   xvfb-run -a -s "-screen 0 1280x1024x24" \
-  cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui \
+  cargo +1.89.0 nextest run --locked --workspace --all-targets --cargo-profile ci --profile ui-pr \
     -E 'package(=engine-client) & binary(=ui_control_functional)' --run-ignored only --no-tests fail
 python3 .github/ci/test_report.py --timings-dir target/ci-timings \
-  target/nextest/ci/junit.xml target/nextest/ui/junit.xml
+  target/nextest/ci/junit.xml target/nextest/ui-pr/junit.xml
 ```
+
+Use `--profile ui` in the display command for the full suite. To run only the
+four deferred cases, retain `--profile ui-pr` and the other arguments, but replace
+the filter with:
+
+```sh
+--ignore-default-filter -E 'package(=engine-client) & binary(=ui_control_functional) & not default()'
+```
+
+`default()` still denotes the `ui-pr` default set when `--ignore-default-filter`
+is used, so this selects its complement within the UI binary. The full nightly
+run intentionally includes PR cases too, providing one complete regression report.
 
 For an individual headless case, add e.g.
 `-E 'package(=spacewars-ai) & test(generated_asteroid_duels)'` to the workspace
@@ -205,5 +249,7 @@ All 732 compiler artifacts were fresh; Cargo's build checks before headless and
 UI execution took 0.36s and 0.37s. The improvement combines warm dependency caches
 and removal of redundant client builds, not an isolated measurement of either.
 
-That 8m48s real-time UI phase motivated the nightly/manual separation. These
-figures precede the split; new PR durations still need hosted measurement.
+The first proposal moved the entire 8m48s UI phase out of PRs. The revised policy
+defers only the four cases above (273.826s combined), retaining 38 cases (253.366s
+combined). Those sums describe the old run's test durations, not a measured new
+pipeline or a performance threshold. New PR durations still need hosted measurement.

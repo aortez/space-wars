@@ -5,7 +5,7 @@ retries = 0
 [profile.ci.junit]
 path = "junit.xml"
 
-# Nightly/manual UI workflow, separate from ordinary PR checks.
+# Complete suite for nightly/manual runs and local investigations.
 # These tests share an X display. Keep them serial until display/focus isolation
 # is explicit; a virtual display does not make real-time scenarios run faster.
 [profile.ui]
@@ -15,3 +15,17 @@ test-threads = 1
 
 [profile.ui.junit]
 path = "junit.xml"
+
+# Most UI workflows stay on PRs. Defer only these four long-running scenarios;
+# exact names ensure new tests are included by default. The CI selection guard
+# detects stale exclusions and accidental loss of other UI coverage.
+[profile.ui-pr]
+inherits = "ui"
+default-filter = '''
+    package(=engine-client) & binary(=ui_control_functional) & not (
+        test(=spacewars_match::normal_spacewars_physical_round_reaches_result_and_play_again)
+        | test(=clock::demo_profile_automatically_runs_multiple_bounded_events)
+        | test(=clock::rain_settings_preview_pause_cleanup_and_persistence)
+        | test(=clock::duck_runs_jumps_exits_and_supports_live_controls_and_cleanup)
+    )
+'''
