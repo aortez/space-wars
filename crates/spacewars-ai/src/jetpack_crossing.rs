@@ -1,7 +1,9 @@
 //! One measured out-and-back ship crossing using ordinary shared pilot actions.
 use crate::BrainReset;
 use engine_core::Vec2;
-use scenario_spacewars::spaceling_geometry::HALF_HEIGHT;
+use scenario_spacewars::surface_sortie::jetpack::flight::{
+    FlightPhase, FlightSample, LAUNCH_CHARGE, flight_command,
+};
 use scenario_spacewars::surface_sortie::{
     PilotLocation, SurfaceSortieAction, TransferResult,
     jetpack::{
@@ -112,7 +114,7 @@ impl JetpackCrossingPilot {
         if !old.same_corridor(plan) {
             return false;
         }
-        self.telemetry.plan = Some(plan.clone());
+        self.telemetry.plan = Some(*plan);
         true
     }
     pub fn telemetry(&self) -> &CrossingTelemetry {
@@ -241,7 +243,7 @@ impl JetpackCrossingPilot {
                     return a;
                 }
                 if self.telemetry.plan.is_none() {
-                    self.telemetry.plan = Some(plan.clone());
+                    self.telemetry.plan = Some(*plan);
                     self.telemetry.goal = CrossingGoal::Recharge;
                 }
                 self.missing_since = None;
@@ -265,7 +267,7 @@ impl JetpackCrossingPilot {
         let right = Vec2::new(p.actor_up.y, -p.actor_up.x);
         let relative = actor.velocity - p.planet.velocity_at(actor.position);
         if self.telemetry.goal == CrossingGoal::Recharge {
-            if charge >= 0.98 {
+            if charge >= LAUNCH_CHARGE {
                 self.telemetry.goal = CrossingGoal::Approach;
             }
             return a;
@@ -314,39 +316,26 @@ impl JetpackCrossingPilot {
             };
             return a;
         }
-        let target_radius = if self.telemetry.goal == CrossingGoal::Descend {
-            // Aim slightly into the standing envelope so contact, rather than
-            // a hovering equilibrium just above it, ends the descent.
-            plan.destination.length() + HALF_HEIGHT * 0.6
-        } else {
-            plan.cruise_radius
+        let mut phase = match self.telemetry.goal {
+            CrossingGoal::Lift => FlightPhase::Lift,
+            CrossingGoal::Cross => FlightPhase::Cross,
+            _ => FlightPhase::Descend,
         };
-        let desired_rise = ((target_radius - local.length()) * 1.8).clamp(-6.0, 7.0);
-        a.primary_held = radial_speed < desired_rise;
-        if self.telemetry.goal == CrossingGoal::Descend
-            && local.length() < plan.destination.length() + HALF_HEIGHT + 0.6
-            && error.abs() < CROSSING_ARRIVAL_RANGE
-        {
-            // Once aligned just above the measured footing, commit to contact.
-            // Trying to hover at capsule height wastes the landing reserve on
-            // stepped/sloping terrain. Charged lateral steering still brakes.
-            a.primary_held = false;
-        }
-        if self.telemetry.goal == CrossingGoal::Lift
-            && p.supported_planet.is_some()
-            && self.previous_action.primary_held
-        {
-            // Getting up consumes a jump press and disarms the pack. Release
-            // before retrying takeoff so standing up cannot leave Lift holding
-            // a spent press forever. Once airborne the burn control is unchanged.
-            a.primary_held = false;
-        }
-        // The motor retains the takeoff velocity, while the destination keeps
-        // orbiting and rotating. Convert the desired ground-relative speed to
-        // that inertial frame instead of silently chasing a moving reference.
-        let frame_speed = (p.planet.velocity_at(actor.position) - o.reference_velocity).dot(right);
-        a.horizontal =
-            (((error * 1.8).clamp(-8.0, 8.0) + frame_speed) / o.air_speed).clamp(-1.0, 1.0);
+        a = flight_command(
+            plan,
+            &mut phase,
+            FlightSample {
+                radius: local.length(),
+                radial_speed,
+                error,
+                lateral_speed: relative.dot(right),
+                frame_speed: (p.planet.velocity_at(actor.position) - o.reference_velocity)
+                    .dot(right),
+                air_speed: o.air_speed,
+                supported: p.supported_planet.is_some(),
+                previous_jump: self.previous_action.primary_held,
+            },
+        );
         if charge <= 0.0 && p.supported_planet.is_none() {
             self.block("jetpack charge exhausted before landing");
         }

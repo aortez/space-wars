@@ -185,11 +185,11 @@ fn main() {
         live_planning.as_ref().is_none_or(|live| {
             (0..2).any(|i| {
                 live.enabled_for(i)
-                    && selected_policies[i] == MissionPolicy::Planner
+                    && !selected_policies[i].objective_planning().is_legacy()
                     && (i == seat || mode == "duel")
             })
         }),
-        "live objective planning needs an active v10 seat"
+        "live objective planning needs an active planner seat"
     );
     assert!(
         !verify_on_foot_surveys || selected_policies == [MissionPolicy::Legacy; 2],
@@ -286,11 +286,12 @@ fn main() {
                 let clock = Instant::now();
                 let mut observe = || {
                     if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i) && selected_policies[i] == MissionPolicy::Planner
+                        live.enabled_for(i)
+                            && !selected_policies[i].objective_planning().is_legacy()
                     }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
-                        live.observe(&state, i, &mut o.local);
+                        live.observe(&state, i, &mut o.local, request.objective_planning);
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)

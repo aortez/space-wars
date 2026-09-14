@@ -312,10 +312,7 @@ impl SurfaceSortieState {
         request: MissionSensorRequest,
         cadence: LandingSurveyCadence,
     ) -> MissionObservationV1 {
-        assert_eq!(
-            request.objective_planning,
-            landing_objective::ObjectivePlanning::JointRoundTrip
-        );
+        assert!(!request.objective_planning.is_legacy());
         self.mission_observation_profile(player, request, cadence, false)
     }
 

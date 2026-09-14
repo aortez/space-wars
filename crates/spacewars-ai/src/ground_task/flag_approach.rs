@@ -6,6 +6,10 @@ use scenario_spacewars::surface_sortie::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct FlagApproach {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crossing:
+        Option<scenario_spacewars::surface_sortie::jetpack::forecast::VehicleCrossingForecast>,
+
     pub objective: LandingObjective,
     pub endpoint: GroundNode,
     /// Planet-local entrances at the measurement, not a boarding permission.
@@ -21,9 +25,21 @@ impl FlagApproach {
 
 impl GroundNavigationTask {
     pub fn with_flag_approach(context: BrainReset, approach: Option<FlagApproach>) -> Self {
+        Self::with_flag_planning(context, approach, false)
+    }
+    pub fn with_flag_planning(
+        context: BrainReset,
+        approach: Option<FlagApproach>,
+        powered: bool,
+    ) -> Self {
         let mut task = Self::new(context, GroundDestination::Flag);
+        task.powered_flag = powered;
         task.joint_flag = true;
-        task.telemetry.policy = "ground_navigation_v11";
+        task.telemetry.policy = if powered {
+            "ground_navigation_v12"
+        } else {
+            "ground_navigation_v11"
+        };
         task.telemetry.flag_approach = approach;
         task
     }
@@ -53,8 +69,25 @@ impl GroundNavigationTask {
             return None;
         };
         let map_tick = map.tick;
+        let crossing = o
+            .jetpack
+            .as_ref()
+            .filter(|j| self.powered_flag && j.surveyed)
+            .and_then(|j| j.vehicle_forecast)
+            .filter(|c| c.valid_for(map));
+        let mut powered_map = None;
+        if let Some(crossing) = crossing {
+            let mut graph = map.clone();
+            graph.edges.extend(crossing.edges());
+            powered_map = Some(graph);
+        }
+        let routes_map = powered_map.as_ref().unwrap_or(map);
         if self.telemetry.flag_approach.is_some_and(|plan| {
-            !plan.objective.matches(objective)
+            (plan.crossing.is_some()
+                && o.jetpack.as_ref().is_some_and(|j| j.surveyed)
+                && crossing
+                    .is_none_or(|fresh| !plan.crossing.unwrap().plan.same_corridor(&fresh.plan)))
+                || !plan.objective.matches(objective)
                 || plan
                     .boarding_hatches
                     .into_iter()
@@ -69,7 +102,7 @@ impl GroundNavigationTask {
                     n.id == plan.endpoint.id && n.position.distance_to(plan.endpoint.position) < 0.1
                 })
                 || (map.tick > plan.tick
-                    && map
+                    && routes_map
                         .routes()
                         .route_to_hatches(plan.endpoint.position, hatches)
                         .diagnostics
@@ -94,12 +127,26 @@ impl GroundNavigationTask {
                 return None;
             }
             self.flag_survey_tick = Some(map_tick);
-            let trip = self.map.as_ref().unwrap().routes().round_trip_to_hatches(
-                foot,
-                objective.position,
-                objective.range,
-                hatches,
-            );
+            let trip = if let Some(c) = crossing {
+                self.map
+                    .as_ref()
+                    .unwrap()
+                    .routes()
+                    .round_trip_with_crossing(
+                        foot,
+                        objective.position,
+                        objective.range,
+                        hatches,
+                        c.edges(),
+                    )
+            } else {
+                self.map.as_ref().unwrap().routes().round_trip_to_hatches(
+                    foot,
+                    objective.position,
+                    objective.range,
+                    hatches,
+                )
+            };
             let Some(endpoint) = trip.endpoint else {
                 self.telemetry.goal = GroundGoal::Survey;
                 self.telemetry.reason = Some("waiting for a complete flag round trip");
@@ -111,6 +158,7 @@ impl GroundNavigationTask {
                 return None;
             };
             self.telemetry.flag_approach = Some(FlagApproach {
+                crossing,
                 objective,
                 endpoint,
                 boarding_hatches: hatches,

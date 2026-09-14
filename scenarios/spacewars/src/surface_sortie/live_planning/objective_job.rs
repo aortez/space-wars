@@ -1,4 +1,7 @@
 use super::*;
+use jetpack::forecast::{
+    FlightForecastJob, FlightScene, Proposal, ProposalJob, VehicleCrossingForecast,
+};
 
 #[derive(Clone)]
 enum Phase {
@@ -6,11 +9,21 @@ enum Phase {
     Avoid(Box<AvoidingJob>),
     Trip(Box<GroundRoundTripJob<'static>>),
     Dependencies(Box<RouteDependenciesJob>),
+    Proposal(Box<ProposalJob>),
+    Flight(Box<FlightForecastJob>),
     Done,
 }
 #[derive(Clone)]
 pub(crate) struct ObjectiveSurveyJob {
     phase: Phase,
+    flight_scene: Option<FlightScene>,
+    flight_dependent: bool,
+    candidate_map: Option<Arc<GroundMap>>,
+    proposal: Option<Proposal>,
+    crossing: Option<VehicleCrossingForecast>,
+    saved_trip: Option<Box<GroundRoundTripJob<'static>>>,
+    walking_failure: Option<LandingObjectiveRoute>,
+    flight_area: Option<QueryArea>,
     base: Option<Arc<GroundMap>>,
     measurements: Option<Box<GroundMeasurements>>,
     reused: ReusedGroundWork,
@@ -27,6 +40,7 @@ pub(crate) struct ObjectiveSurveyJob {
     result: LandingObjectiveSurvey,
 }
 impl SurfaceSortieState {
+    #[cfg(test)]
     pub(crate) fn objective_job(
         &self,
         player: usize,
@@ -36,6 +50,37 @@ impl SurfaceSortieState {
         measurements: Option<Box<GroundMeasurements>>,
         local_dependencies: bool,
     ) -> Option<ObjectiveSurveyJob> {
+        self.objective_job_with_planning(
+            player,
+            p,
+            cover,
+            snapshot,
+            measurements,
+            local_dependencies,
+            ObjectivePlanning::JointRoundTrip,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn objective_job_with_planning(
+        &self,
+        player: usize,
+        p: &PilotObservationV1,
+        cover: &[combat::LandingCover],
+        snapshot: Arc<QuerySnapshot>,
+        measurements: Option<Box<GroundMeasurements>>,
+        local_dependencies: bool,
+        planning: ObjectivePlanning,
+    ) -> Option<ObjectiveSurveyJob> {
+        let flight_scene = if planning == ObjectivePlanning::JetpackRoundTrip {
+            let (position, angle) = measurements
+                .as_ref()
+                .map_or((p.planet.motion.position, p.planet.motion.angle), |m| {
+                    (m.position, m.angle)
+                });
+            FlightScene::read(self, player, p, Arc::clone(&snapshot), position, angle)
+        } else {
+            None
+        };
         let objective = LandingObjective::read(p)?;
         if !p.queries_ready
             || !matches!(p.location, PilotLocation::Aboard(_))
@@ -111,6 +156,14 @@ impl SurfaceSortieState {
         }
         Some(ObjectiveSurveyJob {
             phase: Phase::Ground(Box::new(ground)),
+            flight_scene,
+            flight_dependent: false,
+            candidate_map: None,
+            proposal: None,
+            crossing: None,
+            saved_trip: None,
+            walking_failure: None,
+            flight_area: None,
             base: None,
             measurements: None,
             reused: ReusedGroundWork::default(),
@@ -132,7 +185,7 @@ impl SurfaceSortieState {
                 spec.radius + 0.02,
             )),
             result: LandingObjectiveSurvey {
-                planning: ObjectivePlanning::JointRoundTrip,
+                planning,
                 version: 1,
                 actor: p.owner,
                 tick: measurement_tick,
@@ -162,6 +215,9 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(crate) fn uses_flight_environment(&self) -> bool {
+        self.flight_dependent
+    }
     pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
         &self.dependencies
     }
@@ -194,6 +250,12 @@ impl ObjectiveSurveyJob {
         } else {
             self.result.actual = Some(route);
         }
+        self.candidate_map = None;
+        self.proposal = None;
+        self.crossing = None;
+        self.saved_trip = None;
+        self.walking_failure = None;
+        self.flight_area = None;
         self.index += 1;
         self.phase = if self.index < self.candidates.len() {
             self.avoid()
@@ -243,6 +305,8 @@ impl PlanningJob for ObjectiveSurveyJob {
             Phase::Avoid(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Trip(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Dependencies(j) => j.next_work().or(Some(WorkKind::Graph)),
+            Phase::Proposal(j) => j.next_work().or(Some(WorkKind::Graph)),
+            Phase::Flight(j) => j.next_work().or(Some(WorkKind::Graph)),
             Phase::Done => None,
         }
     }
@@ -268,6 +332,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                     j.step();
                 } else {
                     let map = Arc::new(j.take_map());
+                    self.candidate_map = Some(Arc::clone(&map));
                     let hatch = self.candidates[self.index].hatch;
                     self.phase = Phase::Trip(Box::new(GroundRoundTripJob::with_hatches(
                         map,
@@ -283,6 +348,46 @@ impl PlanningJob for ObjectiveSurveyJob {
                     j.step();
                 } else {
                     let result = j.output().unwrap();
+                    if result.endpoint.is_none()
+                        && self.flight_scene.is_some()
+                        && self.proposal.is_none()
+                    {
+                        self.walking_failure = Some(LandingObjectiveRoute {
+                            site: self.candidates[self.index].site,
+                            outbound: result.outbound.diagnostics.clone(),
+                            returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
+                            endpoint: None,
+                            crossing: None,
+                        });
+                        let candidate = self.candidates[self.index];
+                        self.phase = Phase::Proposal(Box::new(
+                            self.flight_scene.as_ref().unwrap().proposal(
+                                Arc::clone(self.candidate_map.as_ref().unwrap()),
+                                (candidate.vehicle - self.position).rotate_radians(-self.angle),
+                                candidate.angle - self.angle,
+                                self.radius,
+                            ),
+                        ));
+                        return;
+                    }
+                    if self.proposal.is_some() && self.crossing.is_none() {
+                        if result.endpoint.is_none() {
+                            let failure = self.walking_failure.take().unwrap();
+                            self.finish_route(failure);
+                        } else {
+                            if let Phase::Trip(trip) =
+                                std::mem::replace(&mut self.phase, Phase::Done)
+                            {
+                                self.saved_trip = Some(trip);
+                            }
+                            self.flight_dependent = true;
+                            self.phase = Phase::Flight(Box::new(FlightForecastJob::new(
+                                self.flight_scene.as_ref().unwrap(),
+                                self.proposal.unwrap(),
+                            )));
+                        }
+                        return;
+                    }
                     if self.local_dependencies && result.endpoint.is_some() {
                         if let Phase::Trip(trip) = std::mem::replace(&mut self.phase, Phase::Done) {
                             self.phase = Phase::Dependencies(Box::new(RouteDependenciesJob::new(
@@ -294,6 +399,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                         return;
                     }
                     let route = LandingObjectiveRoute {
+                        crossing: self.crossing,
                         site: self.candidates[self.index].site,
                         outbound: result.outbound.diagnostics.clone(),
                         returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
@@ -308,6 +414,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                 } else {
                     let result = j.trip.output().unwrap();
                     let route = LandingObjectiveRoute {
+                        crossing: self.crossing,
                         site: self.candidates[self.index].site,
                         outbound: result.outbound.diagnostics.clone(),
                         returning: result.returning.as_ref().map(|r| r.diagnostics.clone()),
@@ -315,8 +422,42 @@ impl PlanningJob for ObjectiveSurveyJob {
                     };
                     let mut areas = j.take_areas();
                     areas.extend(self.entrance_dependencies());
+                    areas.extend(self.flight_area);
                     self.dependencies.push((route.site, areas));
                     self.finish_route(route);
+                }
+            }
+            Phase::Proposal(j) => {
+                if j.next_work().is_some() {
+                    j.step();
+                } else if let Some(proposal) = *j.output().unwrap() {
+                    self.proposal = Some(proposal);
+                    let c = self.candidates[self.index];
+                    self.phase = Phase::Trip(Box::new(
+                        GroundRoundTripJob::with_hatches(
+                            Arc::clone(self.candidate_map.as_ref().unwrap()),
+                            c.hatch,
+                            self.result.objective.position,
+                            self.result.objective.range,
+                            c.boarding_hatches,
+                        )
+                        .with_crossing(proposal.edges()),
+                    ));
+                } else {
+                    let failure = self.walking_failure.take().unwrap();
+                    self.finish_route(failure);
+                }
+            }
+            Phase::Flight(j) => {
+                if j.next_work().is_some() {
+                    j.step();
+                } else if let Some(crossing) = *j.output().unwrap() {
+                    self.crossing = Some(crossing);
+                    self.flight_area = Some(j.area());
+                    self.phase = Phase::Trip(self.saved_trip.take().unwrap());
+                } else {
+                    let failure = self.walking_failure.take().unwrap();
+                    self.finish_route(failure);
                 }
             }
             Phase::Done => {}

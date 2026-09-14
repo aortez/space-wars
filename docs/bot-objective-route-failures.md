@@ -1,5 +1,11 @@
 # Why the asteroid reproduction publishes no objective route
 
+**September 14 follow-up:** two-sided boarding is checkpointed at `4037ba0`.
+The old timestamp no longer reproduces this failure on that checkpoint. The
+current controlled fixture, opt-in v11 crossing framework and comparison notes
+are in [bot-jetpack-landing.md](bot-jetpack-landing.md). The investigation below
+retains the original source/version-specific evidence.
+
 Investigation of the remaining negative surveys in
 [local route dependencies](bot-route-dependencies.md), on
 `de0142d4f7b1411c2878c095b2f1e151433e3ebc` (PR #92).

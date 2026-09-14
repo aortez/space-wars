@@ -110,6 +110,7 @@ pub struct GroundTelemetry {
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
     joint_flag: bool,
+    powered_flag: bool,
     flag_survey_tick: Option<u64>,
     context: BrainReset,
     telemetry: GroundTelemetry,
@@ -137,6 +138,7 @@ impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             joint_flag: false,
+            powered_flag: false,
             flag_survey_tick: None,
             context,
             telemetry: GroundTelemetry {
@@ -189,12 +191,20 @@ impl GroundNavigationTask {
             rejoin: None,
         }
     }
+    pub fn with_vehicle_forecasts(context: BrainReset, destination: GroundDestination) -> Self {
+        let mut task = Self::new(context, destination);
+        task.powered_flag = true;
+        task.telemetry.policy = "ground_navigation_v12";
+        task
+    }
     pub fn telemetry(&self) -> &GroundTelemetry {
         &self.telemetry
     }
     pub fn reset(&mut self, context: BrainReset) {
         *self = if self.joint_flag {
-            Self::with_flag_approach(context, None)
+            Self::with_flag_planning(context, None, self.powered_flag)
+        } else if self.powered_flag {
+            Self::with_vehicle_forecasts(context, self.telemetry.destination)
         } else {
             Self::new(context, self.telemetry.destination)
         };
@@ -594,7 +604,7 @@ impl GroundNavigationTask {
             && p.supported_planet == Some(p.planet.index)
             && p.balanced
         {
-            self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, plan.clone()));
+            self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, *plan));
             return self.follow_crossing(o);
         }
         let node_id = self.telemetry.path[index];

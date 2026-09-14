@@ -53,7 +53,7 @@ fn crossing_replay_clone_reset_and_identity_are_bounded() {
     }
     let mut changed = state.jetpack_crossing_observation(0, bot.direction());
     changed.surveyed = true;
-    changed.plan = bot.telemetry().plan.clone();
+    changed.plan = bot.telemetry().plan;
     if let scenario_spacewars::surface_sortie::jetpack::CrossingAnchor::Vehicle { angle, .. } =
         &mut changed.plan.as_mut().unwrap().anchor
     {

@@ -15,6 +15,10 @@ pub struct LivePlanningRun {
     planner: LiveObjectivePlanner,
     seats: Vec<usize>,
     trace: BufWriter<fs::File>,
+    profiles: std::collections::BTreeMap<
+        usize,
+        scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning,
+    >,
     dispatch: Vec<f64>,
     active_dispatch: Vec<f64>,
 }
@@ -60,6 +64,7 @@ impl LivePlanningRun {
             planner,
             seats,
             trace,
+            profiles: Default::default(),
             dispatch: Vec::new(),
             active_dispatch: Vec::new(),
         })
@@ -72,8 +77,10 @@ impl LivePlanningRun {
         state: &SurfaceSortieState,
         seat: usize,
         o: &mut TacticalSortieObservationV1,
+        planning: scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning,
     ) {
-        self.planner.observe(state, seat, o);
+        self.profiles.insert(seat, planning);
+        self.planner.observe_with_planning(state, seat, o, planning);
     }
     pub fn advance(&mut self, tick: u64) -> f64 {
         let start = Instant::now();
@@ -115,14 +122,16 @@ impl LivePlanningRun {
                 "p95_ms":values[values.len()*95/100],"p99_ms":values[values.len()*99/100],
                 "max_ms":values.last()})
         };
-        let profile = if self.planner.uses_route_dependencies() {
+        let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
+            "live_jetpack_objective_v1"
+        } else if self.planner.uses_route_dependencies() {
             "live_joint_objective_v3"
         } else if self.planner.reuses_ground() {
             "live_joint_objective_v2"
         } else {
             "live_joint_objective_v1"
         };
-        json!({"version":2,"sensor_profile":profile,
+        json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
             "objective_dependencies":if self.planner.uses_route_dependencies() { "routes" } else { "region" },
             "reuse_objective_ground":self.planner.reuses_ground(),
             "enabled_seats":self.seats,

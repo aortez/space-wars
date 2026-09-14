@@ -3,11 +3,14 @@ use super::*;
 use engine_rapier::spaceling::jetpack as motor;
 use ground_navigation::GroundMap;
 
+pub mod flight;
+pub mod forecast;
+
 pub const MAX_TERRAIN_CROSSINGS: usize = 8;
 /// The executor's final horizontal landing window, in world units.
 pub const CROSSING_ARRIVAL_RANGE: f32 = 1.0;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum CrossingAnchor {
     Vehicle {
         index: usize,
@@ -27,7 +30,7 @@ pub enum CrossingDirection {
     Right,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct CrossingPlan {
     pub planet: usize,
     pub revision: u64,
@@ -98,7 +101,7 @@ impl CrossingPlan {
             },
             start: self.destination,
             destination: self.start,
-            ..self.clone()
+            ..*self
         }
     }
 }
@@ -107,6 +110,9 @@ impl CrossingPlan {
 /// same completed, staggered survey as the ground map.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JetpackNavigationObservation {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vehicle_forecast: Option<forecast::VehicleCrossingForecast>,
+
     pub charge: f32,
     pub reference_velocity: Vec2,
     pub burning: bool,
@@ -138,7 +144,7 @@ impl JetpackNavigationObservation {
                 .crossing
                 .iter()
                 .chain(&self.terrain_crossings)
-                .flat_map(|plan| [plan.clone(), plan.reversed()])
+                .flat_map(|plan| [*plan, plan.reversed()])
                 .find(|plan| selected.same_corridor(plan)),
         }
     }
@@ -190,6 +196,7 @@ impl SurfaceSortieState {
             && !self.world.physics.material_queries_dirty
             && (self.world.tick + player as u64 * 15).is_multiple_of(30);
         Some(JetpackNavigationObservation {
+            vehicle_forecast: None,
             charge,
             reference_velocity: pack.map_or(Vec2::ZERO, |p| p.reference_velocity),
             burning: pack.is_some_and(|p| p.active),
@@ -439,7 +446,7 @@ impl SurfaceSortieState {
                             start: a,
                             destination: b,
                             cruise_radius: cruise,
-                            anchor: anchor.clone(),
+                            anchor,
                         });
                         break 'endpoints;
                     }
@@ -500,24 +507,24 @@ mod tests {
             cruise_radius: 64.54,
             anchor: CrossingAnchor::GroundGap { from: 254, to: 259 },
         };
-        let mut fresh = original.clone();
+        let mut fresh = original;
         fresh.anchor = CrossingAnchor::GroundGap { from: 255, to: 259 };
         fresh.destination.x = 2.92;
         assert!(original.same_corridor(&fresh));
         assert!(original.reversed().same_corridor(&fresh.reversed()));
-        let accepted = fresh.clone();
+        let accepted = fresh;
         fresh.destination.x += 0.4;
         assert!(
             !original.same_corridor(&fresh),
             "endpoint moved outside the landing window"
         );
-        fresh = accepted.clone();
+        fresh = accepted;
         fresh.anchor = CrossingAnchor::GroundGap { from: 256, to: 259 };
         assert!(
             !original.same_corridor(&fresh),
             "a different gap needs a new route"
         );
-        fresh = accepted.clone();
+        fresh = accepted;
         fresh.cruise_radius += 0.3;
         assert!(
             !original.same_corridor(&fresh),

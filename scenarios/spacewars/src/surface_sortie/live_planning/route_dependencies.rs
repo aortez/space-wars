@@ -100,8 +100,7 @@ impl PlanningJob for RouteDependenciesJob {
         let center = node.position + up * standing_height();
         let mut solids = Bounds::new(center);
         solids.capsule(center);
-        if let Some((from, kind)) = previous {
-            assert_ne!(kind, GroundEdgeKind::Jetpack);
+        if let Some((from, kind)) = previous.filter(|(_, kind)| *kind != GroundEdgeKind::Jetpack) {
             let offset = node.position - from.position;
             for sample in 0..=8 {
                 let t = sample as f32 / 8.0;

@@ -50,6 +50,34 @@ fn main() {
     let survey_landing = arg("--survey-landing", "false") == "true";
     let out = PathBuf::from(arg("--out", "/tmp/flag-soak"));
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
+    // Reproduction fixture: offer one measured landing without moving the ship
+    // or weakening any world permission. Useful for prospective route probes.
+    let landing_bearing: Option<u8> = match arg("--landing-bearing", "any").as_str() {
+        "any" => None,
+        value => Some(
+            value
+                .parse()
+                .expect("--landing-bearing must be any or a bearing number"),
+        ),
+    };
+    assert!(landing_bearing.is_none_or(|b| b < 64));
+    let restrict =
+        |o: &mut scenario_spacewars::surface_sortie::combat::TacticalSortieObservationV1| {
+            if let Some(bearing) = landing_bearing {
+                o.combat
+                    .recovery
+                    .flight
+                    .pilot
+                    .sites
+                    .retain(|s| s.id.bearing == bearing);
+                o.cover.retain(|s| s.site.bearing == bearing);
+                if let Some(survey) = &mut o.landing_objective {
+                    survey
+                        .sites
+                        .retain(|s| s.site.is_some_and(|id| id.bearing == bearing));
+                }
+            }
+        };
     let landing_threat = arg("--landing-threat", "false") == "true";
     assert!(!survey_landing || mode == "capture");
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
@@ -99,7 +127,7 @@ fn main() {
             .is_none_or(|live| live.enabled_for(seat)
                 && survey_landing
                 && mode == "capture"
-                && policy == MissionPolicy::Planner)
+                && !policy.objective_planning().is_legacy())
     );
     let mut capture = TacticalCapturePilot::with_planning(
         context,
@@ -156,15 +184,22 @@ fn main() {
         // here would inflate the measured cost beyond the interactive host.
         let mut tactical = matches!(mode.as_str(), "capture" | "recovery").then(|| {
             if let Some(live) = &mut live_planning {
-                let mut o = state.tactical_sortie_observation_for_live_planning(seat, site.into());
-                live.observe(&state, seat, &mut o);
-                o
-            } else {
-                state.tactical_sortie_observation_with_planning(
+                let mut o = state.tactical_sortie_observation_for_live_profile(
                     seat,
                     site.into(),
                     policy.objective_planning(),
-                )
+                );
+                restrict(&mut o);
+                live.observe(&state, seat, &mut o, policy.objective_planning());
+                o
+            } else {
+                let mut o = state.tactical_sortie_observation_with_planning(
+                    seat,
+                    site.into(),
+                    policy.objective_planning(),
+                );
+                restrict(&mut o);
+                o
             }
         });
         if survey_landing && !landing_threat {
@@ -461,6 +496,7 @@ fn main() {
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }
+    report["landing_bearing"] = json!(landing_bearing);
     report["survey_landing"] = json!(survey_landing);
     report["landing_threat"] = json!(landing_threat);
     report["approach_started_tick"] = json!(approach_started_tick);

@@ -106,6 +106,10 @@ struct Request {
     position: Vec2,
     angle: f32,
     gravity: f32,
+    planning: ObjectivePlanning,
+    jetpack_available: bool,
+    flight_dependent: bool,
+    flight_environment: Option<jetpack::forecast::FlightEnvironment>,
     actual: Option<ActualLanding>,
     snapshot: Arc<QuerySnapshot>,
     reused: ReusedGroundWork,
@@ -265,6 +269,18 @@ impl LiveObjectivePlanner {
         if (gravity - request.gravity).abs() > 0.01 {
             return Err("gravity_changed");
         }
+        if request.planning == ObjectivePlanning::JetpackRoundTrip
+            && request.jetpack_available != state.pilots[player].jetpack_charge.is_some()
+        {
+            return Err("jetpack_changed");
+        }
+        if request.flight_dependent
+            && let Some(old) = &request.flight_environment
+            && jetpack::forecast::FlightEnvironment::read(state, p)
+                .is_none_or(|new| !old.compatible(&new))
+        {
+            return Err("flight_environment_changed");
+        }
         if local_dependencies {
             Ok(())
         } else {
@@ -281,6 +297,11 @@ impl LiveObjectivePlanner {
         let spec = SurfaceSortieState::spec();
         let radius =
             p.planet.radius + 12.0 + spec.jump_speed.powi(2) / (2.0 * gravity.max(1.0)) * 0.85;
+        let radius = if request.planning == ObjectivePlanning::JetpackRoundTrip {
+            radius.max(p.planet.radius + jetpack::forecast::FORECAST_REGION_HEIGHT)
+        } else {
+            radius
+        };
         if !request.snapshot.matches_region(
             &state.world.physics.world,
             QueryRegion {
@@ -369,6 +390,11 @@ impl LiveObjectivePlanner {
         let radius = p.planet.radius
             + 12.0
             + spec.jump_speed.powi(2) / (2.0 * request.gravity.max(1.0)) * 0.85;
+        let radius = if request.planning == ObjectivePlanning::JetpackRoundTrip {
+            radius.max(p.planet.radius + jetpack::forecast::FORECAST_REGION_HEIGHT)
+        } else {
+            radius
+        };
         let whole = request.snapshot.validate_region(
             &state.world.physics.world,
             QueryRegion {
@@ -422,6 +448,23 @@ impl LiveObjectivePlanner {
         player: usize,
         o: &mut combat::TacticalSortieObservationV1,
     ) {
+        self.observe_with_planning(state, player, o, ObjectivePlanning::JointRoundTrip);
+    }
+    pub fn observe_with_planning(
+        &mut self,
+        state: &SurfaceSortieState,
+        player: usize,
+        o: &mut combat::TacticalSortieObservationV1,
+        planning: ObjectivePlanning,
+    ) {
+        assert!(!planning.is_legacy());
+        if self
+            .requests
+            .get(&player)
+            .is_some_and(|r| r.planning != planning)
+        {
+            self.invalidate(player, "policy_changed");
+        }
         let p = &o.combat.recovery.flight.pilot;
         assert!(
             player < state.pilots.len()
@@ -615,13 +658,14 @@ impl LiveObjectivePlanner {
             .as_ref()
             .map_or(p.planet.motion.angle, |m| m.angle);
         let reused = measurements.is_some();
-        if let Some(job) = state.objective_job(
+        if let Some(job) = state.objective_job_with_planning(
             player,
             p,
             &o.cover,
             Arc::clone(&snapshot),
             measurements,
             self.local_dependencies,
+            planning,
         ) {
             let token = self
                 .queue
@@ -639,6 +683,12 @@ impl LiveObjectivePlanner {
                     position,
                     angle,
                     gravity: state.objective_gravity(p),
+                    planning,
+                    jetpack_available: state.pilots[player].jetpack_charge.is_some(),
+                    flight_dependent: false,
+                    flight_environment: (planning == ObjectivePlanning::JetpackRoundTrip)
+                        .then(|| jetpack::forecast::FlightEnvironment::read(state, p))
+                        .flatten(),
                     actual: Self::actual(p),
                     snapshot,
                     reused: ReusedGroundWork::default(),
@@ -684,7 +734,9 @@ impl LiveObjectivePlanner {
                 .unwrap();
             request.graph += u64::from(allocation.charged.graph);
             request.physics_queries += u64::from(allocation.charged.physics_queries);
-            let reused = self.queue.job(request.token).unwrap().reused();
+            let job = self.queue.job(request.token).unwrap();
+            request.flight_dependent = job.uses_flight_environment();
+            let reused = job.reused();
             self.telemetry.reused_ground.nodes += reused.nodes - request.reused.nodes;
             self.telemetry.reused_ground.walks += reused.walks - request.reused.walks;
             self.telemetry.reused_ground.physics_queries +=

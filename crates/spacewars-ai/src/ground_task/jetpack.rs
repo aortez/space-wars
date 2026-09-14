@@ -71,16 +71,39 @@ impl GroundNavigationTask {
         }
         let mut graph = map.clone();
         let mut flights = Vec::new();
-        for plan in jetpack
-            .crossing
+        let approved = jetpack.vehicle_forecast.filter(|c| c.valid_for(map));
+        let candidates: Vec<_> = if self.powered_flag {
+            approved.iter().map(|c| c.plan).collect()
+        } else {
+            jetpack
+                .crossing
+                .iter()
+                .chain(&jetpack.terrain_crossings)
+                .copied()
+                .collect()
+        };
+        for plan in candidates
             .iter()
-            .chain(&jetpack.terrain_crossings)
             .filter(|plan| valid_plan(plan, map))
-            .flat_map(|plan| [plan.clone(), plan.reversed()])
+            .flat_map(|plan| [*plan, plan.reversed()])
         {
             // A measured direct ground edge is cheaper. Keep one unambiguous
             // flight per node pair when a vehicle and gap survey overlap.
-            if let Some((from, to)) = graph.connect_jetpack(plan.start, plan.destination) {
+            let connected = if self.powered_flag {
+                approved.map(|c| {
+                    let edges = c.edges();
+                    let edge = if plan.direction == c.plan.direction {
+                        edges[0]
+                    } else {
+                        edges[1]
+                    };
+                    graph.edges.push(edge);
+                    (edge.from, edge.to)
+                })
+            } else {
+                graph.connect_jetpack(plan.start, plan.destination)
+            };
+            if let Some((from, to)) = connected {
                 flights.push((from, to, plan));
             }
         }
@@ -107,7 +130,7 @@ impl GroundNavigationTask {
                     .iter()
                     .find(|(a, b, _)| *a == pair[0] && *b == pair[1])
                 {
-                    let plan = plan.clone();
+                    let plan = *plan;
                     combined.path.truncate(i + 1);
                     return (combined, Some(plan), combined_target);
                 }

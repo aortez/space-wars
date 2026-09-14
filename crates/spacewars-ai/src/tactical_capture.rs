@@ -73,6 +73,7 @@ impl TacticalCapturePilot {
         match planning {
             ObjectivePlanning::Legacy => "tactical_sortie_v10",
             ObjectivePlanning::JointRoundTrip => "tactical_sortie_v11",
+            ObjectivePlanning::JetpackRoundTrip => "tactical_sortie_v12",
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -123,10 +124,17 @@ impl TacticalCapturePilot {
         if self.previous_tick == Some(p.tick) {
             return self.previous_intent;
         }
-        if self.planning == ObjectivePlanning::JointRoundTrip {
+        if !self.planning.is_legacy() {
             if o.landing_objective.as_ref().is_some_and(|s| {
                 s.planning != self.planning
                     || s.sites.iter().chain(s.actual.iter()).any(|route| {
+                        if route.crossing.is_some_and(|c| {
+                            self.planning != ObjectivePlanning::JetpackRoundTrip
+                                || c.plan.planet != s.objective.planet
+                                || c.plan.revision != s.objective.revision
+                        }) {
+                            return true;
+                        }
                         route.cost().is_some()
                             && route.endpoint.is_none_or(|node| {
                                 usize::from(node.id)
@@ -155,6 +163,7 @@ impl TacticalCapturePilot {
                 && p.boarding_hatches.iter().any(Option::is_some)
             {
                 self.telemetry.flag_approach = Some(FlagApproach {
+                    crossing: route.crossing,
                     objective: s.objective,
                     endpoint,
                     boarding_hatches: p.boarding_hatches.map(|h| {
@@ -202,16 +211,15 @@ impl TacticalCapturePilot {
                 {
                     ground.retarget(destination);
                 } else {
-                    self.ground = Some(
-                        if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
-                            GroundNavigationTask::with_flag_approach(
-                                self.context,
-                                self.telemetry.flag_approach,
-                            )
-                        } else {
-                            GroundNavigationTask::new(self.context, destination)
-                        },
-                    );
+                    self.ground = Some(if !self.planning.is_legacy() && !owned {
+                        GroundNavigationTask::with_flag_planning(
+                            self.context,
+                            self.telemetry.flag_approach,
+                            self.planning == ObjectivePlanning::JetpackRoundTrip,
+                        )
+                    } else {
+                        GroundNavigationTask::new(self.context, destination)
+                    });
                 }
             }
             let ground = self.ground.as_mut().unwrap();
@@ -222,7 +230,7 @@ impl TacticalCapturePilot {
             {
                 intent.flight.controls = controls;
             }
-            if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
+            if !self.planning.is_legacy() && !owned {
                 self.telemetry.flag_approach = ground.telemetry().flag_approach;
             }
             self.telemetry.ground = Some(ground.telemetry().clone());

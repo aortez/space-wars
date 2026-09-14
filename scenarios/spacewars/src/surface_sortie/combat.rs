@@ -200,6 +200,16 @@ impl SurfaceSortieState {
         )
     }
 
+    pub fn tactical_sortie_observation_for_live_profile(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        planning: landing_objective::ObjectivePlanning,
+    ) -> TacticalSortieObservationV1 {
+        assert!(!planning.is_legacy());
+        self.tactical_sortie_observation_profile(player, query, planning, false)
+    }
+
     pub(super) fn tactical_sortie_observation_profile(
         &self,
         player: usize,
@@ -209,7 +219,10 @@ impl SurfaceSortieState {
     ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
-        let combat = self.combat_observation_with_query(player, query);
+        let mut combat = self.combat_observation_with_query(player, query);
+        if planning == landing_objective::ObjectivePlanning::JetpackRoundTrip {
+            self.add_vehicle_forecast(player, &mut combat.recovery);
+        }
         let cover: Vec<_> = combat
             .recovery
             .flight

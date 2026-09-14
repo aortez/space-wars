@@ -1657,7 +1657,7 @@ fn surface_ship_colliders(
 /// Build one stable convex collision silhouette from the independently rendered
 /// ship parts. A single collider prevents overlapping decorative triangles from
 /// producing several solver impulses for one impact.
-fn ship_collision_hull(ship: &ShipState) -> Vec<Vec2> {
+pub(super) fn ship_collision_hull(ship: &ShipState) -> Vec<Vec2> {
     let mut points = ship_local_triangles(ship)
         .into_iter()
         .flatten()

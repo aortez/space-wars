@@ -52,6 +52,7 @@ fn fixture() -> (TacticalCapturePilot, TacticalSortieObservationV1) {
         .sites
         .iter()
         .map(|site| LandingObjectiveRoute {
+            crossing: None,
             endpoint: None,
             site: Some(site.id),
             outbound: diagnostics(4.0),
@@ -242,6 +243,7 @@ fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() 
         objective: LandingObjective::read(p).unwrap(),
         sites: vec![],
         actual: Some(LandingObjectiveRoute {
+            crossing: None,
             endpoint: None,
             site: None,
             outbound: diagnostics(1.0),
@@ -369,6 +371,7 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
         ..endpoint
     };
     survey.actual = Some(LandingObjectiveRoute {
+        crossing: None,
         site: None,
         endpoint: Some(actual),
         outbound: diagnostics(2.0),

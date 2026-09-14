@@ -87,21 +87,25 @@ impl Search {
     fn step(
         &mut self,
         map: &GroundMap,
+        extra: &[Option<GroundEdge>; 2],
         offsets: &[usize; GROUND_SAMPLES + 1],
         edges: &[usize],
         reversed: bool,
         work: &mut GroundTripWork,
     ) -> bool {
         if let Some((entry, index, end)) = self.active {
-            let edge = map.edges[edges[index]];
+            let id = edges[index];
+            let edge = edge_at(map, extra, id).unwrap();
             work.scanned_edges += 1;
             self.active = (index + 1 < end).then_some((entry, index + 1, end));
-            if edge.kind != GroundEdgeKind::Jetpack {
+            if edge.kind != GroundEdgeKind::Jetpack || id >= map.edges.len() {
                 let next = usize::from(if reversed { edge.from } else { edge.to });
                 let candidate = entry.cost
                     + edge.length
                     + if edge.kind == GroundEdgeKind::Jump {
                         2.0
+                    } else if edge.kind == GroundEdgeKind::Jetpack {
+                        30.0
                     } else {
                         0.0
                     };
@@ -157,6 +161,7 @@ enum Phase {
 #[derive(Clone)]
 pub struct GroundRoundTripJob<'a> {
     map: Snapshot<'a>,
+    extra: [Option<GroundEdge>; 2],
     start: Vec2,
     target: Vec2,
     range: f32,
@@ -205,6 +210,7 @@ impl<'a> GroundRoundTripJob<'a> {
         let edges = map.edges.len();
         Self {
             map,
+            extra: [None; 2],
             start,
             target,
             range,
@@ -231,6 +237,16 @@ impl<'a> GroundRoundTripJob<'a> {
             },
             work: GroundTripWork::default(),
         }
+    }
+    /// Exactly one explicit crossing pair; arbitrary Jetpack edges in the map
+    /// remain excluded. Positive edge costs prevent repeated flights per leg.
+    pub fn with_crossing(mut self, edges: [GroundEdge; 2]) -> Self {
+        assert!(edges.iter().all(|e| e.kind == GroundEdgeKind::Jetpack));
+        assert_eq!((edges[0].from, edges[0].to), (edges[1].to, edges[1].from));
+        self.extra = edges.map(Some);
+        self.outgoing.reserve(2);
+        self.incoming.reserve(2);
+        self
     }
     pub fn work(&self) -> GroundTripWork {
         self.work
@@ -379,7 +395,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                 }
             }
             Phase::CountEdges(i) => {
-                if let Some(edge) = self.map.edges.get(i) {
+                if let Some(edge) = edge_at(&self.map, &self.extra, i) {
                     assert!(edge.length.is_finite() && edge.length >= 0.0);
                     self.offsets[usize::from(edge.from) + 1] += 1;
                     self.reverse_offsets[usize::from(edge.to) + 1] += 1;
@@ -403,7 +419,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                 }
             }
             Phase::IndexEdges(i) => {
-                if let Some(edge) = self.map.edges.get(i) {
+                if let Some(edge) = edge_at(&self.map, &self.extra, i) {
                     let from = usize::from(edge.from);
                     let to = usize::from(edge.to);
                     self.outgoing[self.next[from]] = i;
@@ -419,6 +435,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
             Phase::Forward => {
                 if self.forward.step(
                     &self.map,
+                    &self.extra,
                     &self.offsets,
                     &self.outgoing,
                     false,
@@ -443,6 +460,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
             Phase::Reverse => {
                 if self.backward.step(
                     &self.map,
+                    &self.extra,
                     &self.reverse_offsets,
                     &self.incoming,
                     true,
@@ -511,6 +529,8 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                     self.result.outbound.diagnostics.length += length;
                     self.result.outbound.diagnostics.jumps +=
                         usize::from(kind == GroundEdgeKind::Jump);
+                    self.result.outbound.diagnostics.flights +=
+                        usize::from(kind == GroundEdgeKind::Jetpack);
                     self.phase = Phase::TraceOut(usize::from(previous));
                 } else {
                     self.phase = Phase::ReverseOut(0);
@@ -534,6 +554,7 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                     back.path.push(next);
                     back.diagnostics.length += length;
                     back.diagnostics.jumps += usize::from(kind == GroundEdgeKind::Jump);
+                    back.diagnostics.flights += usize::from(kind == GroundEdgeKind::Jetpack);
                     if let Some(distance) = distance {
                         back.diagnostics.closest_reachable_distance = Some(
                             back.diagnostics
@@ -572,6 +593,28 @@ impl GroundRoutes<'_> {
         hatches: [Option<Vec2>; 2],
     ) -> GroundRoundTrip {
         GroundRoundTripJob::create(Snapshot::Borrowed(self.map), start, target, range, hatches)
+            .finish()
+    }
+}
+
+fn edge_at(map: &GroundMap, extra: &[Option<GroundEdge>; 2], i: usize) -> Option<GroundEdge> {
+    if i < map.edges.len() {
+        Some(map.edges[i])
+    } else {
+        extra.get(i - map.edges.len()).copied().flatten()
+    }
+}
+impl GroundRoutes<'_> {
+    pub fn round_trip_with_crossing(
+        &self,
+        start: Vec2,
+        target: Vec2,
+        range: f32,
+        hatches: [Option<Vec2>; 2],
+        edges: [GroundEdge; 2],
+    ) -> GroundRoundTrip {
+        GroundRoundTripJob::create(Snapshot::Borrowed(self.map), start, target, range, hatches)
+            .with_crossing(edges)
             .finish()
     }
 }

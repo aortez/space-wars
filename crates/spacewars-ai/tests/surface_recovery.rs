@@ -264,6 +264,7 @@ fn rebuild_flight_keeps_its_destination_until_ownership_changes() {
     o.ground.as_mut().unwrap().edges.clear();
     let site = o.rebuild.as_ref().unwrap().site.unwrap();
     o.jetpack = Some(JetpackNavigationObservation {
+        vehicle_forecast: None,
         reference_velocity: Vec2::ZERO,
         charge: 1.0,
         burning: false,

@@ -148,6 +148,7 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
         })
         .to_vec();
     let plan = FlagApproach {
+        crossing: None,
         objective: LandingObjective::read(p).unwrap(),
         endpoint: map.nodes[3],
         boarding_hatches: p.boarding_hatches,
@@ -470,6 +471,7 @@ fn add_jetpack(o: &mut RecoveryTaskObservationV1, charge: f32) {
         CrossingAnchor, CrossingDirection, CrossingPlan, JetpackNavigationObservation,
     };
     o.jetpack = Some(JetpackNavigationObservation {
+        vehicle_forecast: None,
         reference_velocity: Vec2::ZERO,
         charge,
         burning: false,
@@ -582,7 +584,7 @@ fn route_can_chain_two_measured_flights_without_changing_the_sensor_map() {
             length: 2.0,
         })
         .collect();
-    let mut second = o.jetpack.as_ref().unwrap().crossing.clone().unwrap();
+    let mut second = o.jetpack.as_ref().unwrap().crossing.unwrap();
     second.start = Vec2::new(8.0, 60.0);
     second.destination = Vec2::new(16.0, 60.0);
     second.anchor = CrossingAnchor::GroundGap { from: 5, to: 6 };
