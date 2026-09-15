@@ -18,6 +18,7 @@ pub(crate) struct ObjectiveSurveyJob {
     phase: Phase,
     flight_scene: Option<FlightScene>,
     flight_dependent: bool,
+    flight_work: FlightForecastWork,
     candidate_map: Option<Arc<GroundMap>>,
     proposal: Option<Proposal>,
     crossing: Option<VehicleCrossingForecast>,
@@ -158,6 +159,7 @@ impl SurfaceSortieState {
             phase: Phase::Ground(Box::new(ground)),
             flight_scene,
             flight_dependent: false,
+            flight_work: FlightForecastWork::default(),
             candidate_map: None,
             proposal: None,
             crossing: None,
@@ -215,6 +217,9 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(crate) fn flight_work(&self) -> &FlightForecastWork {
+        &self.flight_work
+    }
     pub(crate) fn uses_flight_environment(&self) -> bool {
         self.flight_dependent
     }
@@ -381,6 +386,7 @@ impl PlanningJob for ObjectiveSurveyJob {
                                 self.saved_trip = Some(trip);
                             }
                             self.flight_dependent = true;
+                            self.flight_work.started += 1;
                             self.phase = Phase::Flight(Box::new(FlightForecastJob::new(
                                 self.flight_scene.as_ref().unwrap(),
                                 self.proposal.unwrap(),
@@ -452,10 +458,16 @@ impl PlanningJob for ObjectiveSurveyJob {
                 if j.next_work().is_some() {
                     j.step();
                 } else if let Some(crossing) = *j.output().unwrap() {
+                    self.flight_work.approved += 1;
                     self.crossing = Some(crossing);
                     self.flight_area = Some(j.area());
                     self.phase = Phase::Trip(self.saved_trip.take().unwrap());
                 } else {
+                    *self
+                        .flight_work
+                        .rejected
+                        .entry(j.rejection().expect("failed forecast has a reason"))
+                        .or_default() += 1;
                     let failure = self.walking_failure.take().unwrap();
                     self.finish_route(failure);
                 }

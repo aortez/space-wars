@@ -7,6 +7,11 @@ round trip is disconnected. `material_mission_v9` and `material_mission_v10`
 retain their sensor/controller identities. The launcher's existing Planner
 choice still selects v10; v11 is currently a headless comparison option.
 
+The measurements below describe checkpoint `e58cdfc`. The follow-up
+[moving-objective investigation](bot-moving-objective-work.md) preserves valid
+ground routes when a flight hypothesis becomes stale, with new comparison data
+and unchanged flight thresholds.
+
 ## What the planner knows
 
 The landing sensor first measures the existing walk/jump round trip. On failure,

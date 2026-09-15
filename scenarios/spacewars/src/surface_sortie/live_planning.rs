@@ -50,10 +50,25 @@ pub enum ObjectiveWorkState {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+pub struct FlightForecastWork {
+    pub started: u64,
+    pub approved: u64,
+    pub rejected: BTreeMap<&'static str, u64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct LivePlanningTelemetry {
     pub submitted: u64,
     pub completed: u64,
     pub published: u64,
+    pub completed_by_actor: BTreeMap<usize, u64>,
+    pub published_by_actor: BTreeMap<usize, u64>,
+    pub flight_forecasts: FlightForecastWork,
+    pub flight_environment_checks: u64,
+    pub flight_environment_mismatches: u64,
+    /// Counts entries withheld during validation, including repeated checks.
+    pub withheld_flight_routes: u64,
+    pub flight_independent_validations: u64,
     pub invalidations: BTreeMap<&'static str, u64>,
     pub deferred_capacity: u64,
     pub deferred_snapshot_limit: u64,
@@ -110,6 +125,7 @@ struct Request {
     jetpack_available: bool,
     flight_dependent: bool,
     flight_environment: Option<jetpack::forecast::FlightEnvironment>,
+    flight_work: FlightForecastWork,
     actual: Option<ActualLanding>,
     snapshot: Arc<QuerySnapshot>,
     reused: ReusedGroundWork,
@@ -274,11 +290,9 @@ impl LiveObjectivePlanner {
         {
             return Err("jetpack_changed");
         }
-        if request.flight_dependent
-            && let Some(old) = &request.flight_environment
-            && jetpack::forecast::FlightEnvironment::read(state, p)
-                .is_none_or(|new| !old.compatible(&new))
-        {
+        // Local validation can still deliver ground routes from this coherent
+        // survey. Certify its flight-dependent answers at publication instead.
+        if !local_dependencies && !Self::flight_environment_valid(state, p, request) {
             return Err("flight_environment_changed");
         }
         if local_dependencies {
@@ -286,6 +300,17 @@ impl LiveObjectivePlanner {
         } else {
             Self::geometry_valid(state, player, p, request, request.gravity)
         }
+    }
+    fn flight_environment_valid(
+        state: &SurfaceSortieState,
+        p: &PilotObservationV1,
+        request: &Request,
+    ) -> bool {
+        !request.flight_dependent
+            || request.flight_environment.as_ref().is_some_and(|old| {
+                jetpack::forecast::FlightEnvironment::read(state, p)
+                    .is_some_and(|new| old.compatible(&new))
+            })
     }
     fn geometry_valid(
         state: &SurfaceSortieState,
@@ -369,6 +394,9 @@ impl LiveObjectivePlanner {
         mut survey: LandingObjectiveSurvey,
         telemetry: &mut LivePlanningTelemetry,
     ) -> Option<LandingObjectiveSurvey> {
+        let flight_valid = Self::flight_environment_valid(state, p, request);
+        telemetry.flight_environment_checks += u64::from(request.flight_dependent);
+        telemetry.flight_environment_mismatches += u64::from(!flight_valid);
         let excluded = [
             pilot_physics_id(p.owner),
             state
@@ -408,11 +436,27 @@ impl LiveObjectivePlanner {
             },
         );
         telemetry.region_area_tests += whole.area_tests;
-        if whole.valid {
+        if whole.valid && flight_valid {
             return Some(survey);
         }
         let mut valid = Vec::new();
         for (site, areas) in job.dependencies() {
+            // Failed flight attempts must not poison independent walking
+            // routes. Conversely, a changed field certifies neither a powered
+            // route nor a negative answer that might now be flyable.
+            let route = survey
+                .sites
+                .iter()
+                .chain(survey.actual.iter())
+                .find(|r| r.site == *site);
+            if !route.is_some_and(|r| r.cost().is_some() && (flight_valid || r.crossing.is_none()))
+            {
+                continue;
+            }
+            if whole.valid {
+                valid.push(*site);
+                continue;
+            }
             telemetry.route_checks += 1;
             telemetry.max_route_areas = telemetry.max_route_areas.max(areas.len());
             let check = request
@@ -425,6 +469,14 @@ impl LiveObjectivePlanner {
             }
         }
         let before = survey.sites.len() + usize::from(survey.actual.is_some());
+        if !flight_valid {
+            telemetry.withheld_flight_routes += survey
+                .sites
+                .iter()
+                .chain(survey.actual.iter())
+                .filter(|r| r.crossing.is_some())
+                .count() as u64;
+        }
         survey
             .sites
             .retain(|r| r.cost().is_some() && valid.contains(&r.site));
@@ -439,6 +491,7 @@ impl LiveObjectivePlanner {
             return None;
         }
         survey.validated_routes_only = true;
+        telemetry.flight_independent_validations += u64::from(!flight_valid);
         Some(survey)
     }
 
@@ -557,6 +610,7 @@ impl LiveObjectivePlanner {
                             if first {
                                 request.completed = true;
                                 self.telemetry.completed += 1;
+                                *self.telemetry.completed_by_actor.entry(player).or_default() += 1;
                                 self.telemetry.max_ready_age_ticks = self
                                     .telemetry
                                     .max_ready_age_ticks
@@ -573,6 +627,7 @@ impl LiveObjectivePlanner {
                                 o.landing_objective = Some(survey);
                                 o.objective_work = Some(ObjectiveWorkState::Ready);
                                 self.telemetry.published += 1;
+                                *self.telemetry.published_by_actor.entry(player).or_default() += 1;
                                 return;
                             }
                             measurements = self.salvage(state, player, p);
@@ -689,6 +744,7 @@ impl LiveObjectivePlanner {
                     flight_environment: (planning == ObjectivePlanning::JetpackRoundTrip)
                         .then(|| jetpack::forecast::FlightEnvironment::read(state, p))
                         .flatten(),
+                    flight_work: FlightForecastWork::default(),
                     actual: Self::actual(p),
                     snapshot,
                     reused: ReusedGroundWork::default(),
@@ -736,6 +792,25 @@ impl LiveObjectivePlanner {
             request.physics_queries += u64::from(allocation.charged.physics_queries);
             let job = self.queue.job(request.token).unwrap();
             request.flight_dependent = job.uses_flight_environment();
+            let flight = job.flight_work();
+            self.telemetry.flight_forecasts.started += flight.started - request.flight_work.started;
+            self.telemetry.flight_forecasts.approved +=
+                flight.approved - request.flight_work.approved;
+            for (&reason, &count) in &flight.rejected {
+                *self
+                    .telemetry
+                    .flight_forecasts
+                    .rejected
+                    .entry(reason)
+                    .or_default() += count
+                    - request
+                        .flight_work
+                        .rejected
+                        .get(reason)
+                        .copied()
+                        .unwrap_or(0);
+            }
+            request.flight_work = flight.clone();
             let reused = job.reused();
             self.telemetry.reused_ground.nodes += reused.nodes - request.reused.nodes;
             self.telemetry.reused_ground.walks += reused.walks - request.reused.walks;

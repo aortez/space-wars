@@ -301,6 +301,7 @@ pub(crate) struct FlightForecastJob {
     minimum: Vec2,
     maximum: Vec2,
     result: Option<VehicleCrossingForecast>,
+    rejection: Option<&'static str>,
 }
 #[derive(Clone)]
 pub(crate) struct FlightScene {
@@ -412,6 +413,7 @@ impl FlightForecastJob {
             minimum: proposal.plan.start,
             maximum: proposal.plan.start,
             result: None,
+            rejection: None,
         };
         job.launch();
         job
@@ -447,6 +449,13 @@ impl FlightForecastJob {
     fn stop(&mut self) {
         self.phase = Phase::Done;
     }
+    fn reject(&mut self, reason: &'static str) {
+        self.rejection = Some(reason);
+        self.stop();
+    }
+    pub(crate) fn rejection(&self) -> Option<&'static str> {
+        self.rejection
+    }
 }
 impl PlanningJob for FlightForecastJob {
     type Output = Option<VehicleCrossingForecast>;
@@ -467,15 +476,18 @@ impl PlanningJob for FlightForecastJob {
                 let plan = self.plan();
                 let time = self.step as f32 * DT;
                 let gravity = self.environment.gravity(self.position, time);
-                if self.step >= MAX_STEPS || !gravity.length().is_finite() || gravity.length() < 0.1
-                {
-                    self.stop();
+                if self.step >= MAX_STEPS {
+                    self.reject("time_limit");
+                    return;
+                }
+                if !gravity.length().is_finite() || gravity.length() < 0.1 {
+                    self.reject("invalid_gravity");
                     return;
                 }
                 let up = -gravity.normalized();
                 // This first primitive assumes gravity approximately normal to the retained footing.
                 if up.dot(self.position.normalized()) < 0.98 {
-                    self.stop();
+                    self.reject("gravity_direction");
                     return;
                 }
                 let right = Vec2::new(up.y, -up.x);
@@ -515,7 +527,7 @@ impl PlanningJob for FlightForecastJob {
                             self.stop();
                         }
                     } else {
-                        self.stop();
+                        self.reject("arrival_window");
                     }
                     return;
                 }
@@ -543,14 +555,14 @@ impl PlanningJob for FlightForecastJob {
                     self.velocity += up * impulse;
                 }
                 if self.burn > (LAUNCH_CHARGE - LANDING_RESERVE) * motor::BURN_SECONDS {
-                    self.stop();
+                    self.reject("fuel_reserve");
                     return;
                 }
                 self.velocity += gravity * DT;
                 self.position += self.velocity * DT;
                 self.step += 1;
                 if self.position.length() > plan.cruise_radius + 20.0 {
-                    self.stop();
+                    self.reject("height_limit");
                     return;
                 }
                 self.query = self
@@ -575,7 +587,7 @@ impl PlanningJob for FlightForecastJob {
                 ) {
                     self.phase = Phase::HullQuery;
                 } else {
-                    self.stop();
+                    self.reject("world_clearance");
                 }
             }
             Phase::HullQuery => {
@@ -587,7 +599,7 @@ impl PlanningJob for FlightForecastJob {
                 ) {
                     self.phase = Phase::Integrate;
                 } else {
-                    self.stop();
+                    self.reject("hull_clearance");
                 }
             }
         }
