@@ -17,6 +17,7 @@ mod physics;
 mod presentation;
 mod rain;
 mod render;
+pub mod water_fixture;
 
 use std::time::Duration;
 
