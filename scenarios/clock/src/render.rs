@@ -30,6 +30,10 @@ const LABEL_COLOR: RenderColor = RenderColor::rgb(0.52, 0.72, 0.77);
 const COLON_X_UNITS: f32 = 14.5;
 const COLON_Y_UNITS: [f32; 2] = [2.25, 5.75];
 
+pub(crate) fn water_fixture(frame: &mut RenderFrame, water: &engine_water::WaterWorld) {
+    meltdown::render_water(frame, water, ACTIVE_CELL_LAYER, 1.0);
+}
+
 pub fn render_frame(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));

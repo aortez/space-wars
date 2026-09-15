@@ -8,6 +8,68 @@ use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat, Scenario
 use std::time::Duration;
 
 #[test]
+fn heavy_rain_has_no_persistent_lip_gaps_and_mixes_opposing_outfalls() {
+    for aspect in [1024.0 / 768.0, 800.0 / 480.0, 480.0 / 800.0] {
+        for seed in [0, 7, 19] {
+            let mut event = RainEvent::new(
+                test_drain(Layout::new(aspect)),
+                seed,
+                ClockRainAmount::Heavy,
+            );
+            let mut checked = 0;
+            let mut gaps = 0;
+            let mut gap_runs = [0; 2];
+            let mut longest_gap = 0;
+            for _ in 0..RAINING_TICKS {
+                event.step();
+                let mut gap = [false; 2];
+                for (i, p) in event.water.parcels().iter().enumerate() {
+                    let Some(engine_water::SpillSource::Outlet { pool, edge }) =
+                        event.water.spill_source(i)
+                    else {
+                        continue;
+                    };
+                    let spec = event.water.pools()[pool].spec();
+                    let lip = spec.left
+                        + if edge == 0 {
+                            0.0
+                        } else {
+                            spec.column_width * spec.bed.len() as f64
+                        };
+                    if (p.position.x as f64 - lip).abs() <= p.velocity.x.abs() as f64 * DT {
+                        // Ignore subpixel startup droplets, as does rendering.
+                        if p.volume < 0.05 * (p.velocity.length() as f64 * DT).max(0.5) {
+                            continue;
+                        }
+                        checked += 1;
+                        gap[pool] |= event.water.spill_ribbon(i).is_none();
+                    }
+                }
+                for pool in 0..2 {
+                    gaps += usize::from(gap[pool]);
+                    gap_runs[pool] = if gap[pool] { gap_runs[pool] + 1 } else { 0 };
+                    longest_gap = longest_gap.max(gap_runs[pool]);
+                }
+            }
+            let stats = event.water.stats();
+            assert!(checked > 100);
+            // A discrete rain impact may create a one-frame source pulse that
+            // cannot fit a convex strip. It must not leave a standing gap as
+            // the former changing-head geometry did for many consecutive ticks.
+            assert!(
+                longest_gap <= 1,
+                "aspect={aspect} seed={seed} gap_run={longest_gap}"
+            );
+            eprintln!(
+                "rain aspect={aspect:.3} seed={seed} transient_fallbacks={gaps}/{checked} max_run={longest_gap} merges={}",
+                stats.spill_merges
+            );
+            assert!(stats.spill_merges > 100, "{stats:?}");
+        }
+    }
+}
+
+#[test]
 fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
     for aspect in [1024.0 / 768.0, 800.0 / 480.0, 480.0 / 800.0] {
         for amount in [

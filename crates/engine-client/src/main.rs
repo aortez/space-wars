@@ -34,6 +34,8 @@ mod ui_inventory;
 mod ui_navigation;
 #[cfg(test)]
 mod ui_render_tests;
+#[cfg(test)]
+mod water_visual_tests;
 
 use std::cell::RefCell;
 use std::env;

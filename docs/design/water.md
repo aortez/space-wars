@@ -33,9 +33,10 @@ solver. Closed edges retain water; open edges have explicit spill lips.
 
 Overflow becomes finite ballistic parcels. They accelerate downward, deposit
 into the first pool surface crossed, or leave through the world lower boundary.
-An upper pool can feed a separate lower pool. Parcels are not colliding particles
-and do not automatically generate impact splashes, mixing, pressure, or breaking
-waves. A caller may inject upward-moving splash parcels. On capacity
+An upper pool can feed a separate lower pool. Opposing automatic outfalls mix
+locally when their swept footprints collide (details below). Other parcels are
+not colliding particles: there is no general pressure, breaking-wave, or impact
+splash solver. A caller may inject upward-moving splash parcels. On capacity
 exhaustion, outflow is held in the pool; it is never silently deleted.
 Each parcel carries optional `horizontal_bounds` that stop horizontal motion at
 vertical walls. Automatic spills inherit `WaterConfig::spill_channel`; explicit
@@ -43,7 +44,7 @@ vertical walls. Automatic spills inherit `WaterConfig::spill_channel`; explicit
 Normal Meltdown uses the central drain channel for outflow and the outer screen
 walls for its impact spray; the open collecting-pool fixture is unconfined.
 The channel is not a general solid
-collision system, and ballistic parcels still pass through one another.
+collision system. Independent rain/splash parcels still pass through one another.
 
 The accounting contract is:
 
@@ -73,6 +74,136 @@ Parcel deposition transfers volume but does not impart impact momentum to a
 pool. These are explicit limitations for future body/wave coupling.
 
 ## Integration and verification
+
+### Connected outfalls and the edge test bed
+
+Surface columns and ballistic water still have different simulation roles, but
+automatic outfalls now retain shared material cross-sections. Consecutive
+emissions from the **same pool edge on consecutive steps** share a face. A dry
+interval, expired/collected parcel, or unrelated rain/splash source cannot create
+a connection. The newest face spans the lip to the current pool surface. Face
+width is flow divided by speed, so an accelerating stream narrows downstream.
+
+`WaterWorld::spill_ribbon(index)` exposes two convex pieces for an attached
+parcel. The faces remain shared; the interior width is solved so the pieces'
+combined area equals that parcel's transported volume, before channel clipping.
+Normalizing each entire polygon independently would reopen seams. Degenerate,
+folded, or abruptly compressed slices fall back to the detached representation
+instead of inventing negative widths or non-convex renderer input. Channel
+clipping and subpixel raster coverage remain presentation approximations, not
+changes to the volume ledger.
+
+Changing source depth also moves the section centers vertically; that motion is
+not the material's flow direction. The midpoint now interpolates the material
+face normals instead of using the center-to-center chord. This fixes the standing
+gap reproduced by `steps-right-depth-15-tick-60`, whose youngest slices previously
+folded through the lip and fell back to drops. The regression checks every slice
+through the rising-head interval in both directions. Heavy-rain regressions cover
+three aspect ratios and three seeds: isolated one-frame impact pulses may still
+use the detached fallback, but repeated lip gaps are rejected.
+
+The emitted parcel center starts halfway through its represented time interval;
+that birth motion is swept for collection just like subsequent movement. Its
+youngest material face starts at the exact lip, not slightly outside it. The
+outfall speed law and donor-limited column fluxes are unchanged. Presentation
+history is preallocated alongside the existing parcel budget, maintained in a
+linear pass, and removed/reclaimed with the parcel. This presentation history
+needs no sorting, unbounded history, additional particles, or per-step allocations.
+
+Clock uses the connected geometry for both Rain and Meltdown. Its surface
+highlight continues down the stream, covering at most 24% of its thickness so a
+thin jet does not turn entirely into the brighter highlight color. Independent
+splashes retain their compact-drop/ribbon rendering.
+
+The deterministic `scenario_clock::water_fixture` lab bypasses event timing and
+uses a fed upper reservoir over a lower collector. It provides left/right
+outfalls, depths 1/5/15, a flat ledge, steps, and a sampled ramp. Opposing fixtures
+add equal/unequal streams and a stopping source, with a no-mixing A/B control.
+The gallery also captures the actual heavy-rain event at Picade and HyperPixel
+aspect ratios. The renderer checks require neither a display nor a new launcher
+scenario:
+
+```sh
+# Geometry/volume regressions at 30, 60 and 120 simulation steps per second.
+cargo test --locked -p scenario-clock water_edge_lab -- --nocapture
+cargo test --locked -p engine-water spill::tests
+cargo test --locked -p engine-water mixing::tests
+cargo test --locked -p scenario-clock opposed_outfalls
+cargo test --locked -p scenario-clock heavy_rain_has
+
+# Production raster PNGs, vector SVG paths, and a browsable index.html.
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/spacewars-water-edge \
+  cargo test --locked -p engine-client --bin engine-client water_edge_lab
+
+# Physics-only timing, not displayed FPS or rendering cost.
+cargo run --locked --release -p engine-water --example water_benchmark
+```
+
+The original renderer reproduced the reported apparent-volume loss: for a
+five-unit reservoir, a vertical probe just outside the lip found water over
+56.9% / 37.9% / 24.7% of its depth at 30 / 60 / 120 Hz, despite a balanced volume
+ledger. Compact parcels overlapped near the source, then changed shape as they
+accelerated. The connected version covers 100% in these fixtures (regression
+minimum 99%); transported polygon area is checked within 0.02%. Shared-face,
+mirror, non-default-gravity, stopped/restarted-flow, independent-drop, reclamation,
+storage reuse, speed-bound, and birth-collection checks cover the engine contract.
+
+### Local opposing-stream mixing
+
+`WaterConfig::mix_spills` defaults to true; false provides the ballistic A/B
+control. `SpillSource` distinguishes automatic pool edges, mixed junctions, and
+independent sources (no attached source). Only approaching outfalls from different
+edges, with opposite horizontal velocities and identical channel bounds, mix.
+Their finite footprints preserve slice area; swept oriented-rectangle tests catch
+crossings within a timestep, rather than only overlapping end positions.
+
+Colliding slices become a local inelastic volume: volume, center of mass, and
+momentum are preserved, while relative kinetic energy is dissipated. Equal jets
+fall downward; unequal jets retain the stronger flow's horizontal momentum.
+Groups require a shared contact patch, so remote intersections cannot teleport
+together. Mixed output can share a material face with the preceding nearby
+junction slice; it never links back to an incoming lip. Junction presentation
+spaces joined faces by volume throughput rather than collision-sampling jitter;
+the actual parcel center and momentum are not moved by this presentation step.
+Compressed junction geometry falls back to a compact area-preserving parcel
+instead of a wide spike.
+
+Scratch storage is preallocated within the existing parcel limit. A deterministic
+swept-AABB sort and vertical sweep prune candidates; dense overlap can still be
+quadratic, bounded by 512 parcels (128 in Clock). Consumed inputs are compacted
+with their metadata; mixing only decreases parcel count. `WaterStats` records
+`spill_merges`, `mixed_volume`, and `mixing_pair_checks` for measurement.
+
+This is deliberately not general particle fluid simulation: independent rain,
+spray, and already-mixed jets do not collide. Contact orientations are frozen at
+mid-step and the center-of-mass replacement happens before ballistic advancement,
+so contact can resolve up to one timestep early. Startup/transient jets can break
+into compact parcels, and strong direction changes or wall compression can still
+produce irregular downstream geometry. There is no pressure or turbulence solver,
+and pool impacts still deposit whole parcels without transferring their momentum.
+
+On a development workstation with Rust 1.89 release, the 128-column opposed
+fixture measured roughly 5.0–5.3 microseconds/step with mixing, versus 4.9–5.2
+without (12,000 measured steps after warm-up, depths 5/15). Mixing reduced peak
+parcels from 128 to 92/88 and avoided capacity backpressure in those fixtures.
+These are physics-only local A/B timings, not Pi measurements or renderer FPS;
+different trajectories and parcel counts are part of the comparison.
+
+Production-renderer snapshots from the deterministic lab:
+
+| Rising stepped outfall (depth 15, tick 60) | Opposing streams (depth 5, tick 90) |
+| --- | --- |
+| ![Connected stepped outfall](../screenshots/water/stepped-outfall.png) | ![Two streams merging downward](../screenshots/water/opposed-streams.png) |
+
+**Remaining boundary:** stepped beds are still stepped, and surface smoothing
+still stops across changes in bed elevation. The steps/ramp captures deliberately
+expose this for the next pass; this is not yet tangent-aware slope flow. Whole
+parcels also still deposit on center-path collection, without an impact-pressure
+or splash solver. Vector backends may antialias separately drawn shared faces;
+the production raster capture checks geometry without relying on SVG rasterizer
+antialiasing behavior.
+
+### General integration checks
 
 - Render pool surfaces from the same geometry used for flow/deposition.
 - Render falling parcels as short ribbons: increased falling speed lengthens
