@@ -1,5 +1,7 @@
 use super::*;
 
+mod edge_lab;
+
 fn column(index: usize, bed: f64, height: f64) -> Column {
     Column {
         left: index as f64 * 3.0,

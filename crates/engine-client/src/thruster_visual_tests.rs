@@ -11,7 +11,7 @@ use slint::{Brush, Rgb8Pixel, SharedPixelBuffer};
 use crate::raster::{RasterOptions, RasterRenderer};
 use crate::render::{self, FrameLayout, Viewport};
 
-fn raster(frame: &RenderFrame, viewport: Viewport) -> SharedPixelBuffer<Rgb8Pixel> {
+pub(crate) fn raster(frame: &RenderFrame, viewport: Viewport) -> SharedPixelBuffer<Rgb8Pixel> {
     RasterRenderer::new()
         .image_from_frames_with_layout(
             std::slice::from_ref(frame),
@@ -353,7 +353,7 @@ fn attached_ion_core_remains_visible_through_the_pulse_cycle() {
     }
 }
 
-fn write_png(path: &Path, pixels: &SharedPixelBuffer<Rgb8Pixel>) {
+pub(crate) fn write_png(path: &Path, pixels: &SharedPixelBuffer<Rgb8Pixel>) {
     let mut encoder = png::Encoder::new(
         std::fs::File::create(path).unwrap(),
         pixels.width(),
@@ -368,7 +368,7 @@ fn write_png(path: &Path, pixels: &SharedPixelBuffer<Rgb8Pixel>) {
         .unwrap();
 }
 
-fn svg(frame: &RenderFrame, viewport: Viewport) -> String {
+pub(crate) fn svg(frame: &RenderFrame, viewport: Viewport) -> String {
     // Export the actual vector adapter's paths rather than independently
     // reimplementing projection/tessellation for the inspection artifact.
     let mut out = format!(
