@@ -63,6 +63,9 @@ pub struct LivePlanningTelemetry {
     pub published: u64,
     pub completed_by_actor: BTreeMap<usize, u64>,
     pub published_by_actor: BTreeMap<usize, u64>,
+    /// Powered entries delivered after both field and geometry validation;
+    /// repeated deliveries count again and do not imply a physical flight.
+    pub powered_route_publications: u64,
     pub flight_forecasts: FlightForecastWork,
     pub flight_environment_checks: u64,
     pub flight_environment_mismatches: u64,
@@ -624,6 +627,13 @@ impl LiveObjectivePlanner {
                                 survey.validated_tick = Some(p.tick);
                                 self.telemetry.local_publications +=
                                     u64::from(survey.validated_routes_only);
+                                self.telemetry.powered_route_publications += survey
+                                    .sites
+                                    .iter()
+                                    .chain(survey.actual.iter())
+                                    .filter(|r| r.crossing.is_some())
+                                    .count()
+                                    as u64;
                                 o.landing_objective = Some(survey);
                                 o.objective_work = Some(ObjectiveWorkState::Ready);
                                 self.telemetry.published += 1;

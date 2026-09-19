@@ -74,7 +74,7 @@ impl GroundNavigationTask {
             .as_ref()
             .filter(|j| self.powered_flag && j.surveyed)
             .and_then(|j| j.vehicle_forecast)
-            .filter(|c| c.valid_for(map));
+            .filter(|c| c.valid_for(map) && c.valid_at(p.tick));
         let mut powered_map = None;
         if let Some(crossing) = crossing {
             let mut graph = map.clone();

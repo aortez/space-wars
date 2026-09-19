@@ -13,7 +13,12 @@ walk measurements across requests. A further opt-in
 paths despite unrelated obstacle motion and preserves partial measurements while
 waiting for candidate refresh. Default v10 remains synchronous; failed routes
 under asteroid pressure, broader sensor coverage and strategic planning remain
-future work.
+future work. The experimental v11 [powered landing routes](../bot-jetpack-landing.md)
+now have [moving-planet prediction and physical calibration](../bot-moving-flight-planning.md).
+This establishes another tactical action for later mission scoring; it does not
+yet establish a stronger match policy. The next tactical investigation is why
+asteroid-pressure surveys contain no successful routes, before broadening the
+mission utility layer.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

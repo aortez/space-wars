@@ -71,7 +71,9 @@ impl GroundNavigationTask {
         }
         let mut graph = map.clone();
         let mut flights = Vec::new();
-        let approved = jetpack.vehicle_forecast.filter(|c| c.valid_for(map));
+        let approved = jetpack
+            .vehicle_forecast
+            .filter(|c| c.valid_for(map) && c.valid_at(p.tick));
         let candidates: Vec<_> = if self.powered_flag {
             approved.iter().map(|c| c.plan).collect()
         } else {
@@ -150,6 +152,12 @@ impl GroundNavigationTask {
             return self.interrupt_crossing(p.tick);
         }
         let old = task.telemetry().plan.as_ref().unwrap();
+        if self.powered_flag
+            && jetpack.surveyed
+            && jetpack.vehicle_forecast.is_none_or(|f| !f.valid_at(p.tick))
+        {
+            return self.interrupt_crossing(p.tick);
+        }
         let observation = jetpack.for_crossing(p, old);
         if jetpack.surveyed {
             if observation

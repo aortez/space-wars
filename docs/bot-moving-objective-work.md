@@ -4,7 +4,9 @@ This follows the opt-in v11 checkpoint `e58cdfc` on
 `jetpack-landing-planning`. The local dependency adapter now reports
 `live_jetpack_objective_v2`. The bot policy remains `material_mission_v11`;
 v9/v10 and the launcher's Planner choice are unchanged. This slice has not
-been deployed to the Pi.
+been deployed to the Pi. The numbers below describe checkpoint `3e03fca`;
+the follow-up [moving-flight model](bot-moving-flight-planning.md) adds orbital
+prediction, launch timing and physical calibration without promoting v11.
 
 ## Diagnosis
 

@@ -10,7 +10,9 @@ choice still selects v10; v11 is currently a headless comparison option.
 The measurements below describe checkpoint `e58cdfc`. The follow-up
 [moving-objective investigation](bot-moving-objective-work.md) preserves valid
 ground routes when a flight hypothesis becomes stale, with new comparison data
-and unchanged flight thresholds.
+and unchanged flight thresholds. The subsequent
+[moving-flight model](bot-moving-flight-planning.md) adds calibrated orbital
+prediction and a bounded launch window.
 
 ## What the planner knows
 

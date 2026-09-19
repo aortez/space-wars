@@ -12,7 +12,8 @@ const DT: f32 = 1.0 / 60.0;
 // cruise; the remaining margin encloses the capsule and transform tolerance.
 pub(crate) const FORECAST_REGION_HEIGHT: f32 = 40.0;
 const MAX_STEPS: usize = 12 * 60;
-const MAX_SOURCES: usize = 32;
+mod environment;
+pub(crate) use environment::FlightEnvironment;
 type Preview = Arc<dyn Fn(Vec2, f32, Vec2, f32) -> bool + Send + Sync>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -24,9 +25,11 @@ pub struct FlightEstimate {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct VehicleCrossingForecast {
     pub version: u32,
+    pub measured_tick: u64,
+    pub launch_until_tick: u64,
     pub plan: CrossingPlan,
     pub nodes: [u16; 2],
-    /// Both directions start recharged on stable retained ground.
+    /// Worst estimates across sampled launch times, independently recharged.
     pub flights: [FlightEstimate; 2],
 }
 impl VehicleCrossingForecast {
@@ -36,7 +39,11 @@ impl VehicleCrossingForecast {
     pub fn is_valid(self) -> bool {
         let plan = self.plan;
         let finite = |p: Vec2| p.x.is_finite() && p.y.is_finite();
-        self.version == 1
+        self.version == 2
+            && self
+                .launch_until_tick
+                .checked_sub(self.measured_tick)
+                .is_some_and(|age| age <= environment::LAUNCH_WINDOW_TICKS)
             && finite(plan.start)
             && finite(plan.destination)
             && plan.start.distance_to(plan.destination) > 1.0
@@ -60,6 +67,9 @@ impl VehicleCrossingForecast {
                     && f.arrival_speed.is_finite()
                     && (0.0..=7.0).contains(&f.arrival_speed)
             })
+    }
+    pub fn valid_at(self, tick: u64) -> bool {
+        (self.measured_tick..=self.launch_until_tick).contains(&tick) && self.is_valid()
     }
     pub fn valid_for(self, map: &GroundMap) -> bool {
         self.is_valid()
@@ -205,72 +215,9 @@ impl PlanningJob for ProposalJob {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Source {
-    position: Vec2,
-    velocity: Vec2,
-    scale: f32,
-    radius: f32,
-}
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct FlightEnvironment {
-    sources: Vec<Source>,
-    spin: f32,
-}
-impl FlightEnvironment {
-    pub(crate) fn read(state: &SurfaceSortieState, p: &pilot::PilotObservationV1) -> Option<Self> {
-        if state.world.planets.len() + usize::from(state.world.sun.is_some()) > MAX_SOURCES {
-            return None;
-        }
-        let frame = p.planet.motion;
-        let mut sources = Vec::new();
-        for (i, body) in state.world.planets.iter().enumerate() {
-            let motion = motion::SurfaceFrame::read(&state.world.physics, i);
-            sources.push(Source {
-                position: (motion.position - frame.position).rotate_radians(-frame.angle),
-                velocity: (motion.linear_velocity - frame.velocity).rotate_radians(-frame.angle),
-                scale: 60.0 * GRAVITY * body.mass,
-                radius: if state.world.terrain.planets.contains_key(&i) {
-                    body.radius
-                } else {
-                    0.0
-                },
-            });
-        }
-        if let Some(sun) = state.world.sun {
-            sources.push(Source {
-                position: (sun.position - frame.position).rotate_radians(-frame.angle),
-                velocity: -frame.velocity.rotate_radians(-frame.angle),
-                scale: 60.0 * GRAVITY * sun.mass,
-                radius: 0.0,
-            });
-        }
-        Some(Self {
-            sources,
-            spin: frame.spin,
-        })
-    }
-    pub(crate) fn compatible(&self, new: &Self) -> bool {
-        (self.spin - new.spin).abs() <= 0.0001
-            && self.sources.len() == new.sources.len()
-            && self.sources.iter().zip(&new.sources).all(|(a, b)| {
-                a.position.distance_to(b.position) <= 0.01
-                    && a.velocity.distance_to(b.velocity) <= 0.01
-                    && a.scale == b.scale
-                    && a.radius == b.radius
-            })
-    }
-    fn gravity(&self, point: Vec2, seconds: f32) -> Vec2 {
-        self.sources.iter().fold(Vec2::ZERO, |g, source| {
-            let d = source.position + source.velocity * seconds - point;
-            let r2 = d.length_squared().max(source.radius.powi(2)).max(0.01);
-            g + d * (source.scale / (r2 * r2.sqrt()))
-        })
-    }
-}
-
 #[derive(Clone, Copy)]
 enum Phase {
+    Warmup,
     Integrate,
     WorldQuery,
     HullQuery,
@@ -279,6 +226,7 @@ enum Phase {
 #[derive(Clone)]
 pub(crate) struct FlightForecastJob {
     proposal: Proposal,
+    initial_environment: FlightEnvironment,
     environment: FlightEnvironment,
     snapshot: Arc<QuerySnapshot>,
     frame_position: Vec2,
@@ -294,6 +242,9 @@ pub(crate) struct FlightForecastJob {
     flight_phase: FlightPhase,
     step: usize,
     direction: usize,
+    sample: usize,
+    samples: usize,
+    warmup_left: u64,
     burn: f32,
     query: Vec2,
     query_size: usize,
@@ -389,8 +340,10 @@ impl FlightForecastJob {
         else {
             unreachable!()
         };
+        let samples = if environment.time_dependent() { 3 } else { 1 };
         let mut job = Self {
             proposal,
+            initial_environment: environment.clone(),
             environment,
             snapshot,
             frame_position,
@@ -406,6 +359,9 @@ impl FlightForecastJob {
             flight_phase: FlightPhase::Lift,
             step: 0,
             direction: 0,
+            sample: 0,
+            samples,
+            warmup_left: 0,
             burn: 0.0,
             query: Vec2::ZERO,
             query_size: 0,
@@ -426,14 +382,34 @@ impl FlightForecastJob {
         }
     }
     fn launch(&mut self) {
+        self.environment.clone_from(&self.initial_environment);
+        self.warmup_left = self.launch_delay_ticks();
+        self.phase = Phase::Warmup;
+    }
+    fn begin_flight(&mut self) {
         let start = self.plan().start;
-        self.position = start + start.normalized() * (spaceling_geometry::HALF_HEIGHT + 0.03);
-        self.reference = Vec2::new(-self.position.y, self.position.x) * self.environment.spin;
-        self.velocity =
-            self.reference + self.position.normalized() * SurfaceSortieState::spec().jump_speed;
+        let time = self.launch_delay();
+        let offset = (start + start.normalized() * (spaceling_geometry::HALF_HEIGHT + 0.03))
+            .rotate_radians(self.environment.spin * time);
+        self.position = self.environment.center() + offset;
+        self.reference = self.environment.surface_velocity(offset);
+        self.velocity = self.reference
+            - self.environment.gravity(self.position).normalized()
+                * SurfaceSortieState::spec().jump_speed;
         self.step = 0;
         self.burn = 0.0;
         self.flight_phase = FlightPhase::Lift;
+        self.phase = Phase::Integrate;
+    }
+    fn launch_delay_ticks(&self) -> u64 {
+        if self.samples == 1 {
+            0
+        } else {
+            self.sample as u64 * environment::LAUNCH_WINDOW_TICKS / (self.samples - 1) as u64
+        }
+    }
+    fn launch_delay(&self) -> f32 {
+        self.launch_delay_ticks() as f32 * DT
     }
     pub(crate) fn area(&self) -> QueryArea {
         let margin = Vec2::new(
@@ -462,7 +438,7 @@ impl PlanningJob for FlightForecastJob {
     fn next_work(&self) -> Option<WorkKind> {
         match self.phase {
             Phase::Done => None,
-            Phase::Integrate => Some(WorkKind::Graph),
+            Phase::Warmup | Phase::Integrate => Some(WorkKind::Graph),
             _ => Some(WorkKind::PhysicsQuery),
         }
     }
@@ -472,10 +448,20 @@ impl PlanningJob for FlightForecastJob {
     fn step(&mut self) {
         match self.phase {
             Phase::Done => {}
+            Phase::Warmup => {
+                if self.warmup_left > 0 {
+                    self.environment.advance();
+                    self.warmup_left -= 1;
+                } else {
+                    self.begin_flight();
+                }
+            }
             Phase::Integrate => {
                 let plan = self.plan();
-                let time = self.step as f32 * DT;
-                let gravity = self.environment.gravity(self.position, time);
+                let elapsed = self.step as f32 * DT;
+                let time = self.launch_delay() + elapsed;
+                let offset = self.position - self.environment.center();
+                let gravity = self.environment.gravity(self.position);
                 if self.step >= MAX_STEPS {
                     self.reject("time_limit");
                     return;
@@ -486,40 +472,54 @@ impl PlanningJob for FlightForecastJob {
                 }
                 let up = -gravity.normalized();
                 // This first primitive assumes gravity approximately normal to the retained footing.
-                if up.dot(self.position.normalized()) < 0.98 {
+                if up.dot(offset.normalized()) < 0.98 {
                     self.reject("gravity_direction");
                     return;
                 }
                 let right = Vec2::new(up.y, -up.x);
-                let surface_velocity =
-                    Vec2::new(-self.position.y, self.position.x) * self.environment.spin;
+                let surface_velocity = self.environment.surface_velocity(offset);
                 let relative = self.velocity - surface_velocity;
                 let target = if self.flight_phase == FlightPhase::Lift {
                     plan.start
                 } else {
                     plan.destination
                 };
-                let error = (target.rotate_radians(self.environment.spin * time) - self.position)
-                    .dot(right);
+                let error =
+                    (target.rotate_radians(self.environment.spin * time) - offset).dot(right);
                 if self.flight_phase == FlightPhase::Descend
-                    && self.position.length()
+                    && offset.length()
                         <= plan.destination.length() + ground_navigation::standing_height() + 0.12
                 {
                     if error.abs() < 0.5
                         && relative.dot(right).abs() < 1.0
                         && relative.length() <= 7.0
                     {
-                        self.estimates.push(FlightEstimate {
-                            seconds: time,
+                        let estimate = FlightEstimate {
+                            seconds: elapsed,
                             burn_seconds: self.burn,
                             arrival_speed: relative.length(),
-                        });
+                        };
+                        if self.estimates.len() <= self.direction {
+                            self.estimates.push(estimate);
+                        } else {
+                            let worst = &mut self.estimates[self.direction];
+                            worst.seconds = worst.seconds.max(estimate.seconds);
+                            worst.burn_seconds = worst.burn_seconds.max(estimate.burn_seconds);
+                            worst.arrival_speed = worst.arrival_speed.max(estimate.arrival_speed);
+                        }
                         if self.direction == 0 {
                             self.direction = 1;
                             self.launch();
+                        } else if self.sample + 1 < self.samples {
+                            self.sample += 1;
+                            self.direction = 0;
+                            self.launch();
                         } else {
                             self.result = Some(VehicleCrossingForecast {
-                                version: 1,
+                                version: 2,
+                                measured_tick: self.environment.tick,
+                                launch_until_tick: self.environment.tick
+                                    + environment::LAUNCH_WINDOW_TICKS,
                                 plan: self.proposal.plan,
                                 nodes: self.proposal.nodes,
                                 flights: [self.estimates[0], self.estimates[1]],
@@ -532,7 +532,7 @@ impl PlanningJob for FlightForecastJob {
                     return;
                 }
                 let sample = FlightSample {
-                    radius: self.position.length(),
+                    radius: offset.length(),
                     radial_speed: relative.dot(up),
                     error,
                     lateral_speed: relative.dot(right),
@@ -561,15 +561,15 @@ impl PlanningJob for FlightForecastJob {
                 self.velocity += gravity * DT;
                 self.position += self.velocity * DT;
                 self.step += 1;
-                if self.position.length() > plan.cruise_radius + 20.0 {
+                self.environment.advance();
+                let offset = self.position - self.environment.center();
+                if offset.length() > plan.cruise_radius + 20.0 {
                     self.reject("height_limit");
                     return;
                 }
-                self.query = self
-                    .position
-                    .rotate_radians(-self.environment.spin * self.step as f32 * DT);
+                self.query = offset.rotate_radians(-self.environment.spin * (time + DT));
                 self.query_size = usize::from(
-                    self.position.length()
+                    offset.length()
                         > plan.start.length().max(plan.destination.length())
                             + corridor_endpoint_height(),
                 );
@@ -679,6 +679,128 @@ impl SurfaceSortieState {
 mod tests {
     use super::*;
     #[test]
+    fn moving_launch_window_preserves_incremental_work_and_expiry() {
+        use engine_core::planning::{JobLimits, JobPoll, PlanningQueue, Work};
+        let state =
+            SurfaceSortieScenario::init_material_moving_crossing_trial(42, 0, 60.0, 0.015, 0.065);
+        let p = state.pilot_observation(0, None);
+        let f = p.planet.motion;
+        let map = state
+            .survey_ground_with_gravity(0, 0, 0..512, false, 18.2)
+            .unwrap();
+        let scene = FlightScene::read(
+            &state,
+            0,
+            &p,
+            Arc::new(state.world.physics.world.query_snapshot()),
+            f.position,
+            f.angle,
+        )
+        .unwrap();
+        let mut proposal = scene.proposal(
+            Arc::new(map),
+            (p.ship.position - f.position).rotate_radians(-f.angle),
+            p.ship.angle - f.angle,
+            p.planet.radius,
+        );
+        while proposal.next_work().is_some() {
+            proposal.step();
+        }
+        let input = proposal.output().unwrap().unwrap();
+        let snapshot = state.world.physics.world.snapshot_bytes().unwrap();
+        let mut outcomes = Vec::new();
+        for allowance in [
+            Work {
+                graph: 17,
+                physics_queries: 11,
+            },
+            Work::UNLIMITED,
+        ] {
+            let job = FlightForecastJob::new(&scene, input);
+            let mut queue = PlanningQueue::new(1);
+            let token = queue.submit(0, (), JobLimits::default(), job).unwrap();
+            let mut charged = Work::default();
+            for _ in 0..2000 {
+                let report = queue.advance(allowance);
+                assert!(
+                    report.charged.graph <= allowance.graph
+                        && report.charged.physics_queries <= allowance.physics_queries
+                );
+                charged.graph += report.charged.graph;
+                charged.physics_queries += report.charged.physics_queries;
+                if matches!(queue.poll(token, &()), JobPoll::Ready(_)) {
+                    break;
+                }
+            }
+            let job = queue.job(token).unwrap();
+            let forecast = job.output().unwrap().unwrap();
+            assert_eq!(job.sample, 2, "both directions at all three launch epochs");
+            // Six flights, each with one launch and one terminal integration,
+            // plus 0/60/120 warmup ticks in each direction.
+            assert!(charged.graph <= 6 * (MAX_STEPS as u32 + 2) + 360);
+            assert!(charged.physics_queries <= 12 * MAX_STEPS as u32);
+            assert!(
+                forecast.valid_at(p.tick)
+                    && forecast.valid_at(p.tick + 60)
+                    && forecast.valid_at(p.tick + 120)
+            );
+            assert!(!forecast.valid_at(p.tick - 1) && !forecast.valid_at(p.tick + 121));
+            let mut invalid = forecast;
+            invalid.launch_until_tick += 1;
+            assert!(!invalid.is_valid());
+            outcomes.push((forecast, charged, job.area().minimum, job.area().maximum));
+        }
+        assert_eq!(outcomes[0], outcomes[1]);
+        assert_eq!(
+            snapshot,
+            state.world.physics.world.snapshot_bytes().unwrap()
+        );
+    }
+
+    #[test]
+    fn moving_forecasts_enforce_the_same_fuel_reserve() {
+        for radius in [100.0, 128.0] {
+            for seat in 0..2 {
+                let state = SurfaceSortieScenario::init_material_moving_crossing_trial(
+                    42, seat, radius, 0.02, 0.04,
+                );
+                let p = state.pilot_observation(seat, None);
+                let map = state
+                    .survey_ground_with_gravity(seat, 0, 0..512, false, 18.2)
+                    .unwrap();
+                let f = p.planet.motion;
+                let scene = FlightScene::read(
+                    &state,
+                    seat,
+                    &p,
+                    Arc::new(state.world.physics.world.query_snapshot()),
+                    f.position,
+                    f.angle,
+                )
+                .unwrap();
+                let mut proposal = scene.proposal(
+                    Arc::new(map),
+                    (p.ship.position - f.position).rotate_radians(-f.angle),
+                    p.ship.angle - f.angle,
+                    radius,
+                );
+                while proposal.next_work().is_some() {
+                    proposal.step();
+                }
+                let p = proposal
+                    .output()
+                    .unwrap()
+                    .expect("measured geometric proposal");
+                let mut job = FlightForecastJob::new(&scene, p);
+                while job.next_work().is_some() {
+                    job.step();
+                }
+                assert_eq!(job.output(), Some(&None));
+                assert_eq!(job.rejection(), Some("fuel_reserve"));
+            }
+        }
+    }
+    #[test]
     fn parked_ship_forecast_is_read_only_and_rejects_blocked_landings() {
         for seat in 0..2 {
             let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);
@@ -688,7 +810,7 @@ mod tests {
             let p = state.pilot_observation(seat, None);
             let gravity = FlightEnvironment::read(&state, &p)
                 .unwrap()
-                .gravity(Vec2::Y * p.planet.radius, 0.0)
+                .gravity(Vec2::Y * p.planet.radius)
                 .length();
             let map = state
                 .survey_ground_with_gravity(

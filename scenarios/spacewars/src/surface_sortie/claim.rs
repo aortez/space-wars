@@ -470,6 +470,39 @@ impl SurfaceSortieScenario {
         let mut state =
             Self::init_material_surface(seed, 2, engine_terrain::TerrainSurface::Interpolated);
         state.enable_jetpacks();
+        Self::finish_flag_crossing_trial(state, player)
+    }
+
+    /// Controlled orbital initial conditions; all later movement, crossing,
+    /// capture and boarding use the ordinary shared world and controls.
+    pub fn init_material_moving_crossing_trial(
+        seed: u64,
+        player: usize,
+        radius: f32,
+        spin: f32,
+        orbit: f32,
+    ) -> SurfaceSortieState {
+        assert!(player < 2 && (30.0..=128.0).contains(&radius));
+        assert!(spin.is_finite() && orbit.is_finite());
+        let mut world = Self::init(SurfaceMotionPreset::Orbit, seed).world;
+        let planet = &mut world.planets[0];
+        planet.radius = radius;
+        planet.mass = 18.0 / (60.0 * GRAVITY) * (radius * BODY_BOUNDS_RADIUS_SCALE + 0.9).powi(2);
+        planet.wrapper_omega = spin;
+        planet.orbit_omega = orbit;
+        world.sun.as_mut().unwrap().mass =
+            orbit.powi(2) * planet.orbit_radius.powi(3) / (60.0 * GRAVITY);
+        let state = Self::on_surface(world, SurfaceMotionPreset::Orbit, 0, Vec2::Y, None);
+        let mut state =
+            Self::material_surface_on(state, 2, engine_terrain::TerrainSurface::Interpolated);
+        state.enable_jetpacks();
+        Self::finish_flag_crossing_trial(state, player)
+    }
+
+    fn finish_flag_crossing_trial(
+        mut state: SurfaceSortieState,
+        player: usize,
+    ) -> SurfaceSortieState {
         for _ in 0..120 {
             Self::step(&mut state, &[], Duration::from_nanos(16_666_667));
         }

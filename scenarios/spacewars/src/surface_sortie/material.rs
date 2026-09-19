@@ -94,8 +94,19 @@ impl SurfaceSortieScenario {
         players: usize,
         surface: engine_terrain::TerrainSurface,
     ) -> SurfaceSortieState {
+        Self::material_surface_on(
+            Self::init(SurfaceMotionPreset::Stationary, seed),
+            players,
+            surface,
+        )
+    }
+
+    pub(super) fn material_surface_on(
+        mut state: SurfaceSortieState,
+        players: usize,
+        surface: engine_terrain::TerrainSurface,
+    ) -> SurfaceSortieState {
         assert!((1..=SPACEWARS_PLAYER_COUNT).contains(&players));
-        let mut state = Self::init(SurfaceMotionPreset::Stationary, seed);
         state.outposts.clear();
         state.world.terrain.surface = surface;
         state.world.terrain.legacy_services = false;
@@ -114,8 +125,8 @@ impl SurfaceSortieScenario {
                 ship.position = center - SHIP_PIVOT;
                 ship.rotation_radians = rotation_for_direction(up);
                 ship.direction = up;
-                ship.velocity =
-                    Vec2::new(-(center - planet.position).y, (center - planet.position).x)
+                ship.velocity = state.motion_preset.initial_velocity(&planet)
+                    + Vec2::new(-(center - planet.position).y, (center - planet.position).x)
                         * planet.wrapper_omega;
                 state
                     .pilots
