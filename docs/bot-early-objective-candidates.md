@@ -147,6 +147,10 @@ the physical survival problem remains.
 
 ## Next investigation
 
+Follow-up: the [contested-approach investigation](bot-contested-approach.md)
+tested and rejected a late switch to combat. It records the dense timing and
+identifies the earlier pursuit-timeout handoff as the next decision to study.
+
 The next useful question is how much approach time a candidate needs, and when
 the bot should abandon a contested landing. The P2 replay offers only seven
 updates between selection and pod conversion. Inspect its observed health,

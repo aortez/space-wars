@@ -28,10 +28,13 @@ replays. The optional [early-candidate adapter](../bot-early-objective-candidate
 now publishes finished positive routes with bounded fresh landing clearance
 before the whole survey completes. In the remaining asteroid case it selects a
 powered route at tick 6,604, but still loses the ship at 6,611. Quiet capture and
-return remain intact. The next bounded investigation is approach lead time and
-retreat under pressure; eager delivery alone does not establish a successful
-powered sortie or justify promoting the experimental live adapter. Broader
-mission utility remains separate work.
+return remain intact. The [contested-approach investigation](../bot-contested-approach.md)
+tested a late damage-triggered switch to combat and rejected it: both triggered
+replays shortened pilot survival. It identifies the earlier pursuit-timeout
+handoff as the next decision boundary to study, with an explicit bounded
+disengagement before resuming a transfer. Eager delivery alone does not establish
+a successful powered sortie or justify promoting the experimental live adapter.
+Broader mission utility remains separate work.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates
