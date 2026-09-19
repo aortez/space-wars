@@ -114,6 +114,11 @@ pub struct LivePlanningTelemetry {
     pub flight_forecasts: FlightForecastWork,
     pub flight_environment_checks: u64,
     pub flight_environment_mismatches: u64,
+    pub jump_gravity_checks: u64,
+    pub jump_gravity_mismatches: u64,
+    /// Counts entries rejected for changed scalar jump gravity, including repeats.
+    pub withheld_jump_routes: u64,
+    pub gravity_independent_validations: u64,
     /// Counts entries withheld during validation, including repeated checks.
     pub withheld_flight_routes: u64,
     pub flight_independent_validations: u64,
@@ -338,8 +343,10 @@ impl LiveObjectivePlanner {
         {
             return Err("hatch_moved");
         }
-        let gravity = state.objective_gravity(p);
-        if (gravity - request.gravity).abs() > 0.01 {
+        // Local validation can preserve successful walks and independently
+        // forecast flights. Keep this job's original scalar jump hypothesis;
+        // do not discard unrelated work or reinterpret its negative answers.
+        if !local_dependencies && !Self::jump_gravity_valid(state, p, request) {
             return Err("gravity_changed");
         }
         if request.planning == ObjectivePlanning::JetpackRoundTrip
@@ -357,6 +364,13 @@ impl LiveObjectivePlanner {
         } else {
             Self::geometry_valid(state, player, p, request, request.gravity)
         }
+    }
+    fn jump_gravity_valid(
+        state: &SurfaceSortieState,
+        p: &PilotObservationV1,
+        request: &Request,
+    ) -> bool {
+        (state.objective_gravity(p) - request.gravity).abs() <= 0.01
     }
     fn flight_environment_valid(
         state: &SurfaceSortieState,
@@ -451,7 +465,17 @@ impl LiveObjectivePlanner {
         mut survey: LandingObjectiveSurvey,
         telemetry: &mut LivePlanningTelemetry,
     ) -> Option<LandingObjectiveSurvey> {
+        let gravity_valid = Self::jump_gravity_valid(state, p, request);
+        telemetry.jump_gravity_checks += 1;
+        telemetry.jump_gravity_mismatches += u64::from(!gravity_valid);
+        let uses_jump = |r: &LandingObjectiveRoute| {
+            r.outbound.jumps > 0 || r.returning.as_ref().is_some_and(|r| r.jumps > 0)
+        };
         let flight_valid = Self::flight_environment_valid(state, p, request);
+        let crossing_valid = |r: &LandingObjectiveRoute| {
+            r.crossing
+                .is_none_or(|c| flight_valid && c.valid_at(p.tick))
+        };
         telemetry.flight_environment_checks += u64::from(request.flight_dependent);
         telemetry.flight_environment_mismatches += u64::from(!flight_valid);
         let excluded = [
@@ -493,21 +517,30 @@ impl LiveObjectivePlanner {
             },
         );
         telemetry.region_area_tests += whole.area_tests;
-        if whole.valid && flight_valid {
+        if whole.valid
+            && gravity_valid
+            && flight_valid
+            && survey
+                .sites
+                .iter()
+                .chain(survey.actual.iter())
+                .all(crossing_valid)
+        {
             return Some(survey);
         }
         let mut valid = Vec::new();
         for (site, areas) in job.dependencies() {
-            // Failed flight attempts must not poison independent walking
-            // routes. Conversely, a changed field certifies neither a powered
-            // route nor a negative answer that might now be flyable.
+            // Ordinary jump arcs use the retained scalar gravity; walks do
+            // not, and powered segments have their own trajectory certificate.
+            // Changed hypotheses never certify an old negative answer.
             let route = survey
                 .sites
                 .iter()
                 .chain(survey.actual.iter())
                 .find(|r| r.site == *site);
-            if !route.is_some_and(|r| r.cost().is_some() && (flight_valid || r.crossing.is_none()))
-            {
+            if !route.is_some_and(|r| {
+                r.cost().is_some() && (gravity_valid || !uses_jump(r)) && crossing_valid(r)
+            }) {
                 continue;
             }
             if whole.valid {
@@ -526,12 +559,18 @@ impl LiveObjectivePlanner {
             }
         }
         let before = survey.sites.len() + usize::from(survey.actual.is_some());
-        if !flight_valid {
-            telemetry.withheld_flight_routes += survey
+        telemetry.withheld_flight_routes += survey
+            .sites
+            .iter()
+            .chain(survey.actual.iter())
+            .filter(|r| !crossing_valid(r))
+            .count() as u64;
+        if !gravity_valid {
+            telemetry.withheld_jump_routes += survey
                 .sites
                 .iter()
                 .chain(survey.actual.iter())
-                .filter(|r| r.crossing.is_some())
+                .filter(|r| uses_jump(r))
                 .count() as u64;
         }
         survey
@@ -549,6 +588,7 @@ impl LiveObjectivePlanner {
         }
         survey.validated_routes_only = true;
         telemetry.flight_independent_validations += u64::from(!flight_valid);
+        telemetry.gravity_independent_validations += u64::from(!gravity_valid);
         Some(survey)
     }
 

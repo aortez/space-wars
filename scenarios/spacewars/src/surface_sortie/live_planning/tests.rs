@@ -2,6 +2,7 @@ use super::*;
 use pilot::LandingSiteQuery;
 
 mod flight_dependencies;
+mod gravity_dependencies;
 mod measurement_work;
 mod route_dependencies;
 

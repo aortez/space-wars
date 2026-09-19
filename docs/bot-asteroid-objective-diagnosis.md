@@ -124,6 +124,11 @@ only in separately retained investigation binaries.
 
 ## Next implementation slice
 
+The [scalar-gravity dependency follow-up](bot-jump-gravity-dependencies.md)
+implements the first slice below and records its controlled tests and matched
+replays. It also identifies a separate landing-site handoff gap after valid
+routes begin publishing. The measurements above describe the earlier baseline.
+
 First separate scalar jump-gravity dependencies from candidate validity. In the
 opt-in route-dependency path, let coherent work finish after a scalar gravity
 change, then preserve only successful candidates that remain justified: routes

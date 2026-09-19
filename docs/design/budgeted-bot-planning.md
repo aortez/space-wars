@@ -19,8 +19,10 @@ This establishes another tactical action for later mission scoring; it does not
 yet establish a stronger match policy. The [asteroid-pressure investigation](../bot-asteroid-objective-diagnosis.md)
 found useful partial v11 candidates cancelled by scalar jump-gravity changes,
 alongside genuinely negative measured v10 routes. The next tactical slice is
-candidate validity under changing scalar gravity, before broadening the mission
-utility layer.
+now implemented as [candidate validity under changing scalar gravity](../bot-jump-gravity-dependencies.md).
+It preserves independent paths but reveals that completed surveys can arrive
+between landing scans with no current sites to select. Coordinate that handoff
+and demonstrate physical use before broadening the mission utility layer.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

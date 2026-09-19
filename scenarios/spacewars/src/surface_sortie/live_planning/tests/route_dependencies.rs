@@ -138,91 +138,101 @@ fn a_return_jump_depends_on_its_apex_even_when_both_endpoints_and_outward_walk_a
 
 #[test]
 fn buried_fragment_motion_allows_route_publication_but_route_obstruction_revokes_it() {
-    let (mut state, mut o, body) = fixture();
-    let flag = o
-        .combat
-        .recovery
-        .flight
-        .pilot
-        .planet
-        .claim
-        .as_ref()
-        .unwrap()
-        .flag;
-    let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
-    planner.observe(&state, 0, &mut o);
-    let source = state.world.tick;
-    let weak = Arc::downgrade(&planner.requests[&0].snapshot);
-    planner.advance(state.world.tick);
-    let job = planner.queue.job(planner.requests[&0].token).unwrap();
-    assert!(!job.dependencies().is_empty());
-    let (site, areas) = &job.dependencies()[0];
-    let site = *site;
-    let area = *areas
-        .iter()
-        .find(|a| a.groups == SurfaceSortieState::spec().collision_groups)
-        .unwrap();
-    let source_frame = o.combat.recovery.flight.pilot.planet.motion;
-    move_body(&mut state, body, source_frame.position + Vec2::X * 11.0);
-    let mut o = target(&state, 0);
-    o.combat
-        .recovery
-        .flight
-        .pilot
-        .planet
-        .claim
-        .as_mut()
-        .unwrap()
-        .flag = flag;
-    let p = &o.combat.recovery.flight.pilot;
-    assert_eq!(
-        LiveObjectivePlanner::geometry_valid(
-            &state,
-            0,
-            p,
-            &planner.requests[&0],
-            planner.requests[&0].gravity
-        ),
-        Err("obstacles_changed")
-    );
-    planner.observe(&state, 0, &mut o);
-    let survey = o.landing_objective.as_ref().unwrap();
-    assert!(survey.validated_routes_only);
-    assert_eq!(survey.tick, source);
-    assert_eq!(survey.validated_tick, Some(state.world.tick));
-    assert!(survey.sites.iter().all(|r| r.cost().is_some()));
-    assert!(survey.sites.iter().any(|r| r.site == site));
-    assert!(planner.telemetry.route_unrelated_changes > 0);
-    let point = (area.minimum + area.maximum) * 0.5;
-    move_body(
-        &mut state,
-        body,
-        source_frame.position + point.rotate_radians(source_frame.angle),
-    );
-    let mut o = target(&state, 0);
-    o.combat
-        .recovery
-        .flight
-        .pilot
-        .planet
-        .claim
-        .as_mut()
-        .unwrap()
-        .flag = flag;
-    planner.observe(&state, 0, &mut o);
-    assert!(
-        o.landing_objective
+    for changed_gravity in [false, true] {
+        let (mut state, mut o, body) = fixture();
+        let flag = o
+            .combat
+            .recovery
+            .flight
+            .pilot
+            .planet
+            .claim
             .as_ref()
-            .is_none_or(|s| !s.sites.iter().any(|r| r.site == site))
-    );
-    assert!(planner.telemetry.route_area_tests > 0);
-    assert!(planner.telemetry.withheld_route_entries > 0);
-    planner.reset();
-    assert!(weak.upgrade().is_none());
+            .unwrap()
+            .flag;
+        let mut planner = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+        planner.observe(&state, 0, &mut o);
+        let source = state.world.tick;
+        let weak = Arc::downgrade(&planner.requests[&0].snapshot);
+        planner.advance(state.world.tick);
+        let job = planner.queue.job(planner.requests[&0].token).unwrap();
+        assert!(!job.dependencies().is_empty());
+        let (site, areas) = &job.dependencies()[0];
+        let site = *site;
+        let area = *areas
+            .iter()
+            .find(|a| a.groups == SurfaceSortieState::spec().collision_groups)
+            .unwrap();
+        let source_frame = o.combat.recovery.flight.pilot.planet.motion;
+        if changed_gravity {
+            let planet = o.combat.recovery.flight.pilot.planet.index;
+            state.world.planets[planet].mass *= 2.0;
+        }
+        move_body(&mut state, body, source_frame.position + Vec2::X * 11.0);
+        let mut o = target(&state, 0);
+        o.combat
+            .recovery
+            .flight
+            .pilot
+            .planet
+            .claim
+            .as_mut()
+            .unwrap()
+            .flag = flag;
+        let p = &o.combat.recovery.flight.pilot;
+        assert_eq!(
+            LiveObjectivePlanner::geometry_valid(
+                &state,
+                0,
+                p,
+                &planner.requests[&0],
+                planner.requests[&0].gravity
+            ),
+            Err("obstacles_changed")
+        );
+        planner.observe(&state, 0, &mut o);
+        let survey = o.landing_objective.as_ref().unwrap();
+        assert!(survey.validated_routes_only);
+        assert_eq!(survey.tick, source);
+        assert_eq!(survey.validated_tick, Some(state.world.tick));
+        assert!(survey.sites.iter().all(|r| r.cost().is_some()));
+        assert!(survey.sites.iter().any(|r| r.site == site));
+        assert!(planner.telemetry.route_unrelated_changes > 0);
+        assert_eq!(
+            planner.telemetry.gravity_independent_validations,
+            u64::from(changed_gravity)
+        );
+        let point = (area.minimum + area.maximum) * 0.5;
+        move_body(
+            &mut state,
+            body,
+            source_frame.position + point.rotate_radians(source_frame.angle),
+        );
+        let mut o = target(&state, 0);
+        o.combat
+            .recovery
+            .flight
+            .pilot
+            .planet
+            .claim
+            .as_mut()
+            .unwrap()
+            .flag = flag;
+        planner.observe(&state, 0, &mut o);
+        assert!(
+            o.landing_objective
+                .as_ref()
+                .is_none_or(|s| !s.sites.iter().any(|r| r.site == site))
+        );
+        assert!(planner.telemetry.route_area_tests > 0);
+        assert!(planner.telemetry.withheld_route_entries > 0);
+        planner.reset();
+        assert!(weak.upgrade().is_none());
+    }
 }
 
 #[test]
-fn stale_failed_surveys_are_unknown_and_partial_source_reuse_does_not_renew_age() {
+fn changed_gravity_keeps_negative_work_pending_then_withholds_the_stale_answer() {
     let (mut state, mut o, body) = fixture();
     o.combat
         .recovery
@@ -258,7 +268,8 @@ fn stale_failed_surveys_are_unknown_and_partial_source_reuse_does_not_renew_age(
     // to change gravity without altering the frozen query geometry.
     state.world.planets[planet].position += Vec2::X * 3.0;
     planner.observe(&state, 0, &mut o);
-    assert_eq!(planner.queue.poll(token, &source), JobPoll::Stale);
+    assert_eq!(planner.queue.poll(token, &source), JobPoll::Pending);
+    assert_eq!(planner.requests[&0].token, token);
     assert_eq!(planner.requests[&0].measurement_tick, source);
     assert!(Weak::ptr_eq(
         &weak,
@@ -291,7 +302,8 @@ fn stale_failed_surveys_are_unknown_and_partial_source_reuse_does_not_renew_age(
         "stale failed paths must not be reported as impossibility"
     );
     assert_eq!(o.objective_work, Some(ObjectiveWorkState::Stale));
-    assert!(planner.telemetry.reused_ground.nodes > 0);
+    assert_eq!(planner.telemetry.reused_requests, 0);
+    assert_eq!(planner.telemetry.jump_gravity_mismatches, 1);
     assert!(weak.upgrade().is_none());
 }
 
@@ -307,6 +319,10 @@ fn deferred_candidate_refresh_keeps_a_bounded_cache_with_normal_lifetime_rules()
             },
         )
         .with_route_dependencies();
+        // A changed actual touchdown still retires and salvages the source.
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.landing.phase = LandingPhase::Landed;
+        p.hatch = Some(p.sites[0].hatch_position);
         planner.observe(&state, 0, &mut o);
         let source = state.world.tick;
         let token = planner.requests[&0].token;
@@ -315,7 +331,8 @@ fn deferred_candidate_refresh_keeps_a_bounded_cache_with_normal_lifetime_rules()
         state.world.tick += 1;
         let p = &mut o.combat.recovery.flight.pilot;
         p.tick = state.world.tick;
-        state.world.planets[p.planet.index].mass *= 2.0;
+        p.landing.phase = LandingPhase::Flying;
+        p.hatch = None;
         p.sites.clear();
         planner.observe(&state, 0, &mut o);
         assert!(planner.requests.is_empty());
