@@ -181,6 +181,13 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--disengagement-seats must be none, 0, 1 or both"),
+    };
     assert!(
         live_planning.as_ref().is_none_or(|live| {
             (0..2).any(|i| {
@@ -204,6 +211,7 @@ fn main() {
             },
             breaks,
         )
+        .with_pursuit_disengagement(disengagement_seats[i])
     });
     // Independent policy state consumes the original observations and must
     // emit identical encoded controls on every tick. This work is not timed.
@@ -632,6 +640,7 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    report["pursuit_disengagement"] = json!({"enabled_seats":disengagement_seats});
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }

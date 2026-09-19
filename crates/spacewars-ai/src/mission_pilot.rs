@@ -19,6 +19,10 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_disengagement.rs"]
+mod disengagement;
+pub use disengagement::{DisengagementAttempt, MissionDisengagement};
+
 pub const MISSION_POLICY: &str = "material_mission_v9";
 const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
 const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
@@ -35,6 +39,7 @@ pub enum MissionGoal {
     Recover,
     Patrol,
     Hunt,
+    Disengage,
     Watch,
     AvoidSun,
     Blocked,
@@ -50,6 +55,7 @@ impl MissionGoal {
             Self::Recover => "recovering ship",
             Self::Patrol => "waiting to resume capture",
             Self::Hunt => "hunting opponent",
+            Self::Disengage => "breaking contact before landing",
             Self::Watch => "following opponent / awaiting ship",
             Self::AvoidSun => "escaping solar heat",
             Self::Blocked => "mission blocked",
@@ -83,6 +89,8 @@ pub struct MissionTelemetry {
     pub opponent: Option<PlayerId>,
     pub combat: Option<CombatPilotTelemetry>,
     pub pursuit: Option<MissionPursuit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disengagement: Option<MissionDisengagement>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -165,6 +173,7 @@ impl MaterialMissionPilot {
                 opponent: None,
                 combat: None,
                 pursuit: None,
+                disengagement: None,
             },
             capture: None,
             recovery: None,
@@ -187,7 +196,9 @@ impl MaterialMissionPilot {
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let disengagement = self.telemetry.disengagement.is_some();
         *self = Self::with_policy(context, self.breaks, self.policy);
+        self.enable_pursuit_disengagement(disengagement);
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry
@@ -318,6 +329,7 @@ impl MaterialMissionPilot {
                     || p.ship_form != ShipForm::Ship
                     || p.location == PilotLocation::OnFoot && self.capture.is_none())
         {
+            self.end_disengagement(p.tick, "recovery required");
             self.end_pursuit(p.tick, "ship or surface recovery required");
             self.reconsider(p.tick, "ship or surface recovery required", false);
             self.recovery = Some(RecoverShipTask::new(self.context));
@@ -388,6 +400,9 @@ impl MaterialMissionPilot {
         }
         if self.pursuit_opportunity(o) {
             return self.hunt(o);
+        }
+        if let Some(intent) = self.disengagement_intent(o) {
+            return intent;
         }
         self.telemetry.reason = None;
         let owned = |planet: &PilotPlanetObservation| {
@@ -589,6 +604,9 @@ impl MaterialMissionPilot {
     }
 
     fn pursuit_opportunity(&mut self, o: &MissionObservationV1) -> bool {
+        if self.disengaging() {
+            return false;
+        }
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         // Finish the committed landing, on-foot objective and departure before
@@ -622,6 +640,9 @@ impl MaterialMissionPilot {
             };
             if let Some(reason) = reason {
                 self.end_pursuit(p.tick, reason);
+                if reason == "pursuit budget exhausted" {
+                    self.start_disengagement(o);
+                }
                 return false;
             }
             return true;
@@ -788,7 +809,7 @@ impl MaterialMissionPilot {
         // velocity while circling a planet or the stationary sun.
         if matches!(
             self.telemetry.goal,
-            MissionGoal::Hunt | MissionGoal::Watch | MissionGoal::Transfer
+            MissionGoal::Hunt | MissionGoal::Watch | MissionGoal::Transfer | MissionGoal::Disengage
         ) && let Some(avoidance) = self.telemetry.avoidance
         {
             match avoidance.obstacle {

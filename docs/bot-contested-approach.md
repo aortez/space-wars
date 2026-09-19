@@ -130,6 +130,10 @@ behavior that no longer exists on the branch.
 
 ## What to try next
 
+Follow-up: the [pursuit disengagement trial](bot-pursuit-disengagement.md) now
+implements and measures the experiment below. It achieves separation but exposes
+an unsafe successor transfer, so the maneuver remains opt-in.
+
 Investigate **the transition out of a timed-out pursuit**, before another
 landing is admitted. Do not start by shortening another route budget or tuning
 the late damage threshold to this seed.

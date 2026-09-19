@@ -65,6 +65,11 @@ impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
     }
+    /// Opt-in headless experiment; standard policy selection leaves it disabled.
+    pub fn with_pursuit_disengagement(mut self, enabled: bool) -> Self {
+        self.0.enable_pursuit_disengagement(enabled);
+        self
+    }
 }
 impl std::ops::Deref for MissionBot {
     type Target = MaterialMissionPilot;
