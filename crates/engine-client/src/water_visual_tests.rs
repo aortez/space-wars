@@ -6,7 +6,7 @@ use crate::{
 use engine_common::{
     Camera2, ClockEventKind, ClockEventProfile, ClockRainAmount, RenderPoint, Scenario,
 };
-use scenario_clock::water_fixture::{OpposedFixture, Profile, WaterFixture};
+use scenario_clock::water_fixture::{DigitRainFixture, OpposedFixture, Profile, WaterFixture};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use slint::{Rgb8Pixel, SharedPixelBuffer};
 use std::time::Duration;
@@ -115,6 +115,234 @@ fn water_unequal_streams_render_a_connected_deflected_jet() {
         outgoing_jet(&unmixed, 48).is_err(),
         "pass-through control unexpectedly looks merged"
     );
+}
+
+#[test]
+fn digit_rain_lab_captures_production_renderers() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let mut fixture = DigitRainFixture::new(8, 7);
+    let viewport = Viewport::new(600.0, 840.0);
+    // Between horizontal rows, excluding the vertical digit bars and their
+    // outlines. Include both sides of the right bar for the later digit "1".
+    // The clock's cyan pixels must not be mistaken for water.
+    let cascade_pixels = |pixels: &SharedPixelBuffer<Rgb8Pixel>| {
+        (455..510)
+            .flat_map(|y| (220..398).chain(443..460).map(move |x| y * 600 + x))
+            .filter(|i| is_water(pixels.as_slice()[*i]))
+            .count()
+    };
+    assert_eq!(cascade_pixels(&raster(&fixture.frame(), viewport)), 0);
+    assert_eq!(
+        cascade_pixels(&raster(&DigitRainFixture::new(1, 7).frame(), viewport)),
+        0
+    );
+    for tick in 1..=600 {
+        if tick >= 360 && fixture.digit() != 1 {
+            // A valid digit can only be deferred by release-capacity pressure.
+            let _ = fixture.set_digit(1);
+        }
+        fixture.step(tick < 480);
+        if ![120, 240, 359, 361, 420, 600].contains(&tick) {
+            continue;
+        }
+        let frame = fixture.frame();
+        let pixels = raster(&frame, viewport);
+        let vector = render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+        assert!(
+            vector
+                .iter()
+                .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+        );
+        assert!(vector.len() <= 2400);
+        // Water in the otherwise empty vertical interval between the middle
+        // and bottom bars. This runs in CI, not only during artifact export.
+        let wet = cascade_pixels(&pixels);
+        if tick < 480 {
+            assert!(wet > 0, "no visible cascading water at tick {tick}");
+        } else {
+            // Two seconds after rain stops there needn't be a drop between
+            // these bars. Unlike the unbatched control, thin residual films
+            // no longer keep drawing nearly volume-free streams forever.
+            assert!(fixture.water.stats().drained > 0.0);
+        }
+        if let Some(output) = &output {
+            let name = format!("digit-rain-tick-{tick}");
+            write_png(&output.join(format!("{name}.png")), &pixels);
+            std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+        }
+    }
+    assert_eq!(fixture.digit(), 1);
+}
+
+#[test]
+fn digit_runoff_is_visible_without_rain_crossing_the_pixel_probe() {
+    let viewport = Viewport::new(600.0, 840.0);
+    let mut fixture = DigitRainFixture::new(8, 0);
+    // Below the top-left block, clear of its outline and the vertical bars.
+    // No source rain: blue here MUST have left the wetted block.
+    let runoff_pixels = |pixels: &SharedPixelBuffer<Rgb8Pixel>| {
+        (195..220)
+            .flat_map(|y| (210..280).map(move |x| y * 600 + x))
+            .filter(|i| is_water(pixels.as_slice()[*i]))
+            .count()
+    };
+    assert_eq!(runoff_pixels(&raster(&fixture.frame(), viewport)), 0);
+    // Pool 2 is the first top-row cell, x=-18 in the real seven-segment layout.
+    fixture.water.add_to_pool(2, -18.0, 6.0).unwrap();
+    let mut visible = 0;
+    for tick in 1..=120 {
+        fixture.step(false);
+        if tick % 6 == 0 {
+            visible = visible.max(runoff_pixels(&raster(&fixture.frame(), viewport)));
+        }
+    }
+    assert!(fixture.water.stats().drip_parcels_emitted > 0);
+    assert!(visible >= 4, "runoff must survive rasterization: {visible}");
+}
+
+#[test]
+fn four_digit_rain_lab_captures_share_the_bounded_renderer_path() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let viewport = Viewport::new(1200.0, 630.0);
+    let mut fixture = DigitRainFixture::row([8; 4], 7, true);
+    let below_lane = |pixels: &SharedPixelBuffer<Rgb8Pixel>, lane: usize| {
+        let left = 120 + 252 * lane;
+        (445..490)
+            .flat_map(|y| (left..left + 190).map(move |x| y * 1200 + x))
+            .filter(|i| is_water(pixels.as_slice()[*i]))
+            .count()
+    };
+    let dry = raster(&fixture.frame(), viewport);
+    for lane in 0..4 {
+        assert_eq!(
+            below_lane(&dry, lane),
+            0,
+            "probe must exclude the digit and floor"
+        );
+    }
+    for tick in 1..=420 {
+        if tick == 360 {
+            fixture.set_digits(&[1; 4]).unwrap();
+        }
+        fixture.step(true);
+        if ![240, 361, 420].contains(&tick) {
+            continue;
+        }
+        let frame = fixture.frame();
+        let pixels = raster(&frame, viewport);
+        let vector = render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+        assert!(
+            vector
+                .iter()
+                .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+        );
+        assert!(vector.len() <= 3600);
+        // Rain reaches all four lanes. Retirement is intentionally intermittent;
+        // a released drop need not already be below every digit one tick later.
+        let mut total = 0;
+        for lane in 0..4 {
+            let wet = below_lane(&pixels, lane);
+            if tick == 240 {
+                assert!(wet > 0, "no water below lane {lane}");
+            }
+            total += wet;
+        }
+        assert!(total > 0, "all cascading water disappeared at tick {tick}");
+        if let Some(output) = &output {
+            let name = format!("four-digit-rain-tick-{tick}");
+            write_png(&output.join(format!("{name}.png")), &pixels);
+            std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+        }
+    }
+}
+
+#[test]
+fn live_clock_rain_captures_wet_digits_and_a_time_correction_on_both_layouts() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (w, h) in [(1024, 768), (800, 480), (480, 800)] {
+        let config = ClockConfig {
+            aspect_ratio: w as f32 / h as f32,
+            time_format: engine_common::ClockTimeFormat::TwentyFourHour,
+            event_profile: ClockEventProfile::Off,
+            rain_amount: ClockRainAmount::Heavy,
+            ..ClockConfig::default()
+        };
+        let mut state = ClockScenario::init(config, 7);
+        ClockScenario::step(
+            &mut state,
+            &[
+                ClockAction::set_reading(ClockReading::new(8, 8, 0).unwrap()),
+                ClockAction::preview_event(ClockEventKind::Rain),
+            ],
+            Duration::ZERO,
+        );
+        let viewport = Viewport::new(w as f32, h as f32);
+        let mut dry = ClockScenario::init(config, 7);
+        for tick in 1..=1600 {
+            let reading = ClockReading::new(
+                if tick < 600 { 8 } else { 11 },
+                if tick < 600 { 8 } else { 11 },
+                0,
+            )
+            .unwrap();
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(reading)],
+                Duration::from_nanos(16_666_667),
+            );
+            if ![300, 599, 601, 660, 1200, 1600].contains(&tick) {
+                continue;
+            }
+            let rain = state.rain_state().unwrap();
+            assert_eq!(rain.surface_digits, state.display().digits);
+            assert!(!rain.surface_change_pending);
+            if tick < 600 {
+                assert!(rain.surface_water_microunits > 0);
+            }
+            let frame = ClockScenario::render_frame(&state);
+            let pixels = raster(&frame, viewport);
+            let vector =
+                render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+            assert!(
+                vector
+                    .iter()
+                    .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+            );
+            assert!(vector.len() <= 3600);
+            ClockScenario::step(
+                &mut dry,
+                &[ClockAction::set_reading(reading)],
+                Duration::ZERO,
+            );
+            let dry_pixels = raster(&ClockScenario::render_frame(&dry), viewport);
+            // Exclude the unchanged cyan face by comparing a same-reading dry
+            // control. No artifact flag is required for the pixel assertion.
+            let wet = pixels
+                .as_slice()
+                .iter()
+                .zip(dry_pixels.as_slice())
+                .filter(|(p, dry)| is_water(**p) && !is_water(**dry))
+                .count();
+            assert!(
+                wet > 20,
+                "missing live water: {w}x{h} tick={tick} wet={wet}"
+            );
+            if let Some(output) = &output {
+                let name = format!("clock-digit-rain-{w}x{h}-tick-{tick}");
+                write_png(&output.join(format!("{name}.png")), &pixels);
+                std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+            }
+        }
+    }
 }
 
 #[test]

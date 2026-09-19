@@ -15,11 +15,12 @@ pub struct SpillRibbon {
     pub surface_side: usize,
 }
 
-/// Only automatic outfalls participate in mixing; arbitrary rain/splash
-/// sources remain independent. Outlet IDs are pool_index * 2 + edge.
+/// Only continuous automatic outfalls participate in mixing; independent drips,
+/// rain/splash sources remain separate. Outlet IDs are pool_index * 2 + edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpillSource {
     Outlet { pool: usize, edge: usize },
+    Drip { pool: usize, edge: usize },
     Junction { outlets: [usize; 2] },
 }
 
@@ -27,7 +28,7 @@ impl SpillSource {
     pub(crate) fn outlet_id(self) -> Option<usize> {
         match self {
             Self::Outlet { pool, edge } => Some(pool * 2 + edge),
-            Self::Junction { .. } => None,
+            Self::Drip { .. } | Self::Junction { .. } => None,
         }
     }
 }
@@ -79,6 +80,9 @@ impl Spill {
     }
 
     pub fn ribbon(self, parcel: &Parcel) -> Option<SpillRibbon> {
+        if matches!(self.source, SpillSource::Drip { .. }) {
+            return None;
+        }
         let along = self.head.position - self.tail.position;
         let length = along.length();
         if length <= 1e-6 {
@@ -142,6 +146,7 @@ impl Spill {
             quads,
             surface_side: match self.source {
                 SpillSource::Outlet { edge, .. } => edge,
+                SpillSource::Drip { .. } => unreachable!(),
                 SpillSource::Junction { .. } => 1,
             },
         })

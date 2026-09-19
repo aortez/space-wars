@@ -1,21 +1,26 @@
-//! Rain's physical arena, independent of digit events and duck navigation.
+//! Rain's physical arena, lit collecting digits and one passive floating duck.
 mod physics;
+pub(crate) mod source;
+mod surfaces;
 
 use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
 use engine_core::Vec2;
 use engine_water::{Parcel, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
-use crate::{events::EventPhase, floor::DrainGeometry, layout::Layout};
+use crate::{
+    DisplaySnapshot, SegmentState, events::EventPhase, floor::DrainGeometry, layout::Layout,
+};
 use physics::{DT, FloatWorld};
+use surfaces::{DigitSurfaces, FLOOR_POOLS, PARCELS, RELEASE_SLOTS};
 
 pub const RAINING_TICKS: u64 = 20 * 60;
 pub const DRAIN_TICKS: u64 = 20 * 60;
 pub const CLEAR_TICKS: u64 = 120;
 pub const RAIN_TICKS: u64 = RAINING_TICKS + DRAIN_TICKS + CLEAR_TICKS;
-// Existing outlet parcels already consume slots. Reserve two *new* slots for
-// this tick's two outlets, rather than starving the source behind those parcels.
-const SOURCE_LIMIT: usize = physics::PARCELS - 2;
+// Floor pools step first. Leave their two new outfalls room even when a wet
+// digit change temporarily crowds the ordinary source/outlet parcel budget.
+const SOURCE_LIMIT: usize = PARCELS - RELEASE_SLOTS - 2;
 const OPEN_TICKS: u64 = 36;
 const CLOSE_TICKS: u64 = 24;
 const DEPTH_TICKS: u64 = 30;
@@ -28,12 +33,11 @@ pub(crate) struct RainEvent {
     pub facing: f32,
     drain: DrainGeometry,
     seed: u64,
-    rng: StdRng,
+    source: source::RainSource,
     amount: ClockRainAmount,
     budget: f64,
     scheduled: f64,
     source_limited: u64,
-    drops: u64,
     depth_ticks: u64,
     door_started: Option<u64>,
     door_floor: f32,
@@ -41,10 +45,16 @@ pub(crate) struct RainEvent {
     spawns: u32,
     floats: Option<FloatWorld>,
     reclaimed_pose: Option<(Vec2, f32)>,
+    surfaces: DigitSurfaces,
 }
 
 impl RainEvent {
-    pub fn new(drain: DrainGeometry, seed: u64, amount: ClockRainAmount) -> Self {
+    pub fn new(
+        drain: DrainGeometry,
+        seed: u64,
+        amount: ClockRainAmount,
+        display: DisplaySnapshot,
+    ) -> Self {
         let layout = drain.layout();
         let mut rng = StdRng::seed_from_u64(seed);
         let amount = if amount == ClockRainAmount::Varied {
@@ -59,15 +69,16 @@ impl RainEvent {
             ClockRainAmount::Varied => unreachable!(),
         };
         let facing = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
+        let (surfaces, water) = DigitSurfaces::new(drain, display);
         Self {
             layout,
-            water: drain.water_world(physics::COLUMNS, physics::PARCELS),
+            water,
             tick: 0,
             entry_x: -facing * layout.bounds_max.x * 0.8,
             facing,
             drain,
             seed,
-            rng,
+            source: source::RainSource::new(rng),
             amount,
             budget: f64::from(layout.bounds_max.x * 2.0 * layout.pitch)
                 * rate
@@ -75,7 +86,6 @@ impl RainEvent {
                 * DT,
             scheduled: 0.0,
             source_limited: 0,
-            drops: 0,
             depth_ticks: 0,
             door_started: None,
             door_floor: layout.floor_y,
@@ -83,7 +93,13 @@ impl RainEvent {
             spawns: 0,
             floats: None,
             reclaimed_pose: None,
+            surfaces,
         }
+    }
+
+    pub fn synchronize(&mut self, display: DisplaySnapshot, segments: &mut [SegmentState]) {
+        self.surfaces
+            .synchronize(&mut self.water, display, segments);
     }
 
     pub fn required_depth(&self) -> f32 {
@@ -95,6 +111,7 @@ impl RainEvent {
         self.water
             .pools()
             .iter()
+            .take(FLOOR_POOLS)
             .flat_map(|p| {
                 p.columns_in_range(
                     f64::from(self.entry_x - half),
@@ -161,24 +178,36 @@ impl RainEvent {
     fn emit_rain(&mut self) {
         let t = self.tick.min(RAINING_TICKS) as f64 / RAINING_TICKS as f64;
         self.scheduled = self.budget * (t * t * (3.0 - 2.0 * t));
-        if self.tick > RAINING_TICKS || !self.tick.is_multiple_of(2) {
+        if self.tick > RAINING_TICKS {
+            return;
+        }
+        let count = self.source.emission_count(self.tick);
+        // Attempt a final batch even if the next random shower is later.
+        // Any undelivered budget remains explicit, not counted as liquid.
+        let count = if self.tick == RAINING_TICKS {
+            count.max(1)
+        } else {
+            count
+        };
+        if count == 0 {
             return;
         }
         let pending = (self.scheduled - self.water.stats().injected).max(0.0);
         if pending <= 1e-9 {
             return;
         }
-        if self.water.parcels().len() + 2 > SOURCE_LIMIT {
+        if self.water.parcels().len() + count > SOURCE_LIMIT {
             self.source_limited += 1;
             return;
         }
-        for _ in 0..2 {
+        // Retiring wet digits can briefly occupy the reserved release slots.
+        // Catch up the delayed shower over several ordinary batches, not one
+        // screen-sized blob. Pending budget is not yet liquid; status/benchmarks
+        // continue to show it until injected. One drop is at most one cell area.
+        let volume = (pending / count as f64).min(f64::from(self.layout.pitch * 0.8).powi(2));
+        for _ in 0..count {
             let half = self.layout.bounds_max.x;
-            // Stratified showers avoid accidentally concentrating a whole
-            // storm in one column. Jitter keeps the visible rain irregular.
-            let fraction =
-                (((self.drops * 13) % 32) as f32 + self.rng.random_range(0.15..0.85)) / 32.0;
-            self.drops += 1;
+            let fraction = self.source.next_fraction();
             self.water
                 .add_falling(Parcel {
                     position: Vec2::new(
@@ -186,7 +215,7 @@ impl RainEvent {
                         self.layout.bounds_max.y - 1.0,
                     ),
                     velocity: Vec2::new(0.0, -220.0),
-                    volume: pending * 0.5,
+                    volume,
                     duration: 0.06,
                     horizontal_bounds: Some([f64::from(-half), f64::from(half)]),
                 })
@@ -289,6 +318,17 @@ impl RainEvent {
             parcels: s.parcels,
             source_limited_ticks: self.source_limited,
             water_limited_ticks: s.capacity_limited_ticks,
+            surface_digits: self.surfaces.digits,
+            surface_water_microunits: micro(
+                self.water.pools()[FLOOR_POOLS..]
+                    .iter()
+                    .flat_map(|p| p.columns())
+                    .map(|c| c.volume)
+                    .sum(),
+            ),
+            drip_parcels_emitted: s.drip_parcels_emitted,
+            surface_change_pending: self.surfaces.pending,
+            surface_change_deferrals: self.surfaces.deferrals,
             entry_depth_milli: (self.entry_depth() * 1000.0).round() as u32,
             required_depth_milli: (self.required_depth() * 1000.0).round() as u32,
             duck_phase: self.phase,

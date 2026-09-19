@@ -4,9 +4,9 @@ use crate::rain::RainEvent;
 
 pub(super) fn render(frame: &mut RenderFrame, event: &RainEvent) {
     let opacity = event.opacity();
-    // Rain is behind the clock face, including the colon and AM/PM indicator.
-    // Reuse the same volume-preserving water geometry as Meltdown.
-    meltdown::render_water(frame, &event.water, ARENA_LAYER, opacity);
+    // Digit ledges and released water share the face's layer, above dim anchors.
+    // The colon/AM-PM are display-only and drawn afterwards, remaining legible.
+    meltdown::render_water(frame, &event.water, ACTIVE_CELL_LAYER, opacity);
     let pitch = event.layout.pitch;
     if let Some((floor, open)) = event.door() {
         let half = pitch * 0.8;

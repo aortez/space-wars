@@ -39,7 +39,11 @@ not colliding particles: there is no general pressure, breaking-wave, or impact
 splash solver. A caller may inject upward-moving splash parcels. On capacity
 exhaustion, outflow is held in the pool; it is never silently deleted.
 Each parcel carries optional `horizontal_bounds` that stop horizontal motion at
-vertical walls. Automatic spills inherit `WaterConfig::spill_channel`; explicit
+vertical walls. Automatic spills default to `WaterConfig::spill_channel`;
+`set_outlet_channel(pool, edge, bounds)` overrides a single edge for future
+emissions (`None` means free flight). A channel must contain its outlet: it cannot
+teleport newborn runoff across the world. Changing it detaches old ribbon history
+without moving existing parcels or replacing their bounds. Explicit
 `add_falling` sources must supply their own bounds (or `None` for free flight).
 Normal Meltdown uses the central drain channel for outflow and the outer screen
 walls for its impact spray; the open collecting-pool fixture is unconfined.
@@ -56,15 +60,16 @@ passed through the outlet. Unlike the old forced drain current, a flat basin
 does not necessarily empty in the Clock's seven-second material window.
 
 Pools reserve all column/face scratch storage at construction; stepping allocates
-no additional buffers. Limits are eight pools, 512 columns total, and at most
-512 parcels (128 in Clock). Each caller step accepts `(0, 1/30]` seconds and is
+no additional buffers. Limits are 128 pools, 512 columns total, and at most
+512 parcels (128 in Clock Meltdown; 512 in Rain, including release reserves).
+Each caller step accepts `(0, 1/30]` seconds and is
 split into substeps no larger than 1/240 second. Speeds and donor withdrawals
 are limited; these are stability/work bounds, not an accuracy guarantee at
 arbitrary depths or scales. Geometry and source inputs must be finite and within
 the API bounds; rejected source additions leave accounting unchanged.
 Without body displacement, pool work is linear in column count. Parcel collection
-scans candidate columns along each swept path in each pool; both pool and parcel
-counts are bounded.
+rejects pools outside the swept horizontal interval before scanning candidate
+columns. Both pool and parcel counts are bounded.
 
 `Pool::columns()` exposes the same bed, surface, liquid volume and separate body
 occupancy used by simulation.
@@ -72,6 +77,220 @@ occupancy used by simulation.
 velocity. Closed boundaries retain unlimited height (not finite-height walls).
 Parcel deposition transfers volume but does not impart impact momentum to a
 pool. These are explicit limitations for future body/wave coupling.
+
+### Irregular rain and live digit surfaces
+
+Normal Clock Rain now shuffles a bag of 32 horizontal bands each cycle, with
+fresh jitter inside each band. It emits batches of 1–3 parcels separated by
+1–3 ticks instead of advancing a fixed modular stride every two ticks. The
+average rate remains about 60 parcels/second at 60 Hz. Position and timing use
+the event's seeded RNG; replay remains deterministic. This changes the visible
+pattern, not the Light/Medium/Heavy scheduled volume or its smooth envelope.
+Backpressure still leaves undelivered volume scheduled, not counted as liquid;
+the deadline attempts a final batch even between scheduled showers. A live rain
+parcel is at most one digit-cell area: backlog catches up over ordinary batches
+instead of suddenly appearing as an enormous drop. Scheduled but undelivered
+rain remains visible in diagnostics, not counted as missing liquid.
+
+`water_fixture::DigitRainFixture` remains the isolated **headless test bed**.
+It uses the real seven-segment cell layout and 0.8-pitch squares,
+with two catching columns per cell and the actual gaps between cells. A full
+digit needs 24 preallocated cell pools plus two floor halves (92 columns total).
+Inactive pixels remain faint visual guides, not water-catching surfaces.
+The fixture can change digits while wet; tests cover a top row disappearing
+and its water landing on the middle row, then spilling down to the floor.
+Production raster/vector captures cover rain and an `8` → `1` transition.
+The four-digit row uses 98 pools / 320 columns, four times the source volume and
+drop rate, and the same 512-parcel hard ceiling. Its simultaneous `8888` → `1111`
+change stresses wet-support retirement independently of the live Clock layout.
+
+The actual Rain event now builds these collecting surfaces from `Layout` and
+the current lit digit mask. It preallocates 96 cell pools plus the two floor
+halves (98 pools, 320 columns). Only lit digit cells collect rain. Dim guides,
+the blinking colon and AM/PM are presentation-only: no per-second support churn,
+and no hidden collector spanning a glyph or the gaps between cells.
+
+Digit outfalls use the outer viewport bounds; only the two floor outfalls use
+the narrow central drain channel. Removing a support releases its water freely
+with the column's horizontal velocity, not a sideways kick into the drain.
+The passive duck tests depth in the floor pools only, so a dry ledge overhead
+cannot prevent its launch. Water renders over the face's dim guides; the clock
+remains readable, with colon and AM/PM drawn afterwards.
+
+The reusable engine addition is `WaterWorld::set_pool_supports(&[bool])`:
+
+- Pool indices/geometry remain stable. Disabled pools do not catch, flow,
+  render water columns, or accept source/displacement submissions.
+- Each removed wet column transfers its liquid into a falling parcel, without
+  changing injected/drained/reclaimed totals. Old attached outfalls detach.
+- The whole update is validated first. Insufficient capacity returns `Capacity`
+  without changing any support, parcel, or accounting. Callers must retain the
+  old visible supports and retry; they must not silently discard the water.
+- `WaterConfig::reserved_release_parcels` can withhold slots from ordinary
+  sources/outlets for removal (default zero). These slots are **inside** the
+  existing hard parcel budget. The single-digit fixture reserves 48 of 512 slots,
+  and the four-digit row/live event reserve 192, enough for all cell columns.
+  Repeated changes can still exhaust this reserve.
+- Re-enabled supports start dry, with no old velocity or body occupancy. Scratch
+  storage is retained. Per-step spill scratch now scales with actual pool count,
+  so increasing the pool ceiling does not initialize 128 entries in a two-pool
+  Meltdown event. Column and engine parcel ceilings are unchanged.
+
+Live reading/format updates switch physical and visible digit masks together.
+Wet disappearing cells release their water even during a paused control update;
+simulation time, source RNG, existing motion and injection/drainage/reclamation
+do not advance. Shared lit supports keep their water. A normal wet change fits
+the reserved slots. Repeated corrections before water can fall can exhaust that
+reserve: the old visible/physical digits stay together and the next simulation
+tick retries the **latest** reading, not a queue of stale readings. Clock status
+reports `surface_digits`, `surface_change_pending`, `surface_change_deferrals`,
+`surface_water_microunits` and `drip_parcels_emitted`. Normal time corrections,
+12/24-hour changes, noon/midnight, pause, resize and event replacement are tested.
+
+This is intentionally a collection-surface model, not solid collision: blocks
+do not deflect sideways/upward-moving parcels, contain pressure, or displace
+surrounding water on appearance. No invisible walls bridge the pixel gaps.
+
+The initial prototype exposed a parcel bottleneck: every tiny positive outfall
+created another slice, so nearly dry ledges competed with actual rainfall for
+slots. Optional `WaterWorld::set_drip_config(pool, Some(DripConfig { ... }))`
+now batches small outflows **in time**, separately for each outlet:
+
+- Waiting water remains in the pool columns: visible, sampleable, and counted
+  as pooled volume. The two inline credits request future outflow; they are not
+  extra liquid or a hidden detached-water reservoir.
+- Accumulate the normal requested outflow until `target_volume` or `max_delay`.
+  The lab uses 3 area units (about 3.3% of a pixel's area) and 0.6 simulated
+  seconds. The deadline permits smaller drips, so there is no minimum-volume
+  cutoff silently deleting residual water.
+  Live rain uses a quarter of a digit-cell area and a 1.2-second deadline.
+  The larger drop target handles heavy throughput; the longer wait prevents
+  light-rain residual films from flooding the queue with tiny parcels. Both
+  keep tiny ledges within the ordinary 320-parcel budget while 192 release
+  slots remain reserved.
+- Requests stay capped to actual above-lip liquid, and all simultaneous donor
+  withdrawals remain bounded. A one-column pool shares retained water correctly
+  between two outlets, including raised lips. Capacity exhaustion keeps liquid
+  upstream; it does not create unlimited flow debt or raise launch-speed caps.
+- A substep with enough flow can still emit an ordinary connected outfall.
+  Batched `SpillSource::Drip` parcels use the existing area-preserving detached
+  renderer and swept collection, not a ribbon stretching back to the lip. Like
+  independent rain drops, they do not participate in opposing-stream mixing.
+- Configuration defaults to `None`; existing floor/drain pools use continuous
+  outflow. Only digit-cell pools opt in. This is a timing approximation,
+  **not** surface tension, pressure, or a general particle collision model.
+- Reclaim/support removal clears stale requests without adding/releasing liquid
+  twice. No additional allocations occur during stepping. Parcel slots are
+  reserved when an outlet is due, so a waiting left edge cannot reserve the only
+  slot needed by its right neighbor. `capacity_limited_ticks` counts blocked
+  outflow requests, not normal batching waits; `drip_parcels_emitted` counts
+  released batched parcels (including ones collected during their birth step).
+
+Initial prototype release A/B results on this workstation, **before the swept
+pool rejection optimization**, seeds 0/7/19, 1,200 ticks each (rain
+through tick 900, digit change at 600, first 120 timing samples excluded):
+
+| Fixture | Peak parcels | Delivered rain | Step median | Step p95 |
+| --- | --- | --- | --- | --- |
+| One digit, continuous control | 486–490 | 81–95% | 64–65 µs | 114–115 µs |
+| One digit, batched drips | 135–138 | 100% | 9.5–10 µs | 29–30 µs |
+| Four digits, continuous control | 402–407 | 3–78% | 90–93 µs | 254–256 µs |
+| Four digits, batched drips | 403–425 | 100% | 58–66 µs | 247–252 µs |
+
+The single-digit batched case had no source/outlet capacity stalls. Four digits
+still had 25–37 denied source attempts and 17–18 outlet-limited ticks, largely
+around simultaneous wet-support retirement; the largest pending budget was
+152–200 units (0.32–0.42 seconds' scheduled rainfall). The four-digit control's
+lower peak is **not** better throughput: it is severely starving the source.
+Every tested digit change succeeded immediately and injected water remained
+conserved; undelivered scheduled rain is not counted as missing liquid.
+Delayed source volume is admitted in a later batch, so larger catch-up drops
+remain visible briefly after the four-digit change. This tradeoff is measured,
+not hidden by reclaiming liquid or calling deferred sources injected water.
+
+These are simulation-only timings, not Pi FPS. The former floor-only Clock workload
+measured about 7.8–7.9 µs median / 9.0–9.1 µs p95 in the same run; it is not an identical
+workload. The benchmark prints counters, pending source volume and pre-change
+pressure separately, with no wall-clock pass/fail assertions. Normal CI tests
+conservation, deterministic replay, delivery and bounded transient backpressure.
+
+An ordinary-water baseline check caught a code-generation regression in the
+first batching implementation. The hot column/donor passes now traverse adjacent
+slices directly, rather than repeatedly indexing every vector. The equations
+and simultaneous-withdrawal limiter are unchanged. With batching disabled,
+`engine-water`'s existing `water_benchmark` compared against main `b0b16b0`:
+512-column closed pools improved from 11.3 to 7.7 µs median; 128-column opposed
+mixed streams from 5.0/5.3 to 4.6/4.8 µs at depths 5/15. Peak parcels, merge
+counts and reported volume errors matched the control. No timing thresholds
+are added to CI.
+
+Live integration results (Rust 1.89 release, workstation, seeds 0/7/19):
+
+| Heavy live Rain | Peak parcels | Delivered rain | Step median | Step p95 |
+| --- | --- | --- | --- | --- |
+| Fixed 12:34, Picade aspect | 190–198 | 100% | 27–28 µs | 31–32 µs |
+| Wet 08:08 → 11:11, Picade/HyperPixel/portrait | 310–341 | 100% | 24–25 µs | 37–43 µs |
+
+The fixed-face cases had no source/outlet stalls. The deliberately large wet
+correction completed immediately in every case, with 0–11 denied source
+attempts and 0–15 outlet-limited ticks (none before the change). Peak pending rain
+was 1.1–9.6 cell areas (less than one second's peak scheduled rate); all arrived
+by the 20-second rain deadline. No liquid was deleted to make room. The 72-case
+amount/aspect/seed lifecycle sweep verifies full scheduled-rain delivery at every
+amount, physical duck exits for medium/heavy storms, and no duck launch for light
+rain. These are simulation-only measurements, **not** Pi timings or
+whole-frame/rendering costs.
+
+The first live pass spent roughly 130 µs per heavy-rain step testing unrelated
+ledges. Rejecting disjoint horizontal pool intervals before the exact swept
+intersection brought that down to roughly 36 µs with the same batching. The
+final coarser live drip setting brings it to the figures above. Thin crossed
+ledges, exact-edge hits, support changes, conservation and replay remain tested.
+
+#### Visual and device checkpoint
+
+These deterministic headless captures use the live Clock event and production
+raster adapter, not an illustrative mockup. The first is a wet `08:08` face at
+1024×768. The second is immediately after a forced `08:08` → `11:11` correction
+at 800×480: water above the retired cells is now falling freely, not still held
+by the dim guides. The capture suite also checks later runoff and portrait.
+
+![Heavy rain collecting on lit Clock digits](../screenshots/water/clock-digit-rain-picade.png)
+
+![Wet time correction releases water from retired digit cells](../screenshots/water/clock-digit-rain-time-change.png)
+
+The release application was deployed and manually playtested on `sw-picade-2`
+(Pi 4, 1024×768, raster scale 2). One 120-sample heavy-rain window reported
+60 FPS / 60 UPS, host simulation step 0.441 ms average / 0.497 ms p95,
+scene construction 0.331 ms average, and frame preparation 7.866 ms average.
+At that checkpoint there were 162 parcels, no source/outlet capacity stalls,
+no deferred support changes and a floating duck. These host costs include more
+than the isolated water benchmark. A later spot check around 50 minutes after
+deployment found the same process and zero service restarts; this is not a
+formally monitored soak or a performance guarantee. Other Pi units were not
+updated as part of this checkpoint.
+
+```sh
+cargo test --locked -p engine-water supports::
+cargo test --locked -p engine-water drips::
+cargo test --locked -p scenario-clock rain::
+cargo test --locked -p scenario-clock water_fixture::digit_rain
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/clock-rain-drips \
+  cargo test --locked -p engine-client --bin engine-client water_visual_tests::
+cargo run --locked --release -p scenario-clock --example rain_benchmark
+cargo run --locked --release -p scenario-clock --example rain_benchmark -- --live-only
+```
+
+The capture command writes `digit-rain-tick-*.png`, `four-digit-rain-tick-*.png`
+and matching SVGs alongside the existing edge gallery. Live captures named
+`clock-digit-rain-WxH-tick-N` include a wet time correction at 1024×768, 800×480
+and 480×800. Their same-reading dry controls exclude cyan digits from the water
+pixel check. All pixel assertions run
+even when no artifact directory is requested. A separate no-rain probe verifies
+visible runoff from a wetted block; dry controls exclude the cyan digit itself.
+Source tests verify
+coverage, non-striding order, cadence variation, deterministic replay and bounded
+batch size; existing rain tests retain conservation, duck exits, and lip continuity.
 
 ## Integration and verification
 
@@ -99,8 +318,9 @@ face normals instead of using the center-to-center chord. This fixes the standin
 gap reproduced by `steps-right-depth-15-tick-60`, whose youngest slices previously
 folded through the lip and fell back to drops. The regression checks every slice
 through the rising-head interval in both directions. Heavy-rain regressions cover
-three aspect ratios and three seeds: isolated one-frame impact pulses may still
-use the detached fallback, but repeated lip gaps are rejected.
+three aspect ratios and three seeds: the original floor-only regression retains
+its one-frame fallback bound; larger batched digit impacts may use a detached
+fallback for at most two frames (33 ms). Persistent lip gaps are rejected.
 
 The emitted parcel center starts halfway through its represented time interval;
 that birth motion is swept for collection just like subsequent movement. Its
@@ -175,7 +395,7 @@ instead of a wide spike.
 
 Scratch storage is preallocated within the existing parcel limit. A deterministic
 swept-AABB sort and vertical sweep prune candidates; dense overlap can still be
-quadratic, bounded by 512 parcels (128 in Clock). Consumed inputs are compacted
+quadratic, bounded by 512 parcels (128 in Clock Meltdown). Consumed inputs are compacted
 with their metadata; mixing only decreases parcel count. `WaterStats` records
 `spill_merges`, `mixed_volume`, and `mixing_pair_checks` for measurement.
 

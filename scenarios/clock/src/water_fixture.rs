@@ -5,6 +5,9 @@ use engine_common::{
 };
 use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld};
 
+mod digit_rain;
+pub use digit_rain::DigitRainFixture;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Profile {
     Ledge,

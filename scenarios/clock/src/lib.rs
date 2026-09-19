@@ -584,6 +584,11 @@ impl ClockState {
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
         }
+        if let Some(ActiveEvent::Rain(event)) = &mut self.active_event {
+            // A control-only update may transfer wet support into free water,
+            // but never advances time, consumes rain RNG, or integrates motion.
+            event.synchronize(self.display, &mut self.segments);
+        }
         if !self
             .active_event
             .as_ref()
