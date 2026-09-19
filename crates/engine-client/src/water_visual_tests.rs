@@ -3,10 +3,119 @@ use crate::{
     render::{self, Viewport},
     thruster_visual_tests::{raster, svg, write_png},
 };
-use engine_common::{ClockEventKind, ClockEventProfile, ClockRainAmount, Scenario};
+use engine_common::{
+    Camera2, ClockEventKind, ClockEventProfile, ClockRainAmount, RenderPoint, Scenario,
+};
 use scenario_clock::water_fixture::{OpposedFixture, Profile, WaterFixture};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
+use slint::{Rgb8Pixel, SharedPixelBuffer};
 use std::time::Duration;
+
+// Four pixels per world unit, showing both lips and the outgoing jet. These
+// checks always run in normal CI; no window, artifact export, or golden PNGs.
+fn opposed_pixels(depths: [f64; 2], mixing: bool) -> SharedPixelBuffer<Rgb8Pixel> {
+    let mut fixture = OpposedFixture::new(depths, mixing, false);
+    for _ in 0..90 {
+        fixture.step(1.0 / 60.0, [true; 2]);
+    }
+    let mut frame = fixture.frame();
+    frame.camera = Camera2::new(RenderPoint::new(0.0, -35.0), 100.0);
+    raster(&frame, Viewport::new(480.0, 400.0))
+}
+
+fn is_water(pixel: Rgb8Pixel) -> bool {
+    // Includes the blue fill and cyan highlight, not the gray supports or sky.
+    pixel.b > 180 && pixel.g > 100 && pixel.b.saturating_sub(pixel.r) > 80
+}
+
+/// Scan world y=-40..-60, below the junction but above the receiving pool.
+/// Every row must contain one connected jet, also connected to the next row.
+/// Allow one pixel of discretization, not large holes or two crossing streams.
+fn outgoing_jet(
+    pixels: &SharedPixelBuffer<Rgb8Pixel>,
+    max_width: usize,
+) -> Result<Vec<f32>, String> {
+    let mut centers = Vec::new();
+    let mut previous: Option<(usize, usize)> = None;
+    for row in 220..=300 {
+        let wet: Vec<_> = (120..360)
+            .filter(|x| is_water(pixels.as_slice()[row * 480 + x]))
+            .collect();
+        let (Some(&first), Some(&last)) = (wet.first(), wet.last()) else {
+            return Err(format!("jet missing at row {row}"));
+        };
+        let width = last - first + 1;
+        if width > max_width || width - wet.len() > 1 {
+            return Err(format!(
+                "split or over-wide jet at row {row}: span={width} wet={}",
+                wet.len()
+            ));
+        }
+        if let Some((old_first, old_last)) = previous
+            && (first > old_last + 1 || old_first > last + 1)
+        {
+            return Err(format!(
+                "jet disconnected between rows {} and {row}",
+                row - 1
+            ));
+        }
+        previous = Some((first, last));
+        centers.push(wet.iter().sum::<usize>() as f32 / wet.len() as f32);
+    }
+    Ok(centers)
+}
+
+fn assert_both_sources_visible(pixels: &SharedPixelBuffer<Rgb8Pixel>) {
+    // World x=+-22, y=2: inside both source pools, just behind the spill lips.
+    for x in [152, 328] {
+        assert!(
+            is_water(pixels.as_slice()[52 * 480 + x]),
+            "source absent at x={x}"
+        );
+    }
+}
+
+#[test]
+fn water_equal_streams_render_a_connected_downward_jet() {
+    let mixed = opposed_pixels([5.0, 5.0], true);
+    assert_both_sources_visible(&mixed);
+    let centers = outgoing_jet(&mixed, 16).expect("equal streams must form one connected jet");
+    assert!(
+        centers.iter().all(|x| (*x - 240.0).abs() <= 6.0),
+        "equal jet must stay centered: {centers:?}"
+    );
+
+    // Negative control: the former crossing streams must not satisfy the same
+    // image contract, even though their volume and replay checks still pass.
+    let unmixed = opposed_pixels([5.0, 5.0], false);
+    assert_both_sources_visible(&unmixed);
+    assert!(
+        outgoing_jet(&unmixed, 16).is_err(),
+        "pass-through control unexpectedly looks merged"
+    );
+}
+
+#[test]
+fn water_unequal_streams_render_a_connected_deflected_jet() {
+    let mixed = opposed_pixels([15.0, 5.0], true);
+    assert_both_sources_visible(&mixed);
+    let centers = outgoing_jet(&mixed, 48).expect("unequal streams must form one connected jet");
+    assert!(
+        centers.iter().all(|x| *x > 256.0 && *x < 352.0),
+        "stronger left stream must push the jet right: {centers:?}"
+    );
+    assert!(
+        centers.last().unwrap() - centers.first().unwrap() >= 8.0,
+        "jet must continue deflecting as it falls: {centers:?}"
+    );
+
+    let unmixed = opposed_pixels([15.0, 5.0], false);
+    assert_both_sources_visible(&unmixed);
+    assert!(
+        outgoing_jet(&unmixed, 48).is_err(),
+        "pass-through control unexpectedly looks merged"
+    );
+}
 
 #[test]
 fn water_edge_lab_captures_production_renderers() {

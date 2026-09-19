@@ -131,6 +131,11 @@ cargo test --locked -p engine-water mixing::tests
 cargo test --locked -p scenario-clock opposed_outfalls
 cargo test --locked -p scenario-clock heavy_rain_has
 
+# Inexpensive pixel checks: connected equal/deflected jets, plus pass-through
+# negative controls. These also run in ordinary CI without artifact export.
+cargo test --locked -p engine-client --bin engine-client water_visual_tests:: \
+  -- --skip water_edge_lab_captures_production_renderers
+
 # Production raster PNGs, vector SVG paths, and a browsable index.html.
 SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/spacewars-water-edge \
   cargo test --locked -p engine-client --bin engine-client water_edge_lab
