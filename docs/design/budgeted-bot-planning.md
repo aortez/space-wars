@@ -39,8 +39,13 @@ default. The [successor-flight investigation](../bot-disengagement-handoff.md)
 now forecasts the actual transfer controller's turning and braking costs.
 Its automatic handoff rule is rejected after two win-to-loss regressions; a
 read-only probe remains for calibration. The opponent's coasting approximation
-can both overstate and understate danger. The next slice should compare plausible
-opponent responses and complete successor value before admitting a transfer.
+can both overstate and understate danger. The subsequent
+[opponent-response calibration](../bot-opponent-response-forecast.md) improves
+the pursuit forecast and exposes a missing arena-wall constraint. The read-only
+probe now flags boundary-margin entry, and mission observations expose the
+enclosing arena. Live guidance is unchanged. The next slice should make escape
+and transfer boundary-feasible and obtain budgeted destination-cover evidence
+before comparing complete successors or admitting a landing.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

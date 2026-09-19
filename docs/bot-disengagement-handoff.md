@@ -176,6 +176,11 @@ or push is part of this investigation.
 
 ## Next bounded investigation
 
+Follow-up: [opponent-response calibration](bot-opponent-response-forecast.md)
+adds the three hypotheses and catches the earlier false admission. It also
+identifies unmodeled arena-wall impacts and absent destination-cover surveys;
+the probe remains read-only and now marks boundary validity limits.
+
 Keep the own-flight forecast and compare a small set of plausible opponent
 responses: coasting, braking to aim, and continuing pursuit. Calibrate those
 against these dense traces before using them to admit a transfer. Report a range

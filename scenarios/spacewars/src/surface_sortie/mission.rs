@@ -74,6 +74,9 @@ pub struct MissionObservationV1 {
     pub planets: Vec<PilotPlanetObservation>,
     /// A flight obstacle only; it never becomes a landing or claim destination.
     pub sun: Option<MissionObstacle>,
+    /// The arena encloses flight space. Unlike a planet, its navigable side is
+    /// inside the radius. The physical wall is a polygonal approximation.
+    pub boundary: MissionBoundary,
     /// Actual opponent motion, including during on-foot or pod recovery.
     /// Weapon eligibility remains in the local combat observation.
     pub opponent: Option<MissionOpponent>,
@@ -88,6 +91,12 @@ pub struct MissionOpponent {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct MissionObstacle {
     pub position: Vec2,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MissionBoundary {
+    pub center: Vec2,
     pub radius: f32,
 }
 
@@ -406,6 +415,10 @@ impl SurfaceSortieState {
                 position: sun.position,
                 radius: sun.radius * BODY_BOUNDS_RADIUS_SCALE,
             }),
+            boundary: MissionBoundary {
+                center: Vec2::splat(self.world.config.universe_radius as f32),
+                radius: self.world.config.universe_radius as f32,
+            },
             opponent: self.pilots.iter().find_map(|other| {
                 if other.owner == self.pilots[player].owner
                     || other.vitals.is_some_and(|v| !v.alive())
@@ -438,6 +451,26 @@ impl SurfaceSortieState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mission_boundary_exposes_the_enclosing_world_without_a_query() {
+        for state in [
+            SurfaceSortieScenario::init_material_combat(42),
+            SurfaceSortieScenario::init_material_arena_trial(2, false, 0.0),
+        ] {
+            let before = state.world.physics.world.snapshot_bytes().unwrap();
+            let o = state.mission_observation(0, None);
+            let radius = state.world.config.universe_radius as f32;
+            assert_eq!(
+                o.boundary,
+                MissionBoundary {
+                    center: Vec2::splat(radius),
+                    radius
+                }
+            );
+            assert_eq!(before, state.world.physics.world.snapshot_bytes().unwrap());
+        }
+    }
 
     #[test]
     fn scheduled_surveys_are_staggered_and_keep_selected_sites_and_live_gates_current() {
