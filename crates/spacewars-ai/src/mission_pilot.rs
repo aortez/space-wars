@@ -197,8 +197,16 @@ impl MaterialMissionPilot {
     }
     pub fn reset(&mut self, context: BrainReset) {
         let disengagement = self.telemetry.disengagement.is_some();
+        let handoff = self
+            .telemetry
+            .disengagement
+            .as_ref()
+            .map(|d| d.handoff_probe);
         *self = Self::with_policy(context, self.breaks, self.policy);
         self.enable_pursuit_disengagement(disengagement);
+        if let Some(enabled) = handoff {
+            self.configure_handoff_probe(enabled);
+        }
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry

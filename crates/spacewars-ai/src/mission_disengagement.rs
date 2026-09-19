@@ -1,12 +1,24 @@
 //! Optional physical handoff from a timed-out fight to another surface mission.
 use super::*;
 
+#[path = "mission_handoff.rs"]
+mod handoff;
+pub use handoff::HandoffTelemetry;
+
+fn disabled(value: &bool) -> bool {
+    !value
+}
+
 const DISENGAGEMENT_TICKS: u64 = 12 * 60;
 const CLEAR_TICKS: u64 = 60;
 const CLEAR_RANGE: f32 = 350.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MissionDisengagement {
+    #[serde(skip_serializing_if = "disabled")]
+    pub handoff_probe: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handoff: Option<HandoffTelemetry>,
     pub attempts: u32,
     pub separated: u32,
     pub timed_out: u32,
@@ -117,8 +129,8 @@ impl MaterialMissionPilot {
         let p = &c.recovery.flight.pilot;
         let Some(target) = c.target else { return };
         let delta = p.ship.position - target.motion.position;
-        // Visibility includes firing alignment; lack of visibility alone is
-        // not evidence of cover. Pods and spacelings cannot shoot this ship.
+        // Visibility is a first-solid query toward the target, independent of
+        // aim. A missing target hit alone is not positive evidence of cover.
         if target.ship_form != Some(ShipForm::Ship)
             || target.health <= 0.0
             || delta.length() >= CLEAR_RANGE
@@ -214,6 +226,7 @@ impl MaterialMissionPilot {
             .clear_since
             .is_some_and(|since| p.tick.saturating_sub(since) >= CLEAR_TICKS)
         {
+            self.probe_disengagement_handoff(o);
             self.end_disengagement(p.tick, "separation established");
             return None;
         }
@@ -269,7 +282,7 @@ mod tests {
     };
     use std::time::Duration;
 
-    fn fixture(enabled: bool) -> (MaterialMissionPilot, MissionObservationV1) {
+    pub(super) fn fixture(enabled: bool) -> (MaterialMissionPilot, MissionObservationV1) {
         let mut state = SurfaceSortieScenario::init_material_travel(42, false);
         SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
         let mut o = state.mission_observation(0, None);

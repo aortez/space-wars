@@ -35,8 +35,12 @@ replays shortened pilot survival. An optional
 escape directions and establishes separation in four activated physical trials.
 The ordinary transfer handoff gives that separation back; one asteroid case
 still loses its pilot much earlier. This task remains headless and disabled by
-default. The next mission-choice slice must evaluate an escape together with
-its successor, including the turn and braking needed to transfer or re-engage.
+default. The [successor-flight investigation](../bot-disengagement-handoff.md)
+now forecasts the actual transfer controller's turning and braking costs.
+Its automatic handoff rule is rejected after two win-to-loss regressions; a
+read-only probe remains for calibration. The opponent's coasting approximation
+can both overstate and understate danger. The next slice should compare plausible
+opponent responses and complete successor value before admitting a transfer.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

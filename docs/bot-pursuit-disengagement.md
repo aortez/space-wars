@@ -18,8 +18,9 @@ weapon settings and the shared live-planning allowance stay unchanged.
 
 When a 30-second pursuit expires, the optional task starts if an unoccluded,
 living full enemy ship remains within 350 units and there is still unowned
-ground to pursue. It does not infer cover from lack of visibility: the combat
-visibility flag also depends on firing alignment. Already supported ships,
+ground to pursue. It does not infer cover from lack of visibility: visibility
+is a first-solid query toward the target, independent of aim, and a missing hit
+does not positively identify an occluder. Already supported ships,
 committed surface tasks, on-foot work and recovery retain their priority.
 
 The task has a fixed 12-second deadline. At entry it compares **seven escape
@@ -42,7 +43,8 @@ These are desired velocities, not instantaneous changes to physical motion.
 The maneuver completes after one continuous second of either:
 
 - at least 350 units of range with nonnegative relative opening speed; or
-- current terrain occlusion reported by the existing combat observation.
+- current body or terrain-fragment occlusion reported by the combat observation.
+  This includes moving debris and does not certify durable ground cover.
 
 A failed 12-second attempt returns to a fresh bounded fight, rather than
 admitting a landing beside the pursuer. Hits do not extend either timer. Solar
@@ -92,10 +94,13 @@ safety bounds.
 | 7,335 | Ship becomes a pod, 12.07 seconds later than baseline ship loss. |
 | 7,707 | Pilot dies; baseline pilot survives until 27,575. |
 
-The pursuit retry delay still ends at 7,022. Ordinary pursuit also requires
-combat visibility, so reaching that tick alone does not cause a handoff. The
-escape task protects its own interval; it does not evaluate the braking and
-turning required by the next transfer.
+The pursuit retry delay still ends at 7,022, and the opponent is visible then.
+P2 owns no planet, the opponent still has 54% hull, and the last hit is too old
+to qualify for pursuit. New damage at 7,080 qualifies; the first-solid query
+reports the opponent visible again at 7,082 and combat resumes. The escape task
+protects its own interval; it does not evaluate the braking and turning required
+by the next transfer. This corrects the earlier attribution to aiming alignment:
+aim is not part of the visibility sensor.
 
 All four triggered comparisons re-enter combat within about 4.7–7.5 seconds of
 returning to transfer. Thus even the favorable match outcomes do **not** prove
@@ -177,6 +182,10 @@ Large sensor logs remain in the target directory. No deployment or push is part
 of this slice.
 
 ## Next decision to investigate
+
+Follow-up: the [successor-flight investigation](bot-disengagement-handoff.md)
+now tests this decision. It retains a read-only forecast probe and rejects the
+automatic rule after two win-to-loss regressions and a measured false admission.
 
 Evaluate **the escape and its successor together**. At 6,802 the local separation
 condition is true, but selecting the nearest eligible planet requires a large

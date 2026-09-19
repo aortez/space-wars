@@ -70,6 +70,12 @@ impl MissionBot {
         self.0.enable_pursuit_disengagement(enabled);
         self
     }
+    /// Records successor forecasts without changing the mission's decisions.
+    /// Requires an enabled pursuit-disengagement experiment.
+    pub fn with_disengagement_handoff_probe(mut self, enabled: bool) -> Self {
+        self.0.configure_handoff_probe(enabled);
+        self
+    }
 }
 impl std::ops::Deref for MissionBot {
     type Target = MaterialMissionPilot;
