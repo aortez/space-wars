@@ -124,12 +124,12 @@ impl LivePlanningRun {
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
             if self.planner.uses_route_dependencies() {
-                "live_jetpack_objective_v4"
+                "live_jetpack_objective_v5"
             } else {
                 "live_jetpack_objective_v3"
             }
         } else if self.planner.uses_route_dependencies() {
-            "live_joint_objective_v4"
+            "live_joint_objective_v5"
         } else if self.planner.reuses_ground() {
             "live_joint_objective_v2"
         } else {

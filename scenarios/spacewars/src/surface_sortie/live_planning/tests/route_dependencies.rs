@@ -46,6 +46,79 @@ fn move_body(state: &mut SurfaceSortieState, id: BodyId, position: Vec2) {
 }
 
 #[test]
+fn a_path_obstructed_while_waiting_for_landing_sites_is_not_handed_off() {
+    let (mut state, mut source, body) = fixture();
+    source.combat.recovery.flight.pilot.landing.phase = LandingPhase::Flying;
+    let mut live = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+    let mut o = source.clone();
+    live.observe(&state, 0, &mut o);
+    live.advance(state.world.tick);
+    let request = live.requests[&0].clone();
+    let job = live.queue.job(request.token).unwrap();
+    let (site, areas) = job.dependencies().first().unwrap();
+    let site = *site;
+    assert!(
+        job.output()
+            .unwrap()
+            .sites
+            .iter()
+            .any(|r| r.site == site && r.cost().is_some())
+    );
+    let area = *areas
+        .iter()
+        .find(|a| a.groups == SurfaceSortieState::spec().collision_groups)
+        .unwrap();
+    let frame = source.combat.recovery.flight.pilot.planet.motion;
+    for age in [1, REFRESH_TICKS + 5] {
+        state.world.tick = request.measurement_tick + age;
+        o = source.clone();
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick = state.world.tick;
+        p.site_query = LandingSiteQuery::Deferred {
+            next_tick: state.world.tick + 1,
+        };
+        p.sites.clear();
+        live.observe(&state, 0, &mut o);
+        assert!(
+            o.landing_objective
+                .as_ref()
+                .unwrap()
+                .sites
+                .iter()
+                .any(|r| r.site == site)
+        );
+        assert_eq!(live.requests[&0].token, request.token);
+    }
+    let point = (area.minimum + area.maximum) * 0.5;
+    move_body(
+        &mut state,
+        body,
+        frame.position + point.rotate_radians(frame.angle),
+    );
+    let mut o = target(&state, 0);
+    let p = &mut o.combat.recovery.flight.pilot;
+    p.landing.phase = LandingPhase::Flying;
+    p.planet.claim.as_mut().unwrap().flag = source
+        .combat
+        .recovery
+        .flight
+        .pilot
+        .planet
+        .claim
+        .as_ref()
+        .unwrap()
+        .flag;
+    live.observe(&state, 0, &mut o);
+    assert!(
+        o.landing_objective
+            .as_ref()
+            .is_none_or(|s| !s.sites.iter().any(|r| r.site == site))
+    );
+    assert!(live.telemetry.withheld_route_entries > 0);
+    assert_eq!(live.telemetry.held_for_site_refresh, 1);
+}
+
+#[test]
 fn a_return_jump_depends_on_its_apex_even_when_both_endpoints_and_outward_walk_are_clear() {
     use ground_navigation::{GroundEdge, GroundEdgeKind, GroundNode, standing_height};
 

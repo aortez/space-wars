@@ -126,6 +126,10 @@ evidence that a powered route was selected or flown.
 
 ## Next: make delivered routes selectable
 
+The [landing-scan handoff follow-up](bot-landing-survey-handoff.md) implements
+this next slice and records controller selection and physical captures. The
+measurements here describe the earlier `0ab3bfe` checkpoint.
+
 The trace records all 77 deliveries in the v11-P1 asteroid run, matching the
 publication counter. Every one has a **deferred landing-site query, zero current
 landing sites and no selected objective route**. The corresponding controller

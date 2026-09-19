@@ -21,8 +21,13 @@ found useful partial v11 candidates cancelled by scalar jump-gravity changes,
 alongside genuinely negative measured v10 routes. The next tactical slice is
 now implemented as [candidate validity under changing scalar gravity](../bot-jump-gravity-dependencies.md).
 It preserves independent paths but reveals that completed surveys can arrive
-between landing scans with no current sites to select. Coordinate that handoff
-and demonstrate physical use before broadening the mission utility layer.
+between landing scans with no current sites to select. The
+[landing-scan handoff](../bot-landing-survey-handoff.md) now joins those results
+to current sites and completes physical enemy-flag captures in quiet paired
+replays. The remaining asteroid case loses its ship before a whole survey
+finishes; earlier validated candidates also need current landing clearance.
+Resolve that time-to-first-use question before broadening the mission utility
+layer or promoting the experimental live adapter.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

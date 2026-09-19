@@ -10,7 +10,7 @@ use ground_navigation::{
 use landing_objective::{
     LandingObjective, LandingObjectiveRoute, LandingObjectiveSurvey, ObjectivePlanning,
 };
-use pilot::{LandingSiteId, PilotObservationV1};
+use pilot::{LandingSiteId, LandingSiteQuery, PilotObservationV1};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},
@@ -106,6 +106,11 @@ pub struct LivePlanningTelemetry {
     /// least one successful candidate; those candidates were not validated.
     pub retired_partial_successes_by_actor: BTreeMap<usize, u64>,
     pub published: u64,
+    /// Deliveries with at least one successful route and matching current site.
+    /// This does not imply controller selection or physical execution.
+    pub publications_with_current_sites: u64,
+    /// Repeated validations retained past refresh while landing scans are absent.
+    pub held_for_site_refresh: u64,
     pub completed_by_actor: BTreeMap<usize, u64>,
     pub published_by_actor: BTreeMap<usize, u64>,
     /// Powered entries delivered after both field and geometry validation;
@@ -717,8 +722,21 @@ impl LiveObjectivePlanner {
                                     .max_request_completion_ticks
                                     .max(p.tick - request.tick);
                             }
-                            if first || p.tick - request.tick < REFRESH_TICKS {
+                            let refresh_due = p.tick - request.tick >= REFRESH_TICKS;
+                            let wait_for_sites = self.local_dependencies
+                                && request.actual.is_none()
+                                && matches!(
+                                    p.site_query,
+                                    LandingSiteQuery::Deferred { .. }
+                                        | LandingSiteQuery::NotRequested
+                                );
+                            if self.local_dependencies || first || !refresh_due {
                                 survey.validated_tick = Some(p.tick);
+                                self.telemetry.publications_with_current_sites +=
+                                    u64::from(survey.sites.iter().any(|r| {
+                                        r.cost().is_some()
+                                            && p.sites.iter().any(|s| r.site == Some(s.id))
+                                    }));
                                 self.telemetry.local_publications +=
                                     u64::from(survey.validated_routes_only);
                                 self.telemetry.powered_route_publications += survey
@@ -732,8 +750,16 @@ impl LiveObjectivePlanner {
                                 o.objective_work = Some(ObjectiveWorkState::Ready);
                                 self.telemetry.published += 1;
                                 *self.telemetry.published_by_actor.entry(player).or_default() += 1;
-                                return;
+                                self.telemetry.held_for_site_refresh +=
+                                    u64::from(refresh_due && wait_for_sites);
+                                if first || !refresh_due || wait_for_sites {
+                                    return;
+                                }
                             }
+                            // Deliver the revalidated old result alongside the
+                            // current landing scan before starting replacement
+                            // work. Deferred scans retain this same bounded job;
+                            // neither path renews the original measurement age.
                             measurements = self.salvage(state, player, p);
                         } else {
                             invalidation = Some("routes_changed");
@@ -751,13 +777,15 @@ impl LiveObjectivePlanner {
                 },
             }
         }
-        o.objective_work = Some(
-            if invalidation.is_some_and(|r| r != "expired" && r != "touchdown_changed") {
-                ObjectiveWorkState::Stale
-            } else {
-                ObjectiveWorkState::Pending
-            },
-        );
+        if o.landing_objective.is_none() {
+            o.objective_work = Some(
+                if invalidation.is_some_and(|r| r != "expired" && r != "touchdown_changed") {
+                    ObjectiveWorkState::Stale
+                } else {
+                    ObjectiveWorkState::Pending
+                },
+            );
+        }
         if self.requests.len() + self.parked.len() == self.capacity {
             self.telemetry.deferred_capacity += 1;
             return;
