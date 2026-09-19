@@ -201,12 +201,13 @@ impl MaterialMissionPilot {
             .telemetry
             .disengagement
             .as_ref()
-            .map(|d| (d.handoff_probe, d.boundary_aware));
+            .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
         self.enable_pursuit_disengagement(disengagement);
-        if let Some((probe, boundary)) = handoff {
+        if let Some((probe, boundary, cover)) = handoff {
             self.configure_handoff_probe(probe);
             self.configure_disengagement_boundary(boundary);
+            self.configure_destination_cover_probe(cover);
         }
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
@@ -248,6 +249,10 @@ impl MaterialMissionPilot {
 
     pub fn sensor_request(&self) -> MissionSensorRequest {
         MissionSensorRequest {
+            destination_cover: self
+                .disengaging()
+                .then(|| self.telemetry.disengagement.as_ref().unwrap().cover_request)
+                .flatten(),
             objective_planning: self.policy.objective_planning(),
             site: self.site_request(),
             last_survey: self.last_survey,

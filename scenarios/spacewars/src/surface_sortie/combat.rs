@@ -229,40 +229,7 @@ impl SurfaceSortieState {
             .pilot
             .sites
             .iter()
-            .map(|site| {
-                let occluded = |height| {
-                    let Some(enemy) = combat.target else {
-                        return true;
-                    };
-                    let pilot = &self.pilots[enemy.owner.index()];
-                    if pilot.body.is_some()
-                        || self.world.ships[pilot.vehicle.0].form != ShipForm::Ship
-                    {
-                        return true; // This survivor has no ship weapons.
-                    }
-                    let target = site.vehicle_position + site.normal * height;
-                    let delta = target - enemy.motion.position;
-                    let vehicle = self.pilots[enemy.owner.index()].vehicle.0;
-                    self.world
-                        .physics
-                        .cast_laser(
-                            vehicle,
-                            enemy.motion.position,
-                            delta.normalized(),
-                            delta.length(),
-                        )
-                        .is_some_and(|hit| {
-                            hit.target
-                                == Some(MechanicalEntity::Body(BodyId::Planet(site.id.planet)))
-                        })
-                };
-                LandingCover {
-                    site: site.id,
-                    grounded: occluded(7.0),
-                    approach: occluded(30.0),
-                    departure: occluded(60.0),
-                }
-            })
+            .map(|site| self.landing_cover_with_queries(site, combat.target, || true))
             .collect();
         TacticalSortieObservationV1 {
             version: 1,

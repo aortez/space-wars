@@ -46,11 +46,14 @@ probe now flags boundary-margin entry, and mission observations expose the
 enclosing arena. A separate [boundary-guidance experiment](../bot-boundary-escape.md)
 now avoids the three recorded wall cases, but also loses a quiet acceptance
 match. It remains opt-in; the older escape and default policies are preserved.
-Braking-only and reflected-direction ablations also regress. The next slice is
-an explicit, bounded remote destination-cover probe sharing the existing query
-allowance, before comparing complete successors or admitting a landing. Its
-request, measurement, invalidation and acceptance plan is recorded with the
-boundary results; cover alone must not imply a feasible capture/return trip.
+Braking-only and reflected-direction ablations also regress. The
+[remote destination-cover probe](../bot-destination-cover.md) now measures a
+four-site shortlist using only query quota left after local planning. Fourteen
+complete matched replays preserve controls and local work. It distinguishes
+covered, exposed and unavailable ground, and retains explicit sample age and
+invalidation. The next slice should compare complete successors using those
+site proposals, with current revalidation and capture/return feasibility still
+required; cover alone must not authorize a mission or landing.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

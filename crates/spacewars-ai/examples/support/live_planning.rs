@@ -15,6 +15,7 @@ pub struct LivePlanningRun {
     planner: LiveObjectivePlanner,
     seats: Vec<usize>,
     trace: BufWriter<fs::File>,
+    destination_trace: BufWriter<fs::File>,
     profiles: std::collections::BTreeMap<
         usize,
         scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning,
@@ -64,11 +65,14 @@ impl LivePlanningRun {
         };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
-        writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms").unwrap();
+        writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms,task").unwrap();
         Some(Self {
             planner,
             seats,
             trace,
+            destination_trace: BufWriter::new(
+                fs::File::create(out.join("destination-cover.jsonl")).unwrap(),
+            ),
             profiles: Default::default(),
             dispatch: Vec::new(),
             active_dispatch: Vec::new(),
@@ -87,9 +91,23 @@ impl LivePlanningRun {
         self.profiles.insert(seat, planning);
         self.planner.observe_with_planning(state, seat, o, planning);
     }
-    pub fn advance(&mut self, tick: u64) -> f64 {
+    #[allow(dead_code)] // Only the mission runner requests remote evidence.
+    pub fn observe_destination_cover(
+        &mut self,
+        state: &SurfaceSortieState,
+        seat: usize,
+        o: &mut scenario_spacewars::surface_sortie::mission::MissionObservationV1,
+        request: Option<
+            scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest,
+        >,
+    ) {
+        self.planner
+            .observe_destination_cover(state, seat, o, request);
+    }
+    pub fn advance(&mut self, state: &SurfaceSortieState) -> f64 {
+        let tick = state.tick();
         let start = Instant::now();
-        let report = self.planner.advance(tick).unwrap();
+        let report = self.planner.advance_with_state(state).unwrap();
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch.push(ms);
         if report.charged != Work::default() {
@@ -98,7 +116,7 @@ impl LivePlanningRun {
         for job in &report.jobs {
             writeln!(
                 self.trace,
-                "{tick},{},{},{},{},{},{},{},{},{},{},{:?},{ms:.6}",
+                "{tick},{},{},{},{},{},{},{},{},{},{},{:?},{ms:.6},{}",
                 report.tick,
                 report.allowance.graph,
                 report.allowance.physics_queries,
@@ -109,14 +127,36 @@ impl LivePlanningRun {
                 job.age_ticks,
                 job.charged.graph,
                 job.charged.physics_queries,
-                job.phase
+                job.phase,
+                if self.planner.is_destination_cover_work(job.request) {
+                    "destination_cover"
+                } else {
+                    "landing_objective"
+                }
             )
             .unwrap();
+        }
+        for (actor, evidence) in self.planner.destination_cover_observations(tick) {
+            // Emit actual measurements outside dispatch timing. Older entries
+            // in a shortlist remain explicitly stale after the physics step.
+            if evidence
+                .candidates
+                .iter()
+                .any(|c| c.measurement.as_ref().is_some_and(|m| m.tick == tick))
+            {
+                serde_json::to_writer(
+                    &mut self.destination_trace,
+                    &json!({"tick":tick,"actor":actor,"evidence":evidence}),
+                )
+                .unwrap();
+                writeln!(self.destination_trace).unwrap();
+            }
         }
         ms
     }
     pub fn report(&mut self) -> Value {
         self.trace.flush().unwrap();
+        self.destination_trace.flush().unwrap();
         let timing = |values: &[f64]| {
             if values.is_empty() {
                 return Value::Null;
@@ -149,9 +189,10 @@ impl LivePlanningRun {
             "reuse_objective_ground":self.planner.reuses_ground(),
             "early_objective_routes":self.planner.uses_early_candidates(),
             "enabled_seats":self.seats,
-            "scope":"landing-objective ground survey, hull overlay, joint routes and optional early landing checks; other sensors and controls remain synchronous",
+            "scope":"landing-objective ground survey, hull overlay, joint routes, optional early landing checks and diagnostic destination cover using remaining query quota; other sensors and controls remain synchronous",
+            "destination_cover":self.planner.destination_cover_telemetry(),
             "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),
             "dispatch":timing(&self.dispatch),"active_dispatch":timing(&self.active_dispatch),
-            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; trace IO excluded"})
+            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; destination site/cover work is included in dispatch; trace IO excluded"})
     }
 }

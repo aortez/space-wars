@@ -162,6 +162,11 @@ local landing/recovery keeps priority; and diagnostic-only requests preserve
 controls. Capture, recovery and survival after a handoff remain the behavioral
 evaluation, including the quiet P2 regression and the existing seed 2 success.
 
+Implemented follow-up: [budgeted destination-cover evidence](bot-destination-cover.md)
+now supplies this diagnostic shortlist. It spends only quota left after local
+planning, keeps older samples explicitly stale, and preserves controls in all
+fourteen matched replays. Mission selection does not consume it yet.
+
 ## Reproduction and verification
 
 ```sh

@@ -188,6 +188,20 @@ fn main() {
         "both" => [true, true],
         _ => panic!("--disengagement-seats must be none, 0, 1 or both"),
     };
+    let cover_probe = arg("--probe-destination-cover", "false") == "true";
+    assert!(
+        !cover_probe || live_planning.is_some(),
+        "destination cover requires --live-objective-planning true"
+    );
+    assert!(
+        !cover_probe
+            || (0..2).any(|i| disengagement_seats[i]
+                && live_planning
+                    .as_ref()
+                    .is_some_and(|live| live.enabled_for(i))
+                && !selected_policies[i].objective_planning().is_legacy()),
+        "destination cover requires an enabled planner escape seat"
+    );
     let handoff_probe = arg("--probe-disengagement-handoff", "false") == "true";
     let boundary_guidance = arg("--disengagement-boundary", "false") == "true";
     assert!(
@@ -224,6 +238,7 @@ fn main() {
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
+        .with_destination_cover_probe(disengagement_seats[i] && cover_probe)
     });
     // Independent policy state consumes the original observations and must
     // emit identical encoded controls on every tick. This work is not timed.
@@ -312,6 +327,12 @@ fn main() {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
                         live.observe(&state, i, &mut o.local, request.objective_planning);
+                        live.observe_destination_cover(
+                            &state,
+                            i,
+                            &mut o,
+                            request.destination_cover,
+                        );
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
@@ -512,7 +533,7 @@ fn main() {
         }
         let planning_ms = live_planning
             .as_mut()
-            .map_or(0.0, |live| live.advance(state.tick()));
+            .map_or(0.0, |live| live.advance(&state));
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -653,7 +674,7 @@ fn main() {
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
     report["pursuit_disengagement"] = json!({"enabled_seats":disengagement_seats,"probe_handoff":handoff_probe,
-            "boundary_guidance":boundary_guidance});
+            "boundary_guidance":boundary_guidance,"destination_cover_probe":cover_probe});
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }

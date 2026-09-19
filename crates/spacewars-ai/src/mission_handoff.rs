@@ -44,6 +44,9 @@ impl BoundaryForecast {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct HandoffTelemetry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_cover:
+        Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverObservation>,
     pub tick: u64,
     pub evaluated_ticks: u64,
     pub opponent_ticks: u64,
@@ -115,6 +118,7 @@ impl MaterialMissionPilot {
             .collect();
         let evaluated_ticks = candidates.iter().map(|f| f.ticks).sum();
         self.telemetry.disengagement.as_mut().unwrap().handoff = Some(HandoffTelemetry {
+            destination_cover: o.destination_cover.clone(),
             tick: p.tick,
             evaluated_ticks,
             opponent_ticks: evaluated_ticks * 3,
@@ -140,6 +144,8 @@ impl MaterialMissionPilot {
             d.last = None;
             d.handoff = None;
             d.handoff_probe = false;
+            d.cover_probe = false;
+            d.cover_request = None;
         }
         preview.telemetry.pursuit = None;
         preview.next_pursuit_tick = u64::MAX;

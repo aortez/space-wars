@@ -8,6 +8,9 @@ pub use handoff::HandoffTelemetry;
 #[path = "mission_boundary.rs"]
 mod boundary;
 pub use boundary::BoundaryGuidance;
+#[path = "mission_destination_cover.rs"]
+mod destination_cover;
+use scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest;
 
 fn disabled(value: &bool) -> bool {
     !value
@@ -19,6 +22,10 @@ const CLEAR_RANGE: f32 = 350.0;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MissionDisengagement {
+    #[serde(skip_serializing_if = "disabled")]
+    pub cover_probe: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_request: Option<DestinationCoverRequest>,
     #[serde(skip_serializing_if = "disabled")]
     pub boundary_aware: bool,
     #[serde(skip_serializing_if = "disabled")]
@@ -182,8 +189,10 @@ impl MaterialMissionPilot {
         };
         let (direction, estimated_min_range, estimated_clearance) =
             escape_direction(o, d.boundary_aware);
+        let cover_request = d.cover_probe.then(|| self.destination_shortlist(o));
         let d = self.telemetry.disengagement.as_mut().unwrap();
         d.attempts += 1;
+        d.cover_request = cover_request;
         if d.boundary_aware {
             d.boundary.get_or_insert_with(Default::default);
         }

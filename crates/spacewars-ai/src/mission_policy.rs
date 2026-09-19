@@ -76,6 +76,12 @@ impl MissionBot {
         self.0.configure_handoff_probe(enabled);
         self
     }
+    /// Request diagnostic destination material/cover evidence during escape.
+    /// Requires a host using the shared live-planning adapter.
+    pub fn with_destination_cover_probe(mut self, enabled: bool) -> Self {
+        self.0.configure_destination_cover_probe(enabled);
+        self
+    }
     /// Experimental wall-aware escape and successor-transfer guidance. Requires
     /// pursuit disengagement; default policies retain their previous controls.
     pub fn with_disengagement_boundary_guidance(mut self, enabled: bool) -> Self {

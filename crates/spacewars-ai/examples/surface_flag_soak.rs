@@ -447,7 +447,7 @@ fn main() {
         }
         actions.push(controls[1 - seat].encode(defender));
         if let Some(live) = &mut live_planning {
-            live.advance(state.tick());
+            live.advance(&state);
         }
         let start = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, DT);

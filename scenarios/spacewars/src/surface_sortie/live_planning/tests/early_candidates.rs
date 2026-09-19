@@ -220,7 +220,7 @@ fn early_clearance_is_charged_once_to_the_shared_allowance_even_after_cancellati
     live.observe(&state, 1, &mut sources[1]);
     assert_eq!(live.telemetry.early_candidates.physics_queries, early);
     live.reset();
-    assert_eq!(live.early_candidates.as_ref().unwrap().charged_queries(), 0);
+    assert_eq!(live.query_budget.charged_queries(), 0);
     assert_eq!(live.telemetry.early_candidates.site_checks, 0);
 }
 

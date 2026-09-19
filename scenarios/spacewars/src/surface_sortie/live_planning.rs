@@ -18,8 +18,13 @@ use std::{
 };
 
 mod avoiding;
+mod destinations;
 mod early_candidates;
 mod objective_job;
+mod query_budget;
+pub use destinations::DestinationCoverTelemetry;
+use destinations::Destinations;
+use query_budget::QueryBudget;
 mod route_dependencies;
 use avoiding::{AvoidingJob, HullPreview};
 pub use early_candidates::EarlyCandidateTelemetry;
@@ -220,6 +225,8 @@ pub struct LiveObjectivePlanner {
     reuse_ground: bool,
     local_dependencies: bool,
     early_candidates: Option<EarlyCandidates>,
+    query_budget: QueryBudget,
+    destinations: Destinations,
     last_observed: Option<u64>,
     last_advanced: Option<u64>,
     shared: Option<(u64, Weak<QuerySnapshot>)>,
@@ -236,6 +243,8 @@ impl LiveObjectivePlanner {
             reuse_ground: false,
             local_dependencies: false,
             early_candidates: None,
+            query_budget: QueryBudget::default(),
+            destinations: Destinations::default(),
             last_observed: None,
             last_advanced: None,
             shared: None,
@@ -270,7 +279,7 @@ impl LiveObjectivePlanner {
             self.local_dependencies,
             "early candidates require route dependencies"
         );
-        self.early_candidates = Some(EarlyCandidates::default());
+        self.early_candidates = Some(EarlyCandidates);
         self
     }
     pub fn uses_early_candidates(&self) -> bool {
@@ -290,11 +299,17 @@ impl LiveObjectivePlanner {
         self.last_observed = None;
         self.last_advanced = None;
         if let Some(early) = &mut self.early_candidates {
-            *early = EarlyCandidates::default();
+            *early = EarlyCandidates;
         }
+        self.query_budget = QueryBudget::default();
+        self.destinations = Destinations::default();
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
+        self.destinations.remove(player);
+        self.remove_objective(player);
+    }
+    fn remove_objective(&mut self, player: usize) {
         self.parked.remove(&player);
         self.retire(player);
     }
@@ -317,7 +332,7 @@ impl LiveObjectivePlanner {
         None
     }
     fn invalidate(&mut self, player: usize, reason: &'static str) {
-        self.remove(player);
+        self.remove_objective(player);
         *self.telemetry.invalidations.entry(reason).or_default() += 1;
     }
     fn actual(p: &PilotObservationV1) -> Option<ActualLanding> {
@@ -459,7 +474,7 @@ impl LiveObjectivePlanner {
         p: &PilotObservationV1,
     ) -> Option<Box<GroundMeasurements>> {
         if !self.reuse_ground {
-            self.remove(player);
+            self.remove_objective(player);
             return None;
         }
         if self.local_dependencies {
@@ -480,7 +495,7 @@ impl LiveObjectivePlanner {
         self.telemetry.validation_max_ms = self.telemetry.validation_max_ms.max(ms);
         if let Err(reason) = valid {
             *self.telemetry.reuse_rejections.entry(reason).or_default() += 1;
-            self.remove(player);
+            self.remove_objective(player);
             return None;
         }
         self.retire(player)
@@ -672,7 +687,7 @@ impl LiveObjectivePlanner {
                 && p.ship_form == ShipForm::Ship
                 && matches!(p.location, PilotLocation::Aboard(_))
         }) else {
-            self.remove(player);
+            self.remove_objective(player);
             return;
         };
         let mut invalidation = None;
@@ -813,6 +828,7 @@ impl LiveObjectivePlanner {
                                 self.allowance,
                                 self.capacity,
                                 self.last_advanced,
+                                &mut self.query_budget,
                             );
                         } else {
                             o.objective_work = Some(ObjectiveWorkState::Pending);
@@ -946,9 +962,42 @@ impl LiveObjectivePlanner {
         }
     }
 
-    /// Repeated calls for the same physics tick cannot spend the allowance twice.
-    /// Actors not observed this tick are removed before dispatch.
+    /// Register remote demand without querying the world or advancing local work.
+    pub fn observe_destination_cover(
+        &mut self,
+        state: &SurfaceSortieState,
+        player: usize,
+        o: &mut mission::MissionObservationV1,
+        request: Option<destination_cover::DestinationCoverRequest>,
+    ) {
+        self.destinations
+            .observe(state, player, o, request, &mut self.queue, self.capacity);
+    }
+    pub fn is_destination_cover_work(&self, token: RequestToken) -> bool {
+        self.destinations.owns_token(token)
+    }
+    pub fn destination_cover_telemetry(&self) -> &DestinationCoverTelemetry {
+        &self.destinations.telemetry
+    }
+    pub fn destination_cover_observations(
+        &self,
+        tick: u64,
+    ) -> Vec<(usize, destination_cover::DestinationCoverObservation)> {
+        self.destinations.snapshots(tick)
+    }
+    /// Dispatch local work first, then diagnostic cover using only unused query
+    /// allowance. Repeated calls cannot spend again; absent actors are retired.
+    pub fn advance_with_state(&mut self, state: &SurfaceSortieState) -> Option<PlanningReport> {
+        self.advance_inner(state.world.tick, Some(state))
+    }
     pub fn advance(&mut self, tick: u64) -> Option<PlanningReport> {
+        self.advance_inner(tick, None)
+    }
+    fn advance_inner(
+        &mut self,
+        tick: u64,
+        state: Option<&SurfaceSortieState>,
+    ) -> Option<PlanningReport> {
         if self.last_advanced == Some(tick) {
             return None;
         }
@@ -965,12 +1014,10 @@ impl LiveObjectivePlanner {
             )
             .collect();
         for player in removed {
-            self.remove(player);
+            self.remove_objective(player);
         }
-        let probe_queries = self.early_candidates.as_mut().map_or(0, |early| {
-            early.prepare_tick(tick, self.last_advanced);
-            early.charged_queries()
-        });
+        self.query_budget.prepare_tick(tick, self.last_advanced);
+        let probe_queries = self.query_budget.charged_queries();
         let mut report = self.queue.advance(Work {
             physics_queries: self.allowance.physics_queries - probe_queries,
             ..self.allowance
@@ -1017,9 +1064,21 @@ impl LiveObjectivePlanner {
                 reused.physics_queries - request.reused.physics_queries;
             request.reused = reused;
         }
-        if let Some(early) = &self.early_candidates {
-            early.account(&mut report, self.allowance);
+        self.destinations.retain_seen(tick);
+        if let Some(state) = state {
+            let remaining =
+                self.allowance.physics_queries - report.charged.physics_queries - probe_queries;
+            self.destinations.advance(
+                state,
+                &mut self.query_budget,
+                remaining,
+                self.allowance,
+                self.capacity,
+                &self.requests,
+                &self.parked,
+            );
         }
+        self.query_budget.account(&mut report, self.allowance);
         self.telemetry.graph += u64::from(report.charged.graph);
         self.telemetry.physics_queries += u64::from(report.charged.physics_queries);
         self.last_advanced = Some(tick);

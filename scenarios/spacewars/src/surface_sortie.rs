@@ -15,6 +15,7 @@ pub mod claim_footing;
 pub mod combat;
 pub mod comparison;
 pub mod compatibility;
+pub mod destination_cover;
 pub mod flight;
 pub mod ground_navigation;
 pub mod ground_posture;

@@ -1,6 +1,7 @@
 use super::*;
 use pilot::LandingSiteQuery;
 
+mod destinations;
 mod early_candidates;
 mod flight_dependencies;
 mod gravity_dependencies;

@@ -293,3 +293,23 @@ fn taking_a_continuation_revokes_its_token_and_preserves_remaining_work() {
     assert!(q.take(fresh).unwrap().output().is_some());
     assert_eq!(Rc::strong_count(&trace), 1);
 }
+
+#[test]
+fn atomic_adapter_tokens_share_identity_without_replacing_or_scheduling_jobs() {
+    let trace = Trace::default();
+    let mut queue = PlanningQueue::new(1);
+    let job_token = queue
+        .submit(3, (), JobLimits::default(), job(3, 2, 0, &trace))
+        .unwrap();
+    let atomic = queue.reserve_token(3);
+    assert_ne!(job_token, atomic);
+    assert!(!queue.cancel(atomic));
+    assert_eq!(queue.poll(job_token, &()), JobPoll::Pending);
+    let report = queue.advance(graph(1));
+    assert_eq!(report.jobs.len(), 1);
+    assert_eq!(report.jobs[0].request, job_token);
+    queue.reset();
+    let next = queue.reserve_token(3);
+    assert!(next.generation > atomic.generation);
+    assert_eq!(queue.advance(Work::UNLIMITED).charged, Work::default());
+}
