@@ -21,7 +21,9 @@ use serde::Serialize;
 
 #[path = "mission_disengagement.rs"]
 mod disengagement;
-pub use disengagement::{DisengagementAttempt, MissionDisengagement};
+pub use disengagement::{
+    DisengagementAttempt, MissionDisengagement, SuccessorComparison, SuccessorComparisonJob,
+};
 
 pub const MISSION_POLICY: &str = "material_mission_v9";
 const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;

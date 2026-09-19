@@ -57,7 +57,8 @@ impl RangeEntryEnvelope {
     }
 }
 
-struct ResponseState {
+#[derive(Clone)]
+pub(super) struct ResponseState {
     initial: PilotMotion,
     motion: PilotMotion,
     sweep: f32,
@@ -69,31 +70,14 @@ pub(super) struct OpponentResponses([ResponseState; 3]);
 
 impl OpponentResponses {
     pub(super) fn new(enemy: PilotMotion, o: &MissionObservationV1) -> Self {
-        let mut responses = Self(
+        Self(
             [
                 OpponentResponse::Coast,
                 OpponentResponse::BrakeToAim,
                 OpponentResponse::Pursue,
             ]
-            .map(|response| ResponseState {
-                initial: enemy,
-                motion: enemy,
-                // An explicit open-wing, zero-gravity hypothesis. Do not substitute
-                // our own measured wing state or gravity for an unseen enemy value.
-                sweep: 0.0,
-                pwm: 0.0,
-                forecast: OpponentForecast {
-                    response,
-                    minimum_range: f32::MAX,
-                    minimum_nominal_clearance: f32::MAX,
-                    first_inside_tick: None,
-                    boundary: BoundaryForecast::new(o.boundary, enemy.position),
-                    samples: Vec::new(),
-                },
-            }),
-        );
-        responses.record(o, 0);
-        responses
+            .map(|response| ResponseState::new(response, enemy, o)),
+        )
     }
 
     pub(super) fn forecasts(&self) -> [OpponentForecast; 3] {
@@ -101,70 +85,105 @@ impl OpponentResponses {
     }
 
     pub(super) fn advance(&mut self, o: &MissionObservationV1, tick: u64) {
-        let own = o.local.combat.recovery.flight.pilot.ship;
         for response in &mut self.0 {
-            if response.forecast.response == OpponentResponse::Coast {
-                response.motion.position =
-                    response.initial.position + response.initial.velocity * (tick as f32 * DT);
-                response.motion.angle =
-                    response.initial.angle + response.initial.spin * (tick as f32 * DT);
-                continue;
-            }
-            let frame_velocity = o
-                .planets
-                .iter()
-                .min_by(|a, b| {
-                    (response.motion.position.distance_to(a.motion.position) - a.radius).total_cmp(
-                        &(response.motion.position.distance_to(b.motion.position) - b.radius),
-                    )
-                })
-                .map_or(Vec2::ZERO, |planet| {
-                    planet.velocity_at(response.motion.position)
-                });
-            let intent = response.intent(own, frame_velocity);
-            advance_motor(
-                &mut response.motion,
-                &mut response.sweep,
-                intent,
-                frame_velocity,
-                Vec2::ZERO,
-            );
+            response.advance(o, tick);
         }
     }
 
     pub(super) fn record(&mut self, o: &MissionObservationV1, tick: u64) {
-        let own = o.local.combat.recovery.flight.pilot.ship.position;
         for response in &mut self.0 {
-            let f = &mut response.forecast;
-            let range = own.distance_to(response.motion.position);
-            f.minimum_range = f.minimum_range.min(range);
-            f.boundary
-                .record(o.boundary, response.motion.position, tick);
-            if range <= RANGE_THRESHOLD {
-                f.first_inside_tick.get_or_insert(tick);
-            }
-            for (center, radius) in o
-                .planets
-                .iter()
-                .map(|p| (p.motion.position, p.radius))
-                .chain(o.sun.map(|sun| (sun.position, sun.radius)))
-            {
-                f.minimum_nominal_clearance = f
-                    .minimum_nominal_clearance
-                    .min(response.motion.position.distance_to(center) - radius - 65.0);
-            }
-            if tick > 0 && tick % 60 == 0 {
-                f.samples.push(OpponentSample {
-                    after_ticks: tick,
-                    motion: response.motion,
-                    range,
-                });
-            }
+            response.record(o, tick);
         }
     }
 }
 
 impl ResponseState {
+    pub(super) fn new(
+        response: OpponentResponse,
+        enemy: PilotMotion,
+        o: &MissionObservationV1,
+    ) -> Self {
+        let mut state = Self {
+            initial: enemy,
+            motion: enemy,
+            // Open wings and zero enemy gravity are hypotheses, not sensed state.
+            sweep: 0.0,
+            pwm: 0.0,
+            forecast: OpponentForecast {
+                response,
+                minimum_range: f32::MAX,
+                minimum_nominal_clearance: f32::MAX,
+                first_inside_tick: None,
+                boundary: BoundaryForecast::new(o.boundary, enemy.position),
+                samples: Vec::new(),
+            },
+        };
+        state.record(o, 0);
+        state
+    }
+
+    pub(super) fn motion(&self) -> PilotMotion {
+        self.motion
+    }
+
+    pub(super) fn forecast(&self) -> &OpponentForecast {
+        &self.forecast
+    }
+
+    pub(super) fn advance(&mut self, o: &MissionObservationV1, tick: u64) {
+        if self.forecast.response == OpponentResponse::Coast {
+            self.motion.position =
+                self.initial.position + self.initial.velocity * (tick as f32 * DT);
+            self.motion.angle = self.initial.angle + self.initial.spin * (tick as f32 * DT);
+            return;
+        }
+        let frame_velocity = o
+            .planets
+            .iter()
+            .min_by(|a, b| {
+                (self.motion.position.distance_to(a.motion.position) - a.radius)
+                    .total_cmp(&(self.motion.position.distance_to(b.motion.position) - b.radius))
+            })
+            .map_or(Vec2::ZERO, |planet| {
+                planet.velocity_at(self.motion.position)
+            });
+        let intent = self.intent(o.local.combat.recovery.flight.pilot.ship, frame_velocity);
+        advance_motor(
+            &mut self.motion,
+            &mut self.sweep,
+            intent,
+            frame_velocity,
+            Vec2::ZERO,
+        );
+    }
+
+    pub(super) fn record(&mut self, o: &MissionObservationV1, tick: u64) {
+        let own = o.local.combat.recovery.flight.pilot.ship.position;
+        let f = &mut self.forecast;
+        let range = own.distance_to(self.motion.position);
+        f.minimum_range = f.minimum_range.min(range);
+        f.boundary.record(o.boundary, self.motion.position, tick);
+        if range <= RANGE_THRESHOLD {
+            f.first_inside_tick.get_or_insert(tick);
+        }
+        for (center, radius) in o
+            .planets
+            .iter()
+            .map(|p| (p.motion.position, p.radius))
+            .chain(o.sun.map(|sun| (sun.position, sun.radius)))
+        {
+            f.minimum_nominal_clearance = f
+                .minimum_nominal_clearance
+                .min(self.motion.position.distance_to(center) - radius - 65.0);
+        }
+        if tick > 0 && tick % 60 == 0 {
+            f.samples.push(OpponentSample {
+                after_ticks: tick,
+                motion: self.motion,
+                range,
+            });
+        }
+    }
     fn intent(&mut self, own: PilotMotion, frame_velocity: Vec2) -> FlightIntent {
         let limits = FlightControlLimits::for_sweep(self.sweep);
         let delta = own.position - self.motion.position;

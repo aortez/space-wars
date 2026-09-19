@@ -51,9 +51,12 @@ Braking-only and reflected-direction ablations also regress. The
 four-site shortlist using only query quota left after local planning. Fourteen
 complete matched replays preserve controls and local work. It distinguishes
 covered, exposed and unavailable ground, and retains explicit sample age and
-invalidation. The next slice should compare complete successors using those
-site proposals, with current revalidation and capture/return feasibility still
-required; cover alone must not authorize a mission or landing.
+invalidation. A [budgeted successor comparison](../bot-successor-comparison.md)
+now evaluates the first flight leg toward those sites, continued escape within
+its deadline, and combat against independent opponent hypotheses. It uses only
+remaining graph allowance and leaves controls unchanged. Current revalidation,
+capture/return feasibility and combat outcome evidence are still required before
+ranking complete successors or promoting a new policy.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

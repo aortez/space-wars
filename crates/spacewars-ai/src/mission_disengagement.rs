@@ -3,7 +3,7 @@ use super::*;
 
 #[path = "mission_handoff.rs"]
 mod handoff;
-pub use handoff::HandoffTelemetry;
+pub use handoff::{HandoffTelemetry, SuccessorComparison, SuccessorComparisonJob};
 
 #[path = "mission_boundary.rs"]
 mod boundary;
@@ -302,8 +302,16 @@ impl MaterialMissionPilot {
             return Some(self.hunt(o));
         }
         let direction = attempt.direction;
+        Some(self.escape_flight(o, direction))
+    }
+
+    // The bounded successor probe uses the same motor action, while retaining
+    // the original attempt's deadline instead of restarting an escape timer.
+    fn escape_flight(&mut self, o: &MissionObservationV1, direction: Vec2) -> CombatIntent {
+        let c = &o.local.combat;
+        let p = &c.recovery.flight.pilot;
         self.goal(MissionGoal::Disengage, p.tick);
-        self.telemetry.opponent = Some(target.owner);
+        self.telemetry.opponent = c.target.map(|target| target.owner);
         self.telemetry.reason = Some("opening range before another landing");
         let radial = p.ship.position - p.planet.motion.position;
         let falling =
@@ -323,7 +331,7 @@ impl MaterialMissionPilot {
             && desired.length() > 90.0
             && !intent.flight.controls.brake_held
             && Vec2::Y.rotate_radians(p.ship.angle).dot(direction) > 0.97;
-        Some(intent)
+        intent
     }
 }
 

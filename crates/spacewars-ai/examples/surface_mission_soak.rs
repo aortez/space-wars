@@ -11,6 +11,8 @@ mod mission_metrics;
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
 mod planning_probe;
+#[path = "support/successor_probe.rs"]
+mod successor_probe;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -189,6 +191,13 @@ fn main() {
         _ => panic!("--disengagement-seats must be none, 0, 1 or both"),
     };
     let cover_probe = arg("--probe-destination-cover", "false") == "true";
+    let compare_successors = arg("--probe-successors", "false") == "true";
+    assert!(
+        !compare_successors || cover_probe,
+        "successor comparison requires --probe-destination-cover true"
+    );
+    let mut successor_probe =
+        compare_successors.then(|| successor_probe::SuccessorProbe::new(&out));
     assert!(
         !cover_probe || live_planning.is_some(),
         "destination cover requires --live-objective-planning true"
@@ -306,6 +315,7 @@ fn main() {
         let mut policy_times = [0.0; 2];
         let mut ground_nodes = [0; 2];
         let mut landing_queries = ["not_observed"; 2];
+        let mut successor_construction_ms = 0.0;
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
@@ -386,6 +396,9 @@ fn main() {
                 let mut intent = pilots[i].intent(&o);
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
+                if let Some(probe) = &mut successor_probe {
+                    successor_construction_ms += probe.observe(i, &pilots[i], &o);
+                }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
                     let mut original = if reference_site == site {
@@ -531,9 +544,16 @@ fn main() {
                 actions.extend(intent.encode(owner));
             }
         }
-        let planning_ms = live_planning
-            .as_mut()
-            .map_or(0.0, |live| live.advance(&state));
+        let mut planning_ms = successor_construction_ms
+            + live_planning
+                .as_mut()
+                .map_or(0.0, |live| live.advance(&state));
+        if let Some(probe) = &mut successor_probe {
+            planning_ms += probe.advance(
+                state.tick(),
+                live_planning.as_ref().unwrap().remaining_work(),
+            );
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -677,6 +697,9 @@ fn main() {
             "boundary_guidance":boundary_guidance,"destination_cover_probe":cover_probe});
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
+    }
+    if let Some(probe) = &mut successor_probe {
+        report["successor_comparison"] = probe.report();
     }
     report["landing_survey_hz"] = json!(survey_hz);
     report["landing_queries"] = json!(landing_query_counts);

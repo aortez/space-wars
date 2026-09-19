@@ -190,3 +190,8 @@ capture/boarding route remains unknown until the existing joint-trip planner
 measures it. The quiet P2 regression, seed 2 success and main asteroid P2 loss
 remain acceptance cases. No distance threshold or cover-only rule should replace
 that comparison.
+
+Follow-up: the [budgeted successor comparison](bot-successor-comparison.md) now
+evaluates site approaches, continued escape and combat against three opponent
+hypotheses. It keeps current permissions, ground-trip feasibility and combat
+outcomes explicit, and remains diagnostic.

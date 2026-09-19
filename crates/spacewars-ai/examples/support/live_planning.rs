@@ -22,6 +22,7 @@ pub struct LivePlanningRun {
     >,
     dispatch: Vec<f64>,
     active_dispatch: Vec<f64>,
+    last_charged: Work,
 }
 impl LivePlanningRun {
     pub fn from_args(out: &Path) -> Option<Self> {
@@ -76,10 +77,19 @@ impl LivePlanningRun {
             profiles: Default::default(),
             dispatch: Vec::new(),
             active_dispatch: Vec::new(),
+            last_charged: Work::default(),
         })
     }
     pub fn enabled_for(&self, seat: usize) -> bool {
         self.seats.contains(&seat)
+    }
+    #[allow(dead_code)] // Only the mission runner has successor jobs.
+    pub fn remaining_work(&self) -> Work {
+        Work {
+            graph: self.planner.allowance().graph - self.last_charged.graph,
+            physics_queries: self.planner.allowance().physics_queries
+                - self.last_charged.physics_queries,
+        }
     }
     pub fn observe(
         &mut self,
@@ -108,6 +118,7 @@ impl LivePlanningRun {
         let tick = state.tick();
         let start = Instant::now();
         let report = self.planner.advance_with_state(state).unwrap();
+        self.last_charged = report.charged;
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch.push(ms);
         if report.charged != Work::default() {
