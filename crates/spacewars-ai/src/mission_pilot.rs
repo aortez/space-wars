@@ -201,11 +201,12 @@ impl MaterialMissionPilot {
             .telemetry
             .disengagement
             .as_ref()
-            .map(|d| d.handoff_probe);
+            .map(|d| (d.handoff_probe, d.boundary_aware));
         *self = Self::with_policy(context, self.breaks, self.policy);
         self.enable_pursuit_disengagement(disengagement);
-        if let Some(enabled) = handoff {
-            self.configure_handoff_probe(enabled);
+        if let Some((probe, boundary)) = handoff {
+            self.configure_handoff_probe(probe);
+            self.configure_disengagement_boundary(boundary);
         }
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
@@ -961,10 +962,12 @@ impl MaterialMissionPilot {
         (waypoint, None)
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
+        let (desired_world, boundary_brake) = self.boundary_guidance(o, desired_world);
         let f = &o.local.combat.recovery.flight;
         let p = &f.pilot;
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-        let brake = desired_world.length() < 10.0
+        let brake = boundary_brake
+            || desired_world.length() < 10.0
             || p.ship.velocity.length() > desired_world.length() + 4.0;
         let acceleration = (desired_world - p.ship.velocity) * 2.0
             - p.gravity

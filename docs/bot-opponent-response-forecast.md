@@ -154,6 +154,11 @@ The pursuit hypothesis is worth retaining. Expanding the number of nominal
 responses or tuning another distance threshold is not the highest-value next
 step while wall constraints and destination evidence are missing.
 
+Follow-up: the [boundary-guidance experiment](bot-boundary-escape.md) avoids
+the three recorded wall cases but regresses a quiet match. It remains separately
+opt-in, with both the previous escape controls and ordinary defaults preserved.
+That report also specifies the next bounded destination-cover probe.
+
 ## Reproduction and verification
 
 The same opt-in flag enables the expanded probe:

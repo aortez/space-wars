@@ -189,9 +189,14 @@ fn main() {
         _ => panic!("--disengagement-seats must be none, 0, 1 or both"),
     };
     let handoff_probe = arg("--probe-disengagement-handoff", "false") == "true";
+    let boundary_guidance = arg("--disengagement-boundary", "false") == "true";
     assert!(
         !handoff_probe || disengagement_seats.contains(&true),
         "handoff probe requires --disengagement-seats"
+    );
+    assert!(
+        !boundary_guidance || disengagement_seats.contains(&true),
+        "boundary guidance requires --disengagement-seats"
     );
     assert!(
         live_planning.as_ref().is_none_or(|live| {
@@ -218,6 +223,7 @@ fn main() {
         )
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
+        .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
     });
     // Independent policy state consumes the original observations and must
     // emit identical encoded controls on every tick. This work is not timed.
@@ -646,8 +652,8 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
-    report["pursuit_disengagement"] =
-        json!({"enabled_seats":disengagement_seats,"probe_handoff":handoff_probe});
+    report["pursuit_disengagement"] = json!({"enabled_seats":disengagement_seats,"probe_handoff":handoff_probe,
+            "boundary_guidance":boundary_guidance});
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }

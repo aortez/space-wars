@@ -43,9 +43,14 @@ can both overstate and understate danger. The subsequent
 [opponent-response calibration](../bot-opponent-response-forecast.md) improves
 the pursuit forecast and exposes a missing arena-wall constraint. The read-only
 probe now flags boundary-margin entry, and mission observations expose the
-enclosing arena. Live guidance is unchanged. The next slice should make escape
-and transfer boundary-feasible and obtain budgeted destination-cover evidence
-before comparing complete successors or admitting a landing.
+enclosing arena. A separate [boundary-guidance experiment](../bot-boundary-escape.md)
+now avoids the three recorded wall cases, but also loses a quiet acceptance
+match. It remains opt-in; the older escape and default policies are preserved.
+Braking-only and reflected-direction ablations also regress. The next slice is
+an explicit, bounded remote destination-cover probe sharing the existing query
+allowance, before comparing complete successors or admitting a landing. Its
+request, measurement, invalidation and acceptance plan is recorded with the
+boundary results; cover alone must not imply a feasible capture/return trip.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

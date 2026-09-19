@@ -5,6 +5,10 @@ use super::*;
 mod handoff;
 pub use handoff::HandoffTelemetry;
 
+#[path = "mission_boundary.rs"]
+mod boundary;
+pub use boundary::BoundaryGuidance;
+
 fn disabled(value: &bool) -> bool {
     !value
 }
@@ -16,9 +20,13 @@ const CLEAR_RANGE: f32 = 350.0;
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct MissionDisengagement {
     #[serde(skip_serializing_if = "disabled")]
+    pub boundary_aware: bool,
+    #[serde(skip_serializing_if = "disabled")]
     pub handoff_probe: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub handoff: Option<HandoffTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub boundary: Option<BoundaryGuidance>,
     pub attempts: u32,
     pub separated: u32,
     pub timed_out: u32,
@@ -40,10 +48,11 @@ pub struct DisengagementAttempt {
     pub clear_since: Option<u64>,
 }
 
-// Seven motor-scale alternatives, evaluated only at the handoff. This is a
+// Seven motor-scale alternatives, plus three inward alternatives in the
+// boundary experiment, evaluated only at the handoff. This is a
 // coarse inertial forecast using observed motion and control limits, not a
 // collision oracle or a prediction of the opponent's future choices.
-fn escape_direction(o: &MissionObservationV1) -> (Vec2, f32, f32) {
+fn escape_direction(o: &MissionObservationV1, boundary_aware: bool) -> (Vec2, f32, f32) {
     let c = &o.local.combat;
     let p = &c.recovery.flight.pilot;
     let target = c.target.unwrap();
@@ -54,8 +63,19 @@ fn escape_direction(o: &MissionObservationV1) -> (Vec2, f32, f32) {
         Vec2::Y.rotate_radians(p.ship.angle)
     };
     let mut best: Option<(Vec2, f32, f32, f32)> = None;
-    for side in -3..=3 {
-        let direction = away.rotate_radians(side as f32 * std::f32::consts::FRAC_PI_6);
+    let inward = (o.boundary.center - p.ship.position).normalized();
+    let directions = (-3..=3)
+        .map(|side| away.rotate_radians(side as f32 * std::f32::consts::FRAC_PI_6))
+        .chain(
+            [-1.0, 0.0, 1.0]
+                .into_iter()
+                .filter(|_| boundary_aware)
+                .map(|side| inward.rotate_radians(side * std::f32::consts::FRAC_PI_3)),
+        );
+    for direction in directions {
+        if direction.length_squared() < 0.5 {
+            continue;
+        }
         let limits = c.recovery.flight.flight.limits;
         let turn = shortest_heading_error(direction.rotate_radians(-p.ship.angle)).abs()
             / limits.turn_speed.max(0.01)
@@ -74,6 +94,9 @@ fn escape_direction(o: &MissionObservationV1) -> (Vec2, f32, f32) {
             };
             velocity += (acceleration + p.gravity) * 0.5;
             position += velocity * 0.5;
+            if boundary_aware {
+                clearance = clearance.min(boundary::stopping_clearance(o, position, velocity));
+            }
             min_range = min_range.min(
                 position.distance_to(target.motion.position + target.motion.velocity * elapsed),
             );
@@ -112,6 +135,15 @@ fn escape_direction(o: &MissionObservationV1) -> (Vec2, f32, f32) {
 }
 
 impl MaterialMissionPilot {
+    pub(crate) fn configure_disengagement_boundary(&mut self, enabled: bool) {
+        if let Some(d) = &mut self.telemetry.disengagement {
+            d.boundary_aware = enabled;
+            d.boundary = None;
+        } else {
+            assert!(!enabled, "enable disengagement before boundary guidance");
+        }
+    }
+
     pub(crate) fn enable_pursuit_disengagement(&mut self, enabled: bool) {
         self.telemetry.disengagement = enabled.then(MissionDisengagement::default);
     }
@@ -145,12 +177,16 @@ impl MaterialMissionPilot {
         {
             return;
         }
-        if self.telemetry.disengagement.is_none() {
+        let Some(d) = &self.telemetry.disengagement else {
             return;
-        }
-        let (direction, estimated_min_range, estimated_clearance) = escape_direction(o);
+        };
+        let (direction, estimated_min_range, estimated_clearance) =
+            escape_direction(o, d.boundary_aware);
         let d = self.telemetry.disengagement.as_mut().unwrap();
         d.attempts += 1;
+        if d.boundary_aware {
+            d.boundary.get_or_insert_with(Default::default);
+        }
         d.last = Some(DisengagementAttempt {
             started_tick: p.tick,
             deadline_tick: p.tick + DISENGAGEMENT_TICKS,
@@ -207,6 +243,13 @@ impl MaterialMissionPilot {
             return None;
         };
         let delta = p.ship.position - target.motion.position;
+        let boundary_ready = !self
+            .telemetry
+            .disengagement
+            .as_ref()
+            .unwrap()
+            .boundary_aware
+            || boundary::stopping_clearance(o, p.ship.position, p.ship.velocity) > 20.0;
         let attempt = self
             .telemetry
             .disengagement
@@ -217,7 +260,10 @@ impl MaterialMissionPilot {
             .unwrap();
         attempt.range = delta.length();
         attempt.opening_speed = (p.ship.velocity - target.motion.velocity).dot(delta.normalized());
-        if target.ground_occluded || attempt.range >= CLEAR_RANGE && attempt.opening_speed >= 0.0 {
+        if boundary_ready
+            && (target.ground_occluded
+                || attempt.range >= CLEAR_RANGE && attempt.opening_speed >= 0.0)
+        {
             attempt.clear_since.get_or_insert(p.tick);
         } else {
             attempt.clear_since = None;
@@ -288,6 +334,9 @@ mod tests {
         let mut o = state.mission_observation(0, None);
         o.match_rules = true;
         o.sun = None;
+        // Synthetic planets below span a larger free-flight fixture than the
+        // source lab; boundary-specific tests move back to its enclosing edge.
+        o.boundary.radius = 5000.0;
         for (planet, x) in o.planets.iter_mut().zip([0.0, 1000.0]) {
             planet.motion.position = Vec2::new(x, 0.0);
             planet.motion.velocity = Vec2::ZERO;
@@ -497,6 +546,7 @@ mod tests {
     #[test]
     fn initial_direction_accounts_for_turning_and_predicted_obstacles() {
         let (_, mut o) = fixture(true);
+        o.boundary.radius = 5000.0;
         o.local.combat.recovery.flight.pilot.ship.angle = 0.0;
         o.local.combat.target.as_mut().unwrap().motion.position = Vec2::new(380.0, 500.0);
         o.planets[0].motion.position = Vec2::new(810.0, 500.0);
@@ -506,13 +556,13 @@ mod tests {
         });
         // Running straight away crosses the planet. The opposite turn goes
         // toward the sun. The open corridor also requires the smaller turn.
-        let (direction, _, clearance) = escape_direction(&o);
+        let (direction, _, clearance) = escape_direction(&o, false);
         assert!(direction.y > 0.2, "{direction:?}");
         assert!(direction.x >= -0.001);
         assert!(clearance > 0.0);
         let original = direction;
         // The corridor uses world observations, not the selected local frame.
         o.local.combat.recovery.flight.pilot.planet = o.planets[1].clone();
-        assert_eq!(escape_direction(&o).0, original);
+        assert_eq!(escape_direction(&o, false).0, original);
     }
 }

@@ -134,7 +134,13 @@ impl MaterialMissionPilot {
 
     fn forecast_transfer(&self, o: &MissionObservationV1, destination: usize) -> TransferForecast {
         let mut preview = self.clone();
-        preview.telemetry.disengagement = None;
+        if let Some(d) = &mut preview.telemetry.disengagement {
+            // Retain the boundary guard's control state, but never start or
+            // recursively probe another disengagement inside this forecast.
+            d.last = None;
+            d.handoff = None;
+            d.handoff_probe = false;
+        }
         preview.telemetry.pursuit = None;
         preview.next_pursuit_tick = u64::MAX;
         preview.capture = None;

@@ -76,6 +76,12 @@ impl MissionBot {
         self.0.configure_handoff_probe(enabled);
         self
     }
+    /// Experimental wall-aware escape and successor-transfer guidance. Requires
+    /// pursuit disengagement; default policies retain their previous controls.
+    pub fn with_disengagement_boundary_guidance(mut self, enabled: bool) -> Self {
+        self.0.configure_disengagement_boundary(enabled);
+        self
+    }
 }
 impl std::ops::Deref for MissionBot {
     type Target = MaterialMissionPilot;
