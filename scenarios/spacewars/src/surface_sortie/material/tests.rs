@@ -525,7 +525,19 @@ fn hatch_prefers_a_clear_neighbor_when_the_central_floor_is_obstructed() {
         .motion(state.world.physics.ship_body(0))
         .unwrap();
     let first = state
-        .material_hatch_candidates_at(0, ShipForm::Ship, body.position, body.angle, 0)
+        .material_hatch_candidates_at(
+            0,
+            ShipForm::Ship,
+            body.position,
+            body.angle,
+            0,
+            &|origin, direction, distance| {
+                state
+                    .world
+                    .physics
+                    .material_ground_ray(0, origin, direction, distance)
+            },
+        )
         .next()
         .expect("central floor still exists");
     assert!(first.point.distance_to(before.point) < 0.1);

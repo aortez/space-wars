@@ -255,6 +255,19 @@ impl SurfaceSortieState {
         id: LandingSiteId,
         pod: bool,
     ) -> Option<PilotLandingSite> {
+        self.vehicle_landing_site_with_queries(player, id, pod, || true)
+    }
+
+    /// The ordinary site check, with permission charged before each ray, hull
+    /// intersection or capsule test. Exhaustion is unknown, not blocked ground;
+    /// a budgeted caller must discard the entire result if any charge failed.
+    pub(super) fn vehicle_landing_site_with_queries(
+        &self,
+        player: usize,
+        id: LandingSiteId,
+        pod: bool,
+        charge: impl Fn() -> bool,
+    ) -> Option<PilotLandingSite> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("vehicle_landing_site");
         if id.bearing >= LANDING_SITE_COUNT || self.world.physics.material_queries_dirty {
@@ -269,9 +282,13 @@ impl SurfaceSortieState {
         let right = Vec2::new(up.y, -up.x);
         let origin = frame.position + up * (self.world.planets[id.planet].radius + 10.0);
         let ground = |origin, direction, length| {
-            self.world
-                .physics
-                .material_ground_ray(id.planet, origin, direction, length)
+            charge()
+                .then(|| {
+                    self.world
+                        .physics
+                        .material_ground_ray(id.planet, origin, direction, length)
+                })
+                .flatten()
         };
         let foot_span = if pod { 0.7 } else { 3.0 };
         let left = ground(origin - right * foot_span, -up, 35.0)?;
@@ -295,11 +312,13 @@ impl SurfaceSortieState {
                 #[cfg(feature = "sensor-profile")]
                 let _profile = super::sensor_profile::Scope::new("landing_hull_placement");
                 [-0.75, 0.0, 0.75].into_iter().all(|offset| {
-                    self.world.physics.surface_hull_fits_at(
-                        self.pilots[player].vehicle.0,
-                        vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2,
-                        rotation_for_direction(normal),
-                    )
+                    charge()
+                        && self.world.physics.surface_hull_fits_at(
+                            self.pilots[player].vehicle.0,
+                            vehicle_position + Vec2::new(normal.y, -normal.x) * offset
+                                - normal * 0.2,
+                            rotation_for_direction(normal),
+                        )
                 })
             }
         {
@@ -373,8 +392,10 @@ impl SurfaceSortieState {
                     return clear;
                 }
             }
-            let clear =
-                world_clear(point, rotation) && vehicle_clear(point, rotation, position, angle);
+            let clear = charge()
+                && world_clear(point, rotation)
+                && charge()
+                && vehicle_clear(point, rotation, position, angle);
             last_clearance.set(Some((query, clear)));
             clear
         };
@@ -400,12 +421,13 @@ impl SurfaceSortieState {
             // slide and tilt is also safe. A bot may need to retry a one-foot
             // stop when rotating here would close the hatch.
             let hatch_at = |position: Vec2, angle: f32| {
-                self.material_access_with_clearance(
+                self.material_access_with_ray(
                     id.planet,
                     ShipForm::Ship,
                     position,
                     angle,
                     |point, rotation| clear_at(point, rotation, position, angle),
+                    &ground,
                 )
                 .filter(|hit| hatch_clear(*hit, position, angle))
             };
@@ -441,7 +463,7 @@ impl SurfaceSortieState {
             vehicle_position,
             hatch_position: hatch.point,
             boarding_hatches: self
-                .material_boarding_with_clearance(
+                .material_boarding_with_ray(
                     id.planet,
                     if pod {
                         ShipForm::EscapePod
@@ -458,6 +480,7 @@ impl SurfaceSortieState {
                             rotation_for_direction(normal),
                         )
                     },
+                    &ground,
                 )
                 .map(|hit| hit.map(|h| h.point)),
         })

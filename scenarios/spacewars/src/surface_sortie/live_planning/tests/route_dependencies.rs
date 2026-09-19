@@ -4,7 +4,7 @@ use engine_rapier::world::{
     PhysicsId,
 };
 
-fn fixture() -> (
+pub(super) fn fixture() -> (
     SurfaceSortieState,
     combat::TacticalSortieObservationV1,
     BodyId,
@@ -39,7 +39,7 @@ fn fixture() -> (
     let o = target(&state, 0);
     (state, o, id)
 }
-fn move_body(state: &mut SurfaceSortieState, id: BodyId, position: Vec2) {
+pub(super) fn move_body(state: &mut SurfaceSortieState, id: BodyId, position: Vec2) {
     state.world.physics.world.set_pose(id, position, 0.0, true);
     state.world.physics.world.step(DT.as_secs_f32());
     state.world.tick += 1;

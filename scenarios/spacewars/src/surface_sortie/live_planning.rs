@@ -18,9 +18,12 @@ use std::{
 };
 
 mod avoiding;
+mod early_candidates;
 mod objective_job;
 mod route_dependencies;
 use avoiding::{AvoidingJob, HullPreview};
+pub use early_candidates::EarlyCandidateTelemetry;
+use early_candidates::EarlyCandidates;
 use objective_job::ObjectiveSurveyJob;
 use route_dependencies::RouteDependenciesJob;
 
@@ -103,8 +106,9 @@ pub struct LivePlanningTelemetry {
     pub completed: u64,
     pub measurements_by_actor: BTreeMap<usize, ObjectiveMeasurementWork>,
     /// Requests retired before finishing all candidates despite finding at
-    /// least one successful candidate; those candidates were not validated.
+    /// least one successful candidate, whether or not it was published early.
     pub retired_partial_successes_by_actor: BTreeMap<usize, u64>,
+    pub early_candidates: EarlyCandidateTelemetry,
     pub published: u64,
     /// Deliveries with at least one successful route and matching current site.
     /// This does not imply controller selection or physical execution.
@@ -176,6 +180,9 @@ struct Request {
     measurement_tick: u64,
     seen: u64,
     completed: bool,
+    published: bool,
+    partial_visible: bool,
+    probed_sites: u64,
     position: Vec2,
     angle: f32,
     gravity: f32,
@@ -212,6 +219,7 @@ pub struct LiveObjectivePlanner {
     allowance: Work,
     reuse_ground: bool,
     local_dependencies: bool,
+    early_candidates: Option<EarlyCandidates>,
     last_observed: Option<u64>,
     last_advanced: Option<u64>,
     shared: Option<(u64, Weak<QuerySnapshot>)>,
@@ -227,6 +235,7 @@ impl LiveObjectivePlanner {
             allowance,
             reuse_ground: false,
             local_dependencies: false,
+            early_candidates: None,
             last_observed: None,
             last_advanced: None,
             shared: None,
@@ -253,6 +262,20 @@ impl LiveObjectivePlanner {
     pub fn uses_route_dependencies(&self) -> bool {
         self.local_dependencies
     }
+    /// Publish independently validated positive candidates while the remaining
+    /// survey runs. Deferred landing scans may receive one current site check,
+    /// charged to the same allowance before dispatch. Requires local paths.
+    pub fn with_early_candidates(mut self) -> Self {
+        assert!(
+            self.local_dependencies,
+            "early candidates require route dependencies"
+        );
+        self.early_candidates = Some(EarlyCandidates::default());
+        self
+    }
+    pub fn uses_early_candidates(&self) -> bool {
+        self.early_candidates.is_some()
+    }
     pub fn allowance(&self) -> Work {
         self.allowance
     }
@@ -266,6 +289,9 @@ impl LiveObjectivePlanner {
         self.shared = None;
         self.last_observed = None;
         self.last_advanced = None;
+        if let Some(early) = &mut self.early_candidates {
+            *early = EarlyCandidates::default();
+        }
         self.telemetry = Default::default();
     }
     pub fn remove(&mut self, player: usize) {
@@ -274,7 +300,7 @@ impl LiveObjectivePlanner {
     }
     fn retire(&mut self, player: usize) -> Option<ObjectiveSurveyJob> {
         if let Some(request) = self.requests.remove(&player) {
-            if !request.completed {
+            if !request.published {
                 self.telemetry.retired_unpublished_graph += request.graph;
                 self.telemetry.retired_unpublished_queries += request.physics_queries;
             }
@@ -470,6 +496,14 @@ impl LiveObjectivePlanner {
         mut survey: LandingObjectiveSurvey,
         telemetry: &mut LivePlanningTelemetry,
     ) -> Option<LandingObjectiveSurvey> {
+        // Partial prospective answers cannot stand in for an unfinished actual
+        // return route, even when the entire snapshot is still unchanged.
+        if survey.validated_routes_only
+            && request.actual.is_some()
+            && survey.actual.as_ref().is_none_or(|r| r.cost().is_none())
+        {
+            return None;
+        }
         let gravity_valid = Self::jump_gravity_valid(state, p, request);
         telemetry.jump_gravity_checks += 1;
         telemetry.jump_gravity_mismatches += u64::from(!gravity_valid);
@@ -731,6 +765,7 @@ impl LiveObjectivePlanner {
                                         | LandingSiteQuery::NotRequested
                                 );
                             if self.local_dependencies || first || !refresh_due {
+                                request.published = true;
                                 survey.validated_tick = Some(p.tick);
                                 self.telemetry.publications_with_current_sites +=
                                     u64::from(survey.sites.iter().any(|r| {
@@ -767,7 +802,21 @@ impl LiveObjectivePlanner {
                         }
                     }
                     JobPoll::Pending => {
-                        o.objective_work = Some(ObjectiveWorkState::Pending);
+                        if let Some(early) = &mut self.early_candidates {
+                            early.observe(
+                                state,
+                                player,
+                                o,
+                                request,
+                                self.queue.job(request.token).unwrap(),
+                                &mut self.telemetry,
+                                self.allowance,
+                                self.capacity,
+                                self.last_advanced,
+                            );
+                        } else {
+                            o.objective_work = Some(ObjectiveWorkState::Pending);
+                        }
                         return;
                     }
                     JobPoll::Stale => {
@@ -867,6 +916,9 @@ impl LiveObjectivePlanner {
                     measurement_tick,
                     seen: p.tick,
                     completed: false,
+                    published: false,
+                    partial_visible: false,
+                    probed_sites: 0,
                     position,
                     angle,
                     gravity: state.objective_gravity(p),
@@ -915,7 +967,14 @@ impl LiveObjectivePlanner {
         for player in removed {
             self.remove(player);
         }
-        let report = self.queue.advance(self.allowance);
+        let probe_queries = self.early_candidates.as_mut().map_or(0, |early| {
+            early.prepare_tick(tick, self.last_advanced);
+            early.charged_queries()
+        });
+        let mut report = self.queue.advance(Work {
+            physics_queries: self.allowance.physics_queries - probe_queries,
+            ..self.allowance
+        });
         for allocation in &report.jobs {
             let request = self
                 .requests
@@ -957,6 +1016,9 @@ impl LiveObjectivePlanner {
             self.telemetry.reused_ground.physics_queries +=
                 reused.physics_queries - request.reused.physics_queries;
             request.reused = reused;
+        }
+        if let Some(early) = &self.early_candidates {
+            early.account(&mut report, self.allowance);
         }
         self.telemetry.graph += u64::from(report.charged.graph);
         self.telemetry.physics_queries += u64::from(report.charged.physics_queries);

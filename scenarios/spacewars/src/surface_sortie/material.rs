@@ -310,8 +310,31 @@ impl SurfaceSortieState {
         angle: f32,
         clear: impl Fn(Vec2, f32) -> bool,
     ) -> Option<RayHit> {
+        self.material_access_with_ray(
+            planet,
+            form,
+            position,
+            angle,
+            clear,
+            &|origin, direction, distance| {
+                self.world
+                    .physics
+                    .material_ground_ray(planet, origin, direction, distance)
+            },
+        )
+    }
+
+    pub(super) fn material_access_with_ray(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+        clear: impl Fn(Vec2, f32) -> bool,
+        ray: &impl Fn(Vec2, Vec2, f32) -> Option<RayHit>,
+    ) -> Option<RayHit> {
         Self::select_hatch_floor(
-            self.material_hatch_candidates_at(planet, form, position, angle, 0),
+            self.material_hatch_candidates_at(planet, form, position, angle, 0, ray),
             &clear,
             true,
         )
@@ -327,9 +350,32 @@ impl SurfaceSortieState {
         angle: f32,
         clear: impl Fn(Vec2, f32) -> bool,
     ) -> [Option<RayHit>; 2] {
+        self.material_boarding_with_ray(
+            planet,
+            form,
+            position,
+            angle,
+            clear,
+            &|origin, direction, distance| {
+                self.world
+                    .physics
+                    .material_ground_ray(planet, origin, direction, distance)
+            },
+        )
+    }
+
+    pub(super) fn material_boarding_with_ray(
+        &self,
+        planet: usize,
+        form: ShipForm,
+        position: Vec2,
+        angle: f32,
+        clear: impl Fn(Vec2, f32) -> bool,
+        ray: &impl Fn(Vec2, Vec2, f32) -> Option<RayHit>,
+    ) -> [Option<RayHit>; 2] {
         [0, 1].map(|side| {
             Self::select_hatch_floor(
-                self.material_hatch_candidates_at(planet, form, position, angle, side),
+                self.material_hatch_candidates_at(planet, form, position, angle, side, ray),
                 &clear,
                 false,
             )
@@ -357,14 +403,15 @@ impl SurfaceSortieState {
         first.filter(|_| retain_blocked_floor)
     }
 
-    fn material_hatch_candidates_at(
-        &self,
+    fn material_hatch_candidates_at<'a>(
+        &'a self,
         planet: usize,
         form: ShipForm,
         position: Vec2,
         angle: f32,
         side: usize,
-    ) -> impl Iterator<Item = RayHit> + '_ {
+        ray: &'a impl Fn(Vec2, Vec2, f32) -> Option<RayHit>,
+    ) -> impl Iterator<Item = RayHit> + 'a {
         let local = hatch_offset(form, side);
         let hatch = position + local.rotate_radians(angle);
         let surface = motion::SurfaceFrame::read(&self.world.physics, planet);
@@ -373,12 +420,7 @@ impl SurfaceSortieState {
         // The hatch can straddle a cell edge. Search one cell to either side
         // for nearby footing without extending its reach down a deep shaft.
         [0.0, -1.0, 1.0].into_iter().filter_map(move |offset| {
-            let hit = self.world.physics.material_ground_ray(
-                planet,
-                hatch + right * offset + up * 2.0,
-                -up,
-                5.0,
-            )?;
+            let hit = ray(hatch + right * offset + up * 2.0, -up, 5.0)?;
             (hit.normal.dot(up) >= Self::spec().min_support_alignment).then_some(hit)
         })
     }

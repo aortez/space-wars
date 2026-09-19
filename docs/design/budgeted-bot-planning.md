@@ -24,10 +24,14 @@ It preserves independent paths but reveals that completed surveys can arrive
 between landing scans with no current sites to select. The
 [landing-scan handoff](../bot-landing-survey-handoff.md) now joins those results
 to current sites and completes physical enemy-flag captures in quiet paired
-replays. The remaining asteroid case loses its ship before a whole survey
-finishes; earlier validated candidates also need current landing clearance.
-Resolve that time-to-first-use question before broadening the mission utility
-layer or promoting the experimental live adapter.
+replays. The optional [early-candidate adapter](../bot-early-objective-candidates.md)
+now publishes finished positive routes with bounded fresh landing clearance
+before the whole survey completes. In the remaining asteroid case it selects a
+powered route at tick 6,604, but still loses the ship at 6,611. Quiet capture and
+return remain intact. The next bounded investigation is approach lead time and
+retreat under pressure; eager delivery alone does not establish a successful
+powered sortie or justify promoting the experimental live adapter. Broader
+mission utility remains separate work.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

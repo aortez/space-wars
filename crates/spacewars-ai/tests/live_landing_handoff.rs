@@ -170,3 +170,88 @@ fn waiting_for_a_scan_does_not_restore_missing_sites_dirty_queries_or_expired_ev
         "none",
     );
 }
+
+#[test]
+fn early_candidate_and_current_clearance_reach_selection_before_the_survey_finishes() {
+    for planning in [
+        ObjectivePlanning::JointRoundTrip,
+        ObjectivePlanning::JetpackRoundTrip,
+    ] {
+        let (mut state, source, mut bot) = fixture(planning);
+        let source_tick = state.tick();
+        let p = &source.combat.recovery.flight.pilot;
+        let flag = p.planet.claim.as_ref().unwrap().flag.unwrap();
+        let local_flag =
+            (flag.position - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
+        let allowance = Work {
+            graph: 512,
+            physics_queries: 1024,
+        };
+        let mut live = LiveObjectivePlanner::new(1, allowance)
+            .with_route_dependencies()
+            .with_early_candidates();
+        let mut selected = false;
+        for age in 0..=MAX_SURVEY_AGE_TICKS {
+            let query = if age == 0 {
+                LandingSiteQuery::Survey
+            } else {
+                LandingSiteQuery::Deferred {
+                    next_tick: source_tick + MAX_SURVEY_AGE_TICKS,
+                }
+            };
+            let mut o = state.tactical_sortie_observation_for_live_profile(0, query, planning);
+            o.sun = None;
+            o.combat.target = None;
+            let p = &mut o.combat.recovery.flight.pilot;
+            p.controls_armed = true;
+            p.landing.phase = LandingPhase::Flying;
+            let claim = p.planet.claim.as_mut().unwrap();
+            claim.owner = Some(PlayerId::PLAYER_2);
+            claim.flag = Some(PlanetFlagObservation {
+                position: p.planet.motion.position
+                    + local_flag.rotate_radians(p.planet.motion.angle),
+                ..flag
+            });
+            live.observe_with_planning(&state, 0, &mut o, planning);
+            bot.intent(&o);
+            if let Some(id) = bot.site_request() {
+                let p = &o.combat.recovery.flight.pilot;
+                assert_eq!(p.site_query, LandingSiteQuery::Selected(id));
+                assert!(p.sites.iter().any(|s| s.id == id));
+                let survey = o.landing_objective.as_ref().unwrap();
+                assert!(survey.validated_routes_only);
+                assert_eq!(survey.tick, source_tick);
+                assert_eq!(survey.validated_tick, Some(state.tick()));
+                assert!(
+                    survey
+                        .sites
+                        .iter()
+                        .any(|r| r.site == Some(id) && r.cost().is_some())
+                );
+                assert_eq!(live.telemetry().completed, 0);
+                assert_eq!(live.telemetry().submitted, 1);
+                assert_eq!(live.telemetry().early_candidates.published_requests, 1);
+                assert!(age < MAX_SURVEY_AGE_TICKS);
+                selected = true;
+            }
+            let report = live.advance(state.tick()).unwrap();
+            assert!(report.charged.graph <= allowance.graph);
+            assert!(report.charged.physics_queries <= allowance.physics_queries);
+            assert_eq!(
+                report.charged.physics_queries,
+                report
+                    .jobs
+                    .iter()
+                    .map(|j| j.charged.physics_queries)
+                    .sum::<u32>()
+            );
+            assert!(live.advance(state.tick()).is_none());
+            if selected {
+                break;
+            }
+            SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        assert!(selected, "{planning:?}: {:?}", live.telemetry());
+        assert!(live.telemetry().early_candidates.clear_sites > 0);
+    }
+}

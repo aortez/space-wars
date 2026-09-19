@@ -219,6 +219,16 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    /// Only finished positive candidates have complete path dependencies.
+    /// Omitted alternatives remain unknown until the full job completes.
+    pub(crate) fn positive_candidates(&self) -> Option<LandingObjectiveSurvey> {
+        let mut survey = self.result.clone();
+        survey.sites.retain(|r| r.cost().is_some());
+        survey.actual = survey.actual.filter(|r| r.cost().is_some());
+        survey.validated_routes_only = true;
+        (!survey.sites.is_empty() || survey.actual.is_some()).then_some(survey)
+    }
+
     pub(crate) fn measurement_work(&self) -> &ObjectiveMeasurementWork {
         &self.measurement_work
     }

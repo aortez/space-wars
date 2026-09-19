@@ -57,6 +57,11 @@ impl LivePlanningRun {
             }
             _ => panic!("--objective-dependencies must be region or routes"),
         };
+        let planner = match super::arg("--early-objective-routes", "false").as_str() {
+            "false" => planner,
+            "true" => planner.with_early_candidates(),
+            _ => panic!("--early-objective-routes must be true or false"),
+        };
         fs::create_dir_all(out).unwrap();
         let mut trace = BufWriter::new(fs::File::create(out.join("live-planning.csv")).unwrap());
         writeln!(trace, "tick,queue_tick,graph_budget,query_budget,total_graph,total_queries,actor,generation,age,graph,queries,phase,dispatch_ms").unwrap();
@@ -123,11 +128,15 @@ impl LivePlanningRun {
                 "max_ms":values.last()})
         };
         let profile = if self.profiles.values().any(|p| *p == scenario_spacewars::surface_sortie::landing_objective::ObjectivePlanning::JetpackRoundTrip) {
-            if self.planner.uses_route_dependencies() {
+            if self.planner.uses_early_candidates() {
+                "live_jetpack_objective_v6"
+            } else if self.planner.uses_route_dependencies() {
                 "live_jetpack_objective_v5"
             } else {
                 "live_jetpack_objective_v3"
             }
+        } else if self.planner.uses_early_candidates() {
+            "live_joint_objective_v6"
         } else if self.planner.uses_route_dependencies() {
             "live_joint_objective_v5"
         } else if self.planner.reuses_ground() {
@@ -138,10 +147,11 @@ impl LivePlanningRun {
         json!({"version":2,"sensor_profile":profile,"objective_planning_by_seat":self.profiles,
             "objective_dependencies":if self.planner.uses_route_dependencies() { "routes" } else { "region" },
             "reuse_objective_ground":self.planner.reuses_ground(),
+            "early_objective_routes":self.planner.uses_early_candidates(),
             "enabled_seats":self.seats,
-            "scope":"landing-objective ground survey, hull overlay and joint routes; other sensors and controls remain synchronous",
+            "scope":"landing-objective ground survey, hull overlay, joint routes and optional early landing checks; other sensors and controls remain synchronous",
             "allowance":self.planner.allowance(),"telemetry":self.planner.telemetry(),
             "dispatch":timing(&self.dispatch),"active_dispatch":timing(&self.active_dispatch),
-            "timing_scope":"snapshot construction and dependency validation are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; trace IO excluded"})
+            "timing_scope":"snapshot construction, dependency validation and early landing checks are included in sensor times; dispatch is separate from sensor/policy/physics CSV columns and included in measured_tick when drawing is measured; trace IO excluded"})
     }
 }
