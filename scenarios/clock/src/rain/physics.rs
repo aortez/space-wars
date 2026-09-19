@@ -11,8 +11,6 @@ use engine_water::{WaterWorld, immersion::HullShape};
 use crate::{floor::DrainGeometry, layout::Layout};
 
 pub(super) const DT: f64 = 1.0 / 60.0;
-pub(super) const COLUMNS: usize = 128;
-pub(super) const PARCELS: usize = 128;
 pub(super) const DENSITY: f32 = 0.45;
 
 pub(super) fn half_extents(layout: Layout) -> Vec2 {
@@ -142,6 +140,8 @@ mod tests {
     use super::*;
     use crate::floor::test_drain;
     use engine_water::{Boundary, PoolSpec, WaterConfig};
+    const COLUMNS: usize = 128;
+    const PARCELS: usize = 128;
 
     fn fill(water: &mut WaterWorld, depth: f64) {
         for pool in 0..water.pools().len() {

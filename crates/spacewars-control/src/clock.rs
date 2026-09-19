@@ -401,6 +401,11 @@ mod tests {
             parcels: 126,
             source_limited_ticks: 2,
             water_limited_ticks: 0,
+            surface_digits: [Some(1), Some(2), Some(3), Some(4)],
+            surface_water_microunits: 100_000,
+            drip_parcels_emitted: 123,
+            surface_change_pending: false,
+            surface_change_deferrals: 0,
             entry_depth_milli: 21_000,
             required_depth_milli: 12_000,
             duck_phase: ClockRainDuckPhase::Floating,
@@ -423,6 +428,25 @@ mod tests {
         assert_eq!(ClockEventKind::DigitSlide as u8, 5);
         assert_eq!(ClockEventKind::Rain as u8, 6);
         let mut value = serde_json::to_value(&state).unwrap();
+        for field in [
+            "surface_digits",
+            "surface_water_microunits",
+            "drip_parcels_emitted",
+            "surface_change_pending",
+            "surface_change_deferrals",
+        ] {
+            value["rain"].as_object_mut().unwrap().remove(field);
+        }
+        let older = ClockState::from_json(&value.to_string())
+            .unwrap()
+            .rain
+            .unwrap();
+        assert_eq!(older.surface_digits, [None; 4]);
+        assert_eq!(older.surface_water_microunits, 0);
+        assert_eq!(older.drip_parcels_emitted, 0);
+        assert!(!older.surface_change_pending);
+        assert_eq!(older.surface_change_deferrals, 0);
+        assert_eq!(older.injected_microunits, 5_000_000);
         value.as_object_mut().unwrap().remove("rain");
         assert!(
             ClockState::from_json(&value.to_string())

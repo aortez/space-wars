@@ -121,11 +121,8 @@ impl DrainGeometry {
     }
 
     pub fn water_world(self, columns: usize, max_parcels: usize) -> WaterWorld {
-        assert!(columns >= 2 && columns.is_multiple_of(2));
         let layout = self.layout();
-        let half = f64::from(layout.bounds_max.x);
         let lip = f64::from(self.half_width());
-        let floor = f64::from(layout.floor_y);
         WaterWorld::new(
             WaterConfig {
                 exit_y: f64::from(layout.bounds_min.y),
@@ -133,22 +130,32 @@ impl DrainGeometry {
                 spill_channel: Some([-lip, lip]),
                 ..WaterConfig::default()
             },
-            vec![
-                PoolSpec {
-                    left: -half,
-                    column_width: (half - lip) / (columns / 2) as f64,
-                    bed: vec![floor; columns / 2],
-                    boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
-                },
-                PoolSpec {
-                    left: lip,
-                    column_width: (half - lip) / (columns / 2) as f64,
-                    bed: vec![floor; columns / 2],
-                    boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
-                },
-            ],
+            self.water_pools(columns).into(),
         )
         .expect("bounded Clock drain geometry")
+    }
+
+    /// Stable floor geometry shared by ordinary drain worlds and digit rain.
+    pub fn water_pools(self, columns: usize) -> [PoolSpec; 2] {
+        assert!(columns >= 2 && columns.is_multiple_of(2));
+        let layout = self.layout();
+        let half = f64::from(layout.bounds_max.x);
+        let lip = f64::from(self.half_width());
+        let floor = f64::from(layout.floor_y);
+        [
+            PoolSpec {
+                left: -half,
+                column_width: (half - lip) / (columns / 2) as f64,
+                bed: vec![floor; columns / 2],
+                boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
+            },
+            PoolSpec {
+                left: lip,
+                column_width: (half - lip) / (columns / 2) as f64,
+                bed: vec![floor; columns / 2],
+                boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
+            },
+        ]
     }
 }
 

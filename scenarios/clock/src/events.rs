@@ -210,6 +210,7 @@ impl ActiveEvent {
                 context.floor.drain().expect("Rain owns the drain"),
                 seed,
                 config.rain_amount,
+                context.display,
             ))),
         }
     }
@@ -235,7 +236,10 @@ impl ActiveEvent {
             Self::Duck(event) => event.step(),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
-            Self::Rain(event) => event.step(),
+            Self::Rain(event) => {
+                event.synchronize(context.display, context.segments);
+                event.step()
+            }
         }
     }
 
@@ -281,8 +285,8 @@ impl ActiveEvent {
     }
 
     pub fn holds_lit_segments(&self) -> bool {
-        !matches!(self, Self::Rain(_))
-            && matches!(
+        matches!(self, Self::Rain(_))
+            || matches!(
                 self.phase(),
                 EventPhase::Falling | EventPhase::Melting | EventPhase::Draining
             )

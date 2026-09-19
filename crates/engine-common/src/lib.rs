@@ -387,6 +387,18 @@ pub struct ClockRainState {
     pub parcels: usize,
     pub source_limited_ticks: u64,
     pub water_limited_ticks: u64,
+    /// Applied physical/visible digits; a rare capacity deferral can lag the reading.
+    #[serde(default)]
+    pub surface_digits: [Option<u8>; 4],
+    #[serde(default)]
+    pub surface_water_microunits: u64,
+    #[serde(default)]
+    pub drip_parcels_emitted: u64,
+    #[serde(default)]
+    pub surface_change_pending: bool,
+    /// Deferred update attempts, including control-only time corrections.
+    #[serde(default)]
+    pub surface_change_deferrals: u64,
     pub entry_depth_milli: u32,
     pub required_depth_milli: u32,
     pub duck_phase: ClockRainDuckPhase,

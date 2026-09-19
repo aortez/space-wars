@@ -34,6 +34,17 @@ pub(crate) fn water_fixture(frame: &mut RenderFrame, water: &engine_water::Water
     meltdown::render_water(frame, water, ACTIVE_CELL_LAYER, 1.0);
 }
 
+pub(crate) fn water_fixture_cell(frame: &mut RenderFrame, center: Vec2, pitch: f32, lit: bool) {
+    render_square(
+        frame,
+        center,
+        pitch,
+        0.0,
+        f32::from(lit),
+        DigitPalette::default(),
+    );
+}
+
 pub fn render_frame(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
@@ -80,10 +91,10 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         marquee::render(&mut frame, event, layout);
         return frame;
     }
+    render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
         rain::render(&mut frame, event);
     }
-    render_segments(&mut frame, state, layout);
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         meltdown::render(&mut frame, event, layout);
     }

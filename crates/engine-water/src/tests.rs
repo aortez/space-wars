@@ -1,8 +1,8 @@
 use super::*;
 
-const DT: f64 = 1.0 / 60.0;
+pub(super) const DT: f64 = 1.0 / 60.0;
 
-fn spec(left: f64, width: f64, bed: Vec<f64>, boundaries: [Boundary; 2]) -> PoolSpec {
+pub(super) fn spec(left: f64, width: f64, bed: Vec<f64>, boundaries: [Boundary; 2]) -> PoolSpec {
     PoolSpec {
         left,
         column_width: width / bed.len() as f64,
@@ -11,7 +11,7 @@ fn spec(left: f64, width: f64, bed: Vec<f64>, boundaries: [Boundary; 2]) -> Pool
     }
 }
 
-fn assert_accounting(world: &WaterWorld) {
+pub(super) fn assert_accounting(world: &WaterWorld) {
     let stats = world.stats();
     let sum = stats.pooled + stats.in_flight + stats.drained + stats.reclaimed;
     assert!(
@@ -245,6 +245,62 @@ fn both_exact_pool_edges_collect_vertical_parcels_symmetrically() {
         assert_eq!(world.stats().pooled, 5.0);
         assert_eq!(world.stats().in_flight, 0.0);
         assert_accounting(&world);
+    }
+}
+
+#[test]
+fn distant_pool_rejection_preserves_swept_crossings_corners_and_support_changes() {
+    let mut world = WaterWorld::new(
+        WaterConfig::default(),
+        (0..98)
+            .map(|i| {
+                // Dense rows of narrow ledges, separated by real gaps. As in the
+                // Clock face, most pools don't overlap any given parcel's path.
+                spec(
+                    (i % 14) as f64 * 5.0,
+                    2.0,
+                    vec![(i / 14) as f64 * 10.0; 2],
+                    [Boundary::Closed; 2],
+                )
+            })
+            .collect(),
+    )
+    .unwrap();
+    for i in 0..14 {
+        let x = (i * 5) as f32;
+        for offset in [0.0, 0.5, 1.5, 2.0] {
+            let expected_column = usize::from(offset > 1.0);
+            assert_eq!(
+                world.catch(
+                    Vec2::new(x + offset, 70.0),
+                    Vec2::new(x + offset, -10.0),
+                    None
+                ),
+                Some((84 + i, expected_column))
+            );
+        }
+        assert_eq!(
+            world.catch(Vec2::new(x + 3.0, 70.0), Vec2::new(x + 3.0, -10.0), None),
+            None
+        );
+    }
+    // Both endpoints lie outside: the path nevertheless crosses a thin ledge.
+    assert_eq!(
+        world.catch(Vec2::new(-1.0, 61.0), Vec2::new(3.0, 59.0), None),
+        Some((84, 0))
+    );
+    let mut mask = vec![true; 98];
+    mask[84..].fill(false);
+    world.set_pool_supports(&mask).unwrap();
+    assert_eq!(
+        world.catch(Vec2::new(0.5, 70.0), Vec2::new(0.5, -10.0), None),
+        Some((70, 0))
+    );
+    for x in [-100.0, 100.0] {
+        assert_eq!(
+            world.catch(Vec2::new(x, 70.0), Vec2::new(x, -10.0), None),
+            None
+        );
     }
 }
 
