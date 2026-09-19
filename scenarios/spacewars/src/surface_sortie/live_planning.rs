@@ -56,10 +56,55 @@ pub struct FlightForecastWork {
     pub rejected: BTreeMap<&'static str, u64>,
 }
 
+/// Finished measurements against retained snapshots, before live validation.
+/// Candidate counts include work in later-cancelled requests; a measured
+/// success is neither a published plan nor a physical execution.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct ObjectiveMeasurementWork {
+    pub finished_surveys: u64,
+    pub finished_candidates: u64,
+    pub successful_candidates: u64,
+    pub powered_candidates: u64,
+    pub failures: BTreeMap<&'static str, u64>,
+}
+impl ObjectiveMeasurementWork {
+    fn record(&mut self, route: &LandingObjectiveRoute) {
+        use ground_navigation::GroundRouteFailure;
+        self.finished_candidates += 1;
+        if route.cost().is_some() {
+            self.successful_candidates += 1;
+            self.powered_candidates += u64::from(route.crossing.is_some());
+        } else {
+            let reason = match route.outbound.failure {
+                Some(GroundRouteFailure::NoStartFooting) => "no_start_footing",
+                Some(GroundRouteFailure::NoDestinationFooting) => "no_destination_footing",
+                Some(GroundRouteFailure::Disconnected) => "disconnected",
+                None => "invalid_result",
+            };
+            *self.failures.entry(reason).or_default() += 1;
+        }
+    }
+    fn add_since(&mut self, new: &Self, old: &Self) {
+        self.finished_surveys += new.finished_surveys - old.finished_surveys;
+        self.finished_candidates += new.finished_candidates - old.finished_candidates;
+        self.successful_candidates += new.successful_candidates - old.successful_candidates;
+        self.powered_candidates += new.powered_candidates - old.powered_candidates;
+        for (&reason, &count) in &new.failures {
+            *self.failures.entry(reason).or_default() +=
+                count - old.failures.get(reason).copied().unwrap_or(0);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct LivePlanningTelemetry {
     pub submitted: u64,
+    /// Completed surveys that passed publication-time validation at least once.
     pub completed: u64,
+    pub measurements_by_actor: BTreeMap<usize, ObjectiveMeasurementWork>,
+    /// Requests retired before finishing all candidates despite finding at
+    /// least one successful candidate; those candidates were not validated.
+    pub retired_partial_successes_by_actor: BTreeMap<usize, u64>,
     pub published: u64,
     pub completed_by_actor: BTreeMap<usize, u64>,
     pub published_by_actor: BTreeMap<usize, u64>,
@@ -129,6 +174,7 @@ struct Request {
     flight_dependent: bool,
     flight_environment: Option<jetpack::forecast::FlightEnvironment>,
     flight_work: FlightForecastWork,
+    measurement_work: ObjectiveMeasurementWork,
     actual: Option<ActualLanding>,
     snapshot: Arc<QuerySnapshot>,
     reused: ReusedGroundWork,
@@ -222,7 +268,15 @@ impl LiveObjectivePlanner {
                 self.telemetry.retired_unpublished_graph += request.graph;
                 self.telemetry.retired_unpublished_queries += request.physics_queries;
             }
-            return self.queue.take(request.token);
+            let job = self.queue.take(request.token)?;
+            if job.output().is_none() && job.measurement_work().successful_candidates > 0 {
+                *self
+                    .telemetry
+                    .retired_partial_successes_by_actor
+                    .entry(player)
+                    .or_default() += 1;
+            }
+            return Some(job);
         }
         None
     }
@@ -755,6 +809,7 @@ impl LiveObjectivePlanner {
                         .then(|| jetpack::forecast::FlightEnvironment::read(state, p))
                         .flatten(),
                     flight_work: FlightForecastWork::default(),
+                    measurement_work: ObjectiveMeasurementWork::default(),
                     actual: Self::actual(p),
                     snapshot,
                     reused: ReusedGroundWork::default(),
@@ -801,6 +856,13 @@ impl LiveObjectivePlanner {
             request.graph += u64::from(allocation.charged.graph);
             request.physics_queries += u64::from(allocation.charged.physics_queries);
             let job = self.queue.job(request.token).unwrap();
+            let measurements = job.measurement_work();
+            self.telemetry
+                .measurements_by_actor
+                .entry(allocation.request.actor as usize)
+                .or_default()
+                .add_since(measurements, &request.measurement_work);
+            request.measurement_work = measurements.clone();
             request.flight_dependent = job.uses_flight_environment();
             let flight = job.flight_work();
             self.telemetry.flight_forecasts.started += flight.started - request.flight_work.started;

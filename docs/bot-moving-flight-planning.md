@@ -141,6 +141,10 @@ equivalence. Concurrent desktop timing is not a Pi benchmark.
 
 ## What remains and how to investigate
 
+The subsequent [asteroid investigation](bot-asteroid-objective-diagnosis.md)
+separates negative v10 results from unfinished positive v11 candidates and
+identifies scalar gravity invalidation as the next dependency fix.
+
 Asteroid runs still publish no completed objective surveys. They have the same
 280 / 159 route-change rejections as the prior checkpoint. Before adding more
 maneuvers, retain a negative survey at its original snapshot and distinguish

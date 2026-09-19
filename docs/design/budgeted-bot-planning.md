@@ -16,9 +16,11 @@ under asteroid pressure, broader sensor coverage and strategic planning remain
 future work. The experimental v11 [powered landing routes](../bot-jetpack-landing.md)
 now have [moving-planet prediction and physical calibration](../bot-moving-flight-planning.md).
 This establishes another tactical action for later mission scoring; it does not
-yet establish a stronger match policy. The next tactical investigation is why
-asteroid-pressure surveys contain no successful routes, before broadening the
-mission utility layer.
+yet establish a stronger match policy. The [asteroid-pressure investigation](../bot-asteroid-objective-diagnosis.md)
+found useful partial v11 candidates cancelled by scalar jump-gravity changes,
+alongside genuinely negative measured v10 routes. The next tactical slice is
+candidate validity under changing scalar gravity, before broadening the mission
+utility layer.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

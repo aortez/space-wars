@@ -274,7 +274,18 @@ fn stale_failed_surveys_are_unknown_and_partial_source_reuse_does_not_renew_age(
         .output()
         .unwrap();
     assert!(result.sites.iter().all(|r| r.cost().is_none()));
+    let measured = planner.telemetry.measurements_by_actor[&0].clone();
+    assert_eq!(measured.finished_surveys, 1);
+    assert_eq!(measured.successful_candidates, 0);
+    assert_eq!(
+        measured.finished_candidates,
+        measured.failures.values().sum::<u64>()
+    );
+    assert!(measured.finished_candidates > 0);
+    assert_eq!(planner.telemetry.completed, 0);
     planner.observe(&state, 0, &mut o);
+    assert_eq!(planner.telemetry.measurements_by_actor[&0], measured);
+    assert_eq!(planner.telemetry.completed, 0);
     assert!(
         o.landing_objective.is_none(),
         "stale failed paths must not be reported as impossibility"

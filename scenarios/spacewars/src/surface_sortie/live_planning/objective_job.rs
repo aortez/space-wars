@@ -19,6 +19,7 @@ pub(crate) struct ObjectiveSurveyJob {
     flight_scene: Option<FlightScene>,
     flight_dependent: bool,
     flight_work: FlightForecastWork,
+    measurement_work: ObjectiveMeasurementWork,
     candidate_map: Option<Arc<GroundMap>>,
     proposal: Option<Proposal>,
     crossing: Option<VehicleCrossingForecast>,
@@ -160,6 +161,7 @@ impl SurfaceSortieState {
             flight_scene,
             flight_dependent: false,
             flight_work: FlightForecastWork::default(),
+            measurement_work: ObjectiveMeasurementWork::default(),
             candidate_map: None,
             proposal: None,
             crossing: None,
@@ -217,6 +219,9 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(crate) fn measurement_work(&self) -> &ObjectiveMeasurementWork {
+        &self.measurement_work
+    }
     pub(crate) fn flight_work(&self) -> &FlightForecastWork {
         &self.flight_work
     }
@@ -250,6 +255,7 @@ impl ObjectiveSurveyJob {
         )))
     }
     fn finish_route(&mut self, route: LandingObjectiveRoute) {
+        self.measurement_work.record(&route);
         if route.site.is_some() {
             self.result.sites.push(route);
         } else {
@@ -265,6 +271,7 @@ impl ObjectiveSurveyJob {
         self.phase = if self.index < self.candidates.len() {
             self.avoid()
         } else {
+            self.measurement_work.finished_surveys += 1;
             Phase::Done
         };
     }

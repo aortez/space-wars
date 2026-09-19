@@ -2,6 +2,7 @@ use super::*;
 use pilot::LandingSiteQuery;
 
 mod flight_dependencies;
+mod measurement_work;
 mod route_dependencies;
 
 const DT: Duration = Duration::from_nanos(16_666_667);
