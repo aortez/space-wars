@@ -85,8 +85,10 @@ fallback, not a planned obstacle jump.
 
 The [return-walking investigation](bot-return-walking.md) follows this checkpoint.
 Stronger steering was rejected after it exposed a deeper moving-terrain contact
-failure. Its fixed-control clones and two-body comparison narrow the next
-physics investigation; the original controller and deadlines remain in place.
+failure. The subsequent [CCD velocity correction](moving-ground-ccd.md) removes
+those reproduced stalls with the original controller and deadlines in place.
+The controlled return now reaches its final waypoint without emergency jumps,
+but still expires before boarding.
 
 The initial investigation plan was waypoint following on this return: measure
 steering, speed, progress thresholds and waypoint transitions around those three

@@ -72,8 +72,11 @@ preserve match outcomes and completed-trip counts, with one capture/return
 finishing earlier. The recorded long return still exceeds its host task clock.
 The [walking investigation](../bot-return-walking.md) rejects a faster steering
 experiment: fixed-control clones and a two-body reduction expose sinking and
-stalls on moving compound terrain. Preserve the controller while isolating that
-physics failure, then retry traversal improvements and complete-trip time costs.
+stalls on moving compound terrain. The [CCD velocity correction](../moving-ground-ccd.md)
+now removes those reproduced stalls while retaining the controller. Its
+controlled return reaches the final waypoint with no emergency jumps but still
+expires before boarding. Retry traversal improvements and complete-trip time
+costs on this corrected physics; the full nominated sortie remains unfinished.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

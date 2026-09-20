@@ -7,6 +7,11 @@ diagnostics and preserves a smaller physical reproduction. It changes no bot
 controls, physics settings or deadlines. An experimental walking change was
 rejected and removed.
 
+The [moving-ground CCD follow-up](moving-ground-ccd.md) identifies and corrects
+the lost kinematic velocity. It removes the reproduced contact stalls; the
+nominated return reaches its final waypoint but still expires before boarding.
+The evidence below describes the earlier diagnostic checkpoint `96971fc`.
+
 ## What the exact replay establishes
 
 Use seed `7725194555774358125`, P1 v10 / P2 v11, no asteroids, source tick 11153
@@ -107,7 +112,9 @@ and compound child contacts are relevant places to inspect next.
 
 ## Reproduction and next investigation
 
-Build with Rust 1.89.0:
+At checkpoint `96971fc`, build with Rust 1.89.0 (or use its archived runtime).
+Current physics changes the earlier match history; use the follow-up's
+controlled comparison to revisit the same old return:
 
 ```sh
 cargo +1.89.0 build --locked --release -p spacewars-ai \
@@ -186,4 +193,5 @@ Evidence is in `target/bot-return-walking/`. A verified archive with commands,
 analysis, source exports, final source patch and runtimes is stored at
 `/home/oldman/.codex/visualizations/2026/09/19/bot-return-walking/`.
 This checkpoint leaves gameplay unchanged and makes no deployment or default
-promotion. The collision cause still needs a tested fix.
+promotion. The subsequent velocity correction and its checks are recorded in
+the [follow-up](moving-ground-ccd.md).

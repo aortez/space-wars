@@ -1,6 +1,151 @@
 use super::*;
 
 #[test]
+fn ccd_uses_ground_velocity_when_rejecting_slow_relative_motion() {
+    for kind in [BodyKind::KinematicPosition, BodyKind::KinematicVelocity] {
+        for compound in [false, true] {
+            for substeps in [1, 4] {
+                for speed in [2.5, 5.0] {
+                    ccd_passenger_clearance(kind, compound, substeps, speed);
+                }
+            }
+        }
+    }
+}
+
+fn ccd_passenger_clearance(kind: BodyKind, compound: bool, substeps: usize, speed: f32) {
+    let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+        max_ccd_substeps: substeps,
+        ..Default::default()
+    });
+    let (_, platform, floor) = ball_ids(3);
+    let children = [-20.0, 20.0].map(|x| CompoundChild {
+        shape: ColliderShape::Cuboid {
+            half_width: 20.0,
+            half_height: 0.2,
+        },
+        position: Vec2::new(x, -0.2),
+        angle: 0.0,
+    });
+    let colliders = if compound {
+        vec![ColliderSpec {
+            shape: ColliderShape::Compound {
+                children: children.to_vec(),
+            },
+            ..ColliderSpec::ball(floor, 1.0)
+        }]
+    } else {
+        children
+            .into_iter()
+            .enumerate()
+            .map(|(i, child)| ColliderSpec {
+                shape: child.shape,
+                local_position: child.position,
+                ..ColliderSpec::ball(ColliderId::new(platform.entity, floor.role, i as u16), 1.0)
+            })
+            .collect()
+    };
+    assert!(world.insert_body(
+        platform,
+        BodySpec {
+            kind,
+            linear_velocity: Vec2::new(0.0, 24.0),
+            ..Default::default()
+        },
+        &colliders
+    ));
+    let (_, passenger, passenger_collider) = ball_ids(1);
+    let start = Vec2::new(-0.2, 0.16);
+    let velocity = Vec2::new(speed, 24.0);
+    assert!(world.insert_body(
+        passenger,
+        BodySpec {
+            position: start,
+            linear_velocity: velocity,
+            ccd_enabled: true,
+            ..Default::default()
+        },
+        &[ColliderSpec {
+            friction: 0.0,
+            ..ColliderSpec::ball(passenger_collider, 0.15)
+        }]
+    ));
+    // Both bodies have the same normal velocity and a 0.01-unit gap. Their
+    // relative motion is too slow to need CCD. Zeroing the floor's CCD velocity
+    // instead counts their shared transport as impact speed and can clamp the
+    // passenger against ground already placed at its future pose.
+    for tick in 1..=30 {
+        let time = tick as f32 / 60.0;
+        let target = Vec2::new(0.0, 24.0 * time);
+        if kind == BodyKind::KinematicPosition {
+            world.set_next_kinematic_pose(platform, target, 0.0);
+        }
+        world.step(1.0 / 60.0);
+        let pose = world.motion(passenger).unwrap();
+        assert!(
+            pose.position.distance_to(start + velocity * time) < 0.002,
+            "{kind:?}, compound={compound}, substeps={substeps}, speed={speed}, tick={tick}: {pose:?}"
+        );
+        assert!(world.motion(platform).unwrap().position.distance_to(target) < 0.0001);
+    }
+}
+
+#[test]
+fn ccd_still_stops_at_a_moving_kinematic_wall() {
+    for kind in [BodyKind::KinematicPosition, BodyKind::KinematicVelocity] {
+        for substeps in [1, 4] {
+            let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+                max_ccd_substeps: substeps,
+                ..Default::default()
+            });
+            let (_, wall, wall_collider) = ball_ids(3);
+            assert!(world.insert_body(
+                wall,
+                BodySpec {
+                    kind,
+                    linear_velocity: Vec2::new(24.0, 0.0),
+                    ..Default::default()
+                },
+                &[ColliderSpec::cuboid(wall_collider, 0.2, 20.0)]
+            ));
+            let (_, ball, ball_collider) = ball_ids(1);
+            assert!(world.insert_body(
+                ball,
+                BodySpec {
+                    position: Vec2::new(-1.0, 0.0),
+                    linear_velocity: Vec2::new(100.0, 0.0),
+                    ccd_enabled: true,
+                    ..Default::default()
+                },
+                &[ColliderSpec::ball(ball_collider, 0.15)]
+            ));
+            let mut impacted = false;
+            for tick in 1..=30 {
+                let target = Vec2::new(24.0 * (tick as f32 / 60.0), 0.0);
+                if kind == BodyKind::KinematicPosition {
+                    world.set_next_kinematic_pose(wall, target, 0.0);
+                }
+                world.step(1.0 / 60.0);
+                impacted |= world
+                    .contact_events()
+                    .iter()
+                    .any(|event| event.impulse_magnitude > 0.0);
+                assert!(world.motion(wall).unwrap().position.distance_to(target) < 0.0001);
+                let motion = world.motion(ball).unwrap();
+                // Allow transient penetration before the next contact solve.
+                assert!(
+                    motion.position.x < target.x - 0.30,
+                    "{kind:?}, substeps={substeps}, tick={tick}: {motion:?}"
+                );
+            }
+            assert!(impacted, "report the real impact while the wall moves");
+            assert!((world.motion(ball).unwrap().position.x - 11.65).abs() < 0.01);
+            assert!((world.motion(ball).unwrap().linear_velocity.x - 24.0).abs() < 0.01);
+        }
+    }
+}
+
+#[test]
 fn ccd_substeps_keep_prescribed_kinematic_motion_uniform() {
     prescribed_motion_substeps(0.0, Vec2::ZERO);
     prescribed_motion_substeps(0.04, Vec2::new(1.5, 0.2));

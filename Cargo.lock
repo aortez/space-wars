@@ -4272,8 +4272,6 @@ dependencies = [
 [[package]]
 name = "rapier2d"
 version = "0.34.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "691626cdcb70312199acd86322b57ddabea6da4f4399b4b1ddad0f2ff140dd71"
 dependencies = [
  "approx",
  "bitflags 2.11.1",
