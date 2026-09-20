@@ -617,6 +617,10 @@ mod tests {
             spill_parcels: 12,
             capacity_limited_ticks: 3,
             drained_microunits: 35_000_000,
+            exited_solid_microunits: 1_000_000,
+            floor_open_milli: 420,
+            floor_load_milli: 2_800,
+            floor_motion_deferrals: 2,
             ..Default::default()
         });
         assert_eq!(
@@ -637,6 +641,10 @@ mod tests {
             "displaced_microunits",
             "spill_parcels",
             "capacity_limited_ticks",
+            "exited_solid_microunits",
+            "floor_open_milli",
+            "floor_load_milli",
+            "floor_motion_deferrals",
         ] {
             material.remove(field);
         }
@@ -648,6 +656,10 @@ mod tests {
         assert_eq!(material.displaced_microunits, 0);
         assert_eq!(material.spill_parcels, 0);
         assert_eq!(material.capacity_limited_ticks, 0);
+        assert_eq!(material.exited_solid_microunits, 0);
+        assert_eq!(material.floor_open_milli, 0);
+        assert_eq!(material.floor_load_milli, 0);
+        assert_eq!(material.floor_motion_deferrals, 0);
     }
 
     #[test]

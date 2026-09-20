@@ -1,4 +1,4 @@
-//! Slow, volume-driven floor actuator shared by Rain and the water test bed.
+//! Slow, volume-driven floor actuator shared by Rain, Meltdown and the water test bed.
 //! This is kinematic scenery, not a simulated pressure/hinge mechanism.
 use engine_core::Vec2;
 use engine_water::{Boundary, PoolGeometry, PoolSpec, WaterError, WaterWorld};
@@ -60,6 +60,14 @@ impl FloorShape {
         )
     }
 
+    /// Top of a panel, also used by lightweight solid-block contact. Callers
+    /// must restrict X to a panel: the gap itself has no supporting surface.
+    pub fn surface_y(self, x: f64, opening: f64) -> f64 {
+        let gap = opening * self.max_gap;
+        self.floor_y
+            - opening * self.max_drop * (self.half_width - x.abs()) / (self.half_width - gap)
+    }
+
     pub fn panel_pose(self, side: usize, opening: f64) -> (Vec2, f32) {
         let sign = if side == 0 { -1.0 } else { 1.0 };
         let angle = (opening * self.max_drop / (self.half_width - opening * self.max_gap)).atan()
@@ -83,7 +91,12 @@ impl FloorShape {
             .map(|(x, y)| center + Vec2::new(x * half.x, y * half.y).rotate_radians(angle))
     }
 
-    fn apply(self, water: &mut WaterWorld, opening: f64, dt: f64) -> Result<(), WaterError> {
+    pub(crate) fn apply(
+        self,
+        water: &mut WaterWorld,
+        opening: f64,
+        dt: f64,
+    ) -> Result<(), WaterError> {
         let drop = opening * self.max_drop;
         let gap = opening * self.max_gap;
         let left: [[f64; 2]; MAX_COLUMNS] = std::array::from_fn(|i| {

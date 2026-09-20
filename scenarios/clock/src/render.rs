@@ -10,6 +10,7 @@ use engine_core::Vec2;
 
 mod digit_slide;
 mod duck;
+mod floor;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -62,13 +63,11 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             1.0 - event.course_opacity(),
         );
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
-        rain::floor(&mut frame, event);
-        render_floor(
-            &mut frame,
-            crate::floor::FloorGeometry::closed(layout),
-            layout.pitch,
-            1.0 - event.opacity(),
-        );
+        floor::responsive(&mut frame, &event.floor, layout, event.opacity());
+    } else if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
+        if let Some(floor) = &event.floor {
+            floor::responsive(&mut frame, floor, layout, event.floor_opacity());
+        }
     } else {
         render_floor(&mut frame, state.floor.geometry(layout), layout.pitch, 1.0);
     }

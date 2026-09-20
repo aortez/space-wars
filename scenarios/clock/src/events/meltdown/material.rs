@@ -1,12 +1,14 @@
-//! Solid-looking ballistic cells become water at the floor/drain elevation,
-//! not at an existing water surface. Splash and pool volumes share one source.
+//! Ballistic cells become water on contact with the actual panel top, not at
+//! an existing water surface or an imaginary plane across the drain opening.
 use super::*;
 
 const SPLASH_DROPS: usize = 3;
 const SPLASH_FRACTION: f64 = 0.3;
 // Optional spray must leave capacity for ongoing pool outflow. Under pressure,
 // more of the source goes straight into the pool rather than stalling impact.
-const DRAIN_PARCEL_RESERVE: usize = 64;
+// Moving lips release real uncovered strips as well as ordinary outfalls.
+// Only the first 32 live parcels may include newly created optional spray.
+const DRAIN_PARCEL_RESERVE: usize = MAX_SPILL_PARCELS - 32;
 
 pub(crate) fn soften(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
@@ -56,26 +58,71 @@ impl MeltCell {
     }
 }
 
+/// Vertical support height of a rotated square over the two finite panel tops.
+/// Clip each edge to each panel's X interval, then evaluate its endpoints: the
+/// separation of two straight edges is linear. Unlike an AABB test this cannot
+/// hit empty space beside a rotated corner at the lip. Four edges, two panels,
+/// no allocation or physics bodies; falling through the gap has no support.
+fn contact_height(cell: &MeltCell, layout: Layout, floor: &ResponsiveFloor) -> Option<f64> {
+    let outline = cell.outline(layout.pitch);
+    let shape = floor.shape;
+    let gap = floor.opening * shape.max_gap;
+    let mut height: Option<f64> = None;
+    for [left, right] in [[-shape.half_width, -gap], [gap, shape.half_width]] {
+        for i in 0..4 {
+            let a = outline[i];
+            let b = outline[(i + 1) % 4];
+            let x = f64::from(cell.position.x) + f64::from(a.x);
+            let dx = f64::from(b.x) - f64::from(a.x);
+            let (lo, hi) = if dx.abs() < 1e-12 {
+                if x < left || x > right {
+                    continue;
+                }
+                (0.0, 1.0)
+            } else {
+                let t0 = (left - x) / dx;
+                let t1 = (right - x) / dx;
+                (t0.min(t1).max(0.0), t0.max(t1).min(1.0))
+            };
+            if lo > hi {
+                continue;
+            }
+            for t in [lo, hi] {
+                let y = f64::from(a.y) + t * f64::from(b.y - a.y);
+                let candidate = shape.surface_y(x + t * dx, floor.opening) - y;
+                height = Some(height.map_or(candidate, |h| h.max(candidate)));
+            }
+        }
+    }
+    height
+}
+
 pub(super) fn merge(
     cell: &mut MeltCell,
-    extent: Vec2,
     water: &mut WaterWorld,
     area: f64,
-    drain: DrainGeometry,
+    layout: Layout,
+    floor: &ResponsiveFloor,
 ) -> bool {
-    let layout = drain.layout();
-    let left = (cell.position.x - extent.x).max(layout.bounds_min.x) as f64;
-    let right = (cell.position.x + extent.x).min(layout.bounds_max.x) as f64;
-    if cell.position.y - extent.y > layout.floor_y {
+    let Some(contact_y) = contact_height(cell, layout, floor) else {
+        return false;
+    };
+    if f64::from(cell.position.y) > contact_y + 1e-5 {
         return false;
     }
-    let lip = drain.half_width() as f64;
+    // Resolve downward crossing at the current top rather than injecting water
+    // from beneath it. Slow actuator motion is already limited by the engine.
+    cell.position.y = contact_y as f32;
+    let extent = cell.extent(layout.pitch);
+    let left = (cell.position.x - extent.x).max(layout.bounds_min.x) as f64;
+    let right = (cell.position.x + extent.x).min(layout.bounds_max.x) as f64;
+    let lip = floor.opening * floor.shape.max_gap;
+    let lip_y = floor.shape.floor_y - floor.opening * floor.shape.max_drop;
     let gap_left = left.max(-lip);
     let gap_right = right.min(lip);
     let gap = (gap_right - gap_left).max(0.0);
     if gap > 0.0 && water.parcels().len() == MAX_SPILL_PARCELS {
         // Do not partially convert a source if its gap portion cannot fit.
-        cell.position.y = layout.floor_y + extent.y;
         cell.velocity.y = 0.0;
         return false;
     }
@@ -104,7 +151,7 @@ pub(super) fn merge(
     if gap > 0.0 {
         water
             .add_falling(Parcel {
-                position: Vec2::new(((gap_left + gap_right) * 0.5) as f32, layout.floor_y),
+                position: Vec2::new(((gap_left + gap_right) * 0.5) as f32, lip_y as f32),
                 velocity: Vec2::new(cell.velocity.x, cell.velocity.y.max(-800.0)),
                 volume: gap * density,
                 duration: 1.0 / 60.0,
@@ -115,12 +162,13 @@ pub(super) fn merge(
     for i in 0..splash_count {
         let t = (i as f32 + 0.5) / splash_count as f32;
         let speed = (-cell.velocity.y * 0.35).clamp(90.0, 160.0);
+        let x = left + (right - left) * t as f64;
+        // Gap portions originate at the inner edge's elevation; bank spray
+        // follows the inclined top so it cannot start below the moving bed.
+        let y = floor.shape.surface_y(x.abs().max(lip), floor.opening);
         water
             .add_falling(Parcel {
-                position: Vec2::new(
-                    (left + (right - left) * t as f64) as f32,
-                    layout.floor_y + 0.05,
-                ),
+                position: Vec2::new(x as f32, y as f32 + 0.05),
                 velocity: Vec2::new(
                     (t - 0.5) * speed * 0.85,
                     speed * (1.0 - (t - 0.5).abs() * 0.25),

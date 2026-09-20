@@ -9,7 +9,8 @@ use std::{
 fn summary(label: &str, values: &mut [f64]) {
     values.sort_by(f64::total_cmp);
     println!(
-        "{label}: p95={:.4}ms max={:.4}ms",
+        "{label}: median={:.4}ms p95={:.4}ms max={:.4}ms",
+        values[values.len() / 2],
         values[values.len() * 95 / 100],
         values[values.len() - 1]
     );
@@ -45,7 +46,7 @@ fn main() {
     };
     println!("fixture={}", water_lab.as_str());
     let duration = EVENT_CATALOG[ClockEventKind::Meltdown as usize].duration_ticks;
-    for (width, height) in [(800, 480), (480, 800), (1280, 720)] {
+    for (width, height) in [(1024, 768), (800, 480), (480, 800), (1280, 720)] {
         let mut steps = Vec::new();
         let mut frames = Vec::new();
         let mut peak_primitives = 0;
@@ -56,6 +57,11 @@ fn main() {
         let mut peak_displaced = 0;
         let mut peak_bodies = 0;
         let mut peak_colliders = 0;
+        let mut peak_open = 0;
+        let mut peak_load = 0;
+        let mut max_deferrals = 0;
+        let mut max_limited = 0;
+        let mut max_exited_solid = 0;
         for seed in 0..24 {
             let mut state = ClockScenario::init(
                 ClockConfig {
@@ -102,6 +108,11 @@ fn main() {
                     peak_spills = peak_spills.max(m.spill_parcels);
                     max_reclaimed = max_reclaimed.max(m.reclaimed_microunits);
                     peak_displaced = peak_displaced.max(m.displaced_microunits);
+                    peak_open = peak_open.max(m.floor_open_milli);
+                    peak_load = peak_load.max(m.floor_load_milli);
+                    max_deferrals = max_deferrals.max(m.floor_motion_deferrals);
+                    max_limited = max_limited.max(m.capacity_limited_ticks);
+                    max_exited_solid = max_exited_solid.max(m.exited_solid_microunits);
                 }
             }
             assert_eq!(state.meltdown_state(), None);
@@ -115,5 +126,11 @@ fn main() {
         );
         summary("step", &mut steps);
         summary("draw list (not raster/presentation)", &mut frames);
+        println!(
+            "floor peak={:.1}% load={:.3} world units, max motion deferrals={max_deferrals}, outlet-limited ticks={max_limited}, solid-exit subset={:.6} cell-volumes",
+            peak_open as f64 / 10.0,
+            peak_load as f64 / 1000.0,
+            max_exited_solid as f64 / 1_000_000.0
+        );
     }
 }

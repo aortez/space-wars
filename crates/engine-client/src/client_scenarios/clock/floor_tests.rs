@@ -40,7 +40,7 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
             (Some(ClockEventKind::ColorCycle), ClockFloorMode::Closed),
             (Some(ClockEventKind::Falling), ClockFloorMode::DrainOpen),
             (Some(ClockEventKind::Marquee), ClockFloorMode::Closed),
-            (Some(ClockEventKind::Meltdown), ClockFloorMode::DrainOpen),
+            (Some(ClockEventKind::Meltdown), ClockFloorMode::EventOwned),
         ] {
             if let Some(event) = event {
                 scenario.preview_clock_event(event);
@@ -67,14 +67,15 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
                 .to_rgb8()
                 .unwrap();
             // At event tick zero there is no material in the lower floor strip.
-            // Rain owns its floor but starts flat/closed until water arrives.
+            // Rain and Meltdown start flat/closed until water arrives.
             let row = pixels.height() as usize * 92 / 100;
             let width = pixels.width() as usize;
             let bank = pixels.as_slice()[row * width + width / 10];
             let center = pixels.as_slice()[row * width + width / 2];
             assert_eq!(
                 center == bank,
-                mode == ClockFloorMode::Closed || event == Some(ClockEventKind::Rain),
+                mode == ClockFloorMode::Closed
+                    || matches!(event, Some(ClockEventKind::Rain | ClockEventKind::Meltdown)),
                 "{event:?}, {viewport:?}"
             );
             if event == Some(ClockEventKind::Rain) {

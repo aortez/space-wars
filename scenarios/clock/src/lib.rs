@@ -514,7 +514,7 @@ impl ClockState {
     ) {
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
-        self.floor.acquire(kind, self.config.water_lab);
+        self.floor.acquire(kind);
         self.active_event = Some(ActiveEvent::new(
             kind,
             EventContext {

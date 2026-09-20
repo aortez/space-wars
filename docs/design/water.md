@@ -287,7 +287,7 @@ offset. No attraction, duck steering or water-displacement coupling is added.
 
 Capacity deferral keeps the old panel/water geometry together. Pausing cannot
 advance the actuator. Replacement, resize, restart and normal completion drop
-all event resources and restore the ordinary floor; Falling, Meltdown and the
+all event resources and restore the ordinary floor; Falling and the
 walking-duck course retain their prior geometry. During the existing final
 two-second cleanup, residual liquid is explicitly reclaimed and any remaining
 opening blends back to the closed floor. Cleanup is still not a duck exit.
@@ -357,6 +357,96 @@ cargo test --locked -p scenario-clock responsive
 SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/clock-water-slopes \
   cargo test --locked -p engine-client --bin engine-client water_visual_tests
 cargo run --locked --release -p scenario-clock --example slope_benchmark
+```
+
+#### Normal Meltdown integration
+
+Meltdown reuses Rain's `ResponsiveFloor` and panel renderer. It acquires an
+`event-owned` floor starting flat/closed, then uses the same filtered floor-water
+load, opening/closing speeds and quasi-static geometry updates. There is no new
+fluid solver, attraction force or pressure model. Rain, Falling, the walking-duck
+course and the development water labs retain their behavior.
+
+Digit/AM-PM blocks remain lightweight ballistic squares, not rigid bodies. A
+bounded four-edge/two-panel contact calculation uses the rotated outline and
+actual inclined top: no early conversion at the old horizontal floor plane, or
+at empty AABB corners beside the lip. Downward crossings resolve at the panel
+top before checking world exit. A square that fits through the gap stays solid
+until it physically leaves the lower boundary. `exited_solid_microunits` reports
+that **subset** of `drained_microunits`; it is not additional material, injected
+water, or cleanup reclamation.
+
+On impact, the existing footprint-based conversion conservatively partitions
+material between both banks, the gap and optional spray. Spray starts at the
+inclined surface; any gap portion starts at the moving inner lip. When the
+required gap parcel cannot fit, the entire block waits at contact without a
+partial conversion. Floor-capacity deferral similarly preserves both water and
+visible geometry atomically.
+
+Retracting floor edges release additional real parcels. Tests found the old
+128-slot budget could stall the floor, even when those parcels held little
+water. Normal Meltdown now preallocates **192 slots**, reserves capacity by
+reducing optional spray once 32 parcels are live, and retains continuous
+outfalls. The 128 columns and zero bodies/colliders are unchanged. Stationary
+water-lab variants retain their 128-slot cap. No per-tick collection or geometry
+allocation is added to the simulation path.
+
+The 3-second melting, 4-second draining and 1.5-second reform envelope is
+unchanged. During reform, explicit residual-material reclamation continues;
+the shared floor art fades into the closed arena while its water bed still
+obeys slow motion limits. This is a bounded visual recovery, not a claim that
+all water physically drains or the wet floor fully closes before the deadline.
+The last reforming frame and the restored face/floor are pixel-identical.
+
+`clock state` adds default-compatible Meltdown floor opening, load and deferral
+fields, with the same units as Rain. A 96-case sweep (three device aspects,
+eight seeds, two readings, 12/24-hour modes) checks per-tick conservation,
+deterministic replay, pause, water/rendered-top agreement, actual load-driven
+opening/closing, zero ordinary floor/outlet stalls and final resource release.
+Separate regressions cover rotated lip contact, full-queue atomicity, high-speed
+bank crossing, and solid gap exits. Existing lifecycle tests cover replacement,
+resize, restart and time/format corrections. Full local workspace/all-target
+tests pass **1,661 tests**, with 46 existing ignored tests; strict scoped Clippy,
+formatting and whitespace checks pass. Windowed UI workflows remain compiled
+but were not executed locally.
+
+The matching release client/CLI pair was fast-deployed to `sw-picade-2` on
+2026-09-19 without rebooting. A scripted Meltdown cycle started with a closed
+hatch, reached 56.5% opening while draining (120 live parcels, zero floor-motion
+or outlet-capacity stalls), then returned to cooldown with a closed floor and
+zero bodies/colliders. The device screenshot was inspected at 1024×768 with
+the existing 2× raster scale, reporting 60 FPS/UPS. Settings, including 5% volume,
+remained byte-identical; the kiosk had no service restarts and the separately
+powered-display boot still had no USB/I/O errors. The Clock was left running
+with its existing Demo profile for manual playtesting.
+
+Workstation release benchmark, 24 complete 08:08 events per aspect:
+
+| Aspect | Step median / p95 | Draw-list median / p95 | Peak parcels |
+| --- | --- | --- | --- |
+| 1024×768 | 14.8 / 17.1 µs | 12.8 / 14.6 µs | 148 |
+| 800×480 | 14.9 / 17.1 µs | 13.1 / 15.2 µs | 148 |
+| 480×800 | 14.7 / 16.9 µs | 12.8 / 14.2 µs | 147 |
+| 1280×720 | 14.9 / 17.1 µs | 13.3 / 15.3 µs | 148 |
+
+All runs had zero floor-motion deferrals and outlet-capacity stalls. Draw lists
+peaked at 948–967 primitives; inclined water needs two area-preserving pieces
+per column, each highlighted. These timings exclude rasterization/display and
+are not Pi performance measurements. The benchmark now prints floor load,
+opening, stalls, and solid-exit accounting alongside its existing material stats.
+
+![Solid blocks reaching the responsive floor](../screenshots/water/meltdown-responsive-impact.png)
+
+![Meltdown water draining between the inclined panels](../screenshots/water/meltdown-responsive-draining.png)
+
+These are inspected headless production-renderer captures, not device photos.
+
+```sh
+cargo +1.89.0 test --locked -p scenario-clock --profile ci events::meltdown
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-meltdown-responsive \
+  cargo +1.89.0 test --locked -p engine-client --profile ci \
+  meltdown_reaches_both_render_paths_and_raster_water_is_visible
+cargo +1.89.0 run --locked --release -p scenario-clock --example meltdown_benchmark
 ```
 
 ### Irregular rain and live digit surfaces

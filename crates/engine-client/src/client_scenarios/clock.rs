@@ -939,7 +939,9 @@ mod tests {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        <= 800,
+                        // Inclined columns need two area-preserving pieces,
+                        // each with a highlight: 256 more than flat columns.
+                        <= if water_lab == scenario_clock::ClockWaterLab::Off { 1056 } else { 800 },
                     "bounded cells, columns, spill parcels and reforming face at tick {tick} {viewport:?}"
                 );
                 let presentation = crate::render::scene_presentation_from_frames_with_layout(
@@ -957,13 +959,11 @@ mod tests {
                 let pixels = image.to_rgb8().unwrap();
                 if water_lab == scenario_clock::ClockWaterLab::Off {
                     if tick == 509 {
-                        final_reforming_pixels =
-                            Some(floor_tests::pixels_above_floor(&pixels).to_vec());
+                        final_reforming_pixels = Some(pixels.as_bytes().to_vec());
                     } else if tick == 510 {
                         assert!(
-                            floor_tests::pixels_above_floor(&pixels)
-                                == final_reforming_pixels.as_deref().unwrap(),
-                            "cleanup must not pop to a different face at {viewport:?}"
+                            pixels.as_bytes() == final_reforming_pixels.as_deref().unwrap(),
+                            "cleanup must not pop to a different face or floor at {viewport:?}"
                         );
                     }
                 }
