@@ -22,7 +22,8 @@ use serde::Serialize;
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{
-    DisengagementAttempt, MissionDisengagement, SuccessorComparison, SuccessorComparisonJob,
+    ContinuationReport, DisengagementAttempt, MissionDisengagement, Successor, SuccessorComparison,
+    SuccessorComparisonJob, SuccessorContinuation,
 };
 
 pub const MISSION_POLICY: &str = "material_mission_v9";
@@ -293,6 +294,13 @@ impl MaterialMissionPilot {
         self.goal(MissionGoal::Select, tick);
     }
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        self.intent_with_continuation(o, None)
+    }
+    fn intent_with_continuation(
+        &mut self,
+        o: &MissionObservationV1,
+        continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
         let c = &o.local.combat;
         let f = &c.recovery.flight;
         let p = &f.pilot;
@@ -321,7 +329,7 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose(o);
+        let result = self.choose_with_continuation(o, continuation);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
@@ -329,6 +337,13 @@ impl MaterialMissionPilot {
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        self.choose_with_continuation(o, None)
+    }
+    fn choose_with_continuation(
+        &mut self,
+        o: &MissionObservationV1,
+        mut continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
         self.telemetry.avoidance = None;
         self.telemetry.opponent = None;
         self.telemetry.combat = None;
@@ -377,6 +392,9 @@ impl MaterialMissionPilot {
                 self.escaping_sun = false;
             }
             if self.escaping_sun {
+                if let Some(trial) = &mut continuation {
+                    trial.stop(self, p.tick, "solar avoidance");
+                }
                 self.goal(MissionGoal::AvoidSun, p.tick);
                 self.telemetry.avoidance = Some(MissionAvoidance {
                     obstacle: MissionObstacleId::Sun,
@@ -384,6 +402,11 @@ impl MaterialMissionPilot {
                 });
                 return self.guide(o, up * 25.0);
             }
+        }
+        if let Some(trial) = continuation
+            && let Some(intent) = trial.flight_intent(self, o)
+        {
+            return intent;
         }
         if let Some(recovery) = &mut self.recovery {
             let flight = recovery.step(&c.recovery);

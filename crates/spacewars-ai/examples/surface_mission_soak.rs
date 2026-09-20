@@ -11,6 +11,8 @@ mod mission_metrics;
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
 mod planning_probe;
+#[path = "support/successor_continuation.rs"]
+mod successor_continuation;
 #[path = "support/successor_probe.rs"]
 mod successor_probe;
 use engine_common::{
@@ -198,6 +200,11 @@ fn main() {
     );
     let mut successor_probe =
         compare_successors.then(|| successor_probe::SuccessorProbe::new(&out));
+    let mut continuation = successor_continuation::ContinuationRun::from_args(&out);
+    assert!(
+        continuation.is_none() || (compare_successors && mode == "duel" && match_rules),
+        "physical continuations require successor probes and a duel with match rules"
+    );
     assert!(
         !cover_probe || live_planning.is_some(),
         "destination cover requires --live-objective-planning true"
@@ -393,11 +400,18 @@ fn main() {
                     objective_sensors.push(sensor_ms);
                 }
                 let clock = Instant::now();
-                let mut intent = pilots[i].intent(&o);
+                let mut intent = if let Some(trial) = &mut continuation {
+                    trial.intent(i, &mut pilots[i], &o)
+                } else {
+                    pilots[i].intent(&o)
+                };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
                 if let Some(probe) = &mut successor_probe {
                     successor_construction_ms += probe.observe(i, &pilots[i], &o);
+                }
+                if let Some(trial) = &mut continuation {
+                    trial.record(i, &pilots[i], &state, &o, intent);
                 }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
@@ -700,6 +714,9 @@ fn main() {
     }
     if let Some(probe) = &mut successor_probe {
         report["successor_comparison"] = probe.report();
+    }
+    if let Some(trial) = &mut continuation {
+        report["successor_continuation"] = trial.report(&state, &pilots[trial.actor()]);
     }
     report["landing_survey_hz"] = json!(survey_hz);
     report["landing_queries"] = json!(landing_query_counts);

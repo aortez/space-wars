@@ -7,6 +7,11 @@ the motor controllers and the existing deterministic scheduler. **No result
 changes the live bot's choice.** This is the first flight leg of the successor
 comparison; capture/return feasibility and combat outcomes remain unmeasured.
 
+The following [physical-continuation experiment](bot-successor-continuation.md)
+now executes explicitly chosen first legs from three matching source states.
+It calibrates short-term closing time and exposes live material invalidation;
+whole capture trips and an automatic successor selection remain future work.
+
 ## What a job evaluates
 
 `MaterialMissionPilot::successor_comparison` creates a job immediately after the

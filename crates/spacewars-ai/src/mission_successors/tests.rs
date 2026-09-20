@@ -322,3 +322,187 @@ fn every_branch_begins_with_the_already_emitted_handoff_control() {
     }
     assert_eq!(job.report.committed_prefix_ticks, 1);
 }
+
+#[test]
+fn physical_trial_preserves_committed_prefix_repeat_calls_and_escape_deadline() {
+    let (mut bot, mut o) = fixture();
+    let source = o.local.combat.recovery.flight.pilot.tick;
+    bot.telemetry
+        .disengagement
+        .as_mut()
+        .unwrap()
+        .last
+        .as_mut()
+        .unwrap()
+        .deadline_tick = source + 4;
+    let before = bot.telemetry.clone();
+    let mut trial = SuccessorContinuation::new(&bot, &o, Successor::ContinueEscape).unwrap();
+    assert_eq!(bot.telemetry, before);
+    assert_eq!(trial.report().deadline_tick, source + 4);
+    let prefix = bot.previous_intent;
+    assert_eq!(trial.intent(&mut bot, &o), prefix);
+    assert_eq!(trial.report().applied_controls, 0);
+    advance_forecast(&mut o, prefix);
+    for applied in 1..=3 {
+        let intent = trial.intent(&mut bot, &o);
+        let telemetry = bot.telemetry.clone();
+        assert_eq!(trial.intent(&mut bot, &o), intent);
+        assert_eq!(bot.intent(&o), intent);
+        assert_eq!(bot.telemetry, telemetry);
+        assert_eq!(trial.report().applied_controls, applied);
+        advance_forecast(&mut o, intent);
+    }
+    trial.intent(&mut bot, &o);
+    assert_eq!(trial.report().stopped_tick, Some(source + 4));
+    assert_eq!(trial.report().applied_controls, 3);
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    let expected = bot.clone().intent(&o);
+    assert_eq!(trial.intent(&mut bot, &o), expected);
+    assert_eq!(trial.report().applied_controls, 3);
+}
+
+#[test]
+fn physical_trial_rejects_missing_proposals_and_stale_handoffs() {
+    let (bot, mut o) = fixture();
+    assert!(
+        SuccessorContinuation::new(
+            &bot,
+            &o,
+            Successor::Transfer {
+                site: LandingSiteId {
+                    planet: 0,
+                    bearing: 12
+                }
+            }
+        )
+        .is_err()
+    );
+    o.destination_cover.as_mut().unwrap().candidates[0].measurement = None;
+    let successor = Successor::Transfer {
+        site: o.destination_cover.as_ref().unwrap().candidates[0].id,
+    };
+    assert!(SuccessorContinuation::new(&bot, &o, successor).is_err());
+    o.local.combat.recovery.flight.pilot.tick += 1;
+    assert!(SuccessorContinuation::new(&bot, &o, Successor::Combat).is_err());
+}
+
+#[test]
+fn physical_approach_rechecks_material_ownership_contact_and_arrival() {
+    for reason in [
+        "destination material changed",
+        "destination now owned",
+        "destination absent",
+        "surface task or contact",
+        "approach reached; fresh surface planning required",
+    ] {
+        let (mut bot, mut o) = fixture();
+        let site = o.destination_cover.as_ref().unwrap().candidates[0].id;
+        let mut trial = SuccessorContinuation::new(&bot, &o, Successor::Transfer { site }).unwrap();
+        advance_forecast(&mut o, bot.previous_intent);
+        match reason {
+            "destination material changed" => o.planets[1].revision += 1,
+            "destination now owned" => {
+                o.planets[1].claim.as_mut().unwrap().owner = Some(bot.context.actor)
+            }
+            "destination absent" => {
+                o.planets.retain(|p| p.index != site.planet);
+            }
+            "surface task or contact" => {
+                o.local.combat.recovery.flight.pilot.landing.supported_feet = 1
+            }
+            _ => {
+                let entry = trial.report().proposal.approach.unwrap().position(&o);
+                let p = &mut o.local.combat.recovery.flight.pilot;
+                p.ship.position = entry;
+                p.ship.velocity = Vec2::ZERO;
+            }
+        }
+        let expected = bot.clone().intent(&o);
+        assert_eq!(trial.intent(&mut bot, &o), expected);
+        assert_eq!(trial.report().stop_reason, Some(reason));
+        assert_eq!(trial.report().applied_controls, 0);
+    }
+}
+
+#[test]
+fn physical_trial_yields_to_ship_recovery_and_solar_avoidance() {
+    for recovery in [true, false] {
+        let (mut bot, mut o) = fixture();
+        let mut trial = SuccessorContinuation::new(&bot, &o, Successor::Combat).unwrap();
+        advance_forecast(&mut o, bot.previous_intent);
+        let intent = trial.intent(&mut bot, &o);
+        assert_eq!(trial.report().applied_controls, 1);
+        advance_forecast(&mut o, intent);
+        if recovery {
+            o.local.combat.recovery.flight.pilot.ship_form = ShipForm::EscapePod;
+        } else {
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            p.ship.velocity = Vec2::ZERO;
+            o.sun = Some(
+                scenario_spacewars::surface_sortie::mission::MissionObstacle {
+                    position: p.ship.position - Vec2::Y * 50.0,
+                    radius: 40.0,
+                },
+            );
+        }
+        trial.intent(&mut bot, &o);
+        assert_eq!(trial.report().applied_controls, 1);
+        assert_eq!(
+            trial.report().stop_reason,
+            Some(if recovery {
+                "recovery required"
+            } else {
+                "solar avoidance"
+            })
+        );
+        if recovery {
+            assert!(bot.recovery.is_some());
+        } else {
+            assert_eq!(bot.telemetry.goal, MissionGoal::AvoidSun);
+        }
+    }
+}
+
+#[test]
+fn physical_combat_uses_actual_visibility_and_readiness() {
+    for visible in [false, true] {
+        let (mut bot, mut o) = fixture();
+        let mut trial = SuccessorContinuation::new(&bot, &o, Successor::Combat).unwrap();
+        let source_tick = o.local.combat.recovery.flight.pilot.tick;
+        advance_forecast(&mut o, bot.previous_intent);
+        let target = o.local.combat.target.as_mut().unwrap();
+        target.visible = visible;
+        target.ground_occluded = !visible;
+        o.local.combat.laser_available = false;
+        o.local.combat.cannon_ready = false;
+        let original = o.clone();
+        let mut reference = bot.clone();
+        reference.prepare_handoff_transfer(source_tick, 0);
+        reference.telemetry.avoidance = None;
+        let expected = reference.hunt(&o);
+        assert_eq!(trial.intent(&mut bot, &o), expected);
+        assert_eq!(o, original);
+        assert_eq!(trial.report().applied_controls, 1);
+    }
+}
+
+#[test]
+fn physical_trial_cannot_resume_after_reset_or_skipped_tick() {
+    for reset in [false, true] {
+        let (mut bot, mut o) = fixture();
+        let mut trial = SuccessorContinuation::new(&bot, &o, Successor::Combat).unwrap();
+        if reset {
+            bot.reset(bot.context);
+            o.local.combat.recovery.flight.pilot.tick += 1;
+        } else {
+            o.local.combat.recovery.flight.pilot.tick += 2;
+        }
+        let expected = bot.clone().intent(&o);
+        assert_eq!(trial.intent(&mut bot, &o), expected);
+        assert_eq!(
+            trial.report().stop_reason,
+            Some("controller reset or nonconsecutive observation")
+        );
+        assert_eq!(trial.report().applied_controls, 0);
+    }
+}

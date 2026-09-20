@@ -3,7 +3,10 @@ use super::*;
 
 #[path = "mission_handoff.rs"]
 mod handoff;
-pub use handoff::{HandoffTelemetry, SuccessorComparison, SuccessorComparisonJob};
+pub use handoff::{
+    ContinuationReport, HandoffTelemetry, Successor, SuccessorComparison, SuccessorComparisonJob,
+    SuccessorContinuation,
+};
 
 #[path = "mission_boundary.rs"]
 mod boundary;

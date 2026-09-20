@@ -11,6 +11,10 @@ use scenario_spacewars::weapons::WeaponSupplyObservation;
 
 const APPROACH_HEIGHT: f32 = 85.0;
 
+#[path = "mission_successors/continuation.rs"]
+mod continuation;
+pub use continuation::{ContinuationReport, SuccessorContinuation};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Successor {

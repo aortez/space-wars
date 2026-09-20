@@ -57,6 +57,12 @@ its deadline, and combat against independent opponent hypotheses. It uses only
 remaining graph allowance and leaves controls unchanged. Current revalidation,
 capture/return feasibility and combat outcome evidence are still required before
 ranking complete successors or promoting a new policy.
+The [physical continuation matrix](../bot-successor-continuation.md) now tests
+those first legs from three exact handoff states. Pursuit range-entry predictions
+are close in the main-seed trials, but no staging point is reached within six
+seconds, asteroid edits invalidate two approaches, and immediate survival does
+not rank eventual outcomes. The next evidence is a bounded longer approach through
+fresh landing and the actual capture/return loop, with model-limit tails explicit.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

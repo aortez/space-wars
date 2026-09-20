@@ -11,7 +11,10 @@ pub use opponent::{OpponentForecast, RangeEntryEnvelope};
 
 #[path = "mission_successors.rs"]
 mod successors;
-pub use successors::{SuccessorComparison, SuccessorComparisonJob};
+pub use successors::{
+    ContinuationReport, Successor, SuccessorComparison, SuccessorComparisonJob,
+    SuccessorContinuation,
+};
 
 const FORECAST_TICKS: u64 = 6 * 60;
 const MAX_DESTINATIONS: usize = 4;
