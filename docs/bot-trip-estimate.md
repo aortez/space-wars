@@ -182,11 +182,11 @@ prediction unchanged. The profile SHA-256 is
 
 ## Next step
 
-Add a read-only rolling landing estimate that expires when its site, route or
-terrain dependencies change, records time already spent retrying, and separates
-remaining successful-trip cost from the attempt's failure/deadline risk. Use
-current approach progress to investigate the landing variation. Preserve the
-original frozen estimate alongside updates so retries remain visible.
+The [rolling landing diagnostic](bot-rolling-trip-estimate.md) now expires
+references on dependency changes, preserves elapsed retry time and exposes the
+native capture deadline separately. It retains the original predictions and
+compares updates at fixed horizons. Timing improves on some long retries but
+remains mixed; a model conditioned on actual approach progress is next.
 
 Before using these costs to rank missions, add independent nontrivial walking
 and crossing examples and a remote-transfer estimate. Keep those missing costs,

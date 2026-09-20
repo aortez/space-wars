@@ -92,8 +92,12 @@ costs at the observed landing choice. Eight independent-world runs yield 29
 completed numeric comparisons with 2.48-second median absolute error, mostly
 for very short ground trips. Terrain/site changes cause landing underestimates
 up to 25 seconds; failed approaches and remote/powered costs remain explicit.
-Rolling landing estimates with invalidation/retry accounting are next, followed
-by independent longer ground trips and remote-transfer estimates before selection.
+The [rolling diagnostic](../bot-rolling-trip-estimate.md) now separates evidence
+refresh from approach restarts, preserves elapsed retry time and exposes native
+capture limits. Twelve new runs verify the accounting; timing accuracy remains
+mixed when a retry is already close to touchdown. Progress-conditioned landing
+estimates are next, followed by independent longer ground trips and
+remote-transfer estimates before selection.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
