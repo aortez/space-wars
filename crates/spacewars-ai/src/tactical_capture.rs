@@ -230,8 +230,7 @@ impl TacticalCapturePilot {
                 }
             }
             let ground = self.ground.as_mut().unwrap();
-            ground
-                .set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip && owned);
+            ground.set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip);
             let controls = ground.step(&o.combat.recovery);
             if ground.is_crossing()
                 || ground.telemetry().goal != GroundGoal::Arrived
@@ -298,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn only_powered_round_trip_returns_opt_into_continuous_walking() {
+    fn only_powered_round_trips_opt_into_continuous_walking_on_both_legs() {
         for planning in [
             ObjectivePlanning::Legacy,
             ObjectivePlanning::JointRoundTrip,
@@ -317,7 +316,7 @@ mod tests {
                 );
                 task.intent(&o);
                 let ground = task.telemetry().ground.as_ref().unwrap();
-                let expected = planning == ObjectivePlanning::JetpackRoundTrip && owned;
+                let expected = planning == ObjectivePlanning::JetpackRoundTrip;
                 assert_eq!(ground.continuous_walk, expected);
                 assert_eq!(
                     serde_json::to_value(ground)

@@ -351,8 +351,73 @@ fn raising_flag_fixture(powered: bool) -> (GroundNavigationTask, RecoveryTaskObs
 }
 
 #[test]
+fn continuous_flag_walk_slows_at_the_selected_claim_footing() {
+    use scenario_spacewars::surface_sortie::landing_objective::LandingObjective;
+    use spacewars_ai::ground_task::FlagApproach;
+    for direction in [-1.0, 1.0] {
+        let (context, mut o) = fixture();
+        o.jetpack = None;
+        let map = o.ground.as_mut().unwrap();
+        for node in &mut map.nodes {
+            node.position.x *= direction;
+        }
+        map.edges
+            .extend(map.edges.clone().into_iter().map(|e| GroundEdge {
+                from: e.to,
+                to: e.from,
+                ..e
+            }));
+        let p = &mut o.flight.pilot;
+        p.hatch = Some(Vec2::new(0.0, 60.0));
+        p.boarding_hatches = [p.hatch, None];
+        let claim = p.planet.claim.as_mut().unwrap();
+        claim.owner = Some(PlayerId::PLAYER_2);
+        claim.flag = Some(PlanetFlagObservation {
+            player: PlayerId::PLAYER_2,
+            position: Vec2::new(6.0 * direction, 60.0),
+            normal: Vec2::Y,
+            raised_fraction: 1.0,
+        });
+        let plan = FlagApproach {
+            crossing: None,
+            objective: LandingObjective::read(p).unwrap(),
+            endpoint: map.nodes[3],
+            boarding_hatches: p.boarding_hatches,
+            tick: p.tick,
+            reached: false,
+        };
+        let mut task = GroundNavigationTask::with_flag_planning(context, Some(plan), true);
+        task.set_continuous_walk(true);
+        task.step(&o);
+        assert_eq!(task.telemetry().path, [0, 1, 2, 3]);
+        advance(&mut o, 1);
+        assert_eq!(task.step(&o).horizontal, direction);
+        for tick in 2..=3 {
+            advance(&mut o, tick);
+            o.flight.pilot.actor.as_mut().unwrap().position =
+                Vec2::new((tick - 1) as f32 * 2.0 * direction, 60.0 + HALF_HEIGHT);
+            assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        }
+        assert_eq!(task.telemetry().waypoint, 3);
+        advance(&mut o, 4);
+        let mut conservative = task.clone();
+        conservative.set_continuous_walk(false);
+        let action = task.step(&o);
+        assert_eq!(action, conservative.step(&o));
+        assert!(action.horizontal * direction > 0.0 && action.horizontal.abs() < 1.0);
+        assert!(!action.primary_held);
+        advance(&mut o, 5);
+        o.flight.pilot.actor.as_mut().unwrap().position = plan.actor_position();
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+        assert!(task.telemetry().flag_approach.unwrap().reached);
+    }
+}
+
+#[test]
 fn powered_planner_finishes_its_own_raise_without_walking_to_a_new_endpoint() {
     let (mut task, mut o) = raising_flag_fixture(true);
+    task.set_continuous_walk(true);
     for tick in 1..=180 {
         advance(&mut o, tick);
         assert_eq!(task.step(&o), SurfaceSortieAction::default());
@@ -374,6 +439,7 @@ fn own_raise_does_not_override_support_flag_hatch_or_task_deadline_checks() {
     use scenario_spacewars::surface_sortie::{PlanetClaimPhase, PlanetClaimStatus};
     for fault in 0..5 {
         let (mut task, mut o) = raising_flag_fixture(true);
+        task.set_continuous_walk(true);
         assert_eq!(task.step(&o), SurfaceSortieAction::default());
         advance(&mut o, if fault == 4 { 5401 } else { 2 });
         let p = &mut o.flight.pilot;

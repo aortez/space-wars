@@ -214,11 +214,11 @@ The new archive records its own manifest, source patch and commit binding.
 
 ## Next bounded step
 
-Try the guarded continuous-walking mode on v11's measured outbound interior
-Walk edges, preserving final flag approach and stopping behavior. Compare the
-same trip first, then physical claim/return tests, both seats and asteroid
-cases. Measure actual claiming, support, overshoot and completion, as well as
-time; retain the previous follower and the existing win-to-loss seed.
+The [guarded outbound walking trial](bot-outbound-walking.md) now reduces the
+main recorded outbound leg to 14.30 seconds and completes capture/return in
+both physical test seats. Matched asteroid and quiet runs retain the comparator
+and known regression seed. Support gaps and a small final settling cost remain
+explicit in the measurements.
 
 Once those execution costs are stable, compose a read-only complete-trip
 estimate with separate approach/landing, outbound, claim, return/boarding and

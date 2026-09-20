@@ -83,8 +83,11 @@ held-out cases do not activate the new input. The first
 [complete-trip timing and exposure analysis](../bot-trip-calibration.md) now
 separates phase costs in dense recordings. It finds a remaining outbound
 waypoint slowdown, omitted landing/claim/departure costs and an exposure counter
-that stops on foot. A guarded outbound walking trial is the next bounded step;
-whole-trip estimates and strategic strength remain unproven.
+that stops on foot. The [guarded outbound walking trial](../bot-outbound-walking.md)
+now reduces the recorded long outbound leg from 30.33 to 14.30 seconds, with
+actual claiming and return. Two activated matched configurations change from
+losses to wins; the small known sample does not establish strategic strength.
+A read-only complete-trip estimate with separate phase costs is the next step.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
