@@ -157,9 +157,8 @@ checkpoint. The binaries are headless comparison builds, not a Picade deploy.
 
 ## Next step
 
-Use the measured phase breakdown to build the first read-only complete-trip
-estimate: approach/landing, outbound, claim, return/boarding and departure,
-each with evidence age, dependencies and uncertainty. Preserve observed support
-gaps and final settling as execution costs. Keep unmeasured remote trips and
-pilot exposure explicitly unknown. Compare those estimates with executions
-before using them to rank missions or alter strategic risk weights.
+The [first read-only trip estimator](bot-trip-estimate.md) now composes the phase
+costs and compares frozen local-choice predictions with independent executions.
+Landing invalidation and retry costs dominate its large misses. Rolling landing
+estimates and broader ground/remote-transfer evidence are next, before mission
+ranking or strategic risk weights change.

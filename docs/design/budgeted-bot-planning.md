@@ -87,7 +87,13 @@ that stops on foot. The [guarded outbound walking trial](../bot-outbound-walking
 now reduces the recorded long outbound leg from 30.33 to 14.30 seconds, with
 actual claiming and return. Two activated matched configurations change from
 losses to wins; the small known sample does not establish strategic strength.
-A read-only complete-trip estimate with separate phase costs is the next step.
+The first [read-only trip estimator](../bot-trip-estimate.md) now freezes phase
+costs at the observed landing choice. Eight independent-world runs yield 29
+completed numeric comparisons with 2.48-second median absolute error, mostly
+for very short ground trips. Terrain/site changes cause landing underestimates
+up to 25 seconds; failed approaches and remote/powered costs remain explicit.
+Rolling landing estimates with invalidation/retry accounting are next, followed
+by independent longer ground trips and remote-transfer estimates before selection.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
