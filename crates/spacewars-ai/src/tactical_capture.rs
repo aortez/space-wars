@@ -230,6 +230,8 @@ impl TacticalCapturePilot {
                 }
             }
             let ground = self.ground.as_mut().unwrap();
+            ground
+                .set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip && owned);
             let controls = ground.step(&o.combat.recovery);
             if ground.is_crossing()
                 || ground.telemetry().goal != GroundGoal::Arrived
@@ -293,6 +295,40 @@ mod tests {
             },
             o,
         )
+    }
+
+    #[test]
+    fn only_powered_round_trip_returns_opt_into_continuous_walking() {
+        for planning in [
+            ObjectivePlanning::Legacy,
+            ObjectivePlanning::JointRoundTrip,
+            ObjectivePlanning::JetpackRoundTrip,
+        ] {
+            for owned in [false, true] {
+                let (context, mut o) = fixture();
+                let p = &mut o.combat.recovery.flight.pilot;
+                if owned {
+                    p.planet.claim.as_mut().unwrap().owner = Some(p.owner);
+                }
+                let mut task = TacticalCapturePilot::with_planning(
+                    context,
+                    CombatBreakSettings::default(),
+                    planning,
+                );
+                task.intent(&o);
+                let ground = task.telemetry().ground.as_ref().unwrap();
+                let expected = planning == ObjectivePlanning::JetpackRoundTrip && owned;
+                assert_eq!(ground.continuous_walk, expected);
+                assert_eq!(
+                    serde_json::to_value(ground)
+                        .unwrap()
+                        .get("continuous_walk")
+                        .is_some(),
+                    expected,
+                    "historical trace shape remains unchanged"
+                );
+            }
+        }
     }
 
     #[test]

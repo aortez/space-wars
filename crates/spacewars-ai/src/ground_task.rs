@@ -79,6 +79,8 @@ impl GroundGoal {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GroundTelemetry {
     pub policy: &'static str,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub continuous_walk: bool,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -143,6 +145,7 @@ impl GroundNavigationTask {
             context,
             telemetry: GroundTelemetry {
                 policy: "ground_navigation_v10",
+                continuous_walk: false,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -200,7 +203,14 @@ impl GroundNavigationTask {
     pub fn telemetry(&self) -> &GroundTelemetry {
         &self.telemetry
     }
+    /// Maintain walking speed through ordinary route interiors. Endpoints,
+    /// sharp turns, jumps and unsupported motion retain proportional steering.
+    /// Like other control changes, this takes effect on the next uncached tick.
+    pub fn set_continuous_walk(&mut self, enabled: bool) {
+        self.telemetry.continuous_walk = enabled;
+    }
     pub fn reset(&mut self, context: BrainReset) {
+        let continuous_walk = self.telemetry.continuous_walk;
         *self = if self.joint_flag {
             Self::with_flag_planning(context, None, self.powered_flag)
         } else if self.powered_flag {
@@ -208,6 +218,7 @@ impl GroundNavigationTask {
         } else {
             Self::new(context, self.telemetry.destination)
         };
+        self.telemetry.continuous_walk = continuous_walk;
     }
     pub fn is_crossing(&self) -> bool {
         self.crossing_task.is_some() || self.settling_after_interrupt
@@ -654,6 +665,43 @@ impl GroundNavigationTask {
         // It still needs a physical jump after ordinary walking stops advancing.
         let overhead_step = stuck && (next - actor.position).dot(p.actor_up) > 0.2;
         action.horizontal = (error * 1.8 / 5.0).clamp(-1.0, 1.0);
+        // Interior samples mark continued walking, not separate stopping
+        // points. Keep the measured route and its ordinary waypoint checks;
+        // only remove their repeated proportional slowdown on forward legs.
+        if self.telemetry.continuous_walk
+            && p.supported_planet == Some(p.planet.index)
+            && p.balanced
+            && error.abs() > 0.25
+            && index > 0
+            && index + 1 < self.telemetry.path.len()
+            && self.telemetry.path[index - 1..=index + 1]
+                .windows(2)
+                .all(|pair| {
+                    map.edges.iter().any(|edge| {
+                        edge.from == pair[0]
+                            && edge.to == pair[1]
+                            && edge.kind == GroundEdgeKind::Walk
+                    })
+                })
+            && let Some(previous) = map
+                .nodes
+                .iter()
+                .find(|n| n.id == self.telemetry.path[index - 1])
+            && let Some(following) = map
+                .nodes
+                .iter()
+                .find(|n| n.id == self.telemetry.path[index + 1])
+        {
+            let incoming = node.position - previous.position;
+            let outgoing = following.position - node.position;
+            let local_right = right.rotate_radians(-p.planet.motion.angle);
+            if incoming.dot(outgoing) > 0.0
+                && incoming.dot(local_right) * error > 0.0
+                && outgoing.dot(local_right) * error > 0.0
+            {
+                action.horizontal = error.signum();
+            }
+        }
         self.telemetry.goal = if p.supported_planet.is_some() {
             GroundGoal::Walk
         } else {

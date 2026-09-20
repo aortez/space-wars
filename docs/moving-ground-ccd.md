@@ -10,6 +10,10 @@ The controlled return now reaches the final walking waypoint without emergency
 jumps. It still expires before boarding. This checkpoint fixes the contact
 defect; waypoint speed and the remaining boarding approach are the next task.
 
+The subsequent [sustained-walking change](bot-return-completion.md) completes
+that controlled return, including real boarding and departure within the same
+deadline. The measurements below remain the physics-only checkpoint.
+
 ## Cause and correction
 
 `velocity_solver::writeback_bodies` records interpolated motion in `ccd_vels`

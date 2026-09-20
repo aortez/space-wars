@@ -11,6 +11,9 @@ The [moving-ground CCD follow-up](moving-ground-ccd.md) identifies and corrects
 the lost kinematic velocity. It removes the reproduced contact stalls; the
 nominated return reaches its final waypoint but still expires before boarding.
 The evidence below describes the earlier diagnostic checkpoint `96971fc`.
+The later [guarded walking retry](bot-return-completion.md) completes the
+controlled return after that physics correction, retaining both earlier
+baselines and a recorded fresh-match outcome regression.
 
 ## What the exact replay establishes
 

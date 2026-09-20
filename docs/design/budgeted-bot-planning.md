@@ -75,8 +75,12 @@ experiment: fixed-control clones and a two-body reduction expose sinking and
 stalls on moving compound terrain. The [CCD velocity correction](../moving-ground-ccd.md)
 now removes those reproduced stalls while retaining the controller. Its
 controlled return reaches the final waypoint with no emergency jumps but still
-expires before boarding. Retry traversal improvements and complete-trip time
-costs on this corrected physics; the full nominated sortie remains unfinished.
+expires before boarding. The [guarded walking retry](../bot-return-completion.md)
+now completes that controlled return through boarding and departure with 17.55
+seconds left on the unchanged clock. Fresh production comparisons retain a
+win-to-loss regression despite faster boarding in the changed match; the extra
+held-out cases do not activate the new input. Complete-trip time and exposure
+calibration remain the next step, with strategic strength still unproven.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

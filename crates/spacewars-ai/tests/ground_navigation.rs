@@ -89,6 +89,118 @@ fn advance(o: &mut RecoveryTaskObservationV1, tick: u64) {
 }
 
 #[test]
+fn continuous_walk_keeps_speed_in_both_directions_then_slows_for_the_hatch() {
+    for direction in [-1.0, 1.0] {
+        let (context, mut o) = fixture();
+        o.jetpack = None;
+        for node in &mut o.ground.as_mut().unwrap().nodes {
+            node.position.x *= direction;
+        }
+        let p = &mut o.flight.pilot;
+        p.hatch.as_mut().unwrap().x *= direction;
+        p.boarding_hatches = [p.hatch, None];
+        let mut task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        task.set_continuous_walk(true);
+        task.step(&o);
+        assert_eq!(task.telemetry().path, [0, 1, 2]);
+        advance(&mut o, 1);
+        assert_eq!(task.step(&o).horizontal, direction);
+        let before = task.telemetry().clone();
+        assert_eq!(task.step(&o).horizontal, direction);
+        assert_eq!(
+            task.telemetry(),
+            &before,
+            "cached ticks do not advance twice"
+        );
+
+        // Rigid world motion cannot change the chosen walking direction.
+        let mut copy = task.clone();
+        let shift = Vec2::new(30.0, -80.0);
+        let p = &mut o.flight.pilot;
+        p.planet.motion.position = shift;
+        p.planet.motion.angle = 0.7;
+        p.actor.as_mut().unwrap().position = shift + p.actor.unwrap().position.rotate_radians(0.7);
+        p.actor_up = Vec2::Y.rotate_radians(0.7);
+        p.hatch = p.hatch.map(|v| shift + v.rotate_radians(0.7));
+        p.boarding_hatches = [p.hatch, None];
+        advance(&mut o, 2);
+        assert_eq!(task.step(&o), copy.step(&o));
+        assert_eq!(task.step(&o).horizontal, direction);
+        assert_eq!(task.telemetry().invalidations, 0);
+
+        // Consume the interior waypoint normally; the final leg still brakes.
+        o.flight.pilot.actor.as_mut().unwrap().position =
+            shift + Vec2::new(2.0 * direction, 60.0 + HALF_HEIGHT).rotate_radians(0.7);
+        advance(&mut o, 3);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().waypoint, 2);
+        advance(&mut o, 4);
+        let action = task.step(&o);
+        assert!(action.horizontal * direction > 0.0 && action.horizontal.abs() < 1.0);
+        assert!(!action.primary_held);
+
+        // Reset clears execution state while retaining this task's opt-in.
+        task.reset(context);
+        let mut fresh = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        fresh.set_continuous_walk(true);
+        assert_eq!(task.telemetry(), fresh.telemetry());
+        assert_eq!(task.step(&o), fresh.step(&o));
+        assert_eq!(task.telemetry(), fresh.telemetry());
+    }
+}
+
+#[test]
+fn continuous_walk_preserves_careful_controls_at_discontinuities() {
+    for case in [
+        "incoming jump",
+        "outgoing jump",
+        "airborne",
+        "other support",
+        "fallen",
+        "overhead",
+        "near overhead",
+        "turn",
+        "reverse",
+        "dirty",
+        "removed edge",
+    ] {
+        let (context, mut o) = fixture();
+        o.jetpack = None;
+        match case {
+            "incoming jump" => o.ground.as_mut().unwrap().edges[0].kind = GroundEdgeKind::Jump,
+            "outgoing jump" => o.ground.as_mut().unwrap().edges[1].kind = GroundEdgeKind::Jump,
+            "turn" => o.ground.as_mut().unwrap().nodes[2].position = Vec2::new(2.0, 62.0),
+            "reverse" => o.ground.as_mut().unwrap().nodes[2].position = Vec2::new(1.0, 62.0),
+            _ => (),
+        }
+        let mut legacy = GroundNavigationTask::new(context, GroundDestination::Hatch);
+        let mut walking = legacy.clone();
+        walking.set_continuous_walk(true);
+        assert_eq!(legacy.step(&o), walking.step(&o));
+        assert!(!walking.telemetry().path.is_empty(), "{case}");
+        advance(&mut o, 1);
+        let p = &mut o.flight.pilot;
+        match case {
+            "airborne" => p.supported_planet = None,
+            "other support" => p.supported_planet = Some(p.planet.index + 1),
+            "fallen" => p.balanced = false,
+            "overhead" | "near overhead" => {
+                p.actor.as_mut().unwrap().position = Vec2::new(
+                    if case == "overhead" { 2.0 } else { 1.9 },
+                    58.8 + HALF_HEIGHT,
+                );
+            }
+            "dirty" => p.queries_ready = false,
+            "removed edge" => o.ground.as_mut().unwrap().edges.clear(),
+            _ => (),
+        }
+        assert_eq!(walking.step(&o), legacy.step(&o), "{case}");
+        assert_eq!(walking.telemetry().path, legacy.telemetry().path, "{case}");
+        assert_eq!(walking.telemetry().goal, legacy.telemetry().goal, "{case}");
+    }
+}
+
+#[test]
 fn return_selects_reachable_entrance_and_replans_when_it_disappears() {
     let (context, mut o) = fixture();
     o.jetpack = None;
