@@ -4,6 +4,10 @@
 use super::*;
 use scenario_spacewars::surface_sortie::LandingPhase;
 
+#[path = "sortie.rs"]
+mod sortie;
+pub use sortie::SortieContinuationReport;
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ContinuationReport {
     pub source_tick: u64,
@@ -16,6 +20,8 @@ pub struct ContinuationReport {
     pub applied_controls: u64,
     pub stopped_tick: Option<u64>,
     pub stop_reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sortie: Option<SortieContinuationReport>,
 }
 
 #[derive(Clone)]
@@ -63,6 +69,7 @@ impl SuccessorContinuation {
                 applied_controls: 0,
                 stopped_tick: None,
                 stop_reason: None,
+                sortie: None,
             },
             context: bot.context,
             direction: bot
@@ -116,7 +123,15 @@ impl SuccessorContinuation {
                 && bot.context == self.context
                 && bot.previous_tick == Some(self.last_tick)
             {
-                bot.reconsider(tick, "successor experiment ended", false);
+                if self.report.sortie.is_some()
+                    && let Some(capture) = &mut bot.capture
+                {
+                    // A deadline must not strand a spaceling by discarding its
+                    // active return task. Resume ordinary, unconstrained capture.
+                    capture.release_site_constraint();
+                } else {
+                    bot.reconsider(tick, "successor experiment ended", false);
+                }
             }
         }
     }
@@ -128,6 +143,9 @@ impl SuccessorContinuation {
     ) -> Option<CombatIntent> {
         if self.report.stopped_tick.is_some() {
             return None;
+        }
+        if self.report.sortie.is_some() {
+            return self.sortie_intent(bot, o);
         }
         let p = &o.local.combat.recovery.flight.pilot;
         let reason = if bot.context != self.context

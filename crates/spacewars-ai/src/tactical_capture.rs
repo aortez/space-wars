@@ -76,6 +76,13 @@ impl TacticalCapturePilot {
             ObjectivePlanning::JetpackRoundTrip => "tactical_sortie_v12",
         }
     }
+    pub(crate) fn requiring_site(mut self, site: LandingSiteId) -> Self {
+        self.base = self.base.requiring_site(site);
+        self
+    }
+    pub(crate) fn release_site_constraint(&mut self) {
+        self.base.release_site_constraint();
+    }
     pub fn reset(&mut self, context: BrainReset) {
         self.base.reset(context);
         self.context = context;

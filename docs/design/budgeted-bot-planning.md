@@ -61,8 +61,14 @@ The [physical continuation matrix](../bot-successor-continuation.md) now tests
 those first legs from three exact handoff states. Pursuit range-entry predictions
 are close in the main-seed trials, but no staging point is reached within six
 seconds, asteroid edits invalidate two approaches, and immediate survival does
-not rank eventual outcomes. The next evidence is a bounded longer approach through
-fresh landing and the actual capture/return loop, with model-limit tails explicit.
+not rank eventual outcomes. The [bounded capture-trip experiment](../bot-successor-sortie.md)
+now reaches three staging points and one actual landing in nine contested site
+trials. That pilot neutralizes the enemy flag but times out while raising its own;
+none completes capture and return. An isolated physical fixture completes the
+whole trip. A dense replay identifies repeated self-interruption while raising
+the own flag. The next focused behavior fix is that enemy-to-own-flag handoff,
+retaining real support and return checks before broader comparisons.
+Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
 

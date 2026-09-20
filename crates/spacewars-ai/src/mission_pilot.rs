@@ -299,7 +299,7 @@ impl MaterialMissionPilot {
     fn intent_with_continuation(
         &mut self,
         o: &MissionObservationV1,
-        continuation: Option<&mut SuccessorContinuation>,
+        mut continuation: Option<&mut SuccessorContinuation>,
     ) -> CombatIntent {
         let c = &o.local.combat;
         let f = &c.recovery.flight;
@@ -329,11 +329,14 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose_with_continuation(o, continuation);
+        let result = self.choose_with_continuation(o, continuation.as_deref_mut());
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
         self.previous_intent = result;
+        if let Some(trial) = continuation {
+            trial.record_sortie(self, o);
+        }
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {

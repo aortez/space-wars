@@ -99,6 +99,7 @@ pub struct TacticalSortiePilot {
     solar_rejected: Vec<(LandingSiteId, u64)>,
     clearing_ground: bool,
     objective: Option<LandingObjective>,
+    required_site: Option<LandingSiteId>,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -147,6 +148,7 @@ impl TacticalSortiePilot {
             solar_rejected: Vec::new(),
             clearing_ground: false,
             objective: None,
+            required_site: None,
         }
     }
     /// Current capture missions tolerate transient cover/clearance changes and
@@ -158,8 +160,19 @@ impl TacticalSortiePilot {
     }
     pub fn reset(&mut self, context: BrainReset) {
         let commit = self.commit_descent;
+        let required = self.required_site;
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
+        self.required_site = required;
+    }
+    /// Explicit continuation trials may constrain selection, but still need
+    /// current material, solar and objective-route evidence for this ID.
+    pub(crate) fn requiring_site(mut self, site: LandingSiteId) -> Self {
+        self.required_site = Some(site);
+        self
+    }
+    pub(crate) fn release_site_constraint(&mut self) {
+        self.required_site = None;
     }
     pub fn combat_telemetry(&self) -> &crate::combat_pilot::CombatPilotTelemetry {
         self.combat.telemetry()
@@ -182,7 +195,7 @@ impl TacticalSortiePilot {
         if self.telemetry.failed_tick.is_some() || self.telemetry.completed_tick.is_some() {
             self.combat.site_request()
         } else {
-            self.site.map(|s| s.id)
+            self.site.map(|s| s.id).or(self.required_site)
         }
     }
     fn goal(&mut self, goal: TacticalGoal, tick: u64) {
@@ -463,6 +476,20 @@ impl TacticalSortiePilot {
             && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
             && p.transfer == TransferResult::Ready
         {
+            if let Some(required) = self.required_site
+                && !p.sites.iter().any(|site| {
+                    self.site.is_some_and(|chosen| chosen.id == required)
+                        && site.id == required
+                        && site.revision == p.planet.revision
+                        && p.ship.position.distance_to(site.vehicle_position) <= 10.0
+                })
+            {
+                self.abort(
+                    p.tick,
+                    "landed outside the currently measured required site",
+                );
+                return CombatIntent::default();
+            }
             if objective.is_some() {
                 let Some(survey) = survey else {
                     return CombatIntent::default();
@@ -523,6 +550,10 @@ impl TacticalSortiePilot {
             if let Some((site, side, solar, _)) = p
                 .sites
                 .iter()
+                .filter(|site| {
+                    self.required_site
+                        .is_none_or(|id| site.id == id && site.revision == p.planet.revision)
+                })
                 .filter(|site| !self.rejected_sites.contains(&(site.id, site.revision)))
                 .filter(|site| !self.solar_rejected.iter().any(|(id, _)| *id == site.id))
                 .flat_map(|site| {
@@ -1281,5 +1312,107 @@ mod tests {
             assert_eq!(state.combat_telemetry(0).shells_fired, 0);
             assert_eq!(state.combat_telemetry(1).shells_fired > 0, fire);
         }
+    }
+
+    #[test]
+    fn required_site_waits_for_fresh_evidence_and_never_exits_at_an_unrelated_landing() {
+        let mut o = observation();
+        let required = o.combat.recovery.flight.pilot.sites[1];
+        let other = o.combat.recovery.flight.pilot.sites[0];
+        let mut stale = required;
+        stale.revision += 1;
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.controls_armed = true;
+        p.sites = vec![other, stale];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(required.id);
+        pilot.intent(&o);
+        assert!(pilot.site.is_none());
+        assert_eq!(pilot.site_request(), Some(required.id));
+        assert!(pilot.telemetry.failed_tick.is_none());
+        o.combat.recovery.flight.pilot.tick += 1;
+        o.combat.recovery.flight.pilot.sites = vec![other, required];
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), Some(required.id));
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.landing.phase = scenario_spacewars::surface_sortie::LandingPhase::Landed;
+        p.transfer = TransferResult::Ready;
+        p.ship.position = required.vehicle_position + Vec2::X * 100.0;
+        let action = pilot.intent(&o);
+        assert!(!action.flight.controls.interact_held);
+        assert_eq!(
+            pilot.telemetry.failure,
+            Some("landed outside the currently measured required site")
+        );
+    }
+
+    #[test]
+    fn releasing_a_site_constraint_keeps_the_task_and_allows_current_alternatives() {
+        let mut o = observation();
+        let required = o.combat.recovery.flight.pilot.sites[1];
+        let other = o.combat.recovery.flight.pilot.sites[0];
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.controls_armed = true;
+        p.sites = vec![other];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(required.id);
+        pilot.intent(&o);
+        assert!(pilot.site.is_none());
+        let started = pilot.telemetry.started_tick;
+        pilot.release_site_constraint();
+        o.combat.recovery.flight.pilot.tick += 1;
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), Some(other.id));
+        assert_eq!(pilot.telemetry.started_tick, started);
+    }
+
+    #[test]
+    fn required_site_physically_lands_claims_boards_and_departs() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let o = state.tactical_sortie_observation(0, None);
+        let p = &o.combat.recovery.flight.pilot;
+        let site = p
+            .sites
+            .iter()
+            .filter(|site| {
+                o.cover.iter().any(|cover| {
+                    cover.site == site.id && cover.grounded && cover.approach && cover.departure
+                })
+            })
+            .min_by(|a, b| {
+                a.vehicle_position
+                    .distance_to(p.ship.position)
+                    .total_cmp(&b.vehicle_position.distance_to(p.ship.position))
+            })
+            .unwrap()
+            .id;
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(site);
+        for _ in 0..60 * 60 {
+            let o = state.tactical_sortie_observation(0, pilot.site_request());
+            let intent = pilot.intent(&o);
+            if let Some(selected) = pilot.telemetry.site {
+                assert_eq!(selected, site);
+            }
+            SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), DT);
+            if pilot.telemetry.completed_tick.is_some() || pilot.telemetry.failed_tick.is_some() {
+                break;
+            }
+        }
+        let t = pilot.telemetry();
+        assert!(
+            t.completed_tick.is_some() && t.failed_tick.is_none(),
+            "{t:?}"
+        );
+        let landed = t.landing.landed_tick.unwrap();
+        let claimed = t.landing.claimed_tick.unwrap();
+        let boarded = t.landing.boarded_tick.unwrap();
+        assert!(landed < claimed && claimed < boarded && boarded < t.completed_tick.unwrap());
+        assert!(state.terrain_diagnostics().issues.is_empty());
     }
 }

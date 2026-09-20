@@ -146,12 +146,15 @@ The physical trajectories continue; they simply exceed those model branches'
 validated scope. Error summaries exclude samples at or beyond a model-margin
 stop and stop when the physical intervention yields to ordinary control.
 
-The next useful experiment is a longer, bounded site approach with periodic
-current evidence checks and recorded progress through arrival, fresh landing,
-capture and return. A rolling forecast should explicitly retain an unsupported
-tail when a plausible opponent response reaches a model limit. Keep the original
-escape clock and compare whole opportunities before making an automatic choice.
-Do not rank these alternatives by the eventual winners in this small matrix.
+The follow-up [bounded capture-trip experiment](bot-successor-sortie.md) now
+extends the nominated-site flights through fresh landing, capture and return.
+Three of nine contested trips reach their staging points, and one lands and
+neutralizes an enemy flag but does not finish raising its own before a ground
+timeout. An isolated physical fixture completes the full trip. A rolling forecast
+must still retain an unsupported tail when a plausible opponent response reaches
+a model limit. Keep the original escape clock and compare whole opportunities
+before making an automatic choice. Do not rank these alternatives by the eventual
+winners in this small matrix.
 
 ## Verification and reproduction
 

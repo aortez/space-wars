@@ -5,7 +5,7 @@ use scenario_spacewars::surface_sortie::{
     pilot::PilotLandingSite,
 };
 
-fn fixture() -> (MaterialMissionPilot, MissionObservationV1) {
+pub(super) fn fixture() -> (MaterialMissionPilot, MissionObservationV1) {
     let (mut bot, mut o) = super::super::super::tests::fixture(true);
     let tick = o.local.combat.recovery.flight.pilot.tick;
     bot.intent(&o);
