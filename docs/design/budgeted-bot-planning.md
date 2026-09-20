@@ -69,9 +69,11 @@ whole trip. A dense replay identifies repeated self-interruption while raising
 the own flag. The [own-flag handoff fix](../bot-claim-handoff.md) now completes
 that raise and starts a freshly planned return. Eight fresh paired comparisons
 preserve match outcomes and completed-trip counts, with one capture/return
-finishing earlier. The recorded long return still exceeds its host task clock;
-the next investigation is slow waypoint following and repeated stuck-fallback
-jumps on measured walking edges, then calibration of complete-trip time costs.
+finishing earlier. The recorded long return still exceeds its host task clock.
+The [walking investigation](../bot-return-walking.md) rejects a faster steering
+experiment: fixed-control clones and a two-body reduction expose sinking and
+stalls on moving compound terrain. Preserve the controller while isolating that
+physics failure, then retry traversal improvements and complete-trip time costs.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

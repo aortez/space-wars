@@ -17,6 +17,7 @@ pub mod comparison;
 pub mod compatibility;
 pub mod destination_cover;
 pub mod flight;
+mod ground_diagnostics;
 pub mod ground_navigation;
 pub mod ground_posture;
 pub mod hud;

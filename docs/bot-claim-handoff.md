@@ -83,7 +83,12 @@ The first three jumps are directly inspectable in the dense window. At ticks
 required distance improvement. Thus those jumps come from the existing stuck
 fallback, not a planned obstacle jump.
 
-The next bounded investigation is waypoint following on this return: measure
+The [return-walking investigation](bot-return-walking.md) follows this checkpoint.
+Stronger steering was rejected after it exposed a deeper moving-terrain contact
+failure. Its fixed-control clones and two-body comparison narrow the next
+physics investigation; the original controller and deadlines remain in place.
+
+The initial investigation plan was waypoint following on this return: measure
 steering, speed, progress thresholds and waypoint transitions around those three
 events. Compare an execution change against the same physical route, including
 real obstacles and disrupted footing. The landing scorer currently converts

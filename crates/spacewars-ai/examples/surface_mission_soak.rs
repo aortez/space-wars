@@ -69,6 +69,11 @@ fn main() {
     let mut physics_profile = (arg("--profile-physics", "false") == "true")
         .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
+    let trace_ground_contacts = arg("--trace-ground-contacts", "false") == "true";
+    assert!(
+        !trace_ground_contacts || trace,
+        "ground contact tracing needs --trace true"
+    );
     let timing_csv = arg("--timing-csv", "false") == "true";
     let mut planning_probe = (arg("--probe-planning-budget", "false") == "true")
         .then(planning_probe::PlanningProbe::default);
@@ -100,6 +105,17 @@ fn main() {
         "--require-finish needs --match true"
     );
     let probe_ground_start = arg("--probe-ground-start", "false") == "true";
+    let probe_ground_tick = match arg("--probe-ground-tick", "none").as_str() {
+        "none" => None,
+        tick => Some(
+            tick.parse::<u64>()
+                .expect("ground probe tick must be an integer"),
+        ),
+    };
+    assert!(
+        !probe_ground_start || probe_ground_tick.is_none(),
+        "choose automatic or explicit ground probing"
+    );
     let mut probed_ground_start = false;
     let require_route = arg("--require-route", "false") == "true";
     let require_hunt = arg("--require-hunt", "false") == "true";
@@ -474,9 +490,11 @@ fn main() {
                     .as_ref()
                     .and_then(|c| c.ground.as_ref())
                     .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
-                if probe_ground_start && !probed_ground_start && i == seat
-                    && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting))
+                if !probed_ground_start && i == seat
+                    && (probe_ground_tick == Some(tick)
+                        || probe_ground_start && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting)))
                 {
+                    assert!(p.actor.is_some(), "ground probe requires an on-foot actor");
                     ground_start_probe::run(&state, i, &out);
                     probed_ground_start = true;
                 }
@@ -510,34 +528,34 @@ fn main() {
                         || posture_key != last_posture[i]
                         || o.local.landing_objective.is_some())
                 {
-                    serde_json::to_writer(
-                        &mut *trace,
-                        &json!({
-                            "version": 1, "tick": tick, "seat": i,
-                            "observation": o, "actions": intent.encode(owner),
-                            "controls": {"turn": intent.flight.controls.horizontal,
-                                "thrust": intent.flight.controls.primary_held,
-                                "brake": intent.flight.controls.brake_held},
-                            "mission": pilots[i].telemetry(),
-                            "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
-                            "posture": posture.map(|s| json!({
-                                "balance": format!("{:?}", s.balance),
-                                "get_up_result": format!("{:?}", s.get_up_result),
-                                "get_up_attempts": s.get_up_attempts,
-                                "recovery_progress": s.recovery_progress,
-                                "settled_seconds": s.settled_seconds,
-                                "knockdowns": s.knockdowns, "recoveries": s.recoveries,
-                                "support": s.support.map(|contact| json!({
-                                    "collider": format!("{:?}", contact.collider),
-                                    "position": contact.position, "normal": contact.normal,
-                                    "local_surface": {"position": contact.local_surface.position, "normal": contact.local_surface.normal},
-                                    "velocity": contact.velocity, "spin": contact.angular_velocity,
-                                    "separation": contact.separation,
-                                })),
+                    let mut record = json!({
+                        "version": 1, "tick": tick, "seat": i,
+                        "observation": o, "actions": intent.encode(owner),
+                        "controls": {"turn": intent.flight.controls.horizontal,
+                            "thrust": intent.flight.controls.primary_held,
+                            "brake": intent.flight.controls.brake_held},
+                        "mission": pilots[i].telemetry(),
+                        "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
+                        "posture": posture.map(|s| json!({
+                            "balance": format!("{:?}", s.balance),
+                            "get_up_result": format!("{:?}", s.get_up_result),
+                            "get_up_attempts": s.get_up_attempts,
+                            "recovery_progress": s.recovery_progress,
+                            "settled_seconds": s.settled_seconds,
+                            "knockdowns": s.knockdowns, "recoveries": s.recoveries,
+                            "support": s.support.map(|contact| json!({
+                                "collider": format!("{:?}", contact.collider),
+                                "position": contact.position, "normal": contact.normal,
+                                "local_surface": {"position": contact.local_surface.position, "normal": contact.local_surface.normal},
+                                "velocity": contact.velocity, "spin": contact.angular_velocity,
+                                "separation": contact.separation,
                             })),
-                        }),
-                    )
-                    .unwrap();
+                        })),
+                    });
+                    if trace_ground_contacts {
+                        record["ground_contacts"] = state.ground_contact_diagnostics(i);
+                    }
+                    serde_json::to_writer(&mut *trace, &record).unwrap();
                     writeln!(trace).unwrap();
                 }
                 last_posture[i] = posture_key;
@@ -762,6 +780,10 @@ fn main() {
         json!({"physics_ok":report["physics_ok"],"distinct_departures":completed,"steps":report["steps"],"sensors":report["sensors"]})
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
+    assert!(
+        probe_ground_tick.is_none() || probed_ground_start,
+        "requested ground probe tick was not reached"
+    );
     if require_finish {
         assert!(
             state.match_outcome().is_some(),
