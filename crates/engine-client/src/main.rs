@@ -1139,6 +1139,12 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
             || window.get_ingame_menu_visible()
             || window.get_game_over_visible()
             || window.get_touch_test_visible();
+        if code == 12 {
+            if !menu && window.get_launcher_scenario() == "clock" {
+                input.borrow_mut().request_clock_next_event();
+            }
+            return;
+        }
         if menu && let Some(action) = UiAction::from_code(code) {
             handle_ui_action(&window, action);
             return;

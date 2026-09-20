@@ -103,11 +103,14 @@ controller polling, small stick drift, connection announcements, animation,
 and telemetry. Use the existing controller thresholds and handoff machinery
 where applicable.
 
-During an automatically started Clock or bot demo, an intentional input exits
-to the launcher and begins a fresh idle delay. Display a short “Press a button
-to return to the menu” hint. Consume that input and clear held actions before exposing
-the menu, so the same press cannot also start a game. Human takeover of a bot's
-ship is separate future work.
+Automatic and manual launches use the same scenario and menu inputs. Action
+buttons never implicitly exit an automatic session. Start/Esc opens the ordinary
+pause menu; Launcher is an explicit choice. Clock also opens the pause menu on
+a completed tap anywhere on its face, consuming that gesture before exposing
+menu controls. There is no permanent Clock Controls button or automatic-activity
+caption on the Clock face. Bot demos retain their bot pilots; human takeover of
+a bot's ship is separate future work. Result menus offer the usual Rematch,
+New Match and Launcher choices while the automatic next-world countdown runs.
 
 Remote read-only inspection, including screenshots and status, does not count
 as activity. Mutating UI controls count as operator interaction. Host pause

@@ -92,11 +92,97 @@ GPIO ownership, event codes, axis values and parameter targets before deploy.
 
 The existing gamepad seat assignment and menu-to-game neutral/release gate
 apply without a userspace input translator. Scenario-specific mappings remain
-those shown by the application's Controls menu. In Clock, the joystick and
-action buttons do nothing on the running clock face: use Escape or Start to
-pause, then choose Clock Controls or Launcher. Enter confirms menu selections;
+those shown by the application's Controls menu. In Clock, HAT Button 3 / West starts
+the next enabled event; other action buttons and the joystick remain available
+for future entity controls. Use Escape or Start to pause, then choose Clock
+Controls or Launcher. Enter confirms menu selections;
 Coin/Select opens controls help. Physical button layout can be adjusted by
 changing the `dtparam=buttonN=...` bindings in the Picade profile and rebooting.
+
+### Record the physical button layout
+
+Connector numbers do not prove front-panel positions. The following layout was
+recorded on `sw-picade-2` on 2026-09-19, viewed from the player's position:
+
+| Physical position | Color | HAT connector | Linux code | Logical input |
+| --- | --- | --- | --- | --- |
+| Top left | Yellow | Button 6 | 311 / BTN_TR | Right shoulder |
+| Top middle | Pink | Button 5 | 310 / BTN_TL | Left shoulder |
+| Top right | Blue | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
+| Bottom left | Pink | Not verified | No event | Not registering |
+| Bottom middle | Yellow | Button 2 | 305 / BTN_EAST | East / B |
+| Bottom right | Blue | Button 4 | 307 / BTN_NORTH | North |
+| Left side utility | Black | Escape | 1 / KEY_ESC | Pause / menu back |
+| Right side utility | Black | Enter | 28 / KEY_ENTER | Menu confirm |
+
+The ordered raw capture received five front-button codes (311, 310, 308, 305,
+307), followed by Escape/Enter. The user then individually identified the
+bottom-left pink button as producing no output, resolving the missing position
+in that sequence. The top-right mapping was also separately confirmed by
+repeated isolated presses. South/A (304) is the only configured front-button
+code not observed; Button 1 is therefore a candidate for the bottom-left
+connection, not a verified wiring assignment. The cause of the missing input
+(switch, wiring, or GPIO configuration) has not been diagnosed.
+
+This records the full physical layout, including one non-reporting button;
+it does not establish eight working inputs. `sw-picade` still needs its own
+verification. Colors and wiring may differ between cabinets. The top-right
+Clock-only binding does not change menus, NES, or other scenarios; ordinary
+gamepads use right shoulder.
+
+Run `python3 tools/capture-picade-buttons.py --host sw-picade-2.local` from the
+workstation. It discovers only the two Picade input devices, reads them over SSH,
+and prints a guided capture: top row left/middle/right, bottom row
+left/middle/right, then left/right utility. Press/release each once, about one
+second apart; never press Power. It installs nothing, changes no configuration,
+and stops after eight buttons or a bounded timeout. The application still sees
+the input. Start from Clock; utility keys may pause/resume it.
+Use `--address <known-IP>` for an mDNS fallback while retaining the named SSH
+host identity. Capture each cabinet separately and record the verified position,
+color, connector, Linux event code and logical input here. `--raw` prints
+individual press/release codes without assigning positions, useful for isolating
+a missing button. If a button produces no output, record its physical position
+explicitly instead of shifting the remaining sequence labels. The guided capture
+expects eight working buttons and cannot complete with a non-reporting button.
+
+### Simulated button verification
+
+`spacewars-cli ui press` sends semantic menu actions. It intentionally does not
+claim to test physical-controller mapping, holds, releases, or the Linux input
+backend. Use the separate workstation diagnostic for that software path:
+
+```sh
+python3 tools/picade_input.py --host sw-picade-2.local verify-clock
+python3 tools/picade_input.py --host sw-picade-2.local press west \
+  --expect-screen gameplay --hold-ms 1200
+```
+
+The same `--address <known-IP>` fallback preserves the named SSH identity. Start
+with Clock running and at least one event enabled; leave the cabinet controls
+untouched. The diagnostic discovers/rechecks the two named Picade input devices,
+requires the expected Clock screen, and injects an evdev press/release pair.
+Each hold is limited to 50–2000 ms. Release traps and a five-second watchdog run
+on the Pi, not across timed SSH round trips. No software is installed, no device
+is grabbed, and Power is not an available input. Screen checks are preflights,
+not locks against concurrent human input. A failed verification stops further
+presses and may leave the pause menu open; buttons still release.
+
+`verify-clock` checks one event per held West press, a second event after a fresh
+press, ignored West input and frozen simulation while paused, Escape/Enter
+pause/resume, and South/A confirmation. It verifies the Clock instance and saved
+preferences remain unchanged. These checks passed on `sw-picade-2` in automatic
+Clock mode on 2026-09-19. Injected South/A successfully confirmed Resume, but
+that does not verify the non-reporting pink switch, its wiring, or GPIO sensing.
+Manual/automatic equivalence, touch release behavior, and menu handoff guards
+also have backend-neutral Rust tests.
+
+Run the diagnostic's host-only safety tests without connecting to a cabinet:
+
+```sh
+python3 -m unittest discover -s tools -p 'test_picade_input.py'
+```
+
+### Controller seats
 
 With the cabinet and a USB gamepad attached, both can navigate host menus but
 their gameplay inputs remain separate: the cabinet occupies P1 and the USB

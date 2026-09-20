@@ -480,13 +480,34 @@ the selected profile.
 ## Live controls
 
 Press **Start** on the controller or **P/Esc** on the keyboard, then choose
-**Clock Controls**. You can also tap **Clock Controls** at the top-right of the
-running clock face. D-pad/left stick or arrow keys move selection; A/Enter
+**Clock Controls**. Tapping anywhere on the running clock face opens the same
+pause menu, on release; the opening tap cannot select a menu item. No permanent
+button is drawn over the clock. Automatic and manual launches use the same
+inputs: pressing action buttons does not return to the launcher.
+D-pad/left stick or arrow keys move selection; A/Enter
 selects. Left/right changes a choice row or moves between side-by-side buttons.
 B/Esc goes back; Start resumes without previewing. C/F1 still opens controls help.
 Menu and host keyboard shortcuts use Slint's backend-neutral input path on both
 desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
+
+Press **N**, the gamepad's **right shoulder**, or Picade's **upper-right blue
+button** (HAT Button 3 / West) for **Next Event**. Each fresh
+press cycles forward through enabled events in catalog order (including Digit
+Slide), starting after the last event that ran. It uses the same clean replacement
+path as Preview & Resume, including recovery of the current event's physics and
+floor. Holding does not repeat; menu/launch handoffs require released controls.
+The event name appears for two seconds of simulation time. Off disables automatic
+scheduling, not this manual action. Individual disabled events are skipped;
+if all are disabled, a brief “No events enabled” notice replaces no event.
+Preferences are unchanged. The Clock action protocol adds `NextEvent` (kind 6,
+version 5, no additional payload); existing action encodings are unchanged.
+Physical cabinet mappings are documented in [Picade controls](picade.md).
+
+Automatic Clock on `sw-picade-2`: the permanent controls button and automatic-mode
+caption are gone; the optional performance overlay remains enabled here.
+
+![Clock face on Picade with no permanent controls button](screenshots/clock/picade-clean-controls.png)
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
 **Falling/Color Cycle/Meltdown/Duck/Marquee/Digit Slide automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
@@ -501,7 +522,9 @@ Off. This releases previous physics/appearance resources, preserves the scenario
 instance and monotonic event IDs, synchronizes the latest time, and resumes.
 It is deliberately different from the strict, non-replacing `clock trigger`.
 
-These are ordinary guarded UI controls, also available to CLI automation:
+These are ordinary guarded UI controls, also available to CLI automation.
+`gameplay.clock-controls` remains a semantic settings shortcut for existing CLI
+scripts; it no longer represents a permanent button on the clock face:
 
 ```sh
 spacewars-cli ui activate gameplay.clock-controls --expect-screen gameplay

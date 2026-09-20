@@ -233,6 +233,13 @@ impl GamepadPump {
             return;
         }
 
+        if window.get_launcher_scenario() == "clock"
+            && button == clock_next_event_button(self.gilrs.gamepad(gamepad_id).name())
+        {
+            self.input.borrow_mut().request_clock_next_event();
+            return;
+        }
+
         let captures_start = window.get_scenario_captures_gamepad_start();
         let captures_select = window.get_scenario_captures_gamepad_select();
         let gamepad = self.gilrs.gamepad(gamepad_id);
@@ -362,6 +369,17 @@ impl GamepadPump {
             window.set_controller_disconnected_visible(false);
             window.set_controller_disconnected_text(SharedString::from(""));
         }
+    }
+}
+
+fn clock_next_event_button(gamepad_name: &str) -> Button {
+    // sw-picade-2's upper-right blue button was captured as HAT Button 3,
+    // Linux BTN_WEST (308). Keep ordinary controllers on their right shoulder;
+    // don't remap this cabinet's buttons globally for NES or other scenarios.
+    if gamepad_name == "Space-Wars Picade" {
+        Button::West
+    } else {
+        Button::RightTrigger
     }
 }
 
@@ -958,6 +976,38 @@ mod tests {
         assert_eq!(
             ui_direction(&handoff.filter(0, next_press)),
             Some(UiDirection::Down)
+        );
+    }
+
+    #[test]
+    fn held_next_event_button_cannot_leak_from_menu_to_clock() {
+        let mut handoff = ModeHandoff::default();
+        handoff.observe(InputMode::Ui);
+        handoff.filter(0, GamepadSeatInput::default());
+        let held = GamepadSeatInput {
+            connected: true,
+            right_bumper: true,
+            west: true,
+            ..Default::default()
+        };
+        handoff.observe(InputMode::Gameplay);
+        for _ in 0..60 {
+            assert!(!handoff.filter(0, held.clone()).right_bumper);
+            assert!(!handoff.filter(0, held.clone()).west);
+            assert!(!handoff.accepts_input(0));
+        }
+        handoff.filter(0, GamepadSeatInput::default());
+        assert!(handoff.accepts_input(0));
+        assert!(handoff.filter(0, held).right_bumper);
+    }
+
+    #[test]
+    fn clock_binding_uses_the_captured_picade_button_without_changing_other_controllers() {
+        assert_eq!(clock_next_event_button("Space-Wars Picade"), Button::West);
+        assert_eq!(clock_next_event_button("USB Gamepad"), Button::RightTrigger);
+        assert_eq!(
+            clock_next_event_button("Xbox Controller"),
+            Button::RightTrigger
         );
     }
 

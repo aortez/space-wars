@@ -1,13 +1,6 @@
 use super::*;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockFloorMode};
 
-/// Face recovery must remain pixel-exact while the drain intentionally closes.
-/// The floor begins 84% down the fixed-height camera; exclude its antialias edge.
-pub(super) fn pixels_above_floor(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>) -> &[u8] {
-    let rows = (pixels.height() as usize * 84 / 100).saturating_sub(1);
-    &pixels.as_bytes()[..rows * pixels.width() as usize * 3]
-}
-
 #[test]
 fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
     for viewport in [

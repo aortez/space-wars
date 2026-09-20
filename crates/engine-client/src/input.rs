@@ -49,6 +49,7 @@ pub(crate) struct ClientInput {
     spacewars_controls: SpacewarsControls,
     pointer_events: Vec<ScreenPointerEvent>,
     active_pointer: Option<RenderPoint>,
+    clock_next_event_requested: bool,
 }
 
 impl Default for ClientInput {
@@ -66,6 +67,7 @@ impl ClientInput {
             gamepads,
             pointer_events: Vec::new(),
             active_pointer: None,
+            clock_next_event_requested: false,
         }
     }
 }
@@ -265,6 +267,14 @@ impl ClientInput {
 
     pub(crate) fn take_return_launcher_requested(&mut self) -> bool {
         self.pressed.borrow_mut().remove(&GameKey::ReturnLauncher)
+    }
+
+    pub(crate) fn request_clock_next_event(&mut self) {
+        self.clock_next_event_requested = true;
+    }
+
+    pub(crate) fn take_clock_next_event_requested(&mut self) -> bool {
+        std::mem::take(&mut self.clock_next_event_requested)
     }
 
     pub(crate) fn actions_for_spacewars(
@@ -533,6 +543,7 @@ impl ClientInput {
 
     fn clear_keyboard(&mut self) {
         self.pressed.borrow_mut().clear();
+        self.clock_next_event_requested = false;
     }
 
     fn handle_focus_loss(&mut self) {
