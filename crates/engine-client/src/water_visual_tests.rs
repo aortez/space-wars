@@ -6,7 +6,9 @@ use crate::{
 use engine_common::{
     Camera2, ClockEventKind, ClockEventProfile, ClockRainAmount, RenderPoint, Scenario,
 };
-use scenario_clock::water_fixture::{DigitRainFixture, OpposedFixture, Profile, WaterFixture};
+use scenario_clock::water_fixture::{
+    DigitRainFixture, ImpactFixture, OpposedFixture, Profile, ResponsiveFloorFixture, WaterFixture,
+};
 use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario};
 use slint::{Rgb8Pixel, SharedPixelBuffer};
 use std::time::Duration;
@@ -26,6 +28,136 @@ fn opposed_pixels(depths: [f64; 2], mixing: bool) -> SharedPixelBuffer<Rgb8Pixel
 fn is_water(pixel: Rgb8Pixel) -> bool {
     // Includes the blue fill and cyan highlight, not the gray supports or sky.
     pixel.b > 180 && pixel.g > 100 && pixel.b.saturating_sub(pixel.r) > 80
+}
+
+#[test]
+fn responsive_floor_lab_captures_load_opening_and_passive_hull_exit() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let mut fixture = ResponsiveFloorFixture::new(7.0, true);
+    let viewport = Viewport::new(1200.0, 660.0);
+    let mut peak = 0.0_f64;
+    for tick in 0..=2400 {
+        if tick > 0 {
+            fixture.step(if tick < 600 { 1.0 } else { 0.0 });
+        }
+        peak = peak.max(fixture.opening);
+        if ![0, 60, 120, 240, 480, 600, 900, 1500, 2400].contains(&tick) {
+            continue;
+        }
+        let mut frame = fixture.frame();
+        frame.camera = Camera2::new(RenderPoint::new(0.0, -10.0), 110.0);
+        let vector = render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+        assert!(vector.len() < 1500);
+        assert!(
+            vector
+                .iter()
+                .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+        );
+        let pixels = raster(&frame, viewport);
+        if tick <= 240 {
+            assert!(pixels.as_slice().iter().filter(|p| is_water(**p)).count() > 100);
+        }
+        if tick == 120 {
+            // Central merged jet, world y=-15..-50. A previously detached
+            // collision slice left several completely dry pixel rows here.
+            for row in 360..=570 {
+                assert!(
+                    (594..=606).any(|x| is_water(pixels.as_slice()[row * 1200 + x])),
+                    "moving-floor jet broken at row {row}"
+                );
+            }
+        }
+        if let Some(output) = &output {
+            let name = format!("responsive-floor-tick-{tick}");
+            write_png(&output.join(format!("{name}.png")), &pixels);
+            std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+        }
+    }
+    assert!(peak > 0.2);
+    assert!(fixture.opening < 0.005);
+    assert!(fixture.duck_exited);
+    assert_eq!(fixture.deferrals, 0);
+}
+
+#[test]
+fn water_impact_response_changes_visible_surface_without_extra_water_or_draw_items() {
+    let output = std::env::var_os("SPACEWARS_WATER_EDGE_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    let viewport = Viewport::new(1000.0, 400.0);
+    let mut control = ImpactFixture::new(0.0);
+    let mut response = ImpactFixture::new(0.25);
+    assert_eq!(control.frame(), response.frame(), "identical before impact");
+    let mut max_difference = 0;
+    for tick in 1..=120 {
+        control.step();
+        response.step();
+        let a = control.water.stats();
+        let b = response.water.stats();
+        assert!((a.pooled - b.pooled).abs() < 1e-8);
+        assert_eq!(a.injected, b.injected);
+        assert_eq!(a.parcels, b.parcels, "no cosmetic/splash parcels added");
+        if ![6, 9, 12, 18, 30, 60, 120].contains(&tick) {
+            continue;
+        }
+        let baseline = raster(&control.frame(), viewport);
+        let actual = raster(&response.frame(), viewport);
+        max_difference = max_difference.max(
+            baseline
+                .as_slice()
+                .iter()
+                .zip(actual.as_slice())
+                .filter(|(a, b)| a != b)
+                .count(),
+        );
+        let water_pixels = |image: &SharedPixelBuffer<Rgb8Pixel>| {
+            image.as_slice().iter().filter(|p| is_water(**p)).count()
+        };
+        assert!(
+            water_pixels(&baseline).abs_diff(water_pixels(&actual)) < 250,
+            "surface motion must not visually manufacture water"
+        );
+        for (fixture, name) in [(&control, "control"), (&response, "response")] {
+            let frame = fixture.frame();
+            let vector =
+                render::scene_primitives_from_frames(std::slice::from_ref(&frame), viewport);
+            let items = frame
+                .layers
+                .iter()
+                .map(|l| l.primitives.len())
+                .sum::<usize>();
+            assert_eq!(
+                items,
+                75 + fixture.water.stats().parcels,
+                "25 support + 50 water primitives + incoming drop; no overlays"
+            );
+            // The adapter may batch adjacent flat rectangles, unlike waves.
+            assert!(!vector.is_empty() && vector.len() <= items);
+            assert!(
+                vector
+                    .iter()
+                    .all(|p| !p.commands.contains("NaN") && !p.commands.contains("inf"))
+            );
+            if let Some(output) = &output {
+                let name = format!("water-impact-{name}-tick-{tick}");
+                write_png(
+                    &output.join(format!("{name}.png")),
+                    &raster(&frame, viewport),
+                );
+                std::fs::write(output.join(format!("{name}.svg")), svg(&frame, viewport)).unwrap();
+            }
+        }
+    }
+    assert_eq!(control.water.stats().impact_transfers, 0);
+    assert_eq!(response.water.stats().impact_transfers, 1);
+    assert!(
+        max_difference >= 40,
+        "response must survive actual rasterization: {max_difference}"
+    );
 }
 
 /// Scan world y=-40..-60, below the junction but above the receiving pool.
@@ -287,7 +419,7 @@ fn live_clock_rain_captures_wet_digits_and_a_time_correction_on_both_layouts() {
         );
         let viewport = Viewport::new(w as f32, h as f32);
         let mut dry = ClockScenario::init(config, 7);
-        for tick in 1..=1600 {
+        for tick in 1..=2520 {
             let reading = ClockReading::new(
                 if tick < 600 { 8 } else { 11 },
                 if tick < 600 { 8 } else { 11 },
@@ -299,14 +431,31 @@ fn live_clock_rain_captures_wet_digits_and_a_time_correction_on_both_layouts() {
                 &[ClockAction::set_reading(reading)],
                 Duration::from_nanos(16_666_667),
             );
-            if ![300, 599, 601, 660, 1200, 1600].contains(&tick) {
+            if tick == 2520 {
+                assert!(state.rain_state().is_none());
+                assert_eq!(state.floor_mode(), engine_common::ClockFloorMode::Closed);
+                assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+                assert_eq!(
+                    ClockScenario::render_frame(&state),
+                    ClockScenario::render_frame(&dry)
+                );
+                continue;
+            }
+            if ![300, 599, 601, 660, 1200, 1600, 2399, 2519].contains(&tick) {
                 continue;
             }
             let rain = state.rain_state().unwrap();
+            assert_eq!(
+                state.floor_mode(),
+                engine_common::ClockFloorMode::EventOwned
+            );
+            assert!(rain.floor_open_milli <= 1000);
+            assert_eq!(rain.floor_motion_deferrals, 0);
             assert_eq!(rain.surface_digits, state.display().digits);
             assert!(!rain.surface_change_pending);
             if tick < 600 {
                 assert!(rain.surface_water_microunits > 0);
+                assert!(rain.surface_impacts > 0);
             }
             let frame = ClockScenario::render_frame(&state);
             let pixels = raster(&frame, viewport);
@@ -332,10 +481,12 @@ fn live_clock_rain_captures_wet_digits_and_a_time_correction_on_both_layouts() {
                 .zip(dry_pixels.as_slice())
                 .filter(|(p, dry)| is_water(**p) && !is_water(**dry))
                 .count();
-            assert!(
-                wet > 20,
-                "missing live water: {w}x{h} tick={tick} wet={wet}"
-            );
+            if tick <= 1600 {
+                assert!(
+                    wet > 20,
+                    "missing live water: {w}x{h} tick={tick} wet={wet}"
+                );
+            }
             if let Some(output) = &output {
                 let name = format!("clock-digit-rain-{w}x{h}-tick-{tick}");
                 write_png(&output.join(format!("{name}.png")), &pixels);
@@ -352,7 +503,7 @@ fn water_edge_lab_captures_production_renderers() {
         std::fs::create_dir_all(output).unwrap();
     }
     let mut html = String::from(
-        "<!doctype html><meta charset=utf-8><title>Water edge lab</title><style>body{background:#151926;color:#eee;font:16px system-ui}img{max-width:100%}a{color:#8de}</style><h1>Water edge lab</h1><p>Production raster PNGs and vector SVGs. The steps/ramp fixtures expose the current stepped-bed approximation; this pass fixes the free outfall.</p>",
+        "<!doctype html><meta charset=utf-8><title>Water edge lab</title><style>body{background:#151926;color:#eee;font:16px system-ui}img{max-width:100%}a{color:#8de}</style><h1>Water edge lab</h1><p>Production raster PNGs and vector SVGs. Steps retain their cliffs; ramps use continuous beds and tangent outfalls.</p>",
     );
     for profile in [Profile::Ledge, Profile::Steps, Profile::Ramp] {
         for mirrored in [false, true] {

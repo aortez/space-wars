@@ -33,7 +33,7 @@ fn every_event_acquires_its_floor_before_stepping_and_releases_it_after_cleanup(
         (ClockEventKind::Duck, ClockFloorMode::EventOwned),
         (ClockEventKind::Marquee, ClockFloorMode::Closed),
         (ClockEventKind::DigitSlide, ClockFloorMode::Closed),
-        (ClockEventKind::Rain, ClockFloorMode::DrainOpen),
+        (ClockEventKind::Rain, ClockFloorMode::EventOwned),
     ] {
         let mut state = ready(ClockConfig {
             event_profile: ClockEventProfile::Off,
@@ -67,6 +67,11 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
         ClockEventKind::Meltdown,
         ClockEventKind::Rain,
     ] {
+        let expected = if source == ClockEventKind::Rain {
+            ClockFloorMode::EventOwned
+        } else {
+            ClockFloorMode::DrainOpen
+        };
         for elapsed in [0, 30, EVENT_CATALOG[source as usize].duration_ticks - 1] {
             let config = ClockConfig {
                 event_profile: ClockEventProfile::Off,
@@ -77,11 +82,11 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
             for _ in 0..elapsed {
                 tick(&mut state);
             }
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
             let phase_tick = state.phase_tick();
             ClockScenario::step(&mut state, &[], Duration::ZERO);
             assert_eq!(state.phase_tick(), phase_tick);
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
 
             // Disabling an active event changes future scheduling, not its lease.
             let mut settings = state.settings();
@@ -93,14 +98,14 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
                 &[ClockAction::configure(settings)],
                 Duration::ZERO,
             );
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
 
             preview(&mut state, ClockEventKind::ColorCycle);
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
             preview(&mut state, source);
             preview(&mut state, ClockEventKind::Rain);
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
             assert_eq!(state.event_kind(), Some(ClockEventKind::Rain));
             state.set_aspect_ratio(0.6);
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
@@ -138,7 +143,7 @@ fn custom_water_arenas_own_their_floors_without_opening_the_ordinary_drain() {
         assert!(geometry.drain().is_none());
         assert_eq!(geometry.slabs().count(), 0);
         preview(&mut state, ClockEventKind::Rain);
-        assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+        assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
         state.set_aspect_ratio(0.6);
         assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     }

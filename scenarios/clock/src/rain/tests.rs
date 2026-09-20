@@ -1,5 +1,4 @@
 use super::*;
-use crate::floor::test_drain;
 use crate::{
     ClockAction, ClockConfig, ClockReading, ClockScenario, SegmentRepresentation,
     events::ActiveEvent,
@@ -12,6 +11,67 @@ fn display() -> DisplaySnapshot {
         ClockReading::new(8, 8, 0).unwrap(),
         ClockTimeFormat::TwentyFourHour,
     )
+}
+
+#[test]
+fn responsive_floor_ignores_digit_weight_and_defers_atomically_when_full() {
+    let layout = Layout::new(4.0 / 3.0);
+    let mut event = RainEvent::new(layout, 0, ClockRainAmount::Heavy, display());
+    let c = event.water.pools()[2].columns().next().unwrap();
+    event
+        .water
+        .add_to_pool(2, c.left + c.width * 0.5, 100.0)
+        .unwrap();
+    event.floor.step(&mut event.water, DT, None);
+    assert_eq!(
+        event.floor.load, 0.0,
+        "water still on a digit is not floor weight"
+    );
+    assert_eq!(event.floor.opening, 0.0);
+    let shape = FloorShape::clock(layout);
+    let mut floor = ResponsiveFloor::new(shape, 0.0);
+    let mut water = WaterWorld::new(
+        engine_water::WaterConfig {
+            max_parcels: 2,
+            exit_y: f64::from(layout.bounds_min.y),
+            ..engine_water::WaterConfig::default()
+        },
+        shape.pools().into(),
+    )
+    .unwrap();
+    shape.configure(&mut water);
+    for side in 0..2 {
+        let cells: Vec<_> = water.pools()[side].columns().collect();
+        for c in cells {
+            water
+                .add_to_pool(side, c.left + c.width * 0.5, c.width * 20.0)
+                .unwrap();
+        }
+    }
+    // A deliberately tiny standalone budget forces this path without changing
+    // Rain's protected digit-release slots or normal capacity configuration.
+    for _ in 0..2 {
+        water
+            .add_falling(Parcel {
+                position: Vec2::new(0.0, 200.0),
+                velocity: Vec2::ZERO,
+                volume: 0.1,
+                duration: DT,
+                horizontal_bounds: None,
+            })
+            .unwrap();
+    }
+    let before = water.stats();
+    let pools = water.pools().to_vec();
+    let floor_points = shape.panel_points(0, floor.opening);
+    let mut floats = FloatWorld::responsive(layout, &floor);
+    floor.step(&mut water, DT, None);
+    floats.move_floor(&floor);
+    assert_eq!(floor.deferrals, 1);
+    assert_eq!(floor.opening, 0.0);
+    assert_eq!(water.stats(), before);
+    assert_eq!(water.pools(), pools);
+    assert_eq!(shape.panel_points(0, floor.opening), floor_points);
 }
 
 #[test]
@@ -28,7 +88,7 @@ fn assert_rain_lips(lit: bool) {
     for aspect in [1024.0 / 768.0, 800.0 / 480.0, 480.0 / 800.0] {
         for seed in [0, 7, 19] {
             let mut event = RainEvent::new(
-                test_drain(Layout::new(aspect)),
+                Layout::new(aspect),
                 seed,
                 ClockRainAmount::Heavy,
                 if lit {
@@ -77,11 +137,12 @@ fn assert_rain_lips(lit: bool) {
             }
             let stats = event.water.stats();
             assert!(checked > 100);
-            // Retain the original one-frame bound without digit supports.
-            // Batched digit runoff adds larger discrete impacts: allow at most
-            // two ticks (33 ms), never the persistent standing lip gaps.
+            // The moving, inclined lip and discrete impacts can briefly lack
+            // a positive convex ribbon reconstruction. Bound the conservative
+            // drop fallback to two ticks (33 ms), not persistent standing gaps.
+            // Fixed-lip continuity retains its separate engine/render coverage.
             assert!(
-                longest_gap <= if lit { 2 } else { 1 },
+                longest_gap <= 2,
                 "lit={lit} aspect={aspect} seed={seed} gap_run={longest_gap}"
             );
             eprintln!(
@@ -103,10 +164,12 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
         ] {
             for seed in 0..8 {
                 let layout = Layout::new(aspect);
-                let mut event = RainEvent::new(test_drain(layout), seed, amount, display());
+                let mut event = RainEvent::new(layout, seed, amount, display());
                 let mut spawn_tick = None;
                 let mut exit_tick = None;
                 let mut max_depth = 0.0_f32;
+                let mut max_open = 0.0_f64;
+                let mut drain_open = 0.0_f64;
                 for tick in 1..=RAIN_TICKS {
                     let done = event.step();
                     let s = event.water.stats();
@@ -127,6 +190,41 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                         );
                     }
                     assert!(event.spawns <= 1);
+                    max_open = max_open.max(event.floor.opening);
+                    if tick == RAINING_TICKS + DRAIN_TICKS - 1 {
+                        drain_open = event.floor.opening;
+                    }
+                    assert!(event.floor.load.is_finite());
+                    assert!((0.0..=1.0).contains(&event.floor.opening));
+                    if tick % 60 == 0 {
+                        for side in 0..2 {
+                            let (position, angle) =
+                                event.floor.shape.panel_pose(side, event.floor.opening);
+                            let half = event.floor.shape.panel_half_extents();
+                            if let Some(floats) = &event.floats {
+                                let m = floats
+                                    .world
+                                    .motion(engine_rapier::world::BodyId::new(
+                                        engine_rapier::world::PhysicsId::new(1001 + side as u64),
+                                        engine_rapier::world::BodyRole::PRIMARY,
+                                    ))
+                                    .unwrap();
+                                assert!((m.position - position).length() < 1e-3);
+                                assert!((m.angle - angle).abs() < 1e-5);
+                                assert_eq!(
+                                    (floats.world.body_count(), floats.world.collider_count()),
+                                    (4, 5)
+                                );
+                            }
+                            for c in event.water.pools()[side].columns() {
+                                let x = (c.left + c.width * 0.5) as f32;
+                                let y = position.y
+                                    + (x - position.x) * angle.tan()
+                                    + half.y / angle.cos();
+                                assert!((y as f64 - c.bed_at(x as f64)).abs() < 1e-4);
+                            }
+                        }
+                    }
                     max_depth = max_depth.max(event.entry_depth());
                     if event.phase == ClockRainDuckPhase::Floating && spawn_tick.is_none() {
                         assert!(event.entry_depth() >= event.required_depth());
@@ -138,8 +236,8 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     assert_eq!(done, tick == RAIN_TICKS);
                 }
                 eprintln!(
-                    "{aspect:.3} {amount:?} seed={seed}: spawn={spawn_tick:?} exit={exit_tick:?} max_depth={max_depth:.1} pitch={:.1} outcome={:?}",
-                    layout.pitch, event.phase
+                    "{aspect:.3} {amount:?} seed={seed}: spawn={spawn_tick:?} exit={exit_tick:?} max_depth={max_depth:.1} max_open={max_open:.3} drain_open={drain_open:.3} final_open={:.3} deferrals={} pitch={:.1} outcome={:?}",
+                    event.floor.opening, event.floor.deferrals, layout.pitch, event.phase
                 );
                 if amount == ClockRainAmount::Light {
                     assert_eq!(event.phase, ClockRainDuckPhase::NotSpawned);
@@ -149,6 +247,20 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     assert_eq!(event.spawns, 1);
                 }
                 assert_eq!(event.physics_counts(), (0, 0));
+                assert_eq!(event.floor.deferrals, 0);
+                assert!(max_open > 0.0);
+                assert!(
+                    event.floor.opening < max_open * 0.6,
+                    "late residual drips must not latch the floor at its peak opening"
+                );
+                if amount == ClockRainAmount::Light {
+                    assert!(
+                        max_open < 0.6,
+                        "light rain should only crack the floor open"
+                    );
+                } else {
+                    assert!(max_open > 0.8);
+                }
                 assert_eq!(event.water.stats().pooled, 0.0);
                 assert_eq!(event.water.stats().in_flight, 0.0);
                 assert_eq!(event.water.parcels().len(), 0);
@@ -171,12 +283,8 @@ fn wet_face_retirement_preserves_delivery_and_bounds_transient_backpressure() {
             );
             let mut visible = crate::digits::create_segments();
             crate::digits::apply_snapshot(&mut visible, initial);
-            let mut event = RainEvent::new(
-                test_drain(Layout::new(aspect)),
-                seed,
-                ClockRainAmount::Heavy,
-                initial,
-            );
+            let mut event =
+                RainEvent::new(Layout::new(aspect), seed, ClockRainAmount::Heavy, initial);
             let mut pending = 0.0_f64;
             for tick in 1..=RAINING_TICKS {
                 if tick == 600 {
@@ -213,8 +321,8 @@ fn seeded_variety_is_replayable_and_does_not_change_mid_event() {
     let mut seen = [false; 4];
     for seed in 0..12 {
         let layout = Layout::new(4.0 / 3.0);
-        let mut a = RainEvent::new(test_drain(layout), seed, ClockRainAmount::Varied, display());
-        let mut b = RainEvent::new(test_drain(layout), seed, ClockRainAmount::Varied, display());
+        let mut a = RainEvent::new(layout, seed, ClockRainAmount::Varied, display());
+        let mut b = RainEvent::new(layout, seed, ClockRainAmount::Varied, display());
         seen[a.amount as usize] = true;
         for _ in 0..900 {
             a.step();
@@ -298,12 +406,7 @@ fn paused_format_rollovers_and_colon_blinks_preserve_rain_rng_and_simulation() {
 
 #[test]
 fn duck_launch_depth_ignores_dry_digit_ledges_overhead() {
-    let mut event = RainEvent::new(
-        test_drain(Layout::new(4.0 / 3.0)),
-        0,
-        ClockRainAmount::Heavy,
-        display(),
-    );
+    let mut event = RainEvent::new(Layout::new(4.0 / 3.0), 0, ClockRainAmount::Heavy, display());
     // Put the probe directly under a lit digit column, with deep floor water
     // below it. Looking across *all* pools would incorrectly reduce it to zero.
     let column = event.water.pools()[2].columns().next().unwrap();
@@ -323,7 +426,7 @@ fn duck_launch_depth_ignores_dry_digit_ledges_overhead() {
 #[test]
 fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
     let layout = Layout::new(4.0 / 3.0);
-    let mut event = RainEvent::new(test_drain(layout), 0, ClockRainAmount::Heavy, display());
+    let mut event = RainEvent::new(layout, 0, ClockRainAmount::Heavy, display());
     for _ in 0..SOURCE_LIMIT {
         event
             .water
@@ -349,7 +452,7 @@ fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
     assert_eq!(event.source_limited, 1);
     assert!((event.water.stats().injected - event.scheduled).abs() < 1e-6);
 
-    let mut floats = FloatWorld::new(test_drain(layout));
+    let mut floats = FloatWorld::responsive(layout, &event.floor);
     floats.spawn(Vec2::new(event.entry_x, 0.0), 0.5);
     event.floats = Some(floats);
     event.phase = ClockRainDuckPhase::Floating;
@@ -371,12 +474,7 @@ fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
 
 #[test]
 fn a_delayed_shower_catches_up_without_emitting_a_giant_drop() {
-    let mut event = RainEvent::new(
-        test_drain(Layout::new(4.0 / 3.0)),
-        7,
-        ClockRainAmount::Heavy,
-        display(),
-    );
+    let mut event = RainEvent::new(Layout::new(4.0 / 3.0), 7, ClockRainAmount::Heavy, display());
     // Simulate a source that was blocked through the storm's first half.
     event.tick = 600;
     event.emit_rain();
@@ -394,12 +492,7 @@ fn a_delayed_shower_catches_up_without_emitting_a_giant_drop() {
 #[test]
 fn extreme_aspects_keep_finite_bounded_physics_and_clean_up() {
     for aspect in [0.25, 4.0] {
-        let mut event = RainEvent::new(
-            test_drain(Layout::new(aspect)),
-            42,
-            ClockRainAmount::Heavy,
-            display(),
-        );
+        let mut event = RainEvent::new(Layout::new(aspect), 42, ClockRainAmount::Heavy, display());
         for _ in 0..RAIN_TICKS {
             event.step();
             if let Some((p, angle)) = event.duck_pose() {
@@ -467,6 +560,7 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
             assert_eq!(after.duck_position_milli, before.duck_position_milli);
             assert_eq!(after.duck_velocity_milli, before.duck_velocity_milli);
             assert_eq!(after.drip_parcels_emitted, before.drip_parcels_emitted);
+            assert_eq!(after.surface_impacts, before.surface_impacts);
             if let Some(previous) = synchronized {
                 assert_eq!(after, previous, "identical control updates are no-ops");
             }

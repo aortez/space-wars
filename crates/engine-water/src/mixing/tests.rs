@@ -17,6 +17,7 @@ fn metadata(p: Parcel, pool: usize) -> Option<Spill> {
         flow: p.volume / p.duration,
     };
     Some(Spill {
+        upstream_end: None,
         source: SpillSource::Outlet {
             pool,
             edge: usize::from(p.velocity.x > 0.0),
@@ -104,6 +105,60 @@ fn swept_contacts_catch_fast_streams_before_they_pass_through() {
     let (output, _, stats) = mix(&input, &[metadata(input[0], 0), metadata(input[1], 1)]);
     assert_eq!(output.len(), 1);
     assert_eq!(stats.pairs, 1);
+}
+
+#[test]
+fn junction_links_material_continuity_not_collision_frame_numbers() {
+    for emission_tick in [11, 12] {
+        let old = parcel(0.0, -0.5, 0.0, 2.0);
+        let previous = Spill {
+            source: SpillSource::Junction { outlets: [1, 2] },
+            tick: 10,
+            upstream_end: Some([10; 2]),
+            tail: Section {
+                position: Vec2::new(0.0, -0.4),
+                velocity: old.velocity,
+                flow: 120.0,
+            },
+            head: Section {
+                position: Vec2::new(0.0, -0.6),
+                velocity: old.velocity,
+                flow: 120.0,
+            },
+        };
+        let a = parcel(-0.5, 0.0, 60.0, 1.0);
+        let b = parcel(0.5, 0.0, -60.0, 1.0);
+        let mut parcels = vec![old, a, b];
+        let mut spills = vec![
+            Some(previous),
+            Some(Spill {
+                tick: emission_tick,
+                ..metadata(a, 0).unwrap()
+            }),
+            Some(Spill {
+                tick: emission_tick,
+                ..metadata(b, 1).unwrap()
+            }),
+        ];
+        step(
+            &mut parcels,
+            &mut spills,
+            &mut Scratch::new(3),
+            &mut Stats::default(),
+            WaterConfig::default(),
+            1.0 / 60.0,
+            12,
+        );
+        assert_eq!(parcels.len(), 2);
+        assert_eq!(parcels.iter().map(|p| p.volume).sum::<f64>(), 4.0);
+        let next = spills[1].unwrap();
+        assert_eq!(next.upstream_end, Some([emission_tick; 2]));
+        assert_eq!(
+            next.head.position == previous.tail.position,
+            emission_tick == 11,
+            "delayed collision of adjacent source slices connects; a real source pause stays separate"
+        );
+    }
 }
 
 #[test]

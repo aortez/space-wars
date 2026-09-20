@@ -61,6 +61,14 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             layout.pitch,
             1.0 - event.course_opacity(),
         );
+    } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
+        rain::floor(&mut frame, event);
+        render_floor(
+            &mut frame,
+            crate::floor::FloorGeometry::closed(layout),
+            layout.pitch,
+            1.0 - event.opacity(),
+        );
     } else {
         render_floor(&mut frame, state.floor.geometry(layout), layout.pitch, 1.0);
     }

@@ -385,7 +385,7 @@ mod tests {
         use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
         let mut state = clock_state();
         state.event_kind = Some(ClockEventKind::Rain);
-        state.floor = engine_common::ClockFloorMode::DrainOpen;
+        state.floor = engine_common::ClockFloorMode::EventOwned;
         state.phase = Some("raining".into());
         state.settings.rain_amount = ClockRainAmount::Varied;
         state.rain = Some(ClockRainState {
@@ -404,8 +404,13 @@ mod tests {
             surface_digits: [Some(1), Some(2), Some(3), Some(4)],
             surface_water_microunits: 100_000,
             drip_parcels_emitted: 123,
+            surface_impacts: 45,
             surface_change_pending: false,
             surface_change_deferrals: 0,
+            floor_open_milli: 650,
+            floor_load_milli: 13_000,
+            floor_motion_deferrals: 0,
+            floor_clearance_holds: 30,
             entry_depth_milli: 21_000,
             required_depth_milli: 12_000,
             duck_phase: ClockRainDuckPhase::Floating,
@@ -432,8 +437,13 @@ mod tests {
             "surface_digits",
             "surface_water_microunits",
             "drip_parcels_emitted",
+            "surface_impacts",
             "surface_change_pending",
             "surface_change_deferrals",
+            "floor_open_milli",
+            "floor_load_milli",
+            "floor_motion_deferrals",
+            "floor_clearance_holds",
         ] {
             value["rain"].as_object_mut().unwrap().remove(field);
         }
@@ -444,8 +454,13 @@ mod tests {
         assert_eq!(older.surface_digits, [None; 4]);
         assert_eq!(older.surface_water_microunits, 0);
         assert_eq!(older.drip_parcels_emitted, 0);
+        assert_eq!(older.surface_impacts, 0);
         assert!(!older.surface_change_pending);
         assert_eq!(older.surface_change_deferrals, 0);
+        assert_eq!(older.floor_open_milli, 0);
+        assert_eq!(older.floor_load_milli, 0);
+        assert_eq!(older.floor_motion_deferrals, 0);
+        assert_eq!(older.floor_clearance_holds, 0);
         assert_eq!(older.injected_microunits, 5_000_000);
         value.as_object_mut().unwrap().remove("rain");
         assert!(

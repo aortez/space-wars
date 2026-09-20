@@ -9,6 +9,7 @@ fn compressed_junction_does_not_turn_into_a_wide_spike() {
         flow: 120.0,
     };
     let spill = Spill {
+        upstream_end: None,
         source: SpillSource::Junction { outlets: [1, 2] },
         tick: 0,
         tail,

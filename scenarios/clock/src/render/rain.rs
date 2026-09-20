@@ -2,6 +2,40 @@
 use super::*;
 use crate::rain::RainEvent;
 
+pub(super) fn floor(frame: &mut RenderFrame, event: &RainEvent) {
+    for side in 0..2 {
+        let points = event.floor.shape.panel_points(side, event.floor.opening);
+        let points = points.map(|p| RenderPoint::new(p.x, p.y));
+        frame.push_primitive(
+            ARENA_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon::filled(
+                points.into(),
+                RenderColor {
+                    a: event.opacity(),
+                    ..FLOOR_COLOR
+                },
+            )),
+        );
+        let mut edge = points;
+        // A thin band along the actual panel top, matching the closed floor.
+        let (_, angle) = event.floor.shape.panel_pose(side, event.floor.opening);
+        let down =
+            Vec2::new(0.0, -(event.layout.pitch * 0.10).clamp(1.5, 3.0)).rotate_radians(angle);
+        edge[0] = RenderPoint::new(edge[3].x + down.x, edge[3].y + down.y);
+        edge[1] = RenderPoint::new(edge[2].x + down.x, edge[2].y + down.y);
+        frame.push_primitive(
+            ARENA_LAYER,
+            RenderPrimitive::Polygon(RenderPolygon::filled(
+                edge.into(),
+                RenderColor {
+                    a: event.opacity(),
+                    ..FLOOR_EDGE_COLOR
+                },
+            )),
+        );
+    }
+}
+
 pub(super) fn render(frame: &mut RenderFrame, event: &RainEvent) {
     let opacity = event.opacity();
     // Digit ledges and released water share the face's layer, above dim anchors.
