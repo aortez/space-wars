@@ -154,9 +154,11 @@ dependency with the two temporary switches. It must not be deployed or used as
 a normal match runtime. Its old-history completion must not be reported as an
 unchanged production replay from startup.
 
-The next planning step is to calibrate complete-trip time and exposure against
-actual approach, claim, return, boarding and departure milestones. Preserve the
-changed quiet seed as a risk/recovery investigation, and seek more naturally
+The first [complete-trip timing and exposure analysis](bot-trip-calibration.md)
+now separates actual approach, claim, return, boarding and departure milestones.
+It finds a remaining outbound slowdown and substantial costs omitted by the
+ground score. Preserve the changed quiet seed as a risk/recovery investigation,
+and seek more naturally
 activated long returns before making strategic or win-rate claims. Keep these
 known inputs and the previous controller as comparators instead of extending
 clocks or selecting a successful future trajectory by hindsight.

@@ -79,8 +79,12 @@ expires before boarding. The [guarded walking retry](../bot-return-completion.md
 now completes that controlled return through boarding and departure with 17.55
 seconds left on the unchanged clock. Fresh production comparisons retain a
 win-to-loss regression despite faster boarding in the changed match; the extra
-held-out cases do not activate the new input. Complete-trip time and exposure
-calibration remain the next step, with strategic strength still unproven.
+held-out cases do not activate the new input. The first
+[complete-trip timing and exposure analysis](../bot-trip-calibration.md) now
+separates phase costs in dense recordings. It finds a remaining outbound
+waypoint slowdown, omitted landing/claim/departure costs and an exposure counter
+that stops on foot. A guarded outbound walking trial is the next bounded step;
+whole-trip estimates and strategic strength remain unproven.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

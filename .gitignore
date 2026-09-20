@@ -3,6 +3,9 @@
 **/target/
 Cargo.lock.bak
 
+# Python analysis/test caches.
+__pycache__/
+
 # Editor / IDE.
 .vscode/
 .idea/

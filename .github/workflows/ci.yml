@@ -104,6 +104,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libdrm-dev libinput-dev libudev-dev libxkbcommon-dev libxkbcommon-x11-0 xauth xvfb
       - name: Test CI reports and build-identity regression fixtures
         run: python3 -m unittest discover -s .github/ci -p 'test_*.py'
+      - name: Test recorded bot-trip analysis
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
       - name: Build optimized Linux test executables
         id: build
         run: |
