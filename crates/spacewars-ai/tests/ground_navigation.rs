@@ -188,6 +188,150 @@ fn joint_flag_approach_executes_the_selected_footing_before_claiming() {
     assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
 }
 
+fn raising_flag_fixture(powered: bool) -> (GroundNavigationTask, RecoveryTaskObservationV1) {
+    use scenario_spacewars::surface_sortie::{
+        PlanetClaimPhase, PlanetClaimStatus, landing_objective::LandingObjective,
+    };
+    use spacewars_ai::ground_task::FlagApproach;
+    let (context, mut o) = fixture();
+    o.jetpack = None;
+    let map = o.ground.as_mut().unwrap();
+    map.edges
+        .extend(map.edges.clone().into_iter().map(|e| GroundEdge {
+            from: e.to,
+            to: e.from,
+            ..e
+        }));
+    let p = &mut o.flight.pilot;
+    p.boarding_hatches = [Some(Vec2::new(0.0, 60.0)), None];
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(PlayerId::PLAYER_2);
+    claim.flag = Some(PlanetFlagObservation {
+        player: PlayerId::PLAYER_2,
+        position: Vec2::new(6.0, 60.0),
+        normal: Vec2::Y,
+        raised_fraction: 0.1,
+    });
+    let plan = FlagApproach {
+        crossing: None,
+        objective: LandingObjective::read(p).unwrap(),
+        endpoint: map.nodes[3],
+        boarding_hatches: p.boarding_hatches,
+        tick: p.tick,
+        reached: true,
+    };
+    p.actor.as_mut().unwrap().position = plan.actor_position();
+    let mut task = GroundNavigationTask::with_flag_planning(context, Some(plan), powered);
+    task.step(&o);
+    assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+    let p = &mut o.flight.pilot;
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = None;
+    claim.claimant = Some(p.owner);
+    claim.phase = PlanetClaimPhase::Raising;
+    claim.status = PlanetClaimStatus::Raising;
+    claim.progress = 0.1;
+    let flag = claim.flag.as_mut().unwrap();
+    flag.player = p.owner;
+    flag.position = p.actor.unwrap().position - p.actor_up * HALF_HEIGHT;
+    advance(&mut o, 1);
+    (task, o)
+}
+
+#[test]
+fn powered_planner_finishes_its_own_raise_without_walking_to_a_new_endpoint() {
+    let (mut task, mut o) = raising_flag_fixture(true);
+    for tick in 1..=180 {
+        advance(&mut o, tick);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry().goal, GroundGoal::Arrived);
+        let before = task.telemetry().clone();
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        assert_eq!(task.telemetry(), &before);
+    }
+    // Preserve the historical joint planner as the comparison policy. In this
+    // graph its new own-flag endpoint is reachable but interrupts a live raise.
+    let (mut historical, mut old) = raising_flag_fixture(false);
+    historical.step(&old);
+    advance(&mut old, 2);
+    assert!(historical.step(&old).horizontal < 0.0);
+}
+
+#[test]
+fn own_raise_does_not_override_support_flag_hatch_or_task_deadline_checks() {
+    use scenario_spacewars::surface_sortie::{PlanetClaimPhase, PlanetClaimStatus};
+    for fault in 0..5 {
+        let (mut task, mut o) = raising_flag_fixture(true);
+        assert_eq!(task.step(&o), SurfaceSortieAction::default());
+        advance(&mut o, if fault == 4 { 5401 } else { 2 });
+        let p = &mut o.flight.pilot;
+        let claim = p.planet.claim.as_mut().unwrap();
+        match fault {
+            0 => {
+                p.supported_planet = None;
+                claim.flag = None;
+                claim.phase = PlanetClaimPhase::Idle;
+                claim.claimant = None;
+                claim.status = PlanetClaimStatus::NeedSupport;
+            }
+            1 => {
+                p.planet.revision += 1;
+                o.ground.as_mut().unwrap().revision = p.planet.revision;
+                claim.flag = None;
+                claim.phase = PlanetClaimPhase::Idle;
+                claim.claimant = None;
+                claim.status = PlanetClaimStatus::NeedSupport;
+            }
+            2 => {
+                claim.owner = Some(PlayerId::PLAYER_2);
+                claim.flag.as_mut().unwrap().player = PlayerId::PLAYER_2;
+                claim.phase = PlanetClaimPhase::Lowering;
+                claim.status = PlanetClaimStatus::Lowering;
+            }
+            3 => p.boarding_hatches = [None; 2],
+            _ => {}
+        }
+        task.step(&o);
+        assert_ne!(task.telemetry().goal, GroundGoal::Arrived, "fault {fault}");
+        if fault < 2 {
+            assert_eq!(task.telemetry().goal, GroundGoal::Settle);
+        } else if fault == 2 {
+            advance(&mut o, 3);
+            assert!(task.step(&o).horizontal < 0.0);
+        } else {
+            assert_eq!(task.telemetry().goal, GroundGoal::Blocked);
+        }
+    }
+}
+
+#[test]
+fn return_after_own_raise_uses_current_hatches_and_routes() {
+    use scenario_spacewars::surface_sortie::{PlanetClaimPhase, PlanetClaimStatus};
+    let (mut task, mut o) = raising_flag_fixture(true);
+    task.step(&o);
+    advance(&mut o, 2);
+    let p = &mut o.flight.pilot;
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(p.owner);
+    claim.claimant = None;
+    claim.phase = PlanetClaimPhase::Idle;
+    claim.status = PlanetClaimStatus::Secured;
+    claim.progress = 0.0;
+    claim.flag.as_mut().unwrap().raised_fraction = 1.0;
+    // Ownership does not turn the old outbound plan into a return permission.
+    o.ground.as_mut().unwrap().edges.retain(|e| e.from != 3);
+    let mut returning = GroundNavigationTask::new(
+        BrainReset {
+            actor: p.owner,
+            episode_seed: 42,
+        },
+        GroundDestination::Hatch,
+    );
+    assert_eq!(returning.step(&o), SurfaceSortieAction::default());
+    assert_ne!(returning.telemetry().goal, GroundGoal::Arrived);
+    assert!(returning.telemetry().path.is_empty());
+}
+
 fn blocked_posture(o: &mut RecoveryTaskObservationV1) {
     use scenario_spacewars::surface_sortie::ground_posture::{
         CrawlStep, GroundPostureObservation, SpacelingBalance, SpacelingGetUpResult,

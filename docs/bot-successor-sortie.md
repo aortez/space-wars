@@ -15,6 +15,12 @@ start raising its own before the existing ground task times out. This is useful
 partial progress, but it must not be scored as a captured planet or completed
 round trip.
 
+The follow-up [own-flag handoff fix](bot-claim-handoff.md) now completes the raise
+in this recorded case and starts a real return task. That return still exceeds
+the existing capture-task clock; the follow-up records the remaining traversal
+problem and fresh paired comparisons. The measurements below retain the original
+pre-fix experiment.
+
 A separate isolated physics test completes every stage, including return to the
 ship and departure with ownership retained. Thus the experimental handoff can
 execute and recognize a complete trip. That fixture supplies the prior successful

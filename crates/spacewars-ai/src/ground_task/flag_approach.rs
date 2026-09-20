@@ -1,7 +1,8 @@
 //! Bind a joint landing forecast to live on-foot execution.
 use super::*;
 use scenario_spacewars::surface_sortie::{
-    ground_navigation::GroundNode, landing_objective::LandingObjective,
+    PlanetClaimPhase, PlanetClaimStatus, ground_navigation::GroundNode,
+    landing_objective::LandingObjective,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -63,6 +64,26 @@ impl GroundNavigationTask {
         if hatches.iter().all(Option::is_none) {
             self.block("joint flag trip has no grounded hatch");
             return None;
+        }
+        if self.powered_flag
+            && p.balanced
+            && p.supported_planet == Some(p.planet.index)
+            && p.planet.claim.as_ref().is_some_and(|claim| {
+                claim.owner.is_none()
+                    && claim.claimant == Some(p.owner)
+                    && claim.phase == PlanetClaimPhase::Raising
+                    && claim.status == PlanetClaimStatus::Raising
+                    && claim.flag.is_some_and(|flag| flag.player == p.owner)
+            })
+        {
+            // The live claim has valid footing already. Choosing a new graph
+            // endpoint around our emerging flag would interrupt the raise.
+            // Completion still needs real ownership, then a fresh hatch task.
+            self.telemetry.flag_approach = None;
+            self.clear_route();
+            self.missing_since = None;
+            self.flag_survey_tick = None;
+            return Some(None);
         }
         let Some(map) = &self.map else {
             self.telemetry.goal = GroundGoal::Survey;
