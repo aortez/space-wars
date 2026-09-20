@@ -1,8 +1,10 @@
-//! Event-owned access to the ordinary floor. No per-tick work or extra bodies.
+//! Event-owned access to the ordinary floor.
 //!
 //! Clock serializes events, so one explicit owner is sufficient. Acquire before
-//! constructing event resources; release only after dropping them. A future
-//! moving hatch must also move its physical/water boundaries, not just its art.
+//! constructing event resources; release only after dropping them. Rain's
+//! responsive hatch owns its physical/water boundaries as well as its art.
+
+pub(crate) mod responsive;
 
 use engine_common::{ClockEventKind, ClockFloorMode};
 use engine_core::Vec2;
@@ -24,11 +26,13 @@ impl FloorManager {
         );
         self.owner = Some(kind);
         self.mode = match kind {
-            ClockEventKind::Falling | ClockEventKind::Rain => ClockFloorMode::DrainOpen,
+            ClockEventKind::Falling => ClockFloorMode::DrainOpen,
             ClockEventKind::Meltdown if water_lab == ClockWaterLab::Off => {
                 ClockFloorMode::DrainOpen
             }
-            ClockEventKind::Meltdown | ClockEventKind::Duck => ClockFloorMode::EventOwned,
+            ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
+                ClockFloorMode::EventOwned
+            }
             ClockEventKind::ColorCycle | ClockEventKind::Marquee | ClockEventKind::DigitSlide => {
                 ClockFloorMode::Closed
             }
@@ -162,6 +166,6 @@ impl DrainGeometry {
 #[cfg(test)]
 pub(crate) fn test_drain(layout: Layout) -> DrainGeometry {
     let mut manager = FloorManager::default();
-    manager.acquire(ClockEventKind::Rain, ClockWaterLab::Off);
+    manager.acquire(ClockEventKind::Falling, ClockWaterLab::Off);
     manager.geometry(layout).drain().unwrap()
 }

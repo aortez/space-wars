@@ -394,11 +394,25 @@ pub struct ClockRainState {
     pub surface_water_microunits: u64,
     #[serde(default)]
     pub drip_parcels_emitted: u64,
+    /// Collected parcels that imparted a local wet-surface impulse.
+    #[serde(default)]
+    pub surface_impacts: u64,
     #[serde(default)]
     pub surface_change_pending: bool,
     /// Deferred update attempts, including control-only time corrections.
     #[serde(default)]
     pub surface_change_deferrals: u64,
+    /// Event-owned floor opening, 0 (flat/closed) to 1000 (fully open).
+    #[serde(default)]
+    pub floor_open_milli: u32,
+    /// Floor volume / original floor width, in world units × 1000.
+    /// Excludes airborne water and water still held on digit ledges.
+    #[serde(default)]
+    pub floor_load_milli: u32,
+    #[serde(default)]
+    pub floor_motion_deferrals: u64,
+    #[serde(default)]
+    pub floor_clearance_holds: u64,
     pub entry_depth_milli: u32,
     pub required_depth_milli: u32,
     pub duck_phase: ClockRainDuckPhase,

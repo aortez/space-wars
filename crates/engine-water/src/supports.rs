@@ -1,7 +1,6 @@
 //! Fixed geometry with switchable supports (e.g. disappearing platforms).
 //! No moving-solid collision or dynamic grid remeshing.
 use crate::{Parcel, SpillSource, WaterError, WaterWorld};
-use engine_core::Vec2;
 
 impl WaterWorld {
     /// Atomically enable/disable the preallocated pools. Indices and geometry
@@ -45,11 +44,8 @@ impl WaterWorld {
             for c in pool.columns() {
                 if c.volume > 0.0 {
                     self.parcels.push(Parcel {
-                        position: Vec2::new(
-                            (c.left + c.width * 0.5) as f32,
-                            ((c.bed + c.surface) * 0.5) as f32,
-                        ),
-                        velocity: Vec2::new(c.velocity as f32, 0.0),
+                        position: c.water_centroid(),
+                        velocity: c.flow_velocity(),
                         volume: c.volume,
                         duration: 1.0 / 60.0,
                         horizontal_bounds: None,

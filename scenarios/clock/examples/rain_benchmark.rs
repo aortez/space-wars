@@ -79,11 +79,14 @@ fn live(seed: u64, aspect_ratio: f32, change: bool) {
     let rain = state.rain_state().unwrap();
     report(
         &format!(
-            "clock-heavy aspect={aspect_ratio:.3} change={change} seed={seed} peak={peak} source_limited={} outlet_limited={} prechange={prechange:?} deferrals={} drips={} peak_surface={:.2} cells max_pending={:.2} cells delivered={:.1}%",
+            "clock-heavy aspect={aspect_ratio:.3} change={change} seed={seed} peak={peak} source_limited={} outlet_limited={} prechange={prechange:?} deferrals={} floor_deferrals={} floor_open={} drips={} impacts={} peak_surface={:.2} cells max_pending={:.2} cells delivered={:.1}%",
             rain.source_limited_ticks,
             rain.water_limited_ticks,
             rain.surface_change_deferrals,
+            rain.floor_motion_deferrals,
+            rain.floor_open_milli,
             rain.drip_parcels_emitted,
+            rain.surface_impacts,
             surface as f64 / 1e6,
             pending as f64 / 1e6,
             100.0 * rain.injected_microunits as f64 / rain.requested_microunits as f64,

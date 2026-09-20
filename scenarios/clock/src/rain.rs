@@ -9,7 +9,10 @@ use engine_water::{Parcel, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use crate::{
-    DisplaySnapshot, SegmentState, events::EventPhase, floor::DrainGeometry, layout::Layout,
+    DisplaySnapshot, SegmentState,
+    events::EventPhase,
+    floor::responsive::{FloorShape, ResponsiveFloor},
+    layout::Layout,
 };
 use physics::{DT, FloatWorld};
 use surfaces::{DigitSurfaces, FLOOR_POOLS, PARCELS, RELEASE_SLOTS};
@@ -31,7 +34,7 @@ pub(crate) struct RainEvent {
     pub tick: u64,
     pub entry_x: f32,
     pub facing: f32,
-    drain: DrainGeometry,
+    pub floor: ResponsiveFloor,
     seed: u64,
     source: source::RainSource,
     amount: ClockRainAmount,
@@ -50,12 +53,11 @@ pub(crate) struct RainEvent {
 
 impl RainEvent {
     pub fn new(
-        drain: DrainGeometry,
+        layout: Layout,
         seed: u64,
         amount: ClockRainAmount,
         display: DisplaySnapshot,
     ) -> Self {
-        let layout = drain.layout();
         let mut rng = StdRng::seed_from_u64(seed);
         let amount = if amount == ClockRainAmount::Varied {
             ClockRainAmount::ALL[rng.random_range(1..4)]
@@ -69,14 +71,14 @@ impl RainEvent {
             ClockRainAmount::Varied => unreachable!(),
         };
         let facing = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
-        let (surfaces, water) = DigitSurfaces::new(drain, display);
+        let (surfaces, water) = DigitSurfaces::new(layout, display);
         Self {
             layout,
             water,
             tick: 0,
             entry_x: -facing * layout.bounds_max.x * 0.8,
             facing,
-            drain,
+            floor: ResponsiveFloor::new(FloorShape::clock(layout), 0.0),
             seed,
             source: source::RainSource::new(rng),
             amount,
@@ -118,9 +120,29 @@ impl RainEvent {
                     f64::from(self.entry_x + half),
                 )
             })
-            .map(|c| (c.surface - c.bed) as f32)
+            .map(|c| {
+                // Use the shallowest point actually under the hull, not the
+                // minimum bed height of an inclined column.
+                let left = c.left.max(f64::from(self.entry_x - half));
+                let right = (c.left + c.width).min(f64::from(self.entry_x + half));
+                (c.surface - c.bed_at(left).max(c.bed_at(right))).max(0.0) as f32
+            })
             .reduce(f32::min)
             .unwrap_or(0.0)
+    }
+
+    fn entry_surface(&self) -> f32 {
+        self.water.pools()[..FLOOR_POOLS]
+            .iter()
+            .flat_map(|p| {
+                p.columns_in_range(
+                    f64::from(self.entry_x) - 1e-4,
+                    f64::from(self.entry_x) + 1e-4,
+                )
+            })
+            .map(|c| c.surface as f32)
+            .next()
+            .unwrap_or(self.layout.floor_y)
     }
 
     pub fn phase(&self) -> EventPhase {
@@ -234,7 +256,7 @@ impl RainEvent {
             if self.depth_ticks >= DEPTH_TICKS && self.tick + OPEN_TICKS < RAINING_TICKS {
                 self.phase = ClockRainDuckPhase::Opening;
                 self.door_started = Some(self.tick);
-                self.door_floor = self.layout.floor_y + depth;
+                self.door_floor = self.entry_surface();
             } else if self.tick >= RAINING_TICKS {
                 self.phase = ClockRainDuckPhase::NotSpawned;
             }
@@ -247,13 +269,13 @@ impl RainEvent {
                 self.depth_ticks = 0;
                 self.door_started = None;
             } else {
-                let mut floats = FloatWorld::new(self.drain);
+                let mut floats = FloatWorld::responsive(self.layout, &self.floor);
                 // Start just above the water, not intersecting a floor or pinned
                 // to its moving surface. Buoyancy takes over during integration.
                 floats.spawn(
                     Vec2::new(
                         self.entry_x,
-                        self.layout.floor_y + depth + floats.half_extents.y * 1.4,
+                        self.entry_surface() + floats.half_extents.y * 1.4,
                     ),
                     0.0,
                 );
@@ -263,6 +285,7 @@ impl RainEvent {
             }
         }
         if let Some(floats) = &mut self.floats {
+            floats.move_floor(&self.floor);
             floats.step(&self.water, 5.0);
             if floats.position().unwrap().y + floats.half_extents.length()
                 < self.layout.bounds_min.y
@@ -280,6 +303,13 @@ impl RainEvent {
         }
         self.tick += 1;
         self.emit_rain();
+        let hull = if self.phase() == EventPhase::Clearing {
+            None
+        } else {
+            self.duck_pose()
+                .map(|(p, _)| (p, f64::from(physics::half_extents(self.layout).length())))
+        };
+        self.floor.step(&mut self.water, DT, hull);
         self.water.step(DT).expect("fixed rain water step");
         if self.phase() == EventPhase::Clearing {
             if self.floats.is_some() {
@@ -327,8 +357,13 @@ impl RainEvent {
                     .sum(),
             ),
             drip_parcels_emitted: s.drip_parcels_emitted,
+            surface_impacts: s.impact_transfers,
             surface_change_pending: self.surfaces.pending,
             surface_change_deferrals: self.surfaces.deferrals,
+            floor_open_milli: (self.floor.opening * 1000.0).round() as u32,
+            floor_load_milli: (self.floor.load * 1000.0).round() as u32,
+            floor_motion_deferrals: self.floor.deferrals,
+            floor_clearance_holds: self.floor.clearance_holds,
             entry_depth_milli: (self.entry_depth() * 1000.0).round() as u32,
             required_depth_milli: (self.required_depth() * 1000.0).round() as u32,
             duck_phase: self.phase,

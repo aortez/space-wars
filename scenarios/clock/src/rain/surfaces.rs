@@ -2,12 +2,11 @@
 //! Colon and AM/PM stay presentation-only; seconds must not churn supports.
 use crate::{
     DIGIT_SLOT_COUNT, DisplaySnapshot, SegmentId, SegmentKind, SegmentState, digits,
-    floor::DrainGeometry,
+    floor::responsive::FloorShape, layout::Layout,
 };
 use engine_water::{Boundary, DripConfig, PoolSpec, WaterConfig, WaterError, WaterWorld};
 
 pub(super) const FLOOR_POOLS: usize = 2;
-pub(super) const FLOOR_COLUMNS: usize = 128;
 const CELL_POOLS: usize = 24 * DIGIT_SLOT_COUNT;
 const POOLS: usize = FLOOR_POOLS + CELL_POOLS;
 pub(super) const RELEASE_SLOTS: usize = CELL_POOLS * 2;
@@ -24,10 +23,10 @@ pub(super) struct DigitSurfaces {
 mod tests;
 
 impl DigitSurfaces {
-    pub fn new(drain: DrainGeometry, display: DisplaySnapshot) -> (Self, WaterWorld) {
-        let layout = drain.layout();
+    pub fn new(layout: Layout, display: DisplaySnapshot) -> (Self, WaterWorld) {
+        let floor = FloorShape::clock(layout);
         let half = layout.pitch * 0.4;
-        let mut specs: Vec<_> = drain.water_pools(FLOOR_COLUMNS).into();
+        let mut specs: Vec<_> = floor.pools().into();
         for slot in 0..DIGIT_SLOT_COUNT {
             for kind in SegmentKind::ALL {
                 let id = SegmentId {
@@ -49,6 +48,9 @@ impl DigitSurfaces {
         assert_eq!(specs.len(), POOLS);
         let mut water = WaterWorld::new(
             WaterConfig {
+                // A gentle local response when a drop reaches an already-wet
+                // surface. Shared engine defaults and Meltdown stay unchanged.
+                impact_response: 0.12,
                 max_parcels: PARCELS,
                 reserved_release_parcels: RELEASE_SLOTS,
                 exit_y: f64::from(layout.bounds_min.y),
@@ -61,11 +63,7 @@ impl DigitSurfaces {
             specs,
         )
         .expect("bounded digit and floor geometry");
-        // Only the two floor outfalls enter the drain. Digit runoff stays at
-        // its own x position; the old world-wide channel would teleport it.
-        let lip = f64::from(drain.half_width());
-        water.set_outlet_channel(0, 1, Some([-lip, lip])).unwrap();
-        water.set_outlet_channel(1, 0, Some([-lip, lip])).unwrap();
+        floor.configure(&mut water);
         let unit = f64::from(layout.pitch * 0.8).powi(2);
         for pool in FLOOR_POOLS..POOLS {
             water

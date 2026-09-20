@@ -1,5 +1,5 @@
 use super::*;
-use crate::{ClockReading, floor::test_drain, layout::Layout};
+use crate::{ClockReading, layout::Layout};
 use engine_common::ClockTimeFormat;
 use engine_core::Vec2;
 use engine_water::{Parcel, SpillSource};
@@ -43,7 +43,7 @@ fn every_support_matches_a_lit_rendered_cell_and_preserves_real_gaps() {
     for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
         let layout = Layout::new(aspect);
         for display in [face(8, 8), face(11, 11), DisplaySnapshot::unsynchronized()] {
-            let (_, water) = DigitSurfaces::new(test_drain(layout), display);
+            let (_, water) = DigitSurfaces::new(layout, display);
             assert_eq!(water.pools().len(), 98);
             assert_eq!(
                 water
@@ -78,7 +78,7 @@ fn every_support_matches_a_lit_rendered_cell_and_preserves_real_gaps() {
 #[test]
 fn wet_reading_changes_transfer_water_once_without_advancing_time() {
     let initial = face(8, 8);
-    let (mut surfaces, mut water) = DigitSurfaces::new(test_drain(Layout::new(4.0 / 3.0)), initial);
+    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial);
     let mut visible = segments(initial);
     wet_supports(&mut water);
     let before = water.stats();
@@ -113,9 +113,9 @@ fn wet_reading_changes_transfer_water_once_without_advancing_time() {
 
 #[test]
 fn actual_rain_collection_keeps_the_gaps_between_clock_pixels_open() {
-    let drain = test_drain(Layout::new(4.0 / 3.0));
+    let layout = Layout::new(4.0 / 3.0);
     for on_cell in [false, true] {
-        let (_, mut water) = DigitSurfaces::new(drain, face(8, 8));
+        let (_, mut water) = DigitSurfaces::new(layout, face(8, 8));
         let spec = water.pools()[2].spec();
         let x = if on_cell {
             spec.left + spec.column_width
@@ -143,7 +143,7 @@ fn actual_rain_collection_keeps_the_gaps_between_clock_pixels_open() {
 #[test]
 fn exhausted_release_reserve_defers_visible_geometry_then_applies_only_latest_reading() {
     let initial = face(8, 8);
-    let (mut surfaces, mut water) = DigitSurfaces::new(test_drain(Layout::new(4.0 / 3.0)), initial);
+    let (mut surfaces, mut water) = DigitSurfaces::new(Layout::new(4.0 / 3.0), initial);
     let mut visible = segments(initial);
     // Simulate consecutive paused corrections before released parcels can fall.
     for _ in 0..PARCELS - RELEASE_SLOTS {
@@ -191,8 +191,7 @@ fn exhausted_release_reserve_defers_visible_geometry_then_applies_only_latest_re
 #[test]
 fn digit_runoff_stays_at_its_ledge_while_floor_outflow_uses_the_drain() {
     let layout = Layout::new(4.0 / 3.0);
-    let drain = test_drain(layout);
-    let (_, mut water) = DigitSurfaces::new(drain, face(8, 8));
+    let (_, mut water) = DigitSurfaces::new(layout, face(8, 8));
     let spec = water.pools()[2].spec();
     let x = spec.left + spec.column_width;
     water.add_to_pool(2, x, 40.0).unwrap();
@@ -213,7 +212,7 @@ fn digit_runoff_stays_at_its_ledge_while_floor_outflow_uses_the_drain() {
                     ])
                 );
                 assert!(
-                    parcel.position.x < -drain.half_width() * 2.0,
+                    parcel.position.x < -layout.drain_half_width() * 2.0,
                     "no teleport to central drain"
                 );
             }
@@ -223,6 +222,8 @@ fn digit_runoff_stays_at_its_ledge_while_floor_outflow_uses_the_drain() {
     assert_ledger(&water);
     let floor_x = water.pools()[0].spec().left + water.pools()[0].spec().column_width * 63.5;
     water.add_to_pool(0, floor_x, 100.0).unwrap();
+    let mut floor = crate::floor::responsive::ResponsiveFloor::new(FloorShape::clock(layout), 0.0);
+    floor.step(&mut water, 1.0 / 60.0, None);
     water.step(1.0 / 60.0).unwrap();
     let floor_parcels: Vec<_> = water
         .parcels()
@@ -237,12 +238,7 @@ fn digit_runoff_stays_at_its_ledge_while_floor_outflow_uses_the_drain() {
         .collect();
     assert!(!floor_parcels.is_empty());
     for (_, parcel) in floor_parcels {
-        assert_eq!(
-            parcel.horizontal_bounds,
-            Some([
-                -f64::from(drain.half_width()),
-                f64::from(drain.half_width())
-            ])
-        );
+        assert_eq!(parcel.horizontal_bounds, None);
+        assert!(parcel.position.x.abs() < layout.drain_half_width());
     }
 }

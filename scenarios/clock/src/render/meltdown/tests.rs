@@ -7,6 +7,7 @@ fn column(index: usize, bed: f64, height: f64) -> Column {
         left: index as f64 * 3.0,
         width: 3.0,
         bed,
+        bed_edges: [bed; 2],
         surface: bed + height,
         volume: height * 3.0,
         displaced: 0.0,
@@ -56,7 +57,7 @@ fn shared_surface_edges_preserve_area_and_do_not_bridge_dry_spots_or_steps() {
     }
 }
 
-fn area(points: &[Vec2]) -> f64 {
+pub(super) fn area(points: &[Vec2]) -> f64 {
     if points.len() < 3 {
         return 0.0;
     }

@@ -36,17 +36,33 @@ struct Group {
     position: [f64; 2],
     momentum: [f64; 2],
     durations: [f64; 2],
+    upstream_first: [u64; 2],
+    upstream_last: [u64; 2],
+    upstream_count: [u64; 2],
     bounds: Option<[f64; 2]>,
 }
 
 impl Group {
-    fn add(&mut self, parcel: Parcel, outlet: usize) {
+    fn add(&mut self, parcel: Parcel, outlet: usize, emission_tick: u64) {
         self.volume += parcel.volume;
         self.position[0] += parcel.position.x as f64 * parcel.volume;
         self.position[1] += parcel.position.y as f64 * parcel.volume;
         self.momentum[0] += parcel.velocity.x as f64 * parcel.volume;
         self.momentum[1] += parcel.velocity.y as f64 * parcel.volume;
-        self.durations[usize::from(outlet == self.outlets[1])] += parcel.duration;
+        let side = usize::from(outlet == self.outlets[1]);
+        self.durations[side] += parcel.duration;
+        self.upstream_first[side] = self.upstream_first[side].min(emission_tick);
+        self.upstream_last[side] = self.upstream_last[side].max(emission_tick);
+        self.upstream_count[side] += 1;
+    }
+
+    fn contiguous(&self) -> bool {
+        (0..2).all(|side| {
+            self.upstream_last[side]
+                .wrapping_sub(self.upstream_first[side])
+                .wrapping_add(1)
+                == self.upstream_count[side]
+        })
     }
 }
 
@@ -212,6 +228,9 @@ pub(crate) fn step(
                     position: [0.0; 2],
                     momentum: [0.0; 2],
                     durations: [0.0; 2],
+                    upstream_first: [u64::MAX; 2],
+                    upstream_last: [0; 2],
+                    upstream_count: [0; 2],
                     bounds: pa.horizontal_bounds,
                 });
                 scratch.groups.last_mut().unwrap()
@@ -226,8 +245,8 @@ pub(crate) fn step(
                 group.contact_max.x.min(contact_max.x),
                 group.contact_max.y.min(contact_max.y),
             );
-            group.add(pa, a.outlet);
-            group.add(pb, b.outlet);
+            group.add(pa, a.outlet, spills[a.index].unwrap().tick);
+            group.add(pb, b.outlet, spills[b.index].unwrap().tick);
             stats.pairs += 1;
             stats.volume += pa.volume + pb.volume;
             break;
@@ -274,8 +293,16 @@ pub(crate) fn step(
             .iter()
             .enumerate()
             .filter_map(|(i, s)| {
-                s.filter(|s| !linked[i] && s.source == source && s.tick.wrapping_add(1) == tick)
-                    .map(|s| (i, s))
+                s.filter(|s| {
+                    !linked[i]
+                        && s.source == source
+                        && group.contiguous()
+                        && s.upstream_end.is_some_and(|end| {
+                            (0..2)
+                                .all(|side| end[side].wrapping_add(1) == group.upstream_first[side])
+                        })
+                })
+                .map(|s| (i, s))
             })
             .filter(|(_, s)| {
                 (s.tail.position - tail.position).length()
@@ -318,6 +345,7 @@ pub(crate) fn step(
         spills.push(Some(Spill {
             source,
             tick,
+            upstream_end: group.contiguous().then_some(group.upstream_last),
             tail,
             head,
         }));

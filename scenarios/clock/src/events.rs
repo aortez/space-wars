@@ -207,7 +207,7 @@ impl ActiveEvent {
                 Self::DigitSlide(DigitSlideEvent::new(previous_display, context.display))
             }
             ClockEventKind::Rain => Self::Rain(Box::new(crate::rain::RainEvent::new(
-                context.floor.drain().expect("Rain owns the drain"),
+                context.layout,
                 seed,
                 config.rain_amount,
                 context.display,

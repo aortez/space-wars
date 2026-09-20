@@ -69,6 +69,9 @@ impl Section {
 pub(crate) struct Spill {
     pub source: SpillSource,
     pub tick: u64,
+    /// Last original emission from each parent of a contiguous merged slice.
+    /// Collision scheduling can skip a tick even for continuous incoming water.
+    pub upstream_end: Option<[u64; 2]>,
     pub tail: Section,
     pub head: Section,
 }

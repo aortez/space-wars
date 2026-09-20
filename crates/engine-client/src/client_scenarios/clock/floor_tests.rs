@@ -36,7 +36,7 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
         let mut renderer = crate::raster::RasterRenderer::new();
         for (event, mode) in [
             (None, ClockFloorMode::Closed),
-            (Some(ClockEventKind::Rain), ClockFloorMode::DrainOpen),
+            (Some(ClockEventKind::Rain), ClockFloorMode::EventOwned),
             (Some(ClockEventKind::ColorCycle), ClockFloorMode::Closed),
             (Some(ClockEventKind::Falling), ClockFloorMode::DrainOpen),
             (Some(ClockEventKind::Marquee), ClockFloorMode::Closed),
@@ -67,16 +67,27 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
                 .to_rgb8()
                 .unwrap();
             // At event tick zero there is no material in the lower floor strip.
-            // The center must match a solid bank only when the drain is closed.
+            // Rain owns its floor but starts flat/closed until water arrives.
             let row = pixels.height() as usize * 92 / 100;
             let width = pixels.width() as usize;
             let bank = pixels.as_slice()[row * width + width / 10];
             let center = pixels.as_slice()[row * width + width / 2];
             assert_eq!(
                 center == bank,
-                mode == ClockFloorMode::Closed,
+                mode == ClockFloorMode::Closed || event == Some(ClockEventKind::Rain),
                 "{event:?}, {viewport:?}"
             );
+            if event == Some(ClockEventKind::Rain) {
+                assert_eq!(
+                    scenario
+                        .clock_state()
+                        .unwrap()
+                        .rain
+                        .unwrap()
+                        .floor_open_milli,
+                    0
+                );
+            }
         }
         scenario.preview_clock_event(ClockEventKind::Duck);
         assert_eq!(

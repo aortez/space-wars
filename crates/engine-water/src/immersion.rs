@@ -121,11 +121,32 @@ impl WaterHull {
                 for (axis, bound, greater) in [
                     (0, column.left - center.x as f64, true),
                     (0, column.left + column.width - center.x as f64, false),
-                    (1, column.bed - center.y as f64, true),
-                    (1, column.surface - center.y as f64, false),
                 ] {
                     clip(&mut polygon, &mut len, axis, bound, greater);
                 }
+                if column.bed_edges[0] == column.bed_edges[1] {
+                    clip(
+                        &mut polygon,
+                        &mut len,
+                        1,
+                        column.bed - center.y as f64,
+                        true,
+                    );
+                } else {
+                    clip_plane(
+                        &mut polygon,
+                        &mut len,
+                        [-column.bed_slope(), 1.0],
+                        column.bed_at(center.x as f64) - center.y as f64,
+                    );
+                }
+                clip(
+                    &mut polygon,
+                    &mut len,
+                    1,
+                    column.surface - center.y as f64,
+                    false,
+                );
                 let m = moments(&polygon[..len]);
                 if m.area <= 0.0 {
                     continue;
@@ -136,12 +157,50 @@ impl WaterHull {
                 }
                 result.polar_moment += m.polar_moment * self.weight;
                 result.flow[0] += column.velocity * m.area * self.weight;
-                result.flow_torque -= column.velocity * m.first_moment[1] * self.weight;
+                let vertical = column.velocity * column.bed_slope();
+                result.flow[1] += vertical * m.area * self.weight;
+                result.flow_torque += (vertical * m.first_moment[0]
+                    - column.velocity * m.first_moment[1])
+                    * self.weight;
                 result.wet_columns += 1;
             }
         }
         Ok(result)
     }
+}
+
+/// Retain normal dot point >= bound. Used for actual inclined bed clipping.
+fn clip_plane<const N: usize>(
+    polygon: &mut [Point; N],
+    len: &mut usize,
+    normal: Point,
+    bound: f64,
+) {
+    if *len == 0 {
+        return;
+    }
+    let source = *polygon;
+    let distance = |p: Point| normal[0] * p[0] + normal[1] * p[1] - bound;
+    let mut previous = source[*len - 1];
+    let mut count = 0;
+    for &current in &source[..*len] {
+        let a = distance(previous);
+        let b = distance(current);
+        if (a >= 0.0) != (b >= 0.0) {
+            let t = a / (a - b);
+            polygon[count] = [
+                previous[0] + t * (current[0] - previous[0]),
+                previous[1] + t * (current[1] - previous[1]),
+            ];
+            count += 1;
+        }
+        if b >= 0.0 {
+            polygon[count] = current;
+            count += 1;
+        }
+        previous = current;
+    }
+    *len = count;
 }
 
 pub(crate) fn clip<const N: usize>(

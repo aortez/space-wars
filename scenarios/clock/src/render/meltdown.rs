@@ -3,6 +3,8 @@ use super::*;
 use crate::events::meltdown::{MeltdownEvent, soften};
 use engine_water::{Column, Parcel};
 
+mod slopes;
+
 const WATER_COLOR: RenderColor = RenderColor::rgb(0.08, 0.55, 0.85);
 const WATER_EDGE: RenderColor = RenderColor::rgb(0.36, 0.91, 1.0);
 
@@ -168,6 +170,20 @@ pub(super) fn render_water(
         let mut columns = pool.columns().peekable();
         let mut previous = None;
         while let Some(column) = columns.next() {
+            if pool.has_sloped_bed() {
+                if visible(column) {
+                    slopes::render(
+                        frame,
+                        column,
+                        previous,
+                        columns.peek().copied(),
+                        layer,
+                        [color, edge_color],
+                    );
+                }
+                previous = Some(column);
+                continue;
+            }
             if visible(column) {
                 let [left, right] = surface_edges(column, previous, columns.peek().copied());
                 let points = [

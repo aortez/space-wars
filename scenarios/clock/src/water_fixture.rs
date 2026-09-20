@@ -7,6 +7,10 @@ use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld};
 
 mod digit_rain;
 pub use digit_rain::DigitRainFixture;
+mod impact;
+pub use impact::ImpactFixture;
+mod responsive;
+pub use responsive::ResponsiveFloorFixture;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Profile {
@@ -37,7 +41,7 @@ impl WaterFixture {
         let mut bed = match profile {
             Profile::Ledge => vec![0.0],
             Profile::Steps => vec![9.0, 6.0, 3.0, 0.0],
-            Profile::Ramp => (0..16).map(|i| (15 - i) as f64 * 0.4).collect(),
+            Profile::Ramp => vec![0.0; 16],
         };
         let boundaries = if mirrored {
             bed.reverse();
@@ -69,6 +73,17 @@ impl WaterFixture {
             ],
         )
         .unwrap();
+        if matches!(profile, Profile::Ramp) {
+            let at = |i: usize| {
+                if mirrored {
+                    i as f64 * 0.4
+                } else {
+                    (16 - i) as f64 * 0.4
+                }
+            };
+            let edges: Vec<_> = (0..16).map(|i| [at(i), at(i + 1)]).collect();
+            water.configure_sloped_bed(0, &edges).unwrap();
+        }
         for i in 0..water.pools()[0].spec().bed.len() {
             water
                 .add_to_pool(0, left + (i as f64 + 0.5) * dx, depth * dx)
@@ -182,14 +197,18 @@ fn frame(water: &WaterWorld, x: f32, y: f32, height: f32) -> RenderFrame {
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::new(x, y), height));
     for pool in water.pools() {
         for c in pool.columns() {
+            let thickness = 4.0 * c.bed_slope().hypot(1.0);
             frame.push_primitive(
                 -1,
                 RenderPrimitive::Polygon(RenderPolygon::filled(
                     vec![
-                        RenderPoint::new(c.left as f32, c.bed as f32 - 4.0),
-                        RenderPoint::new((c.left + c.width) as f32, c.bed as f32 - 4.0),
-                        RenderPoint::new((c.left + c.width) as f32, c.bed as f32),
-                        RenderPoint::new(c.left as f32, c.bed as f32),
+                        RenderPoint::new(c.left as f32, (c.bed_edges[0] - thickness) as f32),
+                        RenderPoint::new(
+                            (c.left + c.width) as f32,
+                            (c.bed_edges[1] - thickness) as f32,
+                        ),
+                        RenderPoint::new((c.left + c.width) as f32, c.bed_edges[1] as f32),
+                        RenderPoint::new(c.left as f32, c.bed_edges[0] as f32),
                     ],
                     RenderColor::rgb(0.28, 0.38, 0.44),
                 )),

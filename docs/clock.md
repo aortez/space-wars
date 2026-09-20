@@ -51,12 +51,19 @@ the Off profile still disables every automatic event.
 ### Managed floor and drain
 
 The ordinary floor is **closed by default**, including unsynchronized startup,
-idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling, normal Meltdown and
-Rain acquire the center drain before creating their temporary material. It stays
+idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling and normal Meltdown
+acquire the center drain before creating their temporary material. It stays
 fully open through their recovery/cleanup, then closes after the event's bodies,
 water and remaining visuals have been released. Preview replacement, resize and
 restart use the same ownership boundary. Pausing or disabling a currently running
 event does not close the drain underneath it.
+
+Rain owns a load-responsive floor instead: two panels start flat and closed,
+gently slope/retract as water accumulates, then close more slowly as it drains.
+Measured nearby runoff delays closure, and a duck in the passage holds enough
+clearance to get out. Thin residual drips cannot latch the hatch at its peak
+opening. The same panel geometry drives the water bed, visible banks and two
+persistent kinematic colliders; no attraction force pulls the duck to the drain.
 
 The obstacle-course Duck and development water labs own their custom floors
 instead; they do not also open the ordinary drain. Their physical floor/pit/tank
@@ -64,12 +71,11 @@ geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
 One small scenario-owned manager is sufficient because events cannot overlap.
-Its shared geometry supplies rendered floor slabs, Falling/Rain floor colliders,
-the Meltdown/Rain pool banks, spill channel and material deposition boundaries.
-It adds no per-tick requests, persistent rigid bodies or fluid work. The initial
-transition is an atomic open/closed change at event boundaries: durations, rain
-amounts and drainage behavior are unchanged. An animated or delayed hatch would
-need coordinated physical/water transitions and is deliberately separate.
+Its fixed geometry supplies Falling's slabs and Meltdown's pool banks and
+material boundaries. Rain's event-owned actuator updates only its two existing
+floor pools, conservatively remapping retained water and releasing uncovered
+strips. It reuses allocated scratch and persistent colliders. The event manager
+itself still needs no per-tick request queue; other events keep their old floors.
 
 `clock state` reports `floor`: `closed`, `drain-open`, or `event-owned` in both
 JSON and text diagnostics. Schema 10 requires a matching client and CLI; this
@@ -97,10 +103,12 @@ default to Varied with Rain enabled, preserving all existing choices.
 Preview **Rain → Preview & Resume** to run it immediately, including when Off.
 
 Rain ramps up and down over 20 simulated seconds. Stratified, jittered drops
-feed the same two finite-volume floor pools used by Meltdown. Local water must
+collect on lit digit pixels, spill through their real gaps and reach the two
+sloping floor pools. A wet time change releases water from retired pixels.
+Local water must
 remain at least 0.65 digit-pitches deep for half a second before the hatch opens;
 depth is checked again before releasing one duck. Light showers normally never
-reach that threshold, so no duck appears. The hatch closes and disappears after
+reach that threshold, so no duck appears. The entrance door closes and disappears after
 release. The ordinary jumping **Duck** event and its two brains are unchanged.
 
 The rubber duck is a passive dynamic Rapier box with density 0.45 relative to
@@ -112,21 +120,30 @@ This is one-way coupling: the duck does not displace water yet, and falling
 parcels do not directly push it. Future player/bot forces can be applied at the
 same physical-body boundary without replacing the flotation model.
 
-The event uses **128 columns, at most 128 water parcels, and one dynamic body**
-(two total bodies/five colliders while the duck is present). Source admission
+The event uses **320 columns, at most 512 water parcels, and one dynamic body**:
+128 floor columns plus 192 digit columns; 192 parcel slots are protected for
+atomic digit retirement. With a duck there are four bodies/five colliders: one
+duck, two persistent moving panels and a fixed pair of side walls. The rigid
+world is allocated only for the duck's visit and released when it exits.
+Source admission
 reserves two new parcel slots for this tick's outlets; already airborne outlet
 parcels count toward the same budget. Capacity pressure defers unadmitted rain
 without inventing or deleting liquid. Remaining requested rain is cancelled when
 the source ends. The digits, colon and AM/PM remain anchored and live throughout.
 
-The last two seconds explicitly reclaim remaining water and fade any stranded
-duck. This is bounded cleanup, **not** a successful drain exit. `clock state`
+The last two seconds explicitly reclaim remaining water, fade any stranded
+duck and blend any remaining panel opening back to the ordinary closed floor.
+This is bounded cleanup, **not** a successful drain exit. `clock state`
 reports the resolved amount, seed, local/required depth, water accounting,
 capacity counters and duck pose. Its duck phase distinguishes `waiting`,
 `opening`, `floating`, `exited`, `not-spawned`, and `reclaimed`.
 Volumes use full-size digit-cell area equivalents (1,000,000 micro-units per
 cell); injected ≈ pooled + in-flight + drained + reclaimed, allowing independent
-rounding. Requested/scheduled budget is not additional liquid. Rain diagnostics
+rounding. Rain also reports `floor_open_milli` (0–1000), `floor_load_milli`
+(average depth in world units × 1000), `floor_motion_deferrals` and
+`floor_clearance_holds`. These fields default to zero when reading older state.
+The top-level floor mode is `event-owned` throughout Rain, even at its closed
+start; ownership is distinct from opening. Requested/scheduled budget is not additional liquid. Rain diagnostics
 are null once the event is over. Pause freezes everything; resize, restart and
 preview replacement release all temporary resources.
 
@@ -776,7 +793,7 @@ tests and screenshots.
 
 The seeded regression covers 72 complete events: eight seeds for each of Light,
 Medium and Heavy at 1024×768, 800×480 and 480×800 aspect ratios. All 24 Light
-cases leave the hatch closed; all 48 Medium/Heavy cases spawn one duck and record
+cases leave the duck's entrance door closed; all 48 Medium/Heavy cases spawn one duck and record
 an actual drain exit, rather than deadline reclamation. Every tick checks water
 accounting and resource caps, and every event finishes with no bodies, colliders,
 parcels or pooled water. Separate tests cover replay, backpressure, deadline
@@ -792,6 +809,9 @@ Demo/Varied preferences and the original volume were restored after testing.
 ![Heavy Rain and a passive floating duck on the Picade](screenshots/clock/picade-rain-floating.png)
 
 ### Managed-floor device validation (2026-09-13)
+
+This checkpoint predates the responsive Rain floor described above; see the
+2026-09-19 checkpoint below for those panels' device validation.
 
 Deployed the matching release client/CLI pair to `sw-picade-2` with a fast update
 (Pi 4, 1024×768, raster scale 2.0; no reboot). Device checks verified:
@@ -820,6 +840,50 @@ no auto-start timing or input behavior was changed.
 | Ordinary closed floor | Managed drain during Heavy Rain |
 | --- | --- |
 | ![Closed Clock floor on sw-picade-2](screenshots/clock/picade-managed-floor-closed.png) | ![Open drain and floating duck on sw-picade-2](screenshots/clock/picade-managed-floor-rain.png) |
+
+### Responsive-floor device validation (2026-09-19)
+
+The ARM release build passed, and the new client/CLI pair was verified on
+`sw-picade-2` after a user reboot. Installed SHA-256 values:
+
+- Client: `7247e2425049d142cdc9353619e1af8de84f216d207b5e009c389f5da020b979`.
+- CLI: `c6baf9ac659c02f8facfab7839991ce3f1d42ff27ec3347d5c4b6c2e16aaea59`.
+
+Heavy Rain preview event 4 (seed 25769803779) started with an event-owned, closed
+floor, reached `floor_open_milli=705` after six seconds, and later recorded one
+duck spawn and physical exit. The closing floor was at 617 after about 34 seconds;
+completion restored a closed floor with no event bodies/colliders. No source,
+outlet or floor-motion deferrals were reported. A live sample showed about
+60 FPS/UPS and a 0.358 ms mean / 0.420 ms p95 host step (1024×768, raster scale
+2.0). A device screenshot was inspected. Demo/Heavy Rain preferences and 5%
+volume were preserved; the settings file remained byte-identical.
+
+This is an application smoke check, **not a clean hardware-health result**.
+The fast installer encountered an I/O error while saving its known-good backup,
+after the new app passed initial health checks; rollback could not run either.
+After reboot, the installed binaries matched the new build and the kiosk stayed
+on PID 401 with zero service restarts during the check. However, that boot also
+logged USB over-current events, a USB disk reset/read error, ext4 recovery and an
+unclean FAT boot partition. The over-current/error cluster did not grow during
+the brief check. Recovery files were left untouched; USB/storage diagnosis and
+any offline filesystem check remain separate follow-up work.
+
+Subsequent power-isolation checks narrowed that caveat: booting without the
+LCD's USB power connection produced no USB errors, but could not run the kiosk
+without a detected display. Powering the LCD from a separate 5 V supply then
+restored the normal displayed workload. Heavy Rain completed at 60 FPS/UPS,
+including a physical duck exit and floor closure; more than 20 minutes of mixed
+Clock events subsequently ran on the same PID with zero service restarts and no
+USB over-current, disk-reset or I/O errors. The client/CLI hashes and saved
+settings were unchanged. This implicates the shared USB power path without
+identifying a specific faulty component; the unclean-filesystem warning still
+needs a separate offline check. No power-protection settings were changed.
+
+Actual Pi 4 captures with independently powered LCD (1024×768, raster scale 2.0):
+
+| Closed floor | Loaded/open floor and duck | Late runoff/closing |
+| --- | --- | --- |
+| ![Closed responsive floor](screenshots/water/picade-responsive-floor-closed.png) | ![Open responsive floor during Heavy Rain](screenshots/water/picade-responsive-floor-open.png) | ![Responsive floor closing after Rain](screenshots/water/picade-responsive-floor-closing.png) |
 
 ### Digit Slide verification
 

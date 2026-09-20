@@ -73,10 +73,291 @@ columns. Both pool and parcel counts are bounded.
 
 `Pool::columns()` exposes the same bed, surface, liquid volume and separate body
 occupancy used by simulation.
-`WaterWorld::sample(point)` queries occupied water and its local horizontal
-velocity. Closed boundaries retain unlimited height (not finite-height walls).
-Parcel deposition transfers volume but does not impart impact momentum to a
-pool. These are explicit limitations for future body/wave coupling.
+`WaterWorld::sample(point)` queries occupied water and its local velocity
+(horizontal on flat beds; tangent-following on opt-in slopes). Closed boundaries
+retain unlimited height (not finite-height walls).
+Parcel deposition transfers volume. By default it does not impart impact
+motion; the optional local surface-response approximation below is not full
+momentum coupling. These remain explicit limitations for future body/wave work.
+
+### Optional wet-surface impact response
+
+`WaterConfig::impact_response` defaults to zero, preserving ordinary volume-only
+collection. A value in `[0, 1]` redirects a fraction of a descending parcel's
+speed into outward velocities on the receiving column's two interior faces.
+The response scales by incoming volume relative to local receiving liquid. It
+also caps each kick by `response * sqrt(gravity * wet_depth)`, so a large drop
+cannot turn an almost-dry film into a fast jet. The existing substep speed and
+donor-volume limits still control actual transport.
+
+Only already-wet faces above their bed barrier participate. Dry landings still
+deposit their volume normally. A single-column ledge has no interior face;
+closed boundaries, spill laws, separate pools and dry/raised barriers receive
+no synthetic current. Incoming parcels are collected once through the same
+swept test, including birth-half-step outfalls. The response uses the arrival
+step's downward velocity, not a new exact sub-tick impact solver. Birth-step
+impulses affect the following pool step.
+
+The waves move **existing liquid**, not an additional highlight/splash overlay.
+There are no new parcels, temporary bodies, draw primitives, per-step buffers or
+changes to the volume ledger. Existing non-flat surfaces can prevent the vector
+adapter from batching flat rectangles, so unchanged source primitive counts do
+not guarantee identical renderer cost. `WaterStats::impact_transfers` counts
+collected parcels that actually changed a surface velocity, not attempted hits.
+
+Clock Rain opts in at **0.12**; the shared engine default and Meltdown remain
+unchanged. Clock's additive `surface_impacts` diagnostic reports that counter,
+including through the CLI; old JSON payloads default it to zero. Paused reading
+updates may release supports but do not apply impacts or advance the waves.
+
+This is a cheap, damped surface disturbance, **not** vertical-pressure dynamics,
+a spray generator or a momentum/energy-conserving fluid/body solver. Asymmetric
+depths and walls can produce asymmetric horizontal motion. There is no new
+attraction toward the drain or moving drain geometry; those remain separate
+work under #102. Exaggerated splash art can later use an explicit bounded
+effect without pretending it is extra water.
+
+`water_fixture::ImpactFixture` compares the same tank, volume and falling drop
+at response 0 and 0.25. These production-renderer captures show the same instant
+after impact. The control has the deposition mound; the response sends two
+small waves outward. The fixture deliberately uses a stronger response than
+the live Rain setting to make the difference easy to inspect.
+
+![Volume-only impact control](../screenshots/water/impact-control.png)
+
+![Optional impact response creates outward waves](../screenshots/water/impact-response.png)
+
+Regression coverage includes conservation/nonnegative volumes, symmetric replay,
+arrival-speed/strength scaling, the shallow-film cap, dry and blocked neighbors,
+closed/single-column boundaries, birth-step collection, 300 repeated large
+impacts and retained storage. Raster/vector checks require a visible difference,
+bounded source primitive counts and approximately equal rasterized water area.
+The live Rain delivery/duck/cleanup suite and existing two-frame maximum outfall
+fallback bound remain unchanged. The first uncapped live experiment exceeded
+that continuity bound; the depth-aware cap addresses it without weakening the
+test.
+
+Release measurements on this workstation (Rust 1.89, simulation only), after
+the concurrent builds/tests finished:
+
+- Two impacts per step, 6,000 measured steps after 600 warmup steps: response
+  off/on medians were 0.52/0.54 µs at 32 columns, 2.34/2.31 µs at 128, and
+  9.97/10.08 µs at 512. The small differences are near run-to-run noise, not a
+  speedup claim. The worst absolute accounting error was below `1.6e-11` area
+  units; all 13,200 impacts per enabled run were recorded.
+- Heavy live Rain at fixed `12:34`, seeds 0/7/19: 28.0–28.3 µs median,
+  32.3–32.6 µs p95, 191–199 peak parcels, no source/outlet stalls, and
+  4,145–4,279 recorded wet-surface impacts over the 20-second rain phase.
+- Wet `08:08` → `11:11` across Picade, HyperPixel and portrait: 23–27 µs median,
+  37–43 µs p95, 315–331 peak parcels. Changes applied immediately, with 0–8
+  denied source attempts / 0–4 outlet-limited ticks after the change, no support
+  deferrals, and at most 5.6 cell areas pending. Every run delivered 100% of
+  scheduled rain by its deadline.
+
+The full local workspace all-target test run passed **1,634 tests** with 46
+existing ignored cases (real-client UI tests remain a separate CI step).
+The 72 live Rain lifecycles still deliver all scheduled volume, keep all 24
+Light cases duck-free, and record real duck exits in all 48 Medium/Heavy cases.
+Formatting and strict scoped Clippy passed. Impact response was subsequently
+deployed to `sw-picade-2`: a Heavy Rain sample reported 60 FPS/UPS, 427 actual
+surface impulses after six seconds and no source/outlet stalls. The passive
+duck exited the drain. Volume remained 5%, and the other units were untouched.
+Those observations precede the separate slope/floor lab below.
+
+```sh
+cargo test --locked -p engine-water impact::
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/clock-water-impact \
+  cargo test --locked -p engine-client --bin engine-client water_impact_response
+cargo run --locked --release -p engine-water --example impact_benchmark
+cargo run --locked --release -p scenario-clock --example rain_benchmark -- --live-only
+```
+
+### Continuous slopes and load-responsive floor lab
+
+The slope and moving-floor paths were first proved in the test bed and are now
+used by **normal Clock Rain** (integration below). Meltdown and existing
+flat/stepped pools keep their original interior-flux path. No new launcher
+scenario is introduced. The responsive-floor work was verified on `sw-picade-2`
+on 2026-09-19; see the device checkpoint below, including its USB/storage caveat.
+
+`configure_sloped_bed(pool, endpoints)` opts a dry, unstepped pool into straight
+bed segments on its existing column grid. Each cell has left/right bed heights;
+adjacent unequal endpoints remain real cliffs. Surface level is obtained from
+the exact area above that segment, including partly wet triangular columns.
+Transfers use the actual shared-face barrier, so a horizontal lake stays at
+rest over an incline while shallow runoff can drain downhill. Sampling, swept
+arrival and one-way hull immersion clip against the same inclined bed. Outfall
+velocity follows the terminal bed tangent before ballistic gravity takes over.
+Body-displacement feedback still deliberately supports flat basins only.
+
+Rendering reconstructs connected faces over fully wet continuous bed segments,
+using a cell-local midpoint to preserve each column's area. Partly wet cells
+keep their actual triangular footprint. It does not smooth across dry regions
+or real cliffs. This is still a finite-resolution height-column approximation,
+not arbitrary wall/ceiling flow or a pressure solver.
+
+`move_sloped_pools` accepts an atomic batch of new spans, segment heights and
+outlet states. It remaps retained liquid by the old occupied cross-section;
+strips exposed by a widening gap become free parcels. They are neither new rain
+nor silently drained/reclaimed water. Validation and parcel-capacity checks
+precede every mutation. A rejected batch leaves all old floor/water geometry
+intact for the caller to retain and retry. Geometry scratch is allocated during
+configuration and reused; column/parcel budgets do not grow. Identical snapshots
+are no-ops. Existing horizontal flow is interpolated, not replaced by a current
+pointing at the drain.
+
+This moving-bed model is intentionally **slow and quasi-static**. Liquid stays
+in contact with the gently moving supporting bed; displacement at retained
+coordinates is bounded by `gravity * dt² / 2` per update. It is not suitable for
+a rapidly falling/rotating platform, pressure-driven hinge physics, or energy-
+conserving solid/fluid coupling. Horizontal remapping is conservative in volume,
+not a full momentum solver. Call once per simulation step, never while paused.
+
+`ResponsiveFloorFixture` shares Rain's actuator and geometry code, with two
+32-column panels and two persistent Rapier kinematic cuboids:
+
+- Measured floor-water amount drives a filtered load signal. More water tilts
+  and retracts the panels farther; closing is slower than opening.
+- Nearby airborne runoff delays closing rather than counting as floor weight.
+- An occupied passage holds a safe opening until the passive hull clears it.
+- A deterministic floor source isolates this response from random rain and digit
+  changes. The yellow rectangle is the duck's actual passive buoyant hull, not
+  the final duck artwork. It has no navigation or steering force.
+- Visible panel tops, water beds and moving rigid colliders agree. Bodies and
+  collider shapes are not recreated per tick. Once empty, the panels return
+  toward a flat, closed floor without reclaiming liquid to force the result.
+
+Production-renderer lab captures:
+
+![Continuous inclined runoff](../screenshots/water/sloped-outfall.png)
+
+![Water-loaded floor opening around the floating hull](../screenshots/water/responsive-floor-open.png)
+
+![Floor returned flat and closed](../screenshots/water/responsive-floor-closed.png)
+
+The original opening capture exposed a short break farther down the merged jet.
+Continuous source slices sometimes collide a frame apart rather than on
+consecutive frames. Merged ribbons now link by contiguous original emission
+sequences from both parents, with the existing spatial bound, not by collision
+frame alone. A genuine source interruption remains separate. This changes
+presentation history, not parcel volume, momentum or the collision response.
+The updated capture and an actual raster-row regression cover the formerly
+broken jet. Thin side streams still represent liquid exposed by panel retraction.
+
+Regression coverage includes partly dry equilibrium, thin/deep mirrored runoff,
+raised-lip retention, inclined sampling/immersion, dry-slope arrivals, tangent
+outfalls, conservative remapping/release, atomic capacity failures, retained
+scratch, changing load, closing interlocks, collider alignment and an actual
+passive-hull exit. PNG/SVG tests use the production raster/vector adapters.
+
+The full local workspace all-target run passed **1,655 tests**, with 46 existing
+ignored tests and no failures. Formatting, whitespace checks and strict scoped
+Clippy for `engine-water`, `scenario-clock` and `spacewars-control` also passed.
+
+Release measurements on the workstation (simulation only): 128-column
+level pools took about 1.5 µs/step for flat beds and 3.4 µs for slopes; 512-column
+cases were about 5.9/13.4 µs. The 64-column responsive-floor lab, including the
+kinematic mechanics and optional hull, was about 9 µs median / 12 µs p95, peaking
+at 120 parcels with no floor-update deferrals. These are not Pi frame timings.
+
+#### Normal Rain integration
+
+Rain acquires an `event-owned` floor and starts flat/closed. Its two existing
+64-column floor pools opt into slopes; collecting digit pixels remain ordinary
+ledges. Average floor-water depth drives a 0.35-second filtered load signal and
+a square-root opening curve. Maximum drop is 0.35 digit pitches, capped at 12
+world units; opening is limited to 0.16/second, closing to 0.06/second, both also
+bounded by the engine's quasi-static displacement limit. A steeper first trial
+drained a portrait entrance too quickly: the gentler slope preserves the
+existing 0.65-pitch, half-second duck launch requirement.
+
+Nearby incoming runoff delays closing for half a second; it does not count as
+floor weight. The floor's own outfalls are excluded, and nearby volume must
+exceed 0.02 square digit-pitches so vanishing digit films cannot latch the hatch
+at its peak opening. A duck occupying the passage holds sufficient clearance
+until its whole hull clears the panels. Unsupported water is released as
+parcels, never silently reclaimed to make the mechanism close.
+
+The rigid world exists only during the duck's visit: one dynamic hull, two
+persistent kinematic panels, and a fixed body holding both side walls (four
+bodies/five colliders). The same panel transform supplies visible floor polygons
+and collider poses; the water bed agrees with their inclined top faces. The door
+samples both actual local depth and surface elevation, not the old flat-floor
+offset. No attraction, duck steering or water-displacement coupling is added.
+
+Capacity deferral keeps the old panel/water geometry together. Pausing cannot
+advance the actuator. Replacement, resize, restart and normal completion drop
+all event resources and restore the ordinary floor; Falling, Meltdown and the
+walking-duck course retain their prior geometry. During the existing final
+two-second cleanup, residual liquid is explicitly reclaimed and any remaining
+opening blends back to the closed floor. Cleanup is still not a duck exit.
+
+`clock state` now includes default-compatible `floor_open_milli`,
+`floor_load_milli`, `floor_motion_deferrals` and `floor_clearance_holds`. See
+[Clock](../clock.md#rain-and-the-rubber-duck) for units and lifecycle semantics.
+
+The 72-case amount/aspect/seed sweep preserves all 48 physical Medium/Heavy
+duck exits and 24 Light no-spawn outcomes, full scheduled delivery, conservation,
+bounded parcels and zero floor-update deferrals. It now verifies persistent
+collider alignment and load-dependent opening/closure too. A forced-capacity
+test checks atomic deferral; existing pause/replay/resize/replacement checks
+cover the new state. Production raster/vector captures cover all three device
+aspects and final cleanup. Transient lip reconstruction fallback stays bounded
+to two ticks (33 ms); true source gaps are not cosmetically filled.
+
+Release timings on the workstation, seeds 0/7/19 (simulation only):
+
+| Heavy Rain | Peak parcels | Step median | Step p95 |
+| --- | --- | --- | --- |
+| Fixed 12:34, Picade aspect | 254–263 | 34–35 µs | 44–46 µs |
+| Wet 08:08 → 11:11, all three aspects | 319–391 | 27–29 µs | 56–60 µs |
+
+All requested rain arrived by the 20-second source deadline. Neither case had
+floor-motion or digit-change deferrals. Fixed-face runs had no source/outlet
+stalls; the large wet correction caused 2–12 source-limited attempts and 0–24
+outlet-limited ticks, with no pre-change stalls and at most 10.8 cell areas of
+pending source volume. This is the existing bounded backpressure path, not
+deleted liquid or an expanded parcel budget. These measurements exclude draw
+list generation, rasterization and display submission, and are not Pi timings.
+
+![Heavy Rain on the responsive Picade floor](../screenshots/water/rain-responsive-picade.png)
+
+![Responsive floor after a wet time correction, HyperPixel aspect](../screenshots/water/rain-responsive-hyperpixel.png)
+
+![Portrait Rain and the same physical floor](../screenshots/water/rain-responsive-portrait.png)
+
+![Late runoff and slowly closing panels](../screenshots/water/rain-responsive-closing.png)
+
+These are headless production-renderer captures, not Pi screenshots. The real
+windowed Rain workflow's ownership expectations have been updated and compiled,
+but that optional display test has not been rerun in this slice.
+
+On 2026-09-19 the release client/CLI pair was installed on `sw-picade-2` and
+verified after a user reboot. A Heavy Rain preview showed the new floor opening,
+one actual duck exit, no floor-motion deferrals or source/outlet stalls, then a
+closed, body-free arena. An active sample reported about 60 FPS/UPS and a
+0.358 ms mean / 0.420 ms p95 host step at 1024×768, raster scale 2.0; an actual
+device screenshot was inspected. Settings remained byte-identical. These are
+short live samples, not a hardware reliability or performance guarantee.
+
+The installer hit a device-side I/O error while retaining the previous binary
+pair, after initial application health checks passed. The rebooted device's
+binary hashes match the new build, but that boot also logged USB over-current
+events, a USB disk reset and a read error. A subsequent boot with the LCD powered
+independently ran the displayed Clock at 60 FPS/UPS, completed Heavy Rain, and
+continued mixed events for over 20 minutes without USB errors or service
+restarts. This points to the shared USB power path, not a confirmed component
+failure; the filesystem warning still needs an offline check. See the actual Pi
+captures and details in [the device checkpoint](../clock.md#responsive-floor-device-validation-2026-09-19).
+
+```sh
+cargo test --locked -p engine-water slopes::
+cargo test --locked -p engine-water moving_bed::
+cargo test --locked -p scenario-clock responsive
+SPACEWARS_WATER_EDGE_ARTIFACTS=/tmp/clock-water-slopes \
+  cargo test --locked -p engine-client --bin engine-client water_visual_tests
+cargo run --locked --release -p scenario-clock --example slope_benchmark
+```
 
 ### Irregular rain and live digit surfaces
 
@@ -420,11 +701,12 @@ Production-renderer snapshots from the deterministic lab:
 | --- | --- |
 | ![Connected stepped outfall](../screenshots/water/stepped-outfall.png) | ![Two streams merging downward](../screenshots/water/opposed-streams.png) |
 
-**Remaining boundary:** stepped beds are still stepped, and surface smoothing
-still stops across changes in bed elevation. The steps/ramp captures deliberately
-expose this for the next pass; this is not yet tangent-aware slope flow. Whole
-parcels also still deposit on center-path collection, without an impact-pressure
-or splash solver. Vector backends may antialias separately drawn shared faces;
+**Boundary of this earlier outfall pass:** bed changes were still steps, and
+surface smoothing stopped at them. The opt-in continuous-slope pass above now
+extends the ramp fixture; actual steps still keep their cliffs. Whole parcels
+still deposit on center-path collection without an impact-pressure or splash
+solver (the optional wet-surface impulse is an approximation). Vector backends
+may antialias separately drawn shared faces;
 the production raster capture checks geometry without relying on SVG rasterizer
 antialiasing behavior.
 
