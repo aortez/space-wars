@@ -32,6 +32,13 @@ use crate::ui_inventory::{
 use crate::{MainWindow, host};
 
 #[cfg(unix)]
+mod input;
+#[cfg(unix)]
+use input::InputAutomation;
+#[cfg(unix)]
+use spacewars_control::{INPUT_PRESS_COMMAND, InputPressRequest};
+
+#[cfg(unix)]
 #[derive(Debug)]
 struct ControlRequest {
     command: ControlCommand,
@@ -41,6 +48,7 @@ struct ControlRequest {
 #[cfg(unix)]
 #[derive(Debug)]
 enum ControlCommand {
+    InputPress(InputPressRequest),
     Screenshot { output: PathBuf },
     Status,
     UiState,
@@ -148,6 +156,8 @@ pub fn start_control_server(
     window: &MainWindow,
     socket_path: PathBuf,
     scenario_controls: host::SharedScenarioControls,
+    input: crate::input::SharedInput,
+    gamepads: crate::input::SharedGamepadInput,
 ) -> Option<Timer> {
     let (tx, rx) = mpsc::channel();
     if let Err(err) = spawn_listener(socket_path.clone(), tx) {
@@ -162,13 +172,21 @@ pub fn start_control_server(
     let timer = Timer::default();
     let weak_window = window.as_weak();
     let mut ui_state_tracker = UiStateTracker::default();
+    let mut input_automation = InputAutomation::new(input, gamepads);
     timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
         let Some(window) = weak_window.upgrade() else {
             return;
         };
 
+        input_automation.tick(&window, &mut ui_state_tracker);
         while let Ok(request) = rx.try_recv() {
-            handle_request(&window, request, &mut ui_state_tracker, &scenario_controls);
+            handle_request(
+                &window,
+                request,
+                &mut ui_state_tracker,
+                &scenario_controls,
+                &mut input_automation,
+            );
         }
     });
 
@@ -180,6 +198,8 @@ pub fn start_control_server(
     _window: &MainWindow,
     _socket_path: PathBuf,
     _scenario_controls: host::SharedScenarioControls,
+    _input: crate::input::SharedInput,
+    _gamepads: crate::input::SharedGamepadInput,
 ) -> Option<Timer> {
     tracing::info!("control socket is unavailable on this platform.");
     None
@@ -249,6 +269,19 @@ fn handle_stream(mut stream: std::os::unix::net::UnixStream, tx: &mpsc::Sender<C
 fn parse_command(body: &str) -> Result<ControlCommand, CommandParseError> {
     let mut lines = body.lines();
     match lines.next() {
+        Some(INPUT_PRESS_COMMAND) => {
+            let payload = lines.next().ok_or_else(|| {
+                invalid_mutation_request("input press requires one JSON request line")
+            })?;
+            if lines.next().is_some() {
+                return Err(invalid_mutation_request(
+                    "input press accepts exactly one JSON request line",
+                ));
+            }
+            InputPressRequest::from_json(payload)
+                .map(ControlCommand::InputPress)
+                .map_err(|error| invalid_mutation_request(error.to_string()))
+        }
         Some("screenshot") => {
             let Some(output) = lines.next() else {
                 return Err(CommandParseError::Legacy(
@@ -378,8 +411,12 @@ fn handle_request(
     request: ControlRequest,
     ui_state_tracker: &mut UiStateTracker,
     scenario_controls: &host::SharedScenarioControls,
+    input_automation: &mut InputAutomation,
 ) {
     match request.command {
+        ControlCommand::InputPress(press) => {
+            input_automation.press(window, press, request.response, ui_state_tracker)
+        }
         ControlCommand::ClockState => handle_clock_request(
             window,
             None,
@@ -1045,6 +1082,8 @@ mod tests {
             "scenario=clock\nscenario_revision=4\npaused=true\nbenchmark_active=false".into(),
         );
         let controls = host::new_scenario_controls();
+        let (input, gamepads) = crate::input::new_shared_input();
+        let mut input_automation = InputAutomation::new(input, gamepads);
         let mut tracker = UiStateTracker::default();
         let mut request = |command| {
             let (mut reader, stream) = std::os::unix::net::UnixStream::pair().unwrap();
@@ -1059,6 +1098,7 @@ mod tests {
                 },
                 &mut tracker,
                 &controls,
+                &mut input_automation,
             );
             let mut reply = String::new();
             reader.read_to_string(&mut reply).unwrap();
@@ -1121,6 +1161,7 @@ mod tests {
                 assert_eq!(output, PathBuf::from("/tmp/shot.png"));
             }
             ControlCommand::Status
+            | ControlCommand::InputPress(_)
             | ControlCommand::UiState
             | ControlCommand::UiPress(_)
             | ControlCommand::UiActivate(_)
@@ -1131,6 +1172,26 @@ mod tests {
             | ControlCommand::HostBenchmark => {
                 panic!("expected screenshot command")
             }
+        }
+    }
+
+    #[test]
+    fn input_press_parser_requires_named_bounded_guarded_request() {
+        let payload = r#"{"schema_version":1,"player":1,"button":"west","profile":"picade","hold_ms":120,"expected_screen":"gameplay","expected_revision":4,"expected_scenario_revision":2}"#;
+        assert!(matches!(
+            parse_command(&format!("input press\n{payload}\n")).unwrap(),
+            ControlCommand::InputPress(_)
+        ));
+        for body in [
+            "input press\n".into(),
+            format!("input press\n{payload}\nextra\n"),
+            format!("input press\n{}\n", payload.replace("120", "2001")),
+            format!("input press\n{}\n", payload.replace("west", "power")),
+        ] {
+            assert!(matches!(
+                parse_command(&body),
+                Err(CommandParseError::Structured(_))
+            ));
         }
     }
 

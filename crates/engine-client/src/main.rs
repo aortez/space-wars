@@ -437,12 +437,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
     let _settings_status = settings_writer::install_status(&window, settings_writer.clone());
     let scenario_controls = host::new_scenario_controls();
+    let (input, gamepad_input) = input::new_shared_input();
     let _control_server = ipc::start_control_server(
         &window,
         ipc::control_socket_path(),
         Rc::clone(&scenario_controls),
+        Rc::clone(&input),
+        Rc::clone(&gamepad_input),
     );
-    let (input, gamepad_input) = input::new_shared_input();
     input::install_window_input(&window, Rc::clone(&input));
     let render_timer = Rc::new(RefCell::new(None));
     let launcher = install_launcher_callbacks(

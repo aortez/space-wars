@@ -147,9 +147,18 @@ expects eight working buttons and cannot complete with a non-reporting button.
 
 ### Simulated button verification
 
+`spacewars-cli input press west --profile picade --hold-ms 1200` now provides
+bounded virtual-controller presses through the app's shared routing, without
+needing the HAT. `input press start` opens pause and `input press south` confirms
+Resume. Use `--expect-screen gameplay` or `pause.main` as appropriate; `--json`
+reports release completion, including early cancellation on context changes.
+The app releases the virtual input even if the CLI exits. See the
+[runtime control instructions](../README.md) for player selection and bounds.
+
 `spacewars-cli ui press` sends semantic menu actions. It intentionally does not
 claim to test physical-controller mapping, holds, releases, or the Linux input
-backend. Use the separate workstation diagnostic for that software path:
+backend. The virtual-controller CLI also bypasses Linux device recognition;
+use the separate workstation diagnostic for that OS input path:
 
 ```sh
 python3 tools/picade_input.py --host sw-picade-2.local verify-clock

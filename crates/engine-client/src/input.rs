@@ -1,9 +1,11 @@
 //! Client-side keyboard state and original Spacewars control mapping.
 
+use spacewars_control::InputButton;
 use std::cell::RefCell;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt::Write as _;
 use std::rc::Rc;
+use std::time::Instant;
 
 use engine_common::{Action, PointerPhase, RenderPoint};
 use engine_core::Vec2;
@@ -99,16 +101,85 @@ pub(crate) struct GamepadSeatInput {
 #[derive(Debug, Default)]
 pub(crate) struct GamepadInput {
     seats: [GamepadSeatInput; 2],
+    simulated: Option<SimulatedSeat>,
+}
+
+#[derive(Debug)]
+struct SimulatedSeat {
+    player: usize,
+    button: InputButton,
+    until: Instant,
+    combined: GamepadSeatInput,
 }
 
 impl GamepadInput {
     pub(crate) fn seat(&self, player: usize) -> Option<&GamepadSeatInput> {
+        self.seat_before(player, Instant::now)
+    }
+
+    fn seat_before(
+        &self,
+        player: usize,
+        now: impl FnOnce() -> Instant,
+    ) -> Option<&GamepadSeatInput> {
+        if let Some(simulated) = &self.simulated {
+            // Even if the IPC timer is delayed, expired input is never sampled
+            // by gameplay. No clock read/allocation on the ordinary input path.
+            if simulated.player == player && now() < simulated.until {
+                return Some(&simulated.combined);
+            }
+        }
+        self.seats.get(player)
+    }
+
+    pub(crate) fn physical_seat(&self, player: usize) -> Option<&GamepadSeatInput> {
         self.seats.get(player)
     }
 
     pub(crate) fn set_seat(&mut self, player: usize, state: GamepadSeatInput) {
         if let Some(seat) = self.seats.get_mut(player) {
             *seat = state;
+        }
+        self.refresh_simulated();
+    }
+
+    pub(crate) fn simulate(&mut self, player: usize, button: InputButton, until: Instant) {
+        self.simulated = Some(SimulatedSeat {
+            player,
+            button,
+            until,
+            combined: GamepadSeatInput::default(),
+        });
+        self.refresh_simulated();
+    }
+
+    pub(crate) fn clear_simulated(&mut self) {
+        self.simulated = None;
+    }
+
+    pub(crate) fn has_simulated(&self) -> bool {
+        self.simulated.is_some()
+    }
+
+    fn refresh_simulated(&mut self) {
+        if let Some(simulated) = &mut self.simulated {
+            simulated.combined = self.seats[simulated.player].clone();
+            let pad = &mut simulated.combined;
+            pad.connected = true;
+            match simulated.button {
+                InputButton::Up => pad.dpad_up = true,
+                InputButton::Down => pad.dpad_down = true,
+                InputButton::Left => pad.dpad_left = true,
+                InputButton::Right => pad.dpad_right = true,
+                InputButton::South => pad.south = true,
+                InputButton::East => pad.east = true,
+                InputButton::North => pad.north = true,
+                InputButton::West => pad.west = true,
+                InputButton::LeftShoulder => pad.left_bumper = true,
+                InputButton::RightShoulder => pad.right_bumper = true,
+                InputButton::Start => pad.start = true,
+                InputButton::Select => pad.select = true,
+            }
         }
     }
 
@@ -121,6 +192,36 @@ impl GamepadInput {
             name,
             ..GamepadSeatInput::default()
         };
+        self.refresh_simulated();
+    }
+}
+
+#[cfg(test)]
+mod simulated_seat_tests {
+    use super::*;
+    #[test]
+    fn expiry_is_enforced_when_sampled_even_without_the_ipc_timer() {
+        let mut pads = GamepadInput::default();
+        let now = Instant::now();
+        pads.simulate(
+            0,
+            InputButton::South,
+            now + std::time::Duration::from_secs(1),
+        );
+        assert!(pads.seat_before(0, || now).unwrap().south);
+        assert!(
+            !pads
+                .seat_before(0, || now + std::time::Duration::from_secs(1))
+                .unwrap()
+                .south
+        );
+        pads.clear_simulated();
+        assert!(
+            !pads
+                .seat_before(0, || panic!("ordinary input must not read the clock"))
+                .unwrap()
+                .south
+        );
     }
 }
 
@@ -544,6 +645,7 @@ impl ClientInput {
     fn clear_keyboard(&mut self) {
         self.pressed.borrow_mut().clear();
         self.clock_next_event_requested = false;
+        self.gamepads.borrow_mut().clear_simulated();
     }
 
     fn handle_focus_loss(&mut self) {

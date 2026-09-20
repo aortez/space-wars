@@ -3,11 +3,192 @@ use super::*;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Key, Platform, PlatformError, WindowAdapter, WindowEvent};
 use std::cell::Cell;
+#[cfg(unix)]
+use std::time::Duration;
 
 struct TestPlatform;
 impl Platform for TestPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+    }
+}
+
+#[cfg(unix)]
+fn simulated_ui(screen: spacewars_control::UiScreen) -> spacewars_control::UiState {
+    spacewars_control::UiState {
+        schema_version: 1,
+        revision: 1,
+        screen,
+        active_scenario: Some("clock".into()),
+        selected_scenario: "clock".into(),
+        selected_control: None,
+        controls: vec![],
+        actions: vec![],
+        scenario_revision: Some(1),
+        paused: screen == spacewars_control::UiScreen::PauseMain,
+        benchmark_active: false,
+        error: None,
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_controller_uses_shared_clock_routing_and_bounded_single_edges() {
+    use spacewars_control::{
+        InputButton, InputPressRequest, InputProfile, InputReleaseReason, UiScreen,
+    };
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(Rc::clone(&input), Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    for (profile, button) in [
+        (InputProfile::Standard, InputButton::RightShoulder),
+        (InputProfile::Picade, InputButton::West),
+    ] {
+        let mut request = InputPressRequest::new(&state, button);
+        request.profile = profile;
+        request.hold_ms = 1200;
+        let now = Instant::now();
+        driver.press(&window, &state, request.clone(), now).unwrap();
+        assert!(input.borrow_mut().take_clock_next_event_requested());
+        assert!(driver.press(&window, &state, request.clone(), now).is_err());
+        for tick in 1..12 {
+            assert!(
+                driver
+                    .tick(&window, &state, now + Duration::from_millis(tick * 100))
+                    .is_none()
+            );
+            assert!(!input.borrow_mut().take_clock_next_event_requested());
+        }
+        assert_eq!(
+            driver.tick(&window, &state, now + Duration::from_millis(1200)),
+            Some((request.clone(), InputReleaseReason::Elapsed))
+        );
+        assert!(!gamepads.borrow().has_simulated());
+        driver
+            .press(&window, &state, request, Instant::now())
+            .unwrap();
+        assert!(input.borrow_mut().take_clock_next_event_requested());
+        driver.cancel();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_controller_never_leaks_across_context_changes_or_input_clear() {
+    use spacewars_control::{InputButton, InputPressRequest, InputReleaseReason, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(Rc::clone(&input), Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    for change in 0..3 {
+        let now = Instant::now();
+        driver
+            .press(
+                &window,
+                &state,
+                InputPressRequest::new(&state, InputButton::South),
+                now,
+            )
+            .unwrap();
+        assert!(gamepads.borrow().seat(0).unwrap().south);
+        let mut next = state.clone();
+        let reason = match change {
+            0 => {
+                next.screen = UiScreen::PauseMain;
+                InputReleaseReason::ContextChanged
+            }
+            1 => {
+                next.scenario_revision = Some(2);
+                InputReleaseReason::ContextChanged
+            }
+            _ => {
+                input.borrow_mut().clear();
+                assert!(
+                    !gamepads.borrow().seat(0).unwrap().south,
+                    "host clear releases immediately"
+                );
+                InputReleaseReason::InputCleared
+            }
+        };
+        assert_eq!(driver.tick(&window, &next, now).unwrap().1, reason);
+        assert!(!gamepads.borrow().seat(0).unwrap().south);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_player_two_merges_without_replacing_physical_controls() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(input, Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    let mut request = InputPressRequest::new(&state, InputButton::South);
+    request.player = 2;
+    driver
+        .press(&window, &state, request, Instant::now())
+        .unwrap();
+    assert!(!gamepads.borrow().seat(0).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().south);
+    gamepads.borrow_mut().set_seat(
+        1,
+        input::GamepadSeatInput {
+            connected: true,
+            west: true,
+            left_stick_x: 0.7,
+            ..Default::default()
+        },
+    );
+    assert!(gamepads.borrow().seat(1).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().west);
+    assert_eq!(gamepads.borrow().seat(1).unwrap().left_stick_x, 0.7);
+    drop(driver);
+    assert!(!gamepads.borrow().seat(1).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().west);
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_directions_repeat_but_confirm_does_not() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_ingame_menu_visible(true);
+    let actions = Rc::new(RefCell::new(Vec::new()));
+    let observed = Rc::clone(&actions);
+    window.on_ui_action(move |code| observed.borrow_mut().push(code));
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(input, gamepads);
+    let state = simulated_ui(UiScreen::PauseMain);
+    for button in [InputButton::Down, InputButton::South] {
+        actions.borrow_mut().clear();
+        let mut request = InputPressRequest::new(&state, button);
+        request.hold_ms = 1000;
+        let now = Instant::now();
+        driver.press(&window, &state, request, now).unwrap();
+        assert_eq!(actions.borrow().len(), 1);
+        driver.tick(&window, &state, now + Duration::from_millis(300));
+        assert_eq!(actions.borrow().len(), 1);
+        driver.tick(&window, &state, now + Duration::from_millis(350));
+        assert_eq!(
+            actions.borrow().len(),
+            if button == InputButton::Down { 2 } else { 1 }
+        );
+        driver.cancel();
     }
 }
 
