@@ -100,9 +100,13 @@ mixed when a retry is already close to touchdown. The
 flight phases and retry context. Eight fresh runs reduce the 15-second
 checkpoint's paired median trip error from 5.41 to 0.28 seconds. A 29.90-second
 underestimate followed by nine further terrain-driven replans preserves the
-need for an interruption-risk model. Independent longer ground trips and
-remote-transfer estimates remain next before selection; retry calibration is
-still sparse and these estimates do not change bot controls.
+need for an interruption-risk model. The [long-ground validation](../bot-long-ground-validation.md)
+now retains 48 independent matches and all 212 attempts. Only three original
+choices are long walks; all exceed the calibration domain and fail, revealing
+a blocked posture recovery and a route whose nominal duration exceeds its task
+clock. Controlled moderate-distance trips are next before selection, alongside
+remote-transfer evidence. Retry calibration is still sparse and these estimates
+do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

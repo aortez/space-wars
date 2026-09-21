@@ -185,10 +185,14 @@ prediction unchanged. The profile SHA-256 is
 The [rolling landing diagnostic](bot-rolling-trip-estimate.md) now expires
 references on dependency changes, preserves elapsed retry time and exposes the
 native capture deadline separately. It retains the original predictions and
-compares updates at fixed horizons. Timing improves on some long retries but
-remains mixed; a model conditioned on actual approach progress is next.
+compares updates at fixed horizons. The subsequent [phase-aware model](bot-phase-landing-estimate.md)
+conditions updates on observed approach progress; interrupted approaches remain
+a separate source of error.
 
-Before using these costs to rank missions, add independent nontrivial walking
-and crossing examples and a remote-transfer estimate. Keep those missing costs,
+The [long-ground validation](bot-long-ground-validation.md) finds that random
+matches leave substantial walking accuracy unproven, with posture and timeout
+failures among the few long choices. Controlled moderate-distance trips and
+a remote-transfer estimate remain necessary before ranking missions. Keep those
+missing costs,
 pilot exposure and completion probability explicit. This completes the first
 local complete-trip accounting slice; strategic selection remains a later step.

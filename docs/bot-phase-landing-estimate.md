@@ -240,8 +240,12 @@ preserve the findings.
 
 ## Remaining work
 
-Keep this as the routine-flight diagnostic and move on to independent longer
-ground trips. Carry unknown retry costs and the interruption case forward.
+Keep this as the routine-flight diagnostic. The subsequent
+[long-ground validation](bot-long-ground-validation.md) retains 48 fresh matches
+but finds no completed long-walk comparison: three choices exceed the calibration
+domain and fail through posture/timeout or approach problems. Controlled moderate
+distances are the next ground test. Carry unknown retry costs and the
+interruption case forward.
 Phase recognition improves the description of progress; it does not measure
 how far a retry still has to fly. The two successful retry examples are a narrow
 basis for a timing model. Future retry work should record current site-relative
