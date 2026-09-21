@@ -159,6 +159,12 @@ case for fitting makes it training/diagnostic data, not a fresh validation case.
 
 ## Next bounded step
 
+The [controlled-ground checkpoint](bot-controlled-ground.md) now implements and
+exercises the first two steps below. Six completed trips remain walks and are
+underpredicted by a median of 4.17 seconds. Unavailable setups, interrupted
+approaches, a powered return and a shorter posture failure remain explicit.
+The frozen profile still needs separate training and independent revalidation.
+
 Use controlled physical trips to fill the missing distance range before these
 costs influence mission selection. Another unconstrained random batch would
 mostly reproduce hatch-adjacent claims and extreme failures.

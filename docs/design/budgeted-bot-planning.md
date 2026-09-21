@@ -104,9 +104,13 @@ need for an interruption-risk model. The [long-ground validation](../bot-long-gr
 now retains 48 independent matches and all 212 attempts. Only three original
 choices are long walks; all exceed the calibration domain and fail, revealing
 a blocked posture recovery and a route whose nominal duration exceeds its task
-clock. Controlled moderate-distance trips are next before selection, alongside
-remote-transfer evidence. Retry calibration is still sparse and these estimates
-do not change bot controls.
+clock. The [controlled-ground fixture](../bot-controlled-ground.md) now retains
+32 generated distance/direction/seat trials. Six completed trips remain walks,
+with a 4.17-second median ground-cost underestimate; a powered return, unavailable
+setups and a shorter posture failure remain separate. Walking/settling calibration
+and independent validation are next before selection, alongside remote-transfer
+evidence. Retry calibration is still sparse and these estimates do not change
+bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

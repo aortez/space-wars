@@ -499,6 +499,57 @@ pub struct MaterialFlightStart {
 }
 
 impl SurfaceSortieScenario {
+    /// Controlled flag trial on the normal generated material arena. Both pilots
+    /// start above planet zero; only initial placement is prescribed. The
+    /// defender must still land, exit and raise a real flag through controls.
+    pub fn init_generated_flag_flight(
+        seed: u64,
+        attacker: PlayerId,
+        bearing_offset: f32,
+    ) -> SurfaceSortieState {
+        assert!(bearing_offset.is_finite());
+        let mut state = Self::init_material_arena(seed);
+        let planet = state.world.planets[0];
+        for seat in 0..2 {
+            state.pilots[seat].planet = 0;
+            let frame = state.planet_motion(seat);
+            let bearing = (1 - attacker.index()) as f32 * std::f32::consts::PI
+                + if seat == attacker.index() {
+                    bearing_offset
+                } else {
+                    0.0
+                };
+            let up = Vec2::Y.rotate_radians(bearing);
+            let altitude = if seat == attacker.index() { 20.0 } else { 0.5 };
+            let position =
+                frame.position + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + altitude + 5.45);
+            let velocity = motion::point_velocity(frame, position);
+            let angle = rotation_for_direction(up);
+            let ship = &mut state.world.ships[seat];
+            ship.position = position - SHIP_PIVOT;
+            ship.velocity = velocity;
+            ship.rotation_radians = angle;
+            ship.direction = up;
+            ship.omega = frame.angular_velocity;
+            let body = state.world.physics.ship_body(seat);
+            assert!(
+                state
+                    .world
+                    .physics
+                    .world
+                    .set_pose(body, position, angle, true)
+            );
+            assert!(state.world.physics.world.set_velocity(
+                body,
+                velocity,
+                frame.angular_velocity,
+                true
+            ));
+        }
+        state.world.physics.material_queries_dirty = true;
+        state
+    }
+
     pub fn init_material_flight(
         seed: u64,
         players: usize,
@@ -559,6 +610,44 @@ mod tests {
     };
     use engine_terrain::{Brush, EditMode, TerrainEdit};
     const DT: Duration = Duration::from_nanos(16_666_667);
+
+    #[test]
+    fn generated_flag_setup_preserves_world_geometry_and_starts_both_pilots_aboard() {
+        let mut radii = Vec::new();
+        for seed in [41, 42] {
+            let reference = SurfaceSortieScenario::init_material_arena(seed);
+            for seat in 0..2 {
+                let state = SurfaceSortieScenario::init_generated_flag_flight(
+                    seed,
+                    PlayerId::from_index(seat).unwrap(),
+                    0.6,
+                );
+                for (actual, original) in state.world.planets.iter().zip(&reference.world.planets) {
+                    assert_eq!(actual.radius, original.radius);
+                    assert_eq!(actual.mass, original.mass);
+                    assert_eq!(actual.position, original.position);
+                    assert_eq!(actual.wrapper_omega, original.wrapper_omega);
+                    assert_eq!(actual.orbit_omega, original.orbit_omega);
+                }
+                for player in 0..2 {
+                    let p = state.pilot_observation(player, None);
+                    assert_eq!(p.planet.index, 0);
+                    assert!(matches!(p.location, PilotLocation::Aboard(_)));
+                    assert!(p.planet.claim.unwrap().owner.is_none());
+                    let body = state
+                        .world
+                        .physics
+                        .world
+                        .motion(state.world.physics.ship_body(player))
+                        .unwrap();
+                    assert!(body.position.distance_to(p.planet.motion.position) > p.planet.radius);
+                }
+                assert!(state.terrain_diagnostics().issues.is_empty());
+            }
+            radii.push(reference.world.planets[0].radius);
+        }
+        assert_ne!(radii[0], radii[1]);
+    }
 
     #[test]
     fn landing_forecast_moves_its_own_ship_but_keeps_other_obstacles() {
