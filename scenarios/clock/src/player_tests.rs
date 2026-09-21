@@ -3,12 +3,19 @@ use engine_common::{ClockDuckOutcome, ClockFloorMode};
 use events::duck::planner::Surface;
 
 mod composition;
+mod rain;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
             aspect_ratio: aspect,
             event_profile: ClockEventProfile::Demo,
+            // Dry movement/visual regressions have their own fixed workload.
+            // Wet composition is exercised independently below.
+            events: ClockEvents {
+                rain: false,
+                ..Default::default()
+            },
             ..Default::default()
         },
         seed,

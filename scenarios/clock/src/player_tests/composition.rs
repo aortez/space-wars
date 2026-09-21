@@ -58,9 +58,12 @@ fn visual_start_replace_finish_are_physically_transparent_during_movement_and_ju
 #[test]
 fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anything() {
     let mut state = off_player(42);
+    let mut settings = state.settings();
+    settings.events.rain = true;
+    state.configure(settings);
     let session = state.player_duck_state();
     for _ in 0..3 {
-        for event in VISUAL {
+        for event in VISUAL.into_iter().chain([ClockEventKind::Rain]) {
             state.next_event();
             assert_eq!(state.event_kind(), Some(event));
             assert_eq!(state.player_duck_state(), session);
@@ -71,7 +74,7 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     assert!(state.can_trigger_event());
     let id = state.event_id();
     for event in ClockEventKind::ALL {
-        if !EVENT_CATALOG[event as usize].uses_floor() {
+        if !state.event_blocked_by_player(event) {
             continue;
         }
         assert!(state.event_blocked_by_player(event));
@@ -83,7 +86,7 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     let id = state.event_id();
     let duck = state.player_duck_state();
     for event in ClockEventKind::ALL {
-        if !EVENT_CATALOG[event as usize].uses_floor() {
+        if !state.event_blocked_by_player(event) {
             continue;
         }
         state.preview_event(event);

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 12;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 13;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -404,6 +404,8 @@ mod tests {
             move_milli: -750,
             jump_held: true,
             facing_right: false,
+            submerged_milli: 450,
+            velocity_milli: Some([-12000, 200]),
             duck: engine_common::ClockDuckState {
                 left_to_right: true,
                 position_milli: Some([-200000, -100000]),
@@ -432,6 +434,7 @@ mod tests {
         state.phase = Some("raining".into());
         state.settings.rain_amount = ClockRainAmount::Varied;
         state.rain = Some(ClockRainState {
+            player_course: false,
             seed: 42,
             amount: ClockRainAmount::Heavy,
             requested_microunits: 10_000_000,

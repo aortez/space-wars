@@ -60,6 +60,63 @@ const BOX: HullShape = HullShape::Box {
 const DT: f64 = 1.0 / 60.0;
 
 #[test]
+fn character_material_is_validated_before_insertion_and_preserves_mass_geometry() {
+    let (mut physics, _) = tank(40.0);
+    let shape = HullShape::Circle { radius: 3.0 };
+    let material = BuoyantMaterial {
+        density: 0.45,
+        friction: 0.0,
+        restitution: 0.0,
+    };
+    for bad in [
+        BuoyantMaterial {
+            friction: f32::NAN,
+            ..material
+        },
+        BuoyantMaterial {
+            friction: -0.1,
+            ..material
+        },
+        BuoyantMaterial {
+            restitution: 1.1,
+            ..material
+        },
+        BuoyantMaterial {
+            restitution: f32::NAN,
+            ..material
+        },
+        BuoyantMaterial {
+            density: 0.0,
+            ..material
+        },
+    ] {
+        assert!(
+            BuoyantBody::insert_with_material(
+                &mut physics,
+                PhysicsId::new(1),
+                BodySpec::default(),
+                shape,
+                bad
+            )
+            .is_none()
+        );
+        assert_eq!(physics.body_count(), 0, "invalid material is atomic");
+    }
+    let body = BuoyantBody::insert_with_material(
+        &mut physics,
+        PhysicsId::new(1),
+        BodySpec::default(),
+        shape,
+        material,
+    )
+    .unwrap();
+    assert_eq!(body.shape(), shape);
+    assert!(
+        (physics.body_mass(body.body()).unwrap() - std::f32::consts::PI * 9.0 * 0.45).abs() < 1e-4
+    );
+}
+
+#[test]
 fn box_floats_at_density_ratio_and_tilt_recovers_with_real_rapier() {
     for dt in [1.0 / 120.0, DT, 1.0 / 30.0] {
         let (mut physics, water) = tank(40.0);

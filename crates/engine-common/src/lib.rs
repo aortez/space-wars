@@ -373,6 +373,10 @@ pub enum ClockRainDuckPhase {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockRainState {
+    /// Rain uses the stable player course instead of its responsive floor and
+    /// passive duck. The course outlives a dismissed player until Rain ends.
+    #[serde(default)]
+    pub player_course: bool,
     pub seed: u64,
     /// The resolved amount for this visit; settings may still say Varied.
     pub amount: ClockRainAmount,
@@ -792,6 +796,11 @@ pub struct ClockPlayerDuckState {
     pub move_milli: i16,
     pub jump_held: bool,
     pub facing_right: bool,
+    #[serde(default)]
+    pub submerged_milli: u32,
+    /// Screen-relative physical velocity, including drift from water.
+    #[serde(default)]
+    pub velocity_milli: Option<[i32; 2]>,
     pub duck: ClockDuckState,
 }
 

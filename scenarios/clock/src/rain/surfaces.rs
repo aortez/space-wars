@@ -6,14 +6,15 @@ use crate::{
 };
 use engine_water::{Boundary, DripConfig, PoolSpec, WaterConfig, WaterError, WaterWorld};
 
+#[cfg(test)]
 pub(super) const FLOOR_POOLS: usize = 2;
 const CELL_POOLS: usize = 24 * DIGIT_SLOT_COUNT;
-const POOLS: usize = FLOOR_POOLS + CELL_POOLS;
 pub(super) const RELEASE_SLOTS: usize = CELL_POOLS * 2;
 // Reuse the lab/engine ceiling, not a growing per-digit or per-event allocation.
 pub(super) const PARCELS: usize = 512;
 
 pub(super) struct DigitSurfaces {
+    pub floor_pools: usize,
     pub digits: [Option<u8>; DIGIT_SLOT_COUNT],
     pub pending: bool,
     pub deferrals: u64,
@@ -25,8 +26,18 @@ mod tests;
 impl DigitSurfaces {
     pub fn new(layout: Layout, display: DisplaySnapshot) -> (Self, WaterWorld) {
         let floor = FloorShape::clock(layout);
+        let (surfaces, mut water) = Self::with_floor(layout, display, floor.pools().into());
+        floor.configure(&mut water);
+        (surfaces, water)
+    }
+
+    pub fn with_floor(
+        layout: Layout,
+        display: DisplaySnapshot,
+        mut specs: Vec<PoolSpec>,
+    ) -> (Self, WaterWorld) {
+        let floor_pools = specs.len();
         let half = layout.pitch * 0.4;
-        let mut specs: Vec<_> = floor.pools().into();
         for slot in 0..DIGIT_SLOT_COUNT {
             for kind in SegmentKind::ALL {
                 let id = SegmentId {
@@ -45,7 +56,7 @@ impl DigitSurfaces {
                 }
             }
         }
-        assert_eq!(specs.len(), POOLS);
+        assert_eq!(specs.len(), floor_pools + CELL_POOLS);
         let mut water = WaterWorld::new(
             WaterConfig {
                 // A gentle local response when a drop reaches an already-wet
@@ -63,9 +74,8 @@ impl DigitSurfaces {
             specs,
         )
         .expect("bounded digit and floor geometry");
-        floor.configure(&mut water);
         let unit = f64::from(layout.pitch * 0.8).powi(2);
-        for pool in FLOOR_POOLS..POOLS {
+        for pool in floor_pools..floor_pools + CELL_POOLS {
             water
                 .set_drip_config(
                     pool,
@@ -81,9 +91,12 @@ impl DigitSurfaces {
                 )
                 .unwrap();
         }
-        water.set_pool_supports(&Self::mask(display)).unwrap();
+        water
+            .set_pool_supports(&Self::mask(display, floor_pools)[..floor_pools + CELL_POOLS])
+            .unwrap();
         (
             Self {
+                floor_pools,
                 digits: display.digits,
                 pending: false,
                 deferrals: 0,
@@ -92,9 +105,9 @@ impl DigitSurfaces {
         )
     }
 
-    fn mask(display: DisplaySnapshot) -> [bool; POOLS] {
-        let mut mask = [true; POOLS];
-        let mut pool = FLOOR_POOLS;
+    fn mask(display: DisplaySnapshot, floor_pools: usize) -> [bool; engine_water::MAX_POOLS] {
+        let mut mask = [true; engine_water::MAX_POOLS];
+        let mut pool = floor_pools;
         for digit in display.digits {
             for kind in SegmentKind::ALL {
                 let lit = digit.is_some_and(|d| digits::digit_mask(d) & (1 << kind as u8) != 0);
@@ -116,7 +129,9 @@ impl DigitSurfaces {
             self.pending = false;
             return;
         }
-        match water.set_pool_supports(&Self::mask(display)) {
+        match water.set_pool_supports(
+            &Self::mask(display, self.floor_pools)[..self.floor_pools + CELL_POOLS],
+        ) {
             Ok(()) => {
                 self.digits = display.digits;
                 self.pending = false;

@@ -2,6 +2,15 @@ use super::*;
 use crate::events::duck::DuckEvent;
 
 pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
+    render_with_course(frame, event, debug, true);
+}
+
+pub(super) fn render_with_course(
+    frame: &mut RenderFrame,
+    event: &DuckEvent,
+    debug: bool,
+    draw_course: bool,
+) {
     let opacity = event.course_opacity();
     if opacity <= 0.0 {
         return;
@@ -9,89 +18,63 @@ pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
     let layout = event.layout;
     let radius = event.radius;
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);
-    if let Some(course) = &event.course {
-        for surface in &course.surfaces {
-            let left = surface.start.max(0.0);
-            let right = surface.end.min(event.width);
-            let top = layout.floor_y + surface.height;
-            rect(
-                frame,
-                event,
-                Vec2::new(left, layout.bounds_min.y),
-                Vec2::new(right, layout.floor_y),
-                FLOOR_COLOR,
-                ARENA_LAYER,
-                opacity,
-            );
-            if surface.height > 0.0 {
+    if draw_course {
+        if let Some(course) = &event.course {
+            let spans = course.surfaces.iter().map(|surface| {
+                let a = event
+                    .render_position(Vec2::new(surface.start.max(0.0), 0.0))
+                    .x;
+                let b = event
+                    .render_position(Vec2::new(surface.end.min(event.width), 0.0))
+                    .x;
+                (a.min(b), a.max(b), surface.height)
+            });
+            course_slabs(frame, layout, radius, opacity, spans);
+        } else {
+            let pit = event.obstacles[1];
+            for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
                 rect(
                     frame,
                     event,
-                    Vec2::new(left, layout.floor_y),
-                    Vec2::new(right, top),
-                    orange,
+                    Vec2::new(start, layout.bounds_min.y),
+                    Vec2::new(end, layout.floor_y),
+                    FLOOR_COLOR,
+                    ARENA_LAYER,
+                    opacity,
+                );
+                rect(
+                    frame,
+                    event,
+                    Vec2::new(start, layout.floor_y - 2.0),
+                    Vec2::new(end, layout.floor_y),
+                    FLOOR_EDGE_COLOR,
                     ARENA_LAYER,
                     opacity,
                 );
             }
-            rect(
-                frame,
-                event,
-                Vec2::new(left, top - event.radius * 0.25),
-                Vec2::new(right, top),
-                if surface.height > 0.0 {
-                    RenderColor::rgb(1.0, 0.85, 0.45)
-                } else {
-                    FLOOR_EDGE_COLOR
-                },
-                ACTIVE_CELL_LAYER,
-                opacity,
-            );
-        }
-    } else {
-        let pit = event.obstacles[1];
-        for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
-            rect(
-                frame,
-                event,
-                Vec2::new(start, layout.bounds_min.y),
-                Vec2::new(end, layout.floor_y),
-                FLOOR_COLOR,
-                ARENA_LAYER,
-                opacity,
-            );
-            rect(
-                frame,
-                event,
-                Vec2::new(start, layout.floor_y - 2.0),
-                Vec2::new(end, layout.floor_y),
-                FLOOR_EDGE_COLOR,
-                ARENA_LAYER,
-                opacity,
-            );
-        }
-        for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
-            rect(
-                frame,
-                event,
-                Vec2::new(obstacle.start, layout.floor_y),
-                Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                orange,
-                ACTIVE_CELL_LAYER,
-                opacity,
-            );
-            rect(
-                frame,
-                event,
-                Vec2::new(
-                    obstacle.start,
-                    layout.floor_y + obstacle.height - radius * 0.3,
-                ),
-                Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                RenderColor::rgb(1.0, 0.85, 0.45),
-                ACTIVE_CELL_LAYER,
-                opacity,
-            );
+            for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
+                rect(
+                    frame,
+                    event,
+                    Vec2::new(obstacle.start, layout.floor_y),
+                    Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
+                    orange,
+                    ACTIVE_CELL_LAYER,
+                    opacity,
+                );
+                rect(
+                    frame,
+                    event,
+                    Vec2::new(
+                        obstacle.start,
+                        layout.floor_y + obstacle.height - radius * 0.3,
+                    ),
+                    Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
+                    RenderColor::rgb(1.0, 0.85, 0.45),
+                    ACTIVE_CELL_LAYER,
+                    opacity,
+                );
+            }
         }
     }
     if debug && let Some(arc) = event.debug_arc() {
@@ -228,6 +211,77 @@ pub(super) fn render(frame: &mut RenderFrame, event: &DuckEvent, debug: bool) {
             ACTIVE_CELL_LAYER,
             1.0,
         );
+    }
+}
+
+/// Rain retains this shared geometry even after the player leaves. It is drawn
+/// before water, with the exact same slab heights, gaps and mirroring.
+pub(super) fn shared_course(
+    frame: &mut RenderFrame,
+    geometry: &crate::events::duck::arena::CourseGeometry,
+    opacity: f32,
+) {
+    let spans = geometry.course.surfaces.iter().map(|surface| {
+        let a = geometry
+            .screen_position(Vec2::new(surface.start.max(0.0), 0.0))
+            .x;
+        let b = geometry
+            .screen_position(Vec2::new(surface.end.min(geometry.width), 0.0))
+            .x;
+        (a.min(b), a.max(b), surface.height)
+    });
+    course_slabs(frame, geometry.layout, geometry.radius, opacity, spans);
+}
+
+fn course_slabs(
+    frame: &mut RenderFrame,
+    layout: Layout,
+    radius: f32,
+    opacity: f32,
+    spans: impl Iterator<Item = (f32, f32, f32)>,
+) {
+    for (left, right, height) in spans {
+        let top = layout.floor_y + height;
+        for (bottom, top, color, layer) in [
+            (
+                layout.bounds_min.y,
+                layout.floor_y,
+                FLOOR_COLOR,
+                ARENA_LAYER,
+            ),
+            (
+                layout.floor_y,
+                top,
+                RenderColor::rgb(1.0, 0.48, 0.08),
+                ARENA_LAYER,
+            ),
+            (
+                top - radius * 0.25,
+                top,
+                if height > 0.0 {
+                    RenderColor::rgb(1.0, 0.85, 0.45)
+                } else {
+                    FLOOR_EDGE_COLOR
+                },
+                ACTIVE_CELL_LAYER,
+            ),
+        ] {
+            if top <= bottom {
+                continue;
+            }
+            frame.push_primitive(
+                layer,
+                rectangle(
+                    RenderPoint::new(left, bottom),
+                    RenderPoint::new(right, top),
+                    RenderColor {
+                        a: opacity,
+                        ..color
+                    },
+                    None,
+                ),
+            );
+        }
     }
 }
 

@@ -132,9 +132,11 @@ Clock-only binding does not change menus, NES, or other scenarios; ordinary
 gamepads use right shoulder.
 
 In Clock, bottom-right blue starts/dismisses a player duck, joystick moves it,
-and bottom-middle yellow jumps. Top-right blue cycles compatible visual events
-without ending the visit. Rain, Meltdown, Falling and the automatic duck course
-wait until the player leaves; saved event settings are not changed.
+and bottom-middle yellow jumps from solid ground. Top-right blue cycles compatible
+visual events and Rain without ending the visit. In water, the joystick paddles;
+neutral floats/drifts with the current. Rain shares the fixed course and does not
+spawn another duck. Meltdown, Falling and the automatic duck course wait until
+the player leaves; saved event settings are not changed.
 
 Run `python3 tools/capture-picade-buttons.py --host sw-picade-2.local` from the
 workstation. It discovers only the two Picade input devices, reads them over SSH,

@@ -1,5 +1,5 @@
 //! Player presence is separate from the automatic event scheduler. For now it
-//! owns the Duck arena while compatible face animations continue independently.
+//! owns the Duck arena while face animations and course-aware Rain continue.
 use super::*;
 use events::duck::DuckEvent;
 
@@ -62,7 +62,11 @@ impl ClockState {
     }
 
     pub fn event_blocked_by_player(&self, kind: ClockEventKind) -> bool {
-        self.player_duck.is_some() && EVENT_CATALOG[kind as usize].uses_floor()
+        self.player_duck.is_some()
+            && matches!(
+                kind,
+                ClockEventKind::Falling | ClockEventKind::Meltdown | ClockEventKind::Duck
+            )
     }
 
     pub(super) fn sync_event_schedule(&mut self) {
@@ -104,9 +108,14 @@ impl ClockState {
             }
             return;
         }
-        if self
-            .event_kind()
-            .is_some_and(|kind| EVENT_CATALOG[kind as usize].uses_floor())
+        let shared_course = match &self.active_event {
+            Some(ActiveEvent::Rain(rain)) => rain.course().cloned(),
+            _ => None,
+        };
+        if shared_course.is_none()
+            && self
+                .event_kind()
+                .is_some_and(|kind| EVENT_CATALOG[kind as usize].uses_floor())
         {
             self.finish_event();
         }
@@ -119,6 +128,9 @@ impl ClockState {
             self.player_duck_sequence,
             player,
         )));
+        if let Some(geometry) = shared_course {
+            self.player_duck.as_mut().unwrap().adopt_course(&geometry);
+        }
         self.sync_event_schedule();
         self.event_notice = Some((
             if player == 1 {

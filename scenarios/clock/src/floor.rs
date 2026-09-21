@@ -1,8 +1,8 @@
 //! Scoped ownership of the ordinary floor.
 //!
-//! One physical arena owner can coexist with a face-only event. Release only
-//! the caller's claim, after dropping its resources. Rain and Meltdown still
-//! own their responsive water/impact geometry as well as their art.
+//! Face-only events make no claim. The player's stable course can be claimed
+//! jointly with Rain; it closes only after both release their resources.
+//! Standalone physical events retain exclusive floor ownership.
 
 pub(crate) mod responsive;
 
@@ -22,7 +22,7 @@ pub(crate) struct FloorManager {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum FloorOwner {
     Event(ClockEventKind),
-    PlayerDuck,
+    PlayerCourse { player: bool, rain: bool },
 }
 
 impl FloorManager {
@@ -47,20 +47,56 @@ impl FloorManager {
     }
 
     pub fn release(&mut self, kind: ClockEventKind) {
+        if kind == ClockEventKind::Rain
+            && let Some(FloorOwner::PlayerCourse { player, .. }) = self.owner
+        {
+            self.owner = player.then_some(FloorOwner::PlayerCourse {
+                player,
+                rain: false,
+            });
+            if !player {
+                self.mode = ClockFloorMode::Closed;
+            }
+            return;
+        }
         self.release_owner(FloorOwner::Event(kind));
     }
 
     pub fn acquire_player(&mut self) {
+        if let Some(FloorOwner::PlayerCourse { player, rain }) = &mut self.owner {
+            assert!(!*player && *rain);
+            *player = true;
+            return;
+        }
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
         );
-        self.owner = Some(FloorOwner::PlayerDuck);
+        self.owner = Some(FloorOwner::PlayerCourse {
+            player: true,
+            rain: false,
+        });
         self.mode = ClockFloorMode::EventOwned;
     }
 
     pub fn release_player(&mut self) {
-        self.release_owner(FloorOwner::PlayerDuck);
+        if let Some(FloorOwner::PlayerCourse { rain, .. }) = self.owner {
+            self.owner = rain.then_some(FloorOwner::PlayerCourse {
+                player: false,
+                rain,
+            });
+            if !rain {
+                self.mode = ClockFloorMode::Closed;
+            }
+        }
+    }
+
+    pub fn acquire_course_rain(&mut self) {
+        let Some(FloorOwner::PlayerCourse { rain, .. }) = &mut self.owner else {
+            panic!("course rain requires a player arena");
+        };
+        assert!(!*rain);
+        *rain = true;
     }
 
     fn release_owner(&mut self, owner: FloorOwner) {

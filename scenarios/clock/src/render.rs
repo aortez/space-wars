@@ -67,7 +67,24 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    if let Some(event) = state.duck_scene() {
+    if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event
+        && let Some(course) = event.course()
+    {
+        // A shower owns a course claim, not a second responsive floor. Keep it
+        // opaque while the player is present, including Rain's clearing phase.
+        let opacity = if state.player_duck.is_some() {
+            1.0
+        } else {
+            event.opacity()
+        };
+        render_floor(
+            &mut frame,
+            crate::floor::FloorGeometry::closed(layout),
+            layout.pitch,
+            1.0 - opacity,
+        );
+        duck::shared_course(&mut frame, course, opacity);
+    } else if let Some(event) = state.duck_scene() {
         // The custom course owns its floor, including the entrance/exit fade.
         // This backdrop never adds a collider across the course's physical pit.
         render_floor(
@@ -77,7 +94,12 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             1.0 - event.course_opacity(),
         );
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
-        floor::responsive(&mut frame, &event.floor, layout, event.opacity());
+        floor::responsive(
+            &mut frame,
+            event.responsive_floor().expect("standalone rain"),
+            layout,
+            event.opacity(),
+        );
     } else if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         if let Some(floor) = &event.floor {
             floor::responsive(&mut frame, floor, layout, event.floor_opacity());
@@ -130,7 +152,12 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
     // Kept outside the marquee's face fade and early return. The duck/course
     // retain their own opacity and geometry while clock content transforms.
     if let Some(event) = state.duck_scene() {
-        duck::render(frame, event, state.config.duck_debug_overlay);
+        let shared = matches!(&state.active_event, Some(crate::events::ActiveEvent::Rain(rain)) if rain.course().is_some());
+        if shared {
+            duck::render_with_course(frame, event, state.config.duck_debug_overlay, false);
+        } else {
+            duck::render(frame, event, state.config.duck_debug_overlay);
+        }
     }
     if let Some((_, player)) = state.player_duck_session() {
         frame.push_primitive(

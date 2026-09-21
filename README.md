@@ -43,8 +43,9 @@ The local launcher includes the following scenarios and presets:
   using one dynamic body and guaranteed arena cleanup.
   **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
   a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
-  (Picade: bottom-middle yellow). Color Cycle, Marquee and Digit Slide continue
-  alongside the player; physical-arena events wait until the visit ends.
+  (Picade: bottom-middle yellow). Color Cycle, Marquee, Digit Slide and Rain
+  continue alongside the player. Rain shares the stable course; the duck floats,
+  drifts and paddles with the joystick. Other physical events wait for the visit.
   **N** / right shoulder / Picade upper-right blue starts the next compatible
   event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or

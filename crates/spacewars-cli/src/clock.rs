@@ -267,6 +267,14 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);
         if let Some(rain) = state.rain {
             println!(
+                "Rain arena: {}",
+                if rain.player_course {
+                    "shared player course (fixed)"
+                } else {
+                    "responsive floor"
+                }
+            );
+            println!(
                 "Rain: {} / {:?}, spawns={}, entry depth={:.1}/{:.1}; position={:?}, velocity={:?}",
                 rain.amount.label(),
                 rain.duck_phase,
@@ -337,6 +345,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 world_vector(player.duck.position_milli),
                 player.duck.outcome,
                 state.automatic_events_suspended,
+            );
+            println!(
+                "Player water: {:.1}% submerged, velocity={:?}",
+                player.submerged_milli as f32 / 10.0,
+                world_vector(player.velocity_milli)
             );
             let blocked: Vec<_> = state
                 .events

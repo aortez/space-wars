@@ -368,8 +368,8 @@ pub struct ClockState {
     floor: floor::FloorManager,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
-    // Player presence is not a timed event. Face-only events can coexist;
-    // private physical-arena events wait until the player releases the course.
+    // Player presence is not a timed event. Face animations and Rain coexist;
+    // remaining private physical arenas wait until the player releases the course.
     player_duck: Option<Box<events::duck::DuckEvent>>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -591,6 +591,18 @@ impl ClockState {
         self.event_notice = None;
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
+        if kind == ClockEventKind::Rain
+            && let Some(duck) = &self.player_duck
+        {
+            self.floor.acquire_course_rain();
+            self.active_event = Some(ActiveEvent::Rain(Box::new(rain::RainEvent::on_course(
+                events::duck::arena::CourseGeometry::from_duck(duck),
+                seed,
+                self.config.rain_amount,
+                self.display,
+            ))));
+            return;
+        }
         self.floor.acquire(kind);
         self.active_event = Some(ActiveEvent::new(
             kind,
@@ -629,11 +641,6 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        if let Some(duck) = &mut self.player_duck
-            && duck.step()
-        {
-            self.finish_player_duck();
-        }
         if let Some(event) = &mut self.active_event {
             if event.step(EventContext {
                 segments: &mut self.segments,
@@ -645,6 +652,17 @@ impl ClockState {
             }
         } else if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
             self.trigger_event(kind);
+        }
+        // Water advances once, then the one player mechanics world samples it.
+        // No second character world or frame-rate dependent force application.
+        let water = match &self.active_event {
+            Some(ActiveEvent::Rain(rain)) if rain.course().is_some() => Some(&rain.water),
+            _ => None,
+        };
+        if let Some(duck) = &mut self.player_duck
+            && duck.step_with_water(water)
+        {
+            self.finish_player_duck();
         }
     }
 

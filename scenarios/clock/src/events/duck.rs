@@ -1,6 +1,7 @@
 //! A bounded, event-local obstacle course. The round body is physical; the
 //! upright pixel character and side doors are presentation, not articulated rigs.
 
+pub(crate) mod arena;
 mod controller;
 mod flow;
 pub(crate) mod planner;
@@ -8,14 +9,18 @@ pub(crate) mod planner;
 mod platform_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod water_tests;
 
 use controller::{Command, Controller, CourseContext, Gait, Movement, Observation};
 use engine_common::{ClockDuckNavigationState, ClockDuckOutcome, ClockDuckState};
 use engine_core::Vec2;
+use engine_rapier::buoyancy::{BuoyancyConfig, BuoyancyReport, BuoyantBody, BuoyantMaterial};
 use engine_rapier::world::{
     BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
     PhysicsWorld, PhysicsWorldConfig,
 };
+use engine_water::{WaterWorld, immersion::HullShape};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
@@ -29,6 +34,10 @@ const DT: f32 = 1.0 / 60.0;
 const DUCK_ENTITY: PhysicsId = PhysicsId::new(1);
 const DUCK_BODY: BodyId = BodyId::new(DUCK_ENTITY, BodyRole::PRIMARY);
 const DUCK_COLLIDER: ColliderId = ColliderId::new(DUCK_ENTITY, ColliderRole::PRIMARY, 0);
+const PLAYER_DENSITY: f32 = 0.45;
+// One third of the dry actuator's acceleration. Water drag sets the eventual
+// relative speed; enough authority to paddle against ordinary course runoff.
+const PADDLE_ACCELERATION: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Obstacle {
@@ -50,6 +59,8 @@ pub(crate) struct DuckEvent {
     pub obstacles: [Obstacle; 3],
     pub course: Option<planner::Course>,
     world: Option<PhysicsWorld>,
+    buoyant: Option<BuoyantBody>,
+    water_report: BuoyancyReport,
     seed: u64,
     movement: Movement,
     controller: Controller,
@@ -91,6 +102,17 @@ impl DuckEvent {
         self.player.as_ref().map(|p| (p.session_id, p.seat))
     }
 
+    pub fn adopt_course(&mut self, geometry: &arena::CourseGeometry) {
+        assert_eq!(self.tick, 0);
+        assert!(self.player.is_some());
+        self.layout = geometry.layout;
+        self.width = geometry.width;
+        self.radius = geometry.radius;
+        self.direction = geometry.direction;
+        self.course = Some(geometry.course.clone());
+        self.movement = Movement::new(self.width, self.radius);
+    }
+
     pub fn set_player_input(&mut self, move_milli: i16, jump: bool) {
         if self.phase == EventPhase::Resetting {
             return;
@@ -123,6 +145,17 @@ impl DuckEvent {
             move_milli: player.move_milli,
             jump_held: player.jump_held,
             facing_right: player.facing * self.direction > 0.0,
+            submerged_milli: (self.water_report.submerged_fraction * 1000.0).round() as u32,
+            velocity_milli: self
+                .world
+                .as_ref()
+                .and_then(|w| w.motion(DUCK_BODY))
+                .map(|m| {
+                    [
+                        (m.linear_velocity.x * 1000.0).round() as i32,
+                        (m.linear_velocity.y * 1000.0).round() as i32,
+                    ]
+                }),
             duck: self.diagnostics(),
         })
     }
@@ -190,6 +223,8 @@ impl DuckEvent {
                 last,
             ],
             world: None,
+            buoyant: None,
+            water_report: BuoyancyReport::default(),
             course: None,
             seed,
             movement: Movement::new(width, radius),
@@ -272,7 +307,8 @@ impl DuckEvent {
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
                     kind: BodyKind::Fixed,
-                    position: Vec2::new((start + end) * 0.5, (bottom + top) * 0.5),
+                    position:
+                        self.physics_position(Vec2::new((start + end) * 0.5, (bottom + top) * 0.5)),
                     ..BodySpec::default()
                 },
                 &[collider],
@@ -293,33 +329,69 @@ impl DuckEvent {
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
                     kind: BodyKind::Fixed,
-                    position: Vec2::new(-self.radius, self.layout.bounds_min.y + height * 0.5),
+                    position: self.physics_position(Vec2::new(
+                        -self.radius,
+                        self.layout.bounds_min.y + height * 0.5
+                    )),
                     ..BodySpec::default()
                 },
                 &[wall],
             ));
         }
-        let mut collider = ColliderSpec::ball(DUCK_COLLIDER, self.radius);
-        collider.friction = 0.0;
-        collider.restitution = 0.0;
-        assert!(world.insert_body(
-            DUCK_BODY,
-            BodySpec {
-                position: Vec2::new(self.radius * 6.0, floor + self.radius * 1.05),
-                can_sleep: false,
-                ccd_enabled: true,
-                ..BodySpec::default()
-            },
-            &[collider],
-        ));
+        let spec = BodySpec {
+            position: self
+                .physics_position(Vec2::new(self.radius * 6.0, floor + self.radius * 1.05)),
+            can_sleep: false,
+            ccd_enabled: true,
+            ..BodySpec::default()
+        };
+        if self.player.is_some() {
+            self.buoyant = Some(
+                BuoyantBody::insert_with_material(
+                    &mut world,
+                    DUCK_ENTITY,
+                    spec,
+                    HullShape::Circle {
+                        radius: self.radius,
+                    },
+                    BuoyantMaterial {
+                        density: PLAYER_DENSITY,
+                        friction: 0.0,
+                        restitution: 0.0,
+                    },
+                )
+                .expect("one bounded player hull"),
+            );
+        } else {
+            let mut collider = ColliderSpec::ball(DUCK_COLLIDER, self.radius);
+            collider.friction = 0.0;
+            collider.restitution = 0.0;
+            assert!(world.insert_body(DUCK_BODY, spec, &[collider],));
+        }
         self.world = Some(world);
     }
 
+    // Player mechanics use screen/world coordinates so water and contacts share
+    // one frame. AI's established entrance-relative simulation is unchanged.
+    fn physics_position(&self, p: Vec2) -> Vec2 {
+        if self.player.is_some() {
+            self.render_position(p)
+        } else {
+            p
+        }
+    }
+
     pub fn position(&self) -> Option<Vec2> {
-        self.world
-            .as_ref()?
-            .motion(DUCK_BODY)
-            .map(|motion| motion.position)
+        self.world.as_ref()?.motion(DUCK_BODY).map(|motion| {
+            if self.player.is_some() {
+                Vec2::new(
+                    motion.position.x * self.direction + self.width * 0.5,
+                    motion.position.y,
+                )
+            } else {
+                motion.position
+            }
+        })
     }
 
     pub fn grounded(&self) -> bool {
@@ -343,15 +415,27 @@ impl DuckEvent {
         })
     }
 
-    fn run(&mut self) {
+    fn run(&mut self, water: Option<&WaterWorld>) {
         let grounded = self.grounded();
         let support = self.supported_surface();
         let exit_visible = self.exit_visible();
         let Some(world) = &mut self.world else { return };
         let motion = world.motion(DUCK_BODY).expect("live duck body");
+        let screen = if self.player.is_some() {
+            self.direction
+        } else {
+            1.0
+        };
         let observed = Observation {
-            position: motion.position,
-            velocity: motion.linear_velocity,
+            position: if self.player.is_some() {
+                Vec2::new(
+                    motion.position.x * screen + self.width * 0.5,
+                    motion.position.y,
+                )
+            } else {
+                motion.position
+            },
+            velocity: Vec2::new(motion.linear_velocity.x * screen, motion.linear_velocity.y),
             grounded,
             blocked: world.surface_contacts(DUCK_COLLIDER).any(|contact| {
                 (contact.normal.x.abs() > 0.3 || contact.normal.y < -0.3)
@@ -391,7 +475,25 @@ impl DuckEvent {
                 exit_visible,
             )
         };
-        let delta = self.movement.velocity_delta(observed, &command);
+        world.clear_forces();
+        self.water_report = match (&self.buoyant, water) {
+            (Some(hull), Some(water)) => hull
+                .apply_forces(world, water, BuoyancyConfig::default(), f64::from(DT))
+                .expect("player hull and non-overlapping course water"),
+            _ => BuoyancyReport::default(),
+        };
+        let mut delta = self.movement.velocity_delta(observed, &command);
+        if self.water_report.submerged_fraction > 0.05 && !grounded {
+            // In water, input supplies a bounded paddling acceleration instead
+            // of cancelling flow with a zero-velocity target. Neutral drifts.
+            let axis = self
+                .player
+                .as_ref()
+                .map_or(0.0, |p| f32::from(p.move_milli) / 1000.0)
+                * screen;
+            delta.x = axis * self.movement.run_speed * DT * PADDLE_ACCELERATION;
+        }
+        delta.x *= screen;
         if command.jump && grounded {
             self.jumps += 1;
         }
@@ -407,6 +509,8 @@ impl DuckEvent {
     fn reset(&mut self, outcome: ClockDuckOutcome) {
         self.outcome = Some(outcome);
         self.world = None;
+        self.buoyant = None;
+        self.water_report = BuoyancyReport::default();
         if let Some(player) = &mut self.player {
             player.move_milli = 0;
             player.jump_held = false;
@@ -416,6 +520,10 @@ impl DuckEvent {
     }
 
     pub fn step(&mut self) -> bool {
+        self.step_with_water(None)
+    }
+
+    pub fn step_with_water(&mut self, water: Option<&WaterWorld>) -> bool {
         self.tick += 1;
         self.phase_tick += 1;
         match self.phase {
@@ -427,7 +535,7 @@ impl DuckEvent {
                 if self.phase == EventPhase::Running && self.exit_visible() {
                     self.enter(EventPhase::Exiting);
                 }
-                self.run();
+                self.run(water);
                 let position = self.position().expect("running duck");
                 if !position.x.is_finite()
                     || !position.y.is_finite()
