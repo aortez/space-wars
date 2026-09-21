@@ -112,7 +112,11 @@ setups and a shorter posture failure remain separate. The
 overhead and distance multipliers on eight new worlds, then freezes them before
 six-world validation. Fourteen paired ground intervals reduce median error from
 2.83 to 0.87 seconds; a newly covered slow return remains underestimated by 15.76
-seconds. Combining this component with phase-aware landing estimates is next,
+seconds. The [composed estimator](../bot-composed-trip-estimate.md) now reduces
+whole-trip error from 3.41 to 1.16 seconds on nine paired controlled completions
+at the 15-second checkpoint. Strictly replacing all walking costs loses ordinary
+short-walk coverage; initial controlled forecasts also trail the original model.
+Explicit short/moderate walking regimes and new-world validation are next,
 alongside remote-transfer and interruption-risk evidence before mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.

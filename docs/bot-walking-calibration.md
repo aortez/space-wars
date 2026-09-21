@@ -5,6 +5,10 @@ the new model reduces median absolute error from **2.83 to 0.87 seconds**.
 An additional newly covered interval is underestimated by **15.76 seconds**;
 the improvement in typical estimates does not resolve the slow tail.
 
+The subsequent [composition replay](bot-composed-trip-estimate.md) combines this
+model with phase-aware landing costs. Moderate controlled trips improve at the
+15-second checkpoint, while ordinary short walks expose a coverage gap.
+
 This checkpoint tests a small conditional walking-time model after the
 [controlled-ground experiment](bot-controlled-ground.md) found that moderate
 walks were consistently underestimated. It adds an offline calibration and

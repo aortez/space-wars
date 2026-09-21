@@ -243,9 +243,12 @@ preserve the findings.
 Keep this as the routine-flight diagnostic. The subsequent
 [long-ground validation](bot-long-ground-validation.md) retains 48 fresh matches
 but finds no completed long-walk comparison: three choices exceed the calibration
-domain and fail through posture/timeout or approach problems. Controlled moderate
-distances are the next ground test. Carry unknown retry costs and the
-interruption case forward.
+domain and fail through posture/timeout or approach problems. Subsequent
+[walking calibration](bot-walking-calibration.md) measures controlled moderate
+distances; the [composition replay](bot-composed-trip-estimate.md) now combines
+that model with this landing estimator. It improves controlled trip estimates
+at +15 seconds but loses short-walk coverage and retains an initial-forecast
+regression. Carry unknown retry costs and the interruption case forward.
 Phase recognition improves the description of progress; it does not measure
 how far a retry still has to fly. The two successful retry examples are a narrow
 basis for a timing model. Future retry work should record current site-relative
