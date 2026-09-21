@@ -143,6 +143,14 @@ class RollingTrip:
         self.terminal = False
         self.capture_started_tick = None
 
+    def landing_estimate(self, row, result):
+        return remaining_landing(self.profile['cells'].get(f"{self.anchor['category']}/landing"),
+                                 result['plan_age_seconds'])
+
+    def record(self):
+        return {'selection': self.selection, 'original_prediction': self.original,
+                'last_observed_tick': self.previous_tick}
+
     def observe(self, row):
         tick, p, mission = row['tick'], frozen.pilot(row), row['mission']
         if self.terminal:
@@ -248,8 +256,7 @@ class RollingTrip:
             result['route_source_tick'] = anchor['dependencies']['route_source_tick']
             result['route_age_ticks'] = tick - result['route_source_tick'] if result['route_source_tick'] is not None else None
             result['ground_reference_scope'] = 'historical timing only; physical validity is not renewed'
-            landing = remaining_landing(self.profile['cells'].get(f"{anchor['category']}/landing"),
-                                        result['plan_age_seconds'])
+            landing = self.landing_estimate(row, result)
             result['landing'] = landing
             if landing['reason']:
                 reasons.append(landing['reason'])
@@ -270,7 +277,7 @@ class RollingTrip:
         return result
 
 
-def replay(config, base, profile, output):
+def replay(config, base, profile, output, trip_factory=RollingTrip):
     """Write forecasts while reading the trace, before opening any outcome report."""
     previous = [-1, -1]
     active = [None, None]
@@ -299,7 +306,7 @@ def replay(config, base, profile, output):
                     output.write(json.dumps(result, allow_nan=False) + '\n')
                 state = active[seat] = None
             if state is None and selected:
-                state = active[seat] = RollingTrip(frozen.snapshot(row, selected['tick'], 'mission_selection'), profile)
+                state = active[seat] = trip_factory(frozen.snapshot(row, selected['tick'], 'mission_selection'), profile)
                 attempts.append(state)
             if state is None:
                 continue
@@ -308,13 +315,13 @@ def replay(config, base, profile, output):
                 # Fixed one-second samples plus lifecycle/phase/evidence events.
                 signature = (result['status'], result.get('plan_generation'), result['unknown_reasons'],
                              result.get('progress', {}).get('tactical_goal'),
-                             result.get('progress', {}).get('landing_goal'))
+                             result.get('progress', {}).get('landing_goal'),
+                             result.get('flight_phase', {}).get('episode'))
                 if (state.first_choice_tick is not None and (tick - state.first_choice_tick) % costs.HZ == 0
                         or result['invalidated_by'] or signature != getattr(state, '_last_signature', None)):
                     output.write(json.dumps(result, allow_nan=False) + '\n')
                 state._last_signature = signature
-    return [{'selection': s.selection, 'original_prediction': s.original,
-             'last_observed_tick': s.previous_tick} for s in attempts]
+    return [s.record() for s in attempts]
 
 
 def evaluate_run(run, attempts, updates):

@@ -95,9 +95,14 @@ up to 25 seconds; failed approaches and remote/powered costs remain explicit.
 The [rolling diagnostic](../bot-rolling-trip-estimate.md) now separates evidence
 refresh from approach restarts, preserves elapsed retry time and exposes native
 capture limits. Twelve new runs verify the accounting; timing accuracy remains
-mixed when a retry is already close to touchdown. Progress-conditioned landing
-estimates are next, followed by independent longer ground trips and
-remote-transfer estimates before selection.
+mixed when a retry is already close to touchdown. The
+[phase-aware diagnostic](../bot-phase-landing-estimate.md) now separates observed
+flight phases and retry context. Eight fresh runs reduce the 15-second
+checkpoint's paired median trip error from 5.41 to 0.28 seconds. A 29.90-second
+underestimate followed by nine further terrain-driven replans preserves the
+need for an interruption-risk model. Independent longer ground trips and
+remote-transfer estimates remain next before selection; retry calibration is
+still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.

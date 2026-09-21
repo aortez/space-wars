@@ -205,11 +205,13 @@ patch, with an adjacent binding to the final commit.
 
 ## Next step
 
-Build and test a landing-duration model conditioned on actual progress: circling,
-approach, final descent and supported settling, with initial choices and retries
-distinguished. Keep both original and rolling predictions, failed attempts and
-unknown costs when comparing it. The present clock/invalidation framework is
-the reusable part; the restarted-approach duration prior still needs work.
+The [phase-aware landing diagnostic](bot-phase-landing-estimate.md) now uses
+circling, approach, alignment, descent and supported settling, with initial
+choices and retries distinguished. Eight fresh matches improve typical timing
+on common completed comparisons while retaining both earlier estimates and
+unknown costs. Sparse retry calibration and a large miss followed by nine more
+terrain-driven replans remain explicit limitations. The clock/invalidation
+framework stays unchanged.
 
 Remote transfer, nontrivial ground travel, powered crossings and pilot exposure
 still require separate evidence before complete-trip costs can drive mission
