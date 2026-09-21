@@ -321,6 +321,36 @@ for a structured success or failure. `spacewars-cli ui press --help` lists all
 action and screen values, while `ui state` lists the actions accepted by the
 current screen.
 
+For actual controller-style holds through application input routing, use:
+
+```sh
+spacewars-cli input press right-shoulder --hold-ms 1200 --expect-screen gameplay
+spacewars-cli input press west --profile picade --expect-screen gameplay
+spacewars-cli input press start --expect-screen gameplay
+spacewars-cli input press south --expect-screen pause.main --json
+```
+
+`input press` creates a virtual controller press for `--player 1` or `2`, without
+requiring a physical gamepad. Named buttons are up/down/left/right,
+south/east/north/west, left/right-shoulder, start and select. Standard and Picade
+profiles share the normal button routing; their Clock Next Event bindings differ.
+Continuous controls go through each scenario's existing gamepad mapping. Bot
+players stay bots; input does not change player ownership or pilot selection.
+
+The app owns the **50–2000 ms hold** (default 120 ms), so killing/disconnecting
+the CLI cannot leave a button stuck. The command waits for release and reports
+`elapsed`, `context-changed`, or `input-cleared`; screen/scenario changes and host
+input clearing cancel the hold early. Directions repeat in menus, while button
+actions fire once. A fresh UI revision/screen/instance guard is captured before
+each request. Busy/benchmark states, overlapping simulated presses, and a held
+physical controller on the selected player are rejected. Physical input is not
+overwritten or disconnected. There is no unbounded key-down mode or power key.
+
+This tests the app's normalized input path, **not** OS controller recognition or
+physical switches. `tools/picade_input.py` remains the separate Linux evdev
+diagnostic for the latter software layer. All control-socket commands currently
+require a Unix host; this does not introduce a privileged device or remote daemon.
+
 Activate a visible control directly by the stable ID reported by `ui state`:
 
 ```sh

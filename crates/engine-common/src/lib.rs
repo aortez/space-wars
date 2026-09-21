@@ -631,9 +631,21 @@ pub struct ClockMeltdownState {
     pub spill_parcels: usize,
     #[serde(default)]
     pub capacity_limited_ticks: u64,
+    /// All material physically exiting the arena: liquid plus solid blocks.
     pub drained_microunits: u64,
+    /// Subset of drained_microunits that left as solid blocks, NOT extra volume.
+    #[serde(default)]
+    pub exited_solid_microunits: u64,
     /// Water/cells reclaimed during reformation, not counted as drainage.
     pub reclaimed_microunits: u64,
+    /// Event-owned hatch opening in thousandths (0..=1000); zero in water labs.
+    #[serde(default)]
+    pub floor_open_milli: u32,
+    /// Average depth on the floor in thousandths of world units.
+    #[serde(default)]
+    pub floor_load_milli: u32,
+    #[serde(default)]
+    pub floor_motion_deferrals: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

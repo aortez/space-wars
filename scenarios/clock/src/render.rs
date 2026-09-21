@@ -1,5 +1,6 @@
 use engine_common::{
-    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive, Stroke,
+    Camera2, Fill, RenderColor, RenderFrame, RenderPoint, RenderPolygon, RenderPrimitive,
+    RenderText, Stroke, TextAnchor,
 };
 
 use crate::{
@@ -10,6 +11,7 @@ use engine_core::Vec2;
 
 mod digit_slide;
 mod duck;
+mod floor;
 mod marquee;
 mod meltdown;
 mod meridiem;
@@ -48,6 +50,19 @@ pub(crate) fn water_fixture_cell(frame: &mut RenderFrame, center: Vec2, pitch: f
 pub fn render_frame(state: &ClockState) -> RenderFrame {
     let layout = Layout::new(state.aspect_ratio());
     let mut frame = RenderFrame::new(Camera2::new(RenderPoint::ZERO, CAMERA_HEIGHT));
+    if let Some((message, _)) = state.event_notice {
+        frame.push_primitive(
+            100,
+            RenderPrimitive::Text(RenderText {
+                position: RenderPoint::new(0.0, layout.bounds_max.y - 24.0),
+                text: message.into(),
+                color: LABEL_COLOR,
+                // RenderText sizes are logical pixels on both render paths.
+                size: 18.0,
+                anchor: TextAnchor::Center,
+            }),
+        );
+    }
     frame.push_primitive(
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
@@ -62,13 +77,11 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             1.0 - event.course_opacity(),
         );
     } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
-        rain::floor(&mut frame, event);
-        render_floor(
-            &mut frame,
-            crate::floor::FloorGeometry::closed(layout),
-            layout.pitch,
-            1.0 - event.opacity(),
-        );
+        floor::responsive(&mut frame, &event.floor, layout, event.opacity());
+    } else if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
+        if let Some(floor) = &event.floor {
+            floor::responsive(&mut frame, floor, layout, event.floor_opacity());
+        }
     } else {
         render_floor(&mut frame, state.floor.geometry(layout), layout.pitch, 1.0);
     }

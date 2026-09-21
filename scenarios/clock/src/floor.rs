@@ -1,16 +1,17 @@
 //! Event-owned access to the ordinary floor.
 //!
 //! Clock serializes events, so one explicit owner is sufficient. Acquire before
-//! constructing event resources; release only after dropping them. Rain's
-//! responsive hatch owns its physical/water boundaries as well as its art.
+//! constructing event resources; release only after dropping them. Rain and
+//! Meltdown own their responsive water/impact geometry as well as their art.
 
 pub(crate) mod responsive;
 
 use engine_common::{ClockEventKind, ClockFloorMode};
 use engine_core::Vec2;
+#[cfg(test)]
 use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld};
 
-use crate::{ClockWaterLab, layout::Layout};
+use crate::layout::Layout;
 
 #[derive(Default)]
 pub(crate) struct FloorManager {
@@ -19,7 +20,7 @@ pub(crate) struct FloorManager {
 }
 
 impl FloorManager {
-    pub fn acquire(&mut self, kind: ClockEventKind, water_lab: ClockWaterLab) {
+    pub fn acquire(&mut self, kind: ClockEventKind) {
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
@@ -27,9 +28,6 @@ impl FloorManager {
         self.owner = Some(kind);
         self.mode = match kind {
             ClockEventKind::Falling => ClockFloorMode::DrainOpen,
-            ClockEventKind::Meltdown if water_lab == ClockWaterLab::Off => {
-                ClockFloorMode::DrainOpen
-            }
             ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
                 ClockFloorMode::EventOwned
             }
@@ -116,6 +114,7 @@ impl DrainGeometry {
         self.0.layout
     }
 
+    #[cfg(test)]
     pub fn half_width(self) -> f32 {
         self.layout().drain_half_width()
     }
@@ -124,6 +123,7 @@ impl DrainGeometry {
         self.0.slabs()
     }
 
+    #[cfg(test)]
     pub fn water_world(self, columns: usize, max_parcels: usize) -> WaterWorld {
         let layout = self.layout();
         let lip = f64::from(self.half_width());
@@ -139,7 +139,8 @@ impl DrainGeometry {
         .expect("bounded Clock drain geometry")
     }
 
-    /// Stable floor geometry shared by ordinary drain worlds and digit rain.
+    /// Flat-bank baseline retained for the one-way buoyancy regression fixture.
+    #[cfg(test)]
     pub fn water_pools(self, columns: usize) -> [PoolSpec; 2] {
         assert!(columns >= 2 && columns.is_multiple_of(2));
         let layout = self.layout();
@@ -166,6 +167,6 @@ impl DrainGeometry {
 #[cfg(test)]
 pub(crate) fn test_drain(layout: Layout) -> DrainGeometry {
     let mut manager = FloorManager::default();
-    manager.acquire(ClockEventKind::Falling, ClockWaterLab::Off);
+    manager.acquire(ClockEventKind::Falling);
     manager.geometry(layout).drain().unwrap()
 }

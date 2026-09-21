@@ -51,19 +51,23 @@ the Off profile still disables every automatic event.
 ### Managed floor and drain
 
 The ordinary floor is **closed by default**, including unsynchronized startup,
-idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling and normal Meltdown
-acquire the center drain before creating their temporary material. It stays
-fully open through their recovery/cleanup, then closes after the event's bodies,
-water and remaining visuals have been released. Preview replacement, resize and
+idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling acquires the center
+drain before creating its temporary material. It stays fully open through
+recovery/cleanup, then closes after the event's bodies and remaining visuals
+have been released. Preview replacement, resize and
 restart use the same ownership boundary. Pausing or disabling a currently running
 event does not close the drain underneath it.
 
-Rain owns a load-responsive floor instead: two panels start flat and closed,
+Rain and normal Meltdown own a shared load-responsive floor: two panels start flat and closed,
 gently slope/retract as water accumulates, then close more slowly as it drains.
-Measured nearby runoff delays closure, and a duck in the passage holds enough
+Measured nearby runoff delays closure, and Rain's duck in the passage holds enough
 clearance to get out. Thin residual drips cannot latch the hatch at its peak
 opening. The same panel geometry drives the water bed, visible banks and two
-persistent kinematic colliders; no attraction force pulls the duck to the drain.
+persistent kinematic colliders while Rain's duck exists. Meltdown instead tests
+its ballistic blocks against the panel tops without creating any rigid bodies.
+No attraction force pulls water or the duck to the drain. During event recovery,
+remaining water is explicitly reclaimed and the responsive floor blends back
+to the ordinary closed floor; that visual recovery is not physical drainage.
 
 The obstacle-course Duck and development water labs own their custom floors
 instead; they do not also open the ordinary drain. Their physical floor/pit/tank
@@ -71,10 +75,10 @@ geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
 One small scenario-owned manager is sufficient because events cannot overlap.
-Its fixed geometry supplies Falling's slabs and Meltdown's pool banks and
-material boundaries. Rain's event-owned actuator updates only its two existing
+Its fixed geometry supplies Falling's slabs. Rain and Meltdown's shared
+event-owned actuator updates only each event's two existing
 floor pools, conservatively remapping retained water and releasing uncovered
-strips. It reuses allocated scratch and persistent colliders. The event manager
+strips. It reuses allocated scratch and, in Rain, persistent colliders. The event manager
 itself still needs no per-tick request queue; other events keep their old floors.
 
 `clock state` reports `floor`: `closed`, `drain-open`, or `event-owned` in both
@@ -202,19 +206,23 @@ Meltdown releases the lit digit cells roughly bottom-up, with small seeded
 delays. They stay cyan, square and solid-looking while falling, including through
 existing water. Gravity, slight rotation and side-wall reflection remain cheap
 ballistic motion, without rigid bodies or block-block collisions. Reaching the
-floor or drain-opening elevation converts each block once: normally 70% of its
+actual inclined panel top converts each block once: normally 70% of its
 area goes directly into the pool/drain across its footprint, while 30% sprays
 upward as three small water drops. The drops use the same volume ledger and
 parcel budget as spills; they rejoin a pool on descent or leave through the drain.
 When parcel capacity is tight, optional spray is reduced and that volume goes
 directly into the pool/drain instead. This replaces the earlier in-air softening
-effect, following dirtsim's solid-block → floor impact → water sequence.
-Water pools and spills through the existing center opening. The colon and dim
+effect, following dirtsim's solid-block → floor impact → water sequence. Contact
+uses the rotated square, not its bounding box; blocks that fit through the open
+gap stay solid and count as drained material only after leaving the screen.
+Water accumulates on the initially closed panels and makes them slope/open,
+using Rain's load filtering and slow movement limits. The colon and dim
 face outline stay visible. After seven seconds, the latest time rebuilds bottom-up
 over 1.5 seconds while remaining water is explicitly reclaimed with eased timing.
 The reusable `engine-water` model drives flow from surface-level differences,
-with damping and conservative donor limits. There is no forced inward current;
-flat basins retain more water than the original Clock-local effect did.
+with damping and conservative donor limits. There is no forced inward current.
+The eight-and-a-half-second event envelope is unchanged; not all material drains
+physically before its explicit final cleanup.
 
 In 12-hour mode, AM/PM also breaks into its individual pixels. These retain
 their smaller size and label color until floor impact; each supplies 0.0324 of
@@ -225,18 +233,23 @@ an event take effect at recovery too: 12→24 fades/removes the old label, while
 their live, anchored face and fixed source volume.
 
 The normal Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
-AM/PM pixels), **128 columns and 128 spill parcels**,
-with no Rapier bodies. The two floor halves meet the existing drain lips exactly.
+AM/PM pixels), **128 columns and 192 spill parcels**, with no Rapier bodies.
+The additional 64 parcel slots accommodate water released by retracting floor
+edges as well as ordinary overflow. Optional impact spray is reduced once 32
+parcels are live; its volume goes to the bank/gap rather than being deleted.
+Stationary development water labs retain their 128-parcel ceiling.
 Each 60 Hz tick uses four bounded pool substeps. Overflow travels as ballistic
 parcels: the renderer stretches/thins their ribbons with falling speed, and the
 model can collect them in a lower basin. Water is counted as drained only after
 leaving the lower world boundary, not upon crossing a ledge. Full parcel capacity
 holds water upstream. This is a fixed-down, unit-depth approximation, not a general
-fluid solver; cells/parcels do not collide with one another.
+fluid solver. Solid blocks do not collide with one another; crossing water
+streams use the engine's existing bounded mixing.
 Shared surface-edge heights replace the staircase with connected trapezoids,
 preserving total area over each continuous wet, flat run. Dry gaps and bed steps
 are not bridged. Ribbons taper with acceleration and are clipped to the drain
-channel instead of having their corners pushed onto the banks. Splash drops use
+channel, when one is present, instead of having their corners pushed onto the banks.
+Responsive-panel outfalls follow their moving lips without a fixed channel. Splash drops use
 the outer screen walls instead of the narrow drain channel. Compact water parcels
 have area-preserving rounded outlines, including at the top of their flight.
 These are bounded
@@ -467,13 +480,34 @@ the selected profile.
 ## Live controls
 
 Press **Start** on the controller or **P/Esc** on the keyboard, then choose
-**Clock Controls**. You can also tap **Clock Controls** at the top-right of the
-running clock face. D-pad/left stick or arrow keys move selection; A/Enter
+**Clock Controls**. Tapping anywhere on the running clock face opens the same
+pause menu, on release; the opening tap cannot select a menu item. No permanent
+button is drawn over the clock. Automatic and manual launches use the same
+inputs: pressing action buttons does not return to the launcher.
+D-pad/left stick or arrow keys move selection; A/Enter
 selects. Left/right changes a choice row or moves between side-by-side buttons.
 B/Esc goes back; Start resumes without previewing. C/F1 still opens controls help.
 Menu and host keyboard shortcuts use Slint's backend-neutral input path on both
 desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
+
+Press **N**, the gamepad's **right shoulder**, or Picade's **upper-right blue
+button** (HAT Button 3 / West) for **Next Event**. Each fresh
+press cycles forward through enabled events in catalog order (including Digit
+Slide), starting after the last event that ran. It uses the same clean replacement
+path as Preview & Resume, including recovery of the current event's physics and
+floor. Holding does not repeat; menu/launch handoffs require released controls.
+The event name appears for two seconds of simulation time. Off disables automatic
+scheduling, not this manual action. Individual disabled events are skipped;
+if all are disabled, a brief “No events enabled” notice replaces no event.
+Preferences are unchanged. The Clock action protocol adds `NextEvent` (kind 6,
+version 5, no additional payload); existing action encodings are unchanged.
+Physical cabinet mappings are documented in [Picade controls](picade.md).
+
+Automatic Clock on `sw-picade-2`: the permanent controls button and automatic-mode
+caption are gone; the optional performance overlay remains enabled here.
+
+![Clock face on Picade with no permanent controls button](screenshots/clock/picade-clean-controls.png)
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
 **Falling/Color Cycle/Meltdown/Duck/Marquee/Digit Slide automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
@@ -488,7 +522,9 @@ Off. This releases previous physics/appearance resources, preserves the scenario
 instance and monotonic event IDs, synchronizes the latest time, and resumes.
 It is deliberately different from the strict, non-replacing `clock trigger`.
 
-These are ordinary guarded UI controls, also available to CLI automation:
+These are ordinary guarded UI controls, also available to CLI automation.
+`gameplay.clock-controls` remains a semantic settings shortcut for existing CLI
+scripts; it no longer represents a permanent button on the clock face:
 
 ```sh
 spacewars-cli ui activate gameplay.clock-controls --expect-screen gameplay
@@ -682,18 +718,24 @@ These diagnostics do not affect `ui state` revisions. The optional `meltdown`
 object is present only during Meltdown (including its reform phase). It reports
 initial/waiting/airborne cells, occupied water columns, active spill parcels,
 capacity-limited ticks, and pooled, in-flight (`spilling_microunits`), drained and
-reclaimed volume. In-flight volume and parcel counts include both impact spray
-and drain spills. One full-size digit cell equals 1,000,000 micro-units; an
+reclaimed volume. In-flight volume and parcel counts include impact spray,
+uncovered floor strips and drain spills. `drained_microunits` includes material
+exiting as either water or solid blocks; `exited_solid_microunits` is the solid
+**subset**, not an additional term in the conservation sum. One full-size digit
+cell equals 1,000,000 micro-units; an
 AM/PM pixel is 32,400. `initial_microunits` reports the total source volume and
 `solid_microunits` reports the volume still in waiting/airborne cells. Use these
 area-weighted values rather than multiplying cell counts by 1,000,000.
-`solid_microunits` plus the four water aggregates must equal
+`solid_microunits` plus pooled, spilling, drained and reclaimed material must equal
 `initial_microunits`, within three micro-units of independent rounding. Reclaimed volume
 is explicit reform cleanup, not drainage. Idle and other events report null.
 `displaced_microunits` reports occupied body space in the displacement lab,
 in cell-equivalent area units; it is **not water** and is excluded from that
 accounting sum. The added volume, displacement and spill fields default to zero when
 reading older payloads.
+Meltdown also reports `floor_open_milli` (0–1000), `floor_load_milli` (average
+floor-water depth in thousandths of world units), and `floor_motion_deferrals`.
+These are zero in custom water labs and default to zero in older payloads.
 The optional `duck` object reports entrance side, position in thousandths of
 render world units, grounded state, jumps, cleared/total obstacles, door openness
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only

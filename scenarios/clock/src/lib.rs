@@ -9,6 +9,8 @@ mod events;
 mod floor;
 #[cfg(test)]
 mod floor_tests;
+#[cfg(test)]
+mod input_tests;
 mod layout;
 #[cfg(test)]
 mod live_tests;
@@ -49,6 +51,7 @@ pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
 pub const CLOCK_ACTION_PREVIEW_EVENT: u32 = 5;
+pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
@@ -95,9 +98,17 @@ pub enum ClockAction {
     TriggerEvent(ClockEventKind),
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
+    NextEvent,
 }
 
 impl ClockAction {
+    pub fn next_event() -> Action {
+        Action::scenario(
+            CLOCK_ACTION_NEXT_EVENT,
+            CLOCK_ACTION_VERSION.to_le_bytes().to_vec(),
+        )
+    }
+
     pub fn configure(settings: ClockSettings) -> Action {
         let mut payload = CLOCK_ACTION_VERSION.to_le_bytes().to_vec();
         payload.push(match settings.time_format {
@@ -152,6 +163,7 @@ impl ClockAction {
             return None;
         }
         match (*kind, payload.len()) {
+            (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
@@ -340,6 +352,8 @@ pub struct ClockState {
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
+    last_started_event: Option<ClockEventKind>,
+    event_notice: Option<(&'static str, u64)>,
 }
 
 impl ClockState {
@@ -503,6 +517,26 @@ impl ClockState {
         }
     }
 
+    fn next_event(&mut self) {
+        if self.reading.is_none() {
+            return;
+        }
+        let kinds = ClockEventKind::ALL;
+        let start = self.last_started_event.map_or(0, |kind| kind as usize + 1);
+        let next = (0..kinds.len())
+            .map(|offset| kinds[(start + offset) % kinds.len()])
+            .find(|kind| self.config.events.enabled(*kind));
+        let message = if let Some(kind) = next {
+            // The preview path owns cancellation/restoration for every event.
+            // Manual cycling ignores automatic cooldowns, not enabled switches.
+            self.preview_event(kind);
+            kind.label()
+        } else {
+            "No events enabled"
+        };
+        self.event_notice = Some((message, self.schedule.tick + 2 * u64::from(FIXED_HZ)));
+    }
+
     fn start_event(&mut self, kind: ClockEventKind) {
         self.start_event_from(kind, None);
     }
@@ -512,9 +546,11 @@ impl ClockState {
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
     ) {
+        self.last_started_event = Some(kind);
+        self.event_notice = None;
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
-        self.floor.acquire(kind, self.config.water_lab);
+        self.floor.acquire(kind);
         self.active_event = Some(ActiveEvent::new(
             kind,
             EventContext {
@@ -543,6 +579,12 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
+        if self
+            .event_notice
+            .is_some_and(|(_, until)| self.schedule.tick >= until)
+        {
+            self.event_notice = None;
+        }
         let layout = Layout::new(self.aspect_ratio());
         if let Some(event) = &mut self.active_event {
             if event.step(EventContext {
@@ -617,6 +659,8 @@ impl Scenario for ClockScenario {
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
+            last_started_event: None,
+            event_notice: None,
         }
     }
 
@@ -627,6 +671,7 @@ impl Scenario for ClockScenario {
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),
+                ClockAction::NextEvent => state.next_event(),
             }
         }
         // The fixed-timestep host supplies one tick per call. Zero duration is

@@ -6,11 +6,18 @@ use engine_water::{Boundary, Parcel, PoolSpec, WaterConfig, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::{EventContext, EventPhase, REFORMING_TICKS};
-use crate::{ClockWaterLab, SegmentRepresentation, digits, floor::DrainGeometry, layout::Layout};
+use crate::{
+    ClockWaterLab, SegmentRepresentation, digits,
+    floor::responsive::{FloorShape, ResponsiveFloor},
+    layout::Layout,
+};
 
 pub const MAX_MELTDOWN_CELLS: usize = 96 + crate::meridiem::MAX_CELLS;
 pub const WATER_COLUMNS: usize = 128;
-pub const MAX_SPILL_PARCELS: usize = 128;
+// Moving banks release uncovered strips as well as ordinary overflow. Keep a
+// fixed ceiling with room for both; stationary development labs stay at 128.
+pub const MAX_SPILL_PARCELS: usize = 192;
+const LAB_SPILL_PARCELS: usize = 128;
 pub const MELTING_TICKS: u64 = 180;
 pub const DRAINING_TICKS: u64 = 240;
 const SIDE_COLUMNS: usize = WATER_COLUMNS / 2;
@@ -30,11 +37,12 @@ pub(crate) struct MeltdownEvent {
     pub water: WaterWorld,
     pub lab: bool,
     pub floats: Option<water_lab::WaterLab>,
-    drain: Option<DrainGeometry>,
+    pub floor: Option<ResponsiveFloor>,
     initial_cells: usize,
     initial_area: f64,
     cell_area: f64,
     reclaimed_area: f64,
+    exited_solid_area: f64,
 }
 
 impl MeltdownEvent {
@@ -80,13 +88,22 @@ impl MeltdownEvent {
             }
         }
         let cell_area = (Self::water_pitch(context.layout, mode) * 0.8).powi(2);
-        let drain = context.floor.drain();
+        let floor = (!lab).then(|| ResponsiveFloor::new(FloorShape::clock(context.layout), 0.0));
         let mut water = if lab {
             Self::lab_water_world(context.layout, mode)
         } else {
-            drain
-                .expect("Meltdown owns the drain")
-                .water_world(WATER_COLUMNS, MAX_SPILL_PARCELS)
+            let shape = floor.as_ref().unwrap().shape;
+            let mut water = WaterWorld::new(
+                WaterConfig {
+                    max_parcels: MAX_SPILL_PARCELS,
+                    exit_y: f64::from(context.layout.bounds_min.y),
+                    ..WaterConfig::default()
+                },
+                shape.pools().into(),
+            )
+            .expect("bounded Meltdown floor");
+            shape.configure(&mut water);
+            water
         };
         let initial_cells = if lab { LAB_INITIAL_CELLS } else { cells.len() };
         let initial_area = cell_area
@@ -116,9 +133,10 @@ impl MeltdownEvent {
             water,
             lab,
             floats,
-            drain,
+            floor,
             cell_area,
             reclaimed_area: 0.0,
+            exited_solid_area: 0.0,
         }
     }
 
@@ -186,12 +204,12 @@ impl MeltdownEvent {
                 },
             ]
         } else {
-            unreachable!("normal Meltdown uses the managed drain")
+            unreachable!("normal Meltdown uses the responsive floor")
         };
         WaterWorld::new(
             WaterConfig {
                 exit_y: layout.bounds_min.y as f64,
-                max_parcels: MAX_SPILL_PARCELS,
+                max_parcels: LAB_SPILL_PARCELS,
                 ..WaterConfig::default()
             },
             specs,
@@ -226,6 +244,7 @@ impl MeltdownEvent {
         if self.tick < MELTING_TICKS + DRAINING_TICKS {
             self.step_material(context.layout);
         } else {
+            self.step_floor();
             if self.tick == MELTING_TICKS + DRAINING_TICKS {
                 self.reclaimed_area = self
                     .cells
@@ -274,7 +293,25 @@ impl MeltdownEvent {
             .map_or((0, 0), |f| (f.world.body_count(), f.world.collider_count()))
     }
 
+    /// Recovery blends the event-owned floor into the ordinary closed arena,
+    /// just as Rain does. The underlying wet bed continues its slow physical
+    /// motion; it is not snapped shut through residual water.
+    pub fn floor_opacity(&self) -> f32 {
+        if self.phase() == EventPhase::Reforming {
+            1.0 - soften(self.phase_tick() as f32 / (REFORMING_TICKS - 1) as f32)
+        } else {
+            1.0
+        }
+    }
+
+    fn step_floor(&mut self) {
+        if let Some(floor) = &mut self.floor {
+            floor.step(&mut self.water, f64::from(DT), None);
+        }
+    }
+
     fn step_material(&mut self, layout: Layout) {
+        self.step_floor();
         self.water.step(1.0 / 60.0).expect("fixed water step");
         let water = &mut self.water;
         let cell_area = self.cell_area;
@@ -294,13 +331,25 @@ impl MeltdownEvent {
                 cell.position.x = x;
                 cell.velocity.x *= -0.35;
             }
-            !material::merge(
+            let area = cell_area * cell.area_scale();
+            if material::merge(
                 cell,
-                extent,
                 water,
-                cell_area * cell.area_scale(),
-                self.drain.expect("normal melting cells own the drain"),
-            )
+                area,
+                layout,
+                self.floor
+                    .as_ref()
+                    .expect("normal cells own a responsive floor"),
+            ) {
+                return false;
+            }
+            if cell.position.y + extent.y < layout.bounds_min.y {
+                // A block fitting through the gap remains solid until it exits.
+                // Never count this as injected water or cleanup reclamation.
+                self.exited_solid_area += area;
+                return false;
+            }
+            true
         });
     }
 
@@ -325,8 +374,18 @@ impl MeltdownEvent {
             displaced_microunits: micro(water.displaced),
             spill_parcels: water.parcels,
             capacity_limited_ticks: water.capacity_limited_ticks,
-            drained_microunits: micro(water.drained),
+            drained_microunits: micro(water.drained + self.exited_solid_area),
+            exited_solid_microunits: micro(self.exited_solid_area),
             reclaimed_microunits: micro(water.reclaimed + self.reclaimed_area),
+            floor_open_milli: self
+                .floor
+                .as_ref()
+                .map_or(0, |f| (f.opening * 1000.0).round() as u32),
+            floor_load_milli: self
+                .floor
+                .as_ref()
+                .map_or(0, |f| (f.load * 1000.0).round() as u32),
+            floor_motion_deferrals: self.floor.as_ref().map_or(0, |f| f.deferrals),
         }
     }
 }

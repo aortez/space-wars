@@ -74,7 +74,7 @@ fn back(h: &mut FunctionalHarness, settings: &UiState) -> UiState {
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
-fn autostart_clock_is_sticky_preserves_preferences_and_yields_without_click_through() {
+fn autostart_clock_is_sticky_and_preserves_preferences_on_explicit_exit() {
     let mut settings = engine_common::Settings::default();
     settings.audio.master_volume = 0.05;
     settings.audio.muted = true;
@@ -195,7 +195,7 @@ fn autostart_bot_matches_use_match_results_repeat_fresh_worlds_and_preserve_huma
                 wait_screen(h, UiScreen::Gameplay);
             } else {
                 assert!(diagnostics.contains("autostart_repeats=2"));
-                let root = h.press_guarded(UiAction::Start, &result);
+                let root = h.press_guarded(UiAction::Back, &result);
                 assert_eq!(root.screen, UiScreen::LauncherMain);
                 assert_stays(h, UiScreen::LauncherMain, Duration::from_secs(2));
             }

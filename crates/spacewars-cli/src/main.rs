@@ -1,6 +1,7 @@
 #[cfg(test)]
 use std::path::Path;
 mod clock;
+mod input;
 mod logs;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -29,6 +30,11 @@ struct Args {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Simulate bounded, named controller input through the running app.
+    Input {
+        #[command(subcommand)]
+        command: input::InputCommand,
+    },
     /// Read the Pi kiosk's journal, even when the application is not running.
     Logs(logs::LogOptions),
 
@@ -273,6 +279,7 @@ fn run() -> Result<(), CliError> {
     let client = ControlClient::new(socket);
 
     match args.command {
+        Command::Input { command } => input::run(&client, command),
         Command::Logs(options) => logs::run(&options).map_err(human_error),
         Command::Clock { command } => clock::run(&client, command),
         Command::Status => request_status(&client).map_err(human_error),

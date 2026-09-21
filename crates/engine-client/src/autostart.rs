@@ -69,7 +69,6 @@ struct Runtime {
     repeat_pending: Option<String>,
     repeats: u64,
     keys: BTreeSet<String>,
-    consumed_keys: BTreeSet<String>,
 }
 
 pub(crate) fn install(
@@ -92,53 +91,29 @@ pub(crate) fn install(
         repeat_pending: None,
         repeats: 0,
         keys: BTreeSet::new(),
-        consumed_keys: BTreeSet::new(),
     }));
 
-    let weak = window.as_weak();
     let state = Rc::clone(&runtime);
     window.global::<UserActivity>().on_notify(move || {
-        let Some(window) = weak.upgrade() else {
-            return false;
-        };
         state.borrow_mut().idle.reset();
-        if window.get_autostart_running() && !window.get_ingame_menu_visible() {
-            window.invoke_autostart_return();
-            return true;
-        }
+        // Automatic launch changes the launch policy, not the input scheme.
+        // Only an explicit Launcher action ends an automatic session.
         false
     });
 
-    let weak = window.as_weak();
     let state = Rc::clone(&runtime);
     window
         .global::<UserActivity>()
         .on_key_event(move |key, down| {
-            let Some(window) = weak.upgrade() else {
-                return false;
-            };
             let key = key.to_string();
-            let consumed = {
-                let mut state = state.borrow_mut();
-                state.idle.reset();
-                if down {
-                    state.keys.insert(key.clone());
-                } else {
-                    state.keys.remove(&key);
-                }
-                let consumed = state.consumed_keys.contains(&key);
-                if !down {
-                    state.consumed_keys.remove(&key);
-                }
-                consumed
-            };
-            if down && window.get_autostart_running() && !window.get_ingame_menu_visible() {
-                state.borrow_mut().consumed_keys.insert(key);
-                window.invoke_autostart_return();
-                true
+            let mut state = state.borrow_mut();
+            state.idle.reset();
+            if down {
+                state.keys.insert(key);
             } else {
-                consumed
+                state.keys.remove(&key);
             }
+            false
         });
 
     let weak = window.as_weak();
@@ -146,7 +121,6 @@ pub(crate) fn install(
     window.global::<UserActivity>().on_focus_lost(move || {
         let mut state = state.borrow_mut();
         state.keys.clear();
-        state.consumed_keys.clear();
         state.idle.reset();
         if let Some(window) = weak.upgrade() {
             window.global::<UserActivity>().set_pointer_held(false);
@@ -283,7 +257,7 @@ pub(crate) fn install(
             if !window.get_launcher_error_text().is_empty() || !window.get_scenario_error_text().is_empty() {
                 runtime.borrow_mut().failed = true;
                 phase = "failed";
-                caption = "Automatic activity stopped. Press a button to return to the menu.".into();
+                caption = "Automatic activity stopped. Open the pause menu to return to the launcher.".into();
             } else if window.get_launcher_busy() {
                 phase = "launching";
             } else if window.get_ingame_menu_visible() {
@@ -293,9 +267,9 @@ pub(crate) fn install(
                 let mut state = runtime.borrow_mut();
                 state.result_remaining = state.result_remaining.saturating_sub(elapsed);
                 caption = if p.enabled {
-                    format!("Next world in {} seconds · Press a button for the menu", state.result_remaining.as_secs_f64().ceil() as u64)
+                    format!("Next world in {} seconds", state.result_remaining.as_secs_f64().ceil() as u64)
                 } else {
-                    "Auto-start is Off · Press a button for the menu".into()
+                    "Auto-start is Off".into()
                 };
                 if state.result_remaining.is_zero() && state.repeat_pending.is_none() && p.enabled && !state.failed {
                     state.repeat_pending = Some(window.get_scenario_instance().to_string());
@@ -310,7 +284,9 @@ pub(crate) fn install(
                     state.repeats += 1;
                 }
                 state.result_remaining = RESULT_DELAY;
-                caption = "Automatic activity · Press a button to return to the menu".into();
+                if window.get_autostart_activity() != "clock" {
+                    caption = "Autoplay · Start/Esc for menu".into();
+                }
             }
         } else {
             let eligible = enabled_for_process && p.enabled && !runtime.borrow().failed

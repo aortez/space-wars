@@ -3,11 +3,192 @@ use super::*;
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType};
 use slint::platform::{Key, Platform, PlatformError, WindowAdapter, WindowEvent};
 use std::cell::Cell;
+#[cfg(unix)]
+use std::time::Duration;
 
 struct TestPlatform;
 impl Platform for TestPlatform {
     fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, PlatformError> {
         Ok(MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer))
+    }
+}
+
+#[cfg(unix)]
+fn simulated_ui(screen: spacewars_control::UiScreen) -> spacewars_control::UiState {
+    spacewars_control::UiState {
+        schema_version: 1,
+        revision: 1,
+        screen,
+        active_scenario: Some("clock".into()),
+        selected_scenario: "clock".into(),
+        selected_control: None,
+        controls: vec![],
+        actions: vec![],
+        scenario_revision: Some(1),
+        paused: screen == spacewars_control::UiScreen::PauseMain,
+        benchmark_active: false,
+        error: None,
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_controller_uses_shared_clock_routing_and_bounded_single_edges() {
+    use spacewars_control::{
+        InputButton, InputPressRequest, InputProfile, InputReleaseReason, UiScreen,
+    };
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(Rc::clone(&input), Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    for (profile, button) in [
+        (InputProfile::Standard, InputButton::RightShoulder),
+        (InputProfile::Picade, InputButton::West),
+    ] {
+        let mut request = InputPressRequest::new(&state, button);
+        request.profile = profile;
+        request.hold_ms = 1200;
+        let now = Instant::now();
+        driver.press(&window, &state, request.clone(), now).unwrap();
+        assert!(input.borrow_mut().take_clock_next_event_requested());
+        assert!(driver.press(&window, &state, request.clone(), now).is_err());
+        for tick in 1..12 {
+            assert!(
+                driver
+                    .tick(&window, &state, now + Duration::from_millis(tick * 100))
+                    .is_none()
+            );
+            assert!(!input.borrow_mut().take_clock_next_event_requested());
+        }
+        assert_eq!(
+            driver.tick(&window, &state, now + Duration::from_millis(1200)),
+            Some((request.clone(), InputReleaseReason::Elapsed))
+        );
+        assert!(!gamepads.borrow().has_simulated());
+        driver
+            .press(&window, &state, request, Instant::now())
+            .unwrap();
+        assert!(input.borrow_mut().take_clock_next_event_requested());
+        driver.cancel();
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_controller_never_leaks_across_context_changes_or_input_clear() {
+    use spacewars_control::{InputButton, InputPressRequest, InputReleaseReason, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(Rc::clone(&input), Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    for change in 0..3 {
+        let now = Instant::now();
+        driver
+            .press(
+                &window,
+                &state,
+                InputPressRequest::new(&state, InputButton::South),
+                now,
+            )
+            .unwrap();
+        assert!(gamepads.borrow().seat(0).unwrap().south);
+        let mut next = state.clone();
+        let reason = match change {
+            0 => {
+                next.screen = UiScreen::PauseMain;
+                InputReleaseReason::ContextChanged
+            }
+            1 => {
+                next.scenario_revision = Some(2);
+                InputReleaseReason::ContextChanged
+            }
+            _ => {
+                input.borrow_mut().clear();
+                assert!(
+                    !gamepads.borrow().seat(0).unwrap().south,
+                    "host clear releases immediately"
+                );
+                InputReleaseReason::InputCleared
+            }
+        };
+        assert_eq!(driver.tick(&window, &next, now).unwrap().1, reason);
+        assert!(!gamepads.borrow().seat(0).unwrap().south);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_player_two_merges_without_replacing_physical_controls() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(input, Rc::clone(&gamepads));
+    let state = simulated_ui(UiScreen::Gameplay);
+    let mut request = InputPressRequest::new(&state, InputButton::South);
+    request.player = 2;
+    driver
+        .press(&window, &state, request, Instant::now())
+        .unwrap();
+    assert!(!gamepads.borrow().seat(0).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().south);
+    gamepads.borrow_mut().set_seat(
+        1,
+        input::GamepadSeatInput {
+            connected: true,
+            west: true,
+            left_stick_x: 0.7,
+            ..Default::default()
+        },
+    );
+    assert!(gamepads.borrow().seat(1).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().west);
+    assert_eq!(gamepads.borrow().seat(1).unwrap().left_stick_x, 0.7);
+    drop(driver);
+    assert!(!gamepads.borrow().seat(1).unwrap().south);
+    assert!(gamepads.borrow().seat(1).unwrap().west);
+}
+
+#[cfg(unix)]
+#[test]
+fn simulated_directions_repeat_but_confirm_does_not() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_ingame_menu_visible(true);
+    let actions = Rc::new(RefCell::new(Vec::new()));
+    let observed = Rc::clone(&actions);
+    window.on_ui_action(move |code| observed.borrow_mut().push(code));
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(input, gamepads);
+    let state = simulated_ui(UiScreen::PauseMain);
+    for button in [InputButton::Down, InputButton::South] {
+        actions.borrow_mut().clear();
+        let mut request = InputPressRequest::new(&state, button);
+        request.hold_ms = 1000;
+        let now = Instant::now();
+        driver.press(&window, &state, request, now).unwrap();
+        assert_eq!(actions.borrow().len(), 1);
+        driver.tick(&window, &state, now + Duration::from_millis(300));
+        assert_eq!(actions.borrow().len(), 1);
+        driver.tick(&window, &state, now + Duration::from_millis(350));
+        assert_eq!(
+            actions.borrow().len(),
+            if button == InputButton::Down { 2 } else { 1 }
+        );
+        driver.cancel();
     }
 }
 
@@ -95,7 +276,7 @@ fn scenario_confirmation_focuses_play_without_changing_the_selection() {
 }
 
 #[test]
-fn automatic_activity_consumes_keyboard_and_touch_before_exposing_the_launcher() {
+fn automatic_activity_uses_normal_controls_and_explicit_launcher_exit() {
     slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
     let window = MainWindow::new().unwrap();
     window
@@ -117,7 +298,7 @@ fn automatic_activity_consumes_keyboard_and_touch_before_exposing_the_launcher()
         writer.clone(),
     );
     install_ui_navigation(&window);
-    install_keyboard_navigation(&window, input);
+    install_keyboard_navigation(&window, Rc::clone(&input));
     let _timer = autostart::install(&window, launcher, settings, writer, catalog, true);
     let exits = Rc::new(Cell::new(0));
     let exited = Rc::clone(&exits);
@@ -133,46 +314,43 @@ fn automatic_activity_consumes_keyboard_and_touch_before_exposing_the_launcher()
     window.on_launcher_start_game(move || started.set(started.get() + 1));
     window.show().unwrap();
     window.set_launcher_visible(false);
-    window.set_autostart_running(true);
-    window.window().dispatch_event(WindowEvent::KeyPressed {
-        text: Key::Return.into(),
-    });
-    assert!(window.get_launcher_visible());
-    assert_eq!(exits.get(), 1);
-    window
-        .window()
-        .dispatch_event(WindowEvent::KeyPressRepeated {
-            text: Key::Return.into(),
-        });
-    window.window().dispatch_event(WindowEvent::KeyReleased {
-        text: Key::Return.into(),
-    });
-    assert_eq!(starts.get(), 0, "exit input must not start a manual game");
-    key(&window, Key::Return);
-    assert_eq!(starts.get(), 1, "fresh input remains usable");
+    for automatic in [false, true] {
+        window.set_autostart_running(automatic);
+        for scenario in ["clock", "spacewars"] {
+            window.set_launcher_scenario(scenario.into());
+            key(&window, Key::Return);
+            key(&window, Key::LeftArrow);
+            assert!(!window.global::<UserActivity>().invoke_notify());
+            assert!(!window.get_launcher_visible());
+            assert_eq!(exits.get(), 0);
+            key(&window, "p");
+            assert!(input.borrow_mut().take_pause_requested());
+            key(&window, Key::Escape);
+            assert!(input.borrow_mut().take_back_requested());
+        }
+        window.set_launcher_scenario("clock".into());
+        key(&window, "n");
+        assert!(input.borrow_mut().take_clock_next_event_requested());
+        window
+            .window()
+            .dispatch_event(WindowEvent::KeyPressRepeated { text: "n".into() });
+        assert!(!input.borrow_mut().take_clock_next_event_requested());
+        click(&window, 400.0, 280.0);
+        assert!(input.borrow_mut().take_pause_requested());
+        assert_eq!(exits.get(), 0);
+        assert_eq!(starts.get(), 0);
+        window.set_ingame_menu_visible(true);
+        key(&window, "n");
+        assert!(!input.borrow_mut().take_clock_next_event_requested());
+        window.set_ingame_menu_visible(false);
+    }
 
-    // A release delivered outside the window must not leave consumed input stuck.
-    window.set_launcher_visible(false);
-    window.set_autostart_running(true);
-    window.window().dispatch_event(WindowEvent::KeyPressed {
-        text: Key::Return.into(),
-    });
     window.global::<UserActivity>().set_pointer_held(true);
     window.global::<UserActivity>().invoke_focus_lost();
     assert!(!window.global::<UserActivity>().get_pointer_held());
-    key(&window, Key::Return);
-    assert_eq!(starts.get(), 2, "fresh input works after focus loss");
-
-    window.set_launcher_visible(false);
-    window.set_autostart_running(true);
-    click(&window, 400.0, 280.0);
-    assert_eq!(exits.get(), 3);
+    window.invoke_autostart_return();
+    assert_eq!(exits.get(), 1);
     assert!(!window.get_autostart_running());
-    assert_eq!(
-        starts.get(),
-        2,
-        "pointer release must not click the newly exposed menu"
-    );
 
     // The new App Settings list must reveal Auto-start below Device Info,
     // even when a short window cannot show all rows at once.
@@ -195,7 +373,7 @@ fn automatic_activity_consumes_keyboard_and_touch_before_exposing_the_launcher()
     assert!(!window.get_autostart_settings_visible());
     assert!(window.get_sound_visible());
     assert_eq!(window.get_sound_focus_index(), 4);
-    assert_eq!(exits.get(), 3);
+    assert_eq!(exits.get(), 1);
     window.window().take_snapshot().unwrap();
     click(&window, 400.0, 288.0);
     assert!(!window.get_sound_visible());
@@ -286,11 +464,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
 
     // Full-screen keyboard focus must not steal pointer hits from sibling UI.
     window.set_ingame_menu_visible(false);
-    let opens = Rc::new(Cell::new(0));
-    let opened = Rc::clone(&opens);
-    window.on_ingame_clock_open(move || opened.set(opened.get() + 1));
     click(&window, 710.0, 34.0);
-    assert_eq!(opens.get(), 1);
+    assert!(input.borrow_mut().take_pause_requested());
     window.set_ingame_menu_visible(true);
     window.set_ingame_clock_visible(true);
     // Pi-sized page: left-hand event switch and time-format row are hittable.
@@ -355,6 +530,67 @@ fn click(window: &MainWindow, x: f32, y: f32) {
             position,
             button: slint::platform::PointerEventButton::Left,
         });
+}
+
+#[test]
+fn clock_tap_opens_only_on_release_without_clicking_through_or_repeating() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let opens = Rc::new(Cell::new(0));
+    let opened = Rc::clone(&opens);
+    let weak = window.as_weak();
+    window.on_keyboard_action(move |code, repeat| {
+        assert_eq!((code, repeat), (8, false));
+        opened.set(opened.get() + 1);
+        weak.upgrade().unwrap().set_ingame_menu_visible(true);
+    });
+    let resumes = Rc::new(Cell::new(0));
+    let resumed = Rc::clone(&resumes);
+    window.on_ingame_resume(move || resumed.set(resumed.get() + 1));
+    window.show().unwrap();
+    for automatic in [false, true] {
+        window.set_autostart_running(automatic);
+        for (x, y) in [(10.0, 10.0), (400.0, 170.0), (790.0, 470.0)] {
+            window.set_ingame_menu_visible(false);
+            slint::platform::update_timers_and_animations();
+            let before = opens.get();
+            let position = slint::LogicalPosition::new(x, y);
+            window.window().dispatch_event(WindowEvent::PointerPressed {
+                position,
+                button: slint::platform::PointerEventButton::Left,
+            });
+            assert_eq!(
+                opens.get(),
+                before,
+                "press must not expose menu to the pending release"
+            );
+            assert!(window.global::<UserActivity>().get_pointer_held());
+            window
+                .window()
+                .dispatch_event(WindowEvent::PointerReleased {
+                    position,
+                    button: slint::platform::PointerEventButton::Left,
+                });
+            assert_eq!(opens.get(), before + 1);
+            assert!(window.get_ingame_menu_visible());
+            assert!(!window.global::<UserActivity>().get_pointer_held());
+            assert_eq!(resumes.get(), 0, "opening tap must not also hit Resume");
+        }
+    }
+    window.set_ingame_menu_visible(false);
+    window.set_launcher_scenario("pizza".into());
+    let before = opens.get();
+    click(&window, 400.0, 170.0);
+    assert_eq!(
+        opens.get(),
+        before,
+        "other scenarios retain their own pointer controls"
+    );
 }
 
 #[test]

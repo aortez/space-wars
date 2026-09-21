@@ -33,7 +33,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Clock follows local device time. Start or P/Esc pauses; choose Clock Controls to change 12/24-hour format, event profile and individual events without restarting. Or tap Clock Controls on the face. Calm runs occasional events, Demo runs frequent events, Off disables automatic events. Preview & Resume replaces the current animation with your chosen event, even if disabled. Settings are saved. Pause freezes animation.",
+    controls_help: "Clock follows local device time. Tap the face, or press Start or P/Esc, to pause; choose Clock Controls to change settings. N, right shoulder (gamepad), or the upper-right blue button (Picade) starts the next enabled event, replacing the current animation. Hold does not repeat. Works with automatic events Off. Calm runs occasional events; Demo runs frequent events. Preview & Resume can also preview disabled events. Automatic and manual launches use the same controls. Settings are saved. Pause freezes animation.",
     create,
 };
 
@@ -146,11 +146,16 @@ impl ClientScenario for ClockClientScenario {
         ClockScenario::step(&mut self.state, actions, dt)
     }
 
-    fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+    fn map_input(&self, input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+        let next_event = input.take_clock_next_event_requested();
         if self.benchmark.is_some() {
             return Vec::new();
         }
-        self.actions_for_reading(local_clock_reading())
+        let mut actions = self.actions_for_reading(local_clock_reading());
+        if next_event {
+            actions.push(ClockAction::next_event());
+        }
+        actions
     }
 
     fn benchmark_counts(&self) -> Option<super::BenchmarkCounts> {
@@ -320,6 +325,82 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+    }
+
+    #[test]
+    fn next_event_input_is_consumed_once_and_cleared_before_menu_handoffs() {
+        let scenario = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let mut input = ClientInput::default();
+        let requested = |actions: Vec<Action>| {
+            actions
+                .iter()
+                .filter(|action| ClockAction::decode(action) == Some(ClockAction::NextEvent))
+                .count()
+        };
+        input.request_clock_next_event();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 1);
+        for _ in 0..120 {
+            assert_eq!(requested(scenario.map_input(&mut input, false)), 0);
+        }
+        input.request_clock_next_event();
+        input.clear();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 0);
+        input.request_clock_next_event();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 1);
+    }
+
+    #[test]
+    fn next_event_notice_is_readable_on_vector_and_raster_overlays() {
+        for viewport in [
+            Viewport::new(1024.0, 768.0),
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+        ] {
+            let mut scenario = create(
+                0,
+                &Settings::default(),
+                viewport,
+                ScenarioStartMode::Normal,
+                &ScenarioAsset::None,
+            )
+            .unwrap();
+            scenario.step(&[ClockAction::next_event()], Duration::ZERO);
+            let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+            let vector = crate::render::scene_presentation_from_frames_with_layout(
+                &frames,
+                viewport,
+                scenario.frame_layout(),
+            );
+            let raster =
+                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+            assert_eq!(raster.len(), 1);
+            assert_eq!(raster[0].text, "Falling");
+            assert_eq!(raster[0].font_size, 18.0);
+            assert!(raster[0].text_x >= 0.0 && raster[0].text_y >= 0.0);
+            assert_eq!(
+                vector
+                    .main_primitives
+                    .iter()
+                    .filter(|p| p.kind == crate::PrimitiveKind::Text)
+                    .collect::<Vec<_>>(),
+                raster.iter().collect::<Vec<_>>()
+            );
+            for _ in 0..120 {
+                scenario.step(&[], Duration::from_nanos(16_666_667));
+            }
+            let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+            assert!(
+                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout())
+                    .is_empty()
+            );
+        }
     }
 
     #[test]
@@ -939,7 +1020,9 @@ mod tests {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        <= 800,
+                        // Inclined columns need two area-preserving pieces,
+                        // each with a highlight: 256 more than flat columns.
+                        <= if water_lab == scenario_clock::ClockWaterLab::Off { 1056 } else { 800 },
                     "bounded cells, columns, spill parcels and reforming face at tick {tick} {viewport:?}"
                 );
                 let presentation = crate::render::scene_presentation_from_frames_with_layout(
@@ -957,13 +1040,11 @@ mod tests {
                 let pixels = image.to_rgb8().unwrap();
                 if water_lab == scenario_clock::ClockWaterLab::Off {
                     if tick == 509 {
-                        final_reforming_pixels =
-                            Some(floor_tests::pixels_above_floor(&pixels).to_vec());
+                        final_reforming_pixels = Some(pixels.as_bytes().to_vec());
                     } else if tick == 510 {
                         assert!(
-                            floor_tests::pixels_above_floor(&pixels)
-                                == final_reforming_pixels.as_deref().unwrap(),
-                            "cleanup must not pop to a different face at {viewport:?}"
+                            pixels.as_bytes() == final_reforming_pixels.as_deref().unwrap(),
+                            "cleanup must not pop to a different face or floor at {viewport:?}"
                         );
                     }
                 }

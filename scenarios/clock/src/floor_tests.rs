@@ -29,7 +29,7 @@ fn every_event_acquires_its_floor_before_stepping_and_releases_it_after_cleanup(
     for (kind, expected) in [
         (ClockEventKind::Falling, ClockFloorMode::DrainOpen),
         (ClockEventKind::ColorCycle, ClockFloorMode::Closed),
-        (ClockEventKind::Meltdown, ClockFloorMode::DrainOpen),
+        (ClockEventKind::Meltdown, ClockFloorMode::EventOwned),
         (ClockEventKind::Duck, ClockFloorMode::EventOwned),
         (ClockEventKind::Marquee, ClockFloorMode::Closed),
         (ClockEventKind::DigitSlide, ClockFloorMode::Closed),
@@ -67,10 +67,10 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
         ClockEventKind::Meltdown,
         ClockEventKind::Rain,
     ] {
-        let expected = if source == ClockEventKind::Rain {
-            ClockFloorMode::EventOwned
-        } else {
+        let expected = if source == ClockEventKind::Falling {
             ClockFloorMode::DrainOpen
+        } else {
+            ClockFloorMode::EventOwned
         };
         for elapsed in [0, 30, EVENT_CATALOG[source as usize].duration_ticks - 1] {
             let config = ClockConfig {
@@ -189,6 +189,6 @@ fn floor_slabs_and_water_boundaries_share_the_same_opening_at_all_aspects() {
 #[should_panic(expected = "finish the previous floor owner first")]
 fn floor_requests_cannot_silently_overwrite_an_existing_owner() {
     let mut floor = FloorManager::default();
-    floor.acquire(ClockEventKind::ColorCycle, ClockWaterLab::Off);
-    floor.acquire(ClockEventKind::Rain, ClockWaterLab::Off);
+    floor.acquire(ClockEventKind::ColorCycle);
+    floor.acquire(ClockEventKind::Rain);
 }

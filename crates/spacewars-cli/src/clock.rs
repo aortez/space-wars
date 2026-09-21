@@ -316,6 +316,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 material.capacity_limited_ticks,
                 material.displaced_microunits as f64 / 1_000_000.0
             );
+            println!(
+                "Meltdown floor: {:.1}% open, load={:.3} world units, motion deferrals={}; {:.3} of drained cell-volumes exited as solid blocks",
+                material.floor_open_milli as f64 / 10.0,
+                material.floor_load_milli as f64 / 1000.0,
+                material.floor_motion_deferrals,
+                material.exited_solid_microunits as f64 / 1_000_000.0,
+            );
         }
         if let Some(duck) = state.duck {
             println!(
