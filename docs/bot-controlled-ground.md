@@ -165,6 +165,11 @@ support the counts above. The runner's raw `complete` field is not target-scoped
 
 ## Next bounded step
 
+The [independent walking calibration](bot-walking-calibration.md) now implements
+the training/validation step below. Fourteen paired held-out ground intervals
+reduce median error from 2.83 to 0.87 seconds. A newly covered slow return still
+has a 15.76-second underestimate; its checkpoints remain available for reduction.
+
 Use separate controlled training worlds to distinguish fixed survey/settling
 overhead from distance-dependent walking time, retaining outbound and
 return/boarding separately. Keep actual powered returns and posture failures

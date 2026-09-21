@@ -192,6 +192,15 @@ def evaluate(report, observed, config, path):
     return result
 
 
+def trial_outcome(setup, attempt):
+    # Physical preparation can leave the initial planet before capture starts.
+    # Keep the whole trial, including any zero-length frame-change attempt, but
+    # never label a route measured on another planet as a valid target setup.
+    if setup['setup'] and setup['setup']['survey']['objective']['planet'] != 0:
+        return 'setup_wrong_planet'
+    return attempt['ending'] if attempt else 'setup_unavailable'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path, required=True)
@@ -221,8 +230,7 @@ def main():
         if (report['version'] != 1 or report['world'] != 'generated' or report['seed'] != c['seed'] or report['seat'] != c['seat']
                 or report['mode'] != 'capture' or not report['survey_landing'] or report['landing_threat']
                 or report['edit'] != 'none' or report['policy_configuration']['policy'] != frozen.POLICY
-                or not setup or setup['version'] != 1 or setup['band'] != c['band']
-                or setup['setup'] and setup['setup']['survey']['objective']['planet'] != 0):
+                or not setup or setup['version'] != 1 or setup['band'] != c['band']):
             raise ValueError('controlled report does not match the declared trial')
         if not report['audit_passed'] or report['audit_failures'] or report['final_audit']['issues']:
             raise ValueError('controlled physical audit failed')
@@ -231,7 +239,7 @@ def main():
         frozen.ensure_independent(profile, source)
         a = evaluate(report, o, c, directory / 'trace.jsonl')
         runs.append({**source, 'scope': SCOPE, 'setup': setup, 'attempts': [a] if a else [],
-            'outcome': a['ending'] if a else 'setup_unavailable', 'elapsed_ticks': report['elapsed_ticks']})
+            'outcome': trial_outcome(setup, a), 'elapsed_ticks': report['elapsed_ticks']})
         print(f"{c['label']}: {runs[-1]['outcome']}", flush=True)
     frozen.write_json(args.out / 'evaluation.json', {'version': 1, 'model': 'controlled-ground-evaluation-v1',
         'scope': SCOPE, 'manifest_sha256': costs.file_hash(args.manifest), 'profile_sha256': costs.file_hash(args.profile),

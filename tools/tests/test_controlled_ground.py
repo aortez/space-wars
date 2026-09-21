@@ -97,6 +97,20 @@ class ControlledPrefixTests(unittest.TestCase):
         self.assertEqual((t.stop, t.ending), (121, 'frame_changed'))
         self.assertNotIn('claimed', t.milestones)
 
+    def test_preparation_on_another_planet_cannot_create_a_target_prediction(self):
+        a = raw(100)
+        a['observation']['combat']['recovery']['flight']['pilot']['planet']['index'] = 1
+        observed = observe([a, raw(101)])
+        t = controlled.make_trip(report(), observed, 0)
+        self.assertEqual((t.start, t.stop, t.ending), (100, 100, 'frame_changed'))
+        self.assertIsNone(observed['choice'])
+        self.assertIsNone(observed['prediction'])
+        setup = {'setup': {'survey': {'objective': {'planet': 1}}}}
+        for attempt in [None, {'ending': t.ending}]:
+            self.assertEqual(controlled.trial_outcome(setup, attempt), 'setup_wrong_planet')
+        setup['setup']['survey']['objective']['planet'] = 0
+        self.assertEqual(controlled.trial_outcome(setup, None), 'setup_unavailable')
+
     def test_departure_uses_the_mission_threshold_not_tactical_hold_time(self):
         a = raw()
         p = a['observation']['combat']['recovery']['flight']['pilot']

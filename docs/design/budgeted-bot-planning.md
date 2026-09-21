@@ -107,10 +107,14 @@ a blocked posture recovery and a route whose nominal duration exceeds its task
 clock. The [controlled-ground fixture](../bot-controlled-ground.md) now retains
 32 generated distance/direction/seat trials. Six completed trips remain walks,
 with a 4.17-second median ground-cost underestimate; a powered return, unavailable
-setups and a shorter posture failure remain separate. Walking/settling calibration
-and independent validation are next before selection, alongside remote-transfer
-evidence. Retry calibration is still sparse and these estimates do not change
-bot controls.
+setups and a shorter posture failure remain separate. The
+[independent walking calibration](../bot-walking-calibration.md) now fits fixed
+overhead and distance multipliers on eight new worlds, then freezes them before
+six-world validation. Fourteen paired ground intervals reduce median error from
+2.83 to 0.87 seconds; a newly covered slow return remains underestimated by 15.76
+seconds. Combining this component with phase-aware landing estimates is next,
+alongside remote-transfer and interruption-risk evidence before mission selection.
+Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
 successful powered sortie or justify promoting either experimental adapter.
