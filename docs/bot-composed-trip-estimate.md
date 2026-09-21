@@ -196,14 +196,13 @@ Its adjacent manifest and commit binding verify the contents and final source.
 
 ## Next step
 
-Make the distinction between **short walks** and **measured moderate walks** an
-explicit model-selection rule. Preserve the earlier short-walk evidence, use
-affine costs only where supported, and keep costs outside the combined measured
-domains unknown. Declare the boundary rule before evaluating it on new worlds;
-do not widen domains or tune coefficients to rescue this replay's results.
+The subsequent [walking-regime validation](bot-walking-regimes.md) makes the
+short/moderate distinction explicit and tests it on seven new worlds. It restores
+short-walk coverage without losing strict numeric forecasts; 11 controlled
+completions improve median initial error from 4.35 to 1.74 seconds versus phase-only.
+The new cases retain initial-flight misses and unsupported longer approaches.
 
-Then validate complete forecasts in normal matches, including coverage and
-failure tails. Landing state/distance and interruption risk remain separate
-limitations, as does unmeasured remote transfer. This composition supplies the
-cost-accounting interface for mission planning, but conditional duration alone
-is not yet sufficient to choose which mission is likely to finish.
+Investigating flight state/progress and interruption risk is next, alongside
+unmeasured remote transfer. This composition supplies the cost-accounting
+interface for mission planning, but conditional duration alone is not yet
+sufficient to choose which mission is likely to finish.

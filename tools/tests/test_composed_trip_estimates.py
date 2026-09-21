@@ -244,6 +244,13 @@ class EvaluationTests(unittest.TestCase):
             process = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(process.returncode, 0, process.stderr)
             self.assertTrue((path / 'out' / 'evaluation.json').exists())
+            process = subprocess.run(command + ['--walk-model', 'short-and-affine',
+                '--out', str(path / 'regimes')], capture_output=True, text=True)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            regime_result = json.loads((path / 'regimes' / 'evaluation.json').read_text())
+            self.assertEqual(regime_result['model'], model.REGIME_MODEL)
+            legs = regime_result['runs'][0]['attempts'][0]['checkpoints'][0]['walking_legs']
+            self.assertEqual(legs['outbound']['regime'], 'moderate_affine')
 
             # Controlled evaluations have their own normalized outcome schema
             # and capture origin; exercise the real CLI adapter, not just rows.

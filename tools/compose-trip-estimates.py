@@ -23,24 +23,45 @@ walking = module('composed_walking', 'calibrate-walking-costs.py')
 rolling, frozen, costs = phase.rolling, phase.frozen, phase.costs
 controlled = walking.controlled
 MODEL = 'composed-capture-trip-v1'
+REGIME_MODEL = 'composed-capture-trip-regimes-v1'
+WALK_MODELS = ['affine', 'short-and-affine']
 NAMES = ['original', 'age_only', 'phase_only', 'combined']
 TAIL = [name for name in frozen.PHASES if name != 'landing']
 
 
-def ground_tail(anchor, profile):
+def ground_tail(anchor, profile, walk_model='affine'):
     """Use only the retained, causally acquired landing-choice snapshot."""
+    if walk_model not in WALK_MODELS:
+        raise ValueError('unknown walking model selection rule')
     tail = {name: copy.deepcopy(anchor['phases'][name]) for name in TAIL}
     if anchor['category'] == 'walk':
         fitted = walking.predict(anchor, anchor, profile, 'affine')
         for name in walking.LEGS:
-            tail[name] = {**fitted[name], 'reference_seconds': anchor['references'][name],
-                          'model': walking.MODEL}
+            ref, cell = anchor['references'][name], profile['cells'][name]
+            # The boundary is the frozen fit's minimum, not a threshold chosen
+            # from validation. Each leg selects independently. The old forecast
+            # already checks its own domain and snapshot validity; it cannot
+            # fill a gap in that evidence or extend the affine upper bound.
+            short = (walk_model == 'short-and-affine' and cell['fits'] and costs.finite(ref)
+                     and 0 <= ref < cell['reference_seconds_domain'][0])
+            if short:
+                tail[name].update(model=frozen.MODEL, regime='short_empirical')
+            else:
+                tail[name] = {**fitted[name], 'reference_seconds': ref, 'model': walking.MODEL}
+                if walk_model == 'short-and-affine':
+                    tail[name]['regime'] = ('moderate_affine' if cell['fits'] and costs.finite(ref)
+                        and cell['reference_seconds_domain'][0] <= ref <= cell['reference_seconds_domain'][1]
+                        else 'unsupported')
     return tail
 
 
 class ComposedTrip(phase.PhaseTrip):
-    def __init__(self, selection, ground_profile, phase_profile, walking_profile):
+    def __init__(self, selection, ground_profile, phase_profile, walking_profile, walk_model='affine'):
         super().__init__(selection, ground_profile, phase_profile)
+        if walk_model not in WALK_MODELS:
+            raise ValueError('unknown walking model selection rule')
+        self.walk_model = walk_model
+        self.model = MODEL if walk_model == 'affine' else REGIME_MODEL
         self.walking_profile = walking_profile
         self.tail_anchor = self.tail = self.first_composed = None
 
@@ -50,13 +71,23 @@ class ComposedTrip(phase.PhaseTrip):
             return None
         # The superclass remains the unmodified phase-only comparator. Never
         # replace its anchor/original or feed our result back into its clocks.
-        result.update(model=MODEL, phase_only_total_seconds=result['total_seconds'],
+        result.update(model=self.model, phase_only_total_seconds=result['total_seconds'],
             phase_only_status=result['status'], phase_only_unknown_reasons=list(result['unknown_reasons']))
         if self.anchor is not None:
             if self.tail_anchor is not self.anchor:
-                self.tail = ground_tail(self.anchor, self.walking_profile)
+                self.tail = ground_tail(self.anchor, self.walking_profile, self.walk_model)
                 self.tail_anchor = self.anchor
             result['ground_model'] = walking.MODEL if self.anchor['category'] == 'walk' else frozen.MODEL
+            if self.walk_model == 'short-and-affine':
+                if self.anchor['category'] == 'walk':
+                    result['ground_model'] = REGIME_MODEL
+                result['walking_legs'] = {name: {
+                    'regime': self.tail[name].get('regime', 'category_empirical'),
+                    'model': self.tail[name].get('model', frozen.MODEL),
+                    'reference_seconds': self.anchor['references'][name],
+                    'estimate_seconds': self.tail[name]['estimate_seconds'],
+                    'unknown_reasons': self.tail[name]['unknown_reasons']}
+                    for name in walking.LEGS}
             result['ground_reference_seconds'] = {n: self.anchor['references'][n] for n in walking.LEGS}
             result['unknown_tail_phases'] = {n: p['unknown_reasons'] for n, p in self.tail.items()
                                              if p['estimate_seconds'] is None}
@@ -150,6 +181,8 @@ def evaluate_run(run, attempts, updates):
                 ground_model=u.get('ground_model') if u and eligible else None,
                 unknown_tail_phases=u.get('unknown_tail_phases', {}) if u and eligible else {},
                 ground_reference_seconds=u.get('ground_reference_seconds') if u and eligible else None)
+            if u and u['model'] == REGIME_MODEL:
+                c['walking_legs'] = u.get('walking_legs', {}) if eligible else {}
     return result
 
 
@@ -222,10 +255,21 @@ def verify_baseline(result, source, scope):
                     raise ValueError(f'phase-only comparator changed: {new}')
 
 
+def evaluation_identities(run, config, prediction, scope):
+    if scope == controlled.SCOPE and not run['attempts'] and not prediction['attempts']:
+        # Different requested bands can all fail preparation, leaving identical
+        # traces before any capture attempt exists. Retain these distinct trials
+        # without admitting repeated copies of the same setup configuration.
+        setup = json.dumps({k: config[k] for k in ['seed', 'seat', 'band', 'offset'] if k in config}, sort_keys=True)
+        return {(run['trace_sha256'], config['seat'], setup)}
+    return {(run['trace_sha256'], s) for s in config.get('seats', [config.get('seat')])}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['manifest', 'source-evaluation', 'ground-profile', 'phase-profile', 'walking-profile', 'out']:
         parser.add_argument('--' + name, required=True, type=Path)
+    parser.add_argument('--walk-model', choices=WALK_MODELS, default='affine')
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
     scope = manifest.get('scope', 'missions')
@@ -239,7 +283,7 @@ def main():
     hashes = {name: costs.file_hash(path) for name, path in paths.items()}
     profiles = [json.loads(path.read_text()) for path in paths.values()]
     validate_profiles(manifest, profiles, hashes['ground'])
-    provenance = {'version': 1, 'model': MODEL, 'scope': scope,
+    provenance = {'version': 1, 'model': MODEL if args.walk_model == 'affine' else REGIME_MODEL, 'scope': scope,
         'runtime_revision': manifest['runtime_revision'], 'profile_sha256': hashes,
         'manifest_sha256': costs.file_hash(args.manifest),
         'source_evaluation_sha256': costs.file_hash(args.source_evaluation)}
@@ -250,7 +294,7 @@ def main():
         trace = base / config['directory'] / 'trace.jsonl'
         trace_hash = costs.file_hash(trace)
         updates = args.out / f'updates-{i}.jsonl'
-        factory = lambda selection: ComposedTrip(selection, *profiles)
+        factory = lambda selection: ComposedTrip(selection, *profiles, walk_model=args.walk_model)
         with updates.open('w') as stream:
             if scope == controlled.SCOPE:
                 attempts = replay_controlled(config, base, factory, stream, trace_hash)
@@ -274,7 +318,7 @@ def main():
         if (run['source_commit'] != manifest['runtime_revision'] or run['trace_sha256'] != prediction['trace_sha256']
                 or run['report_sha256'] != costs.file_hash(base / config['directory'] / 'report.json')):
             raise ValueError('source runtime, trace or report changed')
-        identities = {(run['trace_sha256'], s) for s in config.get('seats', [config.get('seat')])}
+        identities = evaluation_identities(run, config, prediction, scope)
         if seen & identities:
             raise ValueError('duplicate evaluation recording and seat')
         seen |= identities
@@ -290,10 +334,12 @@ def main():
         evaluated.append(result)
     frozen.write_json(args.out / 'evaluation.json', {**provenance, 'runs': evaluated,
         'summary': summarize(evaluated), 'limitations': [
-            'Recorded replays, not fresh validation or changed bot behavior; no refitting.',
+            'Replay alone does not establish independent validation; a separate data-generation protocol is required. No changed bot behavior or refitting.',
             'Conditional completion times, not probabilities, permissions or guaranteed bounds.',
             'First-choice walking calibration applied to currently acquired route references.',
-            'Non-walking categories keep the frozen empirical tail; walking never falls back outside its domain.',
+            ('Non-walking categories keep the frozen empirical tail; walking never falls back outside its domain.'
+                if args.walk_model == 'affine' else
+                'Each leg uses supported empirical costs below the affine minimum, affine costs within its domain, otherwise unknown. Non-walking categories are unchanged.'),
             'Controlled totals start at capture-controller start; preparation and remote transfer are excluded.']})
 
 
