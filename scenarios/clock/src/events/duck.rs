@@ -9,7 +9,7 @@ mod platform_tests;
 #[cfg(test)]
 mod tests;
 
-use controller::{Controller, CourseContext, Movement, Observation};
+use controller::{Command, Controller, CourseContext, Gait, Movement, Observation};
 use engine_common::{ClockDuckNavigationState, ClockDuckOutcome, ClockDuckState};
 use engine_core::Vec2;
 use engine_rapier::world::{
@@ -55,9 +55,78 @@ pub(crate) struct DuckEvent {
     controller: Controller,
     jumps: u32,
     outcome: Option<ClockDuckOutcome>,
+    player: Option<PlayerControl>,
+}
+
+struct PlayerControl {
+    session_id: u64,
+    seat: u8,
+    move_milli: i16,
+    jump_held: bool,
+    jump_pending: bool,
+    facing: f32,
 }
 
 impl DuckEvent {
+    pub fn new_player(
+        layout: Layout,
+        seed: u64,
+        pattern: Option<engine_common::ClockDuckCoursePattern>,
+        session_id: u64,
+        seat: u8,
+    ) -> Self {
+        let mut scene = Self::new_course(layout, seed, pattern);
+        scene.player = Some(PlayerControl {
+            session_id,
+            seat,
+            move_milli: 0,
+            jump_held: false,
+            jump_pending: false,
+            facing: 1.0,
+        });
+        scene
+    }
+
+    pub fn player_session(&self) -> Option<(u64, u8)> {
+        self.player.as_ref().map(|p| (p.session_id, p.seat))
+    }
+
+    pub fn set_player_input(&mut self, move_milli: i16, jump: bool) {
+        if self.phase == EventPhase::Resetting {
+            return;
+        }
+        let Some(player) = &mut self.player else {
+            return;
+        };
+        player.move_milli = move_milli.clamp(-1000, 1000);
+        // No buffered landing jump or opening-phase jump. A new press must
+        // happen while running; holding the button never becomes auto-hop.
+        player.jump_pending |= jump
+            && !player.jump_held
+            && matches!(self.phase, EventPhase::Running | EventPhase::Exiting);
+        player.jump_held = jump;
+    }
+
+    pub fn dismiss_player(&mut self) {
+        if self.player.is_some() && self.phase != EventPhase::Resetting {
+            self.reset(ClockDuckOutcome::Dismissed);
+        }
+    }
+
+    pub fn player_diagnostics(&self) -> Option<engine_common::ClockPlayerDuckState> {
+        let player = self.player.as_ref()?;
+        Some(engine_common::ClockPlayerDuckState {
+            session_id: player.session_id,
+            player: player.seat,
+            phase: self.phase.as_str().into(),
+            phase_tick: self.phase_tick,
+            move_milli: player.move_milli,
+            jump_held: player.jump_held,
+            facing_right: player.facing * self.direction > 0.0,
+            duck: self.diagnostics(),
+        })
+    }
+
     #[cfg(test)]
     pub fn new_platforms(layout: Layout, seed: u64) -> Self {
         Self::new_course(
@@ -127,6 +196,7 @@ impl DuckEvent {
             controller: Controller::new(),
             jumps: 0,
             outcome: None,
+            player: None,
         }
     }
 
@@ -143,6 +213,7 @@ impl DuckEvent {
             .course
             .as_ref()
             .map_or(5, |course| course.surfaces.len() + 1);
+        let count = count + usize::from(self.player.is_some());
         world.reserve(count, count, 0);
         let pit = self.obstacles[1];
         let floor = self.layout.floor_y;
@@ -207,6 +278,27 @@ impl DuckEvent {
                 &[collider],
             ));
         }
+        if self.player.is_some() {
+            // A physical screen-edge wall replaces the bot's turnaround rule.
+            // The far end remains open so the player can walk through the exit.
+            let entity = PhysicsId::new(2000);
+            let height = self.layout.bounds_max.y - self.layout.bounds_min.y;
+            let mut wall = ColliderSpec::cuboid(
+                ColliderId::new(entity, ColliderRole::PRIMARY, 0),
+                self.radius,
+                height * 0.5,
+            );
+            wall.friction = 0.0;
+            assert!(world.insert_body(
+                BodyId::new(entity, BodyRole::PRIMARY),
+                BodySpec {
+                    kind: BodyKind::Fixed,
+                    position: Vec2::new(-self.radius, self.layout.bounds_min.y + height * 0.5),
+                    ..BodySpec::default()
+                },
+                &[wall],
+            ));
+        }
         let mut collider = ColliderSpec::ball(DUCK_COLLIDER, self.radius);
         collider.friction = 0.0;
         collider.restitution = 0.0;
@@ -267,7 +359,18 @@ impl DuckEvent {
             }),
             support,
         };
-        let command = if let Some(course) = &self.course {
+        let command = if let Some(player) = &mut self.player {
+            // Inputs are in screen coordinates; physics is entrance-relative.
+            let axis = f32::from(player.move_milli) / 1000.0 * self.direction;
+            if axis != 0.0 {
+                player.facing = axis.signum();
+            }
+            Command {
+                gait: Gait::Pace(axis.abs()),
+                direction: axis.signum(),
+                jump: std::mem::take(&mut player.jump_pending),
+            }
+        } else if let Some(course) = &self.course {
             self.controller.decide_course(
                 observed,
                 CourseContext {
@@ -304,6 +407,11 @@ impl DuckEvent {
     fn reset(&mut self, outcome: ClockDuckOutcome) {
         self.outcome = Some(outcome);
         self.world = None;
+        if let Some(player) = &mut self.player {
+            player.move_milli = 0;
+            player.jump_held = false;
+            player.jump_pending = false;
+        }
         self.enter(EventPhase::Resetting);
     }
 
@@ -328,7 +436,7 @@ impl DuckEvent {
                     self.reset(ClockDuckOutcome::Fell);
                 } else if self.exit_visible() && position.x > self.width + self.radius * 2.0 {
                     self.reset(ClockDuckOutcome::Exited);
-                } else if self.tick >= DUCK_TICKS - RESET_TICKS {
+                } else if self.player.is_none() && self.tick >= DUCK_TICKS - RESET_TICKS {
                     self.reset(ClockDuckOutcome::TimedOut);
                 }
             }
@@ -336,7 +444,11 @@ impl DuckEvent {
         }
         // Keep the catalog's fixed envelope even after an early recovery. The
         // course fades out, physics is already dropped, and live time continues.
-        self.tick >= DUCK_TICKS
+        if self.player.is_some() {
+            self.phase == EventPhase::Resetting && self.phase_tick >= RESET_TICKS
+        } else {
+            self.tick >= DUCK_TICKS
+        }
     }
 
     pub fn course_opacity(&self) -> f32 {
@@ -355,12 +467,20 @@ impl DuckEvent {
     }
 
     pub fn exit_visible(&self) -> bool {
-        self.tick >= OPENING_TICKS + EXIT_DELAY_TICKS
+        self.tick
+            >= OPENING_TICKS
+                + if self.player.is_some() {
+                    44
+                } else {
+                    EXIT_DELAY_TICKS
+                }
     }
 
     /// Character facing is independent of the entrance-side course transform.
     pub fn facing(&self) -> f32 {
-        self.controller.direction
+        self.player
+            .as_ref()
+            .map_or(self.controller.direction, |p| p.facing)
     }
 
     pub fn debug_arc(&self) -> Option<[Vec2; 25]> {
@@ -422,7 +542,7 @@ impl DuckEvent {
             entrance_open_milli: (entrance * 1000.0).round() as u32,
             exit_open_milli: (exit * 1000.0).round() as u32,
             outcome: self.outcome,
-            navigation: Some(ClockDuckNavigationState {
+            navigation: self.player.is_none().then(|| ClockDuckNavigationState {
                 jump_profile: self.controller.profile,
                 course_seed: self.seed,
                 behavior: self.controller.behavior,

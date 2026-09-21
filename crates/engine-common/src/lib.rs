@@ -654,6 +654,7 @@ pub enum ClockDuckOutcome {
     Exited,
     Fell,
     TimedOut,
+    Dismissed,
 }
 
 /// Movement personality, independent of event scheduling and course geometry.
@@ -778,6 +779,20 @@ pub struct ClockDuckState {
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]
     pub navigation: Option<ClockDuckNavigationState>,
+}
+
+/// A player visit has its own identity/lifetime, independent of timed events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockPlayerDuckState {
+    pub session_id: u64,
+    /// One-based controller seat; keyboard controls belong to player one.
+    pub player: u8,
+    pub phase: String,
+    pub phase_tick: u64,
+    pub move_milli: i16,
+    pub jump_held: bool,
+    pub facing_right: bool,
+    pub duck: ClockDuckState,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

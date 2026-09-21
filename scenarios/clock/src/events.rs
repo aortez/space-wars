@@ -394,6 +394,18 @@ impl EventSchedule {
         }
     }
 
+    pub fn advance_suspended_tick(&mut self) {
+        // Simulation/feedback still advances, but automatic scheduling consumes
+        // no RNG and cannot queue expired events behind a player visit.
+        self.tick += 1;
+    }
+
+    pub fn resume_after_player(&mut self) {
+        self.next_event_tick = None;
+        self.preserve_periodic_deadline = false;
+        self.enter(EventLifecycle::Cooldown);
+    }
+
     pub fn due_event(&mut self, synchronized: bool) -> Option<ClockEventKind> {
         if !synchronized
             || self.lifecycle != EventLifecycle::Idle

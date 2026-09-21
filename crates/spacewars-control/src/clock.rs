@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 10;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 11;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -43,6 +43,8 @@ pub struct ClockState {
     pub floor: engine_common::ClockFloorMode,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
+    pub player_duck: Option<engine_common::ClockPlayerDuckState>,
+    pub automatic_events_suspended: bool,
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
     #[serde(default)]
@@ -353,6 +355,8 @@ mod tests {
             floor: engine_common::ClockFloorMode::Closed,
             meltdown: None,
             duck: None,
+            player_duck: None,
+            automatic_events_suspended: false,
             marquee: None,
             digit_slide: None,
             rain: None,
@@ -378,6 +382,40 @@ mod tests {
             assert!(json.contains(&format!("\"floor\":\"{}\"", mode.as_str())));
             assert_eq!(ClockState::from_json(&json).unwrap(), state);
         }
+    }
+
+    #[test]
+    fn player_visit_has_separate_identity_and_does_not_impersonate_a_timed_event() {
+        let mut state = clock_state();
+        state.event_kind = None;
+        state.phase = None;
+        state.lifecycle = "idle".into();
+        state.automatic_events_suspended = true;
+        state.player_duck = Some(engine_common::ClockPlayerDuckState {
+            session_id: 3,
+            player: 2,
+            phase: "running".into(),
+            phase_tick: 120,
+            move_milli: -750,
+            jump_held: true,
+            facing_right: false,
+            duck: engine_common::ClockDuckState {
+                left_to_right: true,
+                position_milli: Some([-200000, -100000]),
+                grounded: false,
+                jumps: 1,
+                cleared_obstacles: 0,
+                obstacle_count: 3,
+                entrance_open_milli: 0,
+                exit_open_milli: 1000,
+                outcome: None,
+                navigation: None,
+            },
+        });
+        let round_trip = ClockState::from_json(&state.to_json().unwrap()).unwrap();
+        assert_eq!(round_trip, state);
+        assert!(round_trip.duck.is_none());
+        assert_eq!(round_trip.player_duck.unwrap().player, 2);
     }
 
     #[test]

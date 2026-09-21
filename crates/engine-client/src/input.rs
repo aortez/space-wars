@@ -52,6 +52,9 @@ pub(crate) struct ClientInput {
     pointer_events: Vec<ScreenPointerEvent>,
     active_pointer: Option<RenderPoint>,
     clock_next_event_requested: bool,
+    clock_player_duck_requested: Option<u8>,
+    clock_duck_session: Option<(u64, u8)>,
+    clock_duck_ready: bool,
 }
 
 impl Default for ClientInput {
@@ -70,6 +73,9 @@ impl ClientInput {
             pointer_events: Vec::new(),
             active_pointer: None,
             clock_next_event_requested: false,
+            clock_player_duck_requested: None,
+            clock_duck_session: None,
+            clock_duck_ready: false,
         }
     }
 }
@@ -378,6 +384,47 @@ impl ClientInput {
         std::mem::take(&mut self.clock_next_event_requested)
     }
 
+    pub(crate) fn request_clock_player_duck(&mut self, player: u8) {
+        if (1..=2).contains(&player) && self.clock_player_duck_requested.is_none() {
+            self.clock_player_duck_requested = Some(player);
+        }
+    }
+
+    pub(crate) fn take_clock_player_duck_requested(&mut self) -> Option<u8> {
+        self.clock_player_duck_requested.take()
+    }
+
+    pub(crate) fn clock_duck_input(
+        &mut self,
+        session: Option<(u64, u8)>,
+    ) -> Option<scenario_clock::ClockDuckInput> {
+        if self.clock_duck_session != session {
+            self.clock_duck_session = session;
+            self.clock_duck_ready = false;
+        }
+        let (session_id, player) = session?;
+        let (mut axis, mut jump, alt_jump) = self.spaceling_gamepad_input(usize::from(player - 1));
+        if player == 1 {
+            let keyboard = f32::from(self.is_pressed(GameKey::NesRight))
+                - f32::from(self.is_pressed(GameKey::NesLeft));
+            if keyboard != 0.0 {
+                axis = keyboard;
+            }
+            jump |= self.is_pressed(GameKey::P1Laser) || self.is_pressed(GameKey::NesA);
+        }
+        // East is the working bottom-middle yellow Picade button. South remains
+        // a standard controller's A alternative; no dependency on the bad switch.
+        jump |= alt_jump;
+        let move_milli = (axis * 1000.0).round() as i16;
+        self.clock_duck_ready |= move_milli == 0 && !jump;
+        Some(scenario_clock::ClockDuckInput {
+            session_id,
+            player,
+            move_milli: if self.clock_duck_ready { move_milli } else { 0 },
+            jump: self.clock_duck_ready && jump,
+        })
+    }
+
     pub(crate) fn actions_for_spacewars(
         &mut self,
         state: &SpacewarsState,
@@ -645,6 +692,9 @@ impl ClientInput {
     fn clear_keyboard(&mut self) {
         self.pressed.borrow_mut().clear();
         self.clock_next_event_requested = false;
+        self.clock_player_duck_requested = None;
+        self.clock_duck_session = None;
+        self.clock_duck_ready = false;
         self.gamepads.borrow_mut().clear_simulated();
     }
 

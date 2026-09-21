@@ -93,8 +93,9 @@ GPIO ownership, event codes, axis values and parameter targets before deploy.
 The existing gamepad seat assignment and menu-to-game neutral/release gate
 apply without a userspace input translator. Scenario-specific mappings remain
 those shown by the application's Controls menu. In Clock, HAT Button 3 / West starts
-the next enabled event; other action buttons and the joystick remain available
-for future entity controls. Use Escape or Start to pause, then choose Clock
+the next enabled event. Button 4 / North starts or dismisses a player duck;
+the joystick moves it and Button 2 / East jumps. South/A is also a jump binding
+on working controllers, but the non-reporting switch is not required. Use Escape or Start to pause, then choose Clock
 Controls or Launcher. Enter confirms menu selections;
 Coin/Select opens controls help. Physical button layout can be adjusted by
 changing the `dtparam=buttonN=...` bindings in the Picade profile and rebooting.
@@ -110,8 +111,8 @@ recorded on `sw-picade-2` on 2026-09-19, viewed from the player's position:
 | Top middle | Pink | Button 5 | 310 / BTN_TL | Left shoulder |
 | Top right | Blue | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
 | Bottom left | Pink | Not verified | No event | Not registering |
-| Bottom middle | Yellow | Button 2 | 305 / BTN_EAST | East / B |
-| Bottom right | Blue | Button 4 | 307 / BTN_NORTH | North |
+| Bottom middle | Yellow | Button 2 | 305 / BTN_EAST | East / B / Clock jump |
+| Bottom right | Blue | Button 4 | 307 / BTN_NORTH | North / Clock player duck |
 | Left side utility | Black | Escape | 1 / KEY_ESC | Pause / menu back |
 | Right side utility | Black | Enter | 28 / KEY_ENTER | Menu confirm |
 

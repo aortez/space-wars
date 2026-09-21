@@ -581,6 +581,7 @@ export component MainWindow inherits Window {
     callback native-video-ready();
     callback ui-action(int);
     callback keyboard-action(int, bool);
+    callback clock-input-key(int, bool);
 
     forward-focus: launcher-shortcuts;
     changed sound-visible => {
@@ -1381,11 +1382,41 @@ export component MainWindow inherits Window {
 
         capture-key-released(event) => {
             if (UserActivity.key-event(event.text, false)) { return accept; }
+            if (root.launcher-scenario == "clock") {
+                if (event.text == Key.LeftArrow) { root.clock-input-key(0, false); }
+                if (event.text == Key.RightArrow) { root.clock-input-key(1, false); }
+                if (event.text == " ") { root.clock-input-key(2, false); }
+                if (event.text == "z" || event.text == "Z") { root.clock-input-key(3, false); }
+            }
             return reject;
         }
         capture-key-pressed(event) => {
             if (UserActivity.key-event(event.text, true)) { return accept; }
             if (root.launcher-busy) { return accept; }
+            if (root.launcher-scenario == "clock" && !root.launcher-visible
+                && !root.ingame-menu-visible && !root.game-over-visible) {
+                if (event.text == "d" || event.text == "D") {
+                    root.keyboard-action(13, event.repeat);
+                    return accept;
+                }
+                // Do not re-latch keys held across pause/focus changes via repeat.
+                if (event.text == Key.LeftArrow) {
+                    if (!event.repeat) { root.clock-input-key(0, true); }
+                    return accept;
+                }
+                if (event.text == Key.RightArrow) {
+                    if (!event.repeat) { root.clock-input-key(1, true); }
+                    return accept;
+                }
+                if (event.text == " ") {
+                    if (!event.repeat) { root.clock-input-key(2, true); }
+                    return accept;
+                }
+                if (event.text == "z" || event.text == "Z") {
+                    if (!event.repeat) { root.clock-input-key(3, true); }
+                    return accept;
+                }
+            }
             if (root.launcher-scenario == "clock" && !root.launcher-visible
                 && !root.ingame-menu-visible && !root.game-over-visible
                 && (event.text == "n" || event.text == "N")) {

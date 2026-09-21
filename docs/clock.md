@@ -500,9 +500,81 @@ floor. Holding does not repeat; menu/launch handoffs require released controls.
 The event name appears for two seconds of simulation time. Off disables automatic
 scheduling, not this manual action. Individual disabled events are skipped;
 if all are disabled, a brief “No events enabled” notice replaces no event.
-Preferences are unchanged. The Clock action protocol adds `NextEvent` (kind 6,
-version 5, no additional payload); existing action encodings are unchanged.
+Preferences are unchanged. The Clock action protocol is version 6; `NextEvent`
+(kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
+
+### Player-controlled duck visits
+
+Press **D** on the keyboard, **North (Y)** on a gamepad, or the Picade's
+**bottom-right blue** button to start a visit. Press it again to dismiss your
+duck. **Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
+jumps. Picade's working **bottom-middle yellow** is Jump. Keyboard belongs to
+P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
+cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
+Release movement/jump controls after starting or resuming before taking control.
+Touch still opens pause; this first slice does not add touch movement buttons.
+
+This is one player duck in the existing Clock, not another launcher scenario.
+Its visit is separate from the timed event scheduler. Starting replaces the
+current event, recovers its face/water/physics, and opens a seeded course. The
+player drives the **same movement actuator, gravity, jump impulse and physical
+body** used by Careful/Flowing AI; those existing brains and automatic Duck
+timings are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
+through the same acceleration limit, including airborne braking. Horizontal
+input is screen-relative even when the entrance/course is mirrored. A physical
+rear wall keeps the player in view. The opposite exit appears after entry closes;
+walk through it to finish. Missing a gap ends the visit too.
+
+A fresh **grounded** jump press is required: no held-button auto-hop, opening
+jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
+controller seat, so old/other-player actions cannot drive a new visit. There is
+no 35-second player timeout. Bodies/colliders are fixed-count (at most **nine**,
+including course surfaces and rear wall), with no growing history or entity list.
+Dismissal/fall/exit releases physics immediately, fades the course for 30 ticks,
+then releases the floor. Resize, restart, launcher return, Next Event and menu
+preview also clean up. Live readings and format changes continue; pause freezes
+the duck, course and feedback.
+
+**First-slice event policy:** automatic periodic events and Digit Slide wait
+while the player owns the arena. A normal cooldown/fresh scheduling delay starts
+after the visit, not an overdue event burst. Next Event and Preview & Resume
+explicitly replace the visit. The Off profile and disabled Duck event do not
+disable player visits, and playing never changes saved event preferences.
+Allowing events **during** player activity is the next intended slice after
+playtesting this one: the separate player lifetime prepares for it, but shared
+floor/physics/water interactions and event conflicts are not implemented yet.
+
+The version-6 scenario actions add `TogglePlayerDuck` (kind 7: one-based player
+byte) and `PlayerDuckInput` (kind 8: player byte, little-endian u64 visit ID,
+little-endian i16 horizontal intent in -1000..=1000, and a 0/1 jump-held byte).
+Use the existing bounded virtual-controller CLI for device checks:
+
+```sh
+spacewars-cli input press north --expect-screen gameplay
+spacewars-cli clock state --json
+spacewars-cli input press right --hold-ms 300 --expect-screen gameplay
+spacewars-cli input press east --expect-screen gameplay
+spacewars-cli input press north --expect-screen gameplay
+```
+
+`clock state` reports `player_duck` (visit/owner, phase, intent, facing and physical
+state) separately from the AI event's `duck`, plus `automatic_events_suspended`.
+The player does not increment the automatic event ID. Existing `clock wait`
+predicates refer to timed events, not the player; inspect `player_duck` for a
+visit. No claim that idle event state means the arena is unoccupied is implied.
+
+Headless model tests cover mirroring, movement, real exits and missed gaps,
+grounded single-edge jumping, ownership, pause, cleanup/replacement, and
+automatic scheduling suspension/resumption. Client tests cover neutral/release
+handoffs, backend-neutral keyboard input, controller routing and both production
+render adapters. Export the deterministic 800×480, 1024×768 and portrait captures:
+
+```sh
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-player-visuals \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  player_duck_is_observable_and_renders_through_both_production_adapters
+```
 
 Automatic Clock on `sw-picade-2`: the permanent controls button and automatic-mode
 caption are gone; the optional performance overlay remains enabled here.
@@ -705,7 +777,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **10** and reports scenario-instance revision,
+`clock state` uses schema version **11** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
@@ -794,7 +866,7 @@ switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. V
 are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 10, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 11, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -811,7 +883,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 10, `event`
+tick. A raw `clock trigger` request must include schema version 11, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

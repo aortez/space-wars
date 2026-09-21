@@ -16,6 +16,9 @@ mod layout;
 mod live_tests;
 mod meridiem;
 mod physics;
+mod player;
+#[cfg(test)]
+mod player_tests;
 mod presentation;
 mod rain;
 mod render;
@@ -46,12 +49,15 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 5;
+pub const CLOCK_ACTION_VERSION: u16 = 6;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
 pub const CLOCK_ACTION_PREVIEW_EVENT: u32 = 5;
 pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
+pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
+pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
+pub use player::ClockDuckInput;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
@@ -99,6 +105,8 @@ pub enum ClockAction {
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
     NextEvent,
+    TogglePlayerDuck(u8),
+    PlayerDuckInput(ClockDuckInput),
 }
 
 impl ClockAction {
@@ -163,6 +171,12 @@ impl ClockAction {
             return None;
         }
         match (*kind, payload.len()) {
+            (CLOCK_ACTION_TOGGLE_PLAYER_DUCK, 3) if (1..=2).contains(&payload[2]) => {
+                Some(Self::TogglePlayerDuck(payload[2]))
+            }
+            (CLOCK_ACTION_PLAYER_DUCK_INPUT, 14) => {
+                ClockDuckInput::decode(&payload[2..]).map(Self::PlayerDuckInput)
+            }
             (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
@@ -354,6 +368,11 @@ pub struct ClockState {
     floor: floor::FloorManager,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
+    // Player presence is not a timed event. This first slice suspends events
+    // while the player owns the arena; later composition can relax that policy.
+    player_duck: Option<Box<events::duck::DuckEvent>>,
+    player_duck_sequence: u64,
+    player_seed: u64,
 }
 
 impl ClockState {
@@ -414,6 +433,7 @@ impl ClockState {
         self.config.aspect_ratio = aspect_ratio;
         // A resize changes both anchors and floor geometry. Recover immediately
         // instead of leaving bodies in the old arena or teleporting colliders.
+        self.finish_player_duck();
         if self.active_event.is_some() {
             self.finish_event();
         }
@@ -451,7 +471,11 @@ impl ClockState {
         self.schedule.event_id
     }
     pub fn next_event_tick(&self) -> Option<u64> {
-        self.schedule.next_event_tick
+        if self.automatic_events_suspended() {
+            None
+        } else {
+            self.schedule.next_event_tick
+        }
     }
     pub fn event_profile(&self) -> ClockEventProfile {
         self.config.event_profile
@@ -460,11 +484,19 @@ impl ClockState {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
+            + self
+                .player_duck
+                .as_ref()
+                .map_or(0, |duck| duck.physics_counts().0)
     }
     pub fn collider_count(&self) -> usize {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
+            + self
+                .player_duck
+                .as_ref()
+                .map_or(0, |duck| duck.physics_counts().1)
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -492,7 +524,9 @@ impl ClockState {
         }
     }
     pub fn can_trigger_event(&self) -> bool {
-        self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
+        self.reading.is_some()
+            && self.lifecycle() == EventLifecycle::Idle
+            && !self.automatic_events_suspended()
     }
 
     pub fn rain_state(&self) -> Option<engine_common::ClockRainState> {
@@ -512,6 +546,7 @@ impl ClockState {
         if self.reading.is_some() {
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
+            self.finish_player_duck();
             self.finish_event();
             self.start_event(kind);
         }
@@ -578,7 +613,11 @@ impl ClockState {
     }
 
     fn advance_tick(&mut self) {
-        self.schedule.advance_tick();
+        if self.automatic_events_suspended() {
+            self.schedule.advance_suspended_tick();
+        } else {
+            self.schedule.advance_tick();
+        }
         if self
             .event_notice
             .is_some_and(|(_, until)| self.schedule.tick >= until)
@@ -586,7 +625,11 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        if let Some(event) = &mut self.active_event {
+        if let Some(duck) = &mut self.player_duck {
+            if duck.step() {
+                self.finish_player_duck();
+            }
+        } else if let Some(event) = &mut self.active_event {
             if event.step(EventContext {
                 segments: &mut self.segments,
                 display: self.display,
@@ -608,6 +651,7 @@ impl ClockState {
         // minutes, backwards corrections and paused control synchronization snap
         // straight to the truth; there is no backlog of stale transitions.
         let slide = animate
+            && !self.automatic_events_suspended()
             && minute_changed
             && self.reading.is_some_and(|old| {
                 let seconds = |r: ClockReading| {
@@ -661,6 +705,9 @@ impl Scenario for ClockScenario {
             floor: floor::FloorManager::default(),
             last_started_event: None,
             event_notice: None,
+            player_duck: None,
+            player_duck_sequence: 0,
+            player_seed: seed ^ 0x504c_4159_4455_434b,
         }
     }
 
@@ -672,6 +719,8 @@ impl Scenario for ClockScenario {
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),
                 ClockAction::NextEvent => state.next_event(),
+                ClockAction::TogglePlayerDuck(player) => state.toggle_player_duck(player),
+                ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
         // The fixed-timestep host supplies one tick per call. Zero duration is

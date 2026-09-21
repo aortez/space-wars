@@ -67,7 +67,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+    if let Some(event) = state.duck_scene() {
         // The custom course owns its floor, including the entrance/exit fade.
         // This backdrop never adds a collider across the course's physical pit.
         render_floor(
@@ -119,11 +119,23 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         meltdown::render(&mut frame, event, layout);
     }
-    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+    if let Some(event) = state.duck_scene() {
         duck::render(&mut frame, event, state.config.duck_debug_overlay);
     }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
+    if let Some((_, player)) = state.player_duck_session() {
+        frame.push_primitive(
+            100,
+            RenderPrimitive::Text(RenderText {
+                position: RenderPoint::new(layout.bounds_max.x - 60.0, layout.bounds_max.y - 24.0),
+                text: format!("P{player} DUCK"),
+                color: LABEL_COLOR,
+                size: 14.0,
+                anchor: TextAnchor::Center,
+            }),
+        );
+    }
     frame
 }
 

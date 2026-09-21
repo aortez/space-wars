@@ -234,7 +234,7 @@ impl GamepadPump {
         if matches!(route, ButtonRoute::Menu(_) | ButtonRoute::Host(_)) {
             self.begin_handoff();
         }
-        apply_button_route(window, &self.input, route);
+        apply_button_route(window, &self.input, route, seat as u8 + 1);
     }
 
     fn sample_gamepads(&mut self, window: &MainWindow) {
@@ -355,6 +355,7 @@ enum ButtonRoute {
     Menu(UiAction),
     Host(GameKey),
     ClockNext,
+    ClockDuck,
     Scenario,
 }
 
@@ -379,6 +380,9 @@ fn button_route(
     if window.get_launcher_scenario() == "clock" && button == clock_next_event_button(name) {
         return ButtonRoute::ClockNext;
     }
+    if window.get_launcher_scenario() == "clock" && button == Button::North {
+        return ButtonRoute::ClockDuck;
+    }
     let captures_start = window.get_scenario_captures_gamepad_start();
     let captures_select = window.get_scenario_captures_gamepad_select();
     if native_console_menu_chord(button, captures_start, captures_select, start, select) {
@@ -391,11 +395,12 @@ fn button_route(
     }
 }
 
-fn apply_button_route(window: &MainWindow, input: &SharedInput, route: ButtonRoute) {
+fn apply_button_route(window: &MainWindow, input: &SharedInput, route: ButtonRoute, player: u8) {
     match route {
         ButtonRoute::Menu(action) => window.invoke_ui_action(action.code()),
         ButtonRoute::Host(key) => input.borrow_mut().press(key),
         ButtonRoute::ClockNext => input.borrow_mut().request_clock_next_event(),
+        ButtonRoute::ClockDuck => input.borrow_mut().request_clock_player_duck(player),
         ButtonRoute::Scenario => {}
     }
 }

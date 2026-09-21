@@ -262,10 +262,9 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
         }
+        let world_vector =
+            |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);
         if let Some(rain) = state.rain {
-            let world_vector = |value: Option<[i32; 2]>| {
-                value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0])
-            };
             println!(
                 "Rain: {} / {:?}, spawns={}, entry depth={:.1}/{:.1}; position={:?}, velocity={:?}",
                 rain.amount.label(),
@@ -322,6 +321,21 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 material.floor_load_milli as f64 / 1000.0,
                 material.floor_motion_deferrals,
                 material.exited_solid_microunits as f64 / 1_000_000.0,
+            );
+        }
+        if let Some(player) = &state.player_duck {
+            println!(
+                "Player duck: P{} session={} phase={} move={} jump-held={} grounded={} jumps={} position={:?} outcome={:?}; automatic-events-suspended={}",
+                player.player,
+                player.session_id,
+                player.phase,
+                player.move_milli,
+                player.jump_held,
+                player.duck.grounded,
+                player.duck.jumps,
+                world_vector(player.duck.position_milli),
+                player.duck.outcome,
+                state.automatic_events_suspended,
             );
         }
         if let Some(duck) = state.duck {

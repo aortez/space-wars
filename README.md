@@ -41,12 +41,16 @@ The local launcher includes the following scenarios and presets:
   a bounded pool that drains through the floor before the face reforms.
   Duck runs and jumps a tiny seeded obstacle course beneath the readable clock,
   using one dynamic body and guaranteed arena cleanup.
+  **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
+  a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
+  (Picade: bottom-middle yellow). Automatic events wait until the visit ends;
+  **N** / right shoulder / Picade upper-right blue still starts the next event.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
   Digit Slide rolls changed digits on minute boundaries without physics.
   Save custom text through `clock message` in the CLI or the Clock settings file.
-  **Pause → Clock Controls** (or the
-  on-face touch button) changes live settings and offers **Preview & Resume**.
+  Tap the clock face or press Start/P/Esc to pause. **Pause → Clock Controls**
+  changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
