@@ -103,7 +103,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by player={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -111,7 +111,8 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.trigger.as_str(),
                         event.enabled,
                         event.cooldown_ticks,
-                        event.automatic_ready_at_tick
+                        event.automatic_ready_at_tick,
+                        event.blocked_by_player
                     );
                 }
             }
@@ -337,6 +338,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 player.duck.outcome,
                 state.automatic_events_suspended,
             );
+            let blocked: Vec<_> = state
+                .events
+                .iter()
+                .filter(|event| event.blocked_by_player)
+                .map(|event| event.label.as_str())
+                .collect();
+            println!("Waiting for player's arena: {}", blocked.join(", "));
         }
         if let Some(duck) = state.duck {
             println!(

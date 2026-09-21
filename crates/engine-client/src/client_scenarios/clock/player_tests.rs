@@ -102,10 +102,18 @@ fn player_duck_is_observable_and_renders_through_both_production_adapters() {
         }
         let current = scenario.clock_state().unwrap();
         assert_eq!(current.event_kind, None);
-        assert!(current.automatic_events_suspended);
+        assert!(!current.automatic_events_suspended);
         assert_eq!(current.player_duck.unwrap().player, 1);
         assert!(current.duck.is_none());
-        assert!(!current.can_trigger);
+        assert!(current.can_trigger);
+        assert_eq!(
+            current
+                .events
+                .iter()
+                .filter(|event| event.blocked_by_player)
+                .count(),
+            4
+        );
         assert!(current.body_count <= 9 && current.collider_count <= 9);
         let frames = scenario.render_frames(RenderBackend::Raster, viewport);
         assert_eq!(
@@ -133,6 +141,78 @@ fn player_duck_is_observable_and_renders_through_both_production_adapters() {
         if let Some(output) = &output {
             write_png(&output.join(format!("player-duck-{name}.png")), &pixels);
             std::fs::write(output.join(format!("player-duck-{name}.svg")), vector).unwrap();
+        }
+    }
+}
+
+#[test]
+fn visual_events_leave_the_player_and_course_visible_in_all_layouts() {
+    use crate::thruster_visual_tests::{raster, write_png};
+    use engine_common::ClockEventKind;
+    let output = std::env::var_os("SPACEWARS_CLOCK_PLAYER_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (name, viewport) in [
+        ("hyperpixel", Viewport::new(800.0, 480.0)),
+        ("picade", Viewport::new(1024.0, 768.0)),
+        ("portrait", Viewport::new(480.0, 800.0)),
+    ] {
+        for event in [
+            ClockEventKind::ColorCycle,
+            ClockEventKind::Marquee,
+            ClockEventKind::DigitSlide,
+        ] {
+            let mut baseline = scenario(viewport);
+            let mut composed = scenario(viewport);
+            for scene in [&mut baseline, &mut composed] {
+                scene.step(&[ClockAction::toggle_player_duck(1)], Duration::ZERO);
+                for _ in 0..90 {
+                    scene.step(&[], Duration::from_nanos(16_666_667));
+                }
+            }
+            composed.step(&[ClockAction::preview_event(event)], Duration::ZERO);
+            for _ in 0..if event == ClockEventKind::DigitSlide {
+                24
+            } else {
+                120
+            } {
+                for scene in [&mut baseline, &mut composed] {
+                    scene.step(&[], Duration::from_nanos(16_666_667));
+                }
+            }
+            assert_eq!(composed.state.event_kind(), Some(event));
+            assert_eq!(
+                composed.state.player_duck_state(),
+                baseline.state.player_duck_state()
+            );
+            let frames = composed.render_frames(RenderBackend::Raster, viewport);
+            assert_eq!(
+                frames,
+                composed.render_frames(RenderBackend::Vector, viewport)
+            );
+            assert!(
+                crate::render::scene_primitives_from_frames(&frames, viewport)
+                    .iter()
+                    .any(|item| item.text == "P1 DUCK")
+            );
+            let pixels = raster(&frames[0], viewport);
+            let reference = raster(
+                &baseline.render_frames(RenderBackend::Raster, viewport)[0],
+                viewport,
+            );
+            let lower = (pixels.width() * (pixels.height() * 3 / 4)) as usize;
+            assert_eq!(
+                &pixels.as_slice()[lower..],
+                &reference.as_slice()[lower..],
+                "player/course changed under {event:?} on {name}"
+            );
+            if let Some(output) = &output {
+                write_png(
+                    &output.join(format!("player-duck-{name}-{event:?}.png")),
+                    &pixels,
+                );
+            }
         }
     }
 }

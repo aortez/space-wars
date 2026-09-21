@@ -117,7 +117,13 @@ impl ScenarioControls {
     }
 
     pub fn request_clock_event(&mut self, event: engine_common::ClockEventKind) -> bool {
-        if !self.clock_state().is_some_and(|state| state.can_trigger) {
+        if !self.clock_state().is_some_and(|state| {
+            state.can_trigger
+                && state
+                    .events
+                    .iter()
+                    .any(|entry| entry.kind == event && !entry.blocked_by_player)
+        }) {
             return false;
         }
         self.request = Some(ScenarioControlRequest::ClockEvent(event));
@@ -2489,6 +2495,39 @@ mod tests {
     use crate::input::ScreenPointerEvent;
 
     const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
+
+    #[test]
+    fn player_duck_allows_visual_requests_but_not_private_arena_requests() {
+        use engine_common::ClockEventKind;
+        use scenario_clock::{ClockAction, ClockReading};
+        let mut scenario = hosted_scenario("clock", 42).unwrap();
+        scenario.step(
+            &[
+                ClockAction::set_reading(ClockReading::new(12, 34, 56).unwrap()),
+                ClockAction::toggle_player_duck(1),
+            ],
+            Duration::ZERO,
+        );
+        let mut controls = ScenarioControls::default();
+        controls.publish_clock_state(&scenario, 7, false);
+        for event in ClockEventKind::ALL {
+            let expected = matches!(
+                event,
+                ClockEventKind::ColorCycle | ClockEventKind::Marquee | ClockEventKind::DigitSlide
+            );
+            assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
+            if expected {
+                assert!(
+                    !controls.request_clock_event(event),
+                    "only one queued control"
+                );
+                controls.request = None;
+            }
+        }
+        controls.publish_clock_state(&scenario, 7, true);
+        assert!(!controls.request_clock_event(ClockEventKind::Marquee));
+        assert!(controls.request_clock_preview(ClockEventKind::Marquee));
+    }
 
     #[test]
     fn vector_minimap_groups_switch_between_two_one_and_none_without_stale_maps() {

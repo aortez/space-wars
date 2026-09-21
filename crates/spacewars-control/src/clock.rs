@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 11;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -18,6 +18,9 @@ pub struct ClockEventInfo {
     pub duration_ticks: u64,
     pub cooldown_ticks: u64,
     pub enabled: bool,
+    /// Physical-arena event temporarily incompatible with the player's course.
+    /// Independent of saved enablement, cooldown, pause, and event lifecycle.
+    pub blocked_by_player: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -44,6 +47,8 @@ pub struct ClockState {
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
+    /// Player compatibility leaves no enabled automatic event kinds. Profile
+    /// Off is distinct; per-event restrictions also apply to manual requests.
     pub automatic_events_suspended: bool,
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
@@ -844,6 +849,7 @@ mod tests {
             duration_ticks: 48,
             cooldown_ticks: 120,
             enabled: true,
+            blocked_by_player: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

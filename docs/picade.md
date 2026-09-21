@@ -131,6 +131,11 @@ verification. Colors and wiring may differ between cabinets. The top-right
 Clock-only binding does not change menus, NES, or other scenarios; ordinary
 gamepads use right shoulder.
 
+In Clock, bottom-right blue starts/dismisses a player duck, joystick moves it,
+and bottom-middle yellow jumps. Top-right blue cycles compatible visual events
+without ending the visit. Rain, Meltdown, Falling and the automatic duck course
+wait until the player leaves; saved event settings are not changed.
+
 Run `python3 tools/capture-picade-buttons.py --host sw-picade-2.local` from the
 workstation. It discovers only the two Picade input devices, reads them over SSH,
 and prints a guided capture: top row left/middle/right, bottom row

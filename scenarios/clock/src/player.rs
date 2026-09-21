@@ -1,5 +1,5 @@
 //! Player presence is separate from the automatic event scheduler. For now it
-//! exclusively owns the Duck arena; event/player composition is a later slice.
+//! owns the Duck arena while compatible face animations continue independently.
 use super::*;
 use events::duck::DuckEvent;
 
@@ -56,6 +56,30 @@ impl ClockState {
 
     pub fn automatic_events_suspended(&self) -> bool {
         self.player_duck.is_some()
+            && !ClockEventKind::ALL
+                .into_iter()
+                .any(|kind| self.config.events.enabled(kind) && !self.event_blocked_by_player(kind))
+    }
+
+    pub fn event_blocked_by_player(&self, kind: ClockEventKind) -> bool {
+        self.player_duck.is_some() && EVENT_CATALOG[kind as usize].uses_floor()
+    }
+
+    pub(super) fn sync_event_schedule(&mut self) {
+        // Filter the runtime schedule, never the user's saved preferences.
+        let enabled =
+            |kind| self.config.events.enabled(kind) && !self.event_blocked_by_player(kind);
+        let effective = ClockEvents {
+            falling: enabled(ClockEventKind::Falling),
+            color_cycle: enabled(ClockEventKind::ColorCycle),
+            meltdown: enabled(ClockEventKind::Meltdown),
+            duck: enabled(ClockEventKind::Duck),
+            marquee: enabled(ClockEventKind::Marquee),
+            digit_slide: enabled(ClockEventKind::DigitSlide),
+            rain: enabled(ClockEventKind::Rain),
+        };
+        self.schedule
+            .configure(self.config.event_profile, effective);
     }
 
     pub(crate) fn duck_scene(&self) -> Option<&DuckEvent> {
@@ -80,9 +104,14 @@ impl ClockState {
             }
             return;
         }
-        self.finish_event();
+        if self
+            .event_kind()
+            .is_some_and(|kind| EVENT_CATALOG[kind as usize].uses_floor())
+        {
+            self.finish_event();
+        }
         self.player_duck_sequence += 1;
-        self.floor.acquire(ClockEventKind::Duck);
+        self.floor.acquire_player();
         self.player_duck = Some(Box::new(DuckEvent::new_player(
             Layout::new(self.aspect_ratio()),
             self.player_seed.wrapping_add(self.player_duck_sequence),
@@ -90,6 +119,7 @@ impl ClockState {
             self.player_duck_sequence,
             player,
         )));
+        self.sync_event_schedule();
         self.event_notice = Some((
             if player == 1 {
                 "Player 1 duck"
@@ -110,8 +140,8 @@ impl ClockState {
 
     pub(super) fn finish_player_duck(&mut self) {
         if self.player_duck.take().is_some() {
-            self.floor.release();
-            self.schedule.resume_after_player();
+            self.floor.release_player();
+            self.sync_event_schedule();
         }
     }
 }

@@ -110,6 +110,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             }
         }
         marquee::render(&mut frame, event, layout);
+        render_player_and_course(&mut frame, state, layout);
         return frame;
     }
     render_segments(&mut frame, state, layout);
@@ -119,11 +120,18 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         meltdown::render(&mut frame, event, layout);
     }
-    if let Some(event) = state.duck_scene() {
-        duck::render(&mut frame, event, state.config.duck_debug_overlay);
-    }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
+    render_player_and_course(&mut frame, state, layout);
+    frame
+}
+
+fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    // Kept outside the marquee's face fade and early return. The duck/course
+    // retain their own opacity and geometry while clock content transforms.
+    if let Some(event) = state.duck_scene() {
+        duck::render(frame, event, state.config.duck_debug_overlay);
+    }
     if let Some((_, player)) = state.player_duck_session() {
         frame.push_primitive(
             100,
@@ -136,7 +144,6 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             }),
         );
     }
-    frame
 }
 
 fn render_floor(

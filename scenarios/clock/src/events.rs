@@ -105,6 +105,20 @@ pub struct EventDefinition {
     pub cooldown_ticks: u64,
 }
 
+impl EventDefinition {
+    /// These events still own a private physical arena. Face-only animations
+    /// can compose with a player visit without claiming or replacing its floor.
+    pub const fn uses_floor(&self) -> bool {
+        matches!(
+            self.kind,
+            ClockEventKind::Falling
+                | ClockEventKind::Meltdown
+                | ClockEventKind::Duck
+                | ClockEventKind::Rain
+        )
+    }
+}
+
 pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
     EventDefinition {
         kind: ClockEventKind::Falling,
@@ -392,18 +406,6 @@ impl EventSchedule {
             }
             self.preserve_periodic_deadline = false;
         }
-    }
-
-    pub fn advance_suspended_tick(&mut self) {
-        // Simulation/feedback still advances, but automatic scheduling consumes
-        // no RNG and cannot queue expired events behind a player visit.
-        self.tick += 1;
-    }
-
-    pub fn resume_after_player(&mut self) {
-        self.next_event_tick = None;
-        self.preserve_periodic_deadline = false;
-        self.enter(EventLifecycle::Cooldown);
     }
 
     pub fn due_event(&mut self, synchronized: bool) -> Option<ClockEventKind> {

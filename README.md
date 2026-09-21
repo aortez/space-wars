@@ -43,8 +43,10 @@ The local launcher includes the following scenarios and presets:
   using one dynamic body and guaranteed arena cleanup.
   **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
   a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
-  (Picade: bottom-middle yellow). Automatic events wait until the visit ends;
-  **N** / right shoulder / Picade upper-right blue still starts the next event.
+  (Picade: bottom-middle yellow). Color Cycle, Marquee and Digit Slide continue
+  alongside the player; physical-arena events wait until the visit ends.
+  **N** / right shoulder / Picade upper-right blue starts the next compatible
+  event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
   Digit Slide rolls changed digits on minute boundaries without physics.

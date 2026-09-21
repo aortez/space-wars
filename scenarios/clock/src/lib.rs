@@ -368,8 +368,8 @@ pub struct ClockState {
     floor: floor::FloorManager,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
-    // Player presence is not a timed event. This first slice suspends events
-    // while the player owns the arena; later composition can relax that policy.
+    // Player presence is not a timed event. Face-only events can coexist;
+    // private physical-arena events wait until the player releases the course.
     player_duck: Option<Box<events::duck::DuckEvent>>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -388,14 +388,13 @@ impl ClockState {
     }
 
     fn configure(&mut self, settings: ClockSettings) {
-        self.schedule
-            .configure(settings.event_profile, settings.events);
         self.config.time_format = settings.time_format;
         self.config.event_profile = settings.event_profile;
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
         self.config.rain_amount = settings.rain_amount;
+        self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
         }
@@ -471,11 +470,7 @@ impl ClockState {
         self.schedule.event_id
     }
     pub fn next_event_tick(&self) -> Option<u64> {
-        if self.automatic_events_suspended() {
-            None
-        } else {
-            self.schedule.next_event_tick
-        }
+        self.schedule.next_event_tick
     }
     pub fn event_profile(&self) -> ClockEventProfile {
         self.config.event_profile
@@ -524,9 +519,7 @@ impl ClockState {
         }
     }
     pub fn can_trigger_event(&self) -> bool {
-        self.reading.is_some()
-            && self.lifecycle() == EventLifecycle::Idle
-            && !self.automatic_events_suspended()
+        self.reading.is_some() && self.lifecycle() == EventLifecycle::Idle
     }
 
     pub fn rain_state(&self) -> Option<engine_common::ClockRainState> {
@@ -537,16 +530,22 @@ impl ClockState {
     }
 
     fn trigger_event(&mut self, kind: ClockEventKind) {
-        if self.can_trigger_event() {
+        if self.can_trigger_event() && !self.event_blocked_by_player(kind) {
             self.start_event(kind);
         }
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if self.event_blocked_by_player(kind) {
+                self.event_notice = Some((
+                    "Dismiss your duck to preview this event",
+                    self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                ));
+                return;
+            }
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
-            self.finish_player_duck();
             self.finish_event();
             self.start_event(kind);
         }
@@ -560,12 +559,18 @@ impl ClockState {
         let start = self.last_started_event.map_or(0, |kind| kind as usize + 1);
         let next = (0..kinds.len())
             .map(|offset| kinds[(start + offset) % kinds.len()])
-            .find(|kind| self.config.events.enabled(*kind));
+            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked_by_player(*kind));
         let message = if let Some(kind) = next {
             // The preview path owns cancellation/restoration for every event.
             // Manual cycling ignores automatic cooldowns, not enabled switches.
             self.preview_event(kind);
             kind.label()
+        } else if self.player_duck.is_some()
+            && ClockEventKind::ALL
+                .into_iter()
+                .any(|kind| self.config.events.enabled(kind))
+        {
+            "Dismiss your duck for the enabled events"
         } else {
             "No events enabled"
         };
@@ -581,6 +586,7 @@ impl ClockState {
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
     ) {
+        debug_assert!(!self.event_blocked_by_player(kind));
         self.last_started_event = Some(kind);
         self.event_notice = None;
         let seed = self.schedule.start(kind);
@@ -602,10 +608,12 @@ impl ClockState {
 
     fn finish_event(&mut self) {
         if let Some(event) = self.active_event.take() {
-            self.schedule.finish(event.kind());
+            let kind = event.kind();
+            drop(event);
+            self.schedule.finish(kind);
+            self.floor.release(kind);
         }
-        // The event and its bodies/water have been dropped before closing.
-        self.floor.release();
+        // Visual-event cleanup never releases the player's physical arena.
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
@@ -613,11 +621,7 @@ impl ClockState {
     }
 
     fn advance_tick(&mut self) {
-        if self.automatic_events_suspended() {
-            self.schedule.advance_suspended_tick();
-        } else {
-            self.schedule.advance_tick();
-        }
+        self.schedule.advance_tick();
         if self
             .event_notice
             .is_some_and(|(_, until)| self.schedule.tick >= until)
@@ -625,11 +629,12 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        if let Some(duck) = &mut self.player_duck {
-            if duck.step() {
-                self.finish_player_duck();
-            }
-        } else if let Some(event) = &mut self.active_event {
+        if let Some(duck) = &mut self.player_duck
+            && duck.step()
+        {
+            self.finish_player_duck();
+        }
+        if let Some(event) = &mut self.active_event {
             if event.step(EventContext {
                 segments: &mut self.segments,
                 display: self.display,
@@ -651,7 +656,6 @@ impl ClockState {
         // minutes, backwards corrections and paused control synchronization snap
         // straight to the truth; there is no backlog of stale transitions.
         let slide = animate
-            && !self.automatic_events_suspended()
             && minute_changed
             && self.reading.is_some_and(|old| {
                 let seconds = |r: ClockReading| {

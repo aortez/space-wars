@@ -1,8 +1,8 @@
-//! Event-owned access to the ordinary floor.
+//! Scoped ownership of the ordinary floor.
 //!
-//! Clock serializes events, so one explicit owner is sufficient. Acquire before
-//! constructing event resources; release only after dropping them. Rain and
-//! Meltdown own their responsive water/impact geometry as well as their art.
+//! One physical arena owner can coexist with a face-only event. Release only
+//! the caller's claim, after dropping its resources. Rain and Meltdown still
+//! own their responsive water/impact geometry as well as their art.
 
 pub(crate) mod responsive;
 
@@ -15,17 +15,26 @@ use crate::layout::Layout;
 
 #[derive(Default)]
 pub(crate) struct FloorManager {
-    owner: Option<ClockEventKind>,
+    owner: Option<FloorOwner>,
     mode: ClockFloorMode,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FloorOwner {
+    Event(ClockEventKind),
+    PlayerDuck,
 }
 
 impl FloorManager {
     pub fn acquire(&mut self, kind: ClockEventKind) {
+        if !crate::EVENT_CATALOG[kind as usize].uses_floor() {
+            return;
+        }
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
         );
-        self.owner = Some(kind);
+        self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
             ClockEventKind::Falling => ClockFloorMode::DrainOpen,
             ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
@@ -37,9 +46,28 @@ impl FloorManager {
         };
     }
 
-    pub fn release(&mut self) {
-        self.owner = None;
-        self.mode = ClockFloorMode::Closed;
+    pub fn release(&mut self, kind: ClockEventKind) {
+        self.release_owner(FloorOwner::Event(kind));
+    }
+
+    pub fn acquire_player(&mut self) {
+        assert!(
+            self.owner.is_none(),
+            "finish the previous floor owner first"
+        );
+        self.owner = Some(FloorOwner::PlayerDuck);
+        self.mode = ClockFloorMode::EventOwned;
+    }
+
+    pub fn release_player(&mut self) {
+        self.release_owner(FloorOwner::PlayerDuck);
+    }
+
+    fn release_owner(&mut self, owner: FloorOwner) {
+        if self.owner == Some(owner) {
+            self.owner = None;
+            self.mode = ClockFloorMode::Closed;
+        }
     }
 
     pub fn mode(&self) -> ClockFloorMode {

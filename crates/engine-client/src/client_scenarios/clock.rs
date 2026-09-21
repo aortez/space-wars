@@ -35,7 +35,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck on/off: D / Y (North) / Picade bottom-right blue.\nMove: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow. Release to re-arm.\nSpawning pad owns duck; keys=P1. Exit or dismiss.\nEvents wait for your duck; Next Event replaces it.\nOff stops automatic events only. Pause freezes motion.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck on/off: D / Y (North) / Picade bottom-right blue.\nMove: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow. Release to re-arm.\nSpawning pad owns duck; keys=P1. Exit or dismiss.\nVisual events keep your duck; physical events wait.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 
@@ -216,6 +216,7 @@ impl ClientScenario for ClockClientScenario {
                     duration_ticks: event.duration_ticks,
                     cooldown_ticks: event.cooldown_ticks,
                     enabled: self.state.event_enabled(event.kind),
+                    blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),

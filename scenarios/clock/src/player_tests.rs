@@ -2,6 +2,8 @@ use super::*;
 use engine_common::{ClockDuckOutcome, ClockFloorMode};
 use events::duck::planner::Surface;
 
+mod composition;
+
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {
@@ -119,31 +121,44 @@ fn player_actions_are_versioned_bounded_and_reject_stale_or_other_owner_input() 
 }
 
 #[test]
-fn player_visit_blocks_periodic_and_time_change_events_but_keeps_live_time() {
+fn player_visit_outlives_automatic_visual_events_and_keeps_live_time() {
     let mut state = ready(800.0 / 480.0, 42);
     let settings = state.settings();
     toggle(&mut state, 1);
     let session = state.player_duck_session();
-    ticks(&mut state, 3 * DUCK_TICKS as usize);
+    let mut seen = Vec::new();
+    for _ in 0..3 * DUCK_TICKS {
+        tick(&mut state, &[]);
+        if let Some(kind) = state.event_kind() {
+            assert!(!EVENT_CATALOG[kind as usize].uses_floor());
+            seen.push(kind);
+        }
+    }
     assert_eq!(
         state.player_duck_session(),
         session,
         "no timed-event eviction"
     );
-    assert_eq!(state.event_id(), 0);
-    assert_eq!(state.event_kind(), None);
-    assert_eq!(state.next_event_tick(), None);
-    assert!(!state.can_trigger_event());
-    assert!(state.automatic_events_suspended());
+    assert!(seen.contains(&ClockEventKind::ColorCycle));
+    assert!(seen.contains(&ClockEventKind::Marquee));
+    assert!(!state.automatic_events_suspended());
     assert!(state.body_count() <= 9);
     assert!(state.player_duck_state().unwrap().duck.navigation.is_none());
+    // Isolate the minute transition from any due periodic deadline.
+    let mut slide_only = settings;
+    slide_only.events.color_cycle = false;
+    slide_only.events.marquee = false;
+    state.configure(slide_only);
+    state.finish_event();
+    ticks(&mut state, COOLDOWN_TICKS as usize);
     let reading = ClockReading::new(13, 0, 0).unwrap();
     tick(&mut state, &[ClockAction::set_reading(reading)]);
     assert_eq!(
         state.display(),
         digits::snapshot(reading, settings.time_format)
     );
-    assert_eq!(state.event_kind(), None, "no automatic Digit Slide");
+    assert_eq!(state.event_kind(), Some(ClockEventKind::DigitSlide));
+    state.configure(settings);
     let before = state.player_duck_state();
     let frame = ClockScenario::render_frame(&state);
     for _ in 0..120 {
@@ -158,7 +173,7 @@ fn player_visit_blocks_periodic_and_time_change_events_but_keeps_live_time() {
     assert_eq!(state.body_count(), 0);
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     ticks(&mut state, COOLDOWN_TICKS as usize);
-    assert!(state.next_event_tick().unwrap() > state.simulation_tick());
+    assert!(state.next_event_tick().is_some());
     for _ in 0..601 {
         tick(&mut state, &[]);
         if state.event_kind().is_some() {
@@ -275,6 +290,7 @@ fn screen_relative_movement_back_wall_and_real_exit_work_in_both_directions() {
                 at_wall.duck.outcome, None,
                 "physical rear wall keeps player on screen"
             );
+            state.preview_event(ClockEventKind::Marquee);
             let forward = input(&state, (direction * 1000.0) as i16, false);
             tick(&mut state, &[forward]);
             let mut exited = false;
@@ -288,6 +304,7 @@ fn screen_relative_movement_back_wall_and_real_exit_work_in_both_directions() {
             }
             assert!(exited, "seed={seed} aspect={aspect}");
             assert!(state.player_duck_state().is_none());
+            assert_eq!(state.event_kind(), Some(ClockEventKind::Marquee));
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         }
     }
@@ -313,6 +330,7 @@ fn missing_a_gap_falls_and_releases_player_resources() {
         },
     ];
     ticks(&mut state, 90);
+    state.preview_event(ClockEventKind::Marquee);
     let forward = input(&state, axis, false);
     tick(&mut state, &[forward]);
     let mut fell = false;
@@ -326,6 +344,7 @@ fn missing_a_gap_falls_and_releases_player_resources() {
     }
     assert!(fell);
     assert!(state.player_duck_state().is_none());
+    assert_eq!(state.event_kind(), Some(ClockEventKind::Marquee));
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     assert_eq!(state.body_count(), 0);
 }
@@ -342,20 +361,28 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             );
             ticks(&mut state, 90);
             let event_id = state.event_id();
+            let active_at_spawn = state.event_kind();
             toggle(&mut state, 1);
             assert_eq!(
                 state.event_id(),
                 event_id,
                 "player is not a scheduler event"
             );
-            assert!(state.event_kind().is_none());
+            assert_eq!(
+                state.event_kind(),
+                active_at_spawn.filter(|kind| !EVENT_CATALOG[*kind as usize].uses_floor())
+            );
             assert!(state.rain_state().is_none() && state.meltdown_state().is_none());
             assert_eq!(state.body_count(), 0, "old world dropped before opening");
             ticks(&mut state, 60);
             assert!(state.body_count() <= 9);
             ClockScenario::step(&mut state, &[ClockAction::next_event()], Duration::ZERO);
-            assert!(state.player_duck_state().is_none());
+            assert!(state.player_duck_state().is_some());
             assert_eq!(state.event_id(), event_id + 1);
+            assert!(!EVENT_CATALOG[state.event_kind().unwrap() as usize].uses_floor());
+            toggle(&mut state, 1);
+            ticks(&mut state, 30);
+            assert!(state.player_duck_state().is_none());
         }
     }
     toggle(&mut state, 1);
