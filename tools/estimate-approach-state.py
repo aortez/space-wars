@@ -3,7 +3,8 @@
 
 Successful uninterrupted flights supply conditional durations, not completion
 probabilities. Every other flight phase and all ground costs keep their frozen
-models. Unsupported approach states never fall back to a duration countdown.
+models. The default replaces approach durations strictly; an explicit expiry
+regime preserves them while supported and consults state evidence only afterward.
 """
 import argparse
 from collections import defaultdict
@@ -27,6 +28,8 @@ composed = module('state_composition', 'compose-trip-estimates.py')
 flight = module('state_geometry', 'inspect-flight-progress.py')
 phase, frozen, costs = composed.phase, composed.frozen, composed.costs
 MODEL = 'approach-state-trip-v1'
+EXPIRY_MODEL = 'approach-expiry-trip-v1'
+FLIGHT_MODELS = {'state': MODEL, 'duration-then-state': EXPIRY_MODEL}
 PROFILE_MODEL = 'approach-state-profile-v1'
 SCALES = {'height': 12.0, 'side_error': 3.0, 'normal_speed': 4.0,
           'right_speed': 4.0, 'gravity_normal': 4.0, 'gravity_right': 3.0}
@@ -175,10 +178,39 @@ class StateLookup:
 
 
 class StateTrip(composed.ComposedTrip):
-    def __init__(self, selection, ground, landing, walking, lookup):
+    def __init__(self, selection, ground, landing, walking, lookup, flight_model='state'):
         super().__init__(selection, ground, landing, walking, walk_model='short-and-affine')
+        if flight_model not in FLIGHT_MODELS:
+            raise ValueError('unknown flight model selection rule')
+        self.flight_model = flight_model
         self.lookup, self.flight = lookup, flight.FlightProgress()
         self.first_state = None
+        # A cell that never supported a duration estimate cannot expire. Count
+        # distinct attempts through the same frozen duration model at age zero.
+        self.duration_at_entry = {context: phase.remaining(landing,
+            {'context': context, 'name': 'approach', 'age_seconds': 0})
+            for context in ['initial', 'retry']} if flight_model == 'duration-then-state' else {}
+
+    def flight_choice(self, result):
+        choice = {'rule': self.flight_model, 'selected': 'duration',
+                  'state_lookup_attempted': False, 'reason': 'not_approach'}
+        landing, clock = result.get('landing'), result['flight_phase']
+        if landing is None or clock['name'] != 'approach':
+            return choice
+        if self.flight_model == 'state':
+            return {**choice, 'selected': 'state', 'state_lookup_attempted': True,
+                    'reason': 'strict_state_model'}
+        if landing['seconds'] is not None:
+            return {**choice, 'reason': 'duration_supported'}
+        if (landing['reason'] != 'insufficient_surviving_phase_attempts'
+                or not clock['entry_observed']
+                or not costs.finite(clock['age_seconds']) or clock['age_seconds'] <= 0
+                or self.duration_at_entry[clock['context']]['seconds'] is None):
+            return {**choice, 'reason': 'no_expired_duration_support'}
+        if any(r != landing['reason'] for r in result['unknown_reasons']):
+            return {**choice, 'reason': 'other_evidence_or_budget_guard'}
+        return {**choice, 'selected': 'state', 'state_lookup_attempted': True,
+                'reason': 'duration_support_expired'}
 
     def observe(self, row):
         if self.terminal:
@@ -190,12 +222,13 @@ class StateTrip(composed.ComposedTrip):
         # Keep its authoritative phase clock while retaining the reset window.
         if result.get('flight_phase') is not None:
             state['phase'] = copy.deepcopy(result['flight_phase'])
-        result.update(model=MODEL, duration_total_seconds=result['total_seconds'],
+        result.update(model=FLIGHT_MODELS[self.flight_model], duration_total_seconds=result['total_seconds'],
             duration_status=result['status'], duration_unknown_reasons=list(result['unknown_reasons']),
-            duration_landing=copy.deepcopy(result.get('landing')), approach_state=state)
+            duration_landing=copy.deepcopy(result.get('landing')), approach_state=state,
+            flight_selection=self.flight_choice(result))
         # Apply only after the unchanged comparator has run. Never feed the new
         # forecast into its anchors, clocks, phase-only totals or first result.
-        if result.get('landing') is not None and result['flight_phase']['name'] == 'approach':
+        if result['flight_selection']['state_lookup_attempted']:
             landing = self.lookup.predict(state)
             reasons = [r for r in result['unknown_reasons'] if r != result['landing']['reason']]
             if landing['reason']:
@@ -238,6 +271,7 @@ def evaluate_run(run, attempts, updates):
             old = c['duration_total_seconds']
             c['duration_error_seconds_bounds'] = [old - total[1], old - total[0]] if old is not None and actual['ending'] == 'completed' else None
             c['approach_state'] = u['approach_state'] if eligible else None
+            c['flight_selection'] = u['flight_selection'] if eligible else None
             c['state_landing'] = u.get('landing') if eligible else None
             c['walking_legs'] = u.get('walking_legs', {}) if eligible else {}
             landed = actual['milestones'].get('landed')
@@ -312,7 +346,8 @@ def evaluate(args):
     lookup = StateLookup(profile)
     if profile['runtime_revision'] != manifest['runtime_revision']:
         raise ValueError('approach-state runtime differs')
-    provenance = {'version': 1, 'model': MODEL, 'scope': scope, 'runtime_revision': manifest['runtime_revision'],
+    provenance = {'version': 1, 'model': FLIGHT_MODELS[args.flight_model], 'flight_model': args.flight_model,
+        'scope': scope, 'runtime_revision': manifest['runtime_revision'],
         'manifest_sha256': costs.file_hash(args.manifest), 'profile_sha256': hashes,
         'state_profile_sha256': costs.file_hash(args.state_profile),
         'source_evaluation_sha256': costs.file_hash(args.source_evaluation)}
@@ -321,7 +356,7 @@ def evaluate(args):
         trace = base / config['directory'] / 'trace.jsonl'
         trace_hash = costs.file_hash(trace)
         path = args.out / f'updates-{i}.jsonl'
-        factory = lambda selection: StateTrip(selection, *profiles, lookup)
+        factory = lambda selection: StateTrip(selection, *profiles, lookup, flight_model=args.flight_model)
         with path.open('w') as output:
             if scope == composed.controlled.SCOPE:
                 attempts = composed.replay_controlled(config, base, factory, output, trace_hash)
@@ -361,7 +396,9 @@ def evaluate(args):
         results.append(result)
     frozen.write_json(args.out / 'evaluation.json', {**provenance, 'runs': results, 'summary': summarize(results),
         'limitations': ['Conditional on uninterrupted landing; no success or interruption probability.',
-            'State support is local and bounded; unsupported approaches never fall back to phase age.',
+            ('State support is local and bounded; unsupported approaches never fall back to phase age.'
+             if args.flight_model == 'state' else
+             'Supported durations are unchanged; state is consulted only after an initially supported approach cell expires, with other guards satisfied.'),
             'Other flight phases and all ground models retain their frozen estimates.',
             'World-balanced empirical component ranges are not confidence intervals or permissions.',
             'Replay alone does not establish new validation; generation must follow a frozen protocol.']})
@@ -372,6 +409,7 @@ def main():
     parser.add_argument('mode', choices=['calibrate', 'evaluate'])
     parser.add_argument('--manifest', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--flight-model', choices=FLIGHT_MODELS, default='state')
     for name in ['source-evaluation', 'ground-profile', 'phase-profile', 'walking-profile', 'state-profile']:
         parser.add_argument('--' + name, type=Path)
     args = parser.parse_args()

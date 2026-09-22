@@ -127,9 +127,14 @@ large normal miss mostly reflects seven cover retries. The offline
 forty new simulations: it restores two long-approach forecasts, but loses initial
 coverage and worsens the paired median on six normal approach checkpoints.
 Remaining-approach timing is closer than its later flight tail. Keep the strict
-candidate offline; test retaining supported duration forecasts and consulting
-state evidence only when their support expires. Remote transfer and interruption
-risk remain prerequisites for mission selection.
+candidate offline. The explicit [duration-first expiry rule](../bot-approach-expiry.md)
+now preserves all 1,573 previously numeric sampled forecasts in forty further
+simulations and adds six controlled checkpoint estimates across three new worlds
+with 0.98-second median whole-trip error. This closes the approach-support
+selection experiment; investigate ordinary alignment/contact costs separately
+from future interruption overhead next. Large normal misses remain, including
+a 53.98-second underestimate with nine later plan restarts. Remote transfer and
+interruption risk remain prerequisites for mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

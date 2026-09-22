@@ -190,6 +190,12 @@ state evidence when duration support expires**. Unsupported state evidence
 would still remain unknown. This would be a new composed model, not a silent
 fallback added to the strict candidate after seeing its results.
 
+The [duration-first expiry experiment](bot-approach-expiry.md) now implements
+that separate rule. Forty further simulations preserve every original numeric
+forecast and add six controlled +15-second estimates across three new worlds,
+with 0.98-second median whole-trip error. It remains offline; large interrupted
+normal approaches are still underestimated.
+
 Separately investigate the later flight tail using saved handoff, alignment and
 contact states; the present state features do not include ship heading/spin or
 forecast a future handoff pose. Do not widen tolerances or tune the tail on this
