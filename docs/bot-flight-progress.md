@@ -177,6 +177,12 @@ No runtime promotion follows from this investigation. Remote-transfer timing,
 interruption/completion risk and unsupported powered routes still precede
 strategic mission selection based on these costs.
 
+The subsequent [approach-state prototype](bot-approach-state-estimate.md) now
+tests this direction on forty new simulations. It recovers two expired-duration
+forecasts, but loses initial coverage and regresses ordinary whole-trip timing
+through the later flight tail. Keep it as an offline comparator; a narrower
+duration/state selection rule is the next experiment.
+
 ## Verification and reproduction
 
 All **191 Python tests pass**, including 13 new tests for moving/rotating frames,
