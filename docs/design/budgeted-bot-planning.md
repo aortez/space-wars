@@ -131,10 +131,15 @@ candidate offline. The explicit [duration-first expiry rule](../bot-approach-exp
 now preserves all 1,573 previously numeric sampled forecasts in forty further
 simulations and adds six controlled checkpoint estimates across three new worlds
 with 0.98-second median whole-trip error. This closes the approach-support
-selection experiment; investigate ordinary alignment/contact costs separately
-from future interruption overhead next. Large normal misses remain, including
-a 53.98-second underestimate with nine later plan restarts. Remote transfer and
-interruption risk remain prerequisites for mission selection.
+selection experiment. The [landing-tail diagnosis](../bot-landing-tail.md) now
+separates ordinary alignment/descent/contact from interruptions across 136 known
+recordings. Typical uninterrupted tails contain roughly six seconds of descent;
+foot clearance is strongly associated with that duration. The large 53.98-second
+miss contains five native replans plus four site-acquisition markers, and some
+other replans occur after physical touchdown. Next, test an explicit descent
+component using current clearance/motion while retaining separate alignment,
+contact and interruption evidence. Remote transfer and interruption risk remain
+prerequisites for mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

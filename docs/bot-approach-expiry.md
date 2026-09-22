@@ -166,6 +166,12 @@ refit against this validation set and then count it as new validation. Remote
 transfer timing, interruption/completion risk and unsupported powered routes
 still precede strategic mission selection using whole-trip costs.
 
+The [landing-tail diagnosis](bot-landing-tail.md) now separates these costs on
+136 existing recordings. In the large miss, nine phase-clock markers correspond
+to five native replans and four site acquisitions. Some other native replans occur
+after physical touchdown. The next conditional component is a clearance-aware
+descent estimate, while alignment/contact and interruption risk remain separate.
+
 ## Verification
 
 All **225 Python tests pass**, including thirteen new expiry tests. They exercise
