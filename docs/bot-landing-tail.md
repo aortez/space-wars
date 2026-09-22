@@ -11,6 +11,9 @@ The next bounded model should start with **descent conditioned on current foot
 clearance**, while keeping alignment, contact and interruption evidence separate.
 This investigation changes no controller, timing profile, landing permission or
 Pi deployment. It does not fit an ETA or estimate success probability.
+The subsequent [clearance-estimator comparison](bot-descent-clearance.md) now
+tests that component on seven new worlds: later descent timing improves, but a
+strict replacement loses early coverage and leaves future interruption misses.
 
 ## Evidence and accounting
 

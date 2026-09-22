@@ -136,10 +136,16 @@ separates ordinary alignment/descent/contact from interruptions across 136 known
 recordings. Typical uninterrupted tails contain roughly six seconds of descent;
 foot clearance is strongly associated with that duration. The large 53.98-second
 miss contains five native replans plus four site-acquisition markers, and some
-other replans occur after physical touchdown. Next, test an explicit descent
-component using current clearance/motion while retaining separate alignment,
-contact and interruption evidence. Remote transfer and interruption risk remain
-prerequisites for mission selection.
+other replans occur after physical touchdown. The explicit
+[clearance-based descent component](../bot-descent-clearance.md) now passes forty
+new simulations. At the first +1-second descent sample, paired median landing
+error improves from 0.50 to 0.22 seconds in normal matches and 1.03 to 0.59 seconds
+in controlled trials. Strict replacement loses 34 normal and eight controlled
+forecasts at descent entry, while a new retry forecast misses seven future native
+replans by 26 seconds. Keep the component offline; next test an explicit coarse/
+current-state composition rule without losing early support or bypassing hard
+evidence guards. Remote transfer and interruption risk remain prerequisites for
+mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a
