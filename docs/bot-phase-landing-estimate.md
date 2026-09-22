@@ -251,10 +251,12 @@ at +15 seconds but loses short-walk coverage and retains an initial-forecast
 regression. Carry unknown retry costs and the interruption case forward.
 Phase recognition improves the description of progress; it does not measure
 how far a retry still has to fly. The two successful retry examples are a narrow
-basis for a timing model. Future retry work should record current site-relative
-height/side error and velocity, and distinguish ordinary approach from contact
-or objective-readiness stalls. Keep failure/unknown coverage and budget accounting
-when evaluating that extension.
+basis for a timing model. The [flight-progress investigation](bot-flight-progress.md)
+now records site-relative geometry, velocity and contiguous progress from 56
+existing recordings. It distinguishes high/receding controlled arrivals from
+the normal outlier's seven cover retries. A state-conditioned approach estimate
+is next; keep failure/unknown coverage and native budget accounting when
+evaluating that extension.
 
 Interruption risk needs separate treatment before selection: the fresh outlier
 already has four live invalidations at its checkpoint. An investigation can

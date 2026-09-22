@@ -119,8 +119,12 @@ short-walk coverage; initial controlled forecasts also trail the original model.
 The [walking-regime validation](../bot-walking-regimes.md) now restores short-walk
 coverage on seven new worlds while preserving every strict numeric forecast.
 Eleven controlled completions improve median initial trip error from 4.35 to
-1.74 seconds versus phase-only. Flight-state/progress evidence is next, alongside
-remote transfer and interruption risk before mission selection.
+1.74 seconds versus phase-only. The [flight-progress investigation](../bot-flight-progress.md)
+now separates long, progressing approaches from abandoned plans using 56 existing
+recordings. High/receding arrivals need state-conditioned approach timing; the
+large normal miss mostly reflects seven cover retries. The next bounded change
+is an offline approach-state estimate with independently validated support.
+Remote transfer and interruption risk remain prerequisites for mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

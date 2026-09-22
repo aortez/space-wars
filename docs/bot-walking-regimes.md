@@ -205,10 +205,11 @@ verified archive to the commit; earlier runtime/fixture archives are dependencie
 
 ## Next step
 
-Keep this as the supported read-only ground-cost interface. Further walking-fit
-tuning is not the next useful step. Investigate the saved initial/retry flight
-misses and missing support using site-relative height, lateral error, velocity
-and progress. Distinguish ordinary approach time from interruptions or stalled
-control, retaining unknown tails. Any resulting estimator needs a new declared
-comparison and new validation worlds. Remote transfer and completion/interruption
-risk still precede strategic mission selection using these conditional costs.
+Keep this as the supported read-only ground-cost interface. The subsequent
+[flight-progress investigation](bot-flight-progress.md) separates long but
+progressing descents from abandoned approaches. Seven cover retries account for
+most of the large normal miss; controlled high/receding arrivals outlast the
+phase-age calibration. A state-conditioned approach estimate is the next bounded
+change, with interruption risk kept separate. It needs a declared comparison
+and new validation worlds. Remote transfer and completion/interruption risk still
+precede strategic mission selection using these conditional costs.
