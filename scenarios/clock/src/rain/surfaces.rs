@@ -31,6 +31,17 @@ impl DigitSurfaces {
         (surfaces, water)
     }
 
+    pub fn on_responsive_floor(
+        layout: Layout,
+        display: DisplaySnapshot,
+        floor: &crate::floor::responsive::ResponsiveFloor,
+    ) -> (Self, WaterWorld) {
+        let (surfaces, mut water) =
+            Self::with_floor(layout, display, floor.shape.pools_at(floor.opening).into());
+        floor.shape.configure_at(&mut water, floor.opening);
+        (surfaces, water)
+    }
+
     pub fn with_floor(
         layout: Layout,
         display: DisplaySnapshot,

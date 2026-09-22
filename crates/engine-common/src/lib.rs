@@ -369,6 +369,7 @@ pub enum ClockRainDuckPhase {
     Exited,
     NotSpawned,
     Reclaimed,
+    HandedOff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -377,6 +378,9 @@ pub struct ClockRainState {
     /// passive duck. The course outlives a dismissed player until Rain ends.
     #[serde(default)]
     pub player_course: bool,
+    /// This event has hosted a player; passive spawning remains suppressed.
+    #[serde(default)]
+    pub player_joined: bool,
     pub seed: u64,
     /// The resolved amount for this visit; settings may still say Varied.
     pub amount: ClockRainAmount,
@@ -796,6 +800,9 @@ pub struct ClockPlayerDuckState {
     pub move_milli: i16,
     pub jump_held: bool,
     pub facing_right: bool,
+    /// Some(opening) for the moving Rain panels, None for a fixed course.
+    #[serde(default)]
+    pub floor_open_milli: Option<u32>,
     #[serde(default)]
     pub submerged_milli: u32,
     /// Screen-relative physical velocity, including drift from water.

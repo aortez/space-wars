@@ -2497,7 +2497,7 @@ mod tests {
     const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 
     #[test]
-    fn player_duck_allows_visual_and_rain_requests_but_not_private_arena_requests() {
+    fn player_duck_allows_shared_events_but_not_private_arena_requests() {
         use engine_common::ClockEventKind;
         use scenario_clock::{ClockAction, ClockReading};
         let mut scenario = hosted_scenario("clock", 42).unwrap();
@@ -2513,7 +2513,9 @@ mod tests {
         for event in ClockEventKind::ALL {
             let expected = matches!(
                 event,
-                ClockEventKind::ColorCycle
+                ClockEventKind::Falling
+                    | ClockEventKind::Meltdown
+                    | ClockEventKind::ColorCycle
                     | ClockEventKind::Marquee
                     | ClockEventKind::DigitSlide
                     | ClockEventKind::Rain

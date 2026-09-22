@@ -109,25 +109,7 @@ impl FloatWorld {
             },
             &walls
         ));
-        for side in 0..2 {
-            let id = PhysicsId::new(1001 + side as u64);
-            let (position, angle) = floor.shape.panel_pose(side, floor.opening);
-            let half = floor.shape.panel_half_extents();
-            assert!(world.insert_body(
-                BodyId::new(id, BodyRole::PRIMARY),
-                BodySpec {
-                    kind: BodyKind::KinematicPosition,
-                    position,
-                    angle,
-                    ..BodySpec::default()
-                },
-                &[ColliderSpec::cuboid(
-                    ColliderId::new(id, ColliderRole::PRIMARY, 0),
-                    half.x,
-                    half.y
-                )]
-            ));
-        }
+        floor.insert_panels(&mut world);
         Self {
             world,
             duck: None,
@@ -137,14 +119,7 @@ impl FloatWorld {
     }
 
     pub fn move_floor(&mut self, floor: &ResponsiveFloor) {
-        for side in 0..2 {
-            let (position, angle) = floor.shape.panel_pose(side, floor.opening);
-            assert!(self.world.set_next_kinematic_pose(
-                BodyId::new(PhysicsId::new(1001 + side as u64), BodyRole::PRIMARY),
-                position,
-                angle
-            ));
-        }
+        floor.move_panels(&mut self.world);
     }
 
     pub fn spawn(&mut self, position: Vec2, angle: f32) {

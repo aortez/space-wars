@@ -368,8 +368,8 @@ pub struct ClockState {
     floor: floor::FloorManager,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
-    // Player presence is not a timed event. Face animations and Rain coexist;
-    // remaining private physical arenas wait until the player releases the course.
+    // Player presence is not a timed event. Face animations, Rain, Falling and
+    // Meltdown coexist; private AI courses/labs wait until the player leaves.
     player_duck: Option<Box<events::duck::DuckEvent>>,
     player_duck_sequence: u64,
     player_seed: u64,
@@ -594,13 +594,45 @@ impl ClockState {
         if kind == ClockEventKind::Rain
             && let Some(duck) = &self.player_duck
         {
-            self.floor.acquire_course_rain();
-            self.active_event = Some(ActiveEvent::Rain(Box::new(rain::RainEvent::on_course(
-                events::duck::arena::CourseGeometry::from_duck(duck),
-                seed,
-                self.config.rain_amount,
-                self.display,
-            ))));
+            self.floor.acquire_player_event(kind);
+            let rain = if let Some(floor) = duck.responsive_floor() {
+                rain::RainEvent::on_responsive_floor(
+                    layout,
+                    seed,
+                    self.config.rain_amount,
+                    self.display,
+                    floor.clone(),
+                )
+            } else {
+                rain::RainEvent::on_course(
+                    events::duck::arena::CourseGeometry::from_duck(duck),
+                    seed,
+                    self.config.rain_amount,
+                    self.display,
+                )
+            };
+            self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
+            return;
+        }
+        if matches!(kind, ClockEventKind::Falling | ClockEventKind::Meltdown)
+            && let Some(duck) = &mut self.player_duck
+        {
+            self.floor.acquire_player_event(kind);
+            let context = EventContext {
+                segments: &mut self.segments,
+                display: self.display,
+                layout,
+                floor: self.floor.geometry(layout),
+            };
+            self.active_event = Some(match kind {
+                ClockEventKind::Falling => ActiveEvent::Falling(
+                    events::falling::FallingEvent::with_player(context, seed, duck),
+                ),
+                ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
+                    events::meltdown::MeltdownEvent::with_player(context, seed, duck),
+                )),
+                _ => unreachable!(),
+            });
             return;
         }
         self.floor.acquire(kind);
@@ -619,8 +651,15 @@ impl ClockState {
     }
 
     fn finish_event(&mut self) {
-        if let Some(event) = self.active_event.take() {
+        if let Some(mut event) = self.active_event.take() {
             let kind = event.kind();
+            event.release_arena(self.player_duck.as_deref_mut());
+            if let ActiveEvent::Rain(rain) = &event
+                && let Some(floor) = rain.responsive_floor()
+                && let Some(duck) = &mut self.player_duck
+            {
+                duck.sync_responsive_floor(floor);
+            }
             drop(event);
             self.schedule.finish(kind);
             self.floor.release(kind);
@@ -641,29 +680,75 @@ impl ClockState {
             self.event_notice = None;
         }
         let layout = Layout::new(self.aspect_ratio());
-        if let Some(event) = &mut self.active_event {
-            if event.step(EventContext {
-                segments: &mut self.segments,
-                display: self.display,
-                layout,
-                floor: self.floor.geometry(layout),
-            }) {
-                self.finish_event();
-            }
-        } else if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
-            self.trigger_event(kind);
+        let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
+        if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
+            rain.set_player_hull(self.player_duck.as_ref().and_then(|d| d.clearance_hull()));
         }
+        let player_advanced = if self.active_event.is_some() {
+            self.step_active_event(layout)
+        } else {
+            if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
+                self.trigger_event(kind);
+            }
+            // A newly inserted shared batch must be advanced/read back with
+            // the character this tick too; otherwise the rendered bars lag
+            // their colliders until the first regular event step.
+            if self
+                .active_event
+                .as_ref()
+                .is_some_and(ActiveEvent::shares_player_arena)
+            {
+                self.step_active_event(layout)
+            } else {
+                false
+            }
+        };
         // Water advances once, then the one player mechanics world samples it.
         // No second character world or frame-rate dependent force application.
         let water = match &self.active_event {
-            Some(ActiveEvent::Rain(rain)) if rain.course().is_some() => Some(&rain.water),
+            Some(ActiveEvent::Rain(rain)) => {
+                if let Some(duck) = &mut self.player_duck
+                    && let Some(floor) = rain.responsive_floor()
+                {
+                    duck.sync_responsive_floor(floor);
+                }
+                Some(&rain.water)
+            }
             _ => None,
         };
         if let Some(duck) = &mut self.player_duck
-            && duck.step_with_water(water)
+            && if player_advanced {
+                duck.player_finished()
+            } else {
+                duck.step_with_environment(water, panels_advanced || water.is_some())
+            }
         {
             self.finish_player_duck();
         }
+    }
+
+    /// Reports whether the event already stepped the player's mechanics world.
+    /// This remains true on its final tick, after cleanup removes the event.
+    fn step_active_event(&mut self, layout: Layout) -> bool {
+        let event = self.active_event.as_mut().expect("active event");
+        let player_advanced = event.shares_player_arena();
+        let context = EventContext {
+            segments: &mut self.segments,
+            display: self.display,
+            layout,
+            floor: self.floor.geometry(layout),
+        };
+        let finished = match event {
+            ActiveEvent::Falling(falling) => falling.step(context, self.player_duck.as_deref_mut()),
+            ActiveEvent::Meltdown(meltdown) => {
+                meltdown.step_with_player(context, self.player_duck.as_deref_mut())
+            }
+            _ => event.step(context),
+        };
+        if finished {
+            self.finish_event();
+        }
+        player_advanced
     }
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {

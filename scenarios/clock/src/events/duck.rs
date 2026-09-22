@@ -7,6 +7,11 @@ mod flow;
 pub(crate) mod planner;
 #[cfg(test)]
 mod platform_tests;
+mod responsive;
+#[cfg(test)]
+mod responsive_tests;
+mod shared;
+pub(crate) use shared::PlayerArena;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -24,6 +29,7 @@ use engine_water::{WaterWorld, immersion::HullShape};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
+use crate::floor::responsive::ResponsiveFloor;
 use crate::layout::Layout;
 
 pub const DUCK_TICKS: u64 = 35 * 60;
@@ -58,7 +64,14 @@ pub(crate) struct DuckEvent {
     pub direction: f32,
     pub obstacles: [Obstacle; 3],
     pub course: Option<planner::Course>,
+    // Rain/Meltdown advance the authoritative actuator while active. This small
+    // snapshot drives contacts/rendering; after the wet event, it settles dry.
+    responsive_floor: Option<ResponsiveFloor>,
+    spawn_motion: Option<(Vec2, Vec2)>,
     world: Option<PhysicsWorld>,
+    // A physical event can lease this world across entry, dismissal and exit.
+    // It owns its bodies; the visit must remove only the character on reset.
+    arena_claimed: bool,
     buoyant: Option<BuoyantBody>,
     water_report: BuoyancyReport,
     seed: u64,
@@ -86,7 +99,10 @@ impl DuckEvent {
         session_id: u64,
         seat: u8,
     ) -> Self {
-        let mut scene = Self::new_course(layout, seed, pattern);
+        Self::with_player(Self::new_course(layout, seed, pattern), session_id, seat)
+    }
+
+    fn with_player(mut scene: Self, session_id: u64, seat: u8) -> Self {
         scene.player = Some(PlayerControl {
             session_id,
             seat,
@@ -145,6 +161,10 @@ impl DuckEvent {
             move_milli: player.move_milli,
             jump_held: player.jump_held,
             facing_right: player.facing * self.direction > 0.0,
+            floor_open_milli: self
+                .responsive_floor
+                .as_ref()
+                .map(|f| (f.opening * 1000.0).round() as u32),
             submerged_milli: (self.water_report.submerged_fraction * 1000.0).round() as u32,
             velocity_milli: self
                 .world
@@ -175,12 +195,7 @@ impl DuckEvent {
         pattern: Option<engine_common::ClockDuckCoursePattern>,
     ) -> Self {
         let mut event = Self::new(layout, seed);
-        // Preserve room for the full jump arc below the clock on very wide
-        // displays. Standard device layouts keep the existing duck size.
-        event.radius = event
-            .radius
-            .min((layout.face_origin.y - layout.floor_y - 4.0) / 10.5);
-        event.movement = Movement::new(event.width, event.radius);
+        event.fit_character();
         event.course = Some(planner::Course::varied(
             event.width,
             event.radius,
@@ -188,6 +203,15 @@ impl DuckEvent {
             pattern,
         ));
         event
+    }
+
+    fn fit_character(&mut self) {
+        // Preserve room for the full jump arc below the clock on very wide
+        // displays. Standard device layouts keep the existing duck size.
+        self.radius = self
+            .radius
+            .min((self.layout.face_origin.y - self.layout.floor_y - 4.0) / 10.5);
+        self.movement = Movement::new(self.width, self.radius);
     }
 
     pub fn new(layout: Layout, seed: u64) -> Self {
@@ -223,9 +247,12 @@ impl DuckEvent {
                 last,
             ],
             world: None,
+            arena_claimed: false,
             buoyant: None,
             water_report: BuoyancyReport::default(),
             course: None,
+            responsive_floor: None,
+            spawn_motion: None,
             seed,
             movement: Movement::new(width, radius),
             controller: Controller::new(),
@@ -235,7 +262,10 @@ impl DuckEvent {
         }
     }
 
-    fn spawn(&mut self) {
+    fn ensure_world(&mut self) {
+        if self.world.is_some() {
+            return;
+        }
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -self.movement.gravity),
             length_unit: self.radius,
@@ -248,11 +278,18 @@ impl DuckEvent {
             .course
             .as_ref()
             .map_or(5, |course| course.surfaces.len() + 1);
-        let count = count + usize::from(self.player.is_some());
+        let count = if self.responsive_floor.is_some() {
+            4
+        } else {
+            count + usize::from(self.player.is_some())
+        };
         world.reserve(count, count, 0);
         let pit = self.obstacles[1];
         let floor = self.layout.floor_y;
-        let geometry = if let Some(course) = &self.course {
+        let geometry = if let Some(responsive) = &self.responsive_floor {
+            responsive.insert_panels(&mut world);
+            vec![]
+        } else if let Some(course) = &self.course {
             course
                 .surfaces
                 .iter()
@@ -338,9 +375,22 @@ impl DuckEvent {
                 &[wall],
             ));
         }
+        self.world = Some(world);
+    }
+
+    fn spawn(&mut self) {
+        self.ensure_world();
+        let floor = self.layout.floor_y;
+        let (position, linear_velocity) = self.spawn_motion.take().unwrap_or_else(|| {
+            (
+                self.physics_position(Vec2::new(self.radius * 6.0, floor + self.radius * 1.05)),
+                Vec2::ZERO,
+            )
+        });
+        let world = self.world.as_mut().unwrap();
         let spec = BodySpec {
-            position: self
-                .physics_position(Vec2::new(self.radius * 6.0, floor + self.radius * 1.05)),
+            position,
+            linear_velocity,
             can_sleep: false,
             ccd_enabled: true,
             ..BodySpec::default()
@@ -348,7 +398,7 @@ impl DuckEvent {
         if self.player.is_some() {
             self.buoyant = Some(
                 BuoyantBody::insert_with_material(
-                    &mut world,
+                    world,
                     DUCK_ENTITY,
                     spec,
                     HullShape::Circle {
@@ -368,7 +418,6 @@ impl DuckEvent {
             collider.restitution = 0.0;
             assert!(world.insert_body(DUCK_BODY, spec, &[collider],));
         }
-        self.world = Some(world);
     }
 
     // Player mechanics use screen/world coordinates so water and contacts share
@@ -426,6 +475,14 @@ impl DuckEvent {
         } else {
             1.0
         };
+        let support_velocity = if self.player.is_some() && grounded {
+            world
+                .surface_contacts(DUCK_COLLIDER)
+                .find(|c| c.normal.y > 0.7 && c.separation <= self.radius * 0.05)
+                .map_or(Vec2::ZERO, |c| c.velocity)
+        } else {
+            Vec2::ZERO
+        };
         let observed = Observation {
             position: if self.player.is_some() {
                 Vec2::new(
@@ -435,7 +492,10 @@ impl DuckEvent {
             } else {
                 motion.position
             },
-            velocity: Vec2::new(motion.linear_velocity.x * screen, motion.linear_velocity.y),
+            velocity: Vec2::new(
+                (motion.linear_velocity.x - support_velocity.x) * screen,
+                motion.linear_velocity.y - support_velocity.y,
+            ),
             grounded,
             blocked: world.surface_contacts(DUCK_COLLIDER).any(|contact| {
                 (contact.normal.x.abs() > 0.3 || contact.normal.y < -0.3)
@@ -444,7 +504,7 @@ impl DuckEvent {
             support,
         };
         let command = if let Some(player) = &mut self.player {
-            // Inputs are in screen coordinates; physics is entrance-relative.
+            // Translate screen input into the controller's entrance-relative convention.
             let axis = f32::from(player.move_milli) / 1000.0 * self.direction;
             if axis != 0.0 {
                 player.facing = axis.signum();
@@ -508,7 +568,13 @@ impl DuckEvent {
 
     fn reset(&mut self, outcome: ClockDuckOutcome) {
         self.outcome = Some(outcome);
-        self.world = None;
+        if self.arena_claimed {
+            if let Some(world) = &mut self.world {
+                world.remove_entity(DUCK_ENTITY);
+            }
+        } else {
+            self.world = None;
+        }
         self.buoyant = None;
         self.water_report = BuoyancyReport::default();
         if let Some(player) = &mut self.player {
@@ -524,10 +590,27 @@ impl DuckEvent {
     }
 
     pub fn step_with_water(&mut self, water: Option<&WaterWorld>) -> bool {
+        self.step_with_environment(water, water.is_some())
+    }
+
+    pub fn step_with_environment(
+        &mut self,
+        water: Option<&WaterWorld>,
+        panels_advanced: bool,
+    ) -> bool {
+        self.advance_panels(panels_advanced);
+        // Before the door opens and after the character leaves, an event's
+        // bodies still advance exactly once. Running owns its step in run().
+        if self.arena_claimed && !matches!(self.phase, EventPhase::Running | EventPhase::Exiting) {
+            self.world.as_mut().expect("leased arena").step(DT);
+        }
         self.tick += 1;
         self.phase_tick += 1;
         match self.phase {
             EventPhase::Opening if self.phase_tick >= OPENING_TICKS => {
+                if self.responsive_floor.is_some() {
+                    self.prepare_responsive_spawn(water);
+                }
                 self.spawn();
                 self.enter(EventPhase::Running);
             }
@@ -539,7 +622,12 @@ impl DuckEvent {
                 let position = self.position().expect("running duck");
                 if !position.x.is_finite()
                     || !position.y.is_finite()
-                    || position.y < self.layout.floor_y - self.radius * 5.0
+                    || position.y
+                        < if self.responsive_floor.is_some() {
+                            self.layout.bounds_min.y - self.radius
+                        } else {
+                            self.layout.floor_y - self.radius * 5.0
+                        }
                 {
                     self.reset(ClockDuckOutcome::Fell);
                 } else if self.exit_visible() && position.x > self.width + self.radius * 2.0 {
@@ -553,7 +641,7 @@ impl DuckEvent {
         // Keep the catalog's fixed envelope even after an early recovery. The
         // course fades out, physics is already dropped, and live time continues.
         if self.player.is_some() {
-            self.phase == EventPhase::Resetting && self.phase_tick >= RESET_TICKS
+            self.player_finished()
         } else {
             self.tick >= DUCK_TICKS
         }
@@ -643,10 +731,13 @@ impl DuckEvent {
             grounded: self.grounded(),
             jumps: self.jumps,
             cleared_obstacles: self.controller.cleared,
-            obstacle_count: self
-                .course
-                .as_ref()
-                .map_or(self.obstacles.len(), |course| course.surfaces.len() - 1),
+            obstacle_count: if self.responsive_floor.is_some() {
+                0
+            } else {
+                self.course
+                    .as_ref()
+                    .map_or(self.obstacles.len(), |course| course.surfaces.len() - 1)
+            },
             entrance_open_milli: (entrance * 1000.0).round() as u32,
             exit_open_milli: (exit * 1000.0).round() as u32,
             outcome: self.outcome,

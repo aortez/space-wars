@@ -1,5 +1,6 @@
 //! Player presence is separate from the automatic event scheduler. For now it
-//! owns the Duck arena while face animations and course-aware Rain continue.
+//! owns either a Duck course or Rain's shared panels while compatible events continue.
+//! Falling and Meltdown lease that world without owning the player's life.
 use super::*;
 use events::duck::DuckEvent;
 
@@ -63,10 +64,9 @@ impl ClockState {
 
     pub fn event_blocked_by_player(&self, kind: ClockEventKind) -> bool {
         self.player_duck.is_some()
-            && matches!(
-                kind,
-                ClockEventKind::Falling | ClockEventKind::Meltdown | ClockEventKind::Duck
-            )
+            && (kind == ClockEventKind::Duck
+                || (kind == ClockEventKind::Meltdown
+                    && self.config.water_lab != ClockWaterLab::Off))
     }
 
     pub(super) fn sync_event_schedule(&mut self) {
@@ -108,11 +108,17 @@ impl ClockState {
             }
             return;
         }
-        let shared_course = match &self.active_event {
-            Some(ActiveEvent::Rain(rain)) => rain.course().cloned(),
-            _ => None,
-        };
-        if shared_course.is_none()
+        if let Some(event) = &mut self.active_event
+            && let Some(duck) = event.rejoin_arena(self.player_duck_sequence + 1, player)
+        {
+            self.player_duck_sequence += 1;
+            self.floor.acquire_player();
+            self.player_duck = Some(duck);
+            self.sync_event_schedule();
+            return;
+        }
+        let is_rain = matches!(self.active_event, Some(ActiveEvent::Rain(_)));
+        if !is_rain
             && self
                 .event_kind()
                 .is_some_and(|kind| EVENT_CATALOG[kind as usize].uses_floor())
@@ -121,16 +127,37 @@ impl ClockState {
         }
         self.player_duck_sequence += 1;
         self.floor.acquire_player();
-        self.player_duck = Some(Box::new(DuckEvent::new_player(
-            Layout::new(self.aspect_ratio()),
-            self.player_seed.wrapping_add(self.player_duck_sequence),
-            self.config.duck_course_pattern,
-            self.player_duck_sequence,
-            player,
-        )));
-        if let Some(geometry) = shared_course {
-            self.player_duck.as_mut().unwrap().adopt_course(&geometry);
-        }
+        let seed = self.player_seed.wrapping_add(self.player_duck_sequence);
+        let layout = Layout::new(self.aspect_ratio());
+        let duck = if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event
+            && let Some(floor) = rain.responsive_floor().cloned()
+        {
+            let motion = rain.join_player();
+            DuckEvent::new_responsive_player(
+                layout,
+                seed,
+                self.player_duck_sequence,
+                player,
+                rain.facing,
+                floor,
+                motion,
+            )
+        } else {
+            let mut duck = DuckEvent::new_player(
+                layout,
+                seed,
+                self.config.duck_course_pattern,
+                self.player_duck_sequence,
+                player,
+            );
+            if let Some(ActiveEvent::Rain(rain)) = &self.active_event
+                && let Some(geometry) = rain.course()
+            {
+                duck.adopt_course(geometry);
+            }
+            duck
+        };
+        self.player_duck = Some(Box::new(duck));
         self.sync_event_schedule();
         self.event_notice = Some((
             if player == 1 {
@@ -151,7 +178,12 @@ impl ClockState {
     }
 
     pub(super) fn finish_player_duck(&mut self) {
-        if self.player_duck.take().is_some() {
+        if let Some(duck) = self.player_duck.take() {
+            if let Some(event) = &mut self.active_event
+                && event.shares_player_arena()
+            {
+                event.retain_arena(duck);
+            }
             self.floor.release_player();
             self.sync_event_schedule();
         }

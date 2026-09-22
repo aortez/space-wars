@@ -1,109 +1,186 @@
 use rand::{SeedableRng, rngs::StdRng};
 
-use super::{EventContext, EventPhase};
+use super::{
+    EventContext, EventPhase,
+    duck::{DuckEvent, PlayerArena},
+};
 use crate::{
     SegmentRepresentation, digits,
     meridiem::{Glyph, LetterState},
-    physics::FallingWorld,
+    physics::{FallingBodies, FallingWorld},
 };
 
 pub const FALLING_TICKS: u64 = 210;
 pub const REFORMING_TICKS: u64 = 90;
 
-pub(crate) enum FallingEvent {
-    Falling {
-        tick: u64,
-        world: Box<FallingWorld>,
-        letters: Option<[LetterState; 2]>,
+enum Mechanics {
+    Standalone(Option<Box<FallingWorld>>),
+    Player {
+        bodies: Option<FallingBodies>,
+        arena: PlayerArena,
     },
-    Reforming {
-        tick: u64,
-        letters: Option<[LetterState; 2]>,
-    },
+}
+
+pub(crate) struct FallingEvent {
+    phase: EventPhase,
+    tick: u64,
+    mechanics: Mechanics,
+    letters: Option<[LetterState; 2]>,
 }
 
 impl FallingEvent {
     pub fn new(context: EventContext<'_>, seed: u64) -> Self {
-        let letters = context.display.meridiem.map(|label| {
-            Glyph::for_label(label).map(|glyph| LetterState::new(glyph, context.layout))
-        });
-        Self::Falling {
+        let letters = Self::letters_for(&context);
+        let world = FallingWorld::new(
+            context.floor.drain().expect("Falling owns the drain"),
+            context.segments,
+            letters.as_ref().map_or(&[], |l| l.as_slice()),
+            &mut StdRng::seed_from_u64(seed),
+        );
+        Self {
+            phase: EventPhase::Falling,
             tick: 0,
-            world: Box::new(FallingWorld::new(
-                context.floor.drain().expect("Falling owns the drain"),
-                context.segments,
-                letters.as_ref().map_or(&[], |letters| letters.as_slice()),
-                &mut StdRng::seed_from_u64(seed),
-            )),
+            mechanics: Mechanics::Standalone(Some(Box::new(world))),
             letters,
         }
     }
 
-    pub fn step(&mut self, context: EventContext<'_>) -> bool {
-        match self {
-            Self::Falling {
-                tick,
-                world,
-                letters,
-            } => {
-                world.step(
-                    context.segments,
-                    letters
-                        .as_mut()
-                        .map_or(&mut [], |letters| letters.as_mut_slice()),
-                );
-                *tick += 1;
-                if *tick >= FALLING_TICKS {
-                    for segment in context.segments.iter_mut() {
-                        let (position, angle) = match segment.representation {
-                            SegmentRepresentation::Rigid { position, angle } => (position, angle),
-                            _ => (context.layout.segment_center(segment.id), 0.0),
-                        };
-                        segment.representation = SegmentRepresentation::Reforming {
-                            position,
-                            angle,
-                            was_lit: segment.lit,
-                        };
-                    }
-                    // Replacing the variant drops all rigid bodies before reformation.
-                    *self = Self::Reforming {
-                        tick: 0,
-                        letters: *letters,
-                    };
-                    digits::apply_snapshot(context.segments, context.display);
+    pub fn with_player(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
+        let letters = Self::letters_for(&context);
+        let arena = PlayerArena::claim(player);
+        let bodies = FallingBodies::insert(
+            player.arena_world_mut(),
+            context.layout,
+            context.segments,
+            letters.as_ref().map_or(&[], |l| l.as_slice()),
+            &mut StdRng::seed_from_u64(seed),
+        );
+        Self {
+            phase: EventPhase::Falling,
+            tick: 0,
+            mechanics: Mechanics::Player {
+                bodies: Some(bodies),
+                arena,
+            },
+            letters,
+        }
+    }
+
+    fn letters_for(context: &EventContext<'_>) -> Option<[LetterState; 2]> {
+        context.display.meridiem.map(|label| {
+            Glyph::for_label(label).map(|glyph| LetterState::new(glyph, context.layout))
+        })
+    }
+
+    pub fn shares_player_arena(&self) -> bool {
+        matches!(self.mechanics, Mechanics::Player { .. })
+    }
+
+    pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
+        let Mechanics::Player { arena, .. } = &mut self.mechanics else {
+            panic!("shared Falling arena");
+        };
+        arena.retain(duck);
+    }
+
+    pub fn vacant_arena(&self) -> Option<&DuckEvent> {
+        match &self.mechanics {
+            Mechanics::Player { arena, .. } => arena.vacant(),
+            _ => None,
+        }
+    }
+
+    pub fn arena_opacity(&self) -> f32 {
+        if self.vacant_arena().is_some() && self.phase == EventPhase::Reforming {
+            ((REFORMING_TICKS - self.tick) as f32 / 30.0).min(1.0)
+        } else {
+            1.0
+        }
+    }
+
+    pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+        let Mechanics::Player { arena, .. } = &mut self.mechanics else {
+            return None;
+        };
+        arena.rejoin(session, seat)
+    }
+
+    pub fn step(&mut self, context: EventContext<'_>, player: Option<&mut DuckEvent>) -> bool {
+        let letters = self
+            .letters
+            .as_mut()
+            .map_or(&mut [][..], |l| l.as_mut_slice());
+        self.tick += 1;
+        let reform = self.phase == EventPhase::Falling && self.tick >= FALLING_TICKS;
+        match &mut self.mechanics {
+            Mechanics::Standalone(world) => {
+                if let Some(world) = world {
+                    world.step(context.segments, letters);
                 }
-                false
+                if reform {
+                    *world = None;
+                }
             }
-            Self::Reforming { tick, .. } => {
-                *tick += 1;
-                *tick >= REFORMING_TICKS
+            Mechanics::Player { bodies, arena } => {
+                let duck = arena.step(player, None, false);
+                if let Some(bodies) = bodies {
+                    bodies.synchronize(duck.arena_world(), context.segments, letters);
+                }
+                if reform && let Some(bodies) = bodies.take() {
+                    bodies.remove(duck.arena_world_mut());
+                }
             }
+        }
+        if reform {
+            for segment in context.segments.iter_mut() {
+                let (position, angle) = match segment.representation {
+                    SegmentRepresentation::Rigid { position, angle } => (position, angle),
+                    _ => (context.layout.segment_center(segment.id), 0.0),
+                };
+                segment.representation = SegmentRepresentation::Reforming {
+                    position,
+                    angle,
+                    was_lit: segment.lit,
+                };
+            }
+            self.phase = EventPhase::Reforming;
+            self.tick = 0;
+            digits::apply_snapshot(context.segments, context.display);
+        }
+        self.phase == EventPhase::Reforming && self.tick >= REFORMING_TICKS
+    }
+
+    /// Only the event's batch is removed; the live player's floor and character
+    /// survive replacement, reformation and completion unchanged.
+    pub fn release(&mut self, player: Option<&mut DuckEvent>) {
+        if let Mechanics::Player { bodies, arena } = &mut self.mechanics {
+            let duck = arena.get_mut(player);
+            if let Some(bodies) = bodies.take() {
+                bodies.remove(duck.arena_world_mut());
+            }
+            duck.release_arena();
         }
     }
 
     pub fn letters(&self) -> Option<&[LetterState; 2]> {
-        match self {
-            Self::Falling { letters, .. } | Self::Reforming { letters, .. } => letters.as_ref(),
-        }
+        self.letters.as_ref()
     }
-
     pub fn phase(&self) -> EventPhase {
-        match self {
-            Self::Falling { .. } => EventPhase::Falling,
-            Self::Reforming { .. } => EventPhase::Reforming,
-        }
+        self.phase
     }
-
     pub fn phase_tick(&self) -> u64 {
-        match self {
-            Self::Falling { tick, .. } | Self::Reforming { tick, .. } => *tick,
-        }
+        self.tick
     }
 
     pub fn physics_counts(&self) -> (usize, usize) {
-        match self {
-            Self::Falling { world, .. } => (world.body_count(), world.collider_count()),
-            Self::Reforming { .. } => (0, 0),
+        match &self.mechanics {
+            Mechanics::Standalone(world) => world
+                .as_ref()
+                .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
+            // An occupied shared world is counted by ClockState's player.
+            Mechanics::Player { arena, .. } => {
+                arena.vacant().map_or((0, 0), |d| d.physics_counts())
+            }
         }
     }
 }

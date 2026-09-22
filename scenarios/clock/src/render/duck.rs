@@ -11,72 +11,85 @@ pub(super) fn render_with_course(
     debug: bool,
     draw_course: bool,
 ) {
+    if draw_course {
+        render_arena(frame, event, event.arena_opacity());
+    }
     let opacity = event.course_opacity();
+    if opacity <= 0.0 {
+        return;
+    }
+    render_actor(frame, event, debug, opacity);
+}
+
+pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: f32) {
     if opacity <= 0.0 {
         return;
     }
     let layout = event.layout;
     let radius = event.radius;
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);
-    if draw_course {
-        if let Some(course) = &event.course {
-            let spans = course.surfaces.iter().map(|surface| {
-                let a = event
-                    .render_position(Vec2::new(surface.start.max(0.0), 0.0))
-                    .x;
-                let b = event
-                    .render_position(Vec2::new(surface.end.min(event.width), 0.0))
-                    .x;
-                (a.min(b), a.max(b), surface.height)
-            });
-            course_slabs(frame, layout, radius, opacity, spans);
-        } else {
-            let pit = event.obstacles[1];
-            for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
-                rect(
-                    frame,
-                    event,
-                    Vec2::new(start, layout.bounds_min.y),
-                    Vec2::new(end, layout.floor_y),
-                    FLOOR_COLOR,
-                    ARENA_LAYER,
-                    opacity,
-                );
-                rect(
-                    frame,
-                    event,
-                    Vec2::new(start, layout.floor_y - 2.0),
-                    Vec2::new(end, layout.floor_y),
-                    FLOOR_EDGE_COLOR,
-                    ARENA_LAYER,
-                    opacity,
-                );
-            }
-            for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
-                rect(
-                    frame,
-                    event,
-                    Vec2::new(obstacle.start, layout.floor_y),
-                    Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                    orange,
-                    ACTIVE_CELL_LAYER,
-                    opacity,
-                );
-                rect(
-                    frame,
-                    event,
-                    Vec2::new(
-                        obstacle.start,
-                        layout.floor_y + obstacle.height - radius * 0.3,
-                    ),
-                    Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
-                    RenderColor::rgb(1.0, 0.85, 0.45),
-                    ACTIVE_CELL_LAYER,
-                    opacity,
-                );
-            }
+    if let Some(course) = &event.course {
+        let spans = course.surfaces.iter().map(|surface| {
+            let a = event
+                .render_position(Vec2::new(surface.start.max(0.0), 0.0))
+                .x;
+            let b = event
+                .render_position(Vec2::new(surface.end.min(event.width), 0.0))
+                .x;
+            (a.min(b), a.max(b), surface.height)
+        });
+        course_slabs(frame, layout, radius, opacity, spans);
+    } else {
+        let pit = event.obstacles[1];
+        for (start, end) in [(0.0, pit.start), (pit.end, event.width)] {
+            rect(
+                frame,
+                event,
+                Vec2::new(start, layout.bounds_min.y),
+                Vec2::new(end, layout.floor_y),
+                FLOOR_COLOR,
+                ARENA_LAYER,
+                opacity,
+            );
+            rect(
+                frame,
+                event,
+                Vec2::new(start, layout.floor_y - 2.0),
+                Vec2::new(end, layout.floor_y),
+                FLOOR_EDGE_COLOR,
+                ARENA_LAYER,
+                opacity,
+            );
+        }
+        for obstacle in event.obstacles.iter().filter(|o| o.height > 0.0) {
+            rect(
+                frame,
+                event,
+                Vec2::new(obstacle.start, layout.floor_y),
+                Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
+                orange,
+                ACTIVE_CELL_LAYER,
+                opacity,
+            );
+            rect(
+                frame,
+                event,
+                Vec2::new(
+                    obstacle.start,
+                    layout.floor_y + obstacle.height - radius * 0.3,
+                ),
+                Vec2::new(obstacle.end, layout.floor_y + obstacle.height),
+                RenderColor::rgb(1.0, 0.85, 0.45),
+                ACTIVE_CELL_LAYER,
+                opacity,
+            );
         }
     }
+}
+
+fn render_actor(frame: &mut RenderFrame, event: &DuckEvent, debug: bool, opacity: f32) {
+    let radius = event.radius;
+    let orange = RenderColor::rgb(1.0, 0.48, 0.08);
     if debug && let Some(arc) = event.debug_arc() {
         for (index, point) in arc.into_iter().enumerate() {
             let size = radius * if index == 0 || index == 24 { 0.5 } else { 0.15 };
@@ -106,7 +119,7 @@ pub(super) fn render_with_course(
         if !visible {
             continue;
         }
-        let bottom = layout.floor_y;
+        let bottom = event.door_floor(x);
         let top = bottom + radius * 4.0;
         let half = radius * 1.5;
         rect(

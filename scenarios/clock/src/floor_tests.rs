@@ -2,26 +2,32 @@ use super::*;
 
 #[test]
 fn shared_course_floor_is_released_only_after_both_claims_end_in_either_order() {
-    for rain_first in [true, false] {
-        let mut floor = FloorManager::default();
-        floor.acquire_player();
-        floor.acquire_course_rain();
-        floor.release(ClockEventKind::ColorCycle);
-        assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-        if rain_first {
-            floor.release(ClockEventKind::Rain);
+    for kind in [
+        ClockEventKind::Rain,
+        ClockEventKind::Falling,
+        ClockEventKind::Meltdown,
+    ] {
+        for event_first in [true, false] {
+            let mut floor = FloorManager::default();
+            floor.acquire_player();
+            floor.acquire_player_event(kind);
+            floor.release(ClockEventKind::ColorCycle);
             assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-            floor.release_player();
-        } else {
-            floor.release_player();
-            assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-            floor.acquire_player(); // A new visit can reuse the wet course.
-            floor.release_player();
-            floor.release(ClockEventKind::Rain);
+            if event_first {
+                floor.release(kind);
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.release_player();
+            } else {
+                floor.release_player();
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.acquire_player(); // A new visit can reuse the occupied arena.
+                floor.release_player();
+                floor.release(kind);
+            }
+            assert_eq!(floor.mode(), ClockFloorMode::Closed);
+            floor.acquire(ClockEventKind::Falling);
+            assert_eq!(floor.mode(), ClockFloorMode::DrainOpen);
         }
-        assert_eq!(floor.mode(), ClockFloorMode::Closed);
-        floor.acquire(ClockEventKind::Falling);
-        assert_eq!(floor.mode(), ClockFloorMode::DrainOpen);
     }
 }
 use engine_common::ClockFloorMode;

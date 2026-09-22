@@ -3,7 +3,9 @@ use engine_common::{ClockDuckOutcome, ClockFloorMode};
 use events::duck::planner::Surface;
 
 mod composition;
+mod falling;
 mod rain;
+mod responsive;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
@@ -13,6 +15,8 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
             // Dry movement/visual regressions have their own fixed workload.
             // Wet composition is exercised independently below.
             events: ClockEvents {
+                falling: false,
+                meltdown: false,
                 rain: false,
                 ..Default::default()
             },
@@ -377,9 +381,14 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             );
             assert_eq!(
                 state.event_kind(),
-                active_at_spawn.filter(|kind| !EVENT_CATALOG[*kind as usize].uses_floor())
+                active_at_spawn.filter(|kind| *kind == ClockEventKind::Rain
+                    || !EVENT_CATALOG[*kind as usize].uses_floor())
             );
-            assert!(state.rain_state().is_none() && state.meltdown_state().is_none());
+            assert_eq!(
+                state.rain_state().is_some(),
+                active_at_spawn == Some(ClockEventKind::Rain)
+            );
+            assert!(state.meltdown_state().is_none());
             assert_eq!(state.body_count(), 0, "old world dropped before opening");
             ticks(&mut state, 60);
             assert!(state.body_count() <= 9);

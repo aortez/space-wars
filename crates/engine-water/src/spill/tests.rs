@@ -1,6 +1,8 @@
 use super::*;
 use crate::{Boundary, PoolSpec, WaterWorld};
 
+mod junction;
+
 #[test]
 fn compressed_junction_does_not_turn_into_a_wide_spike() {
     let tail = Section {

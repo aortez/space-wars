@@ -59,11 +59,16 @@ fn visual_start_replace_finish_are_physically_transparent_during_movement_and_ju
 fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anything() {
     let mut state = off_player(42);
     let mut settings = state.settings();
+    settings.events.falling = true;
+    settings.events.meltdown = true;
     settings.events.rain = true;
     state.configure(settings);
     let session = state.player_duck_state();
     for _ in 0..3 {
-        for event in VISUAL.into_iter().chain([ClockEventKind::Rain]) {
+        for event in ClockEventKind::ALL
+            .into_iter()
+            .filter(|k| *k != ClockEventKind::Duck)
+        {
             state.next_event();
             assert_eq!(state.event_kind(), Some(event));
             assert_eq!(state.player_duck_state(), session);

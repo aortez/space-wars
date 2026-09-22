@@ -2,6 +2,9 @@ use super::*;
 use crate::input::{GameKey, GamepadSeatInput};
 use engine_common::ClockEventProfile;
 
+mod falling;
+mod meltdown;
+
 fn scenario(viewport: Viewport) -> ClockClientScenario {
     let mut state = ClockScenario::init(
         ClockConfig {
@@ -112,7 +115,7 @@ fn player_duck_is_observable_and_renders_through_both_production_adapters() {
                 .iter()
                 .filter(|event| event.blocked_by_player)
                 .count(),
-            3
+            1
         );
         assert!(current.body_count <= 9 && current.collider_count <= 9);
         let frames = scenario.render_frames(RenderBackend::Raster, viewport);
@@ -305,6 +308,102 @@ fn rain_and_player_share_a_visible_course_in_all_layouts() {
                 &output.join(format!("rain-course-{name}-after-exit.png")),
                 &raster(&frames[0], viewport),
             );
+        }
+    }
+}
+
+#[test]
+fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layouts() {
+    use crate::thruster_visual_tests::{raster, svg, write_png};
+    use engine_common::{ClockEventKind, ClockRainAmount, ClockRainDuckPhase};
+    let output = std::env::var_os("SPACEWARS_CLOCK_PLAYER_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (name, viewport) in [
+        ("hyperpixel", Viewport::new(800.0, 480.0)),
+        ("picade", Viewport::new(1024.0, 768.0)),
+        ("portrait", Viewport::new(480.0, 800.0)),
+    ] {
+        let mut scene = scenario(viewport);
+        let mut settings = scene.state.settings();
+        settings.rain_amount = ClockRainAmount::Heavy;
+        scene.step(
+            &[
+                ClockAction::configure(settings),
+                ClockAction::preview_event(ClockEventKind::Rain),
+            ],
+            Duration::ZERO,
+        );
+        for _ in 0..1200 {
+            scene.step(&[], Duration::from_nanos(16_666_667));
+            if scene.state.rain_state().unwrap().duck_phase == ClockRainDuckPhase::Floating {
+                break;
+            }
+        }
+        assert_eq!(
+            scene.state.rain_state().unwrap().duck_phase,
+            ClockRainDuckPhase::Floating
+        );
+        let id = scene.state.event_id();
+        scene.step(&[ClockAction::toggle_player_duck(1)], Duration::ZERO);
+        assert_eq!(scene.state.event_id(), id);
+        let current = scene.state.player_duck_state().unwrap();
+        let target = current.duck.position_milli.unwrap()[0] as f32 / 1000.0;
+        for tick in 0..=960 {
+            let p = scene.state.player_duck_state().unwrap();
+            let x = p.duck.position_milli.unwrap()[0] as f32 / 1000.0;
+            let vx = p.velocity_milli.unwrap()[0] as f32 / 1000.0;
+            let axis = (((target - x) * 0.05 - vx * 0.03).clamp(-1.0, 1.0) * 1000.0) as i16;
+            scene.step(
+                &[ClockAction::player_duck_input(
+                    scenario_clock::ClockDuckInput {
+                        session_id: current.session_id,
+                        player: 1,
+                        move_milli: axis,
+                        jump: false,
+                    },
+                )],
+                Duration::from_nanos(16_666_667),
+            );
+            if tick == 720 {
+                scene.step(
+                    &[ClockAction::preview_event(ClockEventKind::Marquee)],
+                    Duration::ZERO,
+                );
+            }
+            if ![0, 300, 719, 960].contains(&tick) {
+                continue;
+            }
+            let state = scene.clock_state().unwrap();
+            let player = state.player_duck.unwrap();
+            assert_eq!(player.session_id, current.session_id);
+            assert!(player.floor_open_milli.is_some());
+            assert_eq!((state.body_count, state.collider_count), (4, 4));
+            if let Some(rain) = state.rain {
+                assert!(rain.player_joined && !rain.player_course);
+                assert_eq!(rain.duck_phase, ClockRainDuckPhase::HandedOff);
+            }
+            let frames = scene.render_frames(RenderBackend::Raster, viewport);
+            assert_eq!(frames, scene.render_frames(RenderBackend::Vector, viewport));
+            let pixels = raster(&frames[0], viewport);
+            assert!(
+                pixels
+                    .as_slice()
+                    .iter()
+                    .any(|p| p.r > 230 && p.g > 180 && p.b < 50)
+            );
+            if let Some(output) = &output {
+                write_png(
+                    &output.join(format!("player-panels-{name}-{tick}.png")),
+                    &pixels,
+                );
+                std::fs::write(
+                    output.join(format!("player-panels-{name}-{tick}.svg")),
+                    svg(&frames[0], viewport),
+                )
+                .unwrap();
+            }
         }
     }
 }

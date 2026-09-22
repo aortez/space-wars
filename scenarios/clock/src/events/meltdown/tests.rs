@@ -3,6 +3,7 @@ use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
 use engine_common::{ClockEventKind, ClockEventProfile, ClockSettings, ClockTimeFormat, Scenario};
 use std::time::Duration;
 
+mod player;
 mod presentation;
 mod responsive;
 mod spilling;

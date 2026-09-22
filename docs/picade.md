@@ -133,10 +133,18 @@ gamepads use right shoulder.
 
 In Clock, bottom-right blue starts/dismisses a player duck, joystick moves it,
 and bottom-middle yellow jumps from solid ground. Top-right blue cycles compatible
-visual events and Rain without ending the visit. In water, the joystick paddles;
-neutral floats/drifts with the current. Rain shares the fixed course and does not
-spawn another duck. Meltdown, Falling and the automatic duck course wait until
-the player leaves; saved event settings are not changed.
+visual events, Rain, Falling and Meltdown without ending the visit. In water, the joystick paddles;
+neutral floats/drifts with the current. Rain shares the fixed course; joining a
+shower already in progress instead keeps its water and moving floor. If a passive
+duck is already floating, it becomes yours in place; otherwise your duck enters
+through its door. Rain does not spawn another duck after a player joins. The
+panels stay physical and gently close after the shower ends. Falling bars and
+the player share one physics world: bars can push the duck, and it can stand/jump
+on them. Leaving removes only the duck; the blocks finish their event, and a new
+visit can reuse that arena. Meltdown's individual blocks can push the duck too;
+they become water on floor contact, not on duck/block contact. The automatic duck
+course and developer water-lab previews wait until the player leaves. Saved event
+settings are not changed.
 
 Run `python3 tools/capture-picade-buttons.py --host sw-picade-2.local` from the
 workstation. It discovers only the two Picade input devices, reads them over SSH,
