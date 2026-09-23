@@ -329,7 +329,7 @@ def load_runs(manifest, base):
                 'provenance': provenance[-1]}
 
 
-def inspect(manifest_path, out):
+def inspect(manifest_path, out, features_only=False):
     manifest, manifest_hash = read_bound(manifest_path)
     if manifest['version'] != 1 or not manifest['datasets']:
         raise ValueError('invalid risk manifest')
@@ -361,6 +361,13 @@ def inspect(manifest_path, out):
     feature_path = out / 'features.json'
     tail.frozen.write_json(feature_path, {'model': MODEL, 'rule': RULE, 'records': records})
     feature_hash = tail.costs.file_hash(feature_path)
+    if features_only:
+        tail.frozen.write_json(out / 'provenance.json', {'model': MODEL, 'rule': RULE,
+            'manifest_sha256': manifest_hash, 'features_sha256': feature_hash,
+            'runtime_revision': manifest['runtime_revision'], 'recordings': len(runs),
+            'worlds': len({r['seed'] for r in runs}), 'attempts': len(retained), 'runs': runs})
+        print(json.dumps({'features_sha256': feature_hash, 'outcomes_written': False}))
+        return
     for i, (attempt, actual, events) in enumerate(retained):
         for record in records[i * len(CHECKPOINTS):(i + 1) * len(CHECKPOINTS)]:
             record['actual_ending'] = actual['ending']
@@ -391,8 +398,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--features-only', action='store_true', help='Persist causal features before any outcome labels.')
     args = parser.parse_args()
-    inspect(args.manifest, args.out)
+    inspect(args.manifest, args.out, args.features_only)
 
 
 if __name__ == '__main__':

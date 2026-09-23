@@ -157,10 +157,16 @@ ten seconds, versus 23/217 without one. The association varies by phase; it is
 not an estimated success probability. Physical landing ends exposure, grounded
 replans stay separate, and 212 attempts with no observed landing choice remain
 outside this forecast's population. Progress/contact failure examples are too
-sparse for a general rule. Next compare a small phase-only interruption estimate
-with a phase-plus-recency candidate on disjoint worlds, retaining uncertainty
-and unchanged timing/controllers. Site acquisition and remote transfer remain
-separate prerequisites for mission selection.
+sparse for a general rule. The [first probability comparison](../bot-landing-risk-probability.md)
+now passes 56 new simulations on eleven independent worlds. On 74 normal
++15-second forecasts, a supported recency refinement reduces multiclass Brier
+0.38048 → 0.36695 and interruption Brier 0.12552 → 0.11889 with unchanged coverage.
+Most of the gain comes from seven circling cases; equal-world log loss worsens
+slightly and sparse settling/control cells stay unknown. Keep both models
+offline. Next investigate site-acquisition time/failure before the first usable
+landing choice, which is missing in seventy normal validation attempts. Remote
+transfer and extension beyond fixed forecast checkpoints remain prerequisites
+for mission selection; timing and controllers are still unchanged.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

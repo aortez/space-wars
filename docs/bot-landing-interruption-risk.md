@@ -11,6 +11,10 @@ profile, controller, physical permission or Pi deployment. The
 [combined descent estimator](bot-descent-regimes.md) remains the offline timing
 baseline. This is a diagnosis of known recordings, not independent validation
 or a fitted success probability.
+The subsequent [probability-table comparison](bot-landing-risk-probability.md)
+now tests phase-only and phase-plus-recency forecasts on eleven independent
+worlds. It finds a modest Brier-score improvement, principally during circling,
+with unchanged coverage and explicit calibration limits.
 
 ## Population and prospective observations
 
