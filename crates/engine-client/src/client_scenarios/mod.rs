@@ -74,6 +74,7 @@ impl ScenarioStartMode {
 pub struct BenchmarkCounts {
     pub bodies: usize,
     pub colliders: usize,
+    /// Includes independently timed duck visits as well as timed animations.
     pub clock_event_active: bool,
     pub asteroids: usize,
     pub fragments: usize,

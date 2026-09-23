@@ -8,6 +8,9 @@ use super::flow;
 use super::planner::{self, Capabilities, Course, Plan};
 use super::{DT, Obstacle};
 
+#[path = "water_controller.rs"]
+mod water;
+
 #[derive(Clone, Copy)]
 pub(super) struct Observation {
     pub position: Vec2,
@@ -31,6 +34,7 @@ pub(super) struct Command {
     pub jump: bool,
 }
 
+#[derive(Clone, Copy)]
 pub(super) struct CourseContext<'a> {
     pub course: &'a Course,
     pub obstacles: &'a [Obstacle; 3],
@@ -127,6 +131,7 @@ pub(super) struct Controller {
     pub speeds: Samples,
     pub accelerations: Samples,
     pub navigator: Navigator,
+    pub water: water::WaterNavigation,
     trial: Option<JumpTrial>,
     previous_speed: f32,
     jumped: u8,
@@ -146,6 +151,7 @@ impl Controller {
             speeds: Samples::default(),
             accelerations: Samples::default(),
             navigator: Navigator::default(),
+            water: water::WaterNavigation::default(),
             trial: None,
             previous_speed: 0.0,
             jumped: 0,

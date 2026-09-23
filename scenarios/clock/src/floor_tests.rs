@@ -9,19 +9,19 @@ fn shared_course_floor_is_released_only_after_both_claims_end_in_either_order() 
     ] {
         for event_first in [true, false] {
             let mut floor = FloorManager::default();
-            floor.acquire_player();
-            floor.acquire_player_event(kind);
+            floor.acquire_visit();
+            floor.acquire_visit_event(kind);
             floor.release(ClockEventKind::ColorCycle);
             assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
             if event_first {
                 floor.release(kind);
                 assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-                floor.release_player();
+                floor.release_visit();
             } else {
-                floor.release_player();
+                floor.release_visit();
                 assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-                floor.acquire_player(); // A new visit can reuse the occupied arena.
-                floor.release_player();
+                floor.acquire_visit(); // A new visit can reuse the occupied arena.
+                floor.release_visit();
                 floor.release(kind);
             }
             assert_eq!(floor.mode(), ClockFloorMode::Closed);
@@ -75,14 +75,14 @@ fn every_event_acquires_its_floor_before_stepping_and_releases_it_after_cleanup(
         assert_eq!(state.floor_mode(), expected, "{kind:?} at tick zero");
         let max_ticks = EVENT_CATALOG[kind as usize].duration_ticks;
         for elapsed in 0..max_ticks {
-            if state.active_event.is_none() {
+            if state.active_event.is_none() && state.duck_visit.is_none() {
                 break;
             }
             assert_eq!(state.floor_mode(), expected, "{kind:?} at {elapsed}");
             tick(&mut state);
         }
         assert!(
-            state.active_event.is_none(),
+            state.active_event.is_none() && state.duck_visit.is_none(),
             "{kind:?} exceeded its old deadline"
         );
         assert_eq!((state.body_count(), state.collider_count()), (0, 0));
@@ -227,7 +227,7 @@ fn floor_requests_cannot_silently_overwrite_an_existing_owner() {
 #[test]
 fn face_events_and_unrelated_cleanup_cannot_release_the_player_floor() {
     let mut floor = FloorManager::default();
-    floor.acquire_player();
+    floor.acquire_visit();
     for kind in [
         ClockEventKind::ColorCycle,
         ClockEventKind::Marquee,
@@ -239,10 +239,10 @@ fn face_events_and_unrelated_cleanup_cannot_release_the_player_floor() {
     }
     floor.release(ClockEventKind::Duck);
     assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
-    floor.release_player();
+    floor.release_visit();
     assert_eq!(floor.mode(), ClockFloorMode::Closed);
     floor.acquire(ClockEventKind::Rain);
-    floor.release_player();
+    floor.release_visit();
     floor.release(ClockEventKind::Falling);
     assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
     floor.release(ClockEventKind::Rain);

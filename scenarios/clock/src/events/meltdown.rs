@@ -52,7 +52,7 @@ impl MeltdownEvent {
         Self::in_arena(context, seed, mode, None)
     }
 
-    pub fn with_player(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
+    pub fn with_visit(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
         Self::in_arena(context, seed, ClockWaterLab::Off, Some(player))
     }
 
@@ -264,10 +264,10 @@ impl MeltdownEvent {
     }
 
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
-        self.step_with_player(context, None)
+        self.step_with_visit(context, None)
     }
 
-    pub fn step_with_player(
+    pub fn step_with_visit(
         &mut self,
         context: EventContext<'_>,
         player: Option<&mut DuckEvent>,

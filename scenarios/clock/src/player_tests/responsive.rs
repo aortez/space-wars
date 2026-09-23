@@ -63,7 +63,7 @@ fn joining_rain_keeps_its_clock_water_panels_and_existing_actor_motion() {
         assert_eq!(player.velocity_milli, before.duck_velocity_milli);
         assert_eq!(player.player, 2);
         assert_eq!(after.duck_phase, ClockRainDuckPhase::HandedOff);
-        assert!(after.player_joined && !after.player_course);
+        assert!(after.duck_joined && !after.duck_course);
         assert_eq!(rain(&state).physics_counts(), (0, 0));
         assert_eq!((state.body_count(), state.collider_count()), (4, 4));
         ledger(&state);

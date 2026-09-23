@@ -1,15 +1,15 @@
 //! A visit's physical arena can outlive its character while a timed event uses
-//! it. Ownership moves (never clones) to that event when the player leaves, and
+//! it. Ownership moves (never clones) to that event when the duck leaves, and
 //! can move back on rejoin. There is one world and one step in either case.
 use super::*;
 
 /// A physical event leases a visit's world, retaining it if the character leaves.
-/// It never creates a second world or owns the player's input/session lifetime.
-pub(crate) struct PlayerArena {
+/// It never creates a second world or owns the visit's controller/lifetime.
+pub(crate) struct VisitArena {
     vacant: Option<Box<DuckEvent>>,
 }
 
-impl PlayerArena {
+impl VisitArena {
     pub fn claim(player: &mut DuckEvent) -> Self {
         player.claim_arena();
         Self { vacant: None }
@@ -65,7 +65,7 @@ impl PlayerArena {
 
 impl DuckEvent {
     pub fn claim_arena(&mut self) -> &mut PhysicsWorld {
-        assert!(self.player.is_some() && !self.arena_claimed);
+        assert!(!self.arena_claimed);
         self.ensure_world();
         self.arena_claimed = true;
         self.world.as_mut().unwrap()
@@ -104,6 +104,11 @@ impl DuckEvent {
             1.0,
             OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS,
         ));
+        if self.course.is_some() {
+            // An automatic visitor did not need this wall, but a new player
+            // needs the same entrance boundary as an ordinary player spawn.
+            self.insert_entrance_wall();
+        }
         self.tick = 0;
         self.jumps = 0;
         self.outcome = None;
@@ -112,6 +117,14 @@ impl DuckEvent {
 
     pub fn player_finished(&self) -> bool {
         self.phase == EventPhase::Resetting && self.phase_tick >= RESET_TICKS
+    }
+
+    pub fn visit_finished(&self) -> bool {
+        if self.player.is_some() {
+            self.player_finished()
+        } else {
+            self.tick >= DUCK_TICKS
+        }
     }
 
     pub fn arena_opacity(&self) -> f32 {

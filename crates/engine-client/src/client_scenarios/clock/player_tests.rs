@@ -2,6 +2,7 @@ use super::*;
 use crate::input::{GameKey, GamepadSeatInput};
 use engine_common::ClockEventProfile;
 
+mod autonomous;
 mod falling;
 mod join;
 mod meltdown;
@@ -275,7 +276,7 @@ fn rain_and_player_share_a_visible_course_in_all_layouts() {
             }
             let state = scene.clock_state().unwrap();
             assert_eq!(state.player_duck.unwrap().session_id, current.session_id);
-            assert!(state.rain.unwrap().player_course);
+            assert!(state.rain.unwrap().duck_course);
             assert!(state.body_count <= 9);
             let frames = scene.render_frames(RenderBackend::Raster, viewport);
             assert_eq!(frames, scene.render_frames(RenderBackend::Vector, viewport));
@@ -303,7 +304,7 @@ fn rain_and_player_share_a_visible_course_in_all_layouts() {
             scene.step(&[], Duration::from_nanos(16_666_667));
         }
         assert!(scene.state.player_duck_state().is_none());
-        assert!(scene.state.rain_state().unwrap().player_course);
+        assert!(scene.state.rain_state().unwrap().duck_course);
         let frames = scene.render_frames(RenderBackend::Raster, viewport);
         if let Some(output) = &output {
             write_png(
@@ -383,7 +384,7 @@ fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layout
             assert!(player.floor_open_milli.is_some());
             assert_eq!((state.body_count, state.collider_count), (4, 4));
             if let Some(rain) = state.rain {
-                assert!(rain.player_joined && !rain.player_course);
+                assert!(rain.duck_joined && !rain.duck_course);
                 assert_eq!(rain.duck_phase, ClockRainDuckPhase::HandedOff);
             }
             let frames = scene.render_frames(RenderBackend::Raster, viewport);

@@ -170,7 +170,7 @@ impl ClientScenario for ClockClientScenario {
         Some(super::BenchmarkCounts {
             bodies: self.state.body_count(),
             colliders: self.state.collider_count(),
-            clock_event_active: self.state.event_kind().is_some(),
+            clock_event_active: self.state.event_kind().is_some() || self.state.has_duck_visit(),
             ..Default::default()
         })
     }
@@ -217,6 +217,7 @@ impl ClientScenario for ClockClientScenario {
                     cooldown_ticks: event.cooldown_ticks,
                     enabled: self.state.event_enabled(event.kind),
                     blocked_by_player: self.state.event_blocked_by_player(event.kind),
+                    blocked_by_duck: self.state.event_blocked_by_duck(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),

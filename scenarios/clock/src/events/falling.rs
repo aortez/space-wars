@@ -2,7 +2,7 @@ use rand::{SeedableRng, rngs::StdRng};
 
 use super::{
     EventContext, EventPhase,
-    duck::{DuckEvent, PlayerArena},
+    duck::{DuckEvent, VisitArena},
 };
 use crate::{
     SegmentRepresentation, digits,
@@ -15,9 +15,9 @@ pub const REFORMING_TICKS: u64 = 90;
 
 enum Mechanics {
     Standalone(Option<Box<FallingWorld>>),
-    Player {
+    Shared {
         bodies: Option<FallingBodies>,
-        arena: PlayerArena,
+        arena: VisitArena,
     },
 }
 
@@ -47,9 +47,9 @@ impl FallingEvent {
         }
     }
 
-    pub fn with_player(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
+    pub fn with_visit(context: EventContext<'_>, seed: u64, player: &mut DuckEvent) -> Self {
         let letters = Self::letters_for(&context);
-        let arena = PlayerArena::claim(player);
+        let arena = VisitArena::claim(player);
         let bodies = FallingBodies::insert(
             player.arena_world_mut(),
             context.layout,
@@ -60,7 +60,7 @@ impl FallingEvent {
         Self {
             phase: EventPhase::Falling,
             tick: 0,
-            mechanics: Mechanics::Player {
+            mechanics: Mechanics::Shared {
                 bodies: Some(bodies),
                 arena,
             },
@@ -91,8 +91,8 @@ impl FallingEvent {
         if let Some(bodies) = &bodies {
             bodies.match_gravity(duck.arena_world_mut());
         }
-        let arena = PlayerArena::claim(&mut duck);
-        self.mechanics = Mechanics::Player { bodies, arena };
+        let arena = VisitArena::claim(&mut duck);
+        self.mechanics = Mechanics::Shared { bodies, arena };
         Some(duck)
     }
 
@@ -102,12 +102,12 @@ impl FallingEvent {
         })
     }
 
-    pub fn shares_player_arena(&self) -> bool {
-        matches!(self.mechanics, Mechanics::Player { .. })
+    pub fn shares_visit_arena(&self) -> bool {
+        matches!(self.mechanics, Mechanics::Shared { .. })
     }
 
     pub fn retain_arena(&mut self, duck: Box<DuckEvent>) {
-        let Mechanics::Player { arena, .. } = &mut self.mechanics else {
+        let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
             panic!("shared Falling arena");
         };
         arena.retain(duck);
@@ -115,7 +115,7 @@ impl FallingEvent {
 
     pub fn vacant_arena(&self) -> Option<&DuckEvent> {
         match &self.mechanics {
-            Mechanics::Player { arena, .. } => arena.vacant(),
+            Mechanics::Shared { arena, .. } => arena.vacant(),
             _ => None,
         }
     }
@@ -129,7 +129,7 @@ impl FallingEvent {
     }
 
     pub fn rejoin(&mut self, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
-        let Mechanics::Player { arena, .. } = &mut self.mechanics else {
+        let Mechanics::Shared { arena, .. } = &mut self.mechanics else {
             return None;
         };
         arena.rejoin(session, seat)
@@ -151,7 +151,7 @@ impl FallingEvent {
                     *world = None;
                 }
             }
-            Mechanics::Player { bodies, arena } => {
+            Mechanics::Shared { bodies, arena } => {
                 let duck = arena.step(player, None, false);
                 if let Some(bodies) = bodies {
                     bodies.synchronize(duck.arena_world(), context.segments, letters);
@@ -183,7 +183,7 @@ impl FallingEvent {
     /// Only the event's batch is removed; the live player's floor and character
     /// survive replacement, reformation and completion unchanged.
     pub fn release(&mut self, player: Option<&mut DuckEvent>) {
-        if let Mechanics::Player { bodies, arena } = &mut self.mechanics {
+        if let Mechanics::Shared { bodies, arena } = &mut self.mechanics {
             let duck = arena.get_mut(player);
             if let Some(bodies) = bodies.take() {
                 bodies.remove(duck.arena_world_mut());
@@ -208,7 +208,7 @@ impl FallingEvent {
                 .as_ref()
                 .map_or((0, 0), |w| (w.body_count(), w.collider_count())),
             // An occupied shared world is counted by ClockState's player.
-            Mechanics::Player { arena, .. } => {
+            Mechanics::Shared { arena, .. } => {
                 arena.vacant().map_or((0, 0), |d| d.physics_counts())
             }
         }

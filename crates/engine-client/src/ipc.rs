@@ -662,11 +662,11 @@ fn validate_clock_trigger(
     } else if clock
         .events
         .iter()
-        .any(|event| event.kind == request.event && event.blocked_by_player)
+        .any(|event| event.kind == request.event && event.blocked_by_duck)
     {
         Some((
             ControlFailureCode::ActionUnavailable,
-            "This event needs the player's arena; dismiss the duck first",
+            "This event needs the duck's arena; wait for departure, or take control and dismiss the duck",
         ))
     } else if !clock.can_trigger {
         Some((
@@ -1115,7 +1115,7 @@ mod tests {
                 .iter()
                 .find(|entry| entry.kind == event)
                 .unwrap()
-                .blocked_by_player
+                .blocked_by_duck
             {
                 let failure = result.unwrap_err();
                 assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);

@@ -159,18 +159,18 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
         for aspect in [4.0 / 3.0, 5.0 / 3.0, 0.6] {
             let mut state = standalone(kind, end - 1, aspect);
             toggle(&mut state, 1);
-            let mut opacity = state.player_duck.as_ref().unwrap().arena_opacity();
+            let mut opacity = state.duck_visit.as_ref().unwrap().arena_opacity();
             for _ in 0..90 {
                 tick(&mut state, &[]);
-                let duck = state.player_duck.as_ref().expect("player outlives event");
+                let duck = state.duck_visit.as_ref().expect("player outlives event");
                 assert!(duck.arena_opacity() >= opacity);
                 opacity = duck.arena_opacity();
             }
             assert_eq!(state.event_kind(), None);
             assert_eq!(opacity, 1.0);
-            assert!(state.player_duck.as_ref().unwrap().grounded());
+            assert!(state.duck_visit.as_ref().unwrap().grounded());
             assert!(state.body_count() <= 5);
-            let duck = state.player_duck.as_ref().unwrap();
+            let duck = state.duck_visit.as_ref().unwrap();
             let start_y = duck.position().unwrap().y;
             let radius = duck.radius;
             let jump = input(&state, 0, true);
@@ -178,17 +178,17 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
             let mut peak = start_y;
             for _ in 0..80 {
                 tick(&mut state, &[]);
-                peak = peak.max(state.player_duck.as_ref().unwrap().position().unwrap().y);
+                peak = peak.max(state.duck_visit.as_ref().unwrap().position().unwrap().y);
             }
             assert!(
                 (radius * 3.5..radius * 5.5).contains(&(peak - start_y)),
                 "calibrated jump survives adopted solver settings"
             );
-            assert!(state.player_duck.as_ref().unwrap().grounded());
+            assert!(state.duck_visit.as_ref().unwrap().grounded());
             if kind == ClockEventKind::Falling {
                 // Both original walls stay for the bars; the actor exits at the
                 // far door's threshold instead of getting stuck behind it.
-                let duck = state.player_duck.as_mut().unwrap();
+                let duck = state.duck_visit.as_mut().unwrap();
                 let position = duck.render_position(Vec2::new(
                     duck.width - duck.radius * 2.5,
                     duck.layout.floor_y + duck.radius * 1.01,
@@ -208,7 +208,7 @@ fn late_join_keeps_the_floor_visible_after_the_event_ends_and_duck_can_exit() {
                 toggle(&mut state, 1);
             }
             ticks(&mut state, 30);
-            assert!(state.player_duck.is_none());
+            assert!(state.duck_visit.is_none());
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
         }
@@ -231,7 +231,7 @@ fn joined_event_handles_pause_dismiss_rejoin_replacement_and_resize() {
             assert_eq!(state.player_duck_state(), player);
             toggle(&mut state, 1);
             ticks(&mut state, 30);
-            assert!(state.player_duck.is_none());
+            assert!(state.duck_visit.is_none());
             let phase = state.phase_tick();
             let count = state.body_count();
             toggle(&mut state, 2);
@@ -248,7 +248,7 @@ fn joined_event_handles_pause_dismiss_rejoin_replacement_and_resize() {
             );
             assert!(state.body_count() <= 4, "no event-owned bodies remain");
             state.set_aspect_ratio(0.6);
-            assert!(state.player_duck.is_none());
+            assert!(state.duck_visit.is_none());
             assert_eq!(state.body_count(), 0);
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
         }

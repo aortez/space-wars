@@ -103,7 +103,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by player={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -112,7 +112,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.enabled,
                         event.cooldown_ticks,
                         event.automatic_ready_at_tick,
-                        event.blocked_by_player
+                        event.blocked_by_duck
                     );
                 }
             }
@@ -140,14 +140,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                 .map_err(|e| control_error(e, json))?;
             let state = client
                 .wait_for_clock_state(
-                    &ClockStatePredicate {
-                        scenario_revision: request.expected_scenario_revision,
-                        lifecycle: Some("active".into()),
-                        event_kind: Some(event),
-                        phase: None,
-                        event_id: Some(request.expected_event_id.saturating_add(1)),
-                        min_phase_tick: 0,
-                    },
+                    &request.started_predicate(),
                     deadline.saturating_duration_since(Instant::now()),
                 )
                 .map_err(|e| control_error(e, json))?;
@@ -267,13 +260,13 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);
         if let Some(rain) = state.rain {
             println!(
-                "Rain arena: {}; player has joined={}",
-                if rain.player_course {
-                    "shared player course (fixed)"
+                "Rain arena: {}; visiting duck has joined={}",
+                if rain.duck_course {
+                    "shared duck course (fixed)"
                 } else {
                     "responsive floor"
                 },
-                rain.player_joined
+                rain.duck_joined
             );
             println!(
                 "Rain: {} / {:?}, spawns={}, entry depth={:.1}/{:.1}; position={:?}, velocity={:?}",
@@ -361,12 +354,22 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
             let blocked: Vec<_> = state
                 .events
                 .iter()
-                .filter(|event| event.blocked_by_player)
+                .filter(|event| event.blocked_by_duck)
                 .map(|event| event.label.as_str())
                 .collect();
-            println!("Waiting for player's arena: {}", blocked.join(", "));
+            println!("Waiting for duck arena: {}", blocked.join(", "));
         }
         if let Some(duck) = state.duck {
+            if let Some(visit) = duck.visit {
+                println!(
+                    "Automatic visit: phase={} tick={} phase-tick={}, {:.1}% submerged, velocity={:?}",
+                    visit.phase.as_str(),
+                    visit.tick,
+                    visit.phase_tick,
+                    visit.submerged_milli as f32 / 10.0,
+                    world_vector(visit.velocity_milli),
+                );
+            }
             println!(
                 "Duck: {}; {} jumps, {}/{} obstacles cleared, grounded={}; outcome {:?}",
                 if duck.left_to_right {
@@ -381,6 +384,14 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 duck.outcome
             );
             if let Some(navigation) = duck.navigation {
+                println!(
+                    "Duck water: {} interruptions, {} recoveries, {} paddling ticks, {} recovering ticks, target bank={:?}",
+                    navigation.water.interruptions,
+                    navigation.water.recoveries,
+                    navigation.water.paddling_ticks,
+                    navigation.water.recovering_ticks,
+                    navigation.water.target_surface,
+                );
                 println!(
                     "Duck controller: {:?} / {:?}, facing {}; wall tags L/R={:?}, target obstacle={:?}, exit visible={}; course seed={}",
                     navigation.jump_profile,

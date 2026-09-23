@@ -14,7 +14,7 @@ use crate::{DisplaySnapshot, SegmentState, layout::Layout};
 use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use digit_slide::{DIGIT_SLIDE_TICKS, DigitSlideEvent};
-use duck::{DUCK_TICKS, DuckEvent};
+use duck::DUCK_TICKS;
 use falling::FallingEvent;
 pub use falling::{FALLING_TICKS, REFORMING_TICKS};
 use marquee::{MARQUEE_TICKS, MarqueeEvent};
@@ -107,7 +107,7 @@ pub struct EventDefinition {
 
 impl EventDefinition {
     /// These events claim physical floor geometry, either privately or shared
-    /// with a player. Face-only animations do not claim the arena.
+    /// with a duck visit. Face-only animations do not claim the arena.
     pub const fn uses_floor(&self) -> bool {
         matches!(
             self.kind,
@@ -184,7 +184,6 @@ pub(super) enum ActiveEvent {
     Falling(FallingEvent),
     ColorCycle(ColorCycle),
     Meltdown(Box<MeltdownEvent>),
-    Duck(Box<DuckEvent>),
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
     Rain(Box<crate::rain::RainEvent>),
@@ -206,12 +205,7 @@ impl ActiveEvent {
                 seed,
                 config.water_lab,
             ))),
-            ClockEventKind::Duck => {
-                let mut event =
-                    DuckEvent::new_course(context.layout, seed, config.duck_course_pattern);
-                event.select_jump_profile(config.duck_jump_profile);
-                Self::Duck(Box::new(event))
-            }
+            ClockEventKind::Duck => unreachable!("a duck admission creates an independent visit"),
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
                 config.marquee_preset,
                 config.marquee_message,
@@ -234,17 +228,16 @@ impl ActiveEvent {
             Self::Falling(_) => ClockEventKind::Falling,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
             Self::Meltdown(_) => ClockEventKind::Meltdown,
-            Self::Duck(_) => ClockEventKind::Duck,
             Self::Marquee(_) => ClockEventKind::Marquee,
             Self::DigitSlide(_) => ClockEventKind::DigitSlide,
             Self::Rain(_) => ClockEventKind::Rain,
         }
     }
 
-    pub fn shares_player_arena(&self) -> bool {
+    pub fn shares_visit_arena(&self) -> bool {
         match self {
-            Self::Falling(event) => event.shares_player_arena(),
-            Self::Meltdown(event) => event.shares_player_arena(),
+            Self::Falling(event) => event.shares_visit_arena(),
+            Self::Meltdown(event) => event.shares_visit_arena(),
             _ => false,
         }
     }
@@ -305,7 +298,6 @@ impl ActiveEvent {
             Self::Falling(event) => event.step(context, None),
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step(context),
-            Self::Duck(event) => event.step(),
             Self::Marquee(event) => event.step(),
             Self::DigitSlide(event) => event.step(),
             Self::Rain(event) => {
@@ -320,7 +312,6 @@ impl ActiveEvent {
             Self::Falling(event) => event.phase(),
             Self::ColorCycle(_) => EventPhase::Cycling,
             Self::Meltdown(event) => event.phase(),
-            Self::Duck(event) => event.phase,
             Self::Marquee(_) => EventPhase::Presenting,
             Self::DigitSlide(_) => EventPhase::Sliding,
             Self::Rain(event) => event.phase(),
@@ -332,7 +323,6 @@ impl ActiveEvent {
             Self::Falling(event) => event.phase_tick(),
             Self::ColorCycle(event) => event.tick,
             Self::Meltdown(event) => event.phase_tick(),
-            Self::Duck(event) => event.phase_tick,
             Self::Marquee(event) => event.tick,
             Self::DigitSlide(event) => event.tick,
             Self::Rain(event) => event.phase_tick(),
@@ -344,7 +334,6 @@ impl ActiveEvent {
             Self::Falling(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
             Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) => (0, 0),
-            Self::Duck(event) => event.physics_counts(),
             Self::Rain(event) => event.physics_counts(),
         }
     }
@@ -445,8 +434,14 @@ impl EventSchedule {
     }
 
     pub fn finish(&mut self, kind: ClockEventKind) {
-        self.ready_at[kind as usize] = self.tick + EVENT_CATALOG[kind as usize].cooldown_ticks;
+        self.retire(kind);
         self.enter(EventLifecycle::Cooldown);
+    }
+
+    /// A resident actor's departure must not interrupt a concurrent event or
+    /// reset its cadence, but still starts that actor's per-kind reuse delay.
+    pub fn retire(&mut self, kind: ClockEventKind) {
+        self.ready_at[kind as usize] = self.tick + EVENT_CATALOG[kind as usize].cooldown_ticks;
     }
 
     fn enter(&mut self, lifecycle: EventLifecycle) {

@@ -1,6 +1,8 @@
 //! Deterministic low-resolution clock scenario.
 
 #[cfg(test)]
+mod autonomous_tests;
+#[cfg(test)]
 mod digit_slide_tests;
 mod digits;
 #[cfg(test)]
@@ -368,9 +370,9 @@ pub struct ClockState {
     floor: floor::FloorManager,
     last_started_event: Option<ClockEventKind>,
     event_notice: Option<(&'static str, u64)>,
-    // Player presence is not a timed event. Face animations, Rain, Falling and
-    // Meltdown coexist; private AI courses/labs wait until the player leaves.
-    player_duck: Option<Box<events::duck::DuckEvent>>,
+    // One physical visit, independent of the event scheduler and command source.
+    // Automatic ducks keep their own bounded lifetime; players may stay longer.
+    duck_visit: Option<Box<events::duck::DuckEvent>>,
     player_duck_sequence: u64,
     player_seed: u64,
 }
@@ -432,7 +434,7 @@ impl ClockState {
         self.config.aspect_ratio = aspect_ratio;
         // A resize changes both anchors and floor geometry. Recover immediately
         // instead of leaving bodies in the old arena or teleporting colliders.
-        self.finish_player_duck();
+        self.finish_duck_visit();
         if self.active_event.is_some() {
             self.finish_event();
         }
@@ -480,7 +482,7 @@ impl ClockState {
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
             + self
-                .player_duck
+                .duck_visit
                 .as_ref()
                 .map_or(0, |duck| duck.physics_counts().0)
     }
@@ -489,7 +491,7 @@ impl ClockState {
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
             + self
-                .player_duck
+                .duck_visit
                 .as_ref()
                 .map_or(0, |duck| duck.physics_counts().1)
     }
@@ -501,10 +503,8 @@ impl ClockState {
     }
 
     pub fn duck_state(&self) -> Option<engine_common::ClockDuckState> {
-        match self.active_event.as_ref()? {
-            ActiveEvent::Duck(event) => Some(event.diagnostics()),
-            _ => None,
-        }
+        let duck = self.duck_visit.as_ref()?;
+        duck.player_session().is_none().then(|| duck.diagnostics())
     }
     pub fn marquee_state(&self) -> Option<engine_common::ClockMarqueeState> {
         match self.active_event.as_ref()? {
@@ -530,16 +530,20 @@ impl ClockState {
     }
 
     fn trigger_event(&mut self, kind: ClockEventKind) {
-        if self.can_trigger_event() && !self.event_blocked_by_player(kind) {
+        if self.can_trigger_event() && !self.event_blocked_by_duck(kind) {
             self.start_event(kind);
         }
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
-            if self.event_blocked_by_player(kind) {
+            if self.event_blocked_by_duck(kind) {
                 self.event_notice = Some((
-                    "Dismiss your duck to preview this event",
+                    if self.player_duck_session().is_some() {
+                        "Dismiss your duck to preview this event"
+                    } else {
+                        "Wait for the duck, or take control and dismiss it"
+                    },
                     self.schedule.tick + 2 * u64::from(FIXED_HZ),
                 ));
                 return;
@@ -559,18 +563,18 @@ impl ClockState {
         let start = self.last_started_event.map_or(0, |kind| kind as usize + 1);
         let next = (0..kinds.len())
             .map(|offset| kinds[(start + offset) % kinds.len()])
-            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked_by_player(*kind));
+            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked_by_duck(*kind));
         let message = if let Some(kind) = next {
             // The preview path owns cancellation/restoration for every event.
             // Manual cycling ignores automatic cooldowns, not enabled switches.
             self.preview_event(kind);
             kind.label()
-        } else if self.player_duck.is_some()
+        } else if self.duck_visit.is_some()
             && ClockEventKind::ALL
                 .into_iter()
                 .any(|kind| self.config.events.enabled(kind))
         {
-            "Dismiss your duck for the enabled events"
+            "Waiting for the duck to leave"
         } else {
             "No events enabled"
         };
@@ -586,15 +590,27 @@ impl ClockState {
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
     ) {
-        debug_assert!(!self.event_blocked_by_player(kind));
+        debug_assert!(!self.event_blocked_by_duck(kind));
         self.last_started_event = Some(kind);
         self.event_notice = None;
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
+        if kind == ClockEventKind::Duck {
+            let mut duck =
+                events::duck::DuckEvent::new_course(layout, seed, self.config.duck_course_pattern);
+            duck.select_jump_profile(self.config.duck_jump_profile);
+            self.floor.acquire_visit();
+            self.duck_visit = Some(Box::new(duck));
+            // Admission uses the ordinary cadence/cooldown, but does not hold
+            // the timed-event slot for the actor's entire 35-second visit.
+            self.schedule.finish(kind);
+            self.sync_event_schedule();
+            return;
+        }
         if kind == ClockEventKind::Rain
-            && let Some(duck) = &self.player_duck
+            && let Some(duck) = &self.duck_visit
         {
-            self.floor.acquire_player_event(kind);
+            self.floor.acquire_visit_event(kind);
             let rain = if let Some(floor) = duck.responsive_floor() {
                 rain::RainEvent::on_responsive_floor(
                     layout,
@@ -615,9 +631,9 @@ impl ClockState {
             return;
         }
         if matches!(kind, ClockEventKind::Falling | ClockEventKind::Meltdown)
-            && let Some(duck) = &mut self.player_duck
+            && let Some(duck) = &mut self.duck_visit
         {
-            self.floor.acquire_player_event(kind);
+            self.floor.acquire_visit_event(kind);
             let context = EventContext {
                 segments: &mut self.segments,
                 display: self.display,
@@ -626,10 +642,10 @@ impl ClockState {
             };
             self.active_event = Some(match kind {
                 ClockEventKind::Falling => ActiveEvent::Falling(
-                    events::falling::FallingEvent::with_player(context, seed, duck),
+                    events::falling::FallingEvent::with_visit(context, seed, duck),
                 ),
                 ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
-                    events::meltdown::MeltdownEvent::with_player(context, seed, duck),
+                    events::meltdown::MeltdownEvent::with_visit(context, seed, duck),
                 )),
                 _ => unreachable!(),
             });
@@ -653,10 +669,10 @@ impl ClockState {
     fn finish_event(&mut self) {
         if let Some(mut event) = self.active_event.take() {
             let kind = event.kind();
-            event.release_arena(self.player_duck.as_deref_mut());
+            event.release_arena(self.duck_visit.as_deref_mut());
             if let ActiveEvent::Rain(rain) = &event
                 && let Some(floor) = rain.responsive_floor()
-                && let Some(duck) = &mut self.player_duck
+                && let Some(duck) = &mut self.duck_visit
             {
                 duck.sync_responsive_floor(floor);
             }
@@ -664,7 +680,7 @@ impl ClockState {
             self.schedule.finish(kind);
             self.floor.release(kind);
         }
-        // Visual-event cleanup never releases the player's physical arena.
+        // Visual-event cleanup never releases the visit's physical arena.
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
@@ -682,9 +698,9 @@ impl ClockState {
         let layout = Layout::new(self.aspect_ratio());
         let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
         if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
-            rain.set_player_hull(self.player_duck.as_ref().and_then(|d| d.clearance_hull()));
+            rain.set_duck_hull(self.duck_visit.as_ref().and_then(|d| d.clearance_hull()));
         }
-        let player_advanced = if self.active_event.is_some() {
+        let visit_advanced = if self.active_event.is_some() {
             self.step_active_event(layout)
         } else {
             if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
@@ -696,18 +712,18 @@ impl ClockState {
             if self
                 .active_event
                 .as_ref()
-                .is_some_and(ActiveEvent::shares_player_arena)
+                .is_some_and(ActiveEvent::shares_visit_arena)
             {
                 self.step_active_event(layout)
             } else {
                 false
             }
         };
-        // Water advances once, then the one player mechanics world samples it.
+        // Water advances once, then the one duck mechanics world samples it.
         // No second character world or frame-rate dependent force application.
         let water = match &self.active_event {
             Some(ActiveEvent::Rain(rain)) => {
-                if let Some(duck) = &mut self.player_duck
+                if let Some(duck) = &mut self.duck_visit
                     && let Some(floor) = rain.responsive_floor()
                 {
                     duck.sync_responsive_floor(floor);
@@ -716,22 +732,22 @@ impl ClockState {
             }
             _ => None,
         };
-        if let Some(duck) = &mut self.player_duck
-            && if player_advanced {
-                duck.player_finished()
+        if let Some(duck) = &mut self.duck_visit
+            && if visit_advanced {
+                duck.visit_finished()
             } else {
                 duck.step_with_environment(water, panels_advanced || water.is_some())
             }
         {
-            self.finish_player_duck();
+            self.finish_duck_visit();
         }
     }
 
-    /// Reports whether the event already stepped the player's mechanics world.
+    /// Reports whether the event already stepped the visit's mechanics world.
     /// This remains true on its final tick, after cleanup removes the event.
     fn step_active_event(&mut self, layout: Layout) -> bool {
         let event = self.active_event.as_mut().expect("active event");
-        let player_advanced = event.shares_player_arena();
+        let visit_advanced = event.shares_visit_arena();
         let context = EventContext {
             segments: &mut self.segments,
             display: self.display,
@@ -739,16 +755,16 @@ impl ClockState {
             floor: self.floor.geometry(layout),
         };
         let finished = match event {
-            ActiveEvent::Falling(falling) => falling.step(context, self.player_duck.as_deref_mut()),
+            ActiveEvent::Falling(falling) => falling.step(context, self.duck_visit.as_deref_mut()),
             ActiveEvent::Meltdown(meltdown) => {
-                meltdown.step_with_player(context, self.player_duck.as_deref_mut())
+                meltdown.step_with_visit(context, self.duck_visit.as_deref_mut())
             }
             _ => event.step(context),
         };
         if finished {
             self.finish_event();
         }
-        player_advanced
+        visit_advanced
     }
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {
@@ -812,7 +828,7 @@ impl Scenario for ClockScenario {
             floor: floor::FloorManager::default(),
             last_started_event: None,
             event_notice: None,
-            player_duck: None,
+            duck_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
         }

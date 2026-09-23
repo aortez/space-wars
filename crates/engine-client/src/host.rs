@@ -122,7 +122,7 @@ impl ScenarioControls {
                 && state
                     .events
                     .iter()
-                    .any(|entry| entry.kind == event && !entry.blocked_by_player)
+                    .any(|entry| entry.kind == event && !entry.blocked_by_duck)
         }) {
             return false;
         }

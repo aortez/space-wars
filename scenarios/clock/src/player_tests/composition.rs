@@ -142,7 +142,7 @@ fn filtered_schedule_has_no_backlog_and_reconfigures_without_changing_saved_enab
     state.next_event();
     assert_eq!(
         state.event_notice.unwrap().0,
-        "Dismiss your duck for the enabled events"
+        "Waiting for the duck to leave"
     );
     assert_eq!(state.event_id(), 0);
     assert!(state.player_duck_session().is_some());
@@ -166,7 +166,17 @@ fn filtered_schedule_has_no_backlog_and_reconfigures_without_changing_saved_enab
     assert!((360..=600).contains(&wait));
     assert_eq!(state.event_id(), id, "no deferred-event burst");
     ticks(&mut state, wait as usize);
-    assert!(EVENT_CATALOG[state.event_kind().unwrap() as usize].uses_floor());
+    assert_eq!(
+        state.duck_state(),
+        None,
+        "automatic reuse delay still applies"
+    );
+    let ready_at = state.event_ready_at_tick(ClockEventKind::Duck);
+    assert_eq!(state.next_event_tick(), Some(ready_at));
+    let remaining = ready_at - state.simulation_tick();
+    ticks(&mut state, remaining as usize);
+    assert!(state.duck_state().is_some());
+    assert_eq!(state.event_kind(), None);
     assert_eq!(state.settings(), settings);
 }
 

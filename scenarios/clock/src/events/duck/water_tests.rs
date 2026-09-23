@@ -7,6 +7,14 @@ fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
     for _ in 0..90 {
         duck.step();
     }
+    let water = deep_pool(&duck);
+    for _ in 0..600 {
+        duck.step_with_water(Some(&water));
+    }
+    (duck, water)
+}
+
+fn deep_pool(duck: &DuckEvent) -> WaterWorld {
     let half = duck.width * 0.5;
     let mut water = WaterWorld::new(
         WaterConfig::default(),
@@ -27,10 +35,80 @@ fn floating_player(direction: f32) -> (DuckEvent, WaterWorld) {
             )
             .unwrap();
     }
-    for _ in 0..600 {
-        duck.step_with_water(Some(&water));
+    water
+}
+
+#[test]
+fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
+    for direction in [-1.0, 1.0] {
+        for profile in [
+            engine_common::ClockDuckJumpProfile::Careful,
+            engine_common::ClockDuckJumpProfile::Flowing,
+        ] {
+            let mut duck = DuckEvent::new_platforms(Layout::new(4.0 / 3.0), 42);
+            duck.direction = direction;
+            duck.select_jump_profile(Some(profile));
+            // Interrupt the very first airborne warm-up rather than resetting
+            // the body or inventing already-calibrated controller observations.
+            while duck.jumps == 0 {
+                assert!(duck.tick < 100);
+                duck.step();
+            }
+            let water = deep_pool(&duck);
+            let ledger = water.stats();
+            let jumps = duck.jumps;
+            for _ in 0..480 {
+                duck.step_with_water(Some(&water));
+                let stats = duck.diagnostics();
+                let nav = stats.navigation.unwrap();
+                assert_eq!(stats.outcome, None, "{stats:?}");
+                assert_eq!(stats.jumps, jumps, "no water or buffered jump");
+                assert_eq!(nav.calibrated_jumps, 0, "wet warm-up is discarded");
+                assert_eq!(nav.speed_samples, 0);
+                assert!(nav.planning.unwrap().plan.is_none());
+            }
+            let floating = duck.diagnostics();
+            assert!(!floating.grounded);
+            assert!(
+                (420..=480).contains(&floating.visit.unwrap().submerged_milli),
+                "{floating:?}"
+            );
+            assert_eq!(
+                floating.navigation.unwrap().behavior,
+                engine_common::ClockDuckBehavior::Paddling
+            );
+            assert_eq!(floating.navigation.unwrap().water.interruptions, 1);
+            assert!(floating.navigation.unwrap().water.paddling_ticks > 400);
+            assert_eq!(
+                water.stats(),
+                ledger,
+                "the actor never creates/removes water"
+            );
+
+            let mut saw_recovery = false;
+            let mut resumed = false;
+            for _ in 0..600 {
+                duck.step(); // the water event leaves; gravity/support are still real
+                let stats = duck.diagnostics();
+                let nav = stats.navigation.unwrap();
+                assert_eq!(stats.outcome, None, "{stats:?}");
+                saw_recovery |= nav.behavior == engine_common::ClockDuckBehavior::Recovering;
+                if nav.water.recoveries == 1
+                    && nav.calibrated_jumps == 2
+                    && nav.speed_samples == 9
+                    && nav.planning.unwrap().confirmed_landings > 0
+                {
+                    resumed = true;
+                    break;
+                }
+            }
+            assert!(
+                saw_recovery && resumed,
+                "profile={profile:?}, direction={direction}: {:?}",
+                duck.diagnostics()
+            );
+        }
     }
-    (duck, water)
 }
 
 #[test]
