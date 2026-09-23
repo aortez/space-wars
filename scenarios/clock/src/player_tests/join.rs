@@ -54,7 +54,7 @@ fn joining_standalone_meltdown_preserves_material_floor_and_event_time() {
     }
 }
 
-fn visible_polygons(state: &ClockState) -> Vec<(i32, engine_common::RenderPolygon)> {
+pub(super) fn visible_polygons(state: &ClockState) -> Vec<(i32, engine_common::RenderPolygon)> {
     ClockScenario::render_frame(state)
         .layers
         .into_iter()

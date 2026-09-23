@@ -512,8 +512,9 @@ Physical cabinet mappings are documented in [Picade controls](picade.md).
 ### Player-controlled duck visits
 
 Press **D** on the keyboard, **North (Y)** on a gamepad, or the Picade's
-**bottom-right blue** button to start a visit. Press it again to dismiss your
-duck. **Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
+**bottom-right blue** button to start a visit or take over the automatic duck
+already on screen. Press it again to dismiss your duck.
+**Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
 jumps. Picade's working **bottom-middle yellow** is Jump. Keyboard belongs to
 P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
 cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
@@ -524,15 +525,36 @@ This is one player duck in the existing Clock, not another launcher scenario.
 Its visit is separate from the timed event scheduler. Starting during Falling,
 ordinary Meltdown or Rain joins the current arena without resetting the event,
 its moving objects, water, floor or event ID. An active visual event continues;
-starting from idle opens a seeded course. Only the separate AI Duck course and
-developer water-lab previews are recovered/replaced when starting a player visit. The
-player drives the **same dry movement actuator, gravity, jump impulse and circular
-body shape** used by Careful/Flowing AI; those existing brains and automatic Duck
-timings are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
+starting from idle opens a seeded course. Starting during the automatic Duck
+event takes control of that same visit; only developer water-lab previews are
+recovered/replaced. The player drives the **same dry movement actuator, gravity,
+jump impulse and circular body shape** used by Careful/Flowing AI. Those brains,
+movement tuning and automatic event duration are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
 through the same acceleration limit, including airborne braking. Horizontal
 input is screen-relative even when the entrance/course is mirrored. A physical
 rear wall keeps the player in view. The opposite exit appears after entry closes;
 walk through it to finish. Missing a gap ends the visit too.
+
+**Taking over an automatic duck:** The existing course, body/collider, mass,
+position, velocity, contacts, facing, jump count and entrance animation all stay
+intact, including mid-jump. The automatic event slot enters its usual cooldown
+without recreating the actor or advancing physics. The player owns the same
+visit thereafter, so compatible events can run alongside it. A closed exit
+starts opening within 44 ticks (after entrance opening if still entering); an
+already-open exit stays open. The bot's 35-second timeout no longer applies.
+If the duck has already fallen or exited and is fading out, the button instead
+starts a fresh visit. A second press dismisses; it does **not** hand control back
+to the bot.
+
+Both controllers now share screen/world-space physics and the same buoyant
+circle from spawn. Course planning still uses entrance-relative observations;
+the Careful/Flowing decision algorithms are unchanged. Takeover switches the
+command source and adds the player's entrance safety wall, not a replacement
+physics world. Dry automatic visits still have one dynamic body and do no water
+queries. Tests cover both entrance directions/profiles, opening/running/jumping/
+exiting, exact body/contact continuity, normal bounded braking, controller-neutral
+gating, event composition and cleanup. Raster captures compare the takeover frame
+pixel-for-pixel on Picade, HyperPixel and portrait layouts.
 
 A fresh **grounded** jump press is required: no held-button auto-hop, opening
 jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
@@ -595,7 +617,7 @@ the same bodies, and the floor gently closes using the existing rate/clearance
 rules without allocating a dummy water world. A later shower builds its empty
 pools at that retained pose; it does not snap the panels back to horizontal.
 This is still one-way buoyancy/drag. Meltdown can also reuse these retained panels;
-the automatic AI Duck course remains separate.
+new automatic AI Duck visits wait until the player leaves.
 
 **Falling alongside a player:** Falling is available to the automatic schedule,
 Next Event, previews and CLI triggers during a visit. Its lit bars and AM/PM

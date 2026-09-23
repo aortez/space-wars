@@ -30,7 +30,7 @@ impl DuckEvent {
             }
             duck.spawn_motion = Some((position, velocity));
             duck.spawn();
-            duck.tick = OPENING_TICKS + 44;
+            duck.tick = OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS;
             duck.enter(EventPhase::Exiting);
         }
         duck

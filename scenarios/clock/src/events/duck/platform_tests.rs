@@ -475,6 +475,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
             1 => event.width * 0.9,
             _ => plan.landing.x,
         };
+        let world_x = event.physics_position(Vec2::new(x, 0.0)).x;
         let mut y = floor + radius * 1.2;
         let world = event.world.as_mut().unwrap();
         if kind == 2 {
@@ -486,7 +487,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
                     kind: BodyKind::Fixed,
-                    position: Vec2::new(x, top - radius),
+                    position: Vec2::new(world_x, top - radius),
                     ..BodySpec::default()
                 },
                 &[ColliderSpec::cuboid(
@@ -498,7 +499,7 @@ fn forced_bad_landings_are_classified_using_real_supports_not_proximity() {
             y = top + radius * 1.2;
         }
         let motion = world.motion(DUCK_BODY).unwrap();
-        world.set_pose(DUCK_BODY, Vec2::new(x, y), 0.0, true);
+        world.set_pose(DUCK_BODY, Vec2::new(world_x, y), 0.0, true);
         world.apply_velocity_delta(DUCK_BODY, -motion.linear_velocity, true);
         for _ in 0..30 {
             event.step();
@@ -750,11 +751,12 @@ fn failed_running_takeoff_brakes_and_finishes_with_careful_fallback() {
     }
     let plan = event.controller.navigator.plan.unwrap();
     let before = event.controller.navigator.flowing_fallbacks;
+    let takeoff_x = event.physics_position(Vec2::new(plan.takeoff.x, 0.0)).x;
     let world = event.world.as_mut().unwrap();
     let motion = world.motion(DUCK_BODY).unwrap();
     world.set_pose(
         DUCK_BODY,
-        Vec2::new(plan.takeoff.x, motion.position.y),
+        Vec2::new(takeoff_x, motion.position.y),
         0.0,
         true,
     );

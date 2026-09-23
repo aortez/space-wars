@@ -132,8 +132,12 @@ Clock-only binding does not change menus, NES, or other scenarios; ordinary
 gamepads use right shoulder.
 
 In Clock, bottom-right blue starts/dismisses a player duck, joystick moves it,
-and bottom-middle yellow jumps from solid ground. Top-right blue cycles compatible
-visual events, Rain, Falling and Meltdown without ending the visit. In water, the joystick paddles;
+and bottom-middle yellow jumps from solid ground. If the automatic obstacle-course
+duck is already on screen, bottom-right blue takes control of it in place, even
+mid-jump: no new course, teleport or velocity reset. Release the joystick/jump
+button before steering; press bottom-right again to dismiss, not return to AI.
+Top-right blue cycles compatible visual events, Rain, Falling and Meltdown without
+ending the visit. In water, the joystick paddles;
 neutral floats/drifts with the current. Rain shares the fixed course; joining a
 shower already in progress instead keeps its water and moving floor. If a passive
 duck is already floating, it becomes yours in place; otherwise your duck enters
@@ -145,8 +149,8 @@ visit can reuse that arena. Meltdown's individual blocks can push the duck too;
 they become water on floor contact, not on duck/block contact. Pressing bottom-right
 blue during an existing Falling or Meltdown also joins it in place: no restart,
 new obstacle course, cleared water or reset blocks. The current floor stays after
-the event ends. The automatic duck
-course and developer water-lab previews wait until the player leaves. Saved event
+the event ends. New automatic duck visits and developer water-lab previews wait
+until the player leaves. Saved event
 settings are not changed.
 
 Run `python3 tools/capture-picade-buttons.py --host sw-picade-2.local` from the

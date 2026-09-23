@@ -7,6 +7,7 @@ mod falling;
 mod join;
 mod rain;
 mod responsive;
+mod takeover;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(

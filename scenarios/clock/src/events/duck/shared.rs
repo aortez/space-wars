@@ -98,14 +98,12 @@ impl DuckEvent {
         if self.entry_arena_opacity.is_some() {
             self.entry_arena_opacity = Some(self.arena_opacity());
         }
-        self.player = Some(PlayerControl {
+        self.player = Some(PlayerControl::new(
             session_id,
             seat,
-            move_milli: 0,
-            jump_held: false,
-            jump_pending: false,
-            facing: 1.0,
-        });
+            1.0,
+            OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS,
+        ));
         self.tick = 0;
         self.jumps = 0;
         self.outcome = None;

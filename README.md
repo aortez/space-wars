@@ -52,6 +52,9 @@ The local launcher includes the following scenarios and presets:
   automatic AI Duck course (and developer water labs) waits for the visit.
   Spawning during Rain, Falling or Meltdown joins the live scene without resetting
   its event, moving objects, water or floor. The existing arena remains afterward.
+  If the automatic course duck is already present, the same button takes control
+  of it in place—even mid-jump—without restarting its course or motion. Press
+  again to dismiss; release movement/jump inputs before steering after takeover.
   **N** / right shoulder / Picade upper-right blue starts the next compatible
   event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or

@@ -35,7 +35,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck on/off: D / Y (North) / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow; ground contact needed.\nSpawning pad owns duck; keys=P1. Exit or dismiss.\nVisual events and Rain keep your duck. Neutral floats/drifts.\nOff stops automatic events only. Pause freezes motion.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck join/dismiss: D / Y / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow; ground contact needed.\nJoining pad owns duck; keys=P1. Exit or dismiss.\nEvents keep your duck. Neutral floats/drifts.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 
