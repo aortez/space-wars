@@ -163,10 +163,17 @@ now passes 56 new simulations on eleven independent worlds. On 74 normal
 0.38048 → 0.36695 and interruption Brier 0.12552 → 0.11889 with unchanged coverage.
 Most of the gain comes from seven circling cases; equal-world log loss worsens
 slightly and sparse settling/control cells stay unknown. Keep both models
-offline. Next investigate site-acquisition time/failure before the first usable
-landing choice, which is missing in seventy normal validation attempts. Remote
-transfer and extension beyond fixed forecast checkpoints remain prerequisites
-for mission selection; timing and controllers are still unchanged.
+offline. The [site-acquisition audit](../bot-site-acquisition.md) now separates
+the seventy normal attempts without a choice: 52 end before arrival, mostly for
+combat; eighteen arrive and accumulate 633 seconds of waiting. Their 1,034 native
+objective invalidations precede any selected site. Completed jobs can fail
+publication or return no usable route while the waiting ship repeatedly climbs
+out of the approach frame. Next expose native acquisition outcomes and give
+this stage a progress deadline with bounded waiting flight, preserving physical
+and solar safety. Compare actual captures/departures and the quick acquisitions,
+not only retry counters. Remote transfer and extension beyond fixed forecast
+checkpoints remain prerequisites for mission selection; timing and controllers
+are still unchanged.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

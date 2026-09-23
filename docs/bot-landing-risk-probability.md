@@ -5,6 +5,10 @@ using recent native replans. It follows the
 [interruption investigation](bot-landing-interruption-risk.md). The timing
 profiles, bot controls and native physical permissions remain unchanged.
 
+The subsequent [site-acquisition audit](bot-site-acquisition.md) separates the
+seventy no-choice normal attempts below: 52 end before arrival, while eighteen
+arrive and wait without obtaining a choice.
+
 ## Forecast contract
 
 Forecast four mutually exclusive endpoints over the next ten seconds: native
