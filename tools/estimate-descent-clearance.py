@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Offline descent costs from current foot rays and locally supported motion.
 
-The explicit candidate replaces only descent. Other phases retain the frozen
-duration-first approach model. Successful episodes supply conditional durations,
-not completion probabilities or permission to land.
+The default candidate replaces only descent. An explicit composition option
+retains supported coarse durations when clearance lacks statistical support or
+assist is not established. Other phases retain the frozen duration-first approach
+model. Successful episodes supply conditional durations, not completion
+probabilities or permission to land.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -26,6 +28,8 @@ approach = module('descent_approach', 'estimate-approach-state.py')
 diagnostic = module('descent_diagnostic', 'inspect-landing-tail.py')
 composed, phase, frozen, costs = approach.composed, approach.phase, approach.frozen, approach.costs
 MODEL = 'descent-clearance-trip-v1'
+REGIME_MODEL = 'descent-regime-trip-v1'
+DESCENT_MODELS = {'strict': MODEL, 'supported-clearance': REGIME_MODEL}
 PROFILE_MODEL = 'descent-clearance-profile-v1'
 SCALES = {'clearance': 4.0, 'foot_gap': 2.0, 'descent_speed': 2.0,
           'lateral_speed': 1.0, 'relative_spin': 0.5, 'angle_degrees': 15.0,
@@ -35,6 +39,11 @@ RULE = {'scales': SCALES, 'target_descent_speed': 2.0, 'minimum_assist': 0.5,
         'maximum_states_per_attempt': 32, 'maximum_states_per_cell': 2048,
         'aggregation': 'nearest_per_attempt_then_world_median_residuals',
         'selection': 'strict_descent_other_phases_unchanged'}
+REGIME_RULE = {'selection': 'clearance_when_supported_else_eligible_duration',
+    'duration_fallback_reasons': ['descent_assist_unsupported', 'descent_outside_training_domain',
+        'insufficient_local_descent_support', 'no_descent_clearance_calibration'],
+    'fallback_native_phases': ['flying', 'assisted'],
+    'require_numeric_comparator': True, 'preserve_other_guards': True}
 
 
 def state_vector(record):
@@ -228,6 +237,61 @@ class DescentTrip(approach.StateTrip):
         return {**super().record(), 'first_descent_prediction': self.first_descent}
 
 
+def descent_choice(result):
+    """Lack of calibration can retain a duration; invalid observations cannot."""
+    choice = {'rule': 'supported-clearance', 'selected': 'comparator',
+              'reason': 'not_descent', 'clearance_reason': None}
+    if not result['descent_lookup_attempted']:
+        return choice
+    landing, comparator = result['landing'], result['comparator']
+    choice['clearance_reason'] = landing['reason']
+    if any(r != landing['reason'] for r in result['unknown_reasons']):
+        return {**choice, 'selected': 'unknown', 'reason': 'other_evidence_or_budget_guard'}
+    if landing['seconds'] is not None:
+        return {**choice, 'selected': 'clearance', 'reason': 'clearance_supported'}
+    if landing['reason'] not in REGIME_RULE['duration_fallback_reasons']:
+        return {**choice, 'selected': 'unknown', 'reason': 'clearance_evidence_guard'}
+    # The strict model's assist rejection includes malformed measurements as
+    # well as an ordinary flying/weak-assist transient. Only the latter can
+    # retain the independent coarse model. Earlier frame/ray/motion guards
+    # have already passed before any eligible rejection is returned.
+    contact = result['descent_state']['contact']
+    strength = contact['assist_strength']
+    if (contact['phase'] not in REGIME_RULE['fallback_native_phases']
+            or not costs.finite(strength) or not 0 <= strength <= 1):
+        return {**choice, 'selected': 'unknown', 'reason': 'invalid_assist_evidence'}
+    if comparator['total_seconds'] is None:
+        return {**choice, 'selected': 'unknown', 'reason': 'coarse_duration_unavailable'}
+    return {**choice, 'selected': 'duration', 'reason': 'coarse_duration_retained'}
+
+
+class DescentRegimeTrip(DescentTrip):
+    """Compose independent estimates without feeding back into either model."""
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.first_regime = None
+
+    def observe(self, row):
+        result = super().observe(row)
+        if result is None:
+            return None
+        result.update(model=REGIME_MODEL,
+            strict=copy.deepcopy({k: result.get(k) for k in result['comparator']}),
+            clearance_prediction=copy.deepcopy(result.get('landing')) if result['descent_lookup_attempted'] else None,
+            descent_selection=descent_choice(result))
+        if result['descent_selection']['selected'] == 'duration':
+            # Restore the whole coarse forecast, including its envelope and
+            # deadline comparison; mixing envelopes or totals would invent a
+            # third model. The strict result and its first snapshot stay intact.
+            result.update(copy.deepcopy(result['comparator']))
+        if self.first_regime is None and self.first_choice_tick is not None:
+            self.first_regime = copy.deepcopy(result)
+        return result
+
+    def record(self):
+        return {**super().record(), 'first_regime_prediction': self.first_regime}
+
+
 def calibrate(manifest_path, out):
     manifest, cells, runs, exclusions, seen, sources = json.loads(manifest_path.read_text()), {}, [], [], set(), []
     for dataset in manifest['datasets']:
@@ -271,6 +335,9 @@ def evaluate_run(run, attempts, updates):
             c['comparator'] = u['comparator'] if eligible else None
             c['descent_state'] = u['descent_state'] if eligible else None
             c['descent_lookup_attempted'] = u['descent_lookup_attempted'] if eligible else False
+            if u and u['model'] == REGIME_MODEL:
+                for name in ['strict', 'clearance_prediction', 'descent_selection']:
+                    c[name] = u[name] if eligible else None
     return result
 
 
@@ -291,16 +358,19 @@ def evaluate(args):
     al, dl = approach.StateLookup(ap), DescentLookup(dp)
     if any(p['runtime_revision'] != manifest['runtime_revision'] for p in [ap, dp]):
         raise ValueError('state profile runtime differs')
-    provenance = {'version': 1, 'model': MODEL, 'scope': scope, 'runtime_revision': manifest['runtime_revision'],
+    provenance = {'version': 1, 'model': DESCENT_MODELS[args.descent_model], 'scope': scope, 'runtime_revision': manifest['runtime_revision'],
         'manifest_sha256': costs.file_hash(args.manifest), 'profile_sha256': hashes,
         'state_profile_sha256': costs.file_hash(args.state_profile), 'descent_profile_sha256': costs.file_hash(args.descent_profile),
         'source_evaluation_sha256': costs.file_hash(args.source_evaluation)}
+    if args.descent_model != 'strict':
+        provenance.update(descent_model=args.descent_model, selection_rule=copy.deepcopy(REGIME_RULE))
     base, forecasts = args.manifest.resolve().parent, []
     for i, config in enumerate(manifest['runs']):
         trace = base / config['directory'] / 'trace.jsonl'
         trace_hash = costs.file_hash(trace)
         path = args.out / f'updates-{i}.jsonl'
-        factory = lambda selection: DescentTrip(selection, *profiles, al, dl)
+        trip_type = DescentTrip if args.descent_model == 'strict' else DescentRegimeTrip
+        factory = lambda selection: trip_type(selection, *profiles, al, dl)
         with path.open('w') as output:
             if scope == composed.controlled.SCOPE:
                 attempts = composed.replay_controlled(config, base, factory, output, trace_hash)
@@ -339,7 +409,9 @@ def evaluate(args):
     frozen.write_json(args.out / 'evaluation.json', {**provenance, 'runs': results,
         'summary': composed.summarize(results), 'limitations': [
             'Conditional uninterrupted costs, not interruption or success probabilities.',
-            'Strict descent support: no duration fallback. All other phases retain the expiry comparator.',
+            ('Strict descent support: no duration fallback. All other phases retain the expiry comparator.'
+             if args.descent_model == 'strict' else
+             'Supported clearance is preferred; eligible unsupported states retain the independently numeric coarse forecast. Hard evidence and budget guards never fall back.'),
             'Post-descent flight includes any later contact/alignment episodes before acknowledgement.',
             'Empirical ranges are not confidence intervals or physical permissions.',
             'New-world validation requires a separately frozen generation protocol.']})
@@ -350,6 +422,7 @@ def main():
     parser.add_argument('mode', choices=['calibrate', 'evaluate'])
     parser.add_argument('--manifest', required=True, type=Path)
     parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--descent-model', choices=DESCENT_MODELS, default='strict')
     for name in ['source-evaluation', 'ground-profile', 'phase-profile', 'walking-profile', 'state-profile', 'descent-profile']:
         parser.add_argument('--' + name, type=Path)
     args = parser.parse_args()

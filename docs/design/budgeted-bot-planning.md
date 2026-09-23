@@ -142,10 +142,17 @@ new simulations. At the first +1-second descent sample, paired median landing
 error improves from 0.50 to 0.22 seconds in normal matches and 1.03 to 0.59 seconds
 in controlled trials. Strict replacement loses 34 normal and eight controlled
 forecasts at descent entry, while a new retry forecast misses seven future native
-replans by 26 seconds. Keep the component offline; next test an explicit coarse/
-current-state composition rule without losing early support or bypassing hard
-evidence guards. Remote transfer and interruption risk remain prerequisites for
-mission selection.
+replans by 26 seconds. The explicit [descent composition rule](../bot-descent-regimes.md)
+now restores early coverage on seven further worlds: all declared checkpoints
+retain the coarse model's numeric coverage, while 1,087 common numeric strict
+forecasts remain exact. Normal +15-second whole-trip median error improves
+0.57 to 0.14 seconds on 27 paired completions. Seven other sampled observations
+still become unknown for invalid rays or missing site evidence. This closes the
+descent-selection experiment; use the combined variant as the offline timing
+baseline. Next investigate interruption risk from recent invalidations, progress
+and contact, including failed/censored attempts and distinguishing native
+airborne replans from site acquisition and already-grounded events. Remote
+transfer remains another prerequisite for mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

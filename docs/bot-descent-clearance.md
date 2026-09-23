@@ -53,6 +53,11 @@ support, with paired error 0.60 to 0.12 seconds. This check includes qualified
 training states only; it is development evidence, not independent validation.
 The rule was not retuned after this check.
 
+The subsequent [descent composition experiment](bot-descent-regimes.md) now
+retains early coarse coverage on seven further worlds while preserving supported
+clearance forecasts. Use that explicit variant as the next offline baseline;
+the strict option and the results below remain unchanged.
+
 ## Frozen new-world comparison
 
 The rule, all five profiles, helper sources, tests, generation/evaluation drivers
