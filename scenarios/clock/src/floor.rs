@@ -1,8 +1,9 @@
-//! Event-owned access to the ordinary floor.
+//! Scoped ownership of the ordinary floor.
 //!
-//! Clock serializes events, so one explicit owner is sufficient. Acquire before
-//! constructing event resources; release only after dropping them. Rain and
-//! Meltdown own their responsive water/impact geometry as well as their art.
+//! Face-only events make no claim. The player's course or moving panels can be
+//! claimed jointly with Rain, Falling or Meltdown; the ordinary floor returns
+//! only after both release.
+//! Standalone physical events retain exclusive floor ownership.
 
 pub(crate) mod responsive;
 
@@ -15,17 +16,29 @@ use crate::layout::Layout;
 
 #[derive(Default)]
 pub(crate) struct FloorManager {
-    owner: Option<ClockEventKind>,
+    owner: Option<FloorOwner>,
     mode: ClockFloorMode,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FloorOwner {
+    Event(ClockEventKind),
+    PlayerArena {
+        player: bool,
+        event: Option<ClockEventKind>,
+    },
 }
 
 impl FloorManager {
     pub fn acquire(&mut self, kind: ClockEventKind) {
+        if !crate::EVENT_CATALOG[kind as usize].uses_floor() {
+            return;
+        }
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
         );
-        self.owner = Some(kind);
+        self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
             ClockEventKind::Falling => ClockFloorMode::DrainOpen,
             ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
@@ -37,9 +50,75 @@ impl FloorManager {
         };
     }
 
-    pub fn release(&mut self) {
-        self.owner = None;
-        self.mode = ClockFloorMode::Closed;
+    pub fn release(&mut self, kind: ClockEventKind) {
+        if let Some(FloorOwner::PlayerArena { player, event }) = self.owner
+            && event == Some(kind)
+        {
+            self.owner = player.then_some(FloorOwner::PlayerArena {
+                player,
+                event: None,
+            });
+            if !player {
+                self.mode = ClockFloorMode::Closed;
+            }
+            return;
+        }
+        self.release_owner(FloorOwner::Event(kind));
+    }
+
+    pub fn acquire_player(&mut self) {
+        if self.owner == Some(FloorOwner::Event(ClockEventKind::Rain)) {
+            self.owner = Some(FloorOwner::PlayerArena {
+                player: true,
+                event: Some(ClockEventKind::Rain),
+            });
+            return;
+        }
+        if let Some(FloorOwner::PlayerArena { player, event }) = &mut self.owner {
+            assert!(!*player && event.is_some());
+            *player = true;
+            return;
+        }
+        assert!(
+            self.owner.is_none(),
+            "finish the previous floor owner first"
+        );
+        self.owner = Some(FloorOwner::PlayerArena {
+            player: true,
+            event: None,
+        });
+        self.mode = ClockFloorMode::EventOwned;
+    }
+
+    pub fn release_player(&mut self) {
+        if let Some(FloorOwner::PlayerArena { event, .. }) = self.owner {
+            self.owner = event.map(|kind| FloorOwner::PlayerArena {
+                player: false,
+                event: Some(kind),
+            });
+            if event.is_none() {
+                self.mode = ClockFloorMode::Closed;
+            }
+        }
+    }
+
+    pub fn acquire_player_event(&mut self, kind: ClockEventKind) {
+        assert!(matches!(
+            kind,
+            ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown
+        ));
+        let Some(FloorOwner::PlayerArena { event, .. }) = &mut self.owner else {
+            panic!("shared event requires a player arena");
+        };
+        assert!(event.is_none());
+        *event = Some(kind);
+    }
+
+    fn release_owner(&mut self, owner: FloorOwner) {
+        if self.owner == Some(owner) {
+            self.owner = None;
+            self.mode = ClockFloorMode::Closed;
+        }
     }
 
     pub fn mode(&self) -> ClockFloorMode {

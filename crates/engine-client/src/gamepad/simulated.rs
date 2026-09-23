@@ -71,13 +71,14 @@ impl SimulatedInput {
             request.button == InputButton::Start,
             request.button == InputButton::Select,
         );
+        let player = request.player;
         self.active = Some(Lease {
             request,
             until,
             selected_scenario: state.selected_scenario.clone(),
         });
         window.global::<UserActivity>().invoke_notify();
-        apply_button_route(window, &self.input, route);
+        apply_button_route(window, &self.input, route, player);
         self.repeat_direction(window, now);
         Ok(())
     }

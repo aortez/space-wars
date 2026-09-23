@@ -192,6 +192,111 @@ fn simulated_directions_repeat_but_confirm_does_not() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn simulated_clock_duck_button_is_a_single_edge_for_the_requesting_player() {
+    use spacewars_control::{InputButton, InputPressRequest, UiScreen};
+    use std::time::Instant;
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let (input, gamepads) = input::new_shared_input();
+    let mut driver = gamepad::SimulatedInput::new(Rc::clone(&input), gamepads);
+    let state = simulated_ui(UiScreen::Gameplay);
+    let mut request = InputPressRequest::new(&state, InputButton::North);
+    request.player = 2;
+    request.hold_ms = 1200;
+    let now = Instant::now();
+    driver.press(&window, &state, request, now).unwrap();
+    assert_eq!(
+        input.borrow_mut().take_clock_player_duck_requested(),
+        Some(2)
+    );
+    for tick in 1..=12 {
+        driver.tick(&window, &state, now + Duration::from_millis(tick * 100));
+        assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+    }
+    window.set_ingame_menu_visible(true);
+    let menu = simulated_ui(UiScreen::PauseMain);
+    driver
+        .press(
+            &window,
+            &menu,
+            InputPressRequest::new(&menu, InputButton::North),
+            Instant::now(),
+        )
+        .unwrap();
+    assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+}
+
+#[test]
+fn clock_duck_keys_use_backend_neutral_holds_without_repeating_across_pause() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    let (input, _) = input::new_shared_input();
+    install_keyboard_navigation(&window, Rc::clone(&input));
+    window.set_launcher_scenario("clock".into());
+    window.set_launcher_visible(false);
+    window.show().unwrap();
+    key(&window, "d");
+    assert_eq!(
+        input.borrow_mut().take_clock_player_duck_requested(),
+        Some(1)
+    );
+    window
+        .window()
+        .dispatch_event(WindowEvent::KeyPressRepeated { text: "d".into() });
+    assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+    input.borrow_mut().clock_duck_input(Some((1, 1))); // Observe neutral before control.
+    for (text, code) in [
+        (Key::LeftArrow.into(), 0),
+        (Key::RightArrow.into(), 1),
+        (SharedString::from(" "), 2),
+    ] {
+        window
+            .window()
+            .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+        let sampled = input.borrow_mut().clock_duck_input(Some((1, 1))).unwrap();
+        assert_eq!(
+            sampled.move_milli,
+            match code {
+                0 => -1000,
+                1 => 1000,
+                _ => 0,
+            }
+        );
+        assert_eq!(sampled.jump, code == 2);
+        window
+            .window()
+            .dispatch_event(WindowEvent::KeyReleased { text });
+        let sampled = input.borrow_mut().clock_duck_input(Some((1, 1))).unwrap();
+        assert_eq!(sampled.move_milli, 0);
+        assert!(!sampled.jump);
+    }
+    window.window().dispatch_event(WindowEvent::KeyPressed {
+        text: Key::RightArrow.into(),
+    });
+    input.borrow_mut().clear();
+    window.set_ingame_menu_visible(true);
+    key(&window, "d");
+    assert_eq!(input.borrow_mut().take_clock_player_duck_requested(), None);
+    window.set_ingame_menu_visible(false);
+    window
+        .window()
+        .dispatch_event(WindowEvent::KeyPressRepeated {
+            text: Key::RightArrow.into(),
+        });
+    assert_eq!(
+        input
+            .borrow_mut()
+            .clock_duck_input(Some((1, 1)))
+            .unwrap()
+            .move_milli,
+        0
+    );
+}
+
 fn key(window: &MainWindow, text: impl Into<SharedString>) {
     slint::platform::update_timers_and_animations();
     let text = text.into();

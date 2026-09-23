@@ -8,6 +8,7 @@ use engine_core::Vec2;
 use engine_water::{Parcel, WaterWorld};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
+use crate::events::duck::arena::CourseGeometry;
 use crate::{
     DisplaySnapshot, SegmentState,
     events::EventPhase,
@@ -15,7 +16,9 @@ use crate::{
     layout::Layout,
 };
 use physics::{DT, FloatWorld};
-use surfaces::{DigitSurfaces, FLOOR_POOLS, PARCELS, RELEASE_SLOTS};
+#[cfg(test)]
+use surfaces::FLOOR_POOLS;
+use surfaces::{DigitSurfaces, PARCELS, RELEASE_SLOTS};
 
 pub const RAINING_TICKS: u64 = 20 * 60;
 pub const DRAIN_TICKS: u64 = 20 * 60;
@@ -28,13 +31,24 @@ const OPEN_TICKS: u64 = 36;
 const CLOSE_TICKS: u64 = 24;
 const DEPTH_TICKS: u64 = 30;
 
+pub(crate) enum RainArena {
+    Responsive(ResponsiveFloor),
+    /// No second Rapier world, responsive panels or passive duck. Water uses
+    /// the same immutable slab geometry as the player's mechanics world.
+    Course(CourseGeometry),
+}
+
 pub(crate) struct RainEvent {
     pub layout: Layout,
     pub water: WaterWorld,
     pub tick: u64,
     pub entry_x: f32,
     pub facing: f32,
-    pub floor: ResponsiveFloor,
+    arena: RainArena,
+    // A joined shower never spawns another passive actor, even after a visit
+    // ends. The current live player hull is supplied before the one water step.
+    player_joined: bool,
+    player_hull: Option<(Vec2, f64)>,
     seed: u64,
     source: source::RainSource,
     amount: ClockRainAmount,
@@ -58,6 +72,57 @@ impl RainEvent {
         amount: ClockRainAmount,
         display: DisplaySnapshot,
     ) -> Self {
+        Self::in_arena(
+            layout,
+            seed,
+            amount,
+            display,
+            RainArena::Responsive(ResponsiveFloor::new(FloorShape::clock(layout), 0.0)),
+            false,
+        )
+    }
+
+    pub fn on_course(
+        geometry: CourseGeometry,
+        seed: u64,
+        amount: ClockRainAmount,
+        display: DisplaySnapshot,
+    ) -> Self {
+        Self::in_arena(
+            geometry.layout,
+            seed,
+            amount,
+            display,
+            RainArena::Course(geometry),
+            true,
+        )
+    }
+
+    pub fn on_responsive_floor(
+        layout: Layout,
+        seed: u64,
+        amount: ClockRainAmount,
+        display: DisplaySnapshot,
+        floor: ResponsiveFloor,
+    ) -> Self {
+        Self::in_arena(
+            layout,
+            seed,
+            amount,
+            display,
+            RainArena::Responsive(floor),
+            true,
+        )
+    }
+
+    fn in_arena(
+        layout: Layout,
+        seed: u64,
+        amount: ClockRainAmount,
+        display: DisplaySnapshot,
+        arena: RainArena,
+        player_joined: bool,
+    ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let amount = if amount == ClockRainAmount::Varied {
             ClockRainAmount::ALL[rng.random_range(1..4)]
@@ -71,14 +136,29 @@ impl RainEvent {
             ClockRainAmount::Varied => unreachable!(),
         };
         let facing = if rng.random_bool(0.5) { 1.0 } else { -1.0 };
-        let (surfaces, water) = DigitSurfaces::new(layout, display);
+        let (surfaces, water) = match &arena {
+            RainArena::Course(geometry) => {
+                DigitSurfaces::with_floor(layout, display, geometry.water_pools())
+            }
+            RainArena::Responsive(floor) if floor.opening != 0.0 => {
+                DigitSurfaces::on_responsive_floor(layout, display, floor)
+            }
+            RainArena::Responsive(_) => DigitSurfaces::new(layout, display),
+        };
+        let phase = if player_joined {
+            ClockRainDuckPhase::NotSpawned
+        } else {
+            ClockRainDuckPhase::Waiting
+        };
         Self {
             layout,
             water,
             tick: 0,
             entry_x: -facing * layout.bounds_max.x * 0.8,
             facing,
-            floor: ResponsiveFloor::new(FloorShape::clock(layout), 0.0),
+            arena,
+            player_joined,
+            player_hull: None,
             seed,
             source: source::RainSource::new(rng),
             amount,
@@ -91,7 +171,7 @@ impl RainEvent {
             depth_ticks: 0,
             door_started: None,
             door_floor: layout.floor_y,
-            phase: ClockRainDuckPhase::Waiting,
+            phase,
             spawns: 0,
             floats: None,
             reclaimed_pose: None,
@@ -108,12 +188,55 @@ impl RainEvent {
         self.layout.pitch * 0.65
     }
 
+    pub fn course(&self) -> Option<&CourseGeometry> {
+        match &self.arena {
+            RainArena::Course(course) => Some(course),
+            _ => None,
+        }
+    }
+
+    pub fn responsive_floor(&self) -> Option<&ResponsiveFloor> {
+        match &self.arena {
+            RainArena::Responsive(floor) => Some(floor),
+            _ => None,
+        }
+    }
+
+    /// Transfer the passive actor's translation to a player, without advancing
+    /// water, the event clock or the panel actuator. Drop the old world first.
+    pub fn join_player(&mut self) -> Option<(Vec2, Vec2)> {
+        assert!(self.responsive_floor().is_some());
+        let motion = self.floats.take().and_then(|floats| {
+            floats
+                .duck
+                .as_ref()
+                .and_then(|hull| floats.world.motion(hull.body()))
+        });
+        if motion.is_some() {
+            self.phase = ClockRainDuckPhase::HandedOff;
+        } else if matches!(
+            self.phase,
+            ClockRainDuckPhase::Waiting | ClockRainDuckPhase::Opening
+        ) {
+            self.phase = ClockRainDuckPhase::NotSpawned;
+        }
+        // Preserve a historical exit/reclamation/handoff across later rejoins.
+        self.player_joined = true;
+        self.door_started = None;
+        self.reclaimed_pose = None;
+        motion.map(|m| (m.position, m.linear_velocity))
+    }
+
+    pub fn set_player_hull(&mut self, hull: Option<(Vec2, f64)>) {
+        self.player_hull = hull;
+    }
+
     pub fn entry_depth(&self) -> f32 {
         let half = physics::half_extents(self.layout).x;
         self.water
             .pools()
             .iter()
-            .take(FLOOR_POOLS)
+            .take(self.surfaces.floor_pools)
             .flat_map(|p| {
                 p.columns_in_range(
                     f64::from(self.entry_x - half),
@@ -132,7 +255,7 @@ impl RainEvent {
     }
 
     fn entry_surface(&self) -> f32 {
-        self.water.pools()[..FLOOR_POOLS]
+        self.water.pools()[..self.surfaces.floor_pools]
             .iter()
             .flat_map(|p| {
                 p.columns_in_range(
@@ -218,7 +341,14 @@ impl RainEvent {
         if pending <= 1e-9 {
             return;
         }
-        if self.water.parcels().len() + count > SOURCE_LIMIT {
+        // Course slabs may have more than the ordinary floor's two outlets.
+        // Reserve their first slices too, without enlarging the global budget.
+        let source_limit = if self.course().is_some() {
+            PARCELS - RELEASE_SLOTS - self.surfaces.floor_pools * 2
+        } else {
+            SOURCE_LIMIT
+        };
+        if self.water.parcels().len() + count > source_limit {
             self.source_limited += 1;
             return;
         }
@@ -246,6 +376,12 @@ impl RainEvent {
     }
 
     fn update_duck(&mut self) {
+        if self.player_joined {
+            return;
+        }
+        let RainArena::Responsive(floor) = &self.arena else {
+            return;
+        };
         let depth = self.entry_depth();
         if self.phase == ClockRainDuckPhase::Waiting {
             self.depth_ticks = if depth >= self.required_depth() {
@@ -269,7 +405,7 @@ impl RainEvent {
                 self.depth_ticks = 0;
                 self.door_started = None;
             } else {
-                let mut floats = FloatWorld::responsive(self.layout, &self.floor);
+                let mut floats = FloatWorld::responsive(self.layout, floor);
                 // Start just above the water, not intersecting a floor or pinned
                 // to its moving surface. Buoyancy takes over during integration.
                 floats.spawn(
@@ -285,7 +421,7 @@ impl RainEvent {
             }
         }
         if let Some(floats) = &mut self.floats {
-            floats.move_floor(&self.floor);
+            floats.move_floor(floor);
             floats.step(&self.water, 5.0);
             if floats.position().unwrap().y + floats.half_extents.length()
                 < self.layout.bounds_min.y
@@ -303,13 +439,17 @@ impl RainEvent {
         }
         self.tick += 1;
         self.emit_rain();
-        let hull = if self.phase() == EventPhase::Clearing {
+        let hull = if self.player_joined {
+            self.player_hull
+        } else if self.phase() == EventPhase::Clearing {
             None
         } else {
             self.duck_pose()
                 .map(|(p, _)| (p, f64::from(physics::half_extents(self.layout).length())))
         };
-        self.floor.step(&mut self.water, DT, hull);
+        if let RainArena::Responsive(floor) = &mut self.arena {
+            floor.step(&mut self.water, DT, hull);
+        }
         self.water.step(DT).expect("fixed rain water step");
         if self.phase() == EventPhase::Clearing {
             if self.floats.is_some() {
@@ -336,6 +476,8 @@ impl RainEvent {
             .and_then(|f| f.duck.as_ref().and_then(|d| f.world.motion(d.body())));
         let vector = |v: Vec2| [(v.x * 1000.0).round() as i32, (v.y * 1000.0).round() as i32];
         ClockRainState {
+            player_course: self.course().is_some(),
+            player_joined: self.player_joined,
             seed: self.seed,
             amount: self.amount,
             requested_microunits: micro(self.budget),
@@ -350,7 +492,7 @@ impl RainEvent {
             water_limited_ticks: s.capacity_limited_ticks,
             surface_digits: self.surfaces.digits,
             surface_water_microunits: micro(
-                self.water.pools()[FLOOR_POOLS..]
+                self.water.pools()[self.surfaces.floor_pools..]
                     .iter()
                     .flat_map(|p| p.columns())
                     .map(|c| c.volume)
@@ -360,10 +502,23 @@ impl RainEvent {
             surface_impacts: s.impact_transfers,
             surface_change_pending: self.surfaces.pending,
             surface_change_deferrals: self.surfaces.deferrals,
-            floor_open_milli: (self.floor.opening * 1000.0).round() as u32,
-            floor_load_milli: (self.floor.load * 1000.0).round() as u32,
-            floor_motion_deferrals: self.floor.deferrals,
-            floor_clearance_holds: self.floor.clearance_holds,
+            floor_open_milli: self
+                .responsive_floor()
+                .map_or(0, |f| (f.opening * 1000.0).round() as u32),
+            floor_load_milli: (self.course().map_or_else(
+                || self.responsive_floor().unwrap().load,
+                |geometry| {
+                    self.water.pools()[..self.surfaces.floor_pools]
+                        .iter()
+                        .flat_map(|p| p.columns())
+                        .map(|c| c.volume)
+                        .sum::<f64>()
+                        / f64::from(geometry.width)
+                },
+            ) * 1000.0)
+                .round() as u32,
+            floor_motion_deferrals: self.responsive_floor().map_or(0, |f| f.deferrals),
+            floor_clearance_holds: self.responsive_floor().map_or(0, |f| f.clearance_holds),
             entry_depth_milli: (self.entry_depth() * 1000.0).round() as u32,
             required_depth_milli: (self.required_depth() * 1000.0).round() as u32,
             duck_phase: self.phase,

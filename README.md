@@ -41,12 +41,23 @@ The local launcher includes the following scenarios and presets:
   a bounded pool that drains through the floor before the face reforms.
   Duck runs and jumps a tiny seeded obstacle course beneath the readable clock,
   using one dynamic body and guaranteed arena cleanup.
+  **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
+  a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
+  (Picade: bottom-middle yellow). Falling, Meltdown, Color Cycle, Marquee, Digit Slide and Rain
+  continue alongside the player. Rain shares the stable course, or join a live
+  shower on its moving floor without clearing the water. The duck walks/jumps
+  on panels, floats, drifts and paddles with the joystick. Falling bars share
+  the duck's physics world: they can push it and provide jump surfaces. Meltdown's
+  individual blocks collide too, then become water on floor contact. Only the
+  automatic AI Duck course (and developer water labs) waits for the visit.
+  **N** / right shoulder / Picade upper-right blue starts the next compatible
+  event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
   Digit Slide rolls changed digits on minute boundaries without physics.
   Save custom text through `clock message` in the CLI or the Clock settings file.
-  **Pause → Clock Controls** (or the
-  on-face touch button) changes live settings and offers **Preview & Resume**.
+  Tap the clock face or press Start/P/Esc to pause. **Pause → Clock Controls**
+  changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU

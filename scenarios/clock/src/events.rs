@@ -1,7 +1,7 @@
 mod color_cycle;
 pub(crate) mod digit_slide;
 pub(crate) mod duck;
-mod falling;
+pub(crate) mod falling;
 pub(crate) mod marquee;
 pub(crate) mod meltdown;
 #[cfg(test)]
@@ -103,6 +103,20 @@ pub struct EventDefinition {
     pub duration_ticks: u64,
     /// Automatic reuse delay measured from completion or cancellation.
     pub cooldown_ticks: u64,
+}
+
+impl EventDefinition {
+    /// These events claim physical floor geometry, either privately or shared
+    /// with a player. Face-only animations do not claim the arena.
+    pub const fn uses_floor(&self) -> bool {
+        matches!(
+            self.kind,
+            ClockEventKind::Falling
+                | ClockEventKind::Meltdown
+                | ClockEventKind::Duck
+                | ClockEventKind::Rain
+        )
+    }
 }
 
 pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
@@ -227,10 +241,58 @@ impl ActiveEvent {
         }
     }
 
+    pub fn shares_player_arena(&self) -> bool {
+        match self {
+            Self::Falling(event) => event.shares_player_arena(),
+            Self::Meltdown(event) => event.shares_player_arena(),
+            _ => false,
+        }
+    }
+
+    pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
+        match self {
+            Self::Falling(event) => event.vacant_arena(),
+            Self::Meltdown(event) => event.vacant_arena(),
+            _ => None,
+        }
+    }
+
+    pub fn arena_opacity(&self) -> f32 {
+        match self {
+            Self::Falling(event) => event.arena_opacity(),
+            Self::Meltdown(event) => event.arena_opacity(),
+            _ => 1.0,
+        }
+    }
+
+    pub fn rejoin_arena(&mut self, session: u64, seat: u8) -> Option<Box<duck::DuckEvent>> {
+        match self {
+            Self::Falling(event) => event.rejoin(session, seat),
+            Self::Meltdown(event) => event.rejoin(session, seat),
+            _ => None,
+        }
+    }
+
+    pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
+        match self {
+            Self::Falling(event) => event.retain_arena(duck),
+            Self::Meltdown(event) => event.retain_arena(duck),
+            _ => unreachable!("only leased mechanics arenas outlive the visit"),
+        }
+    }
+
+    pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
+        match self {
+            Self::Falling(event) => event.release(player),
+            Self::Meltdown(event) => event.release(player),
+            _ => (),
+        }
+    }
+
     /// Returns true when the event has finished.
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
         match self {
-            Self::Falling(event) => event.step(context),
+            Self::Falling(event) => event.step(context, None),
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step(context),
             Self::Duck(event) => event.step(),

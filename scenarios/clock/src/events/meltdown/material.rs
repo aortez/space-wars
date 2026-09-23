@@ -58,6 +58,40 @@ impl MeltCell {
     }
 }
 
+/// A contacted rigid block becomes a small liquid footprint, not a teleport to
+/// a guessed pool. The ordinary swept water catches decide which ledge/panel
+/// receives each part, including lower slabs and real gaps. Three area samples
+/// for a digit square, one for a tiny AM/PM pixel; no secondary splash budget.
+/// Capacity is checked for the WHOLE source before changing either material.
+pub(super) fn liquefy(cell: &MeltCell, water: &mut WaterWorld, area: f64, layout: Layout) -> bool {
+    let samples = if cell.meridiem { 1 } else { 3 };
+    if water.parcels().len() + samples > MAX_SPILL_PARCELS {
+        return false;
+    }
+    let extent = cell.extent(layout.pitch);
+    let mut velocity = cell.velocity;
+    if velocity.length() > 800.0 {
+        velocity *= 800.0 / velocity.length();
+    }
+    for i in 0..samples {
+        let offset = ((i as f32 + 0.5) / samples as f32 - 0.5) * extent.x * 1.5;
+        let x = (cell.position.x + offset).clamp(layout.bounds_min.x, layout.bounds_max.x);
+        water
+            .add_falling(Parcel {
+                position: Vec2::new(x, cell.position.y),
+                velocity,
+                volume: area / samples as f64,
+                duration: 1.0 / 60.0,
+                horizontal_bounds: Some([
+                    f64::from(layout.bounds_min.x),
+                    f64::from(layout.bounds_max.x),
+                ]),
+            })
+            .expect("preflighted liquid footprint");
+    }
+    true
+}
+
 /// Vertical support height of a rotated square over the two finite panel tops.
 /// Clip each edge to each panel's X interval, then evaluate its endpoints: the
 /// separation of two straight edges is linear. Unlike an AABB test this cannot

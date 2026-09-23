@@ -135,10 +135,16 @@ impl Spill {
             return None;
         }
         if matches!(self.source, SpillSource::Junction { .. })
-            && half_width > 2.0 * tail.length().max(head.length())
+            && (half_width > 2.0 * tail.length().max(head.length())
+                || half_width.max(tail.length()).max(head.length())
+                    > 2.0 * (parcel.volume as f32).sqrt())
         {
             // A migrating junction can squeeze two material faces together.
-            // Do not stretch that compressed volume into a horizontal spike.
+            // Both faces may themselves be wide after opposing flows mix, so
+            // an endpoint-relative test alone misses the resulting thin spike.
+            // Bound this merged slice against its own area scale as well. The
+            // compact fallback still represents all its volume; steady outlet
+            // faces and all transport/mixing state are untouched.
             return None;
         }
         let quads = pieces(half_width);

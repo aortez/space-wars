@@ -1120,6 +1120,21 @@ fn install_ui_navigation(window: &MainWindow) {
 }
 
 fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
+    let clock_input = Rc::clone(&input);
+    window.on_clock_input_key(move |code, pressed| {
+        let key = match code {
+            0 => input::GameKey::NesLeft,
+            1 => input::GameKey::NesRight,
+            2 => input::GameKey::P1Laser,
+            3 => input::GameKey::NesA,
+            _ => return,
+        };
+        if pressed {
+            clock_input.borrow_mut().press(key);
+        } else {
+            clock_input.borrow_mut().release(key);
+        }
+    });
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
@@ -1141,9 +1156,13 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
             || window.get_ingame_menu_visible()
             || window.get_game_over_visible()
             || window.get_touch_test_visible();
-        if code == 12 {
+        if code == 12 || code == 13 {
             if !menu && window.get_launcher_scenario() == "clock" {
-                input.borrow_mut().request_clock_next_event();
+                if code == 12 {
+                    input.borrow_mut().request_clock_next_event();
+                } else {
+                    input.borrow_mut().request_clock_player_duck(1);
+                }
             }
             return;
         }

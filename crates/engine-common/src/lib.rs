@@ -369,10 +369,18 @@ pub enum ClockRainDuckPhase {
     Exited,
     NotSpawned,
     Reclaimed,
+    HandedOff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockRainState {
+    /// Rain uses the stable player course instead of its responsive floor and
+    /// passive duck. The course outlives a dismissed player until Rain ends.
+    #[serde(default)]
+    pub player_course: bool,
+    /// This event has hosted a player; passive spawning remains suppressed.
+    #[serde(default)]
+    pub player_joined: bool,
     pub seed: u64,
     /// The resolved amount for this visit; settings may still say Varied.
     pub amount: ClockRainAmount,
@@ -654,6 +662,7 @@ pub enum ClockDuckOutcome {
     Exited,
     Fell,
     TimedOut,
+    Dismissed,
 }
 
 /// Movement personality, independent of event scheduling and course geometry.
@@ -778,6 +787,28 @@ pub struct ClockDuckState {
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]
     pub navigation: Option<ClockDuckNavigationState>,
+}
+
+/// A player visit has its own identity/lifetime, independent of timed events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockPlayerDuckState {
+    pub session_id: u64,
+    /// One-based controller seat; keyboard controls belong to player one.
+    pub player: u8,
+    pub phase: String,
+    pub phase_tick: u64,
+    pub move_milli: i16,
+    pub jump_held: bool,
+    pub facing_right: bool,
+    /// Some(opening) for the moving Rain panels, None for a fixed course.
+    #[serde(default)]
+    pub floor_open_milli: Option<u32>,
+    #[serde(default)]
+    pub submerged_milli: u32,
+    /// Screen-relative physical velocity, including drift from water.
+    #[serde(default)]
+    pub velocity_milli: Option<[i32; 2]>,
+    pub duck: ClockDuckState,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

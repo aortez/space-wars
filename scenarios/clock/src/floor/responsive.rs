@@ -1,6 +1,10 @@
 //! Slow, volume-driven floor actuator shared by Rain, Meltdown and the water test bed.
 //! This is kinematic scenery, not a simulated pressure/hinge mechanism.
 use engine_core::Vec2;
+use engine_rapier::world::{
+    BodyId, BodyKind, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId,
+    PhysicsWorld,
+};
 use engine_water::{Boundary, PoolGeometry, PoolSpec, WaterError, WaterWorld};
 
 use crate::layout::Layout;
@@ -32,24 +36,62 @@ impl FloorShape {
     }
 
     pub fn pools(self) -> [PoolSpec; 2] {
+        self.pools_at(0.0)
+    }
+
+    /// Initialize a new shower at the retained panels' actual pose. This is
+    /// empty-water construction, not an instantaneous move of occupied pools.
+    pub fn pools_at(self, opening: f64) -> [PoolSpec; 2] {
         assert!((1..=MAX_COLUMNS).contains(&self.columns));
+        let gap = opening * self.max_gap;
+        let outlet = self.outlet(opening);
         std::array::from_fn(|side| PoolSpec {
-            left: if side == 0 { -self.half_width } else { 0.0 },
-            column_width: self.half_width / self.columns as f64,
-            bed: vec![self.floor_y; self.columns],
-            boundaries: [Boundary::Closed; 2],
+            left: if side == 0 { -self.half_width } else { gap },
+            column_width: (self.half_width - gap) / self.columns as f64,
+            bed: self.bed_edges(side, opening)[..self.columns]
+                .iter()
+                .map(|e| e[0].min(e[1]))
+                .collect(),
+            boundaries: if side == 0 {
+                [Boundary::Closed, outlet]
+            } else {
+                [outlet, Boundary::Closed]
+            },
         })
     }
 
     pub fn configure(self, water: &mut WaterWorld) {
-        let flat = [[self.floor_y; 2]; MAX_COLUMNS];
+        self.configure_at(water, 0.0);
+    }
+
+    pub fn configure_at(self, water: &mut WaterWorld, opening: f64) {
         for side in 0..2 {
             water
-                .configure_sloped_bed(side, &flat[..self.columns])
+                .configure_sloped_bed(side, &self.bed_edges(side, opening)[..self.columns])
                 .unwrap();
             // Free outfalls follow the moving lip. Moving outlet channels
             // every tick would detach material history and open seams.
             water.set_outlet_channel(side, 1 - side, None).unwrap();
+        }
+    }
+
+    fn bed_edges(self, side: usize, opening: f64) -> [[f64; 2]; MAX_COLUMNS] {
+        let drop = opening * self.max_drop;
+        std::array::from_fn(|i| {
+            std::array::from_fn(|edge| {
+                let fraction = (i + edge) as f64 / self.columns as f64;
+                self.floor_y - drop * if side == 0 { fraction } else { 1.0 - fraction }
+            })
+        })
+    }
+
+    fn outlet(self, opening: f64) -> Boundary {
+        if opening * self.max_gap > 0.001 {
+            Boundary::Spill {
+                lip: self.floor_y - opening * self.max_drop,
+            }
+        } else {
+            Boundary::Closed
         }
     }
 
@@ -97,27 +139,10 @@ impl FloorShape {
         opening: f64,
         dt: f64,
     ) -> Result<(), WaterError> {
-        let drop = opening * self.max_drop;
         let gap = opening * self.max_gap;
-        let left: [[f64; 2]; MAX_COLUMNS] = std::array::from_fn(|i| {
-            [
-                self.floor_y - drop * i as f64 / self.columns as f64,
-                self.floor_y - drop * (i + 1) as f64 / self.columns as f64,
-            ]
-        });
-        let right: [[f64; 2]; MAX_COLUMNS] = std::array::from_fn(|i| {
-            [
-                self.floor_y - drop + drop * i as f64 / self.columns as f64,
-                self.floor_y - drop + drop * (i + 1) as f64 / self.columns as f64,
-            ]
-        });
-        let outlet = if gap > 0.001 {
-            Boundary::Spill {
-                lip: self.floor_y - drop,
-            }
-        } else {
-            Boundary::Closed
-        };
+        let left = self.bed_edges(0, opening);
+        let right = self.bed_edges(1, opening);
+        let outlet = self.outlet(opening);
         water.move_sloped_pools(
             &[
                 PoolGeometry {
@@ -140,6 +165,7 @@ impl FloorShape {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct ResponsiveFloor {
     pub shape: FloorShape,
     pub opening: f64,
@@ -173,17 +199,6 @@ impl ResponsiveFloor {
             .map(|c| c.volume)
             .sum::<f64>()
             / (s.half_width * 2.0);
-        self.filtered_load += (self.load - self.filtered_load) * dt / (0.35 + dt);
-        let mut target = if self.load < 1e-6 && self.filtered_load < 1e-4 {
-            0.0
-        } else {
-            (self.filtered_load / s.load_depth).clamp(0.0, 1.0).sqrt()
-        };
-        let clearance = hull.filter(|(p, radius)| {
-            (p.x as f64).abs() < self.opening * s.max_gap + radius + 2.0
-                && p.y as f64 - radius < s.floor_y + 2.0
-                && p.y as f64 + radius > s.floor_y - self.opening * s.max_drop - s.thickness - 2.0
-        });
         let incoming_volume: f64 = water
             .parcels()
             .iter()
@@ -205,6 +220,39 @@ impl ResponsiveFloor {
             })
             .map(|(_, p)| p.volume)
             .sum();
+        let next = self.next_opening(dt, hull, incoming_volume);
+        if (next - self.opening).abs() > 1e-9 {
+            match s.apply(water, next, dt) {
+                Ok(()) => self.opening = next,
+                Err(WaterError::Capacity) => self.deferrals += 1,
+                Err(e) => panic!("bounded responsive floor: {e}"),
+            }
+        }
+    }
+
+    /// After an event releases its water, the live player retains the panels.
+    /// Close at the same bounded speed and keep the passage clear of its hull.
+    pub fn step_dry(&mut self, dt: f64, hull: Option<(Vec2, f64)>) {
+        self.load = 0.0;
+        self.opening = self.next_opening(dt, hull, 0.0);
+    }
+
+    fn next_opening(&mut self, dt: f64, hull: Option<(Vec2, f64)>, incoming_volume: f64) -> f64 {
+        let s = self.shape;
+        self.filtered_load += (self.load - self.filtered_load) * dt / (0.35 + dt);
+        let mut target = if self.load < 1e-6 && self.filtered_load < 1e-4 {
+            0.0
+        } else {
+            (self.filtered_load / s.load_depth).clamp(0.0, 1.0).sqrt()
+        };
+        let clearance = hull.filter(|(p, radius)| {
+            // A closed seam is a supporting floor, not an occupied passage.
+            // Standing there must not open the hatch in an otherwise dry room.
+            self.opening > 1e-6
+                && (p.x as f64).abs() < self.opening * s.max_gap + radius + 2.0
+                && p.y as f64 - radius < s.floor_y + 2.0
+                && p.y as f64 + radius > s.floor_y - self.opening * s.max_drop - s.thickness - 2.0
+        });
         // A handful of vanishing residual films must not repeatedly extend the
         // delay at the storm's peak opening. Measurable nearby runoff still
         // delays closing; it is never included in the floor-weight signal.
@@ -223,15 +271,42 @@ impl ResponsiveFloor {
         // change in slope caused by horizontal retraction of the inner edge.
         let safe_step = 400.0 * dt * dt * 0.4 / s.max_drop * (1.0 - s.max_gap / s.half_width);
         let speed = if target > self.opening { 0.16 } else { 0.06 };
-        let next = self.opening
+        self.opening
             + (target - self.opening)
-                .clamp(-(speed * dt).min(safe_step), (speed * dt).min(safe_step));
-        if (next - self.opening).abs() > 1e-9 {
-            match s.apply(water, next, dt) {
-                Ok(()) => self.opening = next,
-                Err(WaterError::Capacity) => self.deferrals += 1,
-                Err(e) => panic!("bounded responsive floor: {e}"),
-            }
+                .clamp(-(speed * dt).min(safe_step), (speed * dt).min(safe_step))
+    }
+
+    /// The passive and player duck use identical panel poses and persistent IDs.
+    pub fn insert_panels(&self, world: &mut PhysicsWorld) {
+        for side in 0..2 {
+            let id = PhysicsId::new(1001 + side as u64);
+            let (position, angle) = self.shape.panel_pose(side, self.opening);
+            let half = self.shape.panel_half_extents();
+            assert!(world.insert_body(
+                BodyId::new(id, BodyRole::PRIMARY),
+                BodySpec {
+                    kind: BodyKind::KinematicPosition,
+                    position,
+                    angle,
+                    ..BodySpec::default()
+                },
+                &[ColliderSpec::cuboid(
+                    ColliderId::new(id, ColliderRole::PRIMARY, 0),
+                    half.x,
+                    half.y
+                )]
+            ));
+        }
+    }
+
+    pub fn move_panels(&self, world: &mut PhysicsWorld) {
+        for side in 0..2 {
+            let (position, angle) = self.shape.panel_pose(side, self.opening);
+            assert!(world.set_next_kinematic_pose(
+                BodyId::new(PhysicsId::new(1001 + side as u64), BodyRole::PRIMARY),
+                position,
+                angle
+            ));
         }
     }
 }

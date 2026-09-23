@@ -67,7 +67,52 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
-    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
+    if let Some(event) = shared_mechanics_arena(state) {
+        let opacity = state.active_event.as_ref().unwrap().arena_opacity();
+        if let Some(panels) = event.responsive_floor() {
+            floor::responsive(&mut frame, panels, layout, opacity);
+        } else {
+            render_floor(
+                &mut frame,
+                crate::floor::FloorGeometry::closed(layout),
+                layout.pitch,
+                1.0 - opacity,
+            );
+            duck::render_arena(&mut frame, event, opacity);
+        }
+    } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event
+        && let Some(course) = event.course()
+    {
+        // A shower owns a course claim, not a second responsive floor. Keep it
+        // opaque while the player is present, including Rain's clearing phase.
+        let opacity = if state.player_duck.is_some() {
+            1.0
+        } else {
+            event.opacity()
+        };
+        render_floor(
+            &mut frame,
+            crate::floor::FloorGeometry::closed(layout),
+            layout.pitch,
+            1.0 - opacity,
+        );
+        duck::shared_course(&mut frame, course, opacity);
+    } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
+        floor::responsive(
+            &mut frame,
+            event.responsive_floor().expect("responsive rain"),
+            layout,
+            if state.player_duck.is_some() {
+                1.0
+            } else {
+                event.opacity()
+            },
+        );
+    } else if let Some(duck) = &state.player_duck
+        && let Some(panels) = duck.responsive_floor()
+    {
+        floor::responsive(&mut frame, panels, layout, duck.course_opacity());
+    } else if let Some(event) = state.duck_scene() {
         // The custom course owns its floor, including the entrance/exit fade.
         // This backdrop never adds a collider across the course's physical pit.
         render_floor(
@@ -76,8 +121,6 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             layout.pitch,
             1.0 - event.course_opacity(),
         );
-    } else if let Some(crate::events::ActiveEvent::Rain(event)) = &state.active_event {
-        floor::responsive(&mut frame, &event.floor, layout, event.opacity());
     } else if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         if let Some(floor) = &event.floor {
             floor::responsive(&mut frame, floor, layout, event.floor_opacity());
@@ -110,6 +153,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             }
         }
         marquee::render(&mut frame, event, layout);
+        render_player_and_course(&mut frame, state, layout);
         return frame;
     }
     render_segments(&mut frame, state, layout);
@@ -119,12 +163,43 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         meltdown::render(&mut frame, event, layout);
     }
-    if let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event {
-        duck::render(&mut frame, event, state.config.duck_debug_overlay);
-    }
     render_colon(&mut frame, state, layout);
     render_meridiem(&mut frame, state, layout);
+    render_player_and_course(&mut frame, state, layout);
     frame
+}
+
+fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    // Kept outside the marquee's face fade and early return. The duck/course
+    // retain their own opacity and geometry while clock content transforms.
+    if let Some(event) = state.duck_scene() {
+        let shared = matches!(&state.active_event, Some(crate::events::ActiveEvent::Rain(rain)) if rain.course().is_some());
+        if shared || shared_mechanics_arena(state).is_some() || event.responsive_floor().is_some() {
+            duck::render_with_course(frame, event, state.config.duck_debug_overlay, false);
+        } else {
+            duck::render(frame, event, state.config.duck_debug_overlay);
+        }
+    }
+    if let Some((_, player)) = state.player_duck_session() {
+        frame.push_primitive(
+            100,
+            RenderPrimitive::Text(RenderText {
+                position: RenderPoint::new(layout.bounds_max.x - 60.0, layout.bounds_max.y - 24.0),
+                text: format!("P{player} DUCK"),
+                color: LABEL_COLOR,
+                size: 14.0,
+                anchor: TextAnchor::Center,
+            }),
+        );
+    }
+}
+
+fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::DuckEvent> {
+    let event = state.active_event.as_ref()?;
+    event
+        .shares_player_arena()
+        .then(|| state.player_duck.as_deref().or(event.vacant_arena()))
+        .flatten()
 }
 
 fn render_floor(

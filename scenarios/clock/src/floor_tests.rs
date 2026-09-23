@@ -1,4 +1,35 @@
 use super::*;
+
+#[test]
+fn shared_course_floor_is_released_only_after_both_claims_end_in_either_order() {
+    for kind in [
+        ClockEventKind::Rain,
+        ClockEventKind::Falling,
+        ClockEventKind::Meltdown,
+    ] {
+        for event_first in [true, false] {
+            let mut floor = FloorManager::default();
+            floor.acquire_player();
+            floor.acquire_player_event(kind);
+            floor.release(ClockEventKind::ColorCycle);
+            assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+            if event_first {
+                floor.release(kind);
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.release_player();
+            } else {
+                floor.release_player();
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.acquire_player(); // A new visit can reuse the occupied arena.
+                floor.release_player();
+                floor.release(kind);
+            }
+            assert_eq!(floor.mode(), ClockFloorMode::Closed);
+            floor.acquire(ClockEventKind::Falling);
+            assert_eq!(floor.mode(), ClockFloorMode::DrainOpen);
+        }
+    }
+}
 use engine_common::ClockFloorMode;
 use engine_water::Boundary;
 use floor::{FloorManager, test_drain};
@@ -189,6 +220,31 @@ fn floor_slabs_and_water_boundaries_share_the_same_opening_at_all_aspects() {
 #[should_panic(expected = "finish the previous floor owner first")]
 fn floor_requests_cannot_silently_overwrite_an_existing_owner() {
     let mut floor = FloorManager::default();
-    floor.acquire(ClockEventKind::ColorCycle);
+    floor.acquire(ClockEventKind::Falling);
     floor.acquire(ClockEventKind::Rain);
+}
+
+#[test]
+fn face_events_and_unrelated_cleanup_cannot_release_the_player_floor() {
+    let mut floor = FloorManager::default();
+    floor.acquire_player();
+    for kind in [
+        ClockEventKind::ColorCycle,
+        ClockEventKind::Marquee,
+        ClockEventKind::DigitSlide,
+    ] {
+        floor.acquire(kind);
+        floor.release(kind);
+        assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    }
+    floor.release(ClockEventKind::Duck);
+    assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    floor.release_player();
+    assert_eq!(floor.mode(), ClockFloorMode::Closed);
+    floor.acquire(ClockEventKind::Rain);
+    floor.release_player();
+    floor.release(ClockEventKind::Falling);
+    assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    floor.release(ClockEventKind::Rain);
+    assert_eq!(floor.mode(), ClockFloorMode::Closed);
 }

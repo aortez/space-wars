@@ -18,6 +18,8 @@ mod floor_tests;
 #[cfg(test)]
 mod meridiem_tests;
 #[cfg(test)]
+mod player_tests;
+#[cfg(test)]
 mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -33,7 +35,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Clock follows local device time. Tap the face, or press Start or P/Esc, to pause; choose Clock Controls to change settings. N, right shoulder (gamepad), or the upper-right blue button (Picade) starts the next enabled event, replacing the current animation. Hold does not repeat. Works with automatic events Off. Calm runs occasional events; Demo runs frequent events. Preview & Resume can also preview disabled events. Automatic and manual launches use the same controls. Settings are saved. Pause freezes animation.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck on/off: D / Y (North) / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow; ground contact needed.\nSpawning pad owns duck; keys=P1. Exit or dismiss.\nVisual events and Rain keep your duck. Neutral floats/drifts.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 
@@ -148,12 +150,18 @@ impl ClientScenario for ClockClientScenario {
 
     fn map_input(&self, input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
         let next_event = input.take_clock_next_event_requested();
+        let player_duck = input.take_clock_player_duck_requested();
         if self.benchmark.is_some() {
             return Vec::new();
         }
         let mut actions = self.actions_for_reading(local_clock_reading());
         if next_event {
             actions.push(ClockAction::next_event());
+        } else if let Some(player) = player_duck {
+            actions.push(ClockAction::toggle_player_duck(player));
+        }
+        if let Some(controls) = input.clock_duck_input(self.state.player_duck_session()) {
+            actions.push(ClockAction::player_duck_input(controls));
         }
         actions
     }
@@ -208,6 +216,7 @@ impl ClientScenario for ClockClientScenario {
                     duration_ticks: event.duration_ticks,
                     cooldown_ticks: event.cooldown_ticks,
                     enabled: self.state.event_enabled(event.kind),
+                    blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),
@@ -220,6 +229,8 @@ impl ClientScenario for ClockClientScenario {
             floor: self.state.floor_mode(),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
+            player_duck: self.state.player_duck_state(),
+            automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
             rain: self.state.rain_state(),

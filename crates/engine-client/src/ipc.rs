@@ -659,6 +659,15 @@ fn validate_clock_trigger(
             ControlFailureCode::WrongScreen,
             "Resume Clock gameplay before triggering an event",
         ))
+    } else if clock
+        .events
+        .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_player)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            "This event needs the player's arena; dismiss the duck first",
+        ))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
@@ -1055,6 +1064,76 @@ fn write_rgba_png(
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn player_duck_event_restrictions_are_public_and_trigger_failures_are_explicit() {
+        use crate::client_scenarios::{ScenarioStartMode, registration};
+        use crate::render::Viewport;
+        use engine_common::{ClockEventKind, Settings};
+        use scenario_clock::{ClockAction, ClockReading};
+        let mut scenario = registration("clock")
+            .unwrap()
+            .create(
+                42,
+                &Settings::default(),
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+            )
+            .unwrap();
+        scenario.step(
+            &[
+                ClockAction::set_reading(ClockReading::new(12, 34, 56).unwrap()),
+                ClockAction::toggle_player_duck(1),
+            ],
+            Duration::ZERO,
+        );
+        let mut clock = scenario.clock_state().unwrap();
+        clock.scenario_revision = 7;
+        let mut ui = UiState {
+            schema_version: UI_STATE_SCHEMA_VERSION,
+            revision: 1,
+            screen: UiScreen::Gameplay,
+            active_scenario: Some("clock".into()),
+            selected_scenario: "clock".into(),
+            selected_control: None,
+            controls: vec![],
+            actions: vec![],
+            scenario_revision: Some(7),
+            paused: false,
+            benchmark_active: false,
+            error: None,
+        };
+        assert_eq!(
+            ClockState::from_json(&clock.to_json().unwrap()).unwrap(),
+            clock
+        );
+        for event in ClockEventKind::ALL {
+            let request = ClockTriggerRequest::new(&clock, event);
+            let result = validate_clock_trigger(&request, &ui, &clock);
+            if clock
+                .events
+                .iter()
+                .find(|entry| entry.kind == event)
+                .unwrap()
+                .blocked_by_player
+            {
+                let failure = result.unwrap_err();
+                assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+                assert!(failure.message.contains("dismiss the duck"));
+                assert_eq!(failure.current_clock_state, Some(clock.clone()));
+            } else {
+                result.unwrap();
+            }
+        }
+        let request = ClockTriggerRequest::new(&clock, ClockEventKind::Marquee);
+        ui.screen = UiScreen::PauseMain;
+        assert_eq!(
+            validate_clock_trigger(&request, &ui, &clock)
+                .unwrap_err()
+                .code,
+            ControlFailureCode::WrongScreen
+        );
+    }
 
     #[test]
     fn busy_screen_exposes_read_only_progress_and_rejects_launch_actions() {

@@ -8,22 +8,30 @@ use rand::{Rng, rngs::StdRng};
 use crate::{
     SegmentId, SegmentRepresentation, SegmentState, digits,
     floor::DrainGeometry,
+    layout::Layout,
     meridiem::{LetterState, PIXEL_SIZE},
 };
 
 pub(crate) struct FallingWorld {
     world: PhysicsWorld,
+    bodies: FallingBodies,
 }
 
-fn body_id(id: SegmentId) -> BodyId {
+/// One bounded batch, reusable in the standalone arena or a player's world.
+/// These IDs never overlap the duck (1), course/panels (1000s), or wall (2000).
+pub(crate) struct FallingBodies {
+    entities: Vec<PhysicsId>,
+}
+
+pub(crate) fn body_id(id: SegmentId) -> BodyId {
     BodyId::new(
-        PhysicsId::new(1 + u64::from(id.digit_slot) * 7 + id.kind as u64),
+        PhysicsId::new(3001 + u64::from(id.digit_slot) * 7 + id.kind as u64),
         BodyRole::PRIMARY,
     )
 }
 
 fn letter_body_id(slot: usize) -> BodyId {
-    BodyId::new(PhysicsId::new(32 + slot as u64), BodyRole::PRIMARY)
+    BodyId::new(PhysicsId::new(3032 + slot as u64), BodyRole::PRIMARY)
 }
 
 impl FallingWorld {
@@ -75,6 +83,45 @@ impl FallingWorld {
                 )],
             ));
         }
+        let bodies = FallingBodies::insert(&mut world, layout, segments, letters, rng);
+        Self { world, bodies }
+    }
+
+    pub fn step(&mut self, segments: &mut [SegmentState], letters: &mut [LetterState]) {
+        self.world.step(1.0 / 60.0);
+        self.bodies.synchronize(&self.world, segments, letters);
+    }
+
+    pub fn body_count(&self) -> usize {
+        self.world.body_count()
+    }
+    pub fn collider_count(&self) -> usize {
+        self.world.collider_count()
+    }
+}
+
+impl FallingBodies {
+    pub fn insert(
+        world: &mut PhysicsWorld,
+        layout: Layout,
+        segments: &mut [SegmentState],
+        letters: &[LetterState],
+        rng: &mut StdRng,
+    ) -> Self {
+        let mut entities = Vec::with_capacity(30);
+        let lit = segments.iter().filter(|s| s.lit);
+        let collider_count = lit
+            .clone()
+            .map(|s| digits::cells(s.id.kind).len())
+            .sum::<usize>()
+            + letters
+                .iter()
+                .map(|l| l.glyph.cells().count())
+                .sum::<usize>();
+        world.reserve(lit.count() + letters.len(), collider_count, 0);
+        // Preserve Falling's established acceleration without changing the
+        // smaller duck's calibrated gravity/jump on narrow displays.
+        let gravity_scale = 400.0 / -world.gravity().y;
         for segment in segments.iter_mut().filter(|segment| segment.lit) {
             let id = body_id(segment.id);
             let position = layout.segment_center(segment.id);
@@ -97,6 +144,7 @@ impl FallingWorld {
                 id,
                 BodySpec {
                     position,
+                    gravity_scale,
                     linear_velocity: Vec2::new(
                         rng.random_range(-45.0..45.0),
                         rng.random_range(15.0..70.0)
@@ -109,6 +157,7 @@ impl FallingWorld {
                 },
                 &colliders
             ));
+            entities.push(id.entity);
             segment.representation = SegmentRepresentation::Rigid {
                 position,
                 angle: 0.0,
@@ -138,6 +187,7 @@ impl FallingWorld {
                 id,
                 BodySpec {
                     position: letter.position,
+                    gravity_scale,
                     linear_velocity: Vec2::new(
                         rng.random_range(-45.0..45.0),
                         rng.random_range(15.0..70.0)
@@ -150,14 +200,19 @@ impl FallingWorld {
                 },
                 &colliders
             ));
+            entities.push(id.entity);
         }
-        Self { world }
+        Self { entities }
     }
 
-    pub fn step(&mut self, segments: &mut [SegmentState], letters: &mut [LetterState]) {
-        self.world.step(1.0 / 60.0);
+    pub fn synchronize(
+        &self,
+        world: &PhysicsWorld,
+        segments: &mut [SegmentState],
+        letters: &mut [LetterState],
+    ) {
         for segment in segments {
-            if let Some(motion) = self.world.motion(body_id(segment.id)) {
+            if let Some(motion) = world.motion(body_id(segment.id)) {
                 segment.representation = SegmentRepresentation::Rigid {
                     position: motion.position,
                     angle: motion.angle,
@@ -165,8 +220,7 @@ impl FallingWorld {
             }
         }
         for (slot, letter) in letters.iter_mut().enumerate() {
-            let motion = self
-                .world
+            let motion = world
                 .motion(letter_body_id(slot))
                 .expect("live falling letter");
             letter.position = motion.position;
@@ -174,10 +228,9 @@ impl FallingWorld {
         }
     }
 
-    pub fn body_count(&self) -> usize {
-        self.world.body_count()
-    }
-    pub fn collider_count(&self) -> usize {
-        self.world.collider_count()
+    pub fn remove(self, world: &mut PhysicsWorld) {
+        for entity in self.entities {
+            assert!(world.remove_entity(entity), "live Falling batch");
+        }
     }
 }

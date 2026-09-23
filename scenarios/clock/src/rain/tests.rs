@@ -22,12 +22,15 @@ fn responsive_floor_ignores_digit_weight_and_defers_atomically_when_full() {
         .water
         .add_to_pool(2, c.left + c.width * 0.5, 100.0)
         .unwrap();
-    event.floor.step(&mut event.water, DT, None);
+    let RainArena::Responsive(floor) = &mut event.arena else {
+        unreachable!()
+    };
+    floor.step(&mut event.water, DT, None);
     assert_eq!(
-        event.floor.load, 0.0,
+        floor.load, 0.0,
         "water still on a digit is not floor weight"
     );
-    assert_eq!(event.floor.opening, 0.0);
+    assert_eq!(floor.opening, 0.0);
     let shape = FloorShape::clock(layout);
     let mut floor = ResponsiveFloor::new(shape, 0.0);
     let mut water = WaterWorld::new(
@@ -190,17 +193,17 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                         );
                     }
                     assert!(event.spawns <= 1);
-                    max_open = max_open.max(event.floor.opening);
+                    let floor = event.responsive_floor().unwrap();
+                    max_open = max_open.max(floor.opening);
                     if tick == RAINING_TICKS + DRAIN_TICKS - 1 {
-                        drain_open = event.floor.opening;
+                        drain_open = floor.opening;
                     }
-                    assert!(event.floor.load.is_finite());
-                    assert!((0.0..=1.0).contains(&event.floor.opening));
+                    assert!(floor.load.is_finite());
+                    assert!((0.0..=1.0).contains(&floor.opening));
                     if tick % 60 == 0 {
                         for side in 0..2 {
-                            let (position, angle) =
-                                event.floor.shape.panel_pose(side, event.floor.opening);
-                            let half = event.floor.shape.panel_half_extents();
+                            let (position, angle) = floor.shape.panel_pose(side, floor.opening);
+                            let half = floor.shape.panel_half_extents();
                             if let Some(floats) = &event.floats {
                                 let m = floats
                                     .world
@@ -237,7 +240,10 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                 }
                 eprintln!(
                     "{aspect:.3} {amount:?} seed={seed}: spawn={spawn_tick:?} exit={exit_tick:?} max_depth={max_depth:.1} max_open={max_open:.3} drain_open={drain_open:.3} final_open={:.3} deferrals={} pitch={:.1} outcome={:?}",
-                    event.floor.opening, event.floor.deferrals, layout.pitch, event.phase
+                    event.responsive_floor().unwrap().opening,
+                    event.responsive_floor().unwrap().deferrals,
+                    layout.pitch,
+                    event.phase
                 );
                 if amount == ClockRainAmount::Light {
                     assert_eq!(event.phase, ClockRainDuckPhase::NotSpawned);
@@ -247,10 +253,10 @@ fn rainfall_is_bounded_conserved_and_carries_one_passive_duck_to_the_drain() {
                     assert_eq!(event.spawns, 1);
                 }
                 assert_eq!(event.physics_counts(), (0, 0));
-                assert_eq!(event.floor.deferrals, 0);
+                assert_eq!(event.responsive_floor().unwrap().deferrals, 0);
                 assert!(max_open > 0.0);
                 assert!(
-                    event.floor.opening < max_open * 0.6,
+                    event.responsive_floor().unwrap().opening < max_open * 0.6,
                     "late residual drips must not latch the floor at its peak opening"
                 );
                 if amount == ClockRainAmount::Light {
@@ -452,7 +458,7 @@ fn source_backpressure_is_not_liquid_and_deadline_cleanup_is_not_an_exit() {
     assert_eq!(event.source_limited, 1);
     assert!((event.water.stats().injected - event.scheduled).abs() < 1e-6);
 
-    let mut floats = FloatWorld::responsive(layout, &event.floor);
+    let mut floats = FloatWorld::responsive(layout, event.responsive_floor().unwrap());
     floats.spawn(Vec2::new(event.entry_x, 0.0), 0.5);
     event.floats = Some(floats);
     event.phase = ClockRainDuckPhase::Floating;
