@@ -56,6 +56,32 @@ impl TacticalSortiePilot {
             .is_some_and(|w| w.finished_tick.is_none() && tick >= w.deadline_tick)
     }
 
+    /// Evidence guards may return before ordinary sortie control. They must
+    /// still consume the same deadline without authorizing the rejected route.
+    pub(super) fn check_acquisition_deadline(&mut self, o: &TacticalSortieObservationV1) -> bool {
+        let f = &o.combat.recovery.flight;
+        let p = &f.pilot;
+        if !self.bounded_acquisition
+            || !p.controls_armed
+            || !f.flight.enabled
+            || !p.ship_available
+            || p.ship_form != ShipForm::Ship
+        {
+            return false;
+        }
+        self.start_acquisition(o);
+        if p.location == PilotLocation::OnFoot {
+            self.finish_acquisition(p.tick, "on_foot");
+        }
+        if !self.acquisition_expired(p.tick) {
+            return false;
+        }
+        self.acquisition_reason("acquisition_deadline");
+        self.finish_acquisition(p.tick, "deadline");
+        self.abort(p.tick, "landing site acquisition deadline exhausted");
+        true
+    }
+
     pub(super) fn wait_for_site(
         &mut self,
         o: &TacticalSortieObservationV1,

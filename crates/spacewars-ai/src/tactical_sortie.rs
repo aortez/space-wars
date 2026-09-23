@@ -268,6 +268,7 @@ impl TacticalSortiePilot {
     ) {
         self.begin_acquisition(o);
         self.acquisition_reason(reason);
+        self.check_acquisition_deadline(o);
     }
 
     /// A composing mission may abort its added work while retaining V1's
@@ -343,14 +344,7 @@ impl TacticalSortiePilot {
             self.acquisition_reason("controls_unarmed");
             return CombatIntent::default();
         }
-        self.start_acquisition(o);
-        if p.location == PilotLocation::OnFoot {
-            self.finish_acquisition(p.tick, "on_foot");
-        }
-        if self.acquisition_expired(p.tick) {
-            self.acquisition_reason("acquisition_deadline");
-            self.finish_acquisition(p.tick, "deadline");
-            self.abort(p.tick, "landing site acquisition deadline exhausted");
+        if self.check_acquisition_deadline(o) {
             return self.combat.intent(c);
         }
         if !p.queries_ready {

@@ -83,6 +83,47 @@ fn a_positive_route_with_no_joint_endpoint_reports_the_native_guard() {
     }
 }
 
+#[test]
+fn rejected_endpoint_evidence_cannot_bypass_the_acquisition_deadline() {
+    for planning in [
+        ObjectivePlanning::JointRoundTrip,
+        ObjectivePlanning::JetpackRoundTrip,
+    ] {
+        let (state, source, bot) = fixture(planning);
+        let mut bot = bot.with_bounded_acquisition(true);
+        let mut live = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+        let mut o = source.clone();
+        live.observe_with_planning(&state, 0, &mut o, planning);
+        live.advance(state.tick());
+        o = source;
+        live.observe_with_planning(&state, 0, &mut o, planning);
+        o.landing_objective
+            .as_mut()
+            .unwrap()
+            .sites
+            .iter_mut()
+            .find(|r| r.cost().is_some())
+            .unwrap()
+            .endpoint = None;
+        o.combat.recovery.flight.pilot.controls_armed = true;
+        assert_eq!(bot.intent(&o), Default::default());
+        let wait = bot.telemetry().acquisition_wait.unwrap();
+        assert_eq!(
+            bot.telemetry().acquisition.unwrap().reason,
+            "joint_endpoint_missing"
+        );
+        o.combat.recovery.flight.pilot.tick = wait.deadline_tick;
+        assert_eq!(bot.intent(&o), Default::default());
+        assert_eq!(bot.telemetry().failed_tick, Some(wait.deadline_tick));
+        assert_eq!(
+            bot.telemetry().acquisition_wait.unwrap().outcome,
+            Some("deadline")
+        );
+        assert!(bot.telemetry().site.is_none());
+        assert_eq!(bot.telemetry().replans, 0);
+    }
+}
+
 fn run_handoff(planning: ObjectivePlanning, scan_age: u64, fault: &str) {
     let (mut state, source, mut bot) = fixture(planning);
     let source_tick = state.tick();

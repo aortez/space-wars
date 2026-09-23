@@ -26,6 +26,8 @@ At expiry the task reports `landing site acquisition deadline exhausted`, and
 the mission uses its existing thirty-second planet deferral. Missing, deferred,
 negative and invalidated evidence can all exhaust the time allowance without
 declaring the planet unreachable. New planner generations do not restart it.
+Rejected policy or endpoint evidence also consumes the deadline, while its
+guard continues to return neutral controls rather than authorize a route.
 The first chosen site or accepted physical landing ends acquisition permanently
 for that task. Subsequent landing retries retain their existing budgets.
 
@@ -140,3 +142,11 @@ After integrating main at `cf3b3ea`, all **1,853 workspace tests pass**
 tests. Three selected candidate runs preserve their complete traces and all
 non-timing report/planner data across integration. The separate integration logs
 and replay hashes are retained beside the archive in `integration/`.
+
+Final review also covered an early-return path: rejected endpoint evidence must
+consume the same deadline while retaining neutral controls. The regression
+passes for joint walking and powered routes; all **246 AI tests**, Clippy and
+formatting pass after that correction. The same three candidate replays remain
+identical in complete traces and non-timing report/planner data. Supplementary
+logs, replay hashes and the tested patch against `ae41c9a` are retained beside
+the archive in `deadline-guard/`; the original experiment remains unchanged.
