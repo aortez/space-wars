@@ -149,10 +149,18 @@ forecasts remain exact. Normal +15-second whole-trip median error improves
 0.57 to 0.14 seconds on 27 paired completions. Seven other sampled observations
 still become unknown for invalid rays or missing site evidence. This closes the
 descent-selection experiment; use the combined variant as the offline timing
-baseline. Next investigate interruption risk from recent invalidations, progress
-and contact, including failed/censored attempts and distinguishing native
-airborne replans from site acquisition and already-grounded events. Remote
-transfer remains another prerequisite for mission selection.
+baseline. The [interruption-risk investigation](../bot-landing-interruption-risk.md)
+now examines 216 known recordings on 39 worlds, including failed and censored
+attempts. At normal first-choice +15 seconds, 19/33 attempts with a native
+prelanding replan in the preceding five seconds are interrupted again within
+ten seconds, versus 23/217 without one. The association varies by phase; it is
+not an estimated success probability. Physical landing ends exposure, grounded
+replans stay separate, and 212 attempts with no observed landing choice remain
+outside this forecast's population. Progress/contact failure examples are too
+sparse for a general rule. Next compare a small phase-only interruption estimate
+with a phase-plus-recency candidate on disjoint worlds, retaining uncertainty
+and unchanged timing/controllers. Site acquisition and remote transfer remain
+separate prerequisites for mission selection.
 Retry calibration is still sparse and these estimates do not change bot controls.
 Longer commitment is not uniformly better, and forecast tails remain unsupported.
 Eager route delivery or a successful local escape alone does not establish a

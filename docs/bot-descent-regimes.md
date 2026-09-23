@@ -5,6 +5,10 @@ and otherwise retains an eligible coarse duration. This addresses the early
 coverage loss found in the [strict-clearance comparison](bot-descent-clearance.md).
 The strict option stays the default for that tool. Both models remain offline;
 this does not change bot controls, physical permissions or Pi deployment.
+The subsequent [interruption-risk investigation](bot-landing-interruption-risk.md)
+finds useful recent-replan evidence in 216 known recordings, while retaining
+healthy descents interrupted by their first fresh route invalidation. It defines
+the next offline comparison without changing this timing baseline.
 
 ## Selection rule
 
