@@ -103,7 +103,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by player={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -111,7 +111,8 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.trigger.as_str(),
                         event.enabled,
                         event.cooldown_ticks,
-                        event.automatic_ready_at_tick
+                        event.automatic_ready_at_tick,
+                        event.blocked_by_player
                     );
                 }
             }
@@ -262,10 +263,18 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
         }
+        let world_vector =
+            |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);
         if let Some(rain) = state.rain {
-            let world_vector = |value: Option<[i32; 2]>| {
-                value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0])
-            };
+            println!(
+                "Rain arena: {}; player has joined={}",
+                if rain.player_course {
+                    "shared player course (fixed)"
+                } else {
+                    "responsive floor"
+                },
+                rain.player_joined
+            );
             println!(
                 "Rain: {} / {:?}, spawns={}, entry depth={:.1}/{:.1}; position={:?}, velocity={:?}",
                 rain.amount.label(),
@@ -316,6 +325,46 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 material.capacity_limited_ticks,
                 material.displaced_microunits as f64 / 1_000_000.0
             );
+            println!(
+                "Meltdown floor: {:.1}% open, load={:.3} world units, motion deferrals={}; {:.3} of drained cell-volumes exited as solid blocks",
+                material.floor_open_milli as f64 / 10.0,
+                material.floor_load_milli as f64 / 1000.0,
+                material.floor_motion_deferrals,
+                material.exited_solid_microunits as f64 / 1_000_000.0,
+            );
+        }
+        if let Some(player) = &state.player_duck {
+            println!(
+                "Player duck: P{} session={} phase={} move={} jump-held={} grounded={} jumps={} position={:?} outcome={:?}; automatic-events-suspended={}",
+                player.player,
+                player.session_id,
+                player.phase,
+                player.move_milli,
+                player.jump_held,
+                player.duck.grounded,
+                player.duck.jumps,
+                world_vector(player.duck.position_milli),
+                player.duck.outcome,
+                state.automatic_events_suspended,
+            );
+            println!(
+                "Player water: {:.1}% submerged, velocity={:?}",
+                player.submerged_milli as f32 / 10.0,
+                world_vector(player.velocity_milli)
+            );
+            if let Some(opening) = player.floor_open_milli {
+                println!(
+                    "Player arena: responsive floor, {:.1}% open",
+                    opening as f32 / 10.0
+                );
+            }
+            let blocked: Vec<_> = state
+                .events
+                .iter()
+                .filter(|event| event.blocked_by_player)
+                .map(|event| event.label.as_str())
+                .collect();
+            println!("Waiting for player's arena: {}", blocked.join(", "));
         }
         if let Some(duck) = state.duck {
             println!(

@@ -133,7 +133,11 @@ fn rain_fixture_uses_the_public_headless_runner_without_saved_settings() {
         );
         assert!(
             rows.iter()
-                .all(|r| r["max_scene_items"].parse::<usize>().unwrap() <= 800)
+                // Live digit collectors add up to 320 wet columns (fill/edge)
+                // and 512 parcels (up to four ribbon primitives apiece).
+                // Include the bounded clock face, duck and arena too.
+                .all(|r| r["max_scene_items"].parse::<usize>().unwrap() <= 3000),
+            "rain exceeded its bounded scene budget: {renderer}, {rows:?}"
         );
         assert!(
             rows.last().unwrap()["max_scene_items"]

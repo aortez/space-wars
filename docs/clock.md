@@ -51,12 +51,24 @@ the Off profile still disables every automatic event.
 ### Managed floor and drain
 
 The ordinary floor is **closed by default**, including unsynchronized startup,
-idle/cooldown, Color Cycle, Marquee and Digit Slide. Falling, normal Meltdown and
-Rain acquire the center drain before creating their temporary material. It stays
-fully open through their recovery/cleanup, then closes after the event's bodies,
-water and remaining visuals have been released. Preview replacement, resize and
+idle/cooldown, Color Cycle, Marquee and Digit Slide. Standalone Falling acquires the center
+drain before creating its temporary material. It stays fully open through
+recovery/cleanup, then closes after the event's bodies and remaining visuals
+have been released. Preview replacement, resize and
 restart use the same ownership boundary. Pausing or disabling a currently running
-event does not close the drain underneath it.
+event does not close the drain underneath it. During a player visit, Falling
+instead borrows the player's existing course/panels without opening a second drain.
+
+Rain and normal Meltdown own a shared load-responsive floor: two panels start flat and closed,
+gently slope/retract as water accumulates, then close more slowly as it drains.
+Measured nearby runoff delays closure, and Rain's duck in the passage holds enough
+clearance to get out. Thin residual drips cannot latch the hatch at its peak
+opening. The same panel geometry drives the water bed, visible banks and two
+persistent kinematic colliders while Rain's duck exists. Meltdown instead tests
+its ballistic blocks against the panel tops without creating any rigid bodies.
+No attraction force pulls water or the duck to the drain. During event recovery,
+remaining water is explicitly reclaimed and the responsive floor blends back
+to the ordinary closed floor; that visual recovery is not physical drainage.
 
 The obstacle-course Duck and development water labs own their custom floors
 instead; they do not also open the ordinary drain. Their physical floor/pit/tank
@@ -64,12 +76,11 @@ geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
 One small scenario-owned manager is sufficient because events cannot overlap.
-Its shared geometry supplies rendered floor slabs, Falling/Rain floor colliders,
-the Meltdown/Rain pool banks, spill channel and material deposition boundaries.
-It adds no per-tick requests, persistent rigid bodies or fluid work. The initial
-transition is an atomic open/closed change at event boundaries: durations, rain
-amounts and drainage behavior are unchanged. An animated or delayed hatch would
-need coordinated physical/water transitions and is deliberately separate.
+Its fixed geometry supplies Falling's slabs. Rain and Meltdown's shared
+event-owned actuator updates only each event's two existing
+floor pools, conservatively remapping retained water and releasing uncovered
+strips. It reuses allocated scratch and, in Rain, persistent colliders. The event manager
+itself still needs no per-tick request queue; other events keep their old floors.
 
 `clock state` reports `floor`: `closed`, `drain-open`, or `event-owned` in both
 JSON and text diagnostics. Schema 10 requires a matching client and CLI; this
@@ -97,10 +108,12 @@ default to Varied with Rain enabled, preserving all existing choices.
 Preview **Rain → Preview & Resume** to run it immediately, including when Off.
 
 Rain ramps up and down over 20 simulated seconds. Stratified, jittered drops
-feed the same two finite-volume floor pools used by Meltdown. Local water must
+collect on lit digit pixels, spill through their real gaps and reach the two
+sloping floor pools. A wet time change releases water from retired pixels.
+Local water must
 remain at least 0.65 digit-pitches deep for half a second before the hatch opens;
 depth is checked again before releasing one duck. Light showers normally never
-reach that threshold, so no duck appears. The hatch closes and disappears after
+reach that threshold, so no duck appears. The entrance door closes and disappears after
 release. The ordinary jumping **Duck** event and its two brains are unchanged.
 
 The rubber duck is a passive dynamic Rapier box with density 0.45 relative to
@@ -112,21 +125,30 @@ This is one-way coupling: the duck does not displace water yet, and falling
 parcels do not directly push it. Future player/bot forces can be applied at the
 same physical-body boundary without replacing the flotation model.
 
-The event uses **128 columns, at most 128 water parcels, and one dynamic body**
-(two total bodies/five colliders while the duck is present). Source admission
+The event uses **320 columns, at most 512 water parcels, and one dynamic body**:
+128 floor columns plus 192 digit columns; 192 parcel slots are protected for
+atomic digit retirement. With a duck there are four bodies/five colliders: one
+duck, two persistent moving panels and a fixed pair of side walls. The rigid
+world is allocated only for the duck's visit and released when it exits.
+Source admission
 reserves two new parcel slots for this tick's outlets; already airborne outlet
 parcels count toward the same budget. Capacity pressure defers unadmitted rain
 without inventing or deleting liquid. Remaining requested rain is cancelled when
 the source ends. The digits, colon and AM/PM remain anchored and live throughout.
 
-The last two seconds explicitly reclaim remaining water and fade any stranded
-duck. This is bounded cleanup, **not** a successful drain exit. `clock state`
+The last two seconds explicitly reclaim remaining water, fade any stranded
+duck and blend any remaining panel opening back to the ordinary closed floor.
+This is bounded cleanup, **not** a successful drain exit. `clock state`
 reports the resolved amount, seed, local/required depth, water accounting,
 capacity counters and duck pose. Its duck phase distinguishes `waiting`,
 `opening`, `floating`, `exited`, `not-spawned`, and `reclaimed`.
 Volumes use full-size digit-cell area equivalents (1,000,000 micro-units per
 cell); injected ≈ pooled + in-flight + drained + reclaimed, allowing independent
-rounding. Requested/scheduled budget is not additional liquid. Rain diagnostics
+rounding. Rain also reports `floor_open_milli` (0–1000), `floor_load_milli`
+(average depth in world units × 1000), `floor_motion_deferrals` and
+`floor_clearance_holds`. These fields default to zero when reading older state.
+The top-level floor mode is `event-owned` throughout Rain, even at its closed
+start; ownership is distinct from opening. Requested/scheduled budget is not additional liquid. Rain diagnostics
 are null once the event is over. Pause freezes everything; resize, restart and
 preview replacement release all temporary resources.
 
@@ -183,21 +205,25 @@ follow live time throughout; the event creates no physics objects.
 
 Meltdown releases the lit digit cells roughly bottom-up, with small seeded
 delays. They stay cyan, square and solid-looking while falling, including through
-existing water. Gravity, slight rotation and side-wall reflection remain cheap
+existing water. In standalone Meltdown, gravity, slight rotation and side-wall reflection remain cheap
 ballistic motion, without rigid bodies or block-block collisions. Reaching the
-floor or drain-opening elevation converts each block once: normally 70% of its
+actual inclined panel top converts each block once: normally 70% of its
 area goes directly into the pool/drain across its footprint, while 30% sprays
 upward as three small water drops. The drops use the same volume ledger and
 parcel budget as spills; they rejoin a pool on descent or leave through the drain.
 When parcel capacity is tight, optional spray is reduced and that volume goes
 directly into the pool/drain instead. This replaces the earlier in-air softening
-effect, following dirtsim's solid-block → floor impact → water sequence.
-Water pools and spills through the existing center opening. The colon and dim
+effect, following dirtsim's solid-block → floor impact → water sequence. Contact
+uses the rotated square, not its bounding box; blocks that fit through the open
+gap stay solid and count as drained material only after leaving the screen.
+Water accumulates on the initially closed panels and makes them slope/open,
+using Rain's load filtering and slow movement limits. The colon and dim
 face outline stay visible. After seven seconds, the latest time rebuilds bottom-up
 over 1.5 seconds while remaining water is explicitly reclaimed with eased timing.
 The reusable `engine-water` model drives flow from surface-level differences,
-with damping and conservative donor limits. There is no forced inward current;
-flat basins retain more water than the original Clock-local effect did.
+with damping and conservative donor limits. There is no forced inward current.
+The eight-and-a-half-second event envelope is unchanged; not all material drains
+physically before its explicit final cleanup.
 
 In 12-hour mode, AM/PM also breaks into its individual pixels. These retain
 their smaller size and label color until floor impact; each supplies 0.0324 of
@@ -207,19 +233,26 @@ an event take effect at recovery too: 12→24 fades/removes the old label, while
 24→12 introduces the new label as the face reforms. The water-lab previews keep
 their live, anchored face and fixed source volume.
 
-The normal Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
-AM/PM pixels), **128 columns and 128 spill parcels**,
-with no Rapier bodies. The two floor halves meet the existing drain lips exactly.
+The standalone Meltdown ceiling is **119 cells** (96 digit cells plus at most 23
+AM/PM pixels), **128 columns and 192 spill parcels**, with no Rapier bodies.
+The additional 64 parcel slots accommodate water released by retracting floor
+edges as well as ordinary overflow. Optional impact spray is reduced once 32
+parcels are live; its volume goes to the bank/gap rather than being deleted.
+Stationary development water labs retain their 128-parcel ceiling.
 Each 60 Hz tick uses four bounded pool substeps. Overflow travels as ballistic
 parcels: the renderer stretches/thins their ribbons with falling speed, and the
 model can collect them in a lower basin. Water is counted as drained only after
 leaving the lower world boundary, not upon crossing a ledge. Full parcel capacity
 holds water upstream. This is a fixed-down, unit-depth approximation, not a general
-fluid solver; cells/parcels do not collide with one another.
+fluid solver. Standalone solid blocks do not collide with one another; crossing water
+streams use the engine's existing bounded mixing.
+Player-mode Meltdown uses rigid cells and the player's existing floor instead;
+its contact, liquid conversion and resource bounds are described below.
 Shared surface-edge heights replace the staircase with connected trapezoids,
 preserving total area over each continuous wet, flat run. Dry gaps and bed steps
 are not bridged. Ribbons taper with acceleration and are clipped to the drain
-channel instead of having their corners pushed onto the banks. Splash drops use
+channel, when one is present, instead of having their corners pushed onto the banks.
+Responsive-panel outfalls follow their moving lips without a fixed channel. Splash drops use
 the outer screen walls instead of the narrow drain channel. Compact water parcels
 have area-preserving rounded outlines, including at the top of their flight.
 These are bounded
@@ -450,13 +483,288 @@ the selected profile.
 ## Live controls
 
 Press **Start** on the controller or **P/Esc** on the keyboard, then choose
-**Clock Controls**. You can also tap **Clock Controls** at the top-right of the
-running clock face. D-pad/left stick or arrow keys move selection; A/Enter
+**Clock Controls**. Tapping anywhere on the running clock face opens the same
+pause menu, on release; the opening tap cannot select a menu item. No permanent
+button is drawn over the clock. Automatic and manual launches use the same
+inputs: pressing action buttons does not return to the launcher.
+D-pad/left stick or arrow keys move selection; A/Enter
 selects. Left/right changes a choice row or moves between side-by-side buttons.
 B/Esc goes back; Start resumes without previewing. C/F1 still opens controls help.
 Menu and host keyboard shortcuts use Slint's backend-neutral input path on both
 desktop and LinuxKMS; physical gameplay key bindings for other scenarios are
 unchanged.
+
+Press **N**, the gamepad's **right shoulder**, or Picade's **upper-right blue
+button** (HAT Button 3 / West) for **Next Event**. Each fresh
+press cycles forward through enabled, currently compatible events in catalog order
+(including Digit Slide), starting after the last event that ran. It uses the same clean replacement
+path as Preview & Resume, including recovery of the current event's physics and
+floor. Holding does not repeat; menu/launch handoffs require released controls.
+The event name appears for two seconds of simulation time. Off disables automatic
+scheduling, not this manual action. Individual disabled events are skipped;
+if all are disabled, a brief “No events enabled” notice replaces no event.
+During a player visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide and Rain without
+replacing the duck. If all enabled events need the arena, a brief notice asks
+you to dismiss the duck first. Preferences are unchanged. The Clock action protocol is version 6; `NextEvent`
+(kind 6) has no payload after the version prefix.
+Physical cabinet mappings are documented in [Picade controls](picade.md).
+
+### Player-controlled duck visits
+
+Press **D** on the keyboard, **North (Y)** on a gamepad, or the Picade's
+**bottom-right blue** button to start a visit. Press it again to dismiss your
+duck. **Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
+jumps. Picade's working **bottom-middle yellow** is Jump. Keyboard belongs to
+P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
+cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
+Release movement/jump controls after starting or resuming before taking control.
+Touch still opens pause; this first slice does not add touch movement buttons.
+
+This is one player duck in the existing Clock, not another launcher scenario.
+Its visit is separate from the timed event scheduler. Starting replaces a
+standalone Falling, Meltdown or AI Duck event, recovers its face/water/physics,
+and opens a seeded course; an active visual event continues. Joining Rain instead
+preserves its current arena, water, panels and event ID, whether it uses a player
+course or the ordinary responsive floor. The
+player drives the **same dry movement actuator, gravity, jump impulse and circular
+body shape** used by Careful/Flowing AI; those existing brains and automatic Duck
+timings are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
+through the same acceleration limit, including airborne braking. Horizontal
+input is screen-relative even when the entrance/course is mirrored. A physical
+rear wall keeps the player in view. The opposite exit appears after entry closes;
+walk through it to finish. Missing a gap ends the visit too.
+
+A fresh **grounded** jump press is required: no held-button auto-hop, opening
+jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
+controller seat, so old/other-player actions cannot drive a new visit. There is
+no 35-second player timeout. The dry visit has at most **nine** bodies/colliders,
+including course surfaces and rear wall, with no growing history or entity list.
+Dismissal/fall/exit releases character physics immediately. Ordinarily the course
+fades for 30 ticks; concurrent Rain, Falling or Meltdown retains the shared arena until its own cleanup.
+Resize, restart and launcher return also clean up.
+Next Event and compatible menu previews keep the duck. Live readings and format changes continue; pause freezes
+the duck, course and feedback.
+
+**Event overlap policy:** Color Cycle, Marquee and Digit Slide run alongside the
+player, including automatic minute transitions. Starting, replacing or finishing
+an event does not reset the duck, its controls or its physical course. Finishing
+the visit likewise does not end a concurrent animation. Marquee transforms/fades
+only the clock face, never the player/course.
+
+**Rain on the player course:** Spawn a duck, then select Rain (Next Event or a
+preview), or let the scheduler select it. Water collects on the actual course
+slabs and lit digits, spilling through the real gaps. The course stays fixed;
+standalone Rain's responsive panels and passive rubber duck are not created.
+The player's low-density circle uses existing pool buoyancy/flow drag, in the
+same screen coordinates as water. Grounded/dry movement is unchanged. While
+floating, left/right supplies bounded paddling acceleration; neutral does not
+brake away the current. Jump still requires a fresh grounded press; there is no
+water jump, automatic hopping or swimming AI in this slice. Water can carry an
+unattended duck into a gap, producing the ordinary fall/exit lifecycle.
+
+Rain steps water once before the one player mechanics world applies its water
+forces and steps. Coupling is **one-way buoyancy/drag**, not displacement,
+pressure, parcel/duck collision, or a second fluid simulation. Water and rendering
+derive from the same immutable course slabs; geometry is copied only at visit/event
+boundaries. No per-tick geometry allocations or second Rapier world are added.
+At most seven course pools plus 96 digit pools use at most 327 water columns and
+the existing 512-parcel budget. Starting/replacing/ending Rain preserves a live
+duck; dismissing/falling/exiting preserves Rain and its course. A new visit can
+reuse that wet course. Rain finishing with no player releases the last floor claim.
+**Joining ordinary Rain:** Starting a visit during an existing shower uses its
+sloping panels rather than replacing them with an obstacle course. The shower's
+ID, phase, material ledger and water geometry do not change. If Rain already has
+a live passive duck, its position and linear velocity transfer to the player;
+the old world is dropped first. The player still uses its round, upright-rendered
+character hull, not the passive duck's rotating box. A resting box may need a
+small upward clearance adjustment for that new hull. Otherwise the character
+enters from its door above the current water/panel surface. No further passive
+duck spawns during that shower, even if the player dismisses or falls out.
+
+The responsive player world has **four bodies/four colliders**: two persistent
+kinematic panels, the rear wall, and the character. Rain advances its actuator
+and water once, then the player copies the small allocation-free floor state and
+updates those panel targets before stepping the one mechanics world. Ground
+movement/jumps use support-relative velocity so panel motion is inherited. Dry
+seams do not request drain opening; an occupied open passage holds clearance
+until the whole character has left the visible arena. There is no surface
+snapping or attraction to the drain. Drowning/damage is not introduced.
+
+When Rain finishes or is replaced, the player retains the last panel state and
+the same bodies, and the floor gently closes using the existing rate/clearance
+rules without allocating a dummy water world. A later shower builds its empty
+pools at that retained pose; it does not snap the panels back to horizontal.
+This is still one-way buoyancy/drag. Meltdown can also reuse these retained panels;
+the automatic AI Duck course remains separate.
+
+**Falling alongside a player:** Falling is available to the automatic schedule,
+Next Event, previews and CLI triggers during a visit. Its lit bars and AM/PM
+letters are inserted as a bounded, separately owned body batch into the player's
+existing Rapier world, on either a fixed course or retained responsive panels.
+There is no second overlaid simulation, duplicate floor or contact approximation.
+Bars push the character and can become real standing/jumping surfaces; grounded
+movement/jumps inherit the supporting body's point velocity. No damage, crushing
+or invincibility rules are introduced. A knock into a gap can still end the visit.
+
+The shared world steps **once** per fixed tick, including entry, reset and the
+event's first/final ticks. The duck keeps its calibrated gravity and jump; a
+per-body gravity scale preserves Falling's existing 400-unit acceleration across
+display sizes. The batch adds at most **30 bodies / 119 colliders**, for a total
+of at most **39 / 128** with the largest course. IDs occupy separate bounded
+namespaces; geometry and the body-ID list are allocated at event boundaries,
+not rebuilt each tick. Rendering reads the same body poses used for contacts.
+
+Dismissal, falling out or walking out removes only the character. Falling then
+owns the exact existing arena until completion, so the remaining bars keep
+moving. A new visit can take that arena back with a fresh controller/session ID;
+it does not reset the bars, floor or event clock. An occupied arena stays opaque.
+After 210 falling ticks the event removes **only its batch** before the 90-tick
+visual reformation, so there are no invisible bars flying back through the duck.
+A duck formerly standing on a bar becomes airborne normally. Finishing or
+replacing Falling preserves a live player; if nobody remains, the last floor
+claim and world are released. Joining a *standalone* Falling event still replaces
+that old arena with a new player course; in-place joining currently applies to
+Rain and previously shared Falling/Meltdown arenas.
+
+Regression coverage includes actual bar/duck impact and grounded jumping, one
+world step versus an isolated-player baseline, zero-dt pause, first-frame pose
+readback, automatic/Next availability, AM/PM/format changes, both floor types,
+dismiss/rejoin, fall/exit, reformation, replacement and resize. Production raster
+and vector captures cover Picade, HyperPixel and portrait at five event phases.
+
+**Meltdown alongside a player:** The same seeded release schedule breaks the
+face into individual cells, but each released square now becomes one Rapier
+body/collider in the existing player world. Waiting cells are not collidable.
+Cells collide with one another and can push the duck. Only an actual upward
+course/panel contact triggers melting—not another block, the duck, a side wall,
+water, or an imaginary floor across a gap. A block fitting through a gap stays
+solid until it leaves the visible arena, accounted as exited solid material.
+No damage, crushing or drowning is added.
+
+Each melted square becomes three bounded liquid parcels across its footprint
+(one for a small AM/PM pixel). They carry its complete area into the existing
+water solver, which catches each parcel on the real receiving bed or lets it
+fall through a gap. This avoids transferring water straight to a lower platform.
+There is no additional impact-spray source in this mode. If the whole footprint
+cannot fit the parcel budget, the block stays physical and retries later; no
+partial injection or deletion occurs. Colliders disappear on the same tick as
+conversion. Pooled water supplies the player's existing buoyancy/current drag
+and joystick paddling. The coupling remains one-way, with no fluid displacement
+or liquid/block collision model.
+
+The event adds at most **119 bodies/colliders**, for a shared maximum of
+**128 / 128** on a course, or **123 / 123** on responsive panels. Water uses
+at most **135 course columns** (128 on panels) and **192 parcels**. Metadata is
+bounded and compacted in place; local contact queries allocate no history or
+world-wide contact list. Each world steps once per fixed tick, including entry,
+empty-arena simulation and cleanup. At tick 420 all remaining solid bodies are
+removed and explicitly reclaimed before visual reformation; water reclamation
+and the latest-time recovery retain the normal 510-tick envelope.
+
+Falling and Meltdown share the same arena lease lifecycle. Leaving retains the
+exact world for the event; rejoining uses a fresh session without resetting
+blocks, water or event time. Finishing/replacing the event removes only its own
+material and leaves the player/floor intact. Responsive panels continue their
+load/clearance-controlled movement and subsequent dry closure. Standalone
+Meltdown and developer water labs keep their existing lightweight simulations.
+Regression coverage includes real block/duck and block/block contacts, floor
+conversion versus gap escape, capacity deferral, tick-by-tick conservation,
+deterministic replay, flotation, exactly one step, all cleanup phases, rejoin,
+pause, resize, schedule availability, and live reading/format changes. Raster
+and vector captures cover both arenas on all three layouts at seven phases.
+The course capture also reproduces a compressed-junction ribbon spike. Merged
+spill strips now use the existing compact, area-preserving fallback when their
+width is excessive even at both end faces; transport and water accounting are unchanged.
+
+The automatic Duck course and developer **water-lab** Meltdown previews still
+have private arenas and are excluded from automatic selection and Next Event
+while the player owns the course. An incompatible Preview & Resume preserves both the player and
+current event, resumes, and shows a dismissal hint; `clock trigger` rejects it
+with an explicit `action-unavailable` reason. Disabled events can still be manually
+previewed if compatible. The Off profile and disabled Duck event do not disable
+player visits, and playing never changes saved event preferences. Availability
+changes use the existing cadence/cooldowns rather than queuing deferred events.
+
+Floor claims are scoped: face-only events claim no floor; the player and Rain/Falling/Meltdown
+release only their own claim, for either course or responsive-panel layouts.
+Automatic AI Duck cohabitation and any damage rules are separate future work.
+
+The version-6 scenario actions add `TogglePlayerDuck` (kind 7: one-based player
+byte) and `PlayerDuckInput` (kind 8: player byte, little-endian u64 visit ID,
+little-endian i16 horizontal intent in -1000..=1000, and a 0/1 jump-held byte).
+Use the existing bounded virtual-controller CLI for device checks:
+
+```sh
+spacewars-cli input press north --expect-screen gameplay
+spacewars-cli clock state --json
+spacewars-cli input press right --hold-ms 300 --expect-screen gameplay
+spacewars-cli input press east --expect-screen gameplay
+spacewars-cli input press north --expect-screen gameplay
+```
+
+`clock state` reports `player_duck` (visit/owner, phase, intent, facing, screen-space
+`velocity_milli`, `submerged_milli` and physical state) separately from the AI event's
+`duck`. `player_duck.floor_open_milli` is present for responsive panels (including
+dry recovery), and null for a fixed course. `rain.player_course` identifies the
+fixed shared arena; `rain.player_joined` records passive-spawn suppression, and
+the passive `duck_phase` becomes `handed-off` after transferring a live duck.
+`duck_spawns` and other Rain duck fields describe the passive actor only, not the player. Each catalog entry has
+`blocked_by_player`, independent of saved `enabled` and reuse cooldowns.
+`automatic_events_suspended` is true only when a player visit leaves no enabled
+compatible events; Off is still reported separately as the profile. `can_trigger`
+indicates idle host readiness; check the selected event's restriction too.
+The player does not increment the automatic event ID. Existing `clock wait`
+predicates refer to timed events, not the player; inspect `player_duck` for a
+visit. No claim that idle event state means the arena is unoccupied is implied.
+
+Headless model tests cover mirroring, movement, real exits and missed gaps,
+grounded single-edge jumping, ownership, pause, cleanup/replacement, and
+filtered automatic scheduling, and event/player lifecycle independence. Paired
+physics runs verify identical movement/jumps with and without visual animations.
+Client tests cover neutral/release
+handoffs, backend-neutral keyboard input, controller routing and both production
+render adapters. The overlap capture test compares the lower course/duck pixels
+against the no-event reference for all three compatible events at 800×480,
+1024×768 and 480×800, including fully active Marquee. Export the deterministic
+captures (the world PNGs omit Slint's text overlays, which are checked separately):
+
+```sh
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-player-visuals \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  player_duck_is_observable_and_renders_through_both_production_adapters
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  visual_events_leave_the_player_and_course_visible_in_all_layouts
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  rain_and_player_share_a_visible_course_in_all_layouts
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layouts
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  falling_shares_visible_course_and_moving_floor_in_production_adapters
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-captures \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  meltdown_shares_player_blocks_water_and_floor_in_production_adapters
+```
+
+Wet tests cover both course directions, exact slab/gap water geometry, stationary
+flotation, current-driven drift, paddling, no mid-water jump, return to dry controls,
+real gap falls, automatic scheduling, wet digit changes, dismissal/rejoin and pause/
+resize cleanup. Six full Heavy Rain runs station-keep a scripted player on its
+entrance runway while checking water conservation and fixed resource bounds.
+Responsive-player tests additionally cover joining before/after passive spawn,
+motion handoff, moving-panel grounding and jump edges, dry-seam closure, real
+drain exits, repeated wet/dry event replacement, pause/rejoin/resize, and three
+complete heavy showers followed by dry-floor recovery. Captures verify the same
+production raster/vector frames at all three display layouts, including an
+active Marquee after Rain ends.
+
+Automatic Clock on `sw-picade-2`: the permanent controls button and automatic-mode
+caption are gone; the optional performance overlay remains enabled here.
+
+![Clock face on Picade with no permanent controls button](screenshots/clock/picade-clean-controls.png)
 
 The page changes **12/24-hour format**, **Off/Calm/Demo cadence**, and the
 **Falling/Color Cycle/Meltdown/Duck/Marquee/Digit Slide automatic switches** and **Marquee Recipe**. Changes apply at the next host tick,
@@ -471,7 +779,9 @@ Off. This releases previous physics/appearance resources, preserves the scenario
 instance and monotonic event IDs, synchronizes the latest time, and resumes.
 It is deliberately different from the strict, non-replacing `clock trigger`.
 
-These are ordinary guarded UI controls, also available to CLI automation:
+These are ordinary guarded UI controls, also available to CLI automation.
+`gameplay.clock-controls` remains a semantic settings shortcut for existing CLI
+scripts; it no longer represents a permanent button on the clock face:
 
 ```sh
 spacewars-cli ui activate gameplay.clock-controls --expect-screen gameplay
@@ -490,11 +800,13 @@ mutation. Animation ticks still do not invalidate UI revision guards.
 
 The face reforms using the **latest** reading, even across minute/hour changes
 or a host-time correction. Resizing during an event restores the current face
-and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Rapier
-exists only during Falling's falling phase or Duck's running/exiting phases:
+and enters cooldown. Restart/relaunch starts a fresh seeded schedule. Standalone
+Falling releases Rapier at reformation; automatic Duck releases it on exit/reset:
 at most 28 moving bars plus two AM/PM letters and four arena bodies, with
 123 colliders for Falling (32 bodies / 100 colliders without AM/PM),
 or eight bodies/colliders at the Duck course ceiling, with no accumulating debris.
+Player visits keep their own arena across compatible events, with shared Falling/Meltdown
+resource/lifetime bounds described above.
 
 ## Extending the event system
 
@@ -652,7 +964,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **10** and reports scenario-instance revision,
+`clock state` uses schema version **14** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
@@ -665,18 +977,24 @@ These diagnostics do not affect `ui state` revisions. The optional `meltdown`
 object is present only during Meltdown (including its reform phase). It reports
 initial/waiting/airborne cells, occupied water columns, active spill parcels,
 capacity-limited ticks, and pooled, in-flight (`spilling_microunits`), drained and
-reclaimed volume. In-flight volume and parcel counts include both impact spray
-and drain spills. One full-size digit cell equals 1,000,000 micro-units; an
+reclaimed volume. In-flight volume and parcel counts include impact spray,
+uncovered floor strips and drain spills. `drained_microunits` includes material
+exiting as either water or solid blocks; `exited_solid_microunits` is the solid
+**subset**, not an additional term in the conservation sum. One full-size digit
+cell equals 1,000,000 micro-units; an
 AM/PM pixel is 32,400. `initial_microunits` reports the total source volume and
 `solid_microunits` reports the volume still in waiting/airborne cells. Use these
 area-weighted values rather than multiplying cell counts by 1,000,000.
-`solid_microunits` plus the four water aggregates must equal
+`solid_microunits` plus pooled, spilling, drained and reclaimed material must equal
 `initial_microunits`, within three micro-units of independent rounding. Reclaimed volume
 is explicit reform cleanup, not drainage. Idle and other events report null.
 `displaced_microunits` reports occupied body space in the displacement lab,
 in cell-equivalent area units; it is **not water** and is excluded from that
 accounting sum. The added volume, displacement and spill fields default to zero when
 reading older payloads.
+Meltdown also reports `floor_open_milli` (0–1000), `floor_load_milli` (average
+floor-water depth in thousandths of world units), and `floor_motion_deferrals`.
+These are zero in custom water labs and fixed player courses, and default to zero in older payloads.
 The optional `duck` object reports entrance side, position in thousandths of
 render world units, grounded state, jumps, cleared/total obstacles, door openness
 in thousandths, and outcome (`exited`, `fell`, `timed-out`). It is present only
@@ -735,7 +1053,7 @@ switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. V
 are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 10, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 14, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -752,7 +1070,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 10, `event`
+tick. A raw `clock trigger` request must include schema version 14, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
@@ -776,7 +1094,7 @@ tests and screenshots.
 
 The seeded regression covers 72 complete events: eight seeds for each of Light,
 Medium and Heavy at 1024×768, 800×480 and 480×800 aspect ratios. All 24 Light
-cases leave the hatch closed; all 48 Medium/Heavy cases spawn one duck and record
+cases leave the duck's entrance door closed; all 48 Medium/Heavy cases spawn one duck and record
 an actual drain exit, rather than deadline reclamation. Every tick checks water
 accounting and resource caps, and every event finishes with no bodies, colliders,
 parcels or pooled water. Separate tests cover replay, backpressure, deadline
@@ -792,6 +1110,9 @@ Demo/Varied preferences and the original volume were restored after testing.
 ![Heavy Rain and a passive floating duck on the Picade](screenshots/clock/picade-rain-floating.png)
 
 ### Managed-floor device validation (2026-09-13)
+
+This checkpoint predates the responsive Rain floor described above; see the
+2026-09-19 checkpoint below for those panels' device validation.
 
 Deployed the matching release client/CLI pair to `sw-picade-2` with a fast update
 (Pi 4, 1024×768, raster scale 2.0; no reboot). Device checks verified:
@@ -820,6 +1141,50 @@ no auto-start timing or input behavior was changed.
 | Ordinary closed floor | Managed drain during Heavy Rain |
 | --- | --- |
 | ![Closed Clock floor on sw-picade-2](screenshots/clock/picade-managed-floor-closed.png) | ![Open drain and floating duck on sw-picade-2](screenshots/clock/picade-managed-floor-rain.png) |
+
+### Responsive-floor device validation (2026-09-19)
+
+The ARM release build passed, and the new client/CLI pair was verified on
+`sw-picade-2` after a user reboot. Installed SHA-256 values:
+
+- Client: `7247e2425049d142cdc9353619e1af8de84f216d207b5e009c389f5da020b979`.
+- CLI: `c6baf9ac659c02f8facfab7839991ce3f1d42ff27ec3347d5c4b6c2e16aaea59`.
+
+Heavy Rain preview event 4 (seed 25769803779) started with an event-owned, closed
+floor, reached `floor_open_milli=705` after six seconds, and later recorded one
+duck spawn and physical exit. The closing floor was at 617 after about 34 seconds;
+completion restored a closed floor with no event bodies/colliders. No source,
+outlet or floor-motion deferrals were reported. A live sample showed about
+60 FPS/UPS and a 0.358 ms mean / 0.420 ms p95 host step (1024×768, raster scale
+2.0). A device screenshot was inspected. Demo/Heavy Rain preferences and 5%
+volume were preserved; the settings file remained byte-identical.
+
+This is an application smoke check, **not a clean hardware-health result**.
+The fast installer encountered an I/O error while saving its known-good backup,
+after the new app passed initial health checks; rollback could not run either.
+After reboot, the installed binaries matched the new build and the kiosk stayed
+on PID 401 with zero service restarts during the check. However, that boot also
+logged USB over-current events, a USB disk reset/read error, ext4 recovery and an
+unclean FAT boot partition. The over-current/error cluster did not grow during
+the brief check. Recovery files were left untouched; USB/storage diagnosis and
+any offline filesystem check remain separate follow-up work.
+
+Subsequent power-isolation checks narrowed that caveat: booting without the
+LCD's USB power connection produced no USB errors, but could not run the kiosk
+without a detected display. Powering the LCD from a separate 5 V supply then
+restored the normal displayed workload. Heavy Rain completed at 60 FPS/UPS,
+including a physical duck exit and floor closure; more than 20 minutes of mixed
+Clock events subsequently ran on the same PID with zero service restarts and no
+USB over-current, disk-reset or I/O errors. The client/CLI hashes and saved
+settings were unchanged. This implicates the shared USB power path without
+identifying a specific faulty component; the unclean-filesystem warning still
+needs a separate offline check. No power-protection settings were changed.
+
+Actual Pi 4 captures with independently powered LCD (1024×768, raster scale 2.0):
+
+| Closed floor | Loaded/open floor and duck | Late runoff/closing |
+| --- | --- | --- |
+| ![Closed responsive floor](screenshots/water/picade-responsive-floor-closed.png) | ![Open responsive floor during Heavy Rain](screenshots/water/picade-responsive-floor-open.png) | ![Responsive floor closing after Rain](screenshots/water/picade-responsive-floor-closing.png) |
 
 ### Digit Slide verification
 

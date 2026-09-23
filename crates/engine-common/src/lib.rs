@@ -369,10 +369,18 @@ pub enum ClockRainDuckPhase {
     Exited,
     NotSpawned,
     Reclaimed,
+    HandedOff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockRainState {
+    /// Rain uses the stable player course instead of its responsive floor and
+    /// passive duck. The course outlives a dismissed player until Rain ends.
+    #[serde(default)]
+    pub player_course: bool,
+    /// This event has hosted a player; passive spawning remains suppressed.
+    #[serde(default)]
+    pub player_joined: bool,
     pub seed: u64,
     /// The resolved amount for this visit; settings may still say Varied.
     pub amount: ClockRainAmount,
@@ -387,6 +395,32 @@ pub struct ClockRainState {
     pub parcels: usize,
     pub source_limited_ticks: u64,
     pub water_limited_ticks: u64,
+    /// Applied physical/visible digits; a rare capacity deferral can lag the reading.
+    #[serde(default)]
+    pub surface_digits: [Option<u8>; 4],
+    #[serde(default)]
+    pub surface_water_microunits: u64,
+    #[serde(default)]
+    pub drip_parcels_emitted: u64,
+    /// Collected parcels that imparted a local wet-surface impulse.
+    #[serde(default)]
+    pub surface_impacts: u64,
+    #[serde(default)]
+    pub surface_change_pending: bool,
+    /// Deferred update attempts, including control-only time corrections.
+    #[serde(default)]
+    pub surface_change_deferrals: u64,
+    /// Event-owned floor opening, 0 (flat/closed) to 1000 (fully open).
+    #[serde(default)]
+    pub floor_open_milli: u32,
+    /// Floor volume / original floor width, in world units × 1000.
+    /// Excludes airborne water and water still held on digit ledges.
+    #[serde(default)]
+    pub floor_load_milli: u32,
+    #[serde(default)]
+    pub floor_motion_deferrals: u64,
+    #[serde(default)]
+    pub floor_clearance_holds: u64,
     pub entry_depth_milli: u32,
     pub required_depth_milli: u32,
     pub duck_phase: ClockRainDuckPhase,
@@ -605,9 +639,21 @@ pub struct ClockMeltdownState {
     pub spill_parcels: usize,
     #[serde(default)]
     pub capacity_limited_ticks: u64,
+    /// All material physically exiting the arena: liquid plus solid blocks.
     pub drained_microunits: u64,
+    /// Subset of drained_microunits that left as solid blocks, NOT extra volume.
+    #[serde(default)]
+    pub exited_solid_microunits: u64,
     /// Water/cells reclaimed during reformation, not counted as drainage.
     pub reclaimed_microunits: u64,
+    /// Event-owned hatch opening in thousandths (0..=1000); zero in water labs.
+    #[serde(default)]
+    pub floor_open_milli: u32,
+    /// Average depth on the floor in thousandths of world units.
+    #[serde(default)]
+    pub floor_load_milli: u32,
+    #[serde(default)]
+    pub floor_motion_deferrals: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -616,6 +662,7 @@ pub enum ClockDuckOutcome {
     Exited,
     Fell,
     TimedOut,
+    Dismissed,
 }
 
 /// Movement personality, independent of event scheduling and course geometry.
@@ -740,6 +787,28 @@ pub struct ClockDuckState {
     /// Additive diagnostics: old schema-8 payloads may omit this object.
     #[serde(default)]
     pub navigation: Option<ClockDuckNavigationState>,
+}
+
+/// A player visit has its own identity/lifetime, independent of timed events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockPlayerDuckState {
+    pub session_id: u64,
+    /// One-based controller seat; keyboard controls belong to player one.
+    pub player: u8,
+    pub phase: String,
+    pub phase_tick: u64,
+    pub move_milli: i16,
+    pub jump_held: bool,
+    pub facing_right: bool,
+    /// Some(opening) for the moving Rain panels, None for a fixed course.
+    #[serde(default)]
+    pub floor_open_milli: Option<u32>,
+    #[serde(default)]
+    pub submerged_milli: u32,
+    /// Screen-relative physical velocity, including drift from water.
+    #[serde(default)]
+    pub velocity_milli: Option<[i32; 2]>,
+    pub duck: ClockDuckState,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

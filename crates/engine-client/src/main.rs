@@ -34,6 +34,8 @@ mod ui_inventory;
 mod ui_navigation;
 #[cfg(test)]
 mod ui_render_tests;
+#[cfg(test)]
+mod water_visual_tests;
 
 use std::cell::RefCell;
 use std::env;
@@ -435,12 +437,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let settings_writer = settings_writer::SettingsWriter::new(settings_path.clone())?;
     let _settings_status = settings_writer::install_status(&window, settings_writer.clone());
     let scenario_controls = host::new_scenario_controls();
+    let (input, gamepad_input) = input::new_shared_input();
     let _control_server = ipc::start_control_server(
         &window,
         ipc::control_socket_path(),
         Rc::clone(&scenario_controls),
+        Rc::clone(&input),
+        Rc::clone(&gamepad_input),
     );
-    let (input, gamepad_input) = input::new_shared_input();
     input::install_window_input(&window, Rc::clone(&input));
     let render_timer = Rc::new(RefCell::new(None));
     let launcher = install_launcher_callbacks(
@@ -1116,6 +1120,21 @@ fn install_ui_navigation(window: &MainWindow) {
 }
 
 fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
+    let clock_input = Rc::clone(&input);
+    window.on_clock_input_key(move |code, pressed| {
+        let key = match code {
+            0 => input::GameKey::NesLeft,
+            1 => input::GameKey::NesRight,
+            2 => input::GameKey::P1Laser,
+            3 => input::GameKey::NesA,
+            _ => return,
+        };
+        if pressed {
+            clock_input.borrow_mut().press(key);
+        } else {
+            clock_input.borrow_mut().release(key);
+        }
+    });
     let weak = window.as_weak();
     window.on_keyboard_action(move |code, repeat| {
         let Some(window) = weak.upgrade() else { return };
@@ -1137,6 +1156,16 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
             || window.get_ingame_menu_visible()
             || window.get_game_over_visible()
             || window.get_touch_test_visible();
+        if code == 12 || code == 13 {
+            if !menu && window.get_launcher_scenario() == "clock" {
+                if code == 12 {
+                    input.borrow_mut().request_clock_next_event();
+                } else {
+                    input.borrow_mut().request_clock_player_duck(1);
+                }
+            }
+            return;
+        }
         if menu && let Some(action) = UiAction::from_code(code) {
             handle_ui_action(&window, action);
             return;

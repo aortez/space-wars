@@ -5,9 +5,23 @@
 use engine_core::Vec2;
 
 pub mod displacement;
+mod drips;
+pub use drips::DripConfig;
+mod channels;
 pub mod immersion;
+mod impact;
+mod mixing;
+mod moving_bed;
+mod slopes;
+pub use moving_bed::PoolGeometry;
+mod spill;
+mod supports;
+use spill::{Section, Spill};
+pub use spill::{SpillRibbon, SpillSource};
 
-pub const MAX_POOLS: usize = 8;
+// Many small separated ledges share the SAME column/parcel budgets; this is not
+// 128 full-sized water grids. Scratch is sized to actual pools at construction.
+pub const MAX_POOLS: usize = 128;
 pub const MAX_COLUMNS: usize = 512;
 pub const MAX_PARCELS: usize = 512;
 pub const MAX_STEP: f64 = 1.0 / 30.0;
@@ -33,15 +47,29 @@ pub struct PoolSpec {
 
 #[derive(Debug, Clone, Copy)]
 pub struct WaterConfig {
+    /// Conservative local mixing between colliding, opposing automatic
+    /// outfalls. Disable for an A/B control; not a general particle solver.
+    pub mix_spills: bool,
     /// Positive downward acceleration; all pools share this gravity direction.
     pub gravity: f64,
     pub damping: f64,
+    /// Optional fraction of downward parcel speed redirected into local
+    /// outward surface motion. Scaled by incoming/receiving liquid volume;
+    /// also limited by the receiving surface's gravity/depth speed scale.
+    /// Bounded to [0, 1]. Zero (default) preserves volume-only deposition.
+    /// This is a damped impact approximation, not full momentum coupling.
+    pub impact_response: f64,
     pub exit_y: f64,
     /// Pool horizontal-speed and parcel downward-speed cap. Incoming source
     /// velocity magnitude is also checked against this limit.
     pub max_speed: f64,
     pub max_parcels: usize,
-    /// Optional vertical channel for automatically emitted spills, [left, right].
+    /// Slots withheld from ordinary sources/outlets for atomic support removal.
+    /// Included in, not additional to, `max_parcels`. Zero preserves the normal
+    /// pool-only budget. Size for the maximum simultaneous wet-column release.
+    pub reserved_release_parcels: usize,
+    /// Default vertical channel for automatically emitted spills, [left, right].
+    /// Individual outlets can override it with `set_outlet_channel`.
     /// Explicit sources carry their own horizontal bounds.
     pub spill_channel: Option<[f64; 2]>,
 }
@@ -49,11 +77,14 @@ pub struct WaterConfig {
 impl Default for WaterConfig {
     fn default() -> Self {
         Self {
+            mix_spills: true,
             gravity: 400.0,
             damping: 0.8,
+            impact_response: 0.0,
             exit_y: -240.0,
             max_speed: 1000.0,
             max_parcels: 128,
+            reserved_release_parcels: 0,
             spill_channel: None,
         }
     }
@@ -83,6 +114,9 @@ pub struct Column {
     pub left: f64,
     pub width: f64,
     pub bed: f64,
+    /// Actual left/right bed elevations. `bed` is their minimum. Ordinary
+    /// stepped pools have equal endpoints within each column.
+    pub bed_edges: [f64; 2],
     pub surface: f64,
     pub volume: f64,
     /// Occupied space, not liquid; excluded from the water-volume ledger.
@@ -92,22 +126,37 @@ pub struct Column {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pool {
+    enabled: bool,
     spec: PoolSpec,
+    // Opt-in, fixed piecewise-linear beds. Keep the old flat/stepped hot path.
+    slopes: Option<Vec<[f64; 2]>>,
+    geometry_scratch: Vec<f64>,
     volume: Vec<f64>,
     velocity: Vec<f64>,
     flux: Vec<f64>,
     donor_scale: Vec<f64>,
     displaced: Vec<f64>,
     displacement: displacement::Displacement,
+    drip_config: Option<DripConfig>,
+    outlet_credit: [drips::Credit; 2],
+    outlet_channels: [Option<[f64; 2]>; 2],
 }
 
 impl Pool {
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
     pub fn spec(&self) -> &PoolSpec {
         &self.spec
     }
 
+    pub fn has_sloped_bed(&self) -> bool {
+        self.slopes.is_some()
+    }
+
     pub fn columns(&self) -> impl Iterator<Item = Column> + '_ {
-        (0..self.volume.len()).map(|i| self.column(i))
+        (0..if self.enabled { self.volume.len() } else { 0 }).map(|i| self.column(i))
     }
 
     /// Candidate columns overlapping a horizontal body footprint. No allocation.
@@ -118,7 +167,7 @@ impl Pool {
         let end = ((right - self.spec.left) / self.spec.column_width)
             .ceil()
             .clamp(start as f64, self.volume.len() as f64) as usize;
-        (start..end).map(|i| self.column(i))
+        (start..if self.enabled { end } else { start }).map(|i| self.column(i))
     }
 
     fn column(&self, i: usize) -> Column {
@@ -126,6 +175,7 @@ impl Pool {
             left: self.spec.left + i as f64 * self.spec.column_width,
             width: self.spec.column_width,
             bed: self.spec.bed[i],
+            bed_edges: self.bed_edges(i),
             surface: self.surface(i),
             volume: self.volume[i],
             displaced: self.displaced[i],
@@ -134,36 +184,53 @@ impl Pool {
     }
 
     fn surface(&self, i: usize) -> f64 {
-        self.spec.bed[i] + (self.volume[i] + self.displaced[i]) / self.spec.column_width
+        let area = self.volume[i] + self.displaced[i];
+        match &self.slopes {
+            Some(bed) => slopes::level(bed[i], self.spec.column_width, area),
+            None => self.spec.bed[i] + area / self.spec.column_width,
+        }
     }
 
     fn index(&self, x: f64) -> Option<usize> {
         let local = (x - self.spec.left) / self.spec.column_width;
-        (local >= 0.0 && local < self.volume.len() as f64).then_some(local as usize)
+        (self.enabled && local >= 0.0 && local < self.volume.len() as f64).then_some(local as usize)
     }
 
-    fn overflowing(&self, edge: usize) -> bool {
-        let i = if edge == 0 { 0 } else { self.volume.len() - 1 };
-        matches!(self.spec.boundaries[edge], Boundary::Spill { lip } if self.surface(i) > lip)
-    }
-
-    fn step(&mut self, config: WaterConfig, dt: f64, allow: [bool; 2]) -> [Emission; 2] {
+    fn step(
+        &mut self,
+        config: WaterConfig,
+        dt: f64,
+        reserved: &mut [bool; 2],
+        free: &mut usize,
+    ) -> [Emission; 2] {
         let n = self.volume.len();
         let dx = self.spec.column_width;
         let speed_limit = config.max_speed.min(dx * 0.45 / dt);
         self.flux.fill(0.0);
-        self.donor_scale.fill(0.0);
         let mut emitted = [Emission::default(); 2];
-        for face in 1..n {
-            let left = self.surface(face - 1);
-            let right = self.surface(face);
-            let barrier = self.spec.bed[face - 1].max(self.spec.bed[face]);
-            let velocity = ((self.velocity[face] + config.gravity * (left - right) / dx * dt)
-                / (1.0 + config.damping * dt))
-                .clamp(-speed_limit, speed_limit);
-            let depth = ((if velocity > 0.0 { left } else { right }) - barrier).max(0.0);
-            self.velocity[face] = if depth > 0.0 { velocity } else { 0.0 };
-            self.flux[face] = self.velocity[face] * depth * dt;
+        // Traverse equal-length slices directly. Besides expressing adjacent
+        // columns, this avoids bounds checks on every indexed field access in
+        // the hot solver loop when optional outlet logic changes codegen.
+        if self.slopes.is_some() {
+            self.slope_flux(config, dt, speed_limit);
+        } else {
+            for ((((velocity, flux), bed), volume), displaced) in self.velocity[1..n]
+                .iter_mut()
+                .zip(&mut self.flux[1..n])
+                .zip(self.spec.bed.windows(2))
+                .zip(self.volume.windows(2))
+                .zip(self.displaced.windows(2))
+            {
+                let left = bed[0] + (volume[0] + displaced[0]) / dx;
+                let right = bed[1] + (volume[1] + displaced[1]) / dx;
+                let barrier = bed[0].max(bed[1]);
+                let next = ((*velocity + config.gravity * (left - right) / dx * dt)
+                    / (1.0 + config.damping * dt))
+                    .clamp(-speed_limit, speed_limit);
+                let depth = ((if next > 0.0 { left } else { right }) - barrier).max(0.0);
+                *velocity = if depth > 0.0 { next } else { 0.0 };
+                *flux = *velocity * depth * dt;
+            }
         }
         for edge in 0..2 {
             let (i, face, sign) = if edge == 0 {
@@ -172,55 +239,98 @@ impl Pool {
                 (n - 1, n, 1.0)
             };
             self.velocity[face] = 0.0;
-            if allow[edge]
-                && let Boundary::Spill { lip } = self.spec.boundaries[edge]
-            {
+            if let Boundary::Spill { lip } = self.spec.boundaries[edge] {
                 let depth = (self.surface(i) - lip).max(0.0);
                 // Free outfall approximation, limited by the donor like all
                 // other fluxes. It cannot empty a pool through a raised lip.
                 let speed = (2.0 * config.gravity * depth).sqrt().min(speed_limit) * 0.65;
-                self.velocity[face] = sign * speed;
-                self.flux[face] = sign * speed * depth * dt;
+                let available = if self.slopes.is_some() {
+                    (self.volume[i] - self.column(i).area_below(lip)).max(0.0)
+                } else {
+                    self.volume[i].min(depth * dx)
+                };
+                let flow = (speed * depth * dt).min(available);
+                let (requested, batched) = self.drip_config.map_or((flow, false), |config| {
+                    // Raised lips retain their water even when releasing a
+                    // previously accumulated request after a level change.
+                    self.outlet_credit[edge].request(config, dt, flow, available)
+                });
+                if requested > 0.0 {
+                    // Reserve only when a slice is actually due. A dry or
+                    // still-accumulating left edge must not starve the right
+                    // edge when only one parcel slot remains. Each edge keeps
+                    // its reservation for the rest of this caller step.
+                    if !reserved[edge] && *free > 0 {
+                        reserved[edge] = true;
+                        *free -= 1;
+                    }
+                    if reserved[edge] {
+                        self.velocity[face] = sign * speed;
+                        self.flux[face] = sign * requested;
+                        emitted[edge].batched = batched;
+                    } else {
+                        emitted[edge].blocked = true;
+                    }
+                }
                 emitted[edge].height = lip + depth * 0.5;
                 emitted[edge].speed = sign * speed;
             }
         }
-        // Scale all simultaneous withdrawals from each donor together. No
-        // traversal-order bias and no negative depth after a concentrated input.
-        for face in 0..=n {
-            let flow = self.flux[face];
-            let donor = if flow > 0.0 {
-                face.checked_sub(1)
-            } else {
-                (face < n).then_some(face)
-            };
-            if let Some(i) = donor {
-                self.donor_scale[i] += flow.abs();
+        // A one-column basin can release two accumulated requests at once.
+        // Share its above-lip water, not the retained liquid below BOTH lips.
+        if n == 1
+            && self.drip_config.is_some()
+            && let [Boundary::Spill { lip: a }, Boundary::Spill { lip: b }] = self.spec.boundaries
+        {
+            let available = ((self.surface(0) - a.min(b)).max(0.0) * dx).min(self.volume[0]);
+            let requested = -self.flux[0] + self.flux[1];
+            if requested > available {
+                let scale = available / requested;
+                self.flux[0] *= scale;
+                self.flux[1] *= scale;
             }
         }
-        for i in 0..n {
-            self.donor_scale[i] = if self.donor_scale[i] > 0.0 {
-                (self.volume[i] / self.donor_scale[i]).min(1.0)
+        // Scale all simultaneous withdrawals from each donor together. No
+        // traversal-order bias and no negative depth after a concentrated input.
+        for ((scale, volume), faces) in self
+            .donor_scale
+            .iter_mut()
+            .zip(&self.volume)
+            .zip(self.flux.windows(2))
+        {
+            let requested = (-faces[0]).max(0.0) + faces[1].max(0.0);
+            *scale = if requested > 0.0 {
+                (*volume / requested).min(1.0)
             } else {
                 1.0
             };
         }
-        for face in 0..=n {
-            let donor = if self.flux[face] > 0.0 {
-                face.checked_sub(1)
-            } else {
-                (face < n).then_some(face)
-            };
-            if let Some(i) = donor {
-                self.flux[face] *= self.donor_scale[i];
-                self.velocity[face] *= self.donor_scale[i];
-            }
+        // Boundary faces only flow outwards; interior faces choose their donor.
+        for (face, donor) in [(0, 0), (n, n - 1)] {
+            self.flux[face] *= self.donor_scale[donor];
+            self.velocity[face] *= self.donor_scale[donor];
         }
-        for i in 0..n {
-            self.volume[i] = (self.volume[i] + self.flux[i] - self.flux[i + 1]).max(0.0);
+        for ((flux, velocity), donors) in self.flux[1..n]
+            .iter_mut()
+            .zip(&mut self.velocity[1..n])
+            .zip(self.donor_scale.windows(2))
+        {
+            let scale = if *flux > 0.0 { donors[0] } else { donors[1] };
+            *flux *= scale;
+            *velocity *= scale;
+        }
+        for (volume, faces) in self.volume.iter_mut().zip(self.flux.windows(2)) {
+            *volume = (*volume + faces[0] - faces[1]).max(0.0);
         }
         emitted[0].volume = -self.flux[0];
         emitted[1].volume = self.flux[n];
+        for (edge, emission) in emitted.iter().enumerate() {
+            if emission.volume > 0.0 {
+                // Unfulfilled credit is only a request, not detached water.
+                // Re-evaluate the remaining actual donor on the next substep.
+                self.outlet_credit[edge] = drips::Credit::default();
+            }
+        }
         // An open basin's reference occupancy depends on REMAINING liquid.
         // Refresh after every emitting substep, including the final one, so
         // neither the next flux calculation nor callers see stale pressure
@@ -234,6 +344,8 @@ impl Pool {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct Emission {
+    batched: bool,
+    blocked: bool,
     volume: f64,
     height: f64,
     speed: f64,
@@ -244,8 +356,8 @@ pub struct Parcel {
     pub position: Vec2,
     pub velocity: Vec2,
     pub volume: f64,
-    /// Time slice carried by this parcel; rendering can use speed * duration
-    /// for ribbon length, then volume / length for its cross-section.
+    /// Time slice carried by this parcel. Prefer `WaterWorld::spill_ribbon` for
+    /// attached outfalls; detached sources can use speed * duration for length.
     pub duration: f64,
     /// Optional vertical walls, [left, right]. Wall contact removes horizontal
     /// motion without deleting volume. None permits unrestricted free flight.
@@ -271,16 +383,35 @@ pub struct WaterStats {
     pub wet_columns: usize,
     pub parcels: usize,
     pub capacity_limited_ticks: u64,
+    /// Cumulative colliding parcel pairs, not unique water molecules.
+    pub spill_merges: u64,
+    pub mixed_volume: f64,
+    /// Broad-phase candidates that reached the swept footprint check.
+    pub mixing_pair_checks: u64,
+    /// Batched outfalls emitted, including those collected during their birth step.
+    pub drip_parcels_emitted: u64,
+    /// Collected parcels that imparted an optional wet-surface impulse.
+    pub impact_transfers: u64,
 }
 
 pub struct WaterWorld {
     config: WaterConfig,
     pools: Vec<Pool>,
     parcels: Vec<Parcel>,
+    /// Parallel, preallocated presentation history. Explicit rain/splash sources
+    /// have no attached stream, and retain the ordinary parcel representation.
+    spills: Vec<Option<Spill>>,
+    heads: Vec<[Option<Section>; 2]>,
+    origins: Vec<[Vec2; 2]>,
+    tick: u64,
+    mixing: mixing::Scratch,
+    mix_stats: mixing::Stats,
     injected: f64,
     drained: f64,
     reclaimed: f64,
     capacity_limited_ticks: u64,
+    drip_parcels_emitted: u64,
+    impact_transfers: u64,
 }
 
 impl WaterWorld {
@@ -290,11 +421,14 @@ impl WaterWorld {
             || specs.iter().map(|p| p.bed.len()).sum::<usize>() > MAX_COLUMNS
             || config.max_parcels == 0
             || config.max_parcels > MAX_PARCELS
+            || config.reserved_release_parcels >= config.max_parcels
             || ![config.gravity, config.max_speed]
                 .iter()
                 .all(|v| v.is_finite() && *v > 0.0 && *v <= 1.0e6)
             || !config.damping.is_finite()
             || config.damping < 0.0
+            || !config.impact_response.is_finite()
+            || !(0.0..=1.0).contains(&config.impact_response)
             || !finite_coordinate(config.exit_y)
         {
             return Err(WaterError::InvalidGeometry);
@@ -331,9 +465,9 @@ impl WaterWorld {
                         let x = spec.left
                             + spec.column_width
                                 * if edge == 0 {
-                                    -0.01
+                                    0.0
                                 } else {
-                                    spec.bed.len() as f64 + 0.01
+                                    spec.bed.len() as f64
                                 };
                         if x < left || x > right {
                             return Err(WaterError::InvalidGeometry);
@@ -343,11 +477,16 @@ impl WaterWorld {
             }
         }
         Ok(Self {
+            heads: vec![[None; 2]; specs.len()],
+            origins: vec![[Vec2::ZERO; 2]; specs.len()],
             pools: specs
                 .into_iter()
                 .map(|spec| {
                     let n = spec.bed.len();
                     Pool {
+                        enabled: true,
+                        slopes: None,
+                        geometry_scratch: Vec::new(),
                         spec,
                         volume: vec![0.0; n],
                         velocity: vec![0.0; n + 1],
@@ -355,15 +494,24 @@ impl WaterWorld {
                         donor_scale: vec![0.0; n],
                         displaced: vec![0.0; n],
                         displacement: displacement::Displacement::default(),
+                        drip_config: None,
+                        outlet_credit: [drips::Credit::default(); 2],
+                        outlet_channels: [config.spill_channel; 2],
                     }
                 })
                 .collect(),
             parcels: Vec::with_capacity(config.max_parcels),
+            spills: Vec::with_capacity(config.max_parcels),
+            tick: 0,
+            mixing: mixing::Scratch::new(config.max_parcels),
+            mix_stats: mixing::Stats::default(),
             config,
             injected: 0.0,
             drained: 0.0,
             reclaimed: 0.0,
             capacity_limited_ticks: 0,
+            drip_parcels_emitted: 0,
+            impact_transfers: 0,
         })
     }
 
@@ -372,6 +520,19 @@ impl WaterWorld {
     }
     pub fn parcels(&self) -> &[Parcel] {
         &self.parcels
+    }
+
+    /// Connected outfall geometry for a parcel index, if a positive-area strip
+    /// is possible. Independent sources and sharply broken streams return None.
+    pub fn spill_ribbon(&self, index: usize) -> Option<SpillRibbon> {
+        self.spills
+            .get(index)?
+            .as_ref()?
+            .ribbon(&self.parcels[index])
+    }
+
+    pub fn spill_source(&self, index: usize) -> Option<SpillSource> {
+        self.spills.get(index)?.as_ref().map(|s| s.source)
     }
 
     pub fn add_to_pool(&mut self, pool: usize, x: f64, volume: f64) -> Result<(), WaterError> {
@@ -406,11 +567,12 @@ impl WaterWorld {
         {
             return Err(WaterError::InvalidInput);
         }
-        if self.parcels.len() == self.config.max_parcels {
+        if self.parcels.len() >= self.config.max_parcels - self.config.reserved_release_parcels {
             return Err(WaterError::Capacity);
         }
         self.injected += parcel.volume;
         self.parcels.push(parcel);
+        self.spills.push(None);
         Ok(())
     }
 
@@ -433,16 +595,13 @@ impl WaterWorld {
                     return None;
                 }
                 let surface = pool.surface(i);
-                (pool.volume[i] > 0.0
-                    && point.y as f64 >= pool.spec.bed[i]
-                    && point.y as f64 <= surface)
+                let column = pool.column(i);
+                let bed = column.bed_at(point.x as f64);
+                (pool.volume[i] > 0.0 && point.y as f64 >= bed && point.y as f64 <= surface)
                     .then_some(WaterSample {
                         surface_y: surface,
-                        bed_y: pool.spec.bed[i],
-                        velocity: Vec2::new(
-                            ((pool.velocity[i] + pool.velocity[i + 1]) * 0.5) as f32,
-                            0.0,
-                        ),
+                        bed_y: bed,
+                        velocity: column.flow_velocity(),
                     })
             })
             .max_by(|a, b| a.surface_y.total_cmp(&b.surface_y))
@@ -452,6 +611,20 @@ impl WaterWorld {
         if !dt.is_finite() || dt <= 0.0 || dt > MAX_STEP {
             return Err(WaterError::InvalidInput);
         }
+        let previous_tick = self.tick;
+        self.tick = self.tick.wrapping_add(1);
+        if self.config.mix_spills {
+            mixing::step(
+                &mut self.parcels,
+                &mut self.spills,
+                &mut self.mixing,
+                &mut self.mix_stats,
+                self.config,
+                dt,
+                previous_tick,
+            );
+        }
+        self.heads.fill([None; 2]);
         let mut i = 0;
         while i < self.parcels.len() {
             let mut parcel = self.parcels[i];
@@ -467,37 +640,48 @@ impl WaterWorld {
                     parcel.velocity.x = 0.0;
                 }
             }
-            if let Some((pool, column)) = self.catch(from, parcel.position) {
-                self.pools[pool].volume[column] += parcel.volume;
+            if let Some((pool, column)) = self.catch(from, parcel.position, None) {
+                self.deposit(pool, column, parcel);
                 self.parcels.swap_remove(i);
+                self.spills.swap_remove(i);
             } else if parcel.position.y as f64 <= self.config.exit_y {
                 self.drained += parcel.volume;
                 self.parcels.swap_remove(i);
+                self.spills.swap_remove(i);
             } else {
                 self.parcels[i] = parcel;
+                if let Some(spill) = &mut self.spills[i] {
+                    spill.advance(dt, self.config, parcel.horizontal_bounds);
+                    if spill.tick == previous_tick
+                        && let SpillSource::Outlet { pool, edge } = spill.source
+                    {
+                        self.heads[pool][edge] = Some(spill.tail);
+                    }
+                }
                 i += 1;
             }
         }
         let substeps = (dt / SUBSTEP).ceil() as usize;
         let subdt = dt / substeps as f64;
         let mut limited = false;
-        for pool in &mut self.pools {
-            pool.refresh_displacement();
-            let mut free = self.config.max_parcels - self.parcels.len();
-            let mut allow = [false; 2];
-            for (edge, allowed) in allow.iter_mut().enumerate() {
-                if matches!(pool.spec.boundaries[edge], Boundary::Spill { .. }) {
-                    *allowed = free > 0;
-                    if *allowed {
-                        free -= 1;
-                    } else {
-                        limited |= pool.overflowing(edge);
-                    }
-                }
+        let first_emitted = self.parcels.len();
+        for (pool_index, pool) in self.pools.iter_mut().enumerate() {
+            if !pool.enabled {
+                continue;
             }
+            pool.refresh_displacement();
+            let mut free = (self.config.max_parcels - self.config.reserved_release_parcels)
+                .saturating_sub(self.parcels.len());
+            let mut reserved = [false; 2];
             let mut total = [Emission::default(); 2];
             for _ in 0..substeps {
-                for (sum, emission) in total.iter_mut().zip(pool.step(self.config, subdt, allow)) {
+                for (sum, emission) in
+                    total
+                        .iter_mut()
+                        .zip(pool.step(self.config, subdt, &mut reserved, &mut free))
+                {
+                    limited |= emission.blocked;
+                    sum.batched |= emission.batched;
                     sum.volume += emission.volume;
                     sum.height += emission.height * emission.volume;
                     sum.speed += emission.speed * emission.volume;
@@ -505,21 +689,104 @@ impl WaterWorld {
             }
             for (edge, emission) in total.into_iter().enumerate() {
                 if emission.volume > 0.0 {
+                    let bounds = pool.outlet_channels[edge];
                     let dx = pool.spec.column_width;
                     let x = pool.spec.left
                         + if edge == 0 {
-                            -dx * 0.01
+                            0.0
                         } else {
-                            (pool.volume.len() as f64 + 0.01) * dx
+                            pool.volume.len() as f64 * dx
                         };
-                    self.parcels.push(Parcel {
+                    let i = if edge == 0 { 0 } else { pool.volume.len() - 1 };
+                    let Boundary::Spill { lip } = pool.spec.boundaries[edge] else {
+                        unreachable!()
+                    };
+                    let depth = (pool.surface(i) - lip).max(0.0);
+                    // Instantaneous end-of-slice outfall, using the SAME speed
+                    // law as the solver. Dividing average flux by remaining
+                    // depth would launch nearly emptied columns at huge speeds.
+                    let speed = (2.0 * self.config.gravity * depth)
+                        .sqrt()
+                        .min(self.config.max_speed.min(dx * 0.45 / subdt))
+                        * 0.65;
+                    let velocity = pool.outlet_velocity(
+                        edge,
+                        speed * if edge == 0 { -1.0 } else { 1.0 },
+                        self.config.max_speed,
+                    );
+                    let tail = Section {
+                        position: Vec2::new(x as f32, (lip + depth * 0.5) as f32),
+                        velocity,
+                        flow: speed * depth,
+                    };
+                    let mut head = tail;
+                    head.advance(dt, self.config, bounds);
+                    let head = self.heads[pool_index][edge].unwrap_or(head);
+                    let spill = Spill {
+                        upstream_end: None,
+                        source: if emission.batched {
+                            self.drip_parcels_emitted += 1;
+                            SpillSource::Drip {
+                                pool: pool_index,
+                                edge,
+                            }
+                        } else {
+                            SpillSource::Outlet {
+                                pool: pool_index,
+                                edge,
+                            }
+                        },
+                        tick: self.tick,
+                        tail,
+                        head,
+                    };
+                    // A parcel represents the entire emitted time interval, not
+                    // a point born at the end of it. Place its center half a
+                    // slice downstream; the youngest cross-section stays at lip.
+                    let mut center = Section {
                         position: Vec2::new(x as f32, (emission.height / emission.volume) as f32),
-                        velocity: Vec2::new((emission.speed / emission.volume) as f32, 0.0),
+                        velocity: pool.outlet_velocity(
+                            edge,
+                            emission.speed / emission.volume,
+                            self.config.max_speed,
+                        ),
+                        flow: emission.volume / dt,
+                    };
+                    self.origins[pool_index][edge] = center.position;
+                    center.advance(dt * 0.5, self.config, bounds);
+                    self.parcels.push(Parcel {
+                        position: center.position,
+                        velocity: center.velocity,
                         volume: emission.volume,
                         duration: dt,
-                        horizontal_bounds: self.config.spill_channel,
+                        horizontal_bounds: bounds,
                     });
+                    self.spills.push(Some(spill));
                 }
+            }
+        }
+        // The half-slice birth advance must use the same swept collection as
+        // later motion, or a narrow/nearby collector could be skipped at birth.
+        // Reverse order keeps swap_remove aligned with unprocessed new parcels.
+        for i in (first_emitted..self.parcels.len()).rev() {
+            let spill = self.spills[i].expect("newly emitted outfall");
+            let parcel = self.parcels[i];
+            let (source_pool, edge) = match spill.source {
+                SpillSource::Outlet { pool, edge } | SpillSource::Drip { pool, edge } => {
+                    (pool, edge)
+                }
+                SpillSource::Junction { .. } => unreachable!(),
+            };
+            let origin = self.origins[source_pool][edge];
+            if let Some((pool, column)) = self.catch(origin, parcel.position, Some(source_pool)) {
+                self.deposit(pool, column, parcel);
+                self.pools[pool].refresh_displacement();
+                self.parcels.swap_remove(i);
+                self.spills.swap_remove(i);
+            } else if parcel.position.y as f64 <= self.config.exit_y {
+                self.drained += parcel.volume;
+                self.parcels.swap_remove(i);
+                self.spills.swap_remove(i);
             }
         }
         self.capacity_limited_ticks += u64::from(limited);
@@ -529,21 +796,41 @@ impl WaterWorld {
     /// Earliest descending swept intersection, including narrow receiving
     /// columns crossed entirely within one tick. Upper ledges are not solid
     /// below their beds, so parcels can reach an explicitly separate lower pool.
-    fn catch(&self, from: Vec2, to: Vec2) -> Option<(usize, usize)> {
+    fn catch(&self, from: Vec2, to: Vec2, leaving_pool: Option<usize>) -> Option<(usize, usize)> {
         if to.y > from.y {
             return None;
         }
         let mut hit = None;
         let mut earliest = f64::INFINITY;
+        let min_x = from.x.min(to.x) as f64;
+        let max_x = from.x.max(to.x) as f64;
         for (p, pool) in self.pools.iter().enumerate() {
+            if !pool.enabled || leaving_pool == Some(p) {
+                continue;
+            }
             let dx = pool.spec.column_width;
-            let first = ((from.x.min(to.x) as f64 - pool.spec.left) / dx)
+            // Most digit ledges are nowhere near this swept path. Reject
+            // their whole x interval before division/column surface queries.
+            // Match the narrow-phase edge tolerance, including corner hits.
+            if max_x < pool.spec.left - 1.0e-8
+                || min_x > pool.spec.left + dx * pool.volume.len() as f64 + 1.0e-8
+            {
+                continue;
+            }
+            let first = ((min_x - pool.spec.left) / dx)
                 .floor()
                 .clamp(0.0, (pool.volume.len() - 1) as f64) as usize;
-            let last = ((from.x.max(to.x) as f64 - pool.spec.left) / dx)
-                .floor()
-                .max(0.0) as usize;
+            let last = ((max_x - pool.spec.left) / dx).floor().max(0.0) as usize;
             for i in first..=last.min(pool.volume.len() - 1) {
+                if pool.slopes.is_some() {
+                    if let Some(t) = pool.column(i).swept_entry(from, to)
+                        && t < earliest
+                    {
+                        earliest = t;
+                        hit = Some((p, i));
+                    }
+                    continue;
+                }
                 let surface = pool.surface(i);
                 if (from.y as f64) < pool.spec.bed[i] || to.y as f64 > surface {
                     continue;
@@ -592,6 +879,9 @@ impl WaterWorld {
         if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
             return Err(WaterError::InvalidInput);
         }
+        if fraction == 0.0 {
+            return Ok(());
+        }
         for pool in &mut self.pools {
             for volume in &mut pool.volume {
                 let removed = *volume * fraction;
@@ -603,14 +893,29 @@ impl WaterWorld {
                 pool.flux.fill(0.0);
                 pool.donor_scale.fill(0.0);
             }
+            // Credits are not conserved water; clear rather than release old
+            // requests after explicit cleanup changes the available donor.
+            pool.outlet_credit = [drips::Credit::default(); 2];
             pool.refresh_displacement();
         }
-        for parcel in &mut self.parcels {
+        for (parcel, spill) in self.parcels.iter_mut().zip(&mut self.spills) {
             let removed = parcel.volume * fraction;
             parcel.volume -= removed;
             self.reclaimed += removed;
+            if let Some(spill) = spill {
+                spill.tail.flow *= 1.0 - fraction;
+                spill.head.flow *= 1.0 - fraction;
+            }
         }
-        self.parcels.retain(|p| p.volume > 0.0);
+        let mut i = 0;
+        while i < self.parcels.len() {
+            if self.parcels[i].volume == 0.0 {
+                self.parcels.swap_remove(i);
+                self.spills.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
         Ok(())
     }
 
@@ -630,6 +935,11 @@ impl WaterWorld {
                 .count(),
             parcels: self.parcels.len(),
             capacity_limited_ticks: self.capacity_limited_ticks,
+            spill_merges: self.mix_stats.pairs,
+            mixed_volume: self.mix_stats.volume,
+            mixing_pair_checks: self.mix_stats.checks,
+            drip_parcels_emitted: self.drip_parcels_emitted,
+            impact_transfers: self.impact_transfers,
         }
     }
 }

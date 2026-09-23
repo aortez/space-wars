@@ -41,12 +41,23 @@ The local launcher includes the following scenarios and presets:
   a bounded pool that drains through the floor before the face reforms.
   Duck runs and jumps a tiny seeded obstacle course beneath the readable clock,
   using one dynamic body and guaranteed arena cleanup.
+  **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
+  a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
+  (Picade: bottom-middle yellow). Falling, Meltdown, Color Cycle, Marquee, Digit Slide and Rain
+  continue alongside the player. Rain shares the stable course, or join a live
+  shower on its moving floor without clearing the water. The duck walks/jumps
+  on panels, floats, drifts and paddles with the joystick. Falling bars share
+  the duck's physics world: they can push it and provide jump surfaces. Meltdown's
+  individual blocks collide too, then become water on floor contact. Only the
+  automatic AI Duck course (and developer water labs) waits for the visit.
+  **N** / right shoulder / Picade upper-right blue starts the next compatible
+  event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or
   per-letter spins using clock digits or short bitmap text, without physics.
   Digit Slide rolls changed digits on minute boundaries without physics.
   Save custom text through `clock message` in the CLI or the Clock settings file.
-  **Pause → Clock Controls** (or the
-  on-face touch button) changes live settings and offers **Preview & Resume**.
+  Tap the clock face or press Start/P/Esc to pause. **Pause → Clock Controls**
+  changes live settings and offers **Preview & Resume**.
   See [Clock](docs/clock.md) for
   timing, the event catalog, and synchronized preview controls; the
   [performance lab](docs/clock-performance-lab.md) provides repeatable CPU
@@ -324,6 +335,36 @@ screen, stale revision, and an action unavailable on that screen. Add `--json`
 for a structured success or failure. `spacewars-cli ui press --help` lists all
 action and screen values, while `ui state` lists the actions accepted by the
 current screen.
+
+For actual controller-style holds through application input routing, use:
+
+```sh
+spacewars-cli input press right-shoulder --hold-ms 1200 --expect-screen gameplay
+spacewars-cli input press west --profile picade --expect-screen gameplay
+spacewars-cli input press start --expect-screen gameplay
+spacewars-cli input press south --expect-screen pause.main --json
+```
+
+`input press` creates a virtual controller press for `--player 1` or `2`, without
+requiring a physical gamepad. Named buttons are up/down/left/right,
+south/east/north/west, left/right-shoulder, start and select. Standard and Picade
+profiles share the normal button routing; their Clock Next Event bindings differ.
+Continuous controls go through each scenario's existing gamepad mapping. Bot
+players stay bots; input does not change player ownership or pilot selection.
+
+The app owns the **50–2000 ms hold** (default 120 ms), so killing/disconnecting
+the CLI cannot leave a button stuck. The command waits for release and reports
+`elapsed`, `context-changed`, or `input-cleared`; screen/scenario changes and host
+input clearing cancel the hold early. Directions repeat in menus, while button
+actions fire once. A fresh UI revision/screen/instance guard is captured before
+each request. Busy/benchmark states, overlapping simulated presses, and a held
+physical controller on the selected player are rejected. Physical input is not
+overwritten or disconnected. There is no unbounded key-down mode or power key.
+
+This tests the app's normalized input path, **not** OS controller recognition or
+physical switches. `tools/picade_input.py` remains the separate Linux evdev
+diagnostic for the latter software layer. All control-socket commands currently
+require a Unix host; this does not introduce a privileged device or remote daemon.
 
 Activate a visible control directly by the stable ID reported by `ui state`:
 

@@ -1,6 +1,36 @@
 use super::*;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockRainAmount, ClockTimeFormat};
 
+/// Rain shares the lit-cell layer now. Preserve the original face primitives
+/// in order, but allow additional water between digits and the colon/label.
+fn preserves_face(actual: &RenderFrame, normal: &RenderFrame) -> bool {
+    normal.layers.iter().filter(|l| l.z >= 2).all(|expected| {
+        let Some(layer) = actual.layers.iter().find(|l| l.z == expected.z) else {
+            return false;
+        };
+        let mut primitives = layer.primitives.iter();
+        expected
+            .primitives
+            .iter()
+            .all(|expected| primitives.any(|actual| actual == expected))
+    })
+}
+
+fn visible_face_pixels(
+    actual: &slint::SharedPixelBuffer<slint::Rgb8Pixel>,
+    normal: &slint::SharedPixelBuffer<slint::Rgb8Pixel>,
+) -> (usize, usize) {
+    normal
+        .as_slice()
+        .iter()
+        .zip(actual.as_slice())
+        // Default cyan face, excluding inactive guides, labels and floor.
+        .filter(|(p, _)| p.r >= 60 && p.g >= 200 && p.b >= 200)
+        .fold((0, 0), |(visible, total), (expected, actual)| {
+            (visible + usize::from(actual == expected), total + 1)
+        })
+}
+
 #[test]
 fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
     for viewport in [
@@ -32,6 +62,16 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
             Duration::ZERO,
         );
         let normal = ClockScenario::render_frame(&reference);
+        assert!(preserves_face(&normal, &normal));
+        let mut missing_digit = normal.clone();
+        missing_digit
+            .layers
+            .iter_mut()
+            .find(|l| l.z == 3)
+            .unwrap()
+            .primitives
+            .remove(0);
+        assert!(!preserves_face(&missing_digit, &normal));
         let mut scenario = ClockClientScenario {
             state,
             last_emitted_reading: Cell::new(None),
@@ -47,6 +87,10 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
             )
             .to_rgb8()
             .unwrap();
+        let blank = slint::SharedPixelBuffer::new(normal_pixels.width(), normal_pixels.height());
+        let (visible, total) = visible_face_pixels(&blank, &normal_pixels);
+        assert_eq!(visible, 0, "blank negative control must fail readability");
+        assert!(total > 0, "readability mask must include the lit face");
         let duration = scenario_clock::EVENT_CATALOG[ClockEventKind::Rain as usize].duration_ticks;
         let mut saw_duck = false;
         for tick in 1..=duration {
@@ -79,20 +123,14 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
                     .iter()
                     .map(|l| l.primitives.len())
                     .sum::<usize>()
-                    <= 800
+                    // 320 columns × fill/edge, 512 parcels × at most four
+                    // ribbon primitives, plus the face, duck and arena.
+                    <= 3000,
+                "unbounded Rain scene: {viewport:?}, tick={tick}"
             );
-            assert_eq!(
-                frames[0]
-                    .layers
-                    .iter()
-                    .filter(|l| l.z >= 2)
-                    .collect::<Vec<_>>(),
-                normal
-                    .layers
-                    .iter()
-                    .filter(|l| l.z >= 2)
-                    .collect::<Vec<_>>(),
-                "rain never replaces/obscures the clock face"
+            assert!(
+                preserves_face(&frames[0], &normal),
+                "rain must retain the face: {viewport:?}, tick={tick}"
             );
             let pixels = renderer
                 .image_from_frames_with_layout(
@@ -103,6 +141,13 @@ fn rain_is_visible_in_both_render_paths_and_leaves_the_clock_face_readable() {
                 )
                 .to_rgb8()
                 .unwrap();
+            let (visible, total) = visible_face_pixels(&pixels, &normal_pixels);
+            // Passing drops may overlap a few pixels; merely retaining hidden
+            // primitives must not let an opaque water overlay pass this test.
+            assert!(
+                visible * 4 >= total * 3,
+                "rain hid the face: {visible}/{total}, {viewport:?}, tick={tick}"
+            );
             if tick == duration {
                 assert_eq!(frames[0], normal);
                 assert_eq!(pixels.as_bytes(), normal_pixels.as_bytes());

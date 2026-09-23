@@ -43,6 +43,15 @@ pub struct BuoyantBody {
     shape: HullShape,
 }
 
+/// Contact properties are independent of water density/drag. Controllers can
+/// keep a non-bouncy, frictionless character while opting into buoyancy.
+#[derive(Debug, Clone, Copy)]
+pub struct BuoyantMaterial {
+    pub density: f32,
+    pub friction: f32,
+    pub restitution: f32,
+}
+
 impl BuoyantBody {
     /// The collider and water hull are built together, preventing mismatched
     /// shape/density assumptions. The caller owns removal and must not replace
@@ -54,10 +63,39 @@ impl BuoyantBody {
         shape: HullShape,
         density: f32,
     ) -> Option<Self> {
+        Self::insert_with_material(
+            world,
+            entity,
+            spec,
+            shape,
+            BuoyantMaterial {
+                density,
+                friction: 0.5,
+                restitution: 0.1,
+            },
+        )
+    }
+
+    pub fn insert_with_material(
+        world: &mut PhysicsWorld,
+        entity: PhysicsId,
+        spec: BodySpec,
+        shape: HullShape,
+        material: BuoyantMaterial,
+    ) -> Option<Self> {
+        let BuoyantMaterial {
+            density,
+            friction,
+            restitution,
+        } = material;
         if spec.kind != BodyKind::Dynamic
             || spec.gravity_scale != 1.0
             || !density.is_finite()
             || !(0.001..=10_000.0).contains(&density)
+            || !friction.is_finite()
+            || friction < 0.0
+            || !restitution.is_finite()
+            || !(0.0..=1.0).contains(&restitution)
             || world.contains_entity(entity)
         {
             return None;
@@ -73,7 +111,8 @@ impl BuoyantBody {
             HullShape::Circle { radius } => ColliderSpec::ball(collider_id, radius),
         };
         collider.density = density;
-        collider.restitution = 0.1;
+        collider.friction = friction;
+        collider.restitution = restitution;
         if !world.insert_body(body, spec, &[collider]) {
             return None;
         }

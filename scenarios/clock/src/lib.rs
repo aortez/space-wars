@@ -9,14 +9,20 @@ mod events;
 mod floor;
 #[cfg(test)]
 mod floor_tests;
+#[cfg(test)]
+mod input_tests;
 mod layout;
 #[cfg(test)]
 mod live_tests;
 mod meridiem;
 mod physics;
+mod player;
+#[cfg(test)]
+mod player_tests;
 mod presentation;
 mod rain;
 mod render;
+pub mod water_fixture;
 
 use std::time::Duration;
 
@@ -43,11 +49,15 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 5;
+pub const CLOCK_ACTION_VERSION: u16 = 6;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
 pub const CLOCK_ACTION_PREVIEW_EVENT: u32 = 5;
+pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
+pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
+pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
+pub use player::ClockDuckInput;
 pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
@@ -94,9 +104,19 @@ pub enum ClockAction {
     TriggerEvent(ClockEventKind),
     Configure(ClockSettings),
     PreviewEvent(ClockEventKind),
+    NextEvent,
+    TogglePlayerDuck(u8),
+    PlayerDuckInput(ClockDuckInput),
 }
 
 impl ClockAction {
+    pub fn next_event() -> Action {
+        Action::scenario(
+            CLOCK_ACTION_NEXT_EVENT,
+            CLOCK_ACTION_VERSION.to_le_bytes().to_vec(),
+        )
+    }
+
     pub fn configure(settings: ClockSettings) -> Action {
         let mut payload = CLOCK_ACTION_VERSION.to_le_bytes().to_vec();
         payload.push(match settings.time_format {
@@ -151,6 +171,13 @@ impl ClockAction {
             return None;
         }
         match (*kind, payload.len()) {
+            (CLOCK_ACTION_TOGGLE_PLAYER_DUCK, 3) if (1..=2).contains(&payload[2]) => {
+                Some(Self::TogglePlayerDuck(payload[2]))
+            }
+            (CLOCK_ACTION_PLAYER_DUCK_INPUT, 14) => {
+                ClockDuckInput::decode(&payload[2..]).map(Self::PlayerDuckInput)
+            }
+            (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
@@ -339,6 +366,13 @@ pub struct ClockState {
     schedule: EventSchedule,
     active_event: Option<ActiveEvent>,
     floor: floor::FloorManager,
+    last_started_event: Option<ClockEventKind>,
+    event_notice: Option<(&'static str, u64)>,
+    // Player presence is not a timed event. Face animations, Rain, Falling and
+    // Meltdown coexist; private AI courses/labs wait until the player leaves.
+    player_duck: Option<Box<events::duck::DuckEvent>>,
+    player_duck_sequence: u64,
+    player_seed: u64,
 }
 
 impl ClockState {
@@ -354,14 +388,13 @@ impl ClockState {
     }
 
     fn configure(&mut self, settings: ClockSettings) {
-        self.schedule
-            .configure(settings.event_profile, settings.events);
         self.config.time_format = settings.time_format;
         self.config.event_profile = settings.event_profile;
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
         self.config.marquee_message = settings.marquee_message;
         self.config.rain_amount = settings.rain_amount;
+        self.sync_event_schedule();
         if let Some(reading) = self.reading {
             self.apply_reading(reading, false);
         }
@@ -399,6 +432,7 @@ impl ClockState {
         self.config.aspect_ratio = aspect_ratio;
         // A resize changes both anchors and floor geometry. Recover immediately
         // instead of leaving bodies in the old arena or teleporting colliders.
+        self.finish_player_duck();
         if self.active_event.is_some() {
             self.finish_event();
         }
@@ -445,11 +479,19 @@ impl ClockState {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().0)
+            + self
+                .player_duck
+                .as_ref()
+                .map_or(0, |duck| duck.physics_counts().0)
     }
     pub fn collider_count(&self) -> usize {
         self.active_event
             .as_ref()
             .map_or(0, |event| event.physics_counts().1)
+            + self
+                .player_duck
+                .as_ref()
+                .map_or(0, |duck| duck.physics_counts().1)
     }
     pub fn meltdown_state(&self) -> Option<engine_common::ClockMeltdownState> {
         match self.active_event.as_ref()? {
@@ -488,18 +530,51 @@ impl ClockState {
     }
 
     fn trigger_event(&mut self, kind: ClockEventKind) {
-        if self.can_trigger_event() {
+        if self.can_trigger_event() && !self.event_blocked_by_player(kind) {
             self.start_event(kind);
         }
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if self.event_blocked_by_player(kind) {
+                self.event_notice = Some((
+                    "Dismiss your duck to preview this event",
+                    self.schedule.tick + 2 * u64::from(FIXED_HZ),
+                ));
+                return;
+            }
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
             self.finish_event();
             self.start_event(kind);
         }
+    }
+
+    fn next_event(&mut self) {
+        if self.reading.is_none() {
+            return;
+        }
+        let kinds = ClockEventKind::ALL;
+        let start = self.last_started_event.map_or(0, |kind| kind as usize + 1);
+        let next = (0..kinds.len())
+            .map(|offset| kinds[(start + offset) % kinds.len()])
+            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked_by_player(*kind));
+        let message = if let Some(kind) = next {
+            // The preview path owns cancellation/restoration for every event.
+            // Manual cycling ignores automatic cooldowns, not enabled switches.
+            self.preview_event(kind);
+            kind.label()
+        } else if self.player_duck.is_some()
+            && ClockEventKind::ALL
+                .into_iter()
+                .any(|kind| self.config.events.enabled(kind))
+        {
+            "Dismiss your duck for the enabled events"
+        } else {
+            "No events enabled"
+        };
+        self.event_notice = Some((message, self.schedule.tick + 2 * u64::from(FIXED_HZ)));
     }
 
     fn start_event(&mut self, kind: ClockEventKind) {
@@ -511,9 +586,56 @@ impl ClockState {
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
     ) {
+        debug_assert!(!self.event_blocked_by_player(kind));
+        self.last_started_event = Some(kind);
+        self.event_notice = None;
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
-        self.floor.acquire(kind, self.config.water_lab);
+        if kind == ClockEventKind::Rain
+            && let Some(duck) = &self.player_duck
+        {
+            self.floor.acquire_player_event(kind);
+            let rain = if let Some(floor) = duck.responsive_floor() {
+                rain::RainEvent::on_responsive_floor(
+                    layout,
+                    seed,
+                    self.config.rain_amount,
+                    self.display,
+                    floor.clone(),
+                )
+            } else {
+                rain::RainEvent::on_course(
+                    events::duck::arena::CourseGeometry::from_duck(duck),
+                    seed,
+                    self.config.rain_amount,
+                    self.display,
+                )
+            };
+            self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
+            return;
+        }
+        if matches!(kind, ClockEventKind::Falling | ClockEventKind::Meltdown)
+            && let Some(duck) = &mut self.player_duck
+        {
+            self.floor.acquire_player_event(kind);
+            let context = EventContext {
+                segments: &mut self.segments,
+                display: self.display,
+                layout,
+                floor: self.floor.geometry(layout),
+            };
+            self.active_event = Some(match kind {
+                ClockEventKind::Falling => ActiveEvent::Falling(
+                    events::falling::FallingEvent::with_player(context, seed, duck),
+                ),
+                ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
+                    events::meltdown::MeltdownEvent::with_player(context, seed, duck),
+                )),
+                _ => unreachable!(),
+            });
+            return;
+        }
+        self.floor.acquire(kind);
         self.active_event = Some(ActiveEvent::new(
             kind,
             EventContext {
@@ -529,11 +651,20 @@ impl ClockState {
     }
 
     fn finish_event(&mut self) {
-        if let Some(event) = self.active_event.take() {
-            self.schedule.finish(event.kind());
+        if let Some(mut event) = self.active_event.take() {
+            let kind = event.kind();
+            event.release_arena(self.player_duck.as_deref_mut());
+            if let ActiveEvent::Rain(rain) = &event
+                && let Some(floor) = rain.responsive_floor()
+                && let Some(duck) = &mut self.player_duck
+            {
+                duck.sync_responsive_floor(floor);
+            }
+            drop(event);
+            self.schedule.finish(kind);
+            self.floor.release(kind);
         }
-        // The event and its bodies/water have been dropped before closing.
-        self.floor.release();
+        // Visual-event cleanup never releases the player's physical arena.
         for segment in &mut self.segments {
             segment.representation = SegmentRepresentation::Anchored;
         }
@@ -542,19 +673,82 @@ impl ClockState {
 
     fn advance_tick(&mut self) {
         self.schedule.advance_tick();
-        let layout = Layout::new(self.aspect_ratio());
-        if let Some(event) = &mut self.active_event {
-            if event.step(EventContext {
-                segments: &mut self.segments,
-                display: self.display,
-                layout,
-                floor: self.floor.geometry(layout),
-            }) {
-                self.finish_event();
-            }
-        } else if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
-            self.trigger_event(kind);
+        if self
+            .event_notice
+            .is_some_and(|(_, until)| self.schedule.tick >= until)
+        {
+            self.event_notice = None;
         }
+        let layout = Layout::new(self.aspect_ratio());
+        let panels_advanced = matches!(&self.active_event, Some(ActiveEvent::Rain(rain)) if rain.responsive_floor().is_some());
+        if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event {
+            rain.set_player_hull(self.player_duck.as_ref().and_then(|d| d.clearance_hull()));
+        }
+        let player_advanced = if self.active_event.is_some() {
+            self.step_active_event(layout)
+        } else {
+            if let Some(kind) = self.schedule.due_event(self.reading.is_some()) {
+                self.trigger_event(kind);
+            }
+            // A newly inserted shared batch must be advanced/read back with
+            // the character this tick too; otherwise the rendered bars lag
+            // their colliders until the first regular event step.
+            if self
+                .active_event
+                .as_ref()
+                .is_some_and(ActiveEvent::shares_player_arena)
+            {
+                self.step_active_event(layout)
+            } else {
+                false
+            }
+        };
+        // Water advances once, then the one player mechanics world samples it.
+        // No second character world or frame-rate dependent force application.
+        let water = match &self.active_event {
+            Some(ActiveEvent::Rain(rain)) => {
+                if let Some(duck) = &mut self.player_duck
+                    && let Some(floor) = rain.responsive_floor()
+                {
+                    duck.sync_responsive_floor(floor);
+                }
+                Some(&rain.water)
+            }
+            _ => None,
+        };
+        if let Some(duck) = &mut self.player_duck
+            && if player_advanced {
+                duck.player_finished()
+            } else {
+                duck.step_with_environment(water, panels_advanced || water.is_some())
+            }
+        {
+            self.finish_player_duck();
+        }
+    }
+
+    /// Reports whether the event already stepped the player's mechanics world.
+    /// This remains true on its final tick, after cleanup removes the event.
+    fn step_active_event(&mut self, layout: Layout) -> bool {
+        let event = self.active_event.as_mut().expect("active event");
+        let player_advanced = event.shares_player_arena();
+        let context = EventContext {
+            segments: &mut self.segments,
+            display: self.display,
+            layout,
+            floor: self.floor.geometry(layout),
+        };
+        let finished = match event {
+            ActiveEvent::Falling(falling) => falling.step(context, self.player_duck.as_deref_mut()),
+            ActiveEvent::Meltdown(meltdown) => {
+                meltdown.step_with_player(context, self.player_duck.as_deref_mut())
+            }
+            _ => event.step(context),
+        };
+        if finished {
+            self.finish_event();
+        }
+        player_advanced
     }
 
     fn apply_reading(&mut self, reading: ClockReading, animate: bool) {
@@ -582,6 +776,11 @@ impl ClockState {
         }
         if let Some(ActiveEvent::Marquee(event)) = &mut self.active_event {
             event.synchronize(self.display);
+        }
+        if let Some(ActiveEvent::Rain(event)) = &mut self.active_event {
+            // A control-only update may transfer wet support into free water,
+            // but never advances time, consumes rain RNG, or integrates motion.
+            event.synchronize(self.display, &mut self.segments);
         }
         if !self
             .active_event
@@ -611,6 +810,11 @@ impl Scenario for ClockScenario {
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
             active_event: None,
             floor: floor::FloorManager::default(),
+            last_started_event: None,
+            event_notice: None,
+            player_duck: None,
+            player_duck_sequence: 0,
+            player_seed: seed ^ 0x504c_4159_4455_434b,
         }
     }
 
@@ -621,6 +825,9 @@ impl Scenario for ClockScenario {
                 ClockAction::TriggerEvent(kind) => state.trigger_event(kind),
                 ClockAction::Configure(settings) => state.configure(settings),
                 ClockAction::PreviewEvent(kind) => state.preview_event(kind),
+                ClockAction::NextEvent => state.next_event(),
+                ClockAction::TogglePlayerDuck(player) => state.toggle_player_duck(player),
+                ClockAction::PlayerDuckInput(input) => state.apply_player_duck_input(input),
             }
         }
         // The fixed-timestep host supplies one tick per call. Zero duration is

@@ -68,6 +68,13 @@ pub(crate) struct Displacement {
 }
 
 impl Displacement {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.bodies.is_empty()
+    }
+    pub(crate) fn clear(&mut self) {
+        self.bodies.clear();
+    }
+
     pub(crate) fn contains(&self, point: Vec2) -> bool {
         self.bodies.iter().any(|body| body.contains(point))
     }
@@ -126,6 +133,9 @@ impl WaterWorld {
         bodies: &[DisplacementBody],
     ) -> Result<(), WaterError> {
         let pool = self.pools.get_mut(pool).ok_or(WaterError::InvalidInput)?;
+        if !pool.enabled() {
+            return Err(WaterError::InvalidInput);
+        }
         if bodies.len() > MAX_DISPLACERS {
             return Err(WaterError::Capacity);
         }
@@ -158,7 +168,9 @@ impl WaterWorld {
         if diameter > pool.spec.column_width * pool.volume.len() as f64 * 0.75 {
             return Err(WaterError::InvalidInput);
         }
-        if !bodies.is_empty() && pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0]) {
+        if !bodies.is_empty()
+            && (pool.slopes.is_some() || pool.spec.bed.iter().any(|bed| *bed != pool.spec.bed[0]))
+        {
             return Err(WaterError::InvalidGeometry);
         }
         if pool.displacement.bodies != bodies {

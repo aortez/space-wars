@@ -1,6 +1,6 @@
 use super::*;
 
-fn cell(position: Vec2) -> MeltCell {
+pub(super) fn cell(position: Vec2) -> MeltCell {
     MeltCell {
         position,
         meridiem: false,
@@ -9,6 +9,18 @@ fn cell(position: Vec2) -> MeltCell {
         spin: 0.0,
         release_tick: 24,
     }
+}
+
+pub(super) fn open_floor(event: &mut MeltdownEvent, opening: f64) {
+    let floor = event.floor.as_mut().unwrap();
+    // Start the dry fixture at a known pose; live motion remains rate-limited.
+    for i in 1..=400 {
+        floor
+            .shape
+            .apply(&mut event.water, opening * i as f64 / 400.0, 1.0 / 60.0)
+            .unwrap();
+    }
+    floor.opening = opening;
 }
 
 #[test]
@@ -100,7 +112,7 @@ fn meridiem_floor_impacts_and_unmelted_cleanup_credit_only_the_small_pixel_area(
 fn footprint_conversion_partitions_one_cell_across_columns_banks_and_gap() {
     let aspect = 800.0 / 480.0;
     let layout = Layout::new(aspect);
-    let extent = Vec2::new(layout.pitch * 0.5, 5.0);
+    let extent = cell(Vec2::ZERO).extent(layout.pitch);
     for x in [
         -layout.drain_half_width(),
         layout.drain_half_width(),
@@ -113,15 +125,16 @@ fn footprint_conversion_partitions_one_cell_across_columns_banks_and_gap() {
             panic!()
         };
         event.cells.clear();
+        open_floor(event, 1.0);
         event.initial_cells = 1;
         event.initial_area = event.cell_area;
         let mut drop = cell(Vec2::new(x, layout.floor_y));
         assert!(material::merge(
             &mut drop,
-            extent,
             &mut event.water,
             event.cell_area,
-            event.drain.unwrap()
+            layout,
+            event.floor.as_ref().unwrap()
         ));
         let left = (x - extent.x).max(layout.bounds_min.x) as f64;
         let right = (x + extent.x).min(layout.bounds_max.x) as f64;
@@ -159,6 +172,7 @@ fn full_parcel_queue_defers_the_whole_source_then_accepts_it_once() {
     let Some(crate::events::ActiveEvent::Meltdown(event)) = &mut state.active_event else {
         panic!()
     };
+    open_floor(event, 1.0);
     for _ in 0..MAX_SPILL_PARCELS {
         event
             .water
@@ -171,25 +185,25 @@ fn full_parcel_queue_defers_the_whole_source_then_accepts_it_once() {
             })
             .unwrap();
     }
-    let extent = Vec2::new(layout.pitch * 0.5, 5.0);
     let mut drop = cell(Vec2::new(-layout.drain_half_width(), layout.floor_y));
     let before = event.water.stats();
     assert!(!material::merge(
         &mut drop,
-        extent,
         &mut event.water,
         event.cell_area,
-        event.drain.unwrap()
+        layout,
+        event.floor.as_ref().unwrap()
     ));
     assert_eq!(before, event.water.stats());
-    assert_eq!(drop.position.y, layout.floor_y + extent.y);
+    assert!(drop.position.y > layout.floor_y);
+    assert_eq!(drop.velocity.y, 0.0);
     event.water.reclaim();
     assert!(material::merge(
         &mut drop,
-        extent,
         &mut event.water,
         event.cell_area,
-        event.drain.unwrap()
+        layout,
+        event.floor.as_ref().unwrap()
     ));
     let s = event.water.stats();
     assert!((s.injected - before.injected - event.cell_area).abs() < 1e-8);
@@ -217,7 +231,10 @@ fn normal_melting_releases_solid_blocks_and_finishes_its_sources_on_time() {
             }
             let s = state.meltdown_state().unwrap();
             assert_eq!((s.waiting_cells, s.airborne_cells), (0, 0));
-            assert_eq!(s.capacity_limited_ticks, 0);
+            assert_eq!(
+                s.capacity_limited_ticks, 0,
+                "aspect={aspect} seed={seed}: {s:?}"
+            );
         }
     }
 }
@@ -287,10 +304,10 @@ fn a_full_queue_skips_optional_spray_but_does_not_stall_a_bank_impact() {
     let mut block = cell(Vec2::new(-100.0, layout.floor_y));
     assert!(material::merge(
         &mut block,
-        Vec2::new(layout.pitch * 0.4, layout.pitch * 0.4),
         &mut event.water,
         event.cell_area,
-        event.drain.unwrap()
+        layout,
+        event.floor.as_ref().unwrap()
     ));
     let after = event.water.stats();
     assert_eq!(after.in_flight, before.in_flight);

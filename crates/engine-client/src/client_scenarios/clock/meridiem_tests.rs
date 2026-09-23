@@ -82,7 +82,9 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
                             .iter()
                             .map(|l| l.primitives.len())
                             .sum::<usize>()
-                            <= 850
+                            // Sloped water uses two pieces per column, each
+                            // highlighted: 256 additional bounded primitives.
+                            <= if kind == ClockEventKind::Meltdown { 1106 } else { 850 }
                     );
                     let pixels = renderer
                         .image_from_frames_with_layout(
@@ -116,8 +118,7 @@ fn meridiem_events_reach_both_render_paths_and_recover_latest_time_pixels() {
                     }
                     if kind == ClockEventKind::Meltdown && tick == duration - 1 {
                         assert!(
-                            floor_tests::pixels_above_floor(&pixels)
-                                == floor_tests::pixels_above_floor(&normal_pixels),
+                            pixels.as_bytes() == normal_pixels.as_bytes(),
                             "latest label must recover exactly"
                         );
                     }

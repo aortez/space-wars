@@ -1,4 +1,35 @@
 use super::*;
+
+#[test]
+fn shared_course_floor_is_released_only_after_both_claims_end_in_either_order() {
+    for kind in [
+        ClockEventKind::Rain,
+        ClockEventKind::Falling,
+        ClockEventKind::Meltdown,
+    ] {
+        for event_first in [true, false] {
+            let mut floor = FloorManager::default();
+            floor.acquire_player();
+            floor.acquire_player_event(kind);
+            floor.release(ClockEventKind::ColorCycle);
+            assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+            if event_first {
+                floor.release(kind);
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.release_player();
+            } else {
+                floor.release_player();
+                assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+                floor.acquire_player(); // A new visit can reuse the occupied arena.
+                floor.release_player();
+                floor.release(kind);
+            }
+            assert_eq!(floor.mode(), ClockFloorMode::Closed);
+            floor.acquire(ClockEventKind::Falling);
+            assert_eq!(floor.mode(), ClockFloorMode::DrainOpen);
+        }
+    }
+}
 use engine_common::ClockFloorMode;
 use engine_water::Boundary;
 use floor::{FloorManager, test_drain};
@@ -29,11 +60,11 @@ fn every_event_acquires_its_floor_before_stepping_and_releases_it_after_cleanup(
     for (kind, expected) in [
         (ClockEventKind::Falling, ClockFloorMode::DrainOpen),
         (ClockEventKind::ColorCycle, ClockFloorMode::Closed),
-        (ClockEventKind::Meltdown, ClockFloorMode::DrainOpen),
+        (ClockEventKind::Meltdown, ClockFloorMode::EventOwned),
         (ClockEventKind::Duck, ClockFloorMode::EventOwned),
         (ClockEventKind::Marquee, ClockFloorMode::Closed),
         (ClockEventKind::DigitSlide, ClockFloorMode::Closed),
-        (ClockEventKind::Rain, ClockFloorMode::DrainOpen),
+        (ClockEventKind::Rain, ClockFloorMode::EventOwned),
     ] {
         let mut state = ready(ClockConfig {
             event_profile: ClockEventProfile::Off,
@@ -67,6 +98,11 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
         ClockEventKind::Meltdown,
         ClockEventKind::Rain,
     ] {
+        let expected = if source == ClockEventKind::Falling {
+            ClockFloorMode::DrainOpen
+        } else {
+            ClockFloorMode::EventOwned
+        };
         for elapsed in [0, 30, EVENT_CATALOG[source as usize].duration_ticks - 1] {
             let config = ClockConfig {
                 event_profile: ClockEventProfile::Off,
@@ -77,11 +113,11 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
             for _ in 0..elapsed {
                 tick(&mut state);
             }
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
             let phase_tick = state.phase_tick();
             ClockScenario::step(&mut state, &[], Duration::ZERO);
             assert_eq!(state.phase_tick(), phase_tick);
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
 
             // Disabling an active event changes future scheduling, not its lease.
             let mut settings = state.settings();
@@ -93,14 +129,14 @@ fn preview_replacement_resize_and_restart_cannot_leave_a_stale_drain_request() {
                 &[ClockAction::configure(settings)],
                 Duration::ZERO,
             );
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), expected);
 
             preview(&mut state, ClockEventKind::ColorCycle);
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
             preview(&mut state, source);
             preview(&mut state, ClockEventKind::Rain);
-            assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+            assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
             assert_eq!(state.event_kind(), Some(ClockEventKind::Rain));
             state.set_aspect_ratio(0.6);
             assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
@@ -138,7 +174,7 @@ fn custom_water_arenas_own_their_floors_without_opening_the_ordinary_drain() {
         assert!(geometry.drain().is_none());
         assert_eq!(geometry.slabs().count(), 0);
         preview(&mut state, ClockEventKind::Rain);
-        assert_eq!(state.floor_mode(), ClockFloorMode::DrainOpen);
+        assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
         state.set_aspect_ratio(0.6);
         assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     }
@@ -184,6 +220,31 @@ fn floor_slabs_and_water_boundaries_share_the_same_opening_at_all_aspects() {
 #[should_panic(expected = "finish the previous floor owner first")]
 fn floor_requests_cannot_silently_overwrite_an_existing_owner() {
     let mut floor = FloorManager::default();
-    floor.acquire(ClockEventKind::ColorCycle, ClockWaterLab::Off);
-    floor.acquire(ClockEventKind::Rain, ClockWaterLab::Off);
+    floor.acquire(ClockEventKind::Falling);
+    floor.acquire(ClockEventKind::Rain);
+}
+
+#[test]
+fn face_events_and_unrelated_cleanup_cannot_release_the_player_floor() {
+    let mut floor = FloorManager::default();
+    floor.acquire_player();
+    for kind in [
+        ClockEventKind::ColorCycle,
+        ClockEventKind::Marquee,
+        ClockEventKind::DigitSlide,
+    ] {
+        floor.acquire(kind);
+        floor.release(kind);
+        assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    }
+    floor.release(ClockEventKind::Duck);
+    assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    floor.release_player();
+    assert_eq!(floor.mode(), ClockFloorMode::Closed);
+    floor.acquire(ClockEventKind::Rain);
+    floor.release_player();
+    floor.release(ClockEventKind::Falling);
+    assert_eq!(floor.mode(), ClockFloorMode::EventOwned);
+    floor.release(ClockEventKind::Rain);
+    assert_eq!(floor.mode(), ClockFloorMode::Closed);
 }

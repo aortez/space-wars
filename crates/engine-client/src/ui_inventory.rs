@@ -227,18 +227,6 @@ fn world_control(
 }
 
 fn game_over_inventory(context: &UiInventoryContext) -> UiInventory {
-    if context.automatic {
-        return UiInventory {
-            selected_control: Some("game-over.return-to-launcher".into()),
-            controls: vec![
-                UiControl::new("game-over.return-to-launcher", "Launcher", true),
-                UiControl::new("game-over.world-seed", "World seed", false)
-                    .with_value(context.world_seed.clone()),
-            ],
-            actions: UiAction::ALL.to_vec(),
-            error: context.scenario_error.clone(),
-        };
-    }
     let mut ids = vec!["game-over.play-again"];
     let mut controls = vec![world_control(
         "game-over.play-again",
@@ -256,6 +244,13 @@ fn game_over_inventory(context: &UiInventoryContext) -> UiInventory {
         "Launcher",
         true,
     ));
+    if context.automatic {
+        // Preserve existing repeat-loop telemetry, not a special input policy.
+        controls.push(
+            UiControl::new("game-over.world-seed", "World seed", false)
+                .with_value(context.world_seed.clone()),
+        );
+    }
     UiInventory {
         selected_control: selected_from_index(&ids, context.game_over_focus_index),
         controls,
@@ -1448,6 +1443,32 @@ mod tests {
             }),
             UiScreen::PauseClock
         );
+    }
+
+    #[test]
+    fn automatic_match_results_keep_normal_selection_and_actions() {
+        let mut context = context("spacewars");
+        for selected in 0..3 {
+            context.game_over_focus_index = selected;
+            context.automatic = false;
+            let manual = inventory_for_screen(UiScreen::GameOver, &context);
+            context.automatic = true;
+            let automatic = inventory_for_screen(UiScreen::GameOver, &context);
+            assert_eq!(automatic.selected_control, manual.selected_control);
+            assert_eq!(automatic.actions, manual.actions);
+            assert_eq!(
+                automatic
+                    .controls
+                    .iter()
+                    .filter(|c| c.enabled)
+                    .collect::<Vec<_>>(),
+                manual
+                    .controls
+                    .iter()
+                    .filter(|c| c.enabled)
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 
     fn assert_inventory_is_activatable(screen: UiScreen, context: &UiInventoryContext) {

@@ -581,6 +581,7 @@ export component MainWindow inherits Window {
     callback native-video-ready();
     callback ui-action(int);
     callback keyboard-action(int, bool);
+    callback clock-input-key(int, bool);
 
     forward-focus: launcher-shortcuts;
     changed sound-visible => {
@@ -872,13 +873,20 @@ export component MainWindow inherits Window {
 
     // Inactive panels must leave the item tree: visible:false still incurs
     // software-renderer dirty-region/bounds work. Persistent state stays in root.
-    if root.launcher-scenario == "clock" && !root.launcher-visible && !root.ingame-menu-visible: MenuButton {
-        x: parent.width - 178px;
-        y: 12px;
-        width: 166px;
-        height: 44px;
-        text: "Clock Controls";
-        activated => { root.ingame-clock-open(); }
+    if root.launcher-scenario == "clock" && !root.launcher-visible
+        && !root.launcher-busy && !root.ingame-menu-visible && !root.game-over-visible: TouchArea {
+        width: parent.width;
+        height: parent.height;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                UserActivity.pointer-held = true;
+                UserActivity.notify();
+            } else if (event.kind == PointerEventKind.up || event.kind == PointerEventKind.cancel) {
+                UserActivity.pointer-held = false;
+            }
+        }
+        // Open only on release: the opening gesture cannot click a menu item.
+        clicked => { root.keyboard-action(8, false); }
     }
 
     if root.ingame-menu-visible: Rectangle {
@@ -1317,14 +1325,13 @@ export component MainWindow inherits Window {
                 x: 24px;
                 y: 140px;
                 width: parent.width - 48px;
-                text: root.autostart-running ? "Automatic match · Press a button for the launcher" : "A selects  ·  Start rematches  ·  B returns to launcher";
+                text: "A selects  ·  Start rematches  ·  B returns to launcher";
                 color: #80d8ff;
                 font-size: 13px;
                 horizontal-alignment: center;
             }
 
             MenuButton {
-                visible: !root.autostart-running;
                 x: 24px;
                 y: root.launcher-material-match ? 180px : 150px;
                 width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
@@ -1338,7 +1345,7 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                visible: root.launcher-material-match && !root.autostart-running;
+                visible: root.launcher-material-match;
                 x: 24px + (parent.width - 38px) / 3;
                 y: 180px;
                 width: (parent.width - 68px) / 3;
@@ -1352,12 +1359,12 @@ export component MainWindow inherits Window {
             }
 
             MenuButton {
-                x: root.autostart-running ? (parent.width - self.width) / 2 : root.launcher-material-match ? 24px + 2 * (parent.width - 38px) / 3 : parent.width / 2 + 5px;
+                x: root.launcher-material-match ? 24px + 2 * (parent.width - 38px) / 3 : parent.width / 2 + 5px;
                 y: root.launcher-material-match ? 180px : 150px;
                 width: root.launcher-material-match ? (parent.width - 68px) / 3 : (parent.width - 58px) / 2;
                 height: 64px;
                 text: "Launcher";
-                selected: root.autostart-running || root.game-over-focus-index == (root.launcher-material-match ? 2 : 1);
+                selected: root.game-over-focus-index == (root.launcher-material-match ? 2 : 1);
                 activated => {
                     root.game-over-focus-index = root.launcher-material-match ? 2 : 1;
                     root.ingame-return-launcher();
@@ -1375,11 +1382,47 @@ export component MainWindow inherits Window {
 
         capture-key-released(event) => {
             if (UserActivity.key-event(event.text, false)) { return accept; }
+            if (root.launcher-scenario == "clock") {
+                if (event.text == Key.LeftArrow) { root.clock-input-key(0, false); }
+                if (event.text == Key.RightArrow) { root.clock-input-key(1, false); }
+                if (event.text == " ") { root.clock-input-key(2, false); }
+                if (event.text == "z" || event.text == "Z") { root.clock-input-key(3, false); }
+            }
             return reject;
         }
         capture-key-pressed(event) => {
             if (UserActivity.key-event(event.text, true)) { return accept; }
             if (root.launcher-busy) { return accept; }
+            if (root.launcher-scenario == "clock" && !root.launcher-visible
+                && !root.ingame-menu-visible && !root.game-over-visible) {
+                if (event.text == "d" || event.text == "D") {
+                    root.keyboard-action(13, event.repeat);
+                    return accept;
+                }
+                // Do not re-latch keys held across pause/focus changes via repeat.
+                if (event.text == Key.LeftArrow) {
+                    if (!event.repeat) { root.clock-input-key(0, true); }
+                    return accept;
+                }
+                if (event.text == Key.RightArrow) {
+                    if (!event.repeat) { root.clock-input-key(1, true); }
+                    return accept;
+                }
+                if (event.text == " ") {
+                    if (!event.repeat) { root.clock-input-key(2, true); }
+                    return accept;
+                }
+                if (event.text == "z" || event.text == "Z") {
+                    if (!event.repeat) { root.clock-input-key(3, true); }
+                    return accept;
+                }
+            }
+            if (root.launcher-scenario == "clock" && !root.launcher-visible
+                && !root.ingame-menu-visible && !root.game-over-visible
+                && (event.text == "n" || event.text == "N")) {
+                root.keyboard-action(12, event.repeat);
+                return accept;
+            }
             if (event.text == Key.Escape) {
                 root.keyboard-action(5, event.repeat);
                 return accept;
@@ -2688,7 +2731,7 @@ export component MainWindow inherits Window {
             }
         }
     }
-    if root.autostart-running && !root.ingame-menu-visible: Rectangle {
+    if root.autostart-running && !root.ingame-menu-visible && root.autostart-caption != "": Rectangle {
         width: parent.width; height: parent.height;
         background: transparent;
         // Preserve next-round countdowns and failure feedback in full.
@@ -2698,15 +2741,9 @@ export component MainWindow inherits Window {
             x: parent.compact-caption ? parent.width / 2 - 120px : 12px;
             y: parent.height - (parent.compact-caption ? 17px : 24px);
             width: parent.compact-caption ? 240px : parent.width - 24px;
-            text: parent.compact-caption ? "Autoplay · Press a button for menu" : root.autostart-caption;
+            text: parent.compact-caption ? "Autoplay · Start/Esc for menu" : root.autostart-caption;
             color: #ffffff; font-size: parent.compact-caption ? 10px : 12px;
             horizontal-alignment: center;
-        }
-        TouchArea {
-            width: parent.width; height: parent.height;
-            pointer-event(event) => {
-                if (event.kind == PointerEventKind.down) { UserActivity.notify(); }
-            }
         }
     }
 

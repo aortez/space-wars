@@ -8,11 +8,11 @@ use engine_rapier::{
 };
 use engine_water::{WaterWorld, immersion::HullShape};
 
-use crate::{floor::DrainGeometry, layout::Layout};
+#[cfg(test)]
+use crate::floor::DrainGeometry;
+use crate::{floor::responsive::ResponsiveFloor, layout::Layout};
 
 pub(super) const DT: f64 = 1.0 / 60.0;
-pub(super) const COLUMNS: usize = 128;
-pub(super) const PARCELS: usize = 128;
 pub(super) const DENSITY: f32 = 0.45;
 
 pub(super) fn half_extents(layout: Layout) -> Vec2 {
@@ -29,6 +29,7 @@ pub(super) struct FloatWorld {
 }
 
 impl FloatWorld {
+    #[cfg(test)]
     pub fn new(drain: DrainGeometry) -> Self {
         let layout = drain.layout();
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
@@ -79,6 +80,46 @@ impl FloatWorld {
             report: BuoyancyReport::default(),
             half_extents: half_extents(layout),
         }
+    }
+
+    pub fn responsive(layout: Layout, floor: &ResponsiveFloor) -> Self {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -400.0),
+            length_unit: layout.pitch,
+            max_ccd_substeps: 2,
+            collect_events: false,
+            ..PhysicsWorldConfig::default()
+        });
+        world.reserve(4, 5, 0);
+        let id = PhysicsId::new(1000);
+        let walls = [-1.0, 1.0].map(|side| {
+            let mut c = ColliderSpec::cuboid(
+                ColliderId::new(id, ColliderRole::PRIMARY, u16::from(side > 0.0)),
+                2.0,
+                (layout.bounds_max.y - layout.bounds_min.y) * 0.5,
+            );
+            c.local_position = Vec2::new(side * (layout.bounds_max.x + 2.0), 0.0);
+            c
+        });
+        assert!(world.insert_body(
+            BodyId::new(id, BodyRole::PRIMARY),
+            BodySpec {
+                kind: BodyKind::Fixed,
+                ..BodySpec::default()
+            },
+            &walls
+        ));
+        floor.insert_panels(&mut world);
+        Self {
+            world,
+            duck: None,
+            report: BuoyancyReport::default(),
+            half_extents: half_extents(layout),
+        }
+    }
+
+    pub fn move_floor(&mut self, floor: &ResponsiveFloor) {
+        floor.move_panels(&mut self.world);
     }
 
     pub fn spawn(&mut self, position: Vec2, angle: f32) {
@@ -142,6 +183,8 @@ mod tests {
     use super::*;
     use crate::floor::test_drain;
     use engine_water::{Boundary, PoolSpec, WaterConfig};
+    const COLUMNS: usize = 128;
+    const PARCELS: usize = 128;
 
     fn fill(water: &mut WaterWorld, depth: f64) {
         for pool in 0..water.pools().len() {

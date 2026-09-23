@@ -3,7 +3,7 @@
 **/target/
 Cargo.lock.bak
 
-# Python analysis/test caches.
+# Python tooling.
 __pycache__/
 
 # Editor / IDE.

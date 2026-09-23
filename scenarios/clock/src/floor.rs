@@ -1,43 +1,124 @@
-//! Event-owned access to the ordinary floor. No per-tick work or extra bodies.
+//! Scoped ownership of the ordinary floor.
 //!
-//! Clock serializes events, so one explicit owner is sufficient. Acquire before
-//! constructing event resources; release only after dropping them. A future
-//! moving hatch must also move its physical/water boundaries, not just its art.
+//! Face-only events make no claim. The player's course or moving panels can be
+//! claimed jointly with Rain, Falling or Meltdown; the ordinary floor returns
+//! only after both release.
+//! Standalone physical events retain exclusive floor ownership.
+
+pub(crate) mod responsive;
 
 use engine_common::{ClockEventKind, ClockFloorMode};
 use engine_core::Vec2;
+#[cfg(test)]
 use engine_water::{Boundary, PoolSpec, WaterConfig, WaterWorld};
 
-use crate::{ClockWaterLab, layout::Layout};
+use crate::layout::Layout;
 
 #[derive(Default)]
 pub(crate) struct FloorManager {
-    owner: Option<ClockEventKind>,
+    owner: Option<FloorOwner>,
     mode: ClockFloorMode,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FloorOwner {
+    Event(ClockEventKind),
+    PlayerArena {
+        player: bool,
+        event: Option<ClockEventKind>,
+    },
+}
+
 impl FloorManager {
-    pub fn acquire(&mut self, kind: ClockEventKind, water_lab: ClockWaterLab) {
+    pub fn acquire(&mut self, kind: ClockEventKind) {
+        if !crate::EVENT_CATALOG[kind as usize].uses_floor() {
+            return;
+        }
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
         );
-        self.owner = Some(kind);
+        self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
-            ClockEventKind::Falling | ClockEventKind::Rain => ClockFloorMode::DrainOpen,
-            ClockEventKind::Meltdown if water_lab == ClockWaterLab::Off => {
-                ClockFloorMode::DrainOpen
+            ClockEventKind::Falling => ClockFloorMode::DrainOpen,
+            ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
+                ClockFloorMode::EventOwned
             }
-            ClockEventKind::Meltdown | ClockEventKind::Duck => ClockFloorMode::EventOwned,
             ClockEventKind::ColorCycle | ClockEventKind::Marquee | ClockEventKind::DigitSlide => {
                 ClockFloorMode::Closed
             }
         };
     }
 
-    pub fn release(&mut self) {
-        self.owner = None;
-        self.mode = ClockFloorMode::Closed;
+    pub fn release(&mut self, kind: ClockEventKind) {
+        if let Some(FloorOwner::PlayerArena { player, event }) = self.owner
+            && event == Some(kind)
+        {
+            self.owner = player.then_some(FloorOwner::PlayerArena {
+                player,
+                event: None,
+            });
+            if !player {
+                self.mode = ClockFloorMode::Closed;
+            }
+            return;
+        }
+        self.release_owner(FloorOwner::Event(kind));
+    }
+
+    pub fn acquire_player(&mut self) {
+        if self.owner == Some(FloorOwner::Event(ClockEventKind::Rain)) {
+            self.owner = Some(FloorOwner::PlayerArena {
+                player: true,
+                event: Some(ClockEventKind::Rain),
+            });
+            return;
+        }
+        if let Some(FloorOwner::PlayerArena { player, event }) = &mut self.owner {
+            assert!(!*player && event.is_some());
+            *player = true;
+            return;
+        }
+        assert!(
+            self.owner.is_none(),
+            "finish the previous floor owner first"
+        );
+        self.owner = Some(FloorOwner::PlayerArena {
+            player: true,
+            event: None,
+        });
+        self.mode = ClockFloorMode::EventOwned;
+    }
+
+    pub fn release_player(&mut self) {
+        if let Some(FloorOwner::PlayerArena { event, .. }) = self.owner {
+            self.owner = event.map(|kind| FloorOwner::PlayerArena {
+                player: false,
+                event: Some(kind),
+            });
+            if event.is_none() {
+                self.mode = ClockFloorMode::Closed;
+            }
+        }
+    }
+
+    pub fn acquire_player_event(&mut self, kind: ClockEventKind) {
+        assert!(matches!(
+            kind,
+            ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown
+        ));
+        let Some(FloorOwner::PlayerArena { event, .. }) = &mut self.owner else {
+            panic!("shared event requires a player arena");
+        };
+        assert!(event.is_none());
+        *event = Some(kind);
+    }
+
+    fn release_owner(&mut self, owner: FloorOwner) {
+        if self.owner == Some(owner) {
+            self.owner = None;
+            self.mode = ClockFloorMode::Closed;
+        }
     }
 
     pub fn mode(&self) -> ClockFloorMode {
@@ -112,6 +193,7 @@ impl DrainGeometry {
         self.0.layout
     }
 
+    #[cfg(test)]
     pub fn half_width(self) -> f32 {
         self.layout().drain_half_width()
     }
@@ -120,12 +202,10 @@ impl DrainGeometry {
         self.0.slabs()
     }
 
+    #[cfg(test)]
     pub fn water_world(self, columns: usize, max_parcels: usize) -> WaterWorld {
-        assert!(columns >= 2 && columns.is_multiple_of(2));
         let layout = self.layout();
-        let half = f64::from(layout.bounds_max.x);
         let lip = f64::from(self.half_width());
-        let floor = f64::from(layout.floor_y);
         WaterWorld::new(
             WaterConfig {
                 exit_y: f64::from(layout.bounds_min.y),
@@ -133,28 +213,39 @@ impl DrainGeometry {
                 spill_channel: Some([-lip, lip]),
                 ..WaterConfig::default()
             },
-            vec![
-                PoolSpec {
-                    left: -half,
-                    column_width: (half - lip) / (columns / 2) as f64,
-                    bed: vec![floor; columns / 2],
-                    boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
-                },
-                PoolSpec {
-                    left: lip,
-                    column_width: (half - lip) / (columns / 2) as f64,
-                    bed: vec![floor; columns / 2],
-                    boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
-                },
-            ],
+            self.water_pools(columns).into(),
         )
         .expect("bounded Clock drain geometry")
+    }
+
+    /// Flat-bank baseline retained for the one-way buoyancy regression fixture.
+    #[cfg(test)]
+    pub fn water_pools(self, columns: usize) -> [PoolSpec; 2] {
+        assert!(columns >= 2 && columns.is_multiple_of(2));
+        let layout = self.layout();
+        let half = f64::from(layout.bounds_max.x);
+        let lip = f64::from(self.half_width());
+        let floor = f64::from(layout.floor_y);
+        [
+            PoolSpec {
+                left: -half,
+                column_width: (half - lip) / (columns / 2) as f64,
+                bed: vec![floor; columns / 2],
+                boundaries: [Boundary::Closed, Boundary::Spill { lip: floor }],
+            },
+            PoolSpec {
+                left: lip,
+                column_width: (half - lip) / (columns / 2) as f64,
+                bed: vec![floor; columns / 2],
+                boundaries: [Boundary::Spill { lip: floor }, Boundary::Closed],
+            },
+        ]
     }
 }
 
 #[cfg(test)]
 pub(crate) fn test_drain(layout: Layout) -> DrainGeometry {
     let mut manager = FloorManager::default();
-    manager.acquire(ClockEventKind::Rain, ClockWaterLab::Off);
+    manager.acquire(ClockEventKind::Falling);
     manager.geometry(layout).drain().unwrap()
 }

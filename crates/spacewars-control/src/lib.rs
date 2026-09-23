@@ -6,10 +6,15 @@ use serde::{Deserialize, Serialize};
 
 mod client;
 mod clock;
+mod input;
 pub use clock::{
     CLOCK_MESSAGE_COMMAND, CLOCK_STATE_COMMAND, CLOCK_STATE_SCHEMA_VERSION, CLOCK_TRIGGER_COMMAND,
     ClockEventInfo, ClockEventKind, ClockMarqueeMessage, ClockMessageRequest, ClockState,
     ClockStatePredicate, ClockTriggerRequest,
+};
+pub use input::{
+    INPUT_PRESS_COMMAND, INPUT_SCHEMA_VERSION, InputButton, InputPressRequest, InputPressResult,
+    InputProfile, InputReleaseReason,
 };
 
 pub use client::{ControlClient, ControlClientError, UiStatePredicate};
@@ -487,6 +492,7 @@ fn required_status_value<'a>(
 #[derive(Debug)]
 pub enum ProtocolError {
     Json(serde_json::Error),
+    InvalidInput(String),
     UnsupportedSchemaVersion { found: u32, supported: u32 },
     MissingRuntimeField(&'static str),
     InvalidRuntimeField { field: &'static str, value: String },
@@ -496,6 +502,7 @@ impl fmt::Display for ProtocolError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Json(error) => write!(formatter, "invalid control protocol JSON: {error}"),
+            Self::InvalidInput(message) => write!(formatter, "invalid input request: {message}"),
             Self::UnsupportedSchemaVersion { found, supported } => write!(
                 formatter,
                 "unsupported control schema version {found}; this client supports version {supported}"
@@ -518,6 +525,7 @@ impl std::error::Error for ProtocolError {
         match self {
             Self::Json(error) => Some(error),
             Self::UnsupportedSchemaVersion { .. }
+            | Self::InvalidInput(_)
             | Self::MissingRuntimeField(_)
             | Self::InvalidRuntimeField { .. } => None,
         }

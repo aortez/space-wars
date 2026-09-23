@@ -3,7 +3,9 @@ use crate::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
 use engine_common::{ClockEventKind, ClockEventProfile, ClockSettings, ClockTimeFormat, Scenario};
 use std::time::Duration;
 
+mod player;
 mod presentation;
+mod responsive;
 mod spilling;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
@@ -651,15 +653,13 @@ fn assert_volume(state: &ClockState) {
     );
     assert!(stats.spill_parcels <= MAX_SPILL_PARCELS);
     if !event.lab {
-        let lip = Layout::new(state.aspect_ratio()).drain_half_width();
         assert!(event.water.parcels().iter().all(|p| {
-            let Some([left, right]) = p.horizontal_bounds else {
-                return false;
-            };
             let world_half = Layout::new(state.aspect_ratio()).bounds_max.x as f64;
-            ([left, right] == [-lip as f64, lip as f64]
-                || [left, right] == [-world_half, world_half])
-                && (left..=right).contains(&(p.position.x as f64))
+            p.horizontal_bounds.is_none_or(|[left, right]| {
+                left >= -world_half
+                    && right <= world_half
+                    && (left..=right).contains(&(p.position.x as f64))
+            })
         }));
     }
     assert!(

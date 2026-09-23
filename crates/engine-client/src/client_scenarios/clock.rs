@@ -18,6 +18,8 @@ mod floor_tests;
 #[cfg(test)]
 mod meridiem_tests;
 #[cfg(test)]
+mod player_tests;
+#[cfg(test)]
 mod rain_tests;
 
 pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
@@ -33,7 +35,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: false,
         captures_gamepad_select: false,
     },
-    controls_help: "Clock follows local device time. Start or P/Esc pauses; choose Clock Controls to change 12/24-hour format, event profile and individual events without restarting. Or tap Clock Controls on the face. Calm runs occasional events, Demo runs frequent events, Off disables automatic events. Preview & Resume replaces the current animation with your chosen event, even if disabled. Settings are saved. Pause freezes animation.",
+    controls_help: "Pause: tap / Start / P/Esc. Clock Controls: settings.\nNext Event: N / R shoulder / Picade top-right blue.\nDuck on/off: D / Y (North) / Picade bottom-right blue.\nMove/paddle: arrows / joystick. Jump: Space/Z / A or B.\nPicade jump: bottom-middle yellow; ground contact needed.\nSpawning pad owns duck; keys=P1. Exit or dismiss.\nVisual events and Rain keep your duck. Neutral floats/drifts.\nOff stops automatic events only. Pause freezes motion.",
     create,
 };
 
@@ -146,11 +148,22 @@ impl ClientScenario for ClockClientScenario {
         ClockScenario::step(&mut self.state, actions, dt)
     }
 
-    fn map_input(&self, _input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+    fn map_input(&self, input: &mut ClientInput, _benchmark_active: bool) -> Vec<Action> {
+        let next_event = input.take_clock_next_event_requested();
+        let player_duck = input.take_clock_player_duck_requested();
         if self.benchmark.is_some() {
             return Vec::new();
         }
-        self.actions_for_reading(local_clock_reading())
+        let mut actions = self.actions_for_reading(local_clock_reading());
+        if next_event {
+            actions.push(ClockAction::next_event());
+        } else if let Some(player) = player_duck {
+            actions.push(ClockAction::toggle_player_duck(player));
+        }
+        if let Some(controls) = input.clock_duck_input(self.state.player_duck_session()) {
+            actions.push(ClockAction::player_duck_input(controls));
+        }
+        actions
     }
 
     fn benchmark_counts(&self) -> Option<super::BenchmarkCounts> {
@@ -203,6 +216,7 @@ impl ClientScenario for ClockClientScenario {
                     duration_ticks: event.duration_ticks,
                     cooldown_ticks: event.cooldown_ticks,
                     enabled: self.state.event_enabled(event.kind),
+                    blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),
@@ -215,6 +229,8 @@ impl ClientScenario for ClockClientScenario {
             floor: self.state.floor_mode(),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
+            player_duck: self.state.player_duck_state(),
+            automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),
             digit_slide: self.state.digit_slide_state(),
             rain: self.state.rain_state(),
@@ -320,6 +336,82 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+    }
+
+    #[test]
+    fn next_event_input_is_consumed_once_and_cleared_before_menu_handoffs() {
+        let scenario = create(
+            0,
+            &Settings::default(),
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap();
+        let mut input = ClientInput::default();
+        let requested = |actions: Vec<Action>| {
+            actions
+                .iter()
+                .filter(|action| ClockAction::decode(action) == Some(ClockAction::NextEvent))
+                .count()
+        };
+        input.request_clock_next_event();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 1);
+        for _ in 0..120 {
+            assert_eq!(requested(scenario.map_input(&mut input, false)), 0);
+        }
+        input.request_clock_next_event();
+        input.clear();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 0);
+        input.request_clock_next_event();
+        assert_eq!(requested(scenario.map_input(&mut input, false)), 1);
+    }
+
+    #[test]
+    fn next_event_notice_is_readable_on_vector_and_raster_overlays() {
+        for viewport in [
+            Viewport::new(1024.0, 768.0),
+            Viewport::new(800.0, 480.0),
+            Viewport::new(480.0, 800.0),
+        ] {
+            let mut scenario = create(
+                0,
+                &Settings::default(),
+                viewport,
+                ScenarioStartMode::Normal,
+                &ScenarioAsset::None,
+            )
+            .unwrap();
+            scenario.step(&[ClockAction::next_event()], Duration::ZERO);
+            let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+            let vector = crate::render::scene_presentation_from_frames_with_layout(
+                &frames,
+                viewport,
+                scenario.frame_layout(),
+            );
+            let raster =
+                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout());
+            assert_eq!(raster.len(), 1);
+            assert_eq!(raster[0].text, "Falling");
+            assert_eq!(raster[0].font_size, 18.0);
+            assert!(raster[0].text_x >= 0.0 && raster[0].text_y >= 0.0);
+            assert_eq!(
+                vector
+                    .main_primitives
+                    .iter()
+                    .filter(|p| p.kind == crate::PrimitiveKind::Text)
+                    .collect::<Vec<_>>(),
+                raster.iter().collect::<Vec<_>>()
+            );
+            for _ in 0..120 {
+                scenario.step(&[], Duration::from_nanos(16_666_667));
+            }
+            let frames = scenario.render_frames(RenderBackend::Raster, viewport);
+            assert!(
+                crate::render::raster_text_overlay(&frames, viewport, scenario.frame_layout())
+                    .is_empty()
+            );
+        }
     }
 
     #[test]
@@ -939,7 +1031,9 @@ mod tests {
                         .iter()
                         .map(|l| l.primitives.len())
                         .sum::<usize>()
-                        <= 800,
+                        // Inclined columns need two area-preserving pieces,
+                        // each with a highlight: 256 more than flat columns.
+                        <= if water_lab == scenario_clock::ClockWaterLab::Off { 1056 } else { 800 },
                     "bounded cells, columns, spill parcels and reforming face at tick {tick} {viewport:?}"
                 );
                 let presentation = crate::render::scene_presentation_from_frames_with_layout(
@@ -957,13 +1051,11 @@ mod tests {
                 let pixels = image.to_rgb8().unwrap();
                 if water_lab == scenario_clock::ClockWaterLab::Off {
                     if tick == 509 {
-                        final_reforming_pixels =
-                            Some(floor_tests::pixels_above_floor(&pixels).to_vec());
+                        final_reforming_pixels = Some(pixels.as_bytes().to_vec());
                     } else if tick == 510 {
                         assert!(
-                            floor_tests::pixels_above_floor(&pixels)
-                                == final_reforming_pixels.as_deref().unwrap(),
-                            "cleanup must not pop to a different face at {viewport:?}"
+                            pixels.as_bytes() == final_reforming_pixels.as_deref().unwrap(),
+                            "cleanup must not pop to a different face or floor at {viewport:?}"
                         );
                     }
                 }

@@ -10,6 +10,11 @@ use spacewars_control::UiAction;
 use crate::input::{self, GameKey, GamepadSeatInput, SharedGamepadInput, SharedInput};
 use crate::{MainWindow, UserActivity};
 
+#[cfg(unix)]
+mod simulated;
+#[cfg(unix)]
+pub(crate) use simulated::SimulatedInput;
+
 const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const UI_REPEAT_DELAY: Duration = Duration::from_millis(350);
 const UI_REPEAT_INTERVAL: Duration = Duration::from_millis(100);
@@ -218,49 +223,18 @@ impl GamepadPump {
             return;
         };
 
-        if is_ui_mode(window) {
-            let action = match button {
-                Button::South => Some(UiAction::Confirm),
-                Button::East => Some(UiAction::Back),
-                Button::Select => Some(UiAction::Controls),
-                Button::Start => Some(UiAction::Start),
-                _ => None,
-            };
-            if let Some(action) = action {
-                self.begin_handoff();
-                window.invoke_ui_action(action.code());
-            }
-            return;
-        }
-
-        let captures_start = window.get_scenario_captures_gamepad_start();
-        let captures_select = window.get_scenario_captures_gamepad_select();
         let gamepad = self.gilrs.gamepad(gamepad_id);
-        if native_console_menu_chord(
+        let route = button_route(
+            window,
             button,
-            captures_start,
-            captures_select,
+            gamepad.name(),
             gamepad.is_pressed(Button::Start),
             gamepad.is_pressed(Button::Select),
-        ) {
+        );
+        if matches!(route, ButtonRoute::Menu(_) | ButtonRoute::Host(_)) {
             self.begin_handoff();
-            self.input.borrow_mut().press(GameKey::Controls);
-            return;
         }
-
-        match gameplay_button_route(button, captures_start, captures_select) {
-            Some(GameplayButtonRoute::HostPause) => {
-                self.begin_handoff();
-                self.input.borrow_mut().press(GameKey::Pause);
-            }
-            Some(GameplayButtonRoute::HostControls) => {
-                self.begin_handoff();
-                self.input.borrow_mut().press(GameKey::Controls);
-            }
-            // Native-console scenarios sample Start as part of their complete
-            // controller snapshot. Other gameplay buttons are continuous too.
-            Some(GameplayButtonRoute::Scenario) | None => {}
-        }
+        apply_button_route(window, &self.input, route, seat as u8 + 1);
     }
 
     fn sample_gamepads(&mut self, window: &MainWindow) {
@@ -308,7 +282,7 @@ impl GamepadPump {
         let gamepad = self
             .gamepads
             .borrow()
-            .seat(seat)
+            .physical_seat(seat)
             .cloned()
             .unwrap_or_default();
         if !gamepad.connected {
@@ -362,6 +336,72 @@ impl GamepadPump {
             window.set_controller_disconnected_visible(false);
             window.set_controller_disconnected_text(SharedString::from(""));
         }
+    }
+}
+
+fn clock_next_event_button(gamepad_name: &str) -> Button {
+    // sw-picade-2's upper-right blue button was captured as HAT Button 3,
+    // Linux BTN_WEST (308). Keep ordinary controllers on their right shoulder;
+    // don't remap this cabinet's buttons globally for NES or other scenarios.
+    if gamepad_name == "Space-Wars Picade" {
+        Button::West
+    } else {
+        Button::RightTrigger
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ButtonRoute {
+    Menu(UiAction),
+    Host(GameKey),
+    ClockNext,
+    ClockDuck,
+    Scenario,
+}
+
+// Physical and CLI controllers use the same edge routing. Continuous gameplay
+// controls remain in the normal GamepadSeatInput mapping for each scenario.
+fn button_route(
+    window: &MainWindow,
+    button: Button,
+    name: &str,
+    start: bool,
+    select: bool,
+) -> ButtonRoute {
+    if is_ui_mode(window) {
+        return match button {
+            Button::South => ButtonRoute::Menu(UiAction::Confirm),
+            Button::East => ButtonRoute::Menu(UiAction::Back),
+            Button::Start => ButtonRoute::Menu(UiAction::Start),
+            Button::Select => ButtonRoute::Menu(UiAction::Controls),
+            _ => ButtonRoute::Scenario,
+        };
+    }
+    if window.get_launcher_scenario() == "clock" && button == clock_next_event_button(name) {
+        return ButtonRoute::ClockNext;
+    }
+    if window.get_launcher_scenario() == "clock" && button == Button::North {
+        return ButtonRoute::ClockDuck;
+    }
+    let captures_start = window.get_scenario_captures_gamepad_start();
+    let captures_select = window.get_scenario_captures_gamepad_select();
+    if native_console_menu_chord(button, captures_start, captures_select, start, select) {
+        return ButtonRoute::Host(GameKey::Controls);
+    }
+    match gameplay_button_route(button, captures_start, captures_select) {
+        Some(GameplayButtonRoute::HostPause) => ButtonRoute::Host(GameKey::Pause),
+        Some(GameplayButtonRoute::HostControls) => ButtonRoute::Host(GameKey::Controls),
+        _ => ButtonRoute::Scenario,
+    }
+}
+
+fn apply_button_route(window: &MainWindow, input: &SharedInput, route: ButtonRoute, player: u8) {
+    match route {
+        ButtonRoute::Menu(action) => window.invoke_ui_action(action.code()),
+        ButtonRoute::Host(key) => input.borrow_mut().press(key),
+        ButtonRoute::ClockNext => input.borrow_mut().request_clock_next_event(),
+        ButtonRoute::ClockDuck => input.borrow_mut().request_clock_player_duck(player),
+        ButtonRoute::Scenario => {}
     }
 }
 
@@ -958,6 +998,38 @@ mod tests {
         assert_eq!(
             ui_direction(&handoff.filter(0, next_press)),
             Some(UiDirection::Down)
+        );
+    }
+
+    #[test]
+    fn held_next_event_button_cannot_leak_from_menu_to_clock() {
+        let mut handoff = ModeHandoff::default();
+        handoff.observe(InputMode::Ui);
+        handoff.filter(0, GamepadSeatInput::default());
+        let held = GamepadSeatInput {
+            connected: true,
+            right_bumper: true,
+            west: true,
+            ..Default::default()
+        };
+        handoff.observe(InputMode::Gameplay);
+        for _ in 0..60 {
+            assert!(!handoff.filter(0, held.clone()).right_bumper);
+            assert!(!handoff.filter(0, held.clone()).west);
+            assert!(!handoff.accepts_input(0));
+        }
+        handoff.filter(0, GamepadSeatInput::default());
+        assert!(handoff.accepts_input(0));
+        assert!(handoff.filter(0, held).right_bumper);
+    }
+
+    #[test]
+    fn clock_binding_uses_the_captured_picade_button_without_changing_other_controllers() {
+        assert_eq!(clock_next_event_button("Space-Wars Picade"), Button::West);
+        assert_eq!(clock_next_event_button("USB Gamepad"), Button::RightTrigger);
+        assert_eq!(
+            clock_next_event_button("Xbox Controller"),
+            Button::RightTrigger
         );
     }
 

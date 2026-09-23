@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 10;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 14;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -18,6 +18,9 @@ pub struct ClockEventInfo {
     pub duration_ticks: u64,
     pub cooldown_ticks: u64,
     pub enabled: bool,
+    /// Physical-arena event temporarily incompatible with the player's course.
+    /// Independent of saved enablement, cooldown, pause, and event lifecycle.
+    pub blocked_by_player: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -43,6 +46,10 @@ pub struct ClockState {
     pub floor: engine_common::ClockFloorMode,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
+    pub player_duck: Option<engine_common::ClockPlayerDuckState>,
+    /// Player compatibility leaves no enabled automatic event kinds. Profile
+    /// Off is distinct; per-event restrictions also apply to manual requests.
+    pub automatic_events_suspended: bool,
     pub marquee: Option<engine_common::ClockMarqueeState>,
     pub digit_slide: Option<engine_common::ClockDigitSlideState>,
     #[serde(default)]
@@ -353,6 +360,8 @@ mod tests {
             floor: engine_common::ClockFloorMode::Closed,
             meltdown: None,
             duck: None,
+            player_duck: None,
+            automatic_events_suspended: false,
             marquee: None,
             digit_slide: None,
             rain: None,
@@ -381,14 +390,53 @@ mod tests {
     }
 
     #[test]
+    fn player_visit_has_separate_identity_and_does_not_impersonate_a_timed_event() {
+        let mut state = clock_state();
+        state.event_kind = None;
+        state.phase = None;
+        state.lifecycle = "idle".into();
+        state.automatic_events_suspended = true;
+        state.player_duck = Some(engine_common::ClockPlayerDuckState {
+            session_id: 3,
+            player: 2,
+            phase: "running".into(),
+            phase_tick: 120,
+            move_milli: -750,
+            jump_held: true,
+            facing_right: false,
+            floor_open_milli: Some(650),
+            submerged_milli: 450,
+            velocity_milli: Some([-12000, 200]),
+            duck: engine_common::ClockDuckState {
+                left_to_right: true,
+                position_milli: Some([-200000, -100000]),
+                grounded: false,
+                jumps: 1,
+                cleared_obstacles: 0,
+                obstacle_count: 3,
+                entrance_open_milli: 0,
+                exit_open_milli: 1000,
+                outcome: None,
+                navigation: None,
+            },
+        });
+        let round_trip = ClockState::from_json(&state.to_json().unwrap()).unwrap();
+        assert_eq!(round_trip, state);
+        assert!(round_trip.duck.is_none());
+        assert_eq!(round_trip.player_duck.unwrap().player, 2);
+    }
+
+    #[test]
     fn rain_diagnostics_settings_and_named_trigger_round_trip() {
         use engine_common::{ClockRainAmount, ClockRainDuckPhase, ClockRainState};
         let mut state = clock_state();
         state.event_kind = Some(ClockEventKind::Rain);
-        state.floor = engine_common::ClockFloorMode::DrainOpen;
+        state.floor = engine_common::ClockFloorMode::EventOwned;
         state.phase = Some("raining".into());
         state.settings.rain_amount = ClockRainAmount::Varied;
         state.rain = Some(ClockRainState {
+            player_course: false,
+            player_joined: false,
             seed: 42,
             amount: ClockRainAmount::Heavy,
             requested_microunits: 10_000_000,
@@ -401,6 +449,16 @@ mod tests {
             parcels: 126,
             source_limited_ticks: 2,
             water_limited_ticks: 0,
+            surface_digits: [Some(1), Some(2), Some(3), Some(4)],
+            surface_water_microunits: 100_000,
+            drip_parcels_emitted: 123,
+            surface_impacts: 45,
+            surface_change_pending: false,
+            surface_change_deferrals: 0,
+            floor_open_milli: 650,
+            floor_load_milli: 13_000,
+            floor_motion_deferrals: 0,
+            floor_clearance_holds: 30,
             entry_depth_milli: 21_000,
             required_depth_milli: 12_000,
             duck_phase: ClockRainDuckPhase::Floating,
@@ -423,6 +481,35 @@ mod tests {
         assert_eq!(ClockEventKind::DigitSlide as u8, 5);
         assert_eq!(ClockEventKind::Rain as u8, 6);
         let mut value = serde_json::to_value(&state).unwrap();
+        for field in [
+            "surface_digits",
+            "surface_water_microunits",
+            "drip_parcels_emitted",
+            "surface_impacts",
+            "surface_change_pending",
+            "surface_change_deferrals",
+            "floor_open_milli",
+            "floor_load_milli",
+            "floor_motion_deferrals",
+            "floor_clearance_holds",
+        ] {
+            value["rain"].as_object_mut().unwrap().remove(field);
+        }
+        let older = ClockState::from_json(&value.to_string())
+            .unwrap()
+            .rain
+            .unwrap();
+        assert_eq!(older.surface_digits, [None; 4]);
+        assert_eq!(older.surface_water_microunits, 0);
+        assert_eq!(older.drip_parcels_emitted, 0);
+        assert_eq!(older.surface_impacts, 0);
+        assert!(!older.surface_change_pending);
+        assert_eq!(older.surface_change_deferrals, 0);
+        assert_eq!(older.floor_open_milli, 0);
+        assert_eq!(older.floor_load_milli, 0);
+        assert_eq!(older.floor_motion_deferrals, 0);
+        assert_eq!(older.floor_clearance_holds, 0);
+        assert_eq!(older.injected_microunits, 5_000_000);
         value.as_object_mut().unwrap().remove("rain");
         assert!(
             ClockState::from_json(&value.to_string())
@@ -578,6 +665,10 @@ mod tests {
             spill_parcels: 12,
             capacity_limited_ticks: 3,
             drained_microunits: 35_000_000,
+            exited_solid_microunits: 1_000_000,
+            floor_open_milli: 420,
+            floor_load_milli: 2_800,
+            floor_motion_deferrals: 2,
             ..Default::default()
         });
         assert_eq!(
@@ -598,6 +689,10 @@ mod tests {
             "displaced_microunits",
             "spill_parcels",
             "capacity_limited_ticks",
+            "exited_solid_microunits",
+            "floor_open_milli",
+            "floor_load_milli",
+            "floor_motion_deferrals",
         ] {
             material.remove(field);
         }
@@ -609,6 +704,10 @@ mod tests {
         assert_eq!(material.displaced_microunits, 0);
         assert_eq!(material.spill_parcels, 0);
         assert_eq!(material.capacity_limited_ticks, 0);
+        assert_eq!(material.exited_solid_microunits, 0);
+        assert_eq!(material.floor_open_milli, 0);
+        assert_eq!(material.floor_load_milli, 0);
+        assert_eq!(material.floor_motion_deferrals, 0);
     }
 
     #[test]
@@ -755,6 +854,7 @@ mod tests {
             duration_ticks: 48,
             cooldown_ticks: 120,
             enabled: true,
+            blocked_by_player: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

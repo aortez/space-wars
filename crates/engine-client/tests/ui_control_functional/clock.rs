@@ -227,7 +227,7 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         assert_eq!(initial.events.len(), 7);
         harness.clock_trigger_event(&initial, ClockEventKind::Rain);
         let raining = harness.clock_wait(&initial, "raining", 1, 300);
-        assert_eq!(raining.floor, ClockFloorMode::DrainOpen);
+        assert_eq!(raining.floor, ClockFloorMode::EventOwned);
         assert!(raining.rain.unwrap().injected_microunits > 0);
         harness.capture_screenshot("clock-rain-shower.png");
         harness.activate_guarded("gameplay.clock-controls", &gameplay);
@@ -239,7 +239,7 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         assert!(!configured.settings.events.rain);
         assert_eq!(configured.settings.rain_amount, ClockRainAmount::Heavy);
         assert_eq!(configured.rain, paused.rain);
-        assert_eq!(configured.floor, ClockFloorMode::DrainOpen);
+        assert_eq!(configured.floor, ClockFloorMode::EventOwned);
         harness.capture_screenshot("clock-rain-controls.png");
         harness.press_guarded(UiAction::Start, &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
@@ -260,7 +260,7 @@ fn rain_settings_preview_pause_cleanup_and_persistence() {
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
         let preview = harness.clock_wait(&initial, "raining", 2, 1);
         assert_eq!(preview.rain.unwrap().amount, ClockRainAmount::Heavy);
-        assert_eq!(preview.floor, ClockFloorMode::DrainOpen);
+        assert_eq!(preview.floor, ClockFloorMode::EventOwned);
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.restart", &menu);

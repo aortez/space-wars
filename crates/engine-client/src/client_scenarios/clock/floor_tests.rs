@@ -1,13 +1,6 @@
 use super::*;
 use engine_common::{ClockEventKind, ClockEventProfile, ClockFloorMode};
 
-/// Face recovery must remain pixel-exact while the drain intentionally closes.
-/// The floor begins 84% down the fixed-height camera; exclude its antialias edge.
-pub(super) fn pixels_above_floor(pixels: &slint::SharedPixelBuffer<slint::Rgb8Pixel>) -> &[u8] {
-    let rows = (pixels.height() as usize * 84 / 100).saturating_sub(1);
-    &pixels.as_bytes()[..rows * pixels.width() as usize * 3]
-}
-
 #[test]
 fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
     for viewport in [
@@ -36,11 +29,11 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
         let mut renderer = crate::raster::RasterRenderer::new();
         for (event, mode) in [
             (None, ClockFloorMode::Closed),
-            (Some(ClockEventKind::Rain), ClockFloorMode::DrainOpen),
+            (Some(ClockEventKind::Rain), ClockFloorMode::EventOwned),
             (Some(ClockEventKind::ColorCycle), ClockFloorMode::Closed),
             (Some(ClockEventKind::Falling), ClockFloorMode::DrainOpen),
             (Some(ClockEventKind::Marquee), ClockFloorMode::Closed),
-            (Some(ClockEventKind::Meltdown), ClockFloorMode::DrainOpen),
+            (Some(ClockEventKind::Meltdown), ClockFloorMode::EventOwned),
         ] {
             if let Some(event) = event {
                 scenario.preview_clock_event(event);
@@ -67,16 +60,28 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
                 .to_rgb8()
                 .unwrap();
             // At event tick zero there is no material in the lower floor strip.
-            // The center must match a solid bank only when the drain is closed.
+            // Rain and Meltdown start flat/closed until water arrives.
             let row = pixels.height() as usize * 92 / 100;
             let width = pixels.width() as usize;
             let bank = pixels.as_slice()[row * width + width / 10];
             let center = pixels.as_slice()[row * width + width / 2];
             assert_eq!(
                 center == bank,
-                mode == ClockFloorMode::Closed,
+                mode == ClockFloorMode::Closed
+                    || matches!(event, Some(ClockEventKind::Rain | ClockEventKind::Meltdown)),
                 "{event:?}, {viewport:?}"
             );
+            if event == Some(ClockEventKind::Rain) {
+                assert_eq!(
+                    scenario
+                        .clock_state()
+                        .unwrap()
+                        .rain
+                        .unwrap()
+                        .floor_open_milli,
+                    0
+                );
+            }
         }
         scenario.preview_clock_event(ClockEventKind::Duck);
         assert_eq!(

@@ -3,6 +3,8 @@ use super::*;
 use crate::events::meltdown::{MeltdownEvent, soften};
 use engine_water::{Column, Parcel};
 
+mod slopes;
+
 const WATER_COLOR: RenderColor = RenderColor::rgb(0.08, 0.55, 0.85);
 const WATER_EDGE: RenderColor = RenderColor::rgb(0.36, 0.91, 1.0);
 
@@ -168,6 +170,20 @@ pub(super) fn render_water(
         let mut columns = pool.columns().peekable();
         let mut previous = None;
         while let Some(column) = columns.next() {
+            if pool.has_sloped_bed() {
+                if visible(column) {
+                    slopes::render(
+                        frame,
+                        column,
+                        previous,
+                        columns.peek().copied(),
+                        layer,
+                        [color, edge_color],
+                    );
+                }
+                previous = Some(column);
+                continue;
+            }
             if visible(column) {
                 let [left, right] = surface_edges(column, previous, columns.peek().copied());
                 let points = [
@@ -181,8 +197,8 @@ pub(super) fn render_water(
                     RenderPrimitive::Polygon(RenderPolygon::filled(points.to_vec(), color)),
                 );
                 let mut edge = points;
-                edge[0].y = (left - (left - column.bed).min(1.2)) as f32;
-                edge[1].y = (right - (right - column.bed).min(1.2)) as f32;
+                edge[0].y = (left - ((left - column.bed) * 0.24).min(1.2)) as f32;
+                edge[1].y = (right - ((right - column.bed) * 0.24).min(1.2)) as f32;
                 frame.push_primitive(
                     layer,
                     RenderPrimitive::Polygon(RenderPolygon::filled(edge.to_vec(), edge_color)),
@@ -194,7 +210,37 @@ pub(super) fn render_water(
     // The ribbons represent water still in flight. Their area is the transported
     // volume: accelerating water stretches and thins rather than retaining a
     // pool-height rectangle down the entire cliff.
-    for parcel in water.parcels() {
+    for (index, parcel) in water.parcels().iter().enumerate() {
+        if let Some(spill) = water.spill_ribbon(index) {
+            for quad in spill.quads {
+                let points = clip_channel(quad, parcel.horizontal_bounds);
+                if points.len() >= 3 {
+                    frame.push_primitive(
+                        layer,
+                        RenderPrimitive::Polygon(RenderPolygon::filled(points, color)),
+                    );
+                }
+                // Continue the pool's bright surface down the same shared
+                // faces; keep the highlight inside the represented water.
+                let (a, b, c, d) = if spill.surface_side == 1 {
+                    (quad[3], quad[2], quad[1], quad[0])
+                } else {
+                    (quad[0], quad[1], quad[2], quad[3])
+                };
+                let inset = |outer: Vec2, inner: Vec2| {
+                    outer + (inner - outer) * (1.2 / (inner - outer).length().max(1.2)).min(0.24)
+                };
+                let points =
+                    clip_channel([inset(a, d), inset(b, c), b, a], parcel.horizontal_bounds);
+                if points.len() >= 3 {
+                    frame.push_primitive(
+                        layer,
+                        RenderPrimitive::Polygon(RenderPolygon::filled(points, edge_color)),
+                    );
+                }
+            }
+            continue;
+        }
         if (parcel.volume as f32)
             < 0.05 * (parcel.velocity.length() * parcel.duration as f32).max(0.5)
         {
