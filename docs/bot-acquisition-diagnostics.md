@@ -7,6 +7,10 @@ separate failed publication of negative searches from solar rejection of
 otherwise usable ground routes. This checkpoint changes telemetry, not controls,
 physical permissions, planner allowances or the waiting policy.
 
+The follow-up [bounded acquisition experiment](bot-bounded-acquisition.md) now
+implements and compares a deadline and local waiting guidance while retaining
+this checkpoint as its unchanged baseline.
+
 ## What is recorded
 
 Two optional fields expose decisions at the checks themselves:

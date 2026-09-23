@@ -76,6 +76,16 @@ impl TacticalCapturePilot {
             ObjectivePlanning::JetpackRoundTrip => "tactical_sortie_v12",
         }
     }
+    /// Headless comparison option; retained policy defaults remain unchanged.
+    pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
+        self.base.enable_bounded_acquisition(enabled);
+        self
+    }
+    pub(crate) fn start_acquisition(&mut self, o: &TacticalSortieObservationV1) {
+        self.base.start_acquisition(o);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+    }
     pub(crate) fn requiring_site(mut self, site: LandingSiteId) -> Self {
         self.base = self.base.requiring_site(site);
         self

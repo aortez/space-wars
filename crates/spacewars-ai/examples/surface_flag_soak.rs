@@ -162,7 +162,8 @@ fn main() {
         context,
         CombatBreakSettings::default(),
         policy.objective_planning(),
-    );
+    )
+    .with_bounded_acquisition(arg("--bounded-acquisition", "false") == "true");
     let mut defender_pilot = RulePilotV1::new(BrainReset {
         actor: defender,
         episode_seed: seed,
@@ -603,6 +604,12 @@ fn main() {
         "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
     report["policy_configuration"] = json!(policy.descriptor());
+    if arg("--bounded-acquisition", "false") == "true" {
+        report["bounded_acquisition"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACQUISITION_WAIT_PROFILE,
+            "deadline_ticks": spacewars_ai::tactical_sortie::ACQUISITION_DEADLINE_TICKS,
+        });
+    }
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }

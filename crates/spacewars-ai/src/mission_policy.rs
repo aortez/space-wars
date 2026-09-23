@@ -65,6 +65,11 @@ impl MissionBot {
     pub fn new(policy: MissionPolicy, context: BrainReset, breaks: CombatBreakSettings) -> Self {
         Self(MaterialMissionPilot::with_policy(context, breaks, policy))
     }
+    /// Opt-in first-site deadline and local waiting guidance for comparison.
+    pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
+        self.0.bounded_acquisition = enabled;
+        self
+    }
     /// Opt-in headless experiment; standard policy selection leaves it disabled.
     pub fn with_pursuit_disengagement(mut self, enabled: bool) -> Self {
         self.0.enable_pursuit_disengagement(enabled);

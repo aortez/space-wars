@@ -23,8 +23,10 @@ use serde::Serialize;
 use std::cell::Cell;
 
 mod acquisition;
+mod acquisition_wait;
 use acquisition::count;
 pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
+pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,6 +82,8 @@ pub struct TacticalTelemetry {
     pub landing: PilotTelemetry,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acquisition: Option<AcquisitionTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition_wait: Option<AcquisitionWait>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -107,6 +111,7 @@ pub struct TacticalSortiePilot {
     clearing_ground: bool,
     objective: Option<LandingObjective>,
     required_site: Option<LandingSiteId>,
+    bounded_acquisition: bool,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -138,6 +143,7 @@ impl TacticalSortiePilot {
                 site: None,
                 landing: landing.telemetry().clone(),
                 acquisition: None,
+                acquisition_wait: None,
             },
             landing,
             site: None,
@@ -157,6 +163,7 @@ impl TacticalSortiePilot {
             clearing_ground: false,
             objective: None,
             required_site: None,
+            bounded_acquisition: false,
         }
     }
     /// Current capture missions tolerate transient cover/clearance changes and
@@ -169,9 +176,11 @@ impl TacticalSortiePilot {
     pub fn reset(&mut self, context: BrainReset) {
         let commit = self.commit_descent;
         let required = self.required_site;
+        let bounded_acquisition = self.bounded_acquisition;
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
         self.required_site = required;
+        self.bounded_acquisition = bounded_acquisition;
     }
     /// Explicit continuation trials may constrain selection, but still need
     /// current material, solar and objective-route evidence for this ID.
@@ -229,6 +238,9 @@ impl TacticalSortiePilot {
         }
         self.begin_acquisition(o);
         let intent = self.choose(o);
+        if self.site.is_some() {
+            self.finish_acquisition(p.tick, "selected");
+        }
         self.telemetry.landing = self.landing.telemetry().clone();
         self.telemetry.site = self.site.map(|s| s.id);
         if let Some(acquisition) = &mut self.telemetry.acquisition {
@@ -330,6 +342,16 @@ impl TacticalSortiePilot {
         if !p.controls_armed {
             self.acquisition_reason("controls_unarmed");
             return CombatIntent::default();
+        }
+        self.start_acquisition(o);
+        if p.location == PilotLocation::OnFoot {
+            self.finish_acquisition(p.tick, "on_foot");
+        }
+        if self.acquisition_expired(p.tick) {
+            self.acquisition_reason("acquisition_deadline");
+            self.finish_acquisition(p.tick, "deadline");
+            self.abort(p.tick, "landing site acquisition deadline exhausted");
+            return self.combat.intent(c);
         }
         if !p.queries_ready {
             self.acquisition_reason("queries_unavailable");
@@ -499,7 +521,7 @@ impl TacticalSortiePilot {
             return if p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed {
                 CombatIntent::default()
             } else {
-                self.guide(o, up * 5.0, Vec2::ZERO)
+                self.wait_for_site(o, 5.0)
             };
         }
         if self.site.is_some()
@@ -571,6 +593,7 @@ impl TacticalSortiePilot {
             // Physical landing and hatch access can finish an approach at a
             // different valid point from the planner's proposed site.
             self.acquisition_reason("physically_landed");
+            self.finish_acquisition(p.tick, "landed");
             self.goal(TacticalGoal::Surface, p.tick);
             return CombatIntent {
                 flight: FlightIntent {
@@ -584,7 +607,7 @@ impl TacticalSortiePilot {
             self.acquisition_reason("scan_deferred");
             // Preserve the existing clearance climb while awaiting usable
             // candidates, without treating deferred data as rejected ground.
-            return self.guide(o, up * 12.0, Vec2::ZERO);
+            return self.wait_for_site(o, 12.0);
         }
         if let Some(site) = self.site {
             if let Some(updated) = p.sites.iter().find(|s| {
@@ -755,7 +778,7 @@ impl TacticalSortiePilot {
                 });
                 // A completed edit may temporarily leave no valid site. Climb
                 // and survey again within the mission's overall time budget.
-                return self.guide(o, up * 12.0, Vec2::ZERO);
+                return self.wait_for_site(o, 12.0);
             }
         }
         let site = self.site.unwrap();
@@ -950,13 +973,13 @@ mod tests {
     };
     use std::time::Duration;
     const DT: Duration = Duration::from_nanos(16_666_667);
-    fn context() -> BrainReset {
+    pub(super) fn context() -> BrainReset {
         BrainReset {
             actor: PlayerId::PLAYER_1,
             episode_seed: 42,
         }
     }
-    fn observation() -> TacticalSortieObservationV1 {
+    pub(super) fn observation() -> TacticalSortieObservationV1 {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         SurfaceSortieScenario::step(&mut state, &[], DT);
         state.tactical_sortie_observation(0, None)

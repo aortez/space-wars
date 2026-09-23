@@ -172,10 +172,15 @@ out of the approach frame. The [native acquisition diagnostics](../bot-acquisiti
 now separate those causes in seven known reproductions, preserving all 279,289
 control/physics trace rows and planner work. Negative searches repeatedly fail
 publication after region or scalar-gravity changes; other usable ground routes
-fail solar approach/departure checks. Next give acquisition a progress deadline
-with bounded waiting flight, preserving physical and solar safety. Retain the
-successful 10.77-second wait as a regression case. Compare actual
-captures/departures and quick acquisitions, not only retry counters.
+fail solar approach/departure checks. The opt-in
+[bounded acquisition experiment](../bot-bounded-acquisition.md) now adds a
+thirty-second deadline and local waiting guidance. Seven known and sixteen
+fresh matched configurations retain winners and the controlled long-wait
+completion; normal completed trips increase by two and one respectively.
+Waiting and approach-frame exits decrease, but one known pilot dies earlier in
+recovery. Preserve the experiment and evidence without changing defaults. This
+closes the current tactical checkpoint; broader promotion and strategy belong
+in follow-up work rather than extending the acquisition investigation.
 Remote transfer and extension beyond fixed forecast
 checkpoints remain prerequisites for mission selection; timing and controllers
 are still unchanged.

@@ -201,6 +201,13 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--bounded-acquisition-seats must be none, 0, 1 or both"),
+    };
     let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
         "none" => [false, false],
         "0" => [true, false],
@@ -267,6 +274,7 @@ fn main() {
             },
             breaks,
         )
+        .with_bounded_acquisition(acquisition_seats[i])
         .with_pursuit_disengagement(disengagement_seats[i])
         .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
         .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
@@ -725,6 +733,13 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if acquisition_seats.contains(&true) {
+        report["bounded_acquisition"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACQUISITION_WAIT_PROFILE,
+            "enabled_seats": acquisition_seats,
+            "deadline_ticks": spacewars_ai::tactical_sortie::ACQUISITION_DEADLINE_TICKS,
+        });
+    }
     report["pursuit_disengagement"] = json!({"enabled_seats":disengagement_seats,"probe_handoff":handoff_probe,
             "boundary_guidance":boundary_guidance,"destination_cover_probe":cover_probe});
     if let Some(live) = &mut live_planning {

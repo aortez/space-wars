@@ -140,6 +140,7 @@ pub struct MaterialMissionPilot {
     previous_intent: CombatIntent,
     next_pursuit_tick: u64,
     last_survey: Option<LandingSurveyStamp>,
+    pub(crate) bounded_acquisition: bool,
 }
 
 impl MaterialMissionPilot {
@@ -196,9 +197,11 @@ impl MaterialMissionPilot {
             previous_intent: CombatIntent::default(),
             next_pursuit_tick: 0,
             last_survey: None,
+            bounded_acquisition: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let bounded_acquisition = self.bounded_acquisition;
         let disengagement = self.telemetry.disengagement.is_some();
         let handoff = self
             .telemetry
@@ -206,6 +209,7 @@ impl MaterialMissionPilot {
             .as_ref()
             .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
+        self.bounded_acquisition = bounded_acquisition;
         self.enable_pursuit_disengagement(disengagement);
         if let Some((probe, boundary, cover)) = handoff {
             self.configure_handoff_probe(probe);
@@ -606,11 +610,14 @@ impl MaterialMissionPilot {
             && (p.ship.velocity - target.motion.velocity).length() < 18.0
             && p.queries_ready
         {
-            self.capture = Some(TacticalCapturePilot::with_planning(
+            let mut capture = TacticalCapturePilot::with_planning(
                 self.context,
                 self.breaks,
                 self.policy.objective_planning(),
-            ));
+            )
+            .with_bounded_acquisition(self.bounded_acquisition);
+            capture.start_acquisition(&o.local);
+            self.capture = Some(capture);
             self.solar_detour = None;
             self.event(p.tick, "arrived", None);
             self.goal(MissionGoal::Capture, p.tick);
@@ -1045,6 +1052,96 @@ impl MaterialMissionPilot {
             },
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod acquisition_tests {
+    use super::*;
+    use engine_common::Scenario;
+    use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
+    use std::time::Duration;
+
+    #[test]
+    fn acquisition_failure_defers_the_planet_and_solar_escape_keeps_priority() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        o.sun = None;
+        o.local.sun = None;
+        o.opponent = None;
+        o.local.combat.target = None;
+        for planet in &mut o.planets {
+            planet.claim.as_mut().unwrap().owner = None;
+        }
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 100;
+        p.controls_armed = true;
+        p.queries_ready = true;
+        p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 80.0);
+        p.ship.velocity = p.planet.motion.velocity;
+        let planet = p.planet.index;
+        let context = BrainReset {
+            actor: p.owner,
+            episode_seed: 42,
+        };
+        let mut bot = MaterialMissionPilot::new(context, Default::default());
+        bot.bounded_acquisition = true;
+        bot.telemetry.target = Some(planet);
+        bot.selected_tick = p.tick;
+        bot.progress_tick = p.tick;
+        bot.intent(&o);
+        let wait = bot
+            .telemetry
+            .capture
+            .as_ref()
+            .unwrap()
+            .acquisition_wait
+            .unwrap();
+        assert_eq!(wait.started_tick, 100);
+        let mut solar = bot.clone();
+        o.local.combat.recovery.flight.pilot.tick = wait.deadline_tick;
+        let mut hot = o.clone();
+        hot.sun = Some(MissionObstacle {
+            position: hot.local.combat.recovery.flight.pilot.ship.position + Vec2::X,
+            radius: 200.0,
+        });
+        let escape = solar.intent(&hot);
+        assert_eq!(solar.telemetry.goal, MissionGoal::AvoidSun);
+        assert_eq!(escape.weapons, Default::default());
+        assert!(solar.telemetry.capture.as_ref().unwrap().failure.is_none());
+        assert_eq!(
+            solar
+                .telemetry
+                .capture
+                .as_ref()
+                .unwrap()
+                .acquisition_wait
+                .unwrap()
+                .deadline_tick,
+            wait.deadline_tick
+        );
+
+        bot.intent(&o);
+        assert_eq!(
+            bot.telemetry.capture.as_ref().unwrap().failure,
+            Some("landing site acquisition deadline exhausted")
+        );
+        assert_eq!(bot.telemetry.capture.as_ref().unwrap().replans, 0);
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent(&o);
+        assert_eq!(bot.telemetry.target, None);
+        assert_eq!(
+            bot.deferred,
+            vec![(planet, wait.deadline_tick + 1 + 30 * 60)]
+        );
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent(&o);
+        assert_ne!(bot.telemetry.target, Some(planet));
+        bot.reset(context);
+        assert!(bot.bounded_acquisition);
+        assert!(bot.capture.is_none());
+        assert!(bot.deferred.is_empty());
     }
 }
 
