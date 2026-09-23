@@ -132,32 +132,39 @@ impl TacticalCapturePilot {
             return self.previous_intent;
         }
         if !self.planning.is_legacy() {
-            if o.landing_objective.as_ref().is_some_and(|s| {
-                s.planning != self.planning
-                    || s.sites.iter().chain(s.actual.iter()).any(|route| {
-                        if route.crossing.is_some_and(|c| {
-                            self.planning != ObjectivePlanning::JetpackRoundTrip
-                                || c.plan.planet != s.objective.planet
-                                || c.plan.revision != s.objective.revision
-                        }) {
-                            return true;
-                        }
-                        route.cost().is_some()
-                            && route.endpoint.is_none_or(|node| {
-                                usize::from(node.id)
-                            >= scenario_spacewars::surface_sortie::ground_navigation::GROUND_SAMPLES
-                            || !node.position.x.is_finite()
-                            || !node.position.y.is_finite()
-                            || !node.normal.x.is_finite()
-                            || !node.normal.y.is_finite()
-                            || (node.position
-                                + node.position.normalized()
-                                    * scenario_spacewars::spaceling_geometry::HALF_HEIGHT)
-                                .distance_to(s.objective.position)
-                                >= s.objective.range
-                            })
-                    })
+            if let Some(reason) = o.landing_objective.as_ref().and_then(|s| {
+                if s.planning != self.planning {
+                    return Some("survey_policy_mismatch");
+                }
+                s.sites.iter().chain(s.actual.iter()).find_map(|route| {
+                    if route.crossing.is_some_and(|c| {
+                        self.planning != ObjectivePlanning::JetpackRoundTrip
+                            || c.plan.planet != s.objective.planet
+                            || c.plan.revision != s.objective.revision
+                    }) {
+                        return Some("crossing_identity_mismatch");
+                    }
+                    route.cost()?;
+                    let Some(node) = route.endpoint else {
+                        return Some("joint_endpoint_missing");
+                    };
+                    let invalid = usize::from(node.id)
+                        >= scenario_spacewars::surface_sortie::ground_navigation::GROUND_SAMPLES
+                        || !node.position.x.is_finite()
+                        || !node.position.y.is_finite()
+                        || !node.normal.x.is_finite()
+                        || !node.normal.y.is_finite()
+                        || (node.position
+                            + node.position.normalized()
+                                * scenario_spacewars::spaceling_geometry::HALF_HEIGHT)
+                            .distance_to(s.objective.position)
+                            >= s.objective.range;
+                    invalid.then_some("joint_endpoint_invalid")
+                })
             }) {
+                self.base.reject_acquisition_evidence(o, reason);
+                self.telemetry.sortie = self.base.telemetry().clone();
+                self.telemetry.sortie.policy = Self::policy(self.planning);
                 return CombatIntent::default();
             }
             if let Some(s) = &o.landing_objective

@@ -19,6 +19,10 @@ use std::{
 
 mod avoiding;
 mod destinations;
+mod diagnostics;
+pub use diagnostics::{
+    ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence, RouteResultCounts,
+};
 mod early_candidates;
 mod objective_job;
 mod query_budget;
@@ -502,7 +506,19 @@ impl LiveObjectivePlanner {
             .map(ObjectiveSurveyJob::into_measurements)
     }
 
+    #[cfg(test)]
     fn locally_validated(
+        state: &SurfaceSortieState,
+        player: usize,
+        p: &PilotObservationV1,
+        request: &Request,
+        job: &ObjectiveSurveyJob,
+        survey: LandingObjectiveSurvey,
+        telemetry: &mut LivePlanningTelemetry,
+    ) -> Option<LandingObjectiveSurvey> {
+        Self::locally_validated_with_evidence(state, player, p, request, job, survey, telemetry).0
+    }
+    fn locally_validated_with_evidence(
         state: &SurfaceSortieState,
         player: usize,
         p: &PilotObservationV1,
@@ -510,14 +526,24 @@ impl LiveObjectivePlanner {
         job: &ObjectiveSurveyJob,
         mut survey: LandingObjectiveSurvey,
         telemetry: &mut LivePlanningTelemetry,
-    ) -> Option<LandingObjectiveSurvey> {
+    ) -> (Option<LandingObjectiveSurvey>, PublicationEvidence) {
+        let mut evidence = PublicationEvidence {
+            decision: PublicationDecision::MissingActualReturn,
+            partial_survey: survey.validated_routes_only,
+            source: RouteResultCounts::read(&survey),
+            whole_region_valid: None,
+            scalar_gravity_valid: None,
+            flight_environment_valid: None,
+            expired_or_changed_crossings: 0,
+            retained_routes: 0,
+        };
         // Partial prospective answers cannot stand in for an unfinished actual
         // return route, even when the entire snapshot is still unchanged.
         if survey.validated_routes_only
             && request.actual.is_some()
             && survey.actual.as_ref().is_none_or(|r| r.cost().is_none())
         {
-            return None;
+            return (None, evidence);
         }
         let gravity_valid = Self::jump_gravity_valid(state, p, request);
         telemetry.jump_gravity_checks += 1;
@@ -571,6 +597,15 @@ impl LiveObjectivePlanner {
             },
         );
         telemetry.region_area_tests += whole.area_tests;
+        evidence.whole_region_valid = Some(whole.valid);
+        evidence.scalar_gravity_valid = Some(gravity_valid);
+        evidence.flight_environment_valid = Some(flight_valid);
+        evidence.expired_or_changed_crossings = survey
+            .sites
+            .iter()
+            .chain(survey.actual.iter())
+            .filter(|r| !crossing_valid(r))
+            .count();
         if whole.valid
             && gravity_valid
             && flight_valid
@@ -580,7 +615,9 @@ impl LiveObjectivePlanner {
                 .chain(survey.actual.iter())
                 .all(crossing_valid)
         {
-            return Some(survey);
+            evidence.decision = PublicationDecision::WholeSurvey;
+            evidence.retained_routes = evidence.source.entries;
+            return (Some(survey), evidence);
         }
         let mut valid = Vec::new();
         for (site, areas) in job.dependencies() {
@@ -638,12 +675,19 @@ impl LiveObjectivePlanner {
         if (survey.sites.is_empty() && survey.actual.is_none())
             || (request.actual.is_some() && survey.actual.is_none())
         {
-            return None;
+            evidence.decision = if request.actual.is_some() && survey.actual.is_none() {
+                PublicationDecision::MissingActualReturn
+            } else {
+                PublicationDecision::NoValidatedRoutes
+            };
+            return (None, evidence);
         }
         survey.validated_routes_only = true;
         telemetry.flight_independent_validations += u64::from(!flight_valid);
         telemetry.gravity_independent_validations += u64::from(!gravity_valid);
-        Some(survey)
+        evidence.decision = PublicationDecision::ValidatedRoutes;
+        evidence.retained_routes = survey.sites.len() + usize::from(survey.actual.is_some());
+        (Some(survey), evidence)
     }
 
     pub fn observe(
@@ -681,6 +725,7 @@ impl LiveObjectivePlanner {
         self.last_observed = Some(p.tick);
         o.landing_objective = None;
         o.objective_work = None;
+        o.objective_evidence = None;
         let Some(objective) = LandingObjective::read(p).filter(|_| {
             p.queries_ready
                 && p.ship_available
@@ -690,10 +735,14 @@ impl LiveObjectivePlanner {
             self.remove_objective(player);
             return;
         };
+        o.objective_evidence = Some(ObjectiveWorkEvidence::new(p.tick, objective));
         let mut invalidation = None;
         let mut measurements = None;
         let was_parked = self.parked.contains_key(&player);
         if let Some(parked) = self.parked.remove(&player) {
+            o.objective_evidence.as_mut().unwrap().source_objective = Some(parked.objective);
+            o.objective_evidence.as_mut().unwrap().measurement_tick =
+                Some(parked.measurements.tick);
             if !Self::same_objective(parked.objective, objective) {
                 invalidation = Some("objective_changed");
             } else if parked.measurements.tick > p.tick
@@ -704,10 +753,12 @@ impl LiveObjectivePlanner {
                 measurements = Some(parked.measurements);
             }
             if let Some(reason) = invalidation {
+                o.objective_evidence.as_mut().unwrap().invalidated_by = Some(reason);
                 *self.telemetry.invalidations.entry(reason).or_default() += 1;
             }
         }
         if let Some(request) = self.requests.get_mut(&player) {
+            o.objective_evidence.as_mut().unwrap().request(request);
             request.seen = p.tick;
             let clock = Instant::now();
             let valid = Self::valid(
@@ -724,6 +775,7 @@ impl LiveObjectivePlanner {
             match valid {
                 Err(reason) => {
                     invalidation = Some(reason);
+                    o.objective_evidence.as_mut().unwrap().invalidated_by = Some(reason);
                     if matches!(
                         reason,
                         "gravity_changed" | "touchdown_changed" | "hatch_moved"
@@ -739,7 +791,7 @@ impl LiveObjectivePlanner {
                         let survey = survey.clone();
                         let survey = if self.local_dependencies {
                             let clock = Instant::now();
-                            let result = Self::locally_validated(
+                            let (result, evidence) = Self::locally_validated_with_evidence(
                                 state,
                                 player,
                                 p,
@@ -748,6 +800,7 @@ impl LiveObjectivePlanner {
                                 survey,
                                 &mut self.telemetry,
                             );
+                            o.objective_evidence.as_mut().unwrap().publication = Some(evidence);
                             let ms = clock.elapsed().as_secs_f64() * 1000.0;
                             self.telemetry.validation_total_ms += ms;
                             self.telemetry.validation_max_ms =
@@ -813,6 +866,8 @@ impl LiveObjectivePlanner {
                             measurements = self.salvage(state, player, p);
                         } else {
                             invalidation = Some("routes_changed");
+                            o.objective_evidence.as_mut().unwrap().invalidated_by =
+                                Some("routes_changed");
                             self.invalidate(player, "routes_changed");
                         }
                     }
@@ -837,6 +892,7 @@ impl LiveObjectivePlanner {
                     }
                     JobPoll::Stale => {
                         invalidation = Some("cancelled");
+                        o.objective_evidence.as_mut().unwrap().invalidated_by = Some("cancelled");
                         self.invalidate(player, "cancelled");
                     }
                 },
@@ -852,16 +908,28 @@ impl LiveObjectivePlanner {
             );
         }
         if self.requests.len() + self.parked.len() == self.capacity {
+            o.objective_evidence
+                .as_mut()
+                .unwrap()
+                .submission_deferred_by = Some("capacity");
             self.telemetry.deferred_capacity += 1;
             return;
         }
         if state.world.physics.world.collider_count() > MAX_SNAPSHOT_COLLIDERS
             || state.world.physics.world.body_count() > MAX_SNAPSHOT_BODIES
         {
+            o.objective_evidence
+                .as_mut()
+                .unwrap()
+                .submission_deferred_by = Some("snapshot_limit");
             self.telemetry.deferred_snapshot_limit += 1;
             return;
         }
         if p.sites.is_empty() && Self::actual(p).is_none() {
+            o.objective_evidence
+                .as_mut()
+                .unwrap()
+                .submission_deferred_by = Some("no_current_sites");
             if self.local_dependencies
                 && let Some(measurements) = measurements
             {
@@ -953,6 +1021,10 @@ impl LiveObjectivePlanner {
                     physics_queries: 0,
                 },
             );
+            let evidence = o.objective_evidence.as_mut().unwrap();
+            if evidence.request_tick.is_none() && evidence.invalidated_by.is_none() {
+                evidence.request(self.requests.get(&player).unwrap());
+            }
             self.telemetry.submitted += 1;
             self.telemetry.reused_requests += u64::from(reused);
             self.telemetry.max_retained_requests = self

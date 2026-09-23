@@ -397,7 +397,20 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
         }
         let mut copy = pilot.clone();
         assert_eq!(copy.intent(&bad), CombatIntent::default());
-        assert_eq!(copy.telemetry(), pilot.telemetry());
+        let evidence = copy.telemetry().acquisition.unwrap();
+        assert_eq!(
+            evidence.reason,
+            match fault {
+                0 => "survey_policy_mismatch",
+                1 => "joint_endpoint_missing",
+                _ => "joint_endpoint_invalid",
+            }
+        );
+        // Only the current rejection observation may change. Retain the old
+        // controller state, route, milestones and ordinary control contract.
+        let mut expected = pilot.telemetry().clone();
+        expected.sortie.acquisition = Some(evidence);
+        assert_eq!(copy.telemetry(), &expected);
     }
     pilot.intent(&o);
     assert_eq!(pilot.telemetry().flag_approach.unwrap().endpoint, actual);

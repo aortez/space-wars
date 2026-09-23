@@ -34,14 +34,20 @@ impl EarlyCandidates {
         let p = &o.combat.recovery.flight.pilot;
         let clock = Instant::now();
         let survey = job.positive_candidates().and_then(|survey| {
-            LiveObjectivePlanner::locally_validated(
+            let (survey, evidence) = LiveObjectivePlanner::locally_validated_with_evidence(
                 state, player, p, request, job, survey, telemetry,
-            )
+            );
+            o.objective_evidence.as_mut().unwrap().publication = Some(evidence);
+            survey
         });
         let ms = clock.elapsed().as_secs_f64() * 1000.0;
         telemetry.validation_total_ms += ms;
         telemetry.validation_max_ms = telemetry.validation_max_ms.max(ms);
         let Some(mut survey) = survey else {
+            if request.partial_visible {
+                o.objective_evidence.as_mut().unwrap().invalidated_by =
+                    Some("early_routes_withheld");
+            }
             o.objective_work = Some(if request.partial_visible {
                 ObjectiveWorkState::Stale
             } else {

@@ -97,6 +97,8 @@ pub struct TacticalSortieObservationV1 {
     pub landing_objective: Option<landing_objective::LandingObjectiveSurvey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub objective_work: Option<live_planning::ObjectiveWorkState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub objective_evidence: Option<live_planning::ObjectiveWorkEvidence>,
     pub sun: Option<SolarHazard>,
     /// Prescribed circular motion about the sun, absent for linear fixtures.
     pub planet_orbit_omega: Option<f32>,
@@ -234,6 +236,7 @@ impl SurfaceSortieState {
         TacticalSortieObservationV1 {
             version: 1,
             objective_work: None,
+            objective_evidence: None,
             landing_objective: objective_surveys
                 .then(|| {
                     self.landing_objective_survey(

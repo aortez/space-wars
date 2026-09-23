@@ -53,6 +53,36 @@ fn fixture(
     (state, source, bot)
 }
 
+#[test]
+fn a_positive_route_with_no_joint_endpoint_reports_the_native_guard() {
+    for planning in [
+        ObjectivePlanning::JointRoundTrip,
+        ObjectivePlanning::JetpackRoundTrip,
+    ] {
+        let (state, source, mut bot) = fixture(planning);
+        let mut live = LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+        let mut o = source.clone();
+        live.observe_with_planning(&state, 0, &mut o, planning);
+        live.advance(state.tick());
+        o = source;
+        live.observe_with_planning(&state, 0, &mut o, planning);
+        let survey = o.landing_objective.as_mut().unwrap();
+        let route = survey
+            .sites
+            .iter_mut()
+            .find(|r| r.cost().is_some())
+            .unwrap();
+        route.endpoint = None;
+        let measurement_tick = survey.tick;
+        assert_eq!(bot.intent(&o), Default::default());
+        let evidence = bot.telemetry().acquisition.unwrap();
+        assert_eq!(evidence.reason, "joint_endpoint_missing");
+        assert_eq!(evidence.measurement_tick, Some(measurement_tick));
+        assert!(bot.telemetry().site.is_none());
+        assert_eq!(bot.telemetry().replans, 0);
+    }
+}
+
 fn run_handoff(planning: ObjectivePlanning, scan_age: u64, fault: &str) {
     let (mut state, source, mut bot) = fixture(planning);
     let source_tick = state.tick();

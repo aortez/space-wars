@@ -168,10 +168,15 @@ the seventy normal attempts without a choice: 52 end before arrival, mostly for
 combat; eighteen arrive and accumulate 633 seconds of waiting. Their 1,034 native
 objective invalidations precede any selected site. Completed jobs can fail
 publication or return no usable route while the waiting ship repeatedly climbs
-out of the approach frame. Next expose native acquisition outcomes and give
-this stage a progress deadline with bounded waiting flight, preserving physical
-and solar safety. Compare actual captures/departures and the quick acquisitions,
-not only retry counters. Remote transfer and extension beyond fixed forecast
+out of the approach frame. The [native acquisition diagnostics](../bot-acquisition-diagnostics.md)
+now separate those causes in seven known reproductions, preserving all 279,289
+control/physics trace rows and planner work. Negative searches repeatedly fail
+publication after region or scalar-gravity changes; other usable ground routes
+fail solar approach/departure checks. Next give acquisition a progress deadline
+with bounded waiting flight, preserving physical and solar safety. Retain the
+successful 10.77-second wait as a regression case. Compare actual
+captures/departures and quick acquisitions, not only retry counters.
+Remote transfer and extension beyond fixed forecast
 checkpoints remain prerequisites for mission selection; timing and controllers
 are still unchanged.
 Retry calibration is still sparse and these estimates do not change bot controls.

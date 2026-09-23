@@ -12,6 +12,11 @@ not new validation or a policy comparison. Runtime remains
 `43764580869c1ad56e6b7e9c4b7a21f485496220`; controls, planner allowances and all
 timing/risk profiles are unchanged.
 
+The follow-up [native acquisition diagnostics](bot-acquisition-diagnostics.md)
+now identify the publication and candidate-rejection checks in seven retained
+reproductions, with full control/physics parity. The retrospective results below
+remain the original population audit.
+
 ## Population and elapsed time
 
 Normal matches contain 164 attempts across 32 runs and eight worlds. The
