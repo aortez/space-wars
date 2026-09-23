@@ -3,6 +3,7 @@
 
 pub(crate) mod arena;
 mod controller;
+mod drain;
 mod flow;
 pub(crate) mod planner;
 #[cfg(test)]
@@ -67,11 +68,16 @@ pub(crate) struct DuckEvent {
     // Rain/Meltdown advance the authoritative actuator while active. This small
     // snapshot drives contacts/rendering; after the wet event, it settles dry.
     responsive_floor: Option<ResponsiveFloor>,
+    // A joined Falling keeps its original two banks and side walls.
+    pub(crate) drain_floor: Option<crate::floor::DrainGeometry>,
     spawn_motion: Option<(Vec2, Vec2)>,
     world: Option<PhysicsWorld>,
     // A physical event can lease this world across entry, dismissal and exit.
     // It owns its bodies; the visit must remove only the character on reset.
     arena_claimed: bool,
+    // An existing floor must not disappear while the new entrance door opens.
+    // Joining a fading event restores its opacity smoothly, not in one frame.
+    entry_arena_opacity: Option<f32>,
     buoyant: Option<BuoyantBody>,
     water_report: BuoyancyReport,
     seed: u64,
@@ -248,10 +254,12 @@ impl DuckEvent {
             ],
             world: None,
             arena_claimed: false,
+            entry_arena_opacity: None,
             buoyant: None,
             water_report: BuoyancyReport::default(),
             course: None,
             responsive_floor: None,
+            drain_floor: None,
             spawn_motion: None,
             seed,
             movement: Movement::new(width, radius),
@@ -623,14 +631,23 @@ impl DuckEvent {
                 if !position.x.is_finite()
                     || !position.y.is_finite()
                     || position.y
-                        < if self.responsive_floor.is_some() {
+                        < if self.responsive_floor.is_some() || self.drain_floor.is_some() {
                             self.layout.bounds_min.y - self.radius
                         } else {
                             self.layout.floor_y - self.radius * 5.0
                         }
                 {
                     self.reset(ClockDuckOutcome::Fell);
-                } else if self.exit_visible() && position.x > self.width + self.radius * 2.0 {
+                } else if self.exit_visible()
+                    && position.x
+                        > self.width
+                            + self.radius
+                                * if self.drain_floor.is_some() {
+                                    -2.0
+                                } else {
+                                    2.0
+                                }
+                {
                     self.reset(ClockDuckOutcome::Exited);
                 } else if self.player.is_none() && self.tick >= DUCK_TICKS - RESET_TICKS {
                     self.reset(ClockDuckOutcome::TimedOut);

@@ -142,7 +142,10 @@ panels stay physical and gently close after the shower ends. Falling bars and
 the player share one physics world: bars can push the duck, and it can stand/jump
 on them. Leaving removes only the duck; the blocks finish their event, and a new
 visit can reuse that arena. Meltdown's individual blocks can push the duck too;
-they become water on floor contact, not on duck/block contact. The automatic duck
+they become water on floor contact, not on duck/block contact. Pressing bottom-right
+blue during an existing Falling or Meltdown also joins it in place: no restart,
+new obstacle course, cleared water or reset blocks. The current floor stays after
+the event ends. The automatic duck
 course and developer water-lab previews wait until the player leaves. Saved event
 settings are not changed.
 

@@ -16,6 +16,7 @@ impl DuckEvent {
         duck.fit_character();
         duck.direction = facing;
         duck.responsive_floor = Some(floor);
+        duck.preserve_arena_opacity(1.0);
         if let Some((mut position, velocity)) = motion {
             // Preserve an existing floating actor in place. When it is already
             // resting on a panel, give the round player hull minimal clearance

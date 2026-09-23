@@ -42,6 +42,17 @@ impl FallingWorld {
         rng: &mut StdRng,
     ) -> Self {
         let layout = drain.layout();
+        let mut world = Self::arena(drain);
+        let bodies = FallingBodies::insert(&mut world, layout, segments, letters, rng);
+        Self { world, bodies }
+    }
+
+    pub fn into_parts(self) -> (PhysicsWorld, FallingBodies) {
+        (self.world, self.bodies)
+    }
+
+    pub fn arena(drain: DrainGeometry) -> PhysicsWorld {
+        let layout = drain.layout();
         let mut world = PhysicsWorld::new(PhysicsWorldConfig {
             gravity: Vec2::new(0.0, -400.0),
             length_unit: layout.pitch,
@@ -49,11 +60,7 @@ impl FallingWorld {
             collect_events: false,
             ..PhysicsWorldConfig::default()
         });
-        let letter_colliders = letters
-            .iter()
-            .map(|letter| letter.glyph.cells().count())
-            .sum::<usize>();
-        world.reserve(32 + letters.len(), 100 + letter_colliders, 0);
+        world.reserve(4, 4, 0);
         for (index, (min, max)) in drain
             .slabs()
             .chain([
@@ -68,7 +75,12 @@ impl FallingWorld {
             ])
             .enumerate()
         {
-            let entity = PhysicsId::new(100 + index as u64);
+            // Shared arenas use 1000s for supporting terrain, 2000s for walls.
+            let entity = PhysicsId::new(if index < 2 {
+                1000 + index as u64
+            } else {
+                2000 + (index - 2) as u64
+            });
             assert!(world.insert_body(
                 BodyId::new(entity, BodyRole::PRIMARY),
                 BodySpec {
@@ -83,8 +95,7 @@ impl FallingWorld {
                 )],
             ));
         }
-        let bodies = FallingBodies::insert(&mut world, layout, segments, letters, rng);
-        Self { world, bodies }
+        world
     }
 
     pub fn step(&mut self, segments: &mut [SegmentState], letters: &mut [LetterState]) {
@@ -101,6 +112,13 @@ impl FallingWorld {
 }
 
 impl FallingBodies {
+    pub fn match_gravity(&self, world: &mut PhysicsWorld) {
+        let scale = 400.0 / -world.gravity().y;
+        for entity in &self.entities {
+            assert!(world.set_gravity_scale(BodyId::new(*entity, BodyRole::PRIMARY), scale, false));
+        }
+    }
+
     pub fn insert(
         world: &mut PhysicsWorld,
         layout: Layout,
@@ -231,6 +249,49 @@ impl FallingBodies {
     pub fn remove(self, world: &mut PhysicsWorld) {
         for entity in self.entities {
             assert!(world.remove_entity(entity), "live Falling batch");
+        }
+    }
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    use super::*;
+    use crate::events::duck::DuckEvent;
+    use rand::SeedableRng;
+
+    #[test]
+    fn moving_the_falling_world_preserves_every_body_motion_and_mass() {
+        for aspect in [4.0 / 3.0, 0.6] {
+            let layout = Layout::new(aspect);
+            let drain = crate::floor::test_drain(layout);
+            let mut segments = digits::create_segments();
+            for segment in &mut segments {
+                segment.lit = true;
+            }
+            let mut falling =
+                FallingWorld::new(drain, &mut segments, &[], &mut StdRng::seed_from_u64(42));
+            for _ in 0..100 {
+                falling.step(&mut segments, &mut []);
+            }
+            let motions = falling.world.motions().collect::<Vec<_>>();
+            let masses = motions
+                .iter()
+                .map(|r| falling.world.body_mass(r.id))
+                .collect::<Vec<_>>();
+            let collider_count = falling.world.collider_count();
+            let (world, bodies) = falling.into_parts();
+            let mut duck = DuckEvent::new_drain_player(drain, 42, 1, 1, world);
+            bodies.match_gravity(duck.arena_world_mut());
+            let world = duck.arena_world();
+            assert_eq!(world.motions().collect::<Vec<_>>(), motions);
+            assert_eq!(world.collider_count(), collider_count);
+            assert_eq!(
+                motions
+                    .iter()
+                    .map(|r| world.body_mass(r.id))
+                    .collect::<Vec<_>>(),
+                masses
+            );
         }
     }
 }

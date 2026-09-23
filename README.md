@@ -50,6 +50,8 @@ The local launcher includes the following scenarios and presets:
   the duck's physics world: they can push it and provide jump surfaces. Meltdown's
   individual blocks collide too, then become water on floor contact. Only the
   automatic AI Duck course (and developer water labs) waits for the visit.
+  Spawning during Rain, Falling or Meltdown joins the live scene without resetting
+  its event, moving objects, water or floor. The existing arena remains afterward.
   **N** / right shoulder / Picade upper-right blue starts the next compatible
   event without dismissing your duck.
   Marquee combines chasing lights, scrolling, waves, and whole-content or

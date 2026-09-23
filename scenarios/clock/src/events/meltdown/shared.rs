@@ -56,6 +56,42 @@ impl SharedMeltdown {
 }
 
 impl MeltdownEvent {
+    pub fn join_player(
+        &mut self,
+        layout: Layout,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<DuckEvent>> {
+        if self.lab || self.shared.is_some() {
+            return None;
+        }
+        let floor = self
+            .floor
+            .as_ref()
+            .expect("standalone Meltdown panels")
+            .clone();
+        let mut duck = Box::new(DuckEvent::new_responsive_player(
+            layout,
+            seed,
+            session,
+            seat,
+            if seed.is_multiple_of(2) { 1.0 } else { -1.0 },
+            floor,
+            None,
+        ));
+        let mut shared = SharedMeltdown::new(&mut duck, self.cells.len());
+        duck.preserve_arena_opacity(self.floor_opacity());
+        // Promote only the surviving, already-released cells at their exact
+        // current pose and velocity. Neither water nor either clock advances.
+        // Unreleased cells retain their seeded release times; liquid is untouched.
+        shared
+            .bodies
+            .release_due(duck.arena_world_mut(), &self.cells, layout, self.tick);
+        self.shared = Some(shared);
+        Some(duck)
+    }
+
     pub fn shares_player_arena(&self) -> bool {
         self.shared.is_some()
     }

@@ -953,6 +953,18 @@ impl PhysicsWorld {
         true
     }
 
+    /// Change acceleration without rebuilding a body or discarding its contacts.
+    pub fn set_gravity_scale(&mut self, id: BodyId, scale: f32, wake_up: bool) -> bool {
+        if !scale.is_finite() {
+            return false;
+        }
+        let Some(body) = self.body_mut(id) else {
+            return false;
+        };
+        body.set_gravity_scale(scale, wake_up);
+        true
+    }
+
     pub fn set_pose(&mut self, id: BodyId, position: Vec2, angle: f32, wake_up: bool) -> bool {
         if !finite_vec2(position) || !angle.is_finite() {
             return false;
@@ -2243,6 +2255,28 @@ mod tests {
             &[ColliderSpec::ball(collider, 0.25)],
         ));
         body
+    }
+
+    #[test]
+    fn gravity_scale_changes_acceleration_without_resetting_motion() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig {
+            gravity: Vec2::new(0.0, -10.0),
+            ..Default::default()
+        });
+        let body = insert_ball(&mut world, 1, Vec2::new(2.0, 3.0));
+        world.set_velocity(body, Vec2::new(1.0, 2.0), 0.5, true);
+        let before = world.motion(body).unwrap();
+        assert!(!world.set_gravity_scale(body, f32::NAN, true));
+        assert!(!world.set_gravity_scale(body, f32::INFINITY, true));
+        assert!(!world.set_gravity_scale(ball_ids(9).1, 2.0, true));
+        assert!(world.set_gravity_scale(body, 2.0, false));
+        assert_eq!(world.motion(body), Some(before));
+        world.step(1.0 / 60.0);
+        let motion = world.motion(body).unwrap();
+        assert!((motion.linear_velocity.y - (2.0 - 20.0 / 60.0)).abs() < 1e-5);
+        assert_eq!(motion.linear_velocity.x, before.linear_velocity.x);
+        assert_eq!(motion.angular_velocity, before.angular_velocity);
+        assert_eq!((world.body_count(), world.collider_count()), (1, 1));
     }
 
     #[test]

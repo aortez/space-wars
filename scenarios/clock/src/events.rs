@@ -265,10 +265,20 @@ impl ActiveEvent {
         }
     }
 
-    pub fn rejoin_arena(&mut self, session: u64, seat: u8) -> Option<Box<duck::DuckEvent>> {
+    pub fn join_arena(
+        &mut self,
+        layout: Layout,
+        seed: u64,
+        session: u64,
+        seat: u8,
+    ) -> Option<Box<duck::DuckEvent>> {
         match self {
-            Self::Falling(event) => event.rejoin(session, seat),
-            Self::Meltdown(event) => event.rejoin(session, seat),
+            Self::Falling(event) => event
+                .rejoin(session, seat)
+                .or_else(|| event.join_player(seed, session, seat)),
+            Self::Meltdown(event) => event
+                .rejoin(session, seat)
+                .or_else(|| event.join_player(layout, seed, session, seat)),
             _ => None,
         }
     }

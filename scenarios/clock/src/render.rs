@@ -68,7 +68,11 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
     if let Some(event) = shared_mechanics_arena(state) {
-        let opacity = state.active_event.as_ref().unwrap().arena_opacity();
+        let opacity = if state.player_duck.is_some() {
+            event.arena_opacity()
+        } else {
+            state.active_event.as_ref().unwrap().arena_opacity()
+        };
         if let Some(panels) = event.responsive_floor() {
             floor::responsive(&mut frame, panels, layout, opacity);
         } else {
@@ -111,7 +115,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
     } else if let Some(duck) = &state.player_duck
         && let Some(panels) = duck.responsive_floor()
     {
-        floor::responsive(&mut frame, panels, layout, duck.course_opacity());
+        floor::responsive(&mut frame, panels, layout, duck.arena_opacity());
     } else if let Some(event) = state.duck_scene() {
         // The custom course owns its floor, including the entrance/exit fade.
         // This backdrop never adds a collider across the course's physical pit.
@@ -119,7 +123,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             &mut frame,
             crate::floor::FloorGeometry::closed(layout),
             layout.pitch,
-            1.0 - event.course_opacity(),
+            1.0 - event.arena_opacity(),
         );
     } else if let Some(crate::events::ActiveEvent::Meltdown(event)) = &state.active_event {
         if let Some(floor) = &event.floor {

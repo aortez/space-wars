@@ -1,5 +1,5 @@
 //! Player presence is separate from the automatic event scheduler. For now it
-//! owns either a Duck course or Rain's shared panels while compatible events continue.
+//! owns a Duck course, a joined drain or shared panels while compatible events continue.
 //! Falling and Meltdown lease that world without owning the player's life.
 use super::*;
 use events::duck::DuckEvent;
@@ -108,8 +108,11 @@ impl ClockState {
             }
             return;
         }
+        let layout = Layout::new(self.aspect_ratio());
+        let session = self.player_duck_sequence + 1;
+        let seed = self.player_seed.wrapping_add(session);
         if let Some(event) = &mut self.active_event
-            && let Some(duck) = event.rejoin_arena(self.player_duck_sequence + 1, player)
+            && let Some(duck) = event.join_arena(layout, seed, session, player)
         {
             self.player_duck_sequence += 1;
             self.floor.acquire_player();
@@ -127,8 +130,6 @@ impl ClockState {
         }
         self.player_duck_sequence += 1;
         self.floor.acquire_player();
-        let seed = self.player_seed.wrapping_add(self.player_duck_sequence);
-        let layout = Layout::new(self.aspect_ratio());
         let duck = if let Some(ActiveEvent::Rain(rain)) = &mut self.active_event
             && let Some(floor) = rain.responsive_floor().cloned()
         {
