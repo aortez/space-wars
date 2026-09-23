@@ -126,3 +126,17 @@ Intervals exclude first-choice and terminal observations. Mission event reasons
 are read directly, avoiding a later same-tick replan overwriting the earlier
 acquisition failure in a visit summary. The controlled ship-loss observation
 ends its wait. None of these counts infers permission from an offline forecast.
+
+The pre-main-integration experiment is preserved at
+`/home/oldman/.codex/visualizations/2026/09/23/bot-bounded-acquisition/evidence.tar.gz`
+(4,717,857,494 bytes, 436 members), SHA-256
+`49bbd9a6a467b86923c2f8d6653c80e755d995382115fe584e7bfdd3e2f74842`. Manifest SHA-256:
+`cd85690d5057efbb6897dbf700197ebbaa320f9bb8480337a9c5aad4dace8a0e`. The complete runtime patch applies to
+`71b0eaf`; its SHA-256 is
+`b51f881b7d51d359bb9ca5f7edffd672243a5e5322d8952ab791c50baf7168ce`.
+
+After integrating main at `cf3b3ea`, all **1,853 workspace tests pass**
+(46 ignored tests), together with 28 CI-tooling and eight input-diagnostic
+tests. Three selected candidate runs preserve their complete traces and all
+non-timing report/planner data across integration. The separate integration logs
+and replay hashes are retained beside the archive in `integration/`.
