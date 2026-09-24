@@ -137,7 +137,8 @@ mod tests {
                     ClockScenario::render_frame(&a),
                     ClockScenario::render_frame(&b)
                 );
-                active += u64::from(a.event_kind().is_some());
+                assert_eq!(a.duck_state(), b.duck_state());
+                active += u64::from(a.event_kind().is_some() || a.has_duck_visit());
                 assert_eq!(a.reading().unwrap().hour(), 8);
                 assert_eq!(a.reading().unwrap().minute(), 8);
                 if (tick + 1) % case.cycle_ticks() == 0 {

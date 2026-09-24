@@ -1,6 +1,6 @@
 //! Scoped ownership of the ordinary floor.
 //!
-//! Face-only events make no claim. The player's course or moving panels can be
+//! Face-only events make no claim. The visit's course or moving panels can be
 //! claimed jointly with Rain, Falling or Meltdown; the ordinary floor returns
 //! only after both release.
 //! Standalone physical events retain exclusive floor ownership.
@@ -23,8 +23,8 @@ pub(crate) struct FloorManager {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum FloorOwner {
     Event(ClockEventKind),
-    PlayerArena {
-        player: bool,
+    VisitArena {
+        visit: bool,
         event: Option<ClockEventKind>,
     },
 }
@@ -51,14 +51,11 @@ impl FloorManager {
     }
 
     pub fn release(&mut self, kind: ClockEventKind) {
-        if let Some(FloorOwner::PlayerArena { player, event }) = self.owner
+        if let Some(FloorOwner::VisitArena { visit, event }) = self.owner
             && event == Some(kind)
         {
-            self.owner = player.then_some(FloorOwner::PlayerArena {
-                player,
-                event: None,
-            });
-            if !player {
+            self.owner = visit.then_some(FloorOwner::VisitArena { visit, event: None });
+            if !visit {
                 self.mode = ClockFloorMode::Closed;
             }
             return;
@@ -66,38 +63,38 @@ impl FloorManager {
         self.release_owner(FloorOwner::Event(kind));
     }
 
-    pub fn acquire_player(&mut self) {
+    pub fn acquire_visit(&mut self) {
         if let Some(FloorOwner::Event(
             kind @ (ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown),
         )) = self.owner
         {
-            self.owner = Some(FloorOwner::PlayerArena {
-                player: true,
+            self.owner = Some(FloorOwner::VisitArena {
+                visit: true,
                 event: Some(kind),
             });
             self.mode = ClockFloorMode::EventOwned;
             return;
         }
-        if let Some(FloorOwner::PlayerArena { player, event }) = &mut self.owner {
-            assert!(!*player && event.is_some());
-            *player = true;
+        if let Some(FloorOwner::VisitArena { visit, event }) = &mut self.owner {
+            assert!(!*visit && event.is_some());
+            *visit = true;
             return;
         }
         assert!(
             self.owner.is_none(),
             "finish the previous floor owner first"
         );
-        self.owner = Some(FloorOwner::PlayerArena {
-            player: true,
+        self.owner = Some(FloorOwner::VisitArena {
+            visit: true,
             event: None,
         });
         self.mode = ClockFloorMode::EventOwned;
     }
 
-    pub fn release_player(&mut self) {
-        if let Some(FloorOwner::PlayerArena { event, .. }) = self.owner {
-            self.owner = event.map(|kind| FloorOwner::PlayerArena {
-                player: false,
+    pub fn release_visit(&mut self) {
+        if let Some(FloorOwner::VisitArena { event, .. }) = self.owner {
+            self.owner = event.map(|kind| FloorOwner::VisitArena {
+                visit: false,
                 event: Some(kind),
             });
             if event.is_none() {
@@ -106,13 +103,13 @@ impl FloorManager {
         }
     }
 
-    pub fn acquire_player_event(&mut self, kind: ClockEventKind) {
+    pub fn acquire_visit_event(&mut self, kind: ClockEventKind) {
         assert!(matches!(
             kind,
             ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown
         ));
-        let Some(FloorOwner::PlayerArena { event, .. }) = &mut self.owner else {
-            panic!("shared event requires a player arena");
+        let Some(FloorOwner::VisitArena { event, .. }) = &mut self.owner else {
+            panic!("shared event requires a visit arena");
         };
         assert!(event.is_none());
         *event = Some(kind);

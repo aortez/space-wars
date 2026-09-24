@@ -4611,6 +4611,8 @@ dependencies = [
  "engine-rapier",
  "engine-water",
  "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -672,6 +672,9 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
         // Keep the periodic schedule test independent of when a real minute
         // rolls over. Time-change triggers are driven by injected core readings.
         let state = harness.activate_guarded("launcher.settings.clock.digit-slide.next", &state);
+        // This real-time UI smoke checks timed-event cadence. Resident-actor
+        // scheduling/composition is covered at exact ticks in headless tests.
+        let state = harness.activate_guarded("launcher.settings.clock.duck.next", &state);
         assert_eq!(
             control_value(&state, "launcher.settings.clock.event-profile.next"),
             Some("Demo")
@@ -688,10 +691,9 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
                 .collect::<Vec<_>>(),
             ClockEventKind::ALL
         );
-        assert!(
-            initial.events.iter().all(|event| event.enabled
-                == (event.trigger == engine_common::ClockEventTrigger::Periodic))
-        );
+        assert!(initial.events.iter().all(|event| event.enabled
+            == (event.trigger == engine_common::ClockEventTrigger::Periodic
+                && event.kind != ClockEventKind::Duck)));
         assert!((360..=600).contains(&initial.next_event_tick.unwrap()));
         let mut previous = None;
         for event_id in 1..=2 {
@@ -701,9 +703,6 @@ fn demo_profile_automatically_runs_multiple_bounded_events() {
             if active.event_kind == Some(ClockEventKind::Falling) {
                 assert!((5..=32).contains(&active.body_count));
                 assert!(active.collider_count <= 100);
-            } else if active.event_kind == Some(ClockEventKind::Duck) {
-                assert!(active.body_count <= 5 && active.collider_count <= 5);
-                assert!(active.duck.is_some());
             } else if active.event_kind == Some(ClockEventKind::Rain) {
                 assert!(active.body_count <= 2 && active.collider_count <= 5);
                 assert!(active.rain.is_some());
@@ -840,10 +839,10 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
 impl FunctionalHarness {
     fn assert_clock_stays_paused(&mut self, paused: &ClockState) {
         assert!(paused.paused);
-        assert_eq!(paused.lifecycle, "active");
+        assert!(paused.event_kind.is_some() || paused.duck.is_some());
         let predicate = ClockStatePredicate {
             scenario_revision: paused.scenario_revision,
-            lifecycle: Some("active".into()),
+            lifecycle: Some(paused.lifecycle.clone()),
             event_kind: paused.event_kind,
             phase: paused.phase.clone(),
             event_id: Some(paused.event_id),
@@ -883,17 +882,18 @@ impl FunctionalHarness {
         event_id: u64,
         min_phase_tick: u64,
     ) -> ClockState {
+        let duck_phase = ["opening", "running", "exiting", "resetting"].contains(&phase);
         let predicate = ClockStatePredicate {
             scenario_revision: state.scenario_revision,
-            lifecycle: Some(
+            lifecycle: (!duck_phase).then(|| {
                 if ["idle", "active", "cooldown"].contains(&phase) {
                     phase
                 } else {
                     "active"
                 }
-                .into(),
-            ),
-            event_kind: None,
+                .into()
+            }),
+            event_kind: duck_phase.then_some(ClockEventKind::Duck),
             phase: (!["idle", "active", "cooldown"].contains(&phase)).then(|| phase.into()),
             event_id: Some(event_id),
             min_phase_tick,
@@ -909,6 +909,20 @@ impl FunctionalHarness {
         let timeout = Duration::from_secs_f64(max_ticks as f64 / 60.0) + Duration::from_secs(10);
         let result = self.client.wait_for_clock_state(&predicate, timeout);
         self.require_clock(&format!("clock wait {predicate:?}"), result)
+    }
+
+    fn clock_wait_no_duck(&mut self, initial: &ClockState) -> ClockState {
+        let deadline = Instant::now() + Duration::from_secs(45);
+        loop {
+            let result = self.client.clock_state_before(deadline);
+            let state = self.require_clock("clock wait for visit departure", result);
+            assert_eq!(state.scenario_revision, initial.scenario_revision);
+            if state.duck.is_none() {
+                return state;
+            }
+            assert!(Instant::now() < deadline, "duck never departed: {state:?}");
+            thread::sleep(POLL_INTERVAL.min(deadline.saturating_duration_since(Instant::now())));
+        }
     }
 
     fn clock_trigger(&mut self, state: &ClockState) {
@@ -1152,7 +1166,8 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         harness.capture_screenshot("clock-duck-controls.png");
         harness.activate_guarded("pause.clock.preview", &page);
         let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
-        let resetting = harness.clock_wait(&initial, "resetting", 2, 5);
+        // Duplicate Duck preview resumes without evicting the resident actor.
+        let resetting = harness.clock_wait(&initial, "resetting", 1, 5);
         assert_eq!(resetting.scenario_revision, initial.scenario_revision);
         assert!(!resetting.settings.events.duck);
         let duck = resetting.duck.unwrap();
@@ -1196,12 +1211,12 @@ fn duck_runs_jumps_exits_and_supports_live_controls_and_cleanup() {
         assert!(navigation.exit_visible);
         assert_eq!((resetting.body_count, resetting.collider_count), (0, 0));
         harness.capture_screenshot("clock-duck-resetting.png");
-        let idle = harness.clock_wait(&initial, "idle", 2, 0);
+        let idle = harness.clock_wait_no_duck(&initial);
         assert_eq!(idle.duck, None);
         assert_eq!(idle.next_event_tick, None);
         harness.capture_screenshot("clock-duck-recovered.png");
         harness.clock_trigger_event(&idle, ClockEventKind::Duck);
-        harness.clock_wait(&idle, "running", 3, 60);
+        harness.clock_wait(&idle, "running", 2, 60);
         harness.pause_guarded(&gameplay);
         let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
         harness.activate_guarded("pause.restart", &menu);

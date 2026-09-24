@@ -26,10 +26,7 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
     // Keep the first wall-tag/hurdle course as a frozen geometry/controller
     // regression baseline; platform tests exercise the new default separately.
     let event_seed = state.duck_state().unwrap().navigation.unwrap().course_seed;
-    state.active_event = Some(crate::events::ActiveEvent::Duck(Box::new(DuckEvent::new(
-        Layout::new(aspect),
-        event_seed,
-    ))));
+    state.duck_visit = Some(Box::new(DuckEvent::new(Layout::new(aspect), event_seed)));
     state
 }
 
@@ -93,31 +90,34 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                     assert_eq!(stats.exit_open_milli, 0);
                 }
                 directions[usize::from(stats.left_to_right)] = true;
-                if phases.last().copied() != state.event_phase() {
-                    phases.push(state.event_phase().unwrap());
+                if phases.last().copied() != state.duck_visit.as_ref().map(|duck| duck.phase) {
+                    phases.push(state.duck_visit.as_ref().map(|duck| duck.phase).unwrap());
                 }
                 assert!(state.body_count() <= 5 && state.collider_count() <= 5);
                 assert!(stats.entrance_open_milli <= 1000 && stats.exit_open_milli <= 1000);
-                if state.event_phase() == Some(EventPhase::Opening) {
+                if state.duck_visit.as_ref().map(|duck| duck.phase) == Some(EventPhase::Opening) {
                     assert_eq!((state.body_count(), state.collider_count()), (0, 0));
                     assert_eq!(stats.position_milli, None);
                     assert_eq!(stats.jumps, 0);
                     assert_eq!(stats.exit_open_milli, 0);
                     assert_eq!(
                         stats.entrance_open_milli,
-                        (state.phase_tick() as f32 / OPENING_TICKS as f32 * 1000.0).round() as u32
+                        (state.duck_visit.as_ref().unwrap().phase_tick as f32
+                            / OPENING_TICKS as f32
+                            * 1000.0)
+                            .round() as u32
                     );
                 }
                 if matches!(
-                    state.event_phase(),
+                    state.duck_visit.as_ref().map(|duck| duck.phase),
                     Some(EventPhase::Running | EventPhase::Exiting)
                 ) {
                     assert_eq!(state.body_count(), 5);
                     airborne |= stats.jumps > 0 && !stats.grounded;
                 }
-                if state.event_phase() == Some(EventPhase::Exiting) {
+                if state.duck_visit.as_ref().map(|duck| duck.phase) == Some(EventPhase::Exiting) {
                     assert_eq!(stats.entrance_open_milli, 0);
-                    if state.phase_tick() >= 24 {
+                    if state.duck_visit.as_ref().unwrap().phase_tick >= 24 {
                         assert_eq!(stats.exit_open_milli, 1000);
                     }
                 }
@@ -153,7 +153,10 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                         assert_eq!(after.jumps, stats.jumps + 1);
                     }
                     if tick + 1 == OPENING_TICKS {
-                        assert_eq!(state.event_phase(), Some(EventPhase::Running));
+                        assert_eq!(
+                            state.duck_visit.as_ref().map(|duck| duck.phase),
+                            Some(EventPhase::Running)
+                        );
                         assert_eq!(after.entrance_open_milli, 1000);
                         assert!(after.position_milli.is_some());
                     }
@@ -170,7 +173,7 @@ fn seeded_courses_jump_all_obstacles_exit_and_release_every_body() {
                     EventPhase::Resetting
                 ]
             );
-            assert_eq!(state.lifecycle(), EventLifecycle::Cooldown);
+            assert_eq!(state.lifecycle(), EventLifecycle::Idle);
             assert_eq!(state.duck_state(), None);
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
             cases += 1;
@@ -355,9 +358,7 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
     for fall in [false, true] {
         let mut state = ready(800.0 / 480.0, 5);
         ticks(&mut state, OPENING_TICKS);
-        let Some(crate::events::ActiveEvent::Duck(event)) = &mut state.active_event else {
-            panic!()
-        };
+        let event = state.duck_visit.as_mut().unwrap();
         let fallen = event.physics_position(Vec2::new(
             event.width * 0.5,
             event.layout.floor_y - event.radius * 6.0,
@@ -385,7 +386,10 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
             );
         }
         ticks(&mut state, DUCK_TICKS - RESET_TICKS - OPENING_TICKS);
-        assert_eq!(state.event_phase(), Some(EventPhase::Resetting));
+        assert_eq!(
+            state.duck_visit.as_ref().map(|duck| duck.phase),
+            Some(EventPhase::Resetting)
+        );
         assert_eq!(
             state.duck_state().unwrap().outcome,
             Some(if fall {
@@ -414,7 +418,7 @@ fn live_time_pause_resize_and_preview_replacement_preserve_the_clock() {
         let mut state = ready(800.0 / 480.0, 42);
         ticks(&mut state, at);
         let stats = state.duck_state();
-        let phase_tick = state.phase_tick();
+        let phase_tick = state.duck_visit.as_ref().unwrap().phase_tick;
         ClockScenario::step(
             &mut state,
             &[ClockAction::set_reading(
@@ -423,7 +427,7 @@ fn live_time_pause_resize_and_preview_replacement_preserve_the_clock() {
             Duration::ZERO,
         );
         assert_eq!(state.duck_state(), stats);
-        assert_eq!(state.phase_tick(), phase_tick);
+        assert_eq!(state.duck_visit.as_ref().unwrap().phase_tick, phase_tick);
         assert_eq!(state.display().digits, [Some(2), Some(3), Some(5), Some(9)]);
         assert!(
             state
@@ -446,17 +450,6 @@ fn live_time_pause_resize_and_preview_replacement_preserve_the_clock() {
         ticks(&mut a, 1);
         ticks(&mut b, 1);
     }
-    for kind in ClockEventKind::ALL {
-        ClockScenario::step(
-            &mut a,
-            &[ClockAction::preview_event(ClockEventKind::Duck)],
-            Duration::ZERO,
-        );
-        ticks(&mut a, 100);
-        ClockScenario::step(&mut a, &[ClockAction::preview_event(kind)], Duration::ZERO);
-        assert_eq!(a.event_kind(), Some(kind));
-        if kind != ClockEventKind::Duck {
-            assert_eq!(a.duck_state(), None);
-        }
-    }
+    // Shared-event admission is covered on the default platform course in
+    // autonomous_tests. This frozen hurdle fixture only checks resize/replay.
 }

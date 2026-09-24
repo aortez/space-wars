@@ -115,7 +115,7 @@ fn real_heavy_rain_floats_the_player_and_finishes_without_eviction_or_resource_g
                 let player = state.player_duck_state().unwrap();
                 max_immersion = max_immersion.max(player.submerged_milli);
                 let diagnostics = state.rain_state().unwrap();
-                assert!(diagnostics.player_course);
+                assert!(diagnostics.duck_course);
                 assert_eq!(diagnostics.floor_open_milli, 0);
                 assert_eq!(diagnostics.duck_spawns, 0);
                 ledger(&state);
@@ -158,7 +158,7 @@ fn dismiss_and_rejoin_keep_the_same_wet_arena_then_resize_cleans_both() {
     assert_eq!(state.player_duck_session().unwrap().1, 2);
     assert_eq!(state.event_id(), id);
     let geometry =
-        events::duck::arena::CourseGeometry::from_duck(state.player_duck.as_ref().unwrap());
+        events::duck::arena::CourseGeometry::from_duck(state.duck_visit.as_ref().unwrap());
     assert_eq!(geometry.water_pools(), pools);
     assert!(state.body_count() <= 9);
     let player = state.player_duck_state();
@@ -198,7 +198,7 @@ fn course_rain_cleanup_without_player_releases_the_floor_and_next_preview_preser
 #[test]
 fn real_player_fall_does_not_cancel_rain_or_restore_an_invisible_floor() {
     let mut state = wet_player(4.0 / 3.0, 42);
-    let direction = state.player_duck.as_ref().unwrap().direction;
+    let direction = state.duck_visit.as_ref().unwrap().direction;
     let id = state.event_id();
     let action = input(&state, (direction * 1000.0) as i16, false);
     tick(&mut state, &[action]);

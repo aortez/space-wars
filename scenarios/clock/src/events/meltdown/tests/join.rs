@@ -36,7 +36,7 @@ fn promotion_preserves_every_solid_pose_velocity_release_time_and_water_sample()
             assert_eq!(after.water.pools(), pools);
             assert_eq!(after.water.parcels(), parcels);
             assert_eq!(after.water.stats(), stats);
-            let duck = state.player_duck.as_ref().unwrap();
+            let duck = state.duck_visit.as_ref().unwrap();
             assert_eq!(duck.arena_opacity(), opacity);
             assert_eq!(duck.responsive_floor().unwrap().opening, floor.opening);
             assert_eq!(duck.responsive_floor().unwrap().load, floor.load);
@@ -104,7 +104,7 @@ fn promoted_meltdown_replays_and_conserves_through_deadline_and_cleanup() {
             assert!(a.body_count() <= 4);
             a.set_aspect_ratio(2.0);
             assert_eq!((a.body_count(), a.collider_count()), (0, 0));
-            assert!(a.player_duck.is_none());
+            assert!(a.duck_visit.is_none());
         }
     }
 }

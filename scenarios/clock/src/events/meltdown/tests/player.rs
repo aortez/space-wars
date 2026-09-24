@@ -54,7 +54,7 @@ fn event_mut(state: &mut ClockState) -> &mut MeltdownEvent {
 
 fn world(state: &ClockState) -> &PhysicsWorld {
     state
-        .player_duck
+        .duck_visit
         .as_deref()
         .or_else(|| event(state).vacant_arena())
         .unwrap()
@@ -150,7 +150,7 @@ fn shared_meltdown_replays_conserves_material_and_cleans_up_in_both_arenas() {
 fn block_block_contacts_do_not_trigger_the_material_change() {
     let mut state = player(4.0 / 3.0, 42, false);
     state.preview_event(ClockEventKind::Meltdown);
-    let layout = state.player_duck.as_ref().unwrap().layout;
+    let layout = state.duck_visit.as_ref().unwrap().layout;
     isolate_block(
         &mut state,
         Vec2::new(0.0, layout.floor_y + 6.0 * layout.pitch),
@@ -227,10 +227,10 @@ fn scheduled_meltdown_starts_without_an_extra_player_tick() {
     while state.simulation_tick() + 1 < due {
         tick(&mut state);
     }
-    let duck_tick = state.player_duck.as_ref().unwrap().tick;
+    let duck_tick = state.duck_visit.as_ref().unwrap().tick;
     tick(&mut state);
     assert_eq!(event(&state).tick, 1);
-    assert_eq!(state.player_duck.as_ref().unwrap().tick, duck_tick + 1);
+    assert_eq!(state.duck_visit.as_ref().unwrap().tick, duck_tick + 1);
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn impact_driven_course_outfalls_do_not_draw_compressed_water_as_long_spikes() {
 fn block_pushes_duck_without_melting_then_liquefies_on_the_actual_floor() {
     let mut state = player(4.0 / 3.0, 42, false);
     state.preview_event(ClockEventKind::Meltdown);
-    let duck = state.player_duck.as_ref().unwrap();
+    let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
     let radius = duck.radius;
     let origin = duck.arena_world().motion(DUCK).unwrap().position;
@@ -342,7 +342,7 @@ fn solid_blocks_pass_through_real_gaps_without_becoming_water() {
         .iter()
         .max_by(|a, b| (a.1 - a.0).total_cmp(&(b.1 - b.0)))
         .unwrap();
-    let layout = state.player_duck.as_ref().unwrap().layout;
+    let layout = state.duck_visit.as_ref().unwrap().layout;
     isolate_block(
         &mut state,
         Vec2::new(((left + right) * 0.5) as f32, layout.floor_y + layout.pitch),
@@ -369,7 +369,7 @@ fn solid_blocks_pass_through_real_gaps_without_becoming_water() {
 fn conversion_backpressure_keeps_the_whole_solid_then_retries_without_loss() {
     let mut state = player(4.0 / 3.0, 42, false);
     state.preview_event(ClockEventKind::Meltdown);
-    let duck = state.player_duck.as_ref().unwrap();
+    let duck = state.duck_visit.as_ref().unwrap();
     let layout = duck.layout;
     let x = duck.arena_world().motion(DUCK).unwrap().position.x * 0.85;
     isolate_block(
@@ -509,5 +509,5 @@ fn water_lab_previews_remain_explicitly_incompatible_with_a_player() {
     ticks(&mut state, 30);
     state.preview_event(ClockEventKind::Meltdown);
     assert!(event(&state).lab);
-    assert!(!event(&state).shares_player_arena());
+    assert!(!event(&state).shares_visit_arena());
 }

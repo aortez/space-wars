@@ -21,7 +21,7 @@ impl CourseGeometry {
             width: duck.width,
             radius: duck.radius,
             direction: duck.direction,
-            course: duck.course.clone().expect("player course"),
+            course: duck.course.clone().expect("duck course"),
         }
     }
 

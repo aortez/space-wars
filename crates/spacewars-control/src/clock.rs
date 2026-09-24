@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 14;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 15;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -21,6 +21,8 @@ pub struct ClockEventInfo {
     /// Physical-arena event temporarily incompatible with the player's course.
     /// Independent of saved enablement, cooldown, pause, and event lifecycle.
     pub blocked_by_player: bool,
+    /// An existing automatic or player visit temporarily owns the arena.
+    pub blocked_by_duck: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -47,7 +49,7 @@ pub struct ClockState {
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
-    /// Player compatibility leaves no enabled automatic event kinds. Profile
+    /// Duck compatibility leaves no enabled automatic event kinds. Profile
     /// Off is distinct; per-event restrictions also apply to manual requests.
     pub automatic_events_suspended: bool,
     pub marquee: Option<engine_common::ClockMarqueeState>,
@@ -85,6 +87,19 @@ pub struct ClockTriggerRequest {
 }
 
 impl ClockTriggerRequest {
+    /// Queue acknowledgement is not admission. Ducks become resident visits;
+    /// unlike timed animations, they do not remain in the Active lifecycle.
+    pub fn started_predicate(&self) -> ClockStatePredicate {
+        ClockStatePredicate {
+            scenario_revision: self.expected_scenario_revision,
+            lifecycle: (self.event != ClockEventKind::Duck).then(|| "active".into()),
+            event_kind: Some(self.event),
+            phase: None,
+            event_id: Some(self.expected_event_id.saturating_add(1)),
+            min_phase_tick: 0,
+        }
+    }
+
     pub fn new(state: &ClockState, event: ClockEventKind) -> Self {
         Self {
             schema_version: CLOCK_STATE_SCHEMA_VERSION,
@@ -156,20 +171,34 @@ pub struct ClockStatePredicate {
 
 impl ClockStatePredicate {
     pub fn matches(&self, state: &ClockState) -> bool {
+        // Duck is a catalog admission with its own lifetime, not the timed
+        // event slot. Keep `wait --event duck --phase ...` useful during Rain.
+        let duck = (self.event_kind == Some(ClockEventKind::Duck))
+            .then(|| state.duck.and_then(|duck| duck.visit))
+            .flatten();
+        let kind_matches = self.event_kind.is_none_or(|kind| {
+            if kind == ClockEventKind::Duck {
+                duck.is_some()
+            } else {
+                Some(kind) == state.event_kind
+            }
+        });
+        let phase = duck
+            .map(|duck| duck.phase.as_str())
+            .or(state.phase.as_deref());
+        let phase_tick = duck.map_or(state.phase_tick, |duck| duck.phase_tick);
         state.scenario_revision == self.scenario_revision
             && self
                 .lifecycle
                 .as_ref()
                 .is_none_or(|lifecycle| *lifecycle == state.lifecycle)
-            && self
-                .event_kind
-                .is_none_or(|kind| Some(kind) == state.event_kind)
+            && kind_matches
             && self
                 .phase
                 .as_ref()
-                .is_none_or(|phase| Some(phase) == state.phase.as_ref())
+                .is_none_or(|expected| Some(expected.as_str()) == phase)
             && self.event_id.is_none_or(|id| id == state.event_id)
-            && state.phase_tick >= self.min_phase_tick
+            && phase_tick >= self.min_phase_tick
     }
 }
 
@@ -408,6 +437,7 @@ mod tests {
             submerged_milli: 450,
             velocity_milli: Some([-12000, 200]),
             duck: engine_common::ClockDuckState {
+                visit: None,
                 left_to_right: true,
                 position_milli: Some([-200000, -100000]),
                 grounded: false,
@@ -435,8 +465,8 @@ mod tests {
         state.phase = Some("raining".into());
         state.settings.rain_amount = ClockRainAmount::Varied;
         state.rain = Some(ClockRainState {
-            player_course: false,
-            player_joined: false,
+            duck_course: false,
+            duck_joined: false,
             seed: 42,
             amount: ClockRainAmount::Heavy,
             requested_microunits: 10_000_000,
@@ -713,9 +743,16 @@ mod tests {
     #[test]
     fn duck_diagnostics_and_named_trigger_round_trip() {
         let mut state = clock_state();
-        state.event_kind = Some(ClockEventKind::Duck);
-        state.phase = Some("resetting".into());
+        state.event_kind = Some(ClockEventKind::Rain);
+        state.phase = Some("raining".into());
         state.duck = Some(engine_common::ClockDuckState {
+            visit: Some(engine_common::ClockDuckVisitState {
+                phase: engine_common::ClockDuckPhase::Resetting,
+                phase_tick: 20,
+                tick: 1700,
+                submerged_milli: 0,
+                velocity_milli: None,
+            }),
             left_to_right: false,
             position_milli: None,
             grounded: false,
@@ -726,6 +763,13 @@ mod tests {
             exit_open_milli: 700,
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
+                water: engine_common::ClockDuckWaterState {
+                    interruptions: 1,
+                    recoveries: 1,
+                    paddling_ticks: 150,
+                    recovering_ticks: 25,
+                    target_surface: None,
+                },
                 jump_profile: engine_common::ClockDuckJumpProfile::Flowing,
                 course_seed: 42,
                 behavior: engine_common::ClockDuckBehavior::Exiting,
@@ -774,7 +818,62 @@ mod tests {
             ClockState::from_json(&state.to_json().unwrap()).unwrap(),
             state
         );
+        let predicate = ClockStatePredicate {
+            scenario_revision: state.scenario_revision,
+            lifecycle: None,
+            event_kind: Some(ClockEventKind::Duck),
+            phase: Some("resetting".into()),
+            event_id: Some(state.event_id),
+            min_phase_tick: 20,
+        };
+        assert!(predicate.matches(&state));
+        assert!(
+            !ClockStatePredicate {
+                min_phase_tick: 21,
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        assert!(
+            !ClockStatePredicate {
+                event_kind: Some(ClockEventKind::Rain),
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        assert!(
+            !ClockStatePredicate {
+                phase: Some("raining".into()),
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        let mut departed = state.clone();
+        departed.duck = None;
+        assert!(!predicate.matches(&departed));
         let request = ClockTriggerRequest::new(&state, ClockEventKind::Duck);
+        let started = request.started_predicate();
+        assert!(
+            !started.matches(&state),
+            "no admission before the next event ID"
+        );
+        state.event_id += 1;
+        state.event_kind = None;
+        state.phase = None;
+        for lifecycle in ["cooldown", "idle"] {
+            state.lifecycle = lifecycle.into();
+            assert!(
+                started.matches(&state),
+                "visit exists without an active animation"
+            );
+        }
+        assert_eq!(
+            ClockTriggerRequest::new(&state, ClockEventKind::Rain)
+                .started_predicate()
+                .lifecycle
+                .as_deref(),
+            Some("active")
+        );
         assert_eq!(
             ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
             request
@@ -855,6 +954,7 @@ mod tests {
             cooldown_ticks: 120,
             enabled: true,
             blocked_by_player: false,
+            blocked_by_duck: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

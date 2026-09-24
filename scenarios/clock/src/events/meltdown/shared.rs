@@ -1,14 +1,14 @@
-//! Player-mode Meltdown uses real contacts in the one shared mechanics world.
+//! Duck-shared Meltdown uses real contacts in the one shared mechanics world.
 //! Standalone Meltdown keeps its cheaper ballistic cells. Both use the same
 //! release schedule, material budget, water solver and reformation lifecycle.
 use super::*;
-use crate::events::duck::PlayerArena;
+use crate::events::duck::VisitArena;
 use engine_rapier::world::{
     BodyId, BodyRole, BodySpec, ColliderId, ColliderRole, ColliderSpec, PhysicsId, PhysicsWorld,
 };
 
 pub(super) struct SharedMeltdown {
-    pub arena: PlayerArena,
+    pub arena: VisitArena,
     bodies: CellBodies,
 }
 
@@ -30,15 +30,9 @@ impl SharedMeltdown {
         let supports = if player.responsive_floor().is_some() {
             1001..1003
         } else {
-            1000..1000
-                + player
-                    .course
-                    .as_ref()
-                    .expect("player course")
-                    .surfaces
-                    .len() as u64
+            1000..1000 + player.course.as_ref().expect("duck course").surfaces.len() as u64
         };
-        let arena = PlayerArena::claim(player);
+        let arena = VisitArena::claim(player);
         player.arena_world_mut().reserve(count, count, 0);
         Self {
             arena,
@@ -92,7 +86,7 @@ impl MeltdownEvent {
         Some(duck)
     }
 
-    pub fn shares_player_arena(&self) -> bool {
+    pub fn shares_visit_arena(&self) -> bool {
         self.shared.is_some()
     }
 

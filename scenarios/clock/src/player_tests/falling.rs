@@ -22,7 +22,7 @@ fn player(aspect: f32, responsive: bool) -> ClockState {
 }
 
 fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
-    if let Some(duck) = &state.player_duck {
+    if let Some(duck) = &state.duck_visit {
         duck.arena_world()
     } else if let Some(ActiveEvent::Falling(event)) = &state.active_event {
         event.vacant_arena().unwrap().arena_world()
@@ -32,7 +32,7 @@ fn world(state: &ClockState) -> &engine_rapier::world::PhysicsWorld {
 }
 
 fn world_mut(state: &mut ClockState) -> &mut engine_rapier::world::PhysicsWorld {
-    state.player_duck.as_mut().unwrap().arena_world_mut()
+    state.duck_visit.as_mut().unwrap().arena_world_mut()
 }
 
 fn batch(state: &ClockState) -> Vec<(BodyId, Vec2)> {
@@ -64,7 +64,7 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
         for responsive in [false, true] {
             let mut state = player(aspect, responsive);
             let before = state.player_duck_state().unwrap();
-            let base = state.player_duck.as_ref().unwrap().physics_counts();
+            let base = state.duck_visit.as_ref().unwrap().physics_counts();
             state.preview_event(ClockEventKind::Falling);
             assert_eq!(state.player_duck_state(), Some(before.clone()));
             assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
@@ -82,7 +82,7 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
                 "only the character leaves"
             );
             ticks(&mut state, 30);
-            assert!(state.player_duck.is_none());
+            assert!(state.duck_visit.is_none());
             assert_eq!(state.event_id(), id);
             assert_eq!(state.phase_tick(), 42);
             assert_eq!(state.body_count(), base.0 + count - 1);
@@ -208,7 +208,7 @@ fn contact_fixture() -> (ClockState, BodyId) {
     settings.event_profile = ClockEventProfile::Off;
     state.configure(settings);
     toggle(&mut state, 1);
-    let duck = state.player_duck.as_mut().unwrap();
+    let duck = state.duck_visit.as_mut().unwrap();
     duck.course.as_mut().unwrap().surfaces = vec![Surface {
         start: 0.0,
         end: duck.width,
@@ -229,7 +229,7 @@ fn contact_fixture() -> (ClockState, BodyId) {
 #[test]
 fn actual_falling_bar_pushes_the_duck_through_rapier_contacts() {
     let (mut state, bar) = contact_fixture();
-    let duck = state.player_duck.as_ref().unwrap();
+    let duck = state.duck_visit.as_ref().unwrap();
     let r = duck.radius;
     let floor = duck.layout.floor_y;
     let half = duck.layout.pitch * 0.4;
@@ -255,7 +255,7 @@ fn actual_falling_bar_pushes_the_duck_through_rapier_contacts() {
 #[test]
 fn actual_dynamic_falling_bar_is_a_grounded_jump_surface() {
     let (mut state, bar) = contact_fixture();
-    let duck = state.player_duck.as_ref().unwrap();
+    let duck = state.duck_visit.as_ref().unwrap();
     let r = duck.radius;
     let floor = duck.layout.floor_y;
     let half = duck.layout.pitch * 0.4;
@@ -335,7 +335,7 @@ fn falling_out_or_walking_out_leaves_the_batch_and_floor_alive_until_cleanup() {
         let mut state = player(4.0 / 3.0, false);
         let base = state.body_count();
         state.preview_event(ClockEventKind::Falling);
-        let duck = state.player_duck.as_ref().unwrap();
+        let duck = state.duck_visit.as_ref().unwrap();
         let position = if exit {
             duck.render_position(Vec2::new(
                 duck.width + duck.radius * 3.0,
@@ -356,7 +356,7 @@ fn falling_out_or_walking_out_leaves_the_batch_and_floor_alive_until_cleanup() {
         );
         assert!(world(&state).motion(CHARACTER).is_none());
         ticks(&mut state, 30);
-        assert!(state.player_duck.is_none());
+        assert!(state.duck_visit.is_none());
         assert!(!batch(&state).is_empty());
         assert_eq!(state.floor_mode(), ClockFloorMode::EventOwned);
         ticks(&mut state, FALLING_TICKS as usize - 31);

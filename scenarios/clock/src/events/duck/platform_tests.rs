@@ -611,17 +611,10 @@ fn platform_preview_pause_resize_and_debug_overlay_do_not_change_physics() {
             &[ClockAction::preview_event(ClockEventKind::Duck)],
             Duration::ZERO,
         );
-        assert_eq!(debug.body_count(), 0);
         assert_eq!(
-            debug
-                .duck_state()
-                .unwrap()
-                .navigation
-                .unwrap()
-                .planning
-                .unwrap()
-                .confirmed_landings,
-            0
+            debug.duck_state(),
+            before,
+            "duplicate admission cannot replace a duck"
         );
         debug.set_aspect_ratio(0.6);
         assert_eq!(debug.duck_state(), None);
@@ -660,6 +653,15 @@ fn mixed_spawns_replay_both_personalities_without_changing_courses_or_schedules(
             ClockConfig {
                 duck_jump_profile: profile,
                 event_profile: ClockEventProfile::Demo,
+                events: engine_common::ClockEvents {
+                    falling: false,
+                    color_cycle: false,
+                    meltdown: false,
+                    duck: true,
+                    marquee: false,
+                    digit_slide: false,
+                    rain: false,
+                },
                 ..ClockConfig::default()
             },
             42,
@@ -674,9 +676,7 @@ fn mixed_spawns_replay_both_personalities_without_changing_courses_or_schedules(
         state
     };
     let geometry = |state: &ClockState| {
-        let Some(crate::events::ActiveEvent::Duck(event)) = &state.active_event else {
-            panic!("expected duck")
-        };
+        let event = state.duck_visit.as_ref().expect("expected duck");
         event.course.as_ref().unwrap().surfaces.clone()
     };
     assert_eq!(ClockConfig::default().duck_jump_profile, None);

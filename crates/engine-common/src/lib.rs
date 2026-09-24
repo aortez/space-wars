@@ -374,13 +374,13 @@ pub enum ClockRainDuckPhase {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockRainState {
-    /// Rain uses the stable player course instead of its responsive floor and
-    /// passive duck. The course outlives a dismissed player until Rain ends.
+    /// Rain uses a stable visiting duck's course instead of its responsive floor
+    /// and passive duck. The course outlives the visiting actor until Rain ends.
     #[serde(default)]
-    pub player_course: bool,
-    /// This event has hosted a player; passive spawning remains suppressed.
+    pub duck_course: bool,
+    /// This event has hosted an automatic/player visit; no extra passive duck.
     #[serde(default)]
-    pub player_joined: bool,
+    pub duck_joined: bool,
     pub seed: u64,
     /// The resolved amount for this visit; settings may still say Varied.
     pub amount: ClockRainAmount,
@@ -696,6 +696,49 @@ pub enum ClockDuckBehavior {
     Jumping,
     Landing,
     Blocked,
+    Paddling,
+    Recovering,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckWaterState {
+    pub interruptions: u32,
+    pub recoveries: u32,
+    pub paddling_ticks: u64,
+    pub recovering_ticks: u64,
+    /// Course-relative safe bank selected for water recovery, not a jump plan.
+    pub target_surface: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockDuckPhase {
+    Opening,
+    Running,
+    Exiting,
+    Resetting,
+}
+
+impl ClockDuckPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Opening => "opening",
+            Self::Running => "running",
+            Self::Exiting => "exiting",
+            Self::Resetting => "resetting",
+        }
+    }
+}
+
+/// The visit's clock is independent of any concurrent timed event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckVisitState {
+    pub phase: ClockDuckPhase,
+    pub phase_tick: u64,
+    pub tick: u64,
+    pub submerged_milli: u32,
+    /// Screen-relative physical velocity, including drift from water.
+    pub velocity_milli: Option<[i32; 2]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -769,12 +812,16 @@ pub struct ClockDuckNavigationState {
     pub body_radius_milli: u32,
     #[serde(default)]
     pub planning: Option<ClockDuckPlanningState>,
+    #[serde(default)]
+    pub water: ClockDuckWaterState,
 }
 
 /// Temporary course/controller telemetry. Position is in thousandths of render
 /// world units; the duck and its physics are absent during opening/resetting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockDuckState {
+    #[serde(default)]
+    pub visit: Option<ClockDuckVisitState>,
     pub left_to_right: bool,
     pub position_milli: Option<[i32; 2]>,
     pub grounded: bool,

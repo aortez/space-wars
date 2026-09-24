@@ -47,8 +47,8 @@ pub(crate) struct RainEvent {
     arena: RainArena,
     // A joined shower never spawns another passive actor, even after a visit
     // ends. The current live player hull is supplied before the one water step.
-    player_joined: bool,
-    player_hull: Option<(Vec2, f64)>,
+    duck_joined: bool,
+    duck_hull: Option<(Vec2, f64)>,
     seed: u64,
     source: source::RainSource,
     amount: ClockRainAmount,
@@ -121,7 +121,7 @@ impl RainEvent {
         amount: ClockRainAmount,
         display: DisplaySnapshot,
         arena: RainArena,
-        player_joined: bool,
+        duck_joined: bool,
     ) -> Self {
         let mut rng = StdRng::seed_from_u64(seed);
         let amount = if amount == ClockRainAmount::Varied {
@@ -145,7 +145,7 @@ impl RainEvent {
             }
             RainArena::Responsive(_) => DigitSurfaces::new(layout, display),
         };
-        let phase = if player_joined {
+        let phase = if duck_joined {
             ClockRainDuckPhase::NotSpawned
         } else {
             ClockRainDuckPhase::Waiting
@@ -157,8 +157,8 @@ impl RainEvent {
             entry_x: -facing * layout.bounds_max.x * 0.8,
             facing,
             arena,
-            player_joined,
-            player_hull: None,
+            duck_joined,
+            duck_hull: None,
             seed,
             source: source::RainSource::new(rng),
             amount,
@@ -221,14 +221,14 @@ impl RainEvent {
             self.phase = ClockRainDuckPhase::NotSpawned;
         }
         // Preserve a historical exit/reclamation/handoff across later rejoins.
-        self.player_joined = true;
+        self.duck_joined = true;
         self.door_started = None;
         self.reclaimed_pose = None;
         motion.map(|m| (m.position, m.linear_velocity))
     }
 
-    pub fn set_player_hull(&mut self, hull: Option<(Vec2, f64)>) {
-        self.player_hull = hull;
+    pub fn set_duck_hull(&mut self, hull: Option<(Vec2, f64)>) {
+        self.duck_hull = hull;
     }
 
     pub fn entry_depth(&self) -> f32 {
@@ -376,7 +376,7 @@ impl RainEvent {
     }
 
     fn update_duck(&mut self) {
-        if self.player_joined {
+        if self.duck_joined {
             return;
         }
         let RainArena::Responsive(floor) = &self.arena else {
@@ -439,8 +439,8 @@ impl RainEvent {
         }
         self.tick += 1;
         self.emit_rain();
-        let hull = if self.player_joined {
-            self.player_hull
+        let hull = if self.duck_joined {
+            self.duck_hull
         } else if self.phase() == EventPhase::Clearing {
             None
         } else {
@@ -476,8 +476,8 @@ impl RainEvent {
             .and_then(|f| f.duck.as_ref().and_then(|d| f.world.motion(d.body())));
         let vector = |v: Vec2| [(v.x * 1000.0).round() as i32, (v.y * 1000.0).round() as i32];
         ClockRainState {
-            player_course: self.course().is_some(),
-            player_joined: self.player_joined,
+            duck_course: self.course().is_some(),
+            duck_joined: self.duck_joined,
             seed: self.seed,
             amount: self.amount,
             requested_microunits: micro(self.budget),

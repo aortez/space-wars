@@ -12,7 +12,7 @@ mod responsive;
 #[cfg(test)]
 mod responsive_tests;
 mod shared;
-pub(crate) use shared::PlayerArena;
+pub(crate) use shared::VisitArena;
 #[cfg(test)]
 mod takeover_tests;
 #[cfg(test)]
@@ -151,7 +151,7 @@ impl DuckEvent {
         self.player = Some(PlayerControl::new(
             session_id,
             seat,
-            self.controller.direction,
+            self.controller.facing(),
             exit_at_tick,
         ));
         if self.world.is_some() {
@@ -409,6 +409,10 @@ impl DuckEvent {
         // A physical screen-edge wall replaces the bot's turnaround rule.
         // The far end remains open so the player can walk through the exit.
         let entity = PhysicsId::new(2000);
+        let id = BodyId::new(entity, BodyRole::PRIMARY);
+        if self.world.as_ref().unwrap().motion(id).is_some() {
+            return;
+        }
         let height = self.layout.bounds_max.y - self.layout.bounds_min.y;
         let position = self.physics_position(Vec2::new(
             -self.radius,
@@ -421,7 +425,7 @@ impl DuckEvent {
         );
         wall.friction = 0.0;
         assert!(self.world.as_mut().unwrap().insert_body(
-            BodyId::new(entity, BodyRole::PRIMARY),
+            id,
             BodySpec {
                 kind: BodyKind::Fixed,
                 position,
@@ -535,6 +539,13 @@ impl DuckEvent {
             }),
             support,
         };
+        world.clear_forces();
+        self.water_report = match (&self.buoyant, water) {
+            (Some(hull), Some(water)) => hull
+                .apply_forces(world, water, BuoyancyConfig::default(), f64::from(DT))
+                .expect("duck hull and non-overlapping course water"),
+            _ => BuoyancyReport::default(),
+        };
         let command = if let Some(player) = &mut self.player {
             // Translate screen input into the controller's entrance-relative convention.
             let axis = f32::from(player.move_milli) / 1000.0 * self.direction;
@@ -547,17 +558,19 @@ impl DuckEvent {
                 jump: std::mem::take(&mut player.jump_pending),
             }
         } else if let Some(course) = &self.course {
-            self.controller.decide_course(
-                observed,
-                CourseContext {
-                    course,
-                    obstacles: &self.obstacles,
-                    width: self.width,
-                    radius: self.radius,
-                    floor: self.layout.floor_y,
-                },
-                exit_visible,
-            )
+            let context = CourseContext {
+                course,
+                obstacles: &self.obstacles,
+                width: self.width,
+                radius: self.radius,
+                floor: self.layout.floor_y,
+            };
+            self.controller
+                .decide_water(observed, self.water_report.submerged_fraction, context)
+                .unwrap_or_else(|| {
+                    self.controller
+                        .decide_course(observed, context, exit_visible)
+                })
         } else {
             self.controller.decide(
                 observed,
@@ -567,22 +580,17 @@ impl DuckEvent {
                 exit_visible,
             )
         };
-        world.clear_forces();
-        self.water_report = match (&self.buoyant, water) {
-            (Some(hull), Some(water)) => hull
-                .apply_forces(world, water, BuoyancyConfig::default(), f64::from(DT))
-                .expect("player hull and non-overlapping course water"),
-            _ => BuoyancyReport::default(),
-        };
         let mut delta = self.movement.velocity_delta(observed, &command);
         if self.water_report.submerged_fraction > 0.05 && !grounded {
             // In water, input supplies a bounded paddling acceleration instead
             // of cancelling flow with a zero-velocity target. Neutral drifts.
-            let axis = self
-                .player
-                .as_ref()
-                .map_or(0.0, |p| f32::from(p.move_milli) / 1000.0)
-                * screen;
+            let axis = command.direction
+                * match command.gait {
+                    Gait::Still => 0.0,
+                    Gait::Walk => self.movement.walk_speed / self.movement.run_speed,
+                    Gait::Run => 1.0,
+                    Gait::Pace(fraction) => fraction.clamp(0.0, 1.0),
+                };
             delta.x = axis * self.movement.run_speed * DT * PADDLE_ACCELERATION;
         }
         delta.x *= screen;
@@ -617,10 +625,12 @@ impl DuckEvent {
         self.enter(EventPhase::Resetting);
     }
 
+    #[cfg(test)]
     pub fn step(&mut self) -> bool {
         self.step_with_water(None)
     }
 
+    #[cfg(test)]
     pub fn step_with_water(&mut self, water: Option<&WaterWorld>) -> bool {
         self.step_with_environment(water, water.is_some())
     }
@@ -681,11 +691,7 @@ impl DuckEvent {
         }
         // Keep the catalog's fixed envelope even after an early recovery. The
         // course fades out, physics is already dropped, and live time continues.
-        if self.player.is_some() {
-            self.player_finished()
-        } else {
-            self.tick >= DUCK_TICKS
-        }
+        self.visit_finished()
     }
 
     pub fn course_opacity(&self) -> f32 {
@@ -715,7 +721,7 @@ impl DuckEvent {
     pub fn facing(&self) -> f32 {
         self.player
             .as_ref()
-            .map_or(self.controller.direction, |p| p.facing)
+            .map_or_else(|| self.controller.facing(), |p| p.facing)
     }
 
     pub fn debug_arc(&self) -> Option<[Vec2; 25]> {
@@ -764,6 +770,28 @@ impl DuckEvent {
     pub fn diagnostics(&self) -> ClockDuckState {
         let (entrance, exit) = self.door_openness();
         ClockDuckState {
+            visit: Some(engine_common::ClockDuckVisitState {
+                phase: match self.phase {
+                    EventPhase::Opening => engine_common::ClockDuckPhase::Opening,
+                    EventPhase::Running => engine_common::ClockDuckPhase::Running,
+                    EventPhase::Exiting => engine_common::ClockDuckPhase::Exiting,
+                    EventPhase::Resetting => engine_common::ClockDuckPhase::Resetting,
+                    _ => unreachable!("duck visit phase"),
+                },
+                phase_tick: self.phase_tick,
+                tick: self.tick,
+                submerged_milli: (self.water_report.submerged_fraction * 1000.0).round() as u32,
+                velocity_milli: self
+                    .world
+                    .as_ref()
+                    .and_then(|world| world.motion(DUCK_BODY))
+                    .map(|m| {
+                        [
+                            (m.linear_velocity.x * 1000.0).round() as i32,
+                            (m.linear_velocity.y * 1000.0).round() as i32,
+                        ]
+                    }),
+            }),
             left_to_right: self.direction > 0.0,
             position_milli: self.position().map(|p| {
                 let p = self.render_position(p);
@@ -783,10 +811,11 @@ impl DuckEvent {
             exit_open_milli: (exit * 1000.0).round() as u32,
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
+                water: self.controller.water.stats,
                 jump_profile: self.controller.profile,
                 course_seed: self.seed,
                 behavior: self.controller.behavior,
-                facing_right: self.controller.direction * self.direction > 0.0,
+                facing_right: self.controller.facing() * self.direction > 0.0,
                 wall_tags: if self.direction > 0.0 {
                     self.controller.wall_tags
                 } else {

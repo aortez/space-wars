@@ -57,9 +57,16 @@ fn next_cycles_enabled_events_in_all_profiles_without_changing_preferences() {
             .into_iter()
             .filter(|kind| settings.events.enabled(*kind))
             .collect();
-        for kind in enabled.iter().cycle().take(enabled.len() * 2) {
+        let repeated = enabled.iter().filter(|kind| **kind != ClockEventKind::Duck);
+        for kind in enabled.iter().chain(repeated) {
             next(&mut state);
-            assert_eq!(state.event_kind(), Some(*kind));
+            assert_eq!(state.last_started_event, Some(*kind));
+            if *kind == ClockEventKind::Duck {
+                assert!(state.duck_state().is_some());
+                assert_eq!(state.event_kind(), None);
+            } else {
+                assert_eq!(state.event_kind(), Some(*kind));
+            }
             assert_eq!(state.settings(), settings);
         }
     }
@@ -132,7 +139,18 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             Some(ClockEventKind::ColorCycle),
             "replacing {kind:?}"
         );
-        assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        if kind == ClockEventKind::Duck {
+            assert!(
+                state.duck_state().is_some(),
+                "next event preserves the visit"
+            );
+            assert_eq!(
+                state.body_count(),
+                state.duck_scene().unwrap().physics_counts().0
+            );
+        } else {
+            assert_eq!((state.body_count(), state.collider_count()), (0, 0));
+        }
         assert!(state.meltdown_state().is_none());
         assert!(state.rain_state().is_none());
         assert!(
@@ -143,14 +161,21 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
         );
         assert_eq!(state.reading(), Some(reading));
         assert_eq!(state.event_notice.unwrap().0, "Color Cycle");
-        assert_eq!(state.floor_mode(), engine_common::ClockFloorMode::Closed);
+        assert_eq!(
+            state.floor_mode(),
+            if kind == ClockEventKind::Duck {
+                engine_common::ClockFloorMode::EventOwned
+            } else {
+                engine_common::ClockFloorMode::Closed
+            }
+        );
     }
 }
 
 #[test]
 fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
-    let mut state = ready(ClockEventProfile::Off);
     for kind in ClockEventKind::ALL {
+        let mut state = ready(ClockEventProfile::Off);
         state.config.events = ClockEvents {
             falling: true,
             color_cycle: true,
@@ -167,7 +192,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
         );
         next(&mut state);
         assert_eq!(
-            state.event_kind(),
+            state.last_started_event,
             Some(ClockEventKind::ALL[(kind as usize + 1) % ClockEventKind::ALL.len()])
         );
     }

@@ -12,3 +12,7 @@ engine-core = { workspace = true }
 engine-rapier = { workspace = true }
 engine-water = { workspace = true }
 rand = { workspace = true }
+
+[dev-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

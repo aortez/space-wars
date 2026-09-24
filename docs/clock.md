@@ -11,7 +11,8 @@ Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slid
 The issue's September 6 resume notes predate those deliveries. The current Duck
 upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
 Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
-flashlight/glow polish and concurrent events remain future work.
+flashlight/glow polish and multiple concurrent timed animations remain future work.
+Player and automatic duck visits can already share one timed event's scene.
 
 ## Events
 
@@ -29,7 +30,9 @@ can also be changed live through **Pause → Clock Controls**, without relaunchi
 
 One global periodic schedule selects one enabled, eligible event, avoiding the previous
 kind when another is eligible. Adding event types does not multiply the trigger
-rate. Events never overlap. After completion or cancellation, there is a shared
+rate. Timed animations never overlap. Duck is an admission into a separately
+timed visit: admitting it immediately releases the animation slot into cooldown,
+so an ordinary subsequent event can play on its course. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait for periodic events. Digit Slide
 preserves the pending periodic deadline instead of restarting that wait; a
 deadline reached during the slide runs after cooldown. Each kind also has an automatic
@@ -43,7 +46,7 @@ the Off profile still disables every automatic event.
 | `falling` | Digit geometry / rigid bodies | 3.5 s fall + 1.5 s reform | 30 s |
 | `color-cycle` | Appearance only | 6 s | 15 s |
 | `meltdown` | Individual cells, pooling water and drain | 3 s melt + 4 s drain + 1.5 s reform | 40 s |
-| `duck` | Temporary floor course and a physical wall-tag runner | 35 s envelope, exit appears 20 s after spawn | 30 s |
+| `duck` | Admit one independent floor-course runner | 35 s visit, exit appears 20 s after spawn | 30 s after departure |
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
@@ -56,8 +59,8 @@ drain before creating its temporary material. It stays fully open through
 recovery/cleanup, then closes after the event's bodies and remaining visuals
 have been released. Preview replacement, resize and
 restart use the same ownership boundary. Pausing or disabling a currently running
-event does not close the drain underneath it. During a player visit, Falling
-instead borrows the player's existing course/panels without opening a second drain.
+event does not close the drain underneath it. During a duck visit, Falling
+instead borrows the duck's existing course/panels without opening a second drain.
 
 Rain and normal Meltdown own a shared load-responsive floor: two panels start flat and closed,
 gently slope/retract as water accumulates, then close more slowly as it drains.
@@ -75,7 +78,8 @@ instead; they do not also open the ordinary drain. Their physical floor/pit/tank
 geometry is unchanged. The Duck course keeps its entrance/exit fade to the
 ordinary closed floor; water labs return to it on completion.
 
-One small scenario-owned manager is sufficient because events cannot overlap.
+One small scenario-owned manager tracks the timed event and resident visit's
+independent claims; the floor closes only after both have released it.
 Its fixed geometry supplies Falling's slabs. Rain and Meltdown's shared
 event-owned actuator updates only each event's two existing
 floor pools, conservatively remapping retained water and releasing uncovered
@@ -83,7 +87,7 @@ strips. It reuses allocated scratch and, in Rain, persistent colliders. The even
 itself still needs no per-tick request queue; other events keep their old floors.
 
 `clock state` reports `floor`: `closed`, `drain-open`, or `event-owned` in both
-JSON and text diagnostics. Schema 10 requires a matching client and CLI; this
+JSON and text diagnostics. Schema 15 requires a matching client and CLI; this
 does not add another saved setting or change the Clock action payload version.
 
 Focused regressions cover each event's complete ownership lifetime, pause,
@@ -114,7 +118,8 @@ Local water must
 remain at least 0.65 digit-pitches deep for half a second before the hatch opens;
 depth is checked again before releasing one duck. Light showers normally never
 reach that threshold, so no duck appears. The entrance door closes and disappears after
-release. The ordinary jumping **Duck** event and its two brains are unchanged.
+release. With an existing automatic/player visit, Rain instead shares its
+course and suppresses this extra passive actor (see automatic visits below).
 
 The rubber duck is a passive dynamic Rapier box with density 0.45 relative to
 water. Existing `BuoyantBody` integration applies buoyancy, flow-relative drag
@@ -339,8 +344,9 @@ The entrance side is seeded too. Each landing becomes the starting point for the
 next planned jump. The opposite
 door is entirely hidden for 20 simulation seconds after spawn (warm-up included).
 When it appears, the duck finishes its current crossing, turning at the entrance
-if necessary, and leaves through the exit. The course fades away, restoring the
-ordinary closed floor; the clock follows live time throughout.
+if necessary, and leaves through the exit. Without a sharing physical event,
+the course fades away, restoring the ordinary closed floor; the clock follows
+live time throughout. Water can interrupt that dry route as described below.
 
 The duck uses **one dynamic round body** and one fixed body/collider per landing
 surface, including the entrance and exit runways: normally **four to six bodies
@@ -455,9 +461,11 @@ Phases are `opening`, `running`, `exiting`, and `resetting`. A fall or a runner
 still blocked at 34.5 seconds enters reset; successful exits normally occur sooner.
 `exiting` starts when the door appears, even if the duck is still heading toward
 the entrance before its final return crossing.
-Reset immediately drops all physics, fades the course over half a second, and
-keeps the last outcome available until the fixed 35-second event envelope ends.
-Resize, restart, or preview replacement also release the whole event. Narrow
+Reset immediately removes the actor and, if not leased to a sharing physical
+event, its course physics. It fades the course over half a second and keeps the
+last outcome until the fixed 35-second visit envelope ends. Rain/Falling/Meltdown
+retain their course/material until their own cleanup. Resize/restart release both
+lifetimes; compatible previews preserve the visit. Narrow
 layouts scale the duck and jump height down; wider layouts increase running
 speed and horizontal course spacing while keeping the action below the face.
 
@@ -503,9 +511,9 @@ floor. Holding does not repeat; menu/launch handoffs require released controls.
 The event name appears for two seconds of simulation time. Off disables automatic
 scheduling, not this manual action. Individual disabled events are skipped;
 if all are disabled, a brief “No events enabled” notice replaces no event.
-During a player visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide and Rain without
+During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide and Rain without
 replacing the duck. If all enabled events need the arena, a brief notice asks
-you to dismiss the duck first. Preferences are unchanged. The Clock action protocol is version 6; `NextEvent`
+you to wait for the duck to leave (or take control and dismiss it). Preferences are unchanged. The Clock action protocol is version 6; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -525,8 +533,8 @@ This is one player duck in the existing Clock, not another launcher scenario.
 Its visit is separate from the timed event scheduler. Starting during Falling,
 ordinary Meltdown or Rain joins the current arena without resetting the event,
 its moving objects, water, floor or event ID. An active visual event continues;
-starting from idle opens a seeded course. Starting during the automatic Duck
-event takes control of that same visit; only developer water-lab previews are
+starting from idle opens a seeded course. With an automatic Duck already present,
+the button takes control of that same visit; only developer water-lab previews are
 recovered/replaced. The player drives the **same dry movement actuator, gravity,
 jump impulse and circular body shape** used by Careful/Flowing AI. Those brains,
 movement tuning and automatic event duration are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
@@ -537,8 +545,8 @@ walk through it to finish. Missing a gap ends the visit too.
 
 **Taking over an automatic duck:** The existing course, body/collider, mass,
 position, velocity, contacts, facing, jump count and entrance animation all stay
-intact, including mid-jump. The automatic event slot enters its usual cooldown
-without recreating the actor or advancing physics. The player owns the same
+intact, including mid-jump or mid-swim. The timed event slot and its clock are
+untouched: taking control never restarts or retires a concurrent Rain. The player owns the same
 visit thereafter, so compatible events can run alongside it. A closed exit
 starts opening within 44 ticks (after entrance opening if still entering); an
 already-open exit stays open. The bot's 35-second timeout no longer applies.
@@ -728,18 +736,18 @@ The course capture also reproduces a compressed-junction ribbon spike. Merged
 spill strips now use the existing compact, area-preserving fallback when their
 width is excessive even at both end faces; transport and water accounting are unchanged.
 
-The automatic Duck course and developer **water-lab** Meltdown previews still
-have private arenas and are excluded from automatic selection and Next Event
-while the player owns the course. An incompatible Preview & Resume preserves both the player and
+Another Duck admission and developer **water-lab** Meltdown previews are excluded
+from automatic selection and Next Event while any duck owns the course.
+An incompatible Preview & Resume preserves both the duck and
 current event, resumes, and shows a dismissal hint; `clock trigger` rejects it
 with an explicit `action-unavailable` reason. Disabled events can still be manually
 previewed if compatible. The Off profile and disabled Duck event do not disable
 player visits, and playing never changes saved event preferences. Availability
 changes use the existing cadence/cooldowns rather than queuing deferred events.
 
-Floor claims are scoped: face-only events claim no floor; the player and Rain/Falling/Meltdown
+Floor claims are scoped: face-only events claim no floor; the visit and Rain/Falling/Meltdown
 release only their own claim, for either course or responsive-panel layouts.
-Automatic AI Duck cohabitation and any damage rules are separate future work.
+Damage rules and planning around moving digit blocks remain future work.
 
 The version-6 scenario actions add `TogglePlayerDuck` (kind 7: one-based player
 byte) and `PlayerDuckInput` (kind 8: player byte, little-endian u64 visit ID,
@@ -755,19 +763,172 @@ spacewars-cli input press north --expect-screen gameplay
 ```
 
 `clock state` reports `player_duck` (visit/owner, phase, intent, facing, screen-space
-`velocity_milli`, `submerged_milli` and physical state) separately from the AI event's
+`velocity_milli`, `submerged_milli` and physical state) separately from the AI visit's
 `duck`. `player_duck.floor_open_milli` is present for responsive panels (including
-dry recovery), and null for a fixed course. `rain.player_course` identifies the
-fixed shared arena; `rain.player_joined` records passive-spawn suppression, and
+dry recovery), and null for a fixed course. `rain.duck_course` identifies the
+fixed shared arena; `rain.duck_joined` records passive-spawn suppression, and
 the passive `duck_phase` becomes `handed-off` after transferring a live duck.
-`duck_spawns` and other Rain duck fields describe the passive actor only, not the player. Each catalog entry has
-`blocked_by_player`, independent of saved `enabled` and reuse cooldowns.
-`automatic_events_suspended` is true only when a player visit leaves no enabled
+`duck_spawns` and other Rain duck fields describe the passive actor only, not a
+resident visit. Each catalog entry has `blocked_by_duck`, independent of saved
+`enabled` and reuse cooldowns; `blocked_by_player` remains the player-only subset.
+`automatic_events_suspended` is true only when a duck visit leaves no enabled
 compatible events; Off is still reported separately as the profile. `can_trigger`
 indicates idle host readiness; check the selected event's restriction too.
-The player does not increment the automatic event ID. Existing `clock wait`
-predicates refer to timed events, not the player; inspect `player_duck` for a
-visit. No claim that idle event state means the arena is unoccupied is implied.
+The player does not increment the automatic event ID. `clock wait --event duck`
+uses the automatic visit's phase/phase tick, even during Rain. Other event waits
+refer to the timed animation; inspect `player_duck` for a player visit. `event_id`
+still identifies the latest catalog admission, not the resident duck. Idle event
+state does not mean the arena is unoccupied.
+
+### Automatic ducks in Rain
+
+Duck admissions now use the same independent visit/arena ownership as players.
+There is still **one** character, one mechanics world and one step per tick.
+The normal scheduler can choose Rain or another compatible animation during a
+visit; there is no extra overlap timer or per-frame random selection. A second
+Duck admission is blocked until departure. Per-kind reuse delay starts at
+departure, without resetting any concurrently running animation or its cadence.
+Calm's usual wait is longer than a visit, so natural overlap is primarily visible
+in Demo; manual previews work in either profile.
+
+When submerged, the automatic controller suspends its dry route, discards an
+in-progress calibration jump and any stale takeoff/landing plan, but keeps clean
+learned capabilities and diagnostic counters. It paddles toward the interior of
+the reachable bank beneath/nearest to it, using the same capped acceleration,
+buoyancy and current drag as a player. It does not try to swim up high walls,
+jump in mid-water, snap to a surface, or cancel flow by assigning body velocity.
+At most seven existing course spans are inspected; no second trajectory solver,
+per-tick allocations, new bodies or growing history are added.
+
+Wet/dry hysteresis requires 12 consecutive low-immersion grounded ticks before
+resuming Careful/Flowing planning from the actual support. Dry jumping decisions
+are unchanged. This first policy is conservative **bank recovery**, not swimming
+across gaps or planning jumps over moving blocks. A prolonged Heavy shower can
+consume the 35-second AI visit; timeout is ordinary cleanup, not a successful
+exit or a fall. The four replayed Heavy fixtures exercised nine wet interruptions
+with no falls and four timeouts. A flooded-course fixture and the production
+render fixture verify real dry recovery and subsequent landings for both brains
+and the supported display layouts.
+
+Schema 15 reports independent `duck.visit` phase/tick, screen velocity and
+immersion, plus `duck.navigation.water` interruption/recovery counts, paddling/
+recovering tick counts and target bank. Behaviors include `paddling` and
+`recovering`. Rain's old player-specific field names are now `duck_course` and
+`duck_joined`; use matching CLI/client builds.
+
+```sh
+cargo test --locked -p scenario-clock --profile ci autonomous_tests -- --nocapture
+cargo test --locked -p scenario-clock --profile ci automatic_duck_paddles -- --nocapture
+SPACEWARS_CLOCK_PLAYER_ARTIFACTS=/tmp/clock-autonomous-rain \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  automatic_duck_rain_and_recovery
+```
+
+For a deterministic manual check, preview **Duck**, then **Rain** while it is
+present. After a few seconds preview **Color Cycle** to remove the water and
+watch dry navigation resume. Taking control while it floats preserves the same
+body, velocity, water ledger and event phase; input still requires release first.
+
+Local validation (2026-09-23): **1,775 workspace/all-target tests passed**;
+the optional 392-paired-course dry personality sweep and real-client Duck
+pause/preview/exit/restart workflow also passed. Scoped Clock/common/control/CLI
+Clippy is clean. Production raster/vector captures were inspected at 1024×768,
+800×480 and 480×800.
+
+Pi validation (2026-09-23): fast-deployed the matching release client/CLI to
+`sw-picade-2`, verified both binary hashes and schema 15, and retained Demo/Heavy
+Rain preferences and 5% volume. A named Duck admission followed by Rain kept
+one visiting actor (`duck_course=true`, `duck_joined=true`, `duck_spawns=0`).
+Live telemetry showed a wet interruption and `paddling`; the 1024×768 device
+capture was inspected. The kiosk remained healthy with no unexpected restarts
+and was left running its normal automatic schedule.
+
+#### Mixed-event regression lab
+
+The follow-up lab uses the real scenario, controller, Rapier and water solver,
+with fixed 60 Hz steps and **no renderer, sleep or wall-clock assertions**.
+The regular workspace suite runs eight visits: six mixed sequences covering
+Careful/Flowing on Picade, landscape HyperPixel and portrait, plus two focused
+clear-weather recovery cases. They check actual recovery and new landings,
+bounded dry inactivity, successful exits in known fixtures, replay and cleanup.
+The larger **240-visit sweep is ignored by default** and available through the
+manual **Clock mixed-event regression** Actions workflow. Existing PR UI coverage
+is unchanged.
+
+All cases start with a Duck admission. Requests are normal scenario previews:
+
+| Sequence | Scheduled previews (simulation ticks after admission) |
+|---|---|
+| Dry | None |
+| Rain | Rain at 100; allow its full lifecycle to finish |
+| Rain cleared | Rain at 100, Color Cycle at 700 to deliberately remove water |
+| Mixed | Rain at 100, Falling at 700, Meltdown at 1060 |
+
+These are authored interruption tests, not samples of the automatic scheduler.
+The sweep uses seeds 0, 1, 7 and 42, both personalities, all three layouts, and
+Light/Medium/Heavy rainfall (one dry control per seed/personality/layout).
+Each visit has an identical replay; every tick compares duck/event diagnostics,
+segment poses and resource counts. Water/material accounting, passive-duck
+suppression and zero-body/zero-collider/closed-floor cleanup are also checked.
+Every case is bounded to 3,600 ticks, including event cleanup after duck departure.
+
+Run the small suite or explicitly opt into the sweep:
+
+```sh
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression" \
+  cargo test --locked -p scenario-clock --profile ci autonomous_tests::mixed -- --nocapture
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression" \
+  cargo test --locked -p scenario-clock --profile ci mixed_event_sweep -- --ignored --nocapture
+```
+
+JSON reports contain stable `case_id`s, outcomes/ticks, the active event and
+controller behavior at departure, wet interruptions/recoveries, time since last
+recovery, subsequent confirmed landings, peak resource counts and the last live
+duck state before reset removes its body. The dry-inactivity measure counts ticks
+without horizontal travel of one body diameter, excludes water recovery, and
+includes ordinary stationary warm-up jumps; it is not by itself a "stuck" verdict.
+Partial reports identify completed versus expected visits if a later case fails.
+Normal CI uploads the two smoke reports with `linux-test-timings`; the manual
+workflow uploads the sweep report and a short outcome table. Artifacts are kept
+for 14 days. Keep baseline/candidate reports in different directories when
+comparing changes. To replay a single reported case without the full sweep:
+
+```sh
+SPACEWARS_CLOCK_REGRESSION_CASE=picade:42:flowing:heavy:mixed \
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression-one" \
+  cargo test --locked -p scenario-clock --profile ci mixed_event_sweep -- --ignored --nocapture
+jq '.rows[] | {case_id, metrics, terminal_duck}' target/clock-regression-one/mixed-sweep.json
+```
+
+Baseline (2026-09-23, unchanged controller and 35-second visit limit):
+
+| Sequence | Visits | Exited | Fell | Timed out |
+|---|---:|---:|---:|---:|
+| Dry | 24 | 24 | 0 | 0 |
+| Rain cleared | 72 | 72 | 0 | 0 |
+| Rain | 72 | 11 | 1 | 60 |
+| Mixed | 72 | 27 | 33 | 12 |
+
+All 33 mixed falls occurred during Falling/Meltdown; a terminal snapshot is not
+proof of the precise collision that caused a fall. All 12 mixed timeouts had
+recovered and were still navigating. Among the Rain timeouts, 18 were paddling,
+28 were in water recovery, and 14 were navigating again. Rain lasts **42 seconds**
+including drainage/clearing, longer than an AI visit; timeout alone does not show
+a broken controller. The longest stationary dry stretch in this sweep was 211
+ticks (3.52 seconds). All dry/clear-weather controls exited, so this pass adds
+regressions/measurements without extending visits or retuning swimming. Planning
+around physical event debris and any bounded wet-time allowance remain separate
+behavior experiments. Falls/timeouts in the broader hazard cases are measured
+outcomes, not blanket test failures; dry and clear-weather exits are required.
+
+Local validation: **1,777 workspace/all-target tests passed**; scoped Clock
+Clippy, formatting, workflow parsing and the CI summary generator passed. The
+eight normal cases took **0.91 seconds**, and the replayed 240-visit sweep took
+**44.50 seconds** on the development host (execution only, not CI guarantees).
+Single-case selection was checked both for a valid case and fail-closed rejection
+of an unknown ID. No runtime code or Pi settings changed in this lab-only pass.
+
+#### Other shared-visit coverage
 
 Headless model tests cover mirroring, movement, real exits and missed gaps,
 grounded single-edge jumping, ownership, pause, cleanup/replacement, and
@@ -1016,7 +1177,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **14** and reports scenario-instance revision,
+`clock state` uses schema version **15** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
@@ -1098,14 +1259,14 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 8 and
-older requests are rejected. The internal Clock action payload is version 5;
+after completion or cancellation. Use matching client/CLI builds: schema 14 and
+older requests are rejected. The internal Clock action payload is version 6;
 event ordinals 0–5 are unchanged and Rain is 6. Configure contains seven
-switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. Version 1–4 actions
+switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. Version 1–5 actions
 are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 14, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 15, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1122,7 +1283,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 14, `event`
+tick. A raw `clock trigger` request must include schema version 15, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

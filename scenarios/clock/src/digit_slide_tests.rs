@@ -139,7 +139,7 @@ fn off_disabled_and_busy_events_skip_transitions_without_a_backlog() {
     }
     for kind in ClockEventKind::ALL
         .into_iter()
-        .filter(|kind| *kind != ClockEventKind::DigitSlide)
+        .filter(|kind| !matches!(kind, ClockEventKind::DigitSlide | ClockEventKind::Duck))
     {
         let mut state = ready(from, ClockTimeFormat::TwentyFourHour);
         ClockScenario::step(
@@ -249,6 +249,9 @@ fn previews_replacements_resize_and_repeats_are_bounded_and_deterministic() {
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         }
         for kind in ClockEventKind::ALL {
+            // Isolate each replacing-event pair. A duck is now an independent
+            // visit which must survive an appearance event, then be retired.
+            state.finish_duck_visit();
             ClockScenario::step(
                 &mut state,
                 &[
@@ -258,11 +261,8 @@ fn previews_replacements_resize_and_repeats_are_bounded_and_deterministic() {
                 Duration::ZERO,
             );
             assert_eq!((state.body_count(), state.collider_count()), (0, 0));
-            assert!(
-                state.meltdown_state().is_none()
-                    && state.duck_state().is_none()
-                    && state.marquee_state().is_none()
-            );
+            assert!(state.meltdown_state().is_none() && state.marquee_state().is_none());
+            assert_eq!(state.duck_state().is_some(), kind == ClockEventKind::Duck);
         }
         state.set_aspect_ratio(if aspect == 4.0 { 1.0 } else { 4.0 });
         assert!(state.digit_slide_state().is_none());

@@ -29,7 +29,7 @@ fn taking_over_an_automatic_duck_preserves_the_actor_course_and_phase() {
             let player = state.player_duck_state().unwrap();
             assert_eq!(player.duck, before, "aspect={aspect}, elapsed={elapsed}");
             assert_eq!(player.facing_right, facing);
-            let duck = state.player_duck.as_ref().unwrap();
+            let duck = state.duck_visit.as_ref().unwrap();
             assert_eq!((duck.phase, duck.phase_tick, duck.tick), phase);
             assert_eq!(duck.course.as_ref().unwrap().surfaces, surfaces);
             assert_eq!(join::visible_polygons(&state), frame);
@@ -53,7 +53,7 @@ fn taken_over_visit_composes_with_events_and_cleans_up_across_dismissal_and_resi
         let world = state.duck_scene().unwrap().arena_world() as *const _;
         toggle(&mut state, 1);
         assert_eq!(
-            state.player_duck.as_ref().unwrap().arena_world() as *const _,
+            state.duck_visit.as_ref().unwrap().arena_world() as *const _,
             world,
             "the world is moved, not reconstructed"
         );
@@ -75,7 +75,7 @@ fn taken_over_visit_composes_with_events_and_cleans_up_across_dismissal_and_resi
         let phase = state.phase_tick();
         toggle(&mut state, 1);
         ticks(&mut state, 30);
-        assert!(state.player_duck.is_none());
+        assert!(state.duck_visit.is_none());
         assert_eq!(state.event_kind(), Some(kind));
         assert_eq!(state.event_id(), id);
         assert_eq!(state.phase_tick(), phase + 30);
@@ -94,7 +94,7 @@ fn taken_over_visit_composes_with_events_and_cleans_up_across_dismissal_and_resi
         state.preview_event(ClockEventKind::ColorCycle);
         assert!(state.body_count() <= 9);
         state.set_aspect_ratio(0.6);
-        assert!(state.player_duck.is_none());
+        assert!(state.duck_visit.is_none());
         assert_eq!(state.event_kind(), None);
         assert_eq!((state.body_count(), state.collider_count()), (0, 0));
         assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
@@ -130,14 +130,15 @@ fn takeover_retires_only_the_automatic_slot_and_dismissal_restores_its_schedule(
     ticks(&mut state, 30);
     assert_eq!(state.floor_mode(), ClockFloorMode::Closed);
     assert_eq!(state.body_count(), 0);
-    for _ in 0..1000 {
+    for _ in 0..2100 {
         tick(&mut state, &[]);
-        if state.event_kind().is_some() {
+        if state.duck_state().is_some() {
             break;
         }
     }
-    assert_eq!(state.event_kind(), Some(ClockEventKind::Duck));
-    assert!(state.player_duck.is_none());
+    assert_eq!(state.event_kind(), None);
+    assert!(state.duck_state().is_some());
+    assert!(state.player_duck_session().is_none());
     assert_eq!(state.settings(), settings);
 }
 
@@ -145,12 +146,15 @@ fn takeover_retires_only_the_automatic_slot_and_dismissal_restores_its_schedule(
 fn an_already_departed_bot_starts_a_fresh_visit_instead_of_reviving_a_missing_body() {
     let mut state = automatic(5.0 / 3.0, 42, 0);
     for _ in 0..DUCK_TICKS {
-        if state.event_phase() == Some(EventPhase::Resetting) {
+        if state.duck_visit.as_ref().map(|duck| duck.phase) == Some(EventPhase::Resetting) {
             break;
         }
         tick(&mut state, &[]);
     }
-    assert_eq!(state.event_phase(), Some(EventPhase::Resetting));
+    assert_eq!(
+        state.duck_visit.as_ref().map(|duck| duck.phase),
+        Some(EventPhase::Resetting)
+    );
     assert_eq!(state.body_count(), 0);
     assert!(state.duck_state().unwrap().outcome.is_some());
     toggle(&mut state, 1);

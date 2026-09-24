@@ -68,7 +68,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
     if let Some(event) = shared_mechanics_arena(state) {
-        let opacity = if state.player_duck.is_some() {
+        let opacity = if state.duck_visit.is_some() {
             event.arena_opacity()
         } else {
             state.active_event.as_ref().unwrap().arena_opacity()
@@ -88,8 +88,8 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         && let Some(course) = event.course()
     {
         // A shower owns a course claim, not a second responsive floor. Keep it
-        // opaque while the player is present, including Rain's clearing phase.
-        let opacity = if state.player_duck.is_some() {
+        // opaque while a visiting duck is present, including Rain's clearing phase.
+        let opacity = if state.duck_visit.is_some() {
             1.0
         } else {
             event.opacity()
@@ -106,13 +106,13 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
             &mut frame,
             event.responsive_floor().expect("responsive rain"),
             layout,
-            if state.player_duck.is_some() {
+            if state.duck_visit.is_some() {
                 1.0
             } else {
                 event.opacity()
             },
         );
-    } else if let Some(duck) = &state.player_duck
+    } else if let Some(duck) = &state.duck_visit
         && let Some(panels) = duck.responsive_floor()
     {
         floor::responsive(&mut frame, panels, layout, duck.arena_opacity());
@@ -201,8 +201,8 @@ fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout:
 fn shared_mechanics_arena(state: &ClockState) -> Option<&crate::events::duck::DuckEvent> {
     let event = state.active_event.as_ref()?;
     event
-        .shares_player_arena()
-        .then(|| state.player_duck.as_deref().or(event.vacant_arena()))
+        .shares_visit_arena()
+        .then(|| state.duck_visit.as_deref().or(event.vacant_arena()))
         .flatten()
 }
 

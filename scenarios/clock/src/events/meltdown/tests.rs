@@ -834,6 +834,9 @@ fn repeated_previews_and_seeded_motion_are_identical_and_release_material() {
     for cycle in 0..12 {
         for kind in ClockEventKind::ALL {
             for state in [&mut a, &mut b] {
+                // This matrix exercises standalone material worlds. Shared
+                // automatic visits have their own conservation/cleanup matrix.
+                state.finish_duck_visit();
                 ClockScenario::step(state, &[ClockAction::preview_event(kind)], Duration::ZERO);
             }
             for n in 0..(100 + cycle * 31) {

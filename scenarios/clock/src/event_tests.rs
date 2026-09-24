@@ -245,8 +245,13 @@ fn arena_side_walls_keep_falling_cell_geometry_inside_the_view() {
 }
 
 #[test]
-fn every_event_obeys_the_same_lifecycle_and_cleanup_contract() {
-    for definition in EVENT_CATALOG {
+fn timed_events_obey_the_same_lifecycle_and_cleanup_contract() {
+    // Duck admission has an independent visit/cooldown contract, covered in
+    // autonomous_tests; it deliberately does not occupy the timed-event slot.
+    for definition in EVENT_CATALOG
+        .into_iter()
+        .filter(|d| d.kind != ClockEventKind::Duck)
+    {
         let kind = definition.kind;
         let mut state = ready(ClockEventProfile::Off, 9);
         let trigger = ClockAction::trigger_event(kind);
@@ -407,6 +412,7 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }
+        seen[ClockEventKind::Duck as usize] |= a.duck_state().is_some();
     }
     for definition in EVENT_CATALOG {
         assert_eq!(
