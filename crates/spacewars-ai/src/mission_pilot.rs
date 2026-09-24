@@ -265,6 +265,16 @@ impl MaterialMissionPilot {
             last_survey: self.last_survey,
         }
     }
+    fn new_capture_task(&self, o: &MissionObservationV1) -> TacticalCapturePilot {
+        let mut capture = TacticalCapturePilot::with_planning(
+            self.context,
+            self.breaks,
+            self.policy.objective_planning(),
+        )
+        .with_bounded_acquisition(self.bounded_acquisition);
+        capture.start_acquisition(&o.local);
+        capture
+    }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
             self.telemetry.goal = goal;
@@ -610,14 +620,7 @@ impl MaterialMissionPilot {
             && (p.ship.velocity - target.motion.velocity).length() < 18.0
             && p.queries_ready
         {
-            let mut capture = TacticalCapturePilot::with_planning(
-                self.context,
-                self.breaks,
-                self.policy.objective_planning(),
-            )
-            .with_bounded_acquisition(self.bounded_acquisition);
-            capture.start_acquisition(&o.local);
-            self.capture = Some(capture);
+            self.capture = Some(self.new_capture_task(o));
             self.solar_detour = None;
             self.event(p.tick, "arrived", None);
             self.goal(MissionGoal::Capture, p.tick);

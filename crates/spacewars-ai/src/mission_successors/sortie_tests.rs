@@ -60,6 +60,58 @@ fn trip_keeps_the_common_prefix_and_waits_for_the_current_destination_frame() {
 }
 
 #[test]
+fn trip_capture_preserves_bounded_acquisition_setting_and_handoff_deadline() {
+    for enabled in [false, true] {
+        let (mut bot, mut o, mut trial) = fixture();
+        bot.bounded_acquisition = enabled;
+        reach_entry(&mut o, &trial);
+        o.local.combat.recovery.flight.pilot.queries_ready = false;
+        trial.intent(&mut bot, &o);
+        assert!(bot.capture.is_none());
+
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        o.local.combat.recovery.flight.pilot.queries_ready = true;
+        let handoff = o.local.combat.recovery.flight.pilot.tick;
+        let deadline = handoff + crate::tactical_sortie::ACQUISITION_DEADLINE_TICKS;
+        assert_eq!(trial.intent(&mut bot, &o), CombatIntent::default());
+        assert_eq!(
+            bot.sensor_request().site,
+            Some(trial.report.proposal.approach.unwrap().site)
+        );
+        assert_eq!(
+            bot.capture
+                .as_ref()
+                .unwrap()
+                .telemetry()
+                .acquisition_wait
+                .as_ref()
+                .map(|wait| (wait.started_tick, wait.deadline_tick)),
+            enabled.then_some((handoff, deadline))
+        );
+
+        for tick in handoff + 1..deadline {
+            o.local.combat.recovery.flight.pilot.tick = tick;
+            trial.intent(&mut bot, &o);
+        }
+        assert!(bot.capture.as_ref().unwrap().telemetry().failure.is_none());
+        assert!(trial.report.stopped_tick.is_none());
+
+        o.local.combat.recovery.flight.pilot.tick = deadline;
+        trial.intent(&mut bot, &o);
+        let telemetry = bot.capture.as_ref().unwrap().telemetry();
+        let failure = enabled.then_some("landing site acquisition deadline exhausted");
+        assert_eq!(telemetry.failure, failure);
+        assert_eq!(telemetry.failed_tick, enabled.then_some(deadline));
+        assert_eq!(trial.report.stop_reason, failure);
+        assert_eq!(trial.report.stopped_tick, enabled.then_some(deadline));
+        assert_eq!(
+            trial.report.sortie.as_ref().unwrap().surface_failure,
+            failure
+        );
+    }
+}
+
+#[test]
 fn trip_invalidates_a_changed_approach_and_cannot_credit_a_later_capture() {
     let (mut bot, mut o, mut trial) = fixture();
     o.local.combat.recovery.flight.pilot.tick += 1;

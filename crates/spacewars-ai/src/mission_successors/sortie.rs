@@ -151,14 +151,7 @@ impl SuccessorContinuation {
                 if p.planet.index == approach.site.planet && p.queries_ready {
                     // This creates a task, not a landing permission. The next
                     // sensor request surveys actual sites and current routes.
-                    bot.capture = Some(
-                        TacticalCapturePilot::with_planning(
-                            bot.context,
-                            bot.breaks,
-                            bot.policy.objective_planning(),
-                        )
-                        .requiring_site(approach.site),
-                    );
+                    bot.capture = Some(bot.new_capture_task(o).requiring_site(approach.site));
                     bot.solar_detour = None;
                     bot.goal(MissionGoal::Capture, p.tick);
                     bot.event(p.tick, "arrived", Some("explicit successor site trial"));

@@ -150,3 +150,11 @@ formatting pass after that correction. The same three candidate replays remain
 identical in complete traces and non-timing report/planner data. Supplementary
 logs, replay hashes and the tested patch against `ae41c9a` are retained beside
 the archive in `deadline-guard/`; the original experiment remains unchanged.
+
+Explicit successor capture trials now inherit the same acquisition setting as
+ordinary missions. Both paths share capture-task setup: an enabled clock starts
+at the neutral handoff once local queries are available, and the successor's
+nominated site remains required. A regression covers the option enabled and
+disabled, delayed query readiness, and trial failure at the exact deadline; it
+fails on the earlier handoff because that path silently dropped the setting.
+All **247 AI tests**, Clippy and formatting pass after this correction.
