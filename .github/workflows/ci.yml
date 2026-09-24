@@ -120,6 +120,10 @@ jobs:
             python3 .github/ci/assert_fresh_build.py
       - name: Run Linux workspace tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          # Eight fast-headless mixed/recovery cases stay in normal CI. The broader
+          # ignored sweep runs only in clock-regression.yml or explicitly locally.
+          SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
         run: |
           /usr/bin/time -f '%e' -o "$RUNNER_TEMP/spacewars-ci-timings/workspace.seconds" \
             cargo nextest run --locked --workspace --all-targets --cargo-profile ci --profile ci --no-tests fail
@@ -165,6 +169,7 @@ jobs:
             target/cargo-timings/
             target/nextest/ci/junit.xml
             target/nextest/ui-pr/junit.xml
+            target/clock-regression/
           if-no-files-found: ignore
       - name: Upload functional-test failure artifacts
         if: failure()

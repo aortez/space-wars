@@ -843,6 +843,93 @@ Live telemetry showed a wet interruption and `paddling`; the 1024×768 device
 capture was inspected. The kiosk remained healthy with no unexpected restarts
 and was left running its normal automatic schedule.
 
+#### Mixed-event regression lab
+
+The follow-up lab uses the real scenario, controller, Rapier and water solver,
+with fixed 60 Hz steps and **no renderer, sleep or wall-clock assertions**.
+The regular workspace suite runs eight visits: six mixed sequences covering
+Careful/Flowing on Picade, landscape HyperPixel and portrait, plus two focused
+clear-weather recovery cases. They check actual recovery and new landings,
+bounded dry inactivity, successful exits in known fixtures, replay and cleanup.
+The larger **240-visit sweep is ignored by default** and available through the
+manual **Clock mixed-event regression** Actions workflow. Existing PR UI coverage
+is unchanged.
+
+All cases start with a Duck admission. Requests are normal scenario previews:
+
+| Sequence | Scheduled previews (simulation ticks after admission) |
+|---|---|
+| Dry | None |
+| Rain | Rain at 100; allow its full lifecycle to finish |
+| Rain cleared | Rain at 100, Color Cycle at 700 to deliberately remove water |
+| Mixed | Rain at 100, Falling at 700, Meltdown at 1060 |
+
+These are authored interruption tests, not samples of the automatic scheduler.
+The sweep uses seeds 0, 1, 7 and 42, both personalities, all three layouts, and
+Light/Medium/Heavy rainfall (one dry control per seed/personality/layout).
+Each visit has an identical replay; every tick compares duck/event diagnostics,
+segment poses and resource counts. Water/material accounting, passive-duck
+suppression and zero-body/zero-collider/closed-floor cleanup are also checked.
+Every case is bounded to 3,600 ticks, including event cleanup after duck departure.
+
+Run the small suite or explicitly opt into the sweep:
+
+```sh
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression" \
+  cargo test --locked -p scenario-clock --profile ci autonomous_tests::mixed -- --nocapture
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression" \
+  cargo test --locked -p scenario-clock --profile ci mixed_event_sweep -- --ignored --nocapture
+```
+
+JSON reports contain stable `case_id`s, outcomes/ticks, the active event and
+controller behavior at departure, wet interruptions/recoveries, time since last
+recovery, subsequent confirmed landings, peak resource counts and the last live
+duck state before reset removes its body. The dry-inactivity measure counts ticks
+without horizontal travel of one body diameter, excludes water recovery, and
+includes ordinary stationary warm-up jumps; it is not by itself a "stuck" verdict.
+Partial reports identify completed versus expected visits if a later case fails.
+Normal CI uploads the two smoke reports with `linux-test-timings`; the manual
+workflow uploads the sweep report and a short outcome table. Artifacts are kept
+for 14 days. Keep baseline/candidate reports in different directories when
+comparing changes. To replay a single reported case without the full sweep:
+
+```sh
+SPACEWARS_CLOCK_REGRESSION_CASE=picade:42:flowing:heavy:mixed \
+SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression-one" \
+  cargo test --locked -p scenario-clock --profile ci mixed_event_sweep -- --ignored --nocapture
+jq '.rows[] | {case_id, metrics, terminal_duck}' target/clock-regression-one/mixed-sweep.json
+```
+
+Baseline (2026-09-23, unchanged controller and 35-second visit limit):
+
+| Sequence | Visits | Exited | Fell | Timed out |
+|---|---:|---:|---:|---:|
+| Dry | 24 | 24 | 0 | 0 |
+| Rain cleared | 72 | 72 | 0 | 0 |
+| Rain | 72 | 11 | 1 | 60 |
+| Mixed | 72 | 27 | 33 | 12 |
+
+All 33 mixed falls occurred during Falling/Meltdown; a terminal snapshot is not
+proof of the precise collision that caused a fall. All 12 mixed timeouts had
+recovered and were still navigating. Among the Rain timeouts, 18 were paddling,
+28 were in water recovery, and 14 were navigating again. Rain lasts **42 seconds**
+including drainage/clearing, longer than an AI visit; timeout alone does not show
+a broken controller. The longest stationary dry stretch in this sweep was 211
+ticks (3.52 seconds). All dry/clear-weather controls exited, so this pass adds
+regressions/measurements without extending visits or retuning swimming. Planning
+around physical event debris and any bounded wet-time allowance remain separate
+behavior experiments. Falls/timeouts in the broader hazard cases are measured
+outcomes, not blanket test failures; dry and clear-weather exits are required.
+
+Local validation: **1,777 workspace/all-target tests passed**; scoped Clock
+Clippy, formatting, workflow parsing and the CI summary generator passed. The
+eight normal cases took **0.91 seconds**, and the replayed 240-visit sweep took
+**44.50 seconds** on the development host (execution only, not CI guarantees).
+Single-case selection was checked both for a valid case and fail-closed rejection
+of an unknown ID. No runtime code or Pi settings changed in this lab-only pass.
+
+#### Other shared-visit coverage
+
 Headless model tests cover mirroring, movement, real exits and missed gaps,
 grounded single-edge jumping, ownership, pause, cleanup/replacement, and
 filtered automatic scheduling, and event/player lifecycle independence. Paired

@@ -1,5 +1,7 @@
 use super::*;
 
+mod mixed;
+
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
         ClockConfig {

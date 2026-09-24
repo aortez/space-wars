@@ -1,0 +1,63 @@
+name: Clock mixed-event regression
+
+# Optional headless behavior sweep; eight smoke/recovery cases remain on PRs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clock-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clock-regression:
+    name: Seeded duck and event sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RUST_MIN_STACK: 16777216
+      SPACEWARS_CLOCK_REGRESSION_DIR: ${{ github.workspace }}/target/clock-regression
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Install pinned test runner
+        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: nextest@0.9.144
+      - name: Restore Rust dependencies
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          cache-on-failure: true
+      - name: Replay the 240-visit sweep without a renderer or real-time waits
+        run: |
+          cargo nextest run --locked -p scenario-clock --cargo-profile ci --profile ci \
+            -E 'test(=autonomous_tests::mixed::mixed_event_sweep)' \
+            --run-ignored only --no-tests fail
+      - name: Summarize measured outcomes
+        if: always()
+        run: |
+          if test -f target/clock-regression/mixed-sweep.json; then
+            jq -r '
+              "## Clock mixed-event measurements\n",
+              "Recorded \(.completed_visits) of \(.expected_visits) visits.\n",
+              "Each visit was replayed with identical tick-by-tick diagnostics. Falls/timeouts are measured outcomes, not universally forbidden.\n",
+              "| Sequence | Visits | Exits | Falls | Timeouts |\n|---|---:|---:|---:|---:|",
+              (.rows | group_by(.case.sequence)[] |
+                "| \(.[0].case.sequence) | \(length) | \(map(select(.metrics.outcome == "exited")) | length) | \(map(select(.metrics.outcome == "fell")) | length) | \(map(select(.metrics.outcome == "timed-out")) | length) |")
+            ' target/clock-regression/mixed-sweep.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload per-case measurements and terminal duck state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clock-mixed-event-regression
+          retention-days: 14
+          path: |
+            target/clock-regression/
+            target/nextest/ci/junit.xml
+          if-no-files-found: ignore
