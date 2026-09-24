@@ -1,6 +1,12 @@
 use super::*;
 use pilot::LandingSiteQuery;
 
+mod destinations;
+mod diagnostics;
+mod early_candidates;
+mod flight_dependencies;
+mod gravity_dependencies;
+mod measurement_work;
 mod route_dependencies;
 
 const DT: Duration = Duration::from_nanos(16_666_667);
@@ -456,6 +462,37 @@ fn publication_preserves_measurement_tick_and_pending_is_not_a_failed_route() {
 }
 
 #[test]
+fn changing_either_boarding_entrance_invalidates_a_landed_request() {
+    let state = state();
+    for side in 0..2 {
+        for removed in [false, true] {
+            let mut planner =
+                LiveObjectivePlanner::new(1, Work::UNLIMITED).with_route_dependencies();
+            let mut o = target(&state, 0);
+            let p = &mut o.combat.recovery.flight.pilot;
+            let site = p.sites[0];
+            p.landing.phase = LandingPhase::Landed;
+            p.hatch = Some(site.hatch_position);
+            p.boarding_hatches = [
+                Some(site.hatch_position),
+                Some(site.hatch_position + Vec2::X * 12.0),
+            ];
+            planner.observe(&state, 0, &mut o);
+            planner.advance(state.world.tick);
+            let hatch = &mut o.combat.recovery.flight.pilot.boarding_hatches[side];
+            *hatch = if removed {
+                None
+            } else {
+                hatch.map(|h| h + Vec2::X)
+            };
+            planner.observe(&state, 0, &mut o);
+            assert!(o.landing_objective.is_none());
+            assert_eq!(planner.telemetry.invalidations.get("hatch_moved"), Some(&1));
+        }
+    }
+}
+
+#[test]
 fn clone_resume_death_goal_change_and_missing_actor_release_work() {
     let mut state = state();
     let mut planner = LiveObjectivePlanner::new(
@@ -546,4 +583,166 @@ fn capacity_and_expiry_defer_without_reporting_an_impossible_route() {
     planner.observe(&state, 0, &mut o);
     assert_eq!(planner.queue.poll(old.token, &old.tick), JobPoll::Stale);
     assert_ne!(planner.requests[&0].token, old.token);
+}
+
+#[test]
+fn powered_objective_requires_flight_evidence_and_respects_the_same_dispatch_quota() {
+    use jetpack::forecast::FlightEnvironment;
+    let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);
+    for _ in 0..120 {
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+    }
+    let mut o = state.tactical_sortie_observation_for_live_planning(0, LandingSiteQuery::Survey);
+    let p = &mut o.combat.recovery.flight.pilot;
+    let map = state
+        .survey_ground_with_gravity(
+            0,
+            p.planet.index,
+            0..ground_navigation::GROUND_SAMPLES as u16,
+            false,
+            18.2,
+        )
+        .unwrap();
+    let center =
+        (p.ship.position - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
+    let crossing = state
+        .forecast_vehicle_crossing(0, p, &map, center, p.ship.angle - p.planet.motion.angle)
+        .unwrap();
+    p.sites.clear(); // Isolate this actual/proposed pose, not a different landing.
+    let claim = p.planet.claim.as_mut().unwrap();
+    claim.owner = Some(PlayerId::PLAYER_2);
+    claim.flag = Some(PlanetFlagObservation {
+        player: PlayerId::PLAYER_2,
+        position: p.planet.motion.position
+            + crossing
+                .plan
+                .destination
+                .rotate_radians(p.planet.motion.angle),
+        normal: crossing
+            .plan
+            .destination
+            .normalized()
+            .rotate_radians(p.planet.motion.angle),
+        raised_fraction: 1.0,
+    });
+    let p = &o.combat.recovery.flight.pilot;
+    let legacy = state
+        .landing_objective_survey(0, p, &o.cover, ObjectivePlanning::JointRoundTrip)
+        .unwrap();
+    assert!(legacy.actual.as_ref().unwrap().cost().is_none());
+    let before = state.world.physics.world.snapshot_bytes().unwrap();
+    let expected = state
+        .landing_objective_survey(0, p, &o.cover, ObjectivePlanning::JetpackRoundTrip)
+        .unwrap();
+    let route = expected.actual.as_ref().unwrap();
+    assert!(route.cost().is_some(), "{route:?}");
+    assert_eq!(route.outbound.flights, 1);
+    assert_eq!(
+        route.returning.as_ref().unwrap().flights,
+        0,
+        "opposite entrance is reachable without another flight"
+    );
+    assert!(route.crossing.is_some());
+    for allowance in [
+        Work {
+            graph: 17,
+            physics_queries: 11,
+        },
+        Work::UNLIMITED,
+    ] {
+        let job = state
+            .objective_job_with_planning(
+                0,
+                p,
+                &o.cover,
+                Arc::new(state.world.physics.world.query_snapshot()),
+                None,
+                true,
+                ObjectivePlanning::JetpackRoundTrip,
+            )
+            .unwrap();
+        let mut queue = PlanningQueue::new(1);
+        let token = queue.submit(1, (), JobLimits::default(), job).unwrap();
+        for _ in 0..100_000 {
+            let r = queue.advance(allowance);
+            assert!(
+                r.charged.graph <= allowance.graph
+                    && r.charged.physics_queries <= allowance.physics_queries
+            );
+            if matches!(queue.poll(token, &()), JobPoll::Ready(_)) {
+                break;
+            }
+        }
+        assert_eq!(queue.poll(token, &()), JobPoll::Ready(&expected));
+        let job = queue.job(token).unwrap();
+        assert!(
+            job.dependencies()
+                .iter()
+                .any(|(site, areas)| site.is_none() && areas.len() > 4)
+        );
+    }
+    assert_eq!(state.world.physics.world.snapshot_bytes().unwrap(), before);
+    let mut live = LiveObjectivePlanner::new(
+        1,
+        Work {
+            graph: 0,
+            physics_queries: 0,
+        },
+    );
+    let mut observation = o.clone();
+    live.observe_with_planning(
+        &state,
+        0,
+        &mut observation,
+        ObjectivePlanning::JetpackRoundTrip,
+    );
+    let mut request = live.requests[&0].clone();
+    let mut changed_motion = p.clone();
+    changed_motion.planet.motion.spin += 0.001;
+    assert!(
+        LiveObjectivePlanner::valid(
+            &state,
+            0,
+            &changed_motion,
+            &request,
+            request.objective,
+            false
+        )
+        .is_ok(),
+        "walk-only work does not depend on a not-yet-used flight model"
+    );
+    request.flight_dependent = true;
+    assert_eq!(
+        LiveObjectivePlanner::valid(
+            &state,
+            0,
+            &changed_motion,
+            &request,
+            request.objective,
+            false
+        ),
+        Err("flight_environment_changed")
+    );
+    let field = FlightEnvironment::read(&state, p).unwrap();
+    let mut moved = p.clone();
+    moved.planet.motion.spin += 0.001;
+    assert!(!field.compatible(&FlightEnvironment::read(&state, &moved).unwrap()));
+    state.pilots[0].jetpack_charge = None;
+    assert_eq!(
+        LiveObjectivePlanner::valid(&state, 0, p, &request, request.objective, false),
+        Err("jetpack_changed")
+    );
+    let unavailable = state
+        .landing_objective_survey(0, p, &o.cover, ObjectivePlanning::JetpackRoundTrip)
+        .unwrap();
+    assert!(unavailable.actual.as_ref().unwrap().cost().is_none());
+    state.pilots[0].jetpack_charge = Some(1.0);
+    state.world.planets[0].mass *= 1.5;
+    let heavy = state
+        .landing_objective_survey(0, p, &o.cover, ObjectivePlanning::JetpackRoundTrip)
+        .unwrap();
+    assert!(
+        heavy.actual.as_ref().unwrap().cost().is_none(),
+        "a clear hull crossing cannot waive the fuel limit"
+    );
 }

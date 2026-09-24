@@ -15,6 +15,7 @@ pub enum ObjectivePlanning {
     #[default]
     Legacy,
     JointRoundTrip,
+    JetpackRoundTrip,
 }
 impl ObjectivePlanning {
     pub fn is_legacy(&self) -> bool {
@@ -60,6 +61,9 @@ impl LandingObjective {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct LandingObjectiveRoute {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crossing: Option<jetpack::forecast::VehicleCrossingForecast>,
+
     /// Absent for the check at the actual touchdown pose.
     pub site: Option<LandingSiteId>,
     pub outbound: GroundRouteDiagnostics,
@@ -71,6 +75,9 @@ pub struct LandingObjectiveRoute {
 
 impl LandingObjectiveRoute {
     pub fn cost(&self) -> Option<f32> {
+        if self.crossing.is_some_and(|c| !c.is_valid()) {
+            return None;
+        }
         let returning = self.returning.as_ref()?;
         if [&self.outbound, returning].iter().any(|r| {
             r.failure.is_some()
@@ -81,15 +88,22 @@ impl LandingObjectiveRoute {
                 || r.reachable_nodes == 0
                 || r.destination_nodes == 0
                 || r.jumps > GROUND_SAMPLES
-                || r.flights != 0
+                || r.flights > usize::from(self.crossing.is_some())
         }) {
             return None;
         }
         // Express the round trip at walking speed in the flight selector's
         // distance units (38 / 5 = 7.6), with a small per-jump time allowance.
+        let flight_cost = self.crossing.map_or(0.0, |c| {
+            // Include a full recharge and use the slower measured direction.
+            let seconds = c.flights.iter().map(|f| f.seconds).fold(0.0, f32::max)
+                + engine_rapier::spaceling::jetpack::RECHARGE_SECONDS;
+            (seconds * 38.0 - c.plan.start.distance_to(c.plan.destination) * 7.6).max(0.0)
+        });
         Some(
             (self.outbound.length + returning.length) * 7.6
-                + (self.outbound.jumps + returning.jumps) as f32 * 15.0,
+                + (self.outbound.jumps + returning.jumps) as f32 * 15.0
+                + (self.outbound.flights + returning.flights) as f32 * flight_cost,
         )
     }
 }
@@ -141,6 +155,22 @@ impl SurfaceSortieState {
         {
             return None;
         }
+        if planning == ObjectivePlanning::JetpackRoundTrip {
+            use engine_core::planning::PlanningJob;
+            let mut job = self.objective_job_with_planning(
+                player,
+                p,
+                cover,
+                std::sync::Arc::new(self.world.physics.world.query_snapshot()),
+                None,
+                false,
+                planning,
+            )?;
+            while job.next_work().is_some() {
+                job.step();
+            }
+            return job.output().cloned();
+        }
         // Forecast ground jumps at the objective, rather than using an airborne
         // ship's weaker gravity or an absent spaceling's zero acceleration.
         let flag =
@@ -176,7 +206,7 @@ impl SurfaceSortieState {
         let clearance_samples = super::sensor_profile::Counter::new("objective_clearance_samples");
         #[cfg(feature = "sensor-profile")]
         let hull_tests = super::sensor_profile::Counter::new("objective_hull_tests");
-        let measure = |id, vehicle: Vec2, angle: f32, hatch: Vec2| {
+        let measure = |id, vehicle: Vec2, angle: f32, hatch: Vec2, hatches: [Option<Vec2>; 2]| {
             #[cfg(feature = "sensor-profile")]
             let _profile = super::sensor_profile::Scope::new("landing_objective_candidate");
             let avoiding = map.avoiding(gravity, |position| {
@@ -196,7 +226,12 @@ impl SurfaceSortieState {
                 }
             });
             let hatch = (hatch - p.planet.motion.position).rotate_radians(-p.planet.motion.angle);
-            measure_route(&avoiding, id, hatch, objective, planning)
+            let hatches = hatches.map(|h| {
+                h.map(|point| {
+                    (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle)
+                })
+            });
+            measure_route(&avoiding, id, hatch, hatches, objective, planning)
         };
         let mut candidates: Vec<_> = p.sites.iter().collect();
         candidates.sort_by(|a, b| {
@@ -236,12 +271,20 @@ impl SurfaceSortieState {
                     site.vehicle_position,
                     rotation_for_direction(site.normal),
                     site.hatch_position,
+                    site.boarding_hatches,
                 )
             })
             .collect();
         let actual = if p.landing.phase == LandingPhase::Landed {
-            p.hatch
-                .map(|hatch| measure(None, p.ship.position, p.ship.angle, hatch))
+            p.hatch.map(|hatch| {
+                measure(
+                    None,
+                    p.ship.position,
+                    p.ship.angle,
+                    hatch,
+                    p.boarding_hatches,
+                )
+            })
         } else {
             None
         };
@@ -263,16 +306,18 @@ fn measure_route(
     map: &GroundMap,
     site: Option<LandingSiteId>,
     hatch: Vec2,
+    hatches: [Option<Vec2>; 2],
     objective: LandingObjective,
     planning: ObjectivePlanning,
 ) -> LandingObjectiveRoute {
     #[cfg(feature = "sensor-profile")]
     let _profile = super::sensor_profile::Scope::new("landing_objective_routes");
     let routes = map.routes();
-    if planning == ObjectivePlanning::JointRoundTrip {
+    if !planning.is_legacy() {
         let trip =
-            routes.round_trip_to_actor_target(hatch, objective.position, objective.range, hatch);
+            routes.round_trip_to_hatches(hatch, objective.position, objective.range, hatches);
         return LandingObjectiveRoute {
+            crossing: None,
             site,
             outbound: trip.outbound.diagnostics,
             returning: trip.returning.map(|r| r.diagnostics),
@@ -284,8 +329,9 @@ fn measure_route(
         .path
         .last()
         .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
-        .map(|node| routes.route_to_hatch(node.position, hatch).diagnostics);
+        .map(|node| routes.route_to_hatches(node.position, hatches).diagnostics);
     LandingObjectiveRoute {
+        crossing: None,
         endpoint: None,
         site,
         outbound: outbound.diagnostics,
@@ -331,7 +377,14 @@ mod tests {
             range: 1.0,
         };
         let start = Vec2::new(0.0, 60.0);
-        let one_way = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
+        let one_way = measure_route(
+            &map,
+            None,
+            start,
+            [Some(start), None],
+            objective,
+            ObjectivePlanning::Legacy,
+        );
         assert!(one_way.outbound.failure.is_none());
         assert_eq!(
             one_way.returning.as_ref().unwrap().failure,
@@ -345,12 +398,26 @@ mod tests {
             length: 2.0,
         }));
         assert!(
-            measure_route(&map, None, start, objective, ObjectivePlanning::Legacy)
-                .cost()
-                .is_some()
+            measure_route(
+                &map,
+                None,
+                start,
+                [Some(start), None],
+                objective,
+                ObjectivePlanning::Legacy
+            )
+            .cost()
+            .is_some()
         );
         map.edges.clear();
-        let disconnected = measure_route(&map, None, start, objective, ObjectivePlanning::Legacy);
+        let disconnected = measure_route(
+            &map,
+            None,
+            start,
+            [Some(start), None],
+            objective,
+            ObjectivePlanning::Legacy,
+        );
         assert!(disconnected.cost().is_none());
         assert!(disconnected.returning.is_none());
     }

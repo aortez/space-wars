@@ -52,6 +52,7 @@ fn fixture() -> (TacticalCapturePilot, TacticalSortieObservationV1) {
         .sites
         .iter()
         .map(|site| LandingObjectiveRoute {
+            crossing: None,
             endpoint: None,
             site: Some(site.id),
             outbound: diagnostics(4.0),
@@ -242,6 +243,7 @@ fn touchdown_checks_actual_access_and_changed_ownership_discards_the_old_plan() 
         objective: LandingObjective::read(p).unwrap(),
         sites: vec![],
         actual: Some(LandingObjectiveRoute {
+            crossing: None,
             endpoint: None,
             site: None,
             outbound: diagnostics(1.0),
@@ -362,12 +364,14 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
     let survey = o.landing_objective.as_mut().unwrap();
     survey.tick = p.tick;
     p.hatch = Some(p.sites[1].hatch_position);
+    p.boarding_hatches = [p.hatch, None];
     let actual = GroundNode {
         id: 8,
         position: endpoint.position * 1.001,
         ..endpoint
     };
     survey.actual = Some(LandingObjectiveRoute {
+        crossing: None,
         site: None,
         endpoint: Some(actual),
         outbound: diagnostics(2.0),
@@ -393,7 +397,20 @@ fn candidate_retains_actual_touchdown_endpoint_and_rejects_incomplete_profile() 
         }
         let mut copy = pilot.clone();
         assert_eq!(copy.intent(&bad), CombatIntent::default());
-        assert_eq!(copy.telemetry(), pilot.telemetry());
+        let evidence = copy.telemetry().acquisition.unwrap();
+        assert_eq!(
+            evidence.reason,
+            match fault {
+                0 => "survey_policy_mismatch",
+                1 => "joint_endpoint_missing",
+                _ => "joint_endpoint_invalid",
+            }
+        );
+        // Only the current rejection observation may change. Retain the old
+        // controller state, route, milestones and ordinary control contract.
+        let mut expected = pilot.telemetry().clone();
+        expected.sortie.acquisition = Some(evidence);
+        assert_eq!(copy.telemetry(), &expected);
     }
     pilot.intent(&o);
     assert_eq!(pilot.telemetry().flag_approach.unwrap().endpoint, actual);

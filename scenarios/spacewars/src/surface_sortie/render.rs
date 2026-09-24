@@ -649,18 +649,13 @@ fn pilot_color(state: &SurfaceSortieState, player: usize) -> RenderColor {
 }
 
 fn draw_actor(frame: &mut RenderFrame, state: &SurfaceSortieState, player: usize) {
-    let access = state.access_position(player);
     let ship = &state.world.ships[state.pilots[player].vehicle.0];
     let snapshot = state.spaceling_snapshot(player);
     let parked = state.vehicle_settled(player);
     if parked && !ship.dead {
-        circle(
-            frame,
-            -1,
-            access + state.access_up(player) * 0.12,
-            0.38,
-            CYAN,
-        );
+        for (point, up) in state.boarding_access(player).into_iter().flatten() {
+            circle(frame, -1, point + up * 0.12, 0.38, CYAN);
+        }
     }
     if !ship.dead {
         render_ship(frame, ship);

@@ -156,14 +156,7 @@ impl<D: PartialEq, J: PlanningJob> PlanningQueue<D, J> {
         if self.slots.len() == self.capacity && !self.slots.contains_key(&actor) {
             return Err(QueueFull);
         }
-        self.generation = self
-            .generation
-            .checked_add(1)
-            .expect("request ID exhausted");
-        let token = RequestToken {
-            actor,
-            generation: self.generation,
-        };
+        let token = self.reserve_token(actor);
         if self.cursor == Some(actor)
             && self
                 .slots
@@ -189,6 +182,20 @@ impl<D: PartialEq, J: PlanningJob> PlanningQueue<D, J> {
             },
         );
         Ok(token)
+    }
+
+    /// Give an adapter's bounded atomic work an identity in this queue's
+    /// namespace. This does not submit a job or consume a slot; the adapter
+    /// must charge and report that work under the same shared allowance.
+    pub fn reserve_token(&mut self, actor: u64) -> RequestToken {
+        self.generation = self
+            .generation
+            .checked_add(1)
+            .expect("request ID exhausted");
+        RequestToken {
+            actor,
+            generation: self.generation,
+        }
     }
 
     pub fn cancel(&mut self, token: RequestToken) -> bool {

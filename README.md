@@ -247,6 +247,10 @@ jetpack and recovery actions as humans. Both choices persist through Rematch
 and relaunching. The default remains two human players; choose two bots to watch
 a match. Bot combat breaks and asteroid arrivals/strength are configurable.
 
+The [powered planning checkpoint](docs/bot-planning-checkpoint.md) describes
+experimental v11 capture planning and bounded site acquisition, their headless
+comparison options, and the shared physical fixes. Launcher Planner remains v10.
+
 **New Match** generates a fresh world with the same player and gameplay settings.
 **Rematch** resets the current world, and **Play World** starts the seed shown
 in the launcher. Seeds are visible in the launcher, pause and result menus and

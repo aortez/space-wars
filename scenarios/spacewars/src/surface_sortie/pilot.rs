@@ -61,7 +61,10 @@ pub struct PilotLandingSite {
     pub velocity: Vec2,
     /// Suggested body origin with both rear feet on the measured surface.
     pub vehicle_position: Vec2,
+    /// Normal exit, unchanged by the choice of return entrance.
     pub hatch_position: Vec2,
+    /// Clear return entrances at this proposed pose, in world coordinates.
+    pub boarding_hatches: [Option<Vec2>; 2],
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -97,7 +100,10 @@ pub struct PilotObservationV1 {
     pub balanced: bool,
     pub relative_speed: f32,
     pub landing: LandingTelemetry,
+    /// Normal exit floor. A blocked capsule can still leave this observable.
     pub hatch: Option<Vec2>,
+    /// Independently measured clear entrances; neither grants transfer permission.
+    pub boarding_hatches: [Option<Vec2>; 2],
     pub transfer: TransferResult,
     pub last_transfer: TransferResult,
     pub transfers: u64,
@@ -109,6 +115,15 @@ pub struct PilotObservationV1 {
     /// With a requested ID, revalidates only that site. Otherwise surveys at
     /// most 64 bearings. Empty while queries are dirty does not mean no ground.
     pub sites: Vec<PilotLandingSite>,
+}
+
+impl PilotObservationV1 {
+    pub fn nearest_boarding_hatch(&self, point: Vec2) -> Option<Vec2> {
+        self.boarding_hatches
+            .into_iter()
+            .flatten()
+            .min_by(|a, b| a.distance_to(point).total_cmp(&b.distance_to(point)))
+    }
 }
 
 impl PilotPlanetObservation {
@@ -202,6 +217,9 @@ impl SurfaceSortieState {
             relative_speed: snapshot.map_or(0.0, |s| s.relative_speed),
             landing: pilot.landing,
             hatch: self.material_access(player).map(|hit| hit.point),
+            boarding_hatches: self
+                .boarding_access(player)
+                .map(|entry| entry.map(|(point, _)| point)),
             transfer: if ready {
                 self.transfer_readiness(player)
             } else {
@@ -237,6 +255,19 @@ impl SurfaceSortieState {
         id: LandingSiteId,
         pod: bool,
     ) -> Option<PilotLandingSite> {
+        self.vehicle_landing_site_with_queries(player, id, pod, || true)
+    }
+
+    /// The ordinary site check, with permission charged before each ray, hull
+    /// intersection or capsule test. Exhaustion is unknown, not blocked ground;
+    /// a budgeted caller must discard the entire result if any charge failed.
+    pub(super) fn vehicle_landing_site_with_queries(
+        &self,
+        player: usize,
+        id: LandingSiteId,
+        pod: bool,
+        charge: impl Fn() -> bool,
+    ) -> Option<PilotLandingSite> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("vehicle_landing_site");
         if id.bearing >= LANDING_SITE_COUNT || self.world.physics.material_queries_dirty {
@@ -251,9 +282,13 @@ impl SurfaceSortieState {
         let right = Vec2::new(up.y, -up.x);
         let origin = frame.position + up * (self.world.planets[id.planet].radius + 10.0);
         let ground = |origin, direction, length| {
-            self.world
-                .physics
-                .material_ground_ray(id.planet, origin, direction, length)
+            charge()
+                .then(|| {
+                    self.world
+                        .physics
+                        .material_ground_ray(id.planet, origin, direction, length)
+                })
+                .flatten()
         };
         let foot_span = if pod { 0.7 } else { 3.0 };
         let left = ground(origin - right * foot_span, -up, 35.0)?;
@@ -277,11 +312,13 @@ impl SurfaceSortieState {
                 #[cfg(feature = "sensor-profile")]
                 let _profile = super::sensor_profile::Scope::new("landing_hull_placement");
                 [-0.75, 0.0, 0.75].into_iter().all(|offset| {
-                    self.world.physics.surface_hull_fits_at(
-                        self.pilots[player].vehicle.0,
-                        vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2,
-                        rotation_for_direction(normal),
-                    )
+                    charge()
+                        && self.world.physics.surface_hull_fits_at(
+                            self.pilots[player].vehicle.0,
+                            vehicle_position + Vec2::new(normal.y, -normal.x) * offset
+                                - normal * 0.2,
+                            rotation_for_direction(normal),
+                        )
                 })
             }
         {
@@ -355,8 +392,10 @@ impl SurfaceSortieState {
                     return clear;
                 }
             }
-            let clear =
-                world_clear(point, rotation) && vehicle_clear(point, rotation, position, angle);
+            let clear = charge()
+                && world_clear(point, rotation)
+                && charge()
+                && vehicle_clear(point, rotation, position, angle);
             last_clearance.set(Some((query, clear)));
             clear
         };
@@ -382,12 +421,13 @@ impl SurfaceSortieState {
             // slide and tilt is also safe. A bot may need to retry a one-foot
             // stop when rotating here would close the hatch.
             let hatch_at = |position: Vec2, angle: f32| {
-                self.material_access_with_clearance(
+                self.material_access_with_ray(
                     id.planet,
                     ShipForm::Ship,
                     position,
                     angle,
                     |point, rotation| clear_at(point, rotation, position, angle),
+                    &ground,
                 )
                 .filter(|hit| hatch_clear(*hit, position, angle))
             };
@@ -422,6 +462,27 @@ impl SurfaceSortieState {
             velocity: motion::point_velocity(frame, vehicle_position),
             vehicle_position,
             hatch_position: hatch.point,
+            boarding_hatches: self
+                .material_boarding_with_ray(
+                    id.planet,
+                    if pod {
+                        ShipForm::EscapePod
+                    } else {
+                        ShipForm::Ship
+                    },
+                    vehicle_position,
+                    rotation_for_direction(normal),
+                    |point, rotation| {
+                        clear_at(
+                            point,
+                            rotation,
+                            vehicle_position,
+                            rotation_for_direction(normal),
+                        )
+                    },
+                    &ground,
+                )
+                .map(|hit| hit.map(|h| h.point)),
         })
     }
 }
@@ -438,6 +499,57 @@ pub struct MaterialFlightStart {
 }
 
 impl SurfaceSortieScenario {
+    /// Controlled flag trial on the normal generated material arena. Both pilots
+    /// start above planet zero; only initial placement is prescribed. The
+    /// defender must still land, exit and raise a real flag through controls.
+    pub fn init_generated_flag_flight(
+        seed: u64,
+        attacker: PlayerId,
+        bearing_offset: f32,
+    ) -> SurfaceSortieState {
+        assert!(bearing_offset.is_finite());
+        let mut state = Self::init_material_arena(seed);
+        let planet = state.world.planets[0];
+        for seat in 0..2 {
+            state.pilots[seat].planet = 0;
+            let frame = state.planet_motion(seat);
+            let bearing = (1 - attacker.index()) as f32 * std::f32::consts::PI
+                + if seat == attacker.index() {
+                    bearing_offset
+                } else {
+                    0.0
+                };
+            let up = Vec2::Y.rotate_radians(bearing);
+            let altitude = if seat == attacker.index() { 20.0 } else { 0.5 };
+            let position =
+                frame.position + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE + altitude + 5.45);
+            let velocity = motion::point_velocity(frame, position);
+            let angle = rotation_for_direction(up);
+            let ship = &mut state.world.ships[seat];
+            ship.position = position - SHIP_PIVOT;
+            ship.velocity = velocity;
+            ship.rotation_radians = angle;
+            ship.direction = up;
+            ship.omega = frame.angular_velocity;
+            let body = state.world.physics.ship_body(seat);
+            assert!(
+                state
+                    .world
+                    .physics
+                    .world
+                    .set_pose(body, position, angle, true)
+            );
+            assert!(state.world.physics.world.set_velocity(
+                body,
+                velocity,
+                frame.angular_velocity,
+                true
+            ));
+        }
+        state.world.physics.material_queries_dirty = true;
+        state
+    }
+
     pub fn init_material_flight(
         seed: u64,
         players: usize,
@@ -498,6 +610,44 @@ mod tests {
     };
     use engine_terrain::{Brush, EditMode, TerrainEdit};
     const DT: Duration = Duration::from_nanos(16_666_667);
+
+    #[test]
+    fn generated_flag_setup_preserves_world_geometry_and_starts_both_pilots_aboard() {
+        let mut radii = Vec::new();
+        for seed in [41, 42] {
+            let reference = SurfaceSortieScenario::init_material_arena(seed);
+            for seat in 0..2 {
+                let state = SurfaceSortieScenario::init_generated_flag_flight(
+                    seed,
+                    PlayerId::from_index(seat).unwrap(),
+                    0.6,
+                );
+                for (actual, original) in state.world.planets.iter().zip(&reference.world.planets) {
+                    assert_eq!(actual.radius, original.radius);
+                    assert_eq!(actual.mass, original.mass);
+                    assert_eq!(actual.position, original.position);
+                    assert_eq!(actual.wrapper_omega, original.wrapper_omega);
+                    assert_eq!(actual.orbit_omega, original.orbit_omega);
+                }
+                for player in 0..2 {
+                    let p = state.pilot_observation(player, None);
+                    assert_eq!(p.planet.index, 0);
+                    assert!(matches!(p.location, PilotLocation::Aboard(_)));
+                    assert!(p.planet.claim.unwrap().owner.is_none());
+                    let body = state
+                        .world
+                        .physics
+                        .world
+                        .motion(state.world.physics.ship_body(player))
+                        .unwrap();
+                    assert!(body.position.distance_to(p.planet.motion.position) > p.planet.radius);
+                }
+                assert!(state.terrain_diagnostics().issues.is_empty());
+            }
+            radii.push(reference.world.planets[0].radius);
+        }
+        assert_ne!(radii[0], radii[1]);
+    }
 
     #[test]
     fn landing_forecast_moves_its_own_ship_but_keeps_other_obstacles() {

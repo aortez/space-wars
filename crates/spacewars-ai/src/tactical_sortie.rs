@@ -20,6 +20,13 @@ use scenario_spacewars::{
     },
 };
 use serde::Serialize;
+use std::cell::Cell;
+
+mod acquisition;
+mod acquisition_wait;
+use acquisition::count;
+pub use acquisition::{AcquisitionTelemetry, CandidateCheckCounts};
+pub use acquisition_wait::{ACQUISITION_DEADLINE_TICKS, ACQUISITION_WAIT_PROFILE, AcquisitionWait};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,6 +80,10 @@ pub struct TacticalTelemetry {
     pub covered_ticks: u64,
     pub site: Option<LandingSiteId>,
     pub landing: PilotTelemetry,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition: Option<AcquisitionTelemetry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acquisition_wait: Option<AcquisitionWait>,
 }
 fn is_zero(value: &u32) -> bool {
     *value == 0
@@ -99,6 +110,8 @@ pub struct TacticalSortiePilot {
     solar_rejected: Vec<(LandingSiteId, u64)>,
     clearing_ground: bool,
     objective: Option<LandingObjective>,
+    required_site: Option<LandingSiteId>,
+    bounded_acquisition: bool,
 }
 impl TacticalSortiePilot {
     pub fn new(context: BrainReset, breaks: CombatBreakSettings) -> Self {
@@ -129,6 +142,8 @@ impl TacticalSortiePilot {
                 covered_ticks: 0,
                 site: None,
                 landing: landing.telemetry().clone(),
+                acquisition: None,
+                acquisition_wait: None,
             },
             landing,
             site: None,
@@ -147,6 +162,8 @@ impl TacticalSortiePilot {
             solar_rejected: Vec::new(),
             clearing_ground: false,
             objective: None,
+            required_site: None,
+            bounded_acquisition: false,
         }
     }
     /// Current capture missions tolerate transient cover/clearance changes and
@@ -158,8 +175,21 @@ impl TacticalSortiePilot {
     }
     pub fn reset(&mut self, context: BrainReset) {
         let commit = self.commit_descent;
+        let required = self.required_site;
+        let bounded_acquisition = self.bounded_acquisition;
         *self = Self::new(context, self.combat.telemetry().breaks.config);
         self.commit_descent = commit;
+        self.required_site = required;
+        self.bounded_acquisition = bounded_acquisition;
+    }
+    /// Explicit continuation trials may constrain selection, but still need
+    /// current material, solar and objective-route evidence for this ID.
+    pub(crate) fn requiring_site(mut self, site: LandingSiteId) -> Self {
+        self.required_site = Some(site);
+        self
+    }
+    pub(crate) fn release_site_constraint(&mut self) {
+        self.required_site = None;
     }
     pub fn combat_telemetry(&self) -> &crate::combat_pilot::CombatPilotTelemetry {
         self.combat.telemetry()
@@ -182,7 +212,7 @@ impl TacticalSortiePilot {
         if self.telemetry.failed_tick.is_some() || self.telemetry.completed_tick.is_some() {
             self.combat.site_request()
         } else {
-            self.site.map(|s| s.id)
+            self.site.map(|s| s.id).or(self.required_site)
         }
     }
     fn goal(&mut self, goal: TacticalGoal, tick: u64) {
@@ -206,12 +236,39 @@ impl TacticalSortiePilot {
         if self.previous_tick == Some(p.tick) {
             return self.previous_intent;
         }
+        self.begin_acquisition(o);
         let intent = self.choose(o);
+        if self.site.is_some() {
+            self.finish_acquisition(p.tick, "selected");
+        }
         self.telemetry.landing = self.landing.telemetry().clone();
         self.telemetry.site = self.site.map(|s| s.id);
+        if let Some(acquisition) = &mut self.telemetry.acquisition {
+            acquisition.selected_site = self.telemetry.site;
+        }
         self.previous_tick = Some(p.tick);
         self.previous_intent = intent;
         intent
+    }
+
+    fn begin_acquisition(&mut self, o: &TacticalSortieObservationV1) {
+        self.telemetry.acquisition = self
+            .commit_descent
+            .then(|| AcquisitionTelemetry::new(o, self.required_site, self.site.map(|s| s.id)));
+    }
+    fn acquisition_reason(&mut self, reason: &'static str) {
+        if let Some(acquisition) = &mut self.telemetry.acquisition {
+            acquisition.reason = reason;
+        }
+    }
+    pub(crate) fn reject_acquisition_evidence(
+        &mut self,
+        o: &TacticalSortieObservationV1,
+        reason: &'static str,
+    ) {
+        self.begin_acquisition(o);
+        self.acquisition_reason(reason);
+        self.check_acquisition_deadline(o);
     }
 
     /// A composing mission may abort its added work while retaining V1's
@@ -269,21 +326,29 @@ impl TacticalSortiePilot {
         let c = &o.combat;
         let p = &c.recovery.flight.pilot;
         if self.telemetry.failed_tick.is_some() || self.telemetry.completed_tick.is_some() {
+            self.acquisition_reason("controller_finished");
             return self.combat.intent(c);
         }
         if !p.ship_available || p.ship_form != ShipForm::Ship {
+            self.acquisition_reason("ship_unavailable");
             self.telemetry.failed_tick.get_or_insert(p.tick);
             self.telemetry.failure = Some("ship lost during capture sortie");
             self.goal(TacticalGoal::Recover, p.tick);
             return self.combat.intent(c);
         }
         if !c.recovery.flight.flight.enabled {
+            self.acquisition_reason("flight_disabled");
             return CombatIntent::default();
         }
         if !p.controls_armed {
+            self.acquisition_reason("controls_unarmed");
             return CombatIntent::default();
         }
+        if self.check_acquisition_deadline(o) {
+            return self.combat.intent(c);
+        }
         if !p.queries_ready {
+            self.acquisition_reason("queries_unavailable");
             return CombatIntent {
                 flight: FlightIntent {
                     controls: SurfaceSortieAction {
@@ -305,6 +370,7 @@ impl TacticalSortiePilot {
             || self.telemetry.cover_replans >= 8
             || self.telemetry.solar_replans >= 8
         {
+            self.acquisition_reason("capture_limit");
             self.telemetry.failed_tick = Some(p.tick);
             self.telemetry.failure = Some("capture approach exhausted its time or retry budget");
             self.goal(TacticalGoal::Blocked, p.tick);
@@ -324,6 +390,7 @@ impl TacticalSortiePilot {
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
         let altitude = radius - p.planet.radius;
         if p.location == PilotLocation::OnFoot {
+            self.acquisition_reason("on_foot");
             self.goal(TacticalGoal::Surface, p.tick);
             return CombatIntent {
                 flight: FlightIntent {
@@ -336,6 +403,7 @@ impl TacticalSortiePilot {
         if self.landing.telemetry().claimed_tick.is_some()
             && p.last_transfer == TransferResult::Boarded
         {
+            self.acquisition_reason("departing");
             // Keep the existing transfer/milestone bookkeeping while guiding the
             // launch with observed motion and cover instead of a radial climb.
             let lift = self.landing.intent(p);
@@ -381,6 +449,7 @@ impl TacticalSortiePilot {
             if p.landing.supported_feet == 0 && p.landing.altitude > 25.0 {
                 self.clearing_ground = false;
             } else {
+                self.acquisition_reason("clearing_ground");
                 return CombatIntent {
                     flight: FlightIntent {
                         controls: SurfaceSortieAction {
@@ -399,12 +468,25 @@ impl TacticalSortiePilot {
             .then(|| LandingObjective::read(p))
             .flatten();
         let survey = o.landing_objective.as_ref().filter(|survey| {
-            survey.version == 1
-                && survey.actor == p.owner
-                && survey.is_current(p.tick)
-                && objective.is_some_and(|target| target.matches(survey.objective))
-                && survey.sites.len()
-                    <= scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
+            let reason = if survey.version != 1 {
+                Some("survey_version")
+            } else if survey.actor != p.owner {
+                Some("survey_actor")
+            } else if !survey.is_current(p.tick) {
+                Some("survey_age")
+            } else if !objective.is_some_and(|target| target.matches(survey.objective)) {
+                Some("survey_objective")
+            } else if survey.sites.len()
+                > scenario_spacewars::surface_sortie::landing_objective::MAX_OBJECTIVE_SITES
+            {
+                Some("survey_size")
+            } else {
+                None
+            };
+            if let Some(acquisition) = &mut self.telemetry.acquisition {
+                acquisition.survey_rejected_by = reason;
+            }
+            reason.is_none()
         });
         let selected_route_revoked = self.site.is_some_and(|site| {
             survey.is_some_and(|s| {
@@ -422,13 +504,18 @@ impl TacticalSortiePilot {
                     scenario_spacewars::surface_sortie::live_planning::ObjectiveWorkState::Stale,
                 ))
         {
+            self.acquisition_reason(if selected_route_revoked {
+                "selected_route_revoked"
+            } else {
+                "objective_stale"
+            });
             self.telemetry.objective_replans += 1;
             self.telemetry.live_invalidations += 1;
             self.replan(p.tick);
             return if p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed {
                 CombatIntent::default()
             } else {
-                self.guide(o, up * 5.0, Vec2::ZERO)
+                self.wait_for_site(o, 5.0)
             };
         }
         if self.site.is_some()
@@ -438,6 +525,7 @@ impl TacticalSortiePilot {
                 _ => true,
             }
         {
+            self.acquisition_reason("objective_changed");
             self.telemetry.objective_replans += 1;
             self.replan(p.tick);
             return self.guide(o, up * 5.0, Vec2::ZERO);
@@ -454,6 +542,7 @@ impl TacticalSortiePilot {
                 self.objective = Some(new);
                 self.telemetry.objective_route = Some(route.clone());
             } else if survey.actual.as_ref().and_then(|r| r.cost()).is_none() {
+                self.acquisition_reason("objective_revision_changed");
                 self.telemetry.objective_replans += 1;
                 self.replan(p.tick);
                 return self.guide(o, up * 5.0, Vec2::ZERO);
@@ -463,8 +552,24 @@ impl TacticalSortiePilot {
             && p.landing.phase == scenario_spacewars::surface_sortie::LandingPhase::Landed
             && p.transfer == TransferResult::Ready
         {
+            if let Some(required) = self.required_site
+                && !p.sites.iter().any(|site| {
+                    self.site.is_some_and(|chosen| chosen.id == required)
+                        && site.id == required
+                        && site.revision == p.planet.revision
+                        && p.ship.position.distance_to(site.vehicle_position) <= 10.0
+                })
+            {
+                self.acquisition_reason("landed_outside_required_site");
+                self.abort(
+                    p.tick,
+                    "landed outside the currently measured required site",
+                );
+                return CombatIntent::default();
+            }
             if objective.is_some() {
                 let Some(survey) = survey else {
+                    self.acquisition_reason("actual_route_unavailable");
                     return CombatIntent::default();
                 };
                 if survey
@@ -473,6 +578,7 @@ impl TacticalSortiePilot {
                     .and_then(|route| route.cost())
                     .is_none()
                 {
+                    self.acquisition_reason("actual_route_unusable");
                     self.telemetry.objective_replans += 1;
                     self.retry_landing(p.tick);
                     return CombatIntent::default();
@@ -480,6 +586,8 @@ impl TacticalSortiePilot {
             }
             // Physical landing and hatch access can finish an approach at a
             // different valid point from the planner's proposed site.
+            self.acquisition_reason("physically_landed");
+            self.finish_acquisition(p.tick, "landed");
             self.goal(TacticalGoal::Surface, p.tick);
             return CombatIntent {
                 flight: FlightIntent {
@@ -490,9 +598,10 @@ impl TacticalSortiePilot {
             };
         }
         if p.site_query.is_deferred() {
+            self.acquisition_reason("scan_deferred");
             // Preserve the existing clearance climb while awaiting usable
             // candidates, without treating deferred data as rejected ground.
-            return self.guide(o, up * 12.0, Vec2::ZERO);
+            return self.wait_for_site(o, 12.0);
         }
         if let Some(site) = self.site {
             if let Some(updated) = p.sites.iter().find(|s| {
@@ -507,12 +616,14 @@ impl TacticalSortiePilot {
                 if self.commit_descent && p.planet.revision == site.revision {
                     let since = *self.site_unavailable_since.get_or_insert(p.tick);
                     if p.tick.saturating_sub(since) < 60 {
+                        self.acquisition_reason("selected_site_temporarily_unavailable");
                         // Moving debris can briefly obstruct a sound site.
                         // Hold clear while the complete clearance survey retries.
                         return self.guide(o, up * 5.0, Vec2::ZERO);
                     }
                 }
                 self.telemetry.invalidations += 1;
+                self.acquisition_reason("selected_site_invalidated");
                 self.replan(p.tick);
                 return self.guide(o, up * 12.0, Vec2::ZERO);
             }
@@ -520,11 +631,34 @@ impl TacticalSortiePilot {
         if self.site.is_none() {
             self.solar_rejected.retain(|(_, until)| p.tick < *until);
             let commit_descent = self.commit_descent;
-            if let Some((site, side, solar, _)) = p
+            let checks = Cell::new(CandidateCheckCounts::default());
+            let checks_ref = &checks;
+            let selected = p
                 .sites
                 .iter()
-                .filter(|site| !self.rejected_sites.contains(&(site.id, site.revision)))
-                .filter(|site| !self.solar_rejected.iter().any(|(id, _)| *id == site.id))
+                .filter(|site| {
+                    let allowed = self
+                        .required_site
+                        .is_none_or(|id| site.id == id && site.revision == p.planet.revision);
+                    if !allowed {
+                        count(checks_ref, |c| c.required_site += 1);
+                    }
+                    allowed
+                })
+                .filter(|site| {
+                    let allowed = !self.rejected_sites.contains(&(site.id, site.revision));
+                    if !allowed {
+                        count(checks_ref, |c| c.previously_rejected += 1);
+                    }
+                    allowed
+                })
+                .filter(|site| {
+                    let allowed = !self.solar_rejected.iter().any(|(id, _)| *id == site.id);
+                    if !allowed {
+                        count(checks_ref, |c| c.solar_cooldown += 1);
+                    }
+                    allowed
+                })
                 .flat_map(|site| {
                     let direction = (site.vehicle_position - p.planet.motion.position).normalized();
                     let short = angle_between(up, direction);
@@ -533,19 +667,38 @@ impl TacticalSortiePilot {
                         if side != preferred && (!commit_descent || o.sun.is_none()) {
                             return None;
                         }
+                        count(checks_ref, |c| c.directions += 1);
                         let solar = commit_descent
                             .then(|| crate::landing_safety::assess(o, *site, side, true))
                             .flatten();
-                        if solar.is_some_and(|plan| !plan.safe()) {
+                        if let Some(plan) = solar.filter(|plan| !plan.safe()) {
+                            count(checks_ref, |c| {
+                                c.unsafe_solar += 1;
+                                c.unsafe_approach += usize::from(plan.approach_clearance < 0.0);
+                                c.unsafe_parking += usize::from(plan.parked_clearance < 0.0);
+                                c.unsafe_departure += usize::from(plan.departure_clearance < 0.0);
+                            });
                             return None;
                         }
                         let cover = o.cover.iter().find(|s| s.site == site.id);
                         let ground_cost = if objective.is_some() {
-                            survey?
+                            let Some(survey) = survey else {
+                                count(checks_ref, |c| c.survey_unavailable += 1);
+                                return None;
+                            };
+                            let Some(route) = survey
                                 .sites
                                 .iter()
-                                .find(|route| route.site == Some(site.id))?
-                                .cost()?
+                                .find(|route| route.site == Some(site.id))
+                            else {
+                                count(checks_ref, |c| c.route_absent += 1);
+                                return None;
+                            };
+                            let Some(cost) = route.cost() else {
+                                count(checks_ref, |c| c.route_unusable += 1);
+                                return None;
+                            };
+                            cost
                         } else {
                             0.0
                         };
@@ -568,6 +721,7 @@ impl TacticalSortiePilot {
                         } else {
                             short
                         };
+                        count(checks_ref, |c| c.eligible += 1);
                         Some((
                             *site,
                             side,
@@ -578,8 +732,12 @@ impl TacticalSortiePilot {
                         ))
                     })
                 })
-                .min_by(|a, b| a.3.total_cmp(&b.3))
-            {
+                .min_by(|a, b| a.3.total_cmp(&b.3));
+            if let Some(acquisition) = &mut self.telemetry.acquisition {
+                acquisition.checks = checks.get();
+            }
+            if let Some((site, side, solar, _)) = selected {
+                self.acquisition_reason("selected_site");
                 self.site = Some(site);
                 self.objective = objective;
                 self.telemetry.objective_route = survey
@@ -600,9 +758,21 @@ impl TacticalSortiePilot {
                     solar.is_some() && short.abs() >= 0.2 && short.signum() != side;
                 self.goal(TacticalGoal::SeekCover, p.tick);
             } else {
+                self.acquisition_reason(if p.sites.is_empty() {
+                    if matches!(
+                        p.site_query,
+                        scenario_spacewars::surface_sortie::pilot::LandingSiteQuery::NotRequested
+                    ) {
+                        "scan_not_requested"
+                    } else {
+                        "no_measured_candidates"
+                    }
+                } else {
+                    "candidates_rejected"
+                });
                 // A completed edit may temporarily leave no valid site. Climb
                 // and survey again within the mission's overall time budget.
-                return self.guide(o, up * 12.0, Vec2::ZERO);
+                return self.wait_for_site(o, 12.0);
             }
         }
         let site = self.site.unwrap();
@@ -797,13 +967,13 @@ mod tests {
     };
     use std::time::Duration;
     const DT: Duration = Duration::from_nanos(16_666_667);
-    fn context() -> BrainReset {
+    pub(super) fn context() -> BrainReset {
         BrainReset {
             actor: PlayerId::PLAYER_1,
             episode_seed: 42,
         }
     }
-    fn observation() -> TacticalSortieObservationV1 {
+    pub(super) fn observation() -> TacticalSortieObservationV1 {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         SurfaceSortieScenario::step(&mut state, &[], DT);
         state.tactical_sortie_observation(0, None)
@@ -833,6 +1003,14 @@ mod tests {
             assert_eq!(pilot.telemetry().replans, 0);
             assert!(pilot.telemetry().failed_tick.is_none());
             assert!(pilot.rejected_sites.is_empty());
+            let evidence = pilot.telemetry().acquisition.unwrap();
+            assert_eq!(evidence.tick, tick);
+            assert_eq!(evidence.reason, "scan_deferred");
+            assert_eq!(evidence.checks, CandidateCheckCounts::default());
+            assert_eq!(
+                waiting.telemetry().acquisition.unwrap().reason,
+                "no_measured_candidates"
+            );
         }
         let p = &mut o.combat.recovery.flight.pilot;
         p.tick = 15;
@@ -840,6 +1018,36 @@ mod tests {
         p.sites = sites;
         pilot.intent(&o);
         assert!(pilot.site_request().is_some());
+        assert_eq!(
+            pilot.telemetry().acquisition.unwrap().reason,
+            "selected_site"
+        );
+        assert!(pilot.telemetry().acquisition.unwrap().checks.eligible > 0);
+    }
+
+    #[test]
+    fn acquisition_records_solar_rejections_without_turning_them_into_ground_failures() {
+        let mut o = observation();
+        o.combat.recovery.flight.pilot.controls_armed = true;
+        o.sun = Some(scenario_spacewars::surface_sortie::SolarHazard {
+            position: o.combat.recovery.flight.pilot.planet.motion.position,
+            radius: 10_000.0,
+            heat_radius: 10_024.0,
+        });
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default());
+        let action = pilot.intent(&o);
+        let evidence = pilot.telemetry().acquisition.unwrap();
+        assert_eq!(evidence.reason, "candidates_rejected");
+        assert_eq!(evidence.checks.directions, 2 * evidence.sites_available);
+        assert_eq!(evidence.checks.unsafe_solar, evidence.checks.directions);
+        assert_eq!(evidence.checks.route_unusable, 0);
+        assert!(evidence.selected_site.is_none());
+        assert_eq!(pilot.telemetry().replans, 0);
+        assert_eq!(pilot.intent(&o), action);
+        assert_eq!(pilot.telemetry().acquisition.unwrap(), evidence);
+        pilot.reset(context());
+        assert!(pilot.telemetry().acquisition.is_none());
     }
 
     #[test]
@@ -1281,5 +1489,107 @@ mod tests {
             assert_eq!(state.combat_telemetry(0).shells_fired, 0);
             assert_eq!(state.combat_telemetry(1).shells_fired > 0, fire);
         }
+    }
+
+    #[test]
+    fn required_site_waits_for_fresh_evidence_and_never_exits_at_an_unrelated_landing() {
+        let mut o = observation();
+        let required = o.combat.recovery.flight.pilot.sites[1];
+        let other = o.combat.recovery.flight.pilot.sites[0];
+        let mut stale = required;
+        stale.revision += 1;
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.controls_armed = true;
+        p.sites = vec![other, stale];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(required.id);
+        pilot.intent(&o);
+        assert!(pilot.site.is_none());
+        assert_eq!(pilot.site_request(), Some(required.id));
+        assert!(pilot.telemetry.failed_tick.is_none());
+        o.combat.recovery.flight.pilot.tick += 1;
+        o.combat.recovery.flight.pilot.sites = vec![other, required];
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), Some(required.id));
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.tick += 1;
+        p.landing.phase = scenario_spacewars::surface_sortie::LandingPhase::Landed;
+        p.transfer = TransferResult::Ready;
+        p.ship.position = required.vehicle_position + Vec2::X * 100.0;
+        let action = pilot.intent(&o);
+        assert!(!action.flight.controls.interact_held);
+        assert_eq!(
+            pilot.telemetry.failure,
+            Some("landed outside the currently measured required site")
+        );
+    }
+
+    #[test]
+    fn releasing_a_site_constraint_keeps_the_task_and_allows_current_alternatives() {
+        let mut o = observation();
+        let required = o.combat.recovery.flight.pilot.sites[1];
+        let other = o.combat.recovery.flight.pilot.sites[0];
+        let p = &mut o.combat.recovery.flight.pilot;
+        p.controls_armed = true;
+        p.sites = vec![other];
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(required.id);
+        pilot.intent(&o);
+        assert!(pilot.site.is_none());
+        let started = pilot.telemetry.started_tick;
+        pilot.release_site_constraint();
+        o.combat.recovery.flight.pilot.tick += 1;
+        pilot.intent(&o);
+        assert_eq!(pilot.site_request(), Some(other.id));
+        assert_eq!(pilot.telemetry.started_tick, started);
+    }
+
+    #[test]
+    fn required_site_physically_lands_claims_boards_and_departs() {
+        let mut state = SurfaceSortieScenario::init_material_combat(42);
+        SurfaceSortieScenario::step(&mut state, &[], DT);
+        let o = state.tactical_sortie_observation(0, None);
+        let p = &o.combat.recovery.flight.pilot;
+        let site = p
+            .sites
+            .iter()
+            .filter(|site| {
+                o.cover.iter().any(|cover| {
+                    cover.site == site.id && cover.grounded && cover.approach && cover.departure
+                })
+            })
+            .min_by(|a, b| {
+                a.vehicle_position
+                    .distance_to(p.ship.position)
+                    .total_cmp(&b.vehicle_position.distance_to(p.ship.position))
+            })
+            .unwrap()
+            .id;
+        let mut pilot =
+            TacticalSortiePilot::with_committed_descent(context(), CombatBreakSettings::default())
+                .requiring_site(site);
+        for _ in 0..60 * 60 {
+            let o = state.tactical_sortie_observation(0, pilot.site_request());
+            let intent = pilot.intent(&o);
+            if let Some(selected) = pilot.telemetry.site {
+                assert_eq!(selected, site);
+            }
+            SurfaceSortieScenario::step(&mut state, &intent.encode(PlayerId::PLAYER_1), DT);
+            if pilot.telemetry.completed_tick.is_some() || pilot.telemetry.failed_tick.is_some() {
+                break;
+            }
+        }
+        let t = pilot.telemetry();
+        assert!(
+            t.completed_tick.is_some() && t.failed_tick.is_none(),
+            "{t:?}"
+        );
+        let landed = t.landing.landed_tick.unwrap();
+        let claimed = t.landing.claimed_tick.unwrap();
+        let boarded = t.landing.boarded_tick.unwrap();
+        assert!(landed < claimed && claimed < boarded && boarded < t.completed_tick.unwrap());
+        assert!(state.terrain_diagnostics().issues.is_empty());
     }
 }

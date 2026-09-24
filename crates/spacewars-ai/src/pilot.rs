@@ -207,7 +207,10 @@ impl RulePilotV1 {
                 if o.transfer == TransferResult::Ready {
                     self.goal(PilotGoal::Board, o.tick);
                     action.interact_held = !self.was_interacting;
-                } else if let (Some(actor), Some(hatch)) = (o.actor, o.hatch) {
+                } else if let (Some(actor), Some(hatch)) = (
+                    o.actor,
+                    o.actor.and_then(|a| o.nearest_boarding_hatch(a.position)),
+                ) {
                     self.goal(PilotGoal::Board, o.tick);
                     let right = Vec2::new(o.actor_up.y, -o.actor_up.x);
                     let distance = (hatch - actor.position).dot(right);

@@ -1,4 +1,6 @@
 //! Contested surface missions with physical setup, loss and queued route edits.
+#[path = "support/ground_distance.rs"]
+mod ground_distance;
 #[path = "support/live_planning.rs"]
 mod live_planning;
 use engine_common::{CombatBreakSettings, Scenario};
@@ -21,6 +23,7 @@ use spacewars_ai::{
     tactical_capture::TacticalCapturePilot,
 };
 use std::{
+    io::{BufWriter, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -48,8 +51,45 @@ fn main() {
     let bearing_offset: f32 = arg("--offset", "0.6").parse().unwrap();
     let jetpacks: bool = arg("--jetpacks", "false").parse().unwrap();
     let survey_landing = arg("--survey-landing", "false") == "true";
+    let world = arg("--world", "fixed");
+    assert!(["fixed", "generated"].contains(&world.as_str()));
+    let seconds: u64 = arg("--seconds", "180").parse().unwrap();
+    assert!((1..=600).contains(&seconds));
+    let band = match arg("--ground-distance", "none").as_str() {
+        "none" => None,
+        value => {
+            let (minimum, maximum) = value
+                .split_once(':')
+                .expect("--ground-distance needs min:max");
+            Some(ground_distance::DistanceBand::new(
+                minimum.parse().unwrap(),
+                maximum.parse().unwrap(),
+                arg("--ground-direction", "1").parse().unwrap(),
+            ))
+        }
+    };
     let out = PathBuf::from(arg("--out", "/tmp/flag-soak"));
+    let mut trace = (arg("--trace", "false") == "true").then(|| {
+        assert!(
+            mode == "capture" && survey_landing,
+            "dense flag tracing needs a capture approach"
+        );
+        std::fs::create_dir_all(&out).unwrap();
+        BufWriter::new(std::fs::File::create(out.join("trace.jsonl")).unwrap())
+    });
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
+    // Reproduction fixture: offer one measured landing without moving the ship
+    // or weakening any world permission. Useful for prospective route probes.
+    let landing_bearing: Option<u8> = match arg("--landing-bearing", "any").as_str() {
+        "any" => None,
+        value => Some(
+            value
+                .parse()
+                .expect("--landing-bearing must be any or a bearing number"),
+        ),
+    };
+    assert!(landing_bearing.is_none_or(|b| b < 64));
+    let mut selected_bearing = landing_bearing;
     let landing_threat = arg("--landing-threat", "false") == "true";
     assert!(!survey_landing || mode == "capture");
     assert!(seat < 2 && ["navigation", "capture", "recovery", "pod"].contains(&mode.as_str()));
@@ -65,24 +105,40 @@ fn main() {
         ]
         .contains(&edit.as_str())
     );
-    assert!(["complete", "blocked", "bounded"].contains(&expected.as_str()));
+    assert!(["complete", "blocked", "bounded", "observe"].contains(&expected.as_str()));
+    assert!(
+        band.is_none()
+            || (survey_landing
+                && mode == "capture"
+                && landing_bearing.is_none()
+                && !landing_threat
+                && edit == "none")
+    );
+    assert!(
+        expected != "observe" || band.is_some(),
+        "observe is only a controlled-distance outcome mode"
+    );
     let owner = PlayerId::from_index(seat).unwrap();
     let defender = PlayerId::from_index(1 - seat).unwrap();
     let bearing = (1 - seat) as f32 * std::f32::consts::PI + bearing_offset;
-    let mut state = SurfaceSortieScenario::init_material_flight(
-        seed,
-        2,
-        &[(
-            owner,
-            MaterialFlightStart {
-                bearing,
-                altitude: 20.0,
-                radial_speed: 0.0,
-                lateral_speed: 0.0,
-                heading_offset: 0.0,
-            },
-        )],
-    );
+    let mut state = if world == "generated" {
+        SurfaceSortieScenario::init_generated_flag_flight(seed, owner, bearing_offset)
+    } else {
+        SurfaceSortieScenario::init_material_flight(
+            seed,
+            2,
+            &[(
+                owner,
+                MaterialFlightStart {
+                    bearing,
+                    altitude: 20.0,
+                    radial_speed: 0.0,
+                    lateral_speed: 0.0,
+                    heading_offset: 0.0,
+                },
+            )],
+        )
+    };
     let context = BrainReset {
         actor: owner,
         episode_seed: seed,
@@ -93,19 +149,21 @@ fn main() {
     let mut navigation = GroundNavigationTask::new(context, GroundDestination::Flag);
     let mut recovery = RulePilotV3::new(context);
     let policy: MissionPolicy = arg("--policy", "material_mission_v9").parse().unwrap();
+    assert!(band.is_none() || policy == MissionPolicy::JetpackPlanner);
     assert!(
         live_planning
             .as_ref()
             .is_none_or(|live| live.enabled_for(seat)
                 && survey_landing
                 && mode == "capture"
-                && policy == MissionPolicy::Planner)
+                && !policy.objective_planning().is_legacy())
     );
     let mut capture = TacticalCapturePilot::with_planning(
         context,
         CombatBreakSettings::default(),
         policy.objective_planning(),
-    );
+    )
+    .with_bounded_acquisition(arg("--bounded-acquisition", "false") == "true");
     let mut defender_pilot = RulePilotV1::new(BrainReset {
         actor: defender,
         episode_seed: seed,
@@ -129,13 +187,16 @@ fn main() {
     let mut previous_interact = false;
     let mut approach_started_tick = None;
     let mut approach_landed_tick = None;
+    let mut capture_started_tick = None;
+    let mut setup = None;
     let mut objective_surveys: Vec<serde_json::Value> = Vec::new();
     let mut last_ground = None;
     let mut last_map = None;
     let mut last_jetpack_survey = None;
     let mut ground_failures = Vec::new();
     let initial_cells = state.terrain_diagnostics().occupied_cells;
-    for tick in 0..180 * 60 {
+    let initial_planet = band.map(|_| state.pilot_observation(seat, None).planet);
+    for tick in 0..seconds * 60 {
         let mut controls = [SurfaceSortieAction::default(); 2];
         let d = state.pilot_observation(1 - seat, defender_pilot.site_request());
         if d.planet
@@ -156,15 +217,25 @@ fn main() {
         // here would inflate the measured cost beyond the interactive host.
         let mut tactical = matches!(mode.as_str(), "capture" | "recovery").then(|| {
             if let Some(live) = &mut live_planning {
-                let mut o = state.tactical_sortie_observation_for_live_planning(seat, site.into());
-                live.observe(&state, seat, &mut o);
-                o
-            } else {
-                state.tactical_sortie_observation_with_planning(
+                let mut o = state.tactical_sortie_observation_for_live_profile(
                     seat,
                     site.into(),
                     policy.objective_planning(),
-                )
+                );
+                ground_distance::restrict(&mut o, selected_bearing);
+                live.observe(&state, seat, &mut o, policy.objective_planning());
+                if band.is_some() {
+                    ground_distance::restrict(&mut o, selected_bearing);
+                }
+                o
+            } else {
+                let mut o = state.tactical_sortie_observation_with_planning(
+                    seat,
+                    site.into(),
+                    policy.objective_planning(),
+                );
+                ground_distance::restrict(&mut o, selected_bearing);
+                o
             }
         });
         if survey_landing && !landing_threat {
@@ -229,6 +300,7 @@ fn main() {
                 controls[seat] = navigation.step(&o);
                 ground = Some(navigation.telemetry().clone());
             } else {
+                capture_started_tick.get_or_insert(tick);
                 actions.extend(capture.intent(tactical.as_ref().unwrap()).encode(owner));
                 ground = capture.telemetry().ground.clone();
                 intent_encoded = true;
@@ -241,9 +313,55 @@ fn main() {
                 approach_started_tick.get_or_insert(tick);
             }
             if approach_started_tick.is_some() {
-                actions.extend(capture.intent(tactical.as_ref().unwrap()).encode(owner));
-                ground = capture.telemetry().ground.clone();
-                intent_encoded = true;
+                if let Some(band) = band
+                    && setup.is_none()
+                {
+                    // Setup measures each currently offered site before capture
+                    // controls. The normal eight-site strategic shortlist is
+                    // mostly hatch-adjacent and cannot fill distance bands.
+                    // These setup queries are outside the live execution quota.
+                    let mut measured = state.tactical_sortie_observation_with_planning(
+                        seat,
+                        None.into(),
+                        policy.objective_planning(),
+                    );
+                    if measured.landing_objective.is_some() {
+                        let sites: Vec<_> = measured
+                            .combat
+                            .recovery
+                            .flight
+                            .pilot
+                            .sites
+                            .iter()
+                            .map(|s| s.id)
+                            .collect();
+                        let mut routes = Vec::new();
+                        for id in &sites {
+                            let candidate = state.tactical_sortie_observation_with_planning(
+                                seat,
+                                Some(*id).into(),
+                                policy.objective_planning(),
+                            );
+                            if let Some(survey) = candidate.landing_objective {
+                                routes.extend(survey.sites);
+                            }
+                        }
+                        measured.landing_objective.as_mut().unwrap().sites = routes;
+                        let chosen = band.choose(&measured);
+                        selected_bearing = chosen.as_ref().and_then(|r| r.site).map(|s| s.bearing);
+                        setup = Some(
+                            json!({"tick":tick,"survey":measured.landing_objective,"chosen":chosen,"queried_sites":sites,
+                            "status":if selected_bearing.is_some() { "selected" } else { "no_matching_route" }}),
+                        );
+                        ground_distance::restrict(tactical.as_mut().unwrap(), selected_bearing);
+                    }
+                }
+                if band.is_none() || selected_bearing.is_some() {
+                    capture_started_tick.get_or_insert(tick);
+                    actions.extend(capture.intent(tactical.as_ref().unwrap()).encode(owner));
+                    ground = capture.telemetry().ground.clone();
+                    intent_encoded = true;
+                }
             } else {
                 let error = spacewars_ai::shortest_heading_error(up.rotate_radians(-p.ship.angle));
                 controls[seat] = SurfaceSortieAction {
@@ -411,8 +529,25 @@ fn main() {
             actions.push(controls[seat].encode(owner));
         }
         actions.push(controls[1 - seat].encode(defender));
+        if let Some(trace) = &mut trace {
+            let control = actions
+                .iter()
+                .filter_map(SurfaceSortieAction::decode)
+                .find(|(player, _)| *player == owner)
+                .unwrap()
+                .1;
+            let posture = state.spaceling_snapshot(seat);
+            serde_json::to_writer(&mut *trace, &json!({"version":1,"scope":"controlled_ground_v1",
+                "tick":tick,"seat":seat,"capture_started_tick":capture_started_tick,
+                "observation":tactical,"capture":capture.telemetry(),"actions":actions,
+                "controls":{"turn":control.horizontal,"thrust":control.primary_held,"brake":control.brake_held},
+                "posture":posture.map(|s| json!({"balance":format!("{:?}",s.balance),
+                    "get_up_result":format!("{:?}",s.get_up_result),"get_up_attempts":s.get_up_attempts,
+                    "knockdowns":s.knockdowns,"recoveries":s.recoveries}))})).unwrap();
+            writeln!(trace).unwrap();
+        }
         if let Some(live) = &mut live_planning {
-            live.advance(state.tick());
+            live.advance(&state);
         }
         let start = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, DT);
@@ -431,6 +566,17 @@ fn main() {
             o.flight.pilot.sites.clear();
             samples.push(json!({"second":(tick+1)/60,"observation_tick":tick,"audit_tick":tick+1,"ground":ground,"map_size":map_size,"pilot":o,"audit":audit}));
         }
+        if band.is_some()
+            && (setup.is_some() && selected_bearing.is_none()
+                || capture.telemetry().failed_tick.is_some()
+                || capture.telemetry().completed_tick.is_some()
+                || lost)
+        {
+            break;
+        }
+    }
+    if let Some(trace) = &mut trace {
+        trace.flush().unwrap();
     }
     let captured = claimed_tick.is_some();
     let complete = if mode == "navigation" {
@@ -458,14 +604,29 @@ fn main() {
         "rebuild_refresh_p95_ms":rebuild_times.get(rebuild_times.len().saturating_sub(1)*95/100),"rebuild_refresh_max_ms":rebuild_times.last(),
         "step_p95_ms":step_times[(step_times.len()-1)*95/100],"step_max_ms":step_times.last()});
     report["policy_configuration"] = json!(policy.descriptor());
+    if arg("--bounded-acquisition", "false") == "true" {
+        report["bounded_acquisition"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACQUISITION_WAIT_PROFILE,
+            "deadline_ticks": spacewars_ai::tactical_sortie::ACQUISITION_DEADLINE_TICKS,
+        });
+    }
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
     }
+    report["landing_bearing"] = json!(landing_bearing);
     report["survey_landing"] = json!(survey_landing);
     report["landing_threat"] = json!(landing_threat);
     report["approach_started_tick"] = json!(approach_started_tick);
     report["approach_landed_tick"] = json!(approach_landed_tick);
     report["objective_surveys"] = json!(objective_surveys);
+    report["world"] = json!(world);
+    report["seconds"] = json!(seconds);
+    report["elapsed_ticks"] = json!(state.tick());
+    report["capture_started_tick"] = json!(capture_started_tick);
+    report["controlled_ground"] = json!(band.map(|band| json!({"version":1,"band":band,
+        "initial_planet":initial_planet,"setup":setup,"selected_bearing":selected_bearing,
+        "setup_survey_scope":"one read-only pass over offered sites before capture, outside live execution quota"})));
+    report["final_audit"] = json!(state.terrain_diagnostics());
     std::fs::write(
         out.join("report.json"),
         serde_json::to_vec_pretty(&report).unwrap(),
@@ -476,6 +637,13 @@ fn main() {
         json!({"complete":complete,"captured":captured,"blocked":blocked,"ground":last_ground})
     );
     assert!(audits.is_empty(), "physical audit failed; report retained");
+    assert!(
+        state.terrain_diagnostics().issues.is_empty(),
+        "final physical audit failed; report retained"
+    );
+    if expected == "observe" {
+        return;
+    }
     assert!(defender_claimed.is_some() && exited_tick.is_some());
     if expected == "blocked" {
         assert!(blocked && !complete, "expected a bounded unreachable route");

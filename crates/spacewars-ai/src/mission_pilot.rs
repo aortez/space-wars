@@ -19,6 +19,13 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_disengagement.rs"]
+mod disengagement;
+pub use disengagement::{
+    ContinuationReport, DisengagementAttempt, MissionDisengagement, Successor, SuccessorComparison,
+    SuccessorComparisonJob, SuccessorContinuation,
+};
+
 pub const MISSION_POLICY: &str = "material_mission_v9";
 const PURSUIT_BUDGET_TICKS: u64 = 30 * 60;
 const PURSUIT_RETRY_TICKS: u64 = 12 * 60;
@@ -35,6 +42,7 @@ pub enum MissionGoal {
     Recover,
     Patrol,
     Hunt,
+    Disengage,
     Watch,
     AvoidSun,
     Blocked,
@@ -50,6 +58,7 @@ impl MissionGoal {
             Self::Recover => "recovering ship",
             Self::Patrol => "waiting to resume capture",
             Self::Hunt => "hunting opponent",
+            Self::Disengage => "breaking contact before landing",
             Self::Watch => "following opponent / awaiting ship",
             Self::AvoidSun => "escaping solar heat",
             Self::Blocked => "mission blocked",
@@ -83,6 +92,8 @@ pub struct MissionTelemetry {
     pub opponent: Option<PlayerId>,
     pub combat: Option<CombatPilotTelemetry>,
     pub pursuit: Option<MissionPursuit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disengagement: Option<MissionDisengagement>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -129,6 +140,7 @@ pub struct MaterialMissionPilot {
     previous_intent: CombatIntent,
     next_pursuit_tick: u64,
     last_survey: Option<LandingSurveyStamp>,
+    pub(crate) bounded_acquisition: bool,
 }
 
 impl MaterialMissionPilot {
@@ -165,6 +177,7 @@ impl MaterialMissionPilot {
                 opponent: None,
                 combat: None,
                 pursuit: None,
+                disengagement: None,
             },
             capture: None,
             recovery: None,
@@ -184,10 +197,25 @@ impl MaterialMissionPilot {
             previous_intent: CombatIntent::default(),
             next_pursuit_tick: 0,
             last_survey: None,
+            bounded_acquisition: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
+        let bounded_acquisition = self.bounded_acquisition;
+        let disengagement = self.telemetry.disengagement.is_some();
+        let handoff = self
+            .telemetry
+            .disengagement
+            .as_ref()
+            .map(|d| (d.handoff_probe, d.boundary_aware, d.cover_probe));
         *self = Self::with_policy(context, self.breaks, self.policy);
+        self.bounded_acquisition = bounded_acquisition;
+        self.enable_pursuit_disengagement(disengagement);
+        if let Some((probe, boundary, cover)) = handoff {
+            self.configure_handoff_probe(probe);
+            self.configure_disengagement_boundary(boundary);
+            self.configure_destination_cover_probe(cover);
+        }
     }
     pub fn telemetry(&self) -> &MissionTelemetry {
         &self.telemetry
@@ -228,10 +256,24 @@ impl MaterialMissionPilot {
 
     pub fn sensor_request(&self) -> MissionSensorRequest {
         MissionSensorRequest {
+            destination_cover: self
+                .disengaging()
+                .then(|| self.telemetry.disengagement.as_ref().unwrap().cover_request)
+                .flatten(),
             objective_planning: self.policy.objective_planning(),
             site: self.site_request(),
             last_survey: self.last_survey,
         }
+    }
+    fn new_capture_task(&self, o: &MissionObservationV1) -> TacticalCapturePilot {
+        let mut capture = TacticalCapturePilot::with_planning(
+            self.context,
+            self.breaks,
+            self.policy.objective_planning(),
+        )
+        .with_bounded_acquisition(self.bounded_acquisition);
+        capture.start_acquisition(&o.local);
+        capture
     }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
@@ -266,6 +308,13 @@ impl MaterialMissionPilot {
         self.goal(MissionGoal::Select, tick);
     }
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        self.intent_with_continuation(o, None)
+    }
+    fn intent_with_continuation(
+        &mut self,
+        o: &MissionObservationV1,
+        mut continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
         let c = &o.local.combat;
         let f = &c.recovery.flight;
         let p = &f.pilot;
@@ -294,14 +343,24 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose(o);
+        let result = self.choose_with_continuation(o, continuation.as_deref_mut());
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
         self.previous_intent = result;
+        if let Some(trial) = continuation {
+            trial.record_sortie(self, o);
+        }
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
+        self.choose_with_continuation(o, None)
+    }
+    fn choose_with_continuation(
+        &mut self,
+        o: &MissionObservationV1,
+        mut continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
         self.telemetry.avoidance = None;
         self.telemetry.opponent = None;
         self.telemetry.combat = None;
@@ -318,6 +377,7 @@ impl MaterialMissionPilot {
                     || p.ship_form != ShipForm::Ship
                     || p.location == PilotLocation::OnFoot && self.capture.is_none())
         {
+            self.end_disengagement(p.tick, "recovery required");
             self.end_pursuit(p.tick, "ship or surface recovery required");
             self.reconsider(p.tick, "ship or surface recovery required", false);
             self.recovery = Some(RecoverShipTask::new(self.context));
@@ -349,6 +409,9 @@ impl MaterialMissionPilot {
                 self.escaping_sun = false;
             }
             if self.escaping_sun {
+                if let Some(trial) = &mut continuation {
+                    trial.stop(self, p.tick, "solar avoidance");
+                }
                 self.goal(MissionGoal::AvoidSun, p.tick);
                 self.telemetry.avoidance = Some(MissionAvoidance {
                     obstacle: MissionObstacleId::Sun,
@@ -356,6 +419,11 @@ impl MaterialMissionPilot {
                 });
                 return self.guide(o, up * 25.0);
             }
+        }
+        if let Some(trial) = continuation
+            && let Some(intent) = trial.flight_intent(self, o)
+        {
+            return intent;
         }
         if let Some(recovery) = &mut self.recovery {
             let flight = recovery.step(&c.recovery);
@@ -388,6 +456,9 @@ impl MaterialMissionPilot {
         }
         if self.pursuit_opportunity(o) {
             return self.hunt(o);
+        }
+        if let Some(intent) = self.disengagement_intent(o) {
+            return intent;
         }
         self.telemetry.reason = None;
         let owned = |planet: &PilotPlanetObservation| {
@@ -549,11 +620,7 @@ impl MaterialMissionPilot {
             && (p.ship.velocity - target.motion.velocity).length() < 18.0
             && p.queries_ready
         {
-            self.capture = Some(TacticalCapturePilot::with_planning(
-                self.context,
-                self.breaks,
-                self.policy.objective_planning(),
-            ));
+            self.capture = Some(self.new_capture_task(o));
             self.solar_detour = None;
             self.event(p.tick, "arrived", None);
             self.goal(MissionGoal::Capture, p.tick);
@@ -589,6 +656,9 @@ impl MaterialMissionPilot {
     }
 
     fn pursuit_opportunity(&mut self, o: &MissionObservationV1) -> bool {
+        if self.disengaging() {
+            return false;
+        }
         let c = &o.local.combat;
         let p = &c.recovery.flight.pilot;
         // Finish the committed landing, on-foot objective and departure before
@@ -622,6 +692,9 @@ impl MaterialMissionPilot {
             };
             if let Some(reason) = reason {
                 self.end_pursuit(p.tick, reason);
+                if reason == "pursuit budget exhausted" {
+                    self.start_disengagement(o);
+                }
                 return false;
             }
             return true;
@@ -788,7 +861,7 @@ impl MaterialMissionPilot {
         // velocity while circling a planet or the stationary sun.
         if matches!(
             self.telemetry.goal,
-            MissionGoal::Hunt | MissionGoal::Watch | MissionGoal::Transfer
+            MissionGoal::Hunt | MissionGoal::Watch | MissionGoal::Transfer | MissionGoal::Disengage
         ) && let Some(avoidance) = self.telemetry.avoidance
         {
             match avoidance.obstacle {
@@ -932,10 +1005,12 @@ impl MaterialMissionPilot {
         (waypoint, None)
     }
     fn guide(&mut self, o: &MissionObservationV1, desired_world: Vec2) -> CombatIntent {
+        let (desired_world, boundary_brake) = self.boundary_guidance(o, desired_world);
         let f = &o.local.combat.recovery.flight;
         let p = &f.pilot;
         let relative = p.ship.velocity - p.planet.velocity_at(p.ship.position);
-        let brake = desired_world.length() < 10.0
+        let brake = boundary_brake
+            || desired_world.length() < 10.0
             || p.ship.velocity.length() > desired_world.length() + 4.0;
         let acceleration = (desired_world - p.ship.velocity) * 2.0
             - p.gravity
@@ -980,6 +1055,96 @@ impl MaterialMissionPilot {
             },
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod acquisition_tests {
+    use super::*;
+    use engine_common::Scenario;
+    use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, mission::MissionObstacle};
+    use std::time::Duration;
+
+    #[test]
+    fn acquisition_failure_defers_the_planet_and_solar_escape_keeps_priority() {
+        let mut state = SurfaceSortieScenario::init_material_travel(42, false);
+        SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let mut o = state.mission_observation(0, None);
+        o.sun = None;
+        o.local.sun = None;
+        o.opponent = None;
+        o.local.combat.target = None;
+        for planet in &mut o.planets {
+            planet.claim.as_mut().unwrap().owner = None;
+        }
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 100;
+        p.controls_armed = true;
+        p.queries_ready = true;
+        p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 80.0);
+        p.ship.velocity = p.planet.motion.velocity;
+        let planet = p.planet.index;
+        let context = BrainReset {
+            actor: p.owner,
+            episode_seed: 42,
+        };
+        let mut bot = MaterialMissionPilot::new(context, Default::default());
+        bot.bounded_acquisition = true;
+        bot.telemetry.target = Some(planet);
+        bot.selected_tick = p.tick;
+        bot.progress_tick = p.tick;
+        bot.intent(&o);
+        let wait = bot
+            .telemetry
+            .capture
+            .as_ref()
+            .unwrap()
+            .acquisition_wait
+            .unwrap();
+        assert_eq!(wait.started_tick, 100);
+        let mut solar = bot.clone();
+        o.local.combat.recovery.flight.pilot.tick = wait.deadline_tick;
+        let mut hot = o.clone();
+        hot.sun = Some(MissionObstacle {
+            position: hot.local.combat.recovery.flight.pilot.ship.position + Vec2::X,
+            radius: 200.0,
+        });
+        let escape = solar.intent(&hot);
+        assert_eq!(solar.telemetry.goal, MissionGoal::AvoidSun);
+        assert_eq!(escape.weapons, Default::default());
+        assert!(solar.telemetry.capture.as_ref().unwrap().failure.is_none());
+        assert_eq!(
+            solar
+                .telemetry
+                .capture
+                .as_ref()
+                .unwrap()
+                .acquisition_wait
+                .unwrap()
+                .deadline_tick,
+            wait.deadline_tick
+        );
+
+        bot.intent(&o);
+        assert_eq!(
+            bot.telemetry.capture.as_ref().unwrap().failure,
+            Some("landing site acquisition deadline exhausted")
+        );
+        assert_eq!(bot.telemetry.capture.as_ref().unwrap().replans, 0);
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent(&o);
+        assert_eq!(bot.telemetry.target, None);
+        assert_eq!(
+            bot.deferred,
+            vec![(planet, wait.deadline_tick + 1 + 30 * 60)]
+        );
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent(&o);
+        assert_ne!(bot.telemetry.target, Some(planet));
+        bot.reset(context);
+        assert!(bot.bounded_acquisition);
+        assert!(bot.capture.is_none());
+        assert!(bot.deferred.is_empty());
     }
 }
 

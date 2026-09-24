@@ -27,6 +27,7 @@ members = [
 exclude = [
     "vendor/i-slint-backend-linuxkms",
     "vendor/i-slint-core",
+    "vendor/rapier2d",
 ]
 
 [workspace.package]
@@ -45,7 +46,7 @@ directories = "6"
 gilrs = { version = "0.11.2", default-features = false, features = ["xinput"] }
 rand = { version = "0.9", features = ["std_rng"] }
 png = "0.17"
-rapier2d = { version = "0.34", default-features = false, features = [
+rapier2d = { version = "=0.34.0", default-features = false, features = [
     "dim2",
     "enhanced-determinism",
     "f32",
@@ -84,6 +85,10 @@ scenario-terrain-lab = { path = "scenarios/terrain-lab" }
 scenario-spacewars = { path = "scenarios/spacewars" }
 
 [patch.crates-io]
+# Retain kinematic velocity for CCD's relative-speed checks; zeroing it can
+# mistake shared transport for impact speed and trap small actors in the ground.
+# See vendor/rapier2d/SPACEWARS_PATCH.md for provenance and regression coverage.
+rapier2d = { path = "vendor/rapier2d" }
 # Slint 1.13's software snapshot path leaves alpha unset and reuses the display
 # rotation, producing transparent PNGs and panicking for non-square windows
 # rotated by 90 or 270 degrees. Its system-font path also

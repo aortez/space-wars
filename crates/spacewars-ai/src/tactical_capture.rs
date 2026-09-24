@@ -73,7 +73,25 @@ impl TacticalCapturePilot {
         match planning {
             ObjectivePlanning::Legacy => "tactical_sortie_v10",
             ObjectivePlanning::JointRoundTrip => "tactical_sortie_v11",
+            ObjectivePlanning::JetpackRoundTrip => "tactical_sortie_v12",
         }
+    }
+    /// Headless comparison option; retained policy defaults remain unchanged.
+    pub fn with_bounded_acquisition(mut self, enabled: bool) -> Self {
+        self.base.enable_bounded_acquisition(enabled);
+        self
+    }
+    pub(crate) fn start_acquisition(&mut self, o: &TacticalSortieObservationV1) {
+        self.base.start_acquisition(o);
+        self.telemetry.sortie = self.base.telemetry().clone();
+        self.telemetry.sortie.policy = Self::policy(self.planning);
+    }
+    pub(crate) fn requiring_site(mut self, site: LandingSiteId) -> Self {
+        self.base = self.base.requiring_site(site);
+        self
+    }
+    pub(crate) fn release_site_constraint(&mut self) {
+        self.base.release_site_constraint();
     }
     pub fn reset(&mut self, context: BrainReset) {
         self.base.reset(context);
@@ -123,26 +141,40 @@ impl TacticalCapturePilot {
         if self.previous_tick == Some(p.tick) {
             return self.previous_intent;
         }
-        if self.planning == ObjectivePlanning::JointRoundTrip {
-            if o.landing_objective.as_ref().is_some_and(|s| {
-                s.planning != self.planning
-                    || s.sites.iter().chain(s.actual.iter()).any(|route| {
-                        route.cost().is_some()
-                            && route.endpoint.is_none_or(|node| {
-                                usize::from(node.id)
-                            >= scenario_spacewars::surface_sortie::ground_navigation::GROUND_SAMPLES
-                            || !node.position.x.is_finite()
-                            || !node.position.y.is_finite()
-                            || !node.normal.x.is_finite()
-                            || !node.normal.y.is_finite()
-                            || (node.position
-                                + node.position.normalized()
-                                    * scenario_spacewars::spaceling_geometry::HALF_HEIGHT)
-                                .distance_to(s.objective.position)
-                                >= s.objective.range
-                            })
-                    })
+        if !self.planning.is_legacy() {
+            if let Some(reason) = o.landing_objective.as_ref().and_then(|s| {
+                if s.planning != self.planning {
+                    return Some("survey_policy_mismatch");
+                }
+                s.sites.iter().chain(s.actual.iter()).find_map(|route| {
+                    if route.crossing.is_some_and(|c| {
+                        self.planning != ObjectivePlanning::JetpackRoundTrip
+                            || c.plan.planet != s.objective.planet
+                            || c.plan.revision != s.objective.revision
+                    }) {
+                        return Some("crossing_identity_mismatch");
+                    }
+                    route.cost()?;
+                    let Some(node) = route.endpoint else {
+                        return Some("joint_endpoint_missing");
+                    };
+                    let invalid = usize::from(node.id)
+                        >= scenario_spacewars::surface_sortie::ground_navigation::GROUND_SAMPLES
+                        || !node.position.x.is_finite()
+                        || !node.position.y.is_finite()
+                        || !node.normal.x.is_finite()
+                        || !node.normal.y.is_finite()
+                        || (node.position
+                            + node.position.normalized()
+                                * scenario_spacewars::spaceling_geometry::HALF_HEIGHT)
+                            .distance_to(s.objective.position)
+                            >= s.objective.range;
+                    invalid.then_some("joint_endpoint_invalid")
+                })
             }) {
+                self.base.reject_acquisition_evidence(o, reason);
+                self.telemetry.sortie = self.base.telemetry().clone();
+                self.telemetry.sortie.policy = Self::policy(self.planning);
                 return CombatIntent::default();
             }
             if let Some(s) = &o.landing_objective
@@ -152,13 +184,18 @@ impl TacticalCapturePilot {
                 && LandingObjective::read(p).is_some_and(|target| target.matches(s.objective))
                 && let Some(route) = s.actual.as_ref().filter(|r| r.cost().is_some())
                 && let Some(endpoint) = route.endpoint
-                && let Some(hatch) = p.hatch
+                && p.boarding_hatches.iter().any(Option::is_some)
             {
                 self.telemetry.flag_approach = Some(FlagApproach {
+                    crossing: route.crossing,
                     objective: s.objective,
                     endpoint,
-                    hatch: (hatch - p.planet.motion.position)
-                        .rotate_radians(-p.planet.motion.angle),
+                    boarding_hatches: p.boarding_hatches.map(|h| {
+                        h.map(|point| {
+                            (point - p.planet.motion.position)
+                                .rotate_radians(-p.planet.motion.angle)
+                        })
+                    }),
                     tick: s.tick,
                     reached: false,
                 });
@@ -198,19 +235,19 @@ impl TacticalCapturePilot {
                 {
                     ground.retarget(destination);
                 } else {
-                    self.ground = Some(
-                        if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
-                            GroundNavigationTask::with_flag_approach(
-                                self.context,
-                                self.telemetry.flag_approach,
-                            )
-                        } else {
-                            GroundNavigationTask::new(self.context, destination)
-                        },
-                    );
+                    self.ground = Some(if !self.planning.is_legacy() && !owned {
+                        GroundNavigationTask::with_flag_planning(
+                            self.context,
+                            self.telemetry.flag_approach,
+                            self.planning == ObjectivePlanning::JetpackRoundTrip,
+                        )
+                    } else {
+                        GroundNavigationTask::new(self.context, destination)
+                    });
                 }
             }
             let ground = self.ground.as_mut().unwrap();
+            ground.set_continuous_walk(self.planning == ObjectivePlanning::JetpackRoundTrip);
             let controls = ground.step(&o.combat.recovery);
             if ground.is_crossing()
                 || ground.telemetry().goal != GroundGoal::Arrived
@@ -218,7 +255,7 @@ impl TacticalCapturePilot {
             {
                 intent.flight.controls = controls;
             }
-            if self.planning == ObjectivePlanning::JointRoundTrip && !owned {
+            if !self.planning.is_legacy() && !owned {
                 self.telemetry.flag_approach = ground.telemetry().flag_approach;
             }
             self.telemetry.ground = Some(ground.telemetry().clone());
@@ -274,6 +311,40 @@ mod tests {
             },
             o,
         )
+    }
+
+    #[test]
+    fn only_powered_round_trips_opt_into_continuous_walking_on_both_legs() {
+        for planning in [
+            ObjectivePlanning::Legacy,
+            ObjectivePlanning::JointRoundTrip,
+            ObjectivePlanning::JetpackRoundTrip,
+        ] {
+            for owned in [false, true] {
+                let (context, mut o) = fixture();
+                let p = &mut o.combat.recovery.flight.pilot;
+                if owned {
+                    p.planet.claim.as_mut().unwrap().owner = Some(p.owner);
+                }
+                let mut task = TacticalCapturePilot::with_planning(
+                    context,
+                    CombatBreakSettings::default(),
+                    planning,
+                );
+                task.intent(&o);
+                let ground = task.telemetry().ground.as_ref().unwrap();
+                let expected = planning == ObjectivePlanning::JetpackRoundTrip;
+                assert_eq!(ground.continuous_walk, expected);
+                assert_eq!(
+                    serde_json::to_value(ground)
+                        .unwrap()
+                        .get("continuous_walk")
+                        .is_some(),
+                    expected,
+                    "historical trace shape remains unchanged"
+                );
+            }
+        }
     }
 
     #[test]

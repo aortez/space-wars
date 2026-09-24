@@ -15,7 +15,9 @@ pub mod claim_footing;
 pub mod combat;
 pub mod comparison;
 pub mod compatibility;
+pub mod destination_cover;
 pub mod flight;
+mod ground_diagnostics;
 pub mod ground_navigation;
 pub mod ground_posture;
 pub mod hud;
@@ -63,6 +65,16 @@ pub(super) fn pilot_physics_id(player: PlayerId) -> PhysicsId {
 }
 const SURFACE_RADIUS: f32 = 60.0;
 const BOARDING_RANGE: f32 = 3.0;
+
+// Index zero remains the normal exit. Index one mirrors it across the hull.
+fn hatch_offset(form: ShipForm, side: usize) -> Vec2 {
+    let offset = if form == ShipForm::Ship {
+        Vec2::new(8.0, -5.0)
+    } else {
+        Vec2::new(2.8, -0.65)
+    };
+    Vec2::new(offset.x * [1.0, -1.0][side], offset.y)
+}
 const SETTLED_SPEED: f32 = 2.0;
 
 pub struct SurfaceSortieScenario;
@@ -103,7 +115,7 @@ impl TransferResult {
             Self::Boarded => "Aboard the same ship; ready to pilot",
             Self::ShipNotSettled => "Land rear-first and settle before entering or exiting",
             Self::ExitBlocked => "Surface access blocked; no safe exit",
-            Self::TooFar => "Return to the cyan hatch beside the landed ship",
+            Self::TooFar => "Return to either cyan hatch beside the landed ship",
             Self::MustBeSupported => "Stand and settle at the access marker to board",
             Self::VehicleUnavailable => "Vehicle unavailable; restart this experiment",
         }
@@ -435,11 +447,7 @@ impl SurfaceSortieState {
         let ship = &self.world.ships[self.pilots[player].vehicle.0];
         // A surface access point beside the *actual* ship. No elevated berth
         // or fixed planet marker; the physical landing gate is checked first.
-        let local = if ship.form == ShipForm::Ship {
-            Vec2::new(8.0, -5.0)
-        } else {
-            Vec2::new(2.8, -0.65)
-        };
+        let local = hatch_offset(ship.form, 0);
         let hatch = ship.position
             + physics::ship_pivot(ship.form)
             + local.rotate_radians(ship.rotation_radians);
@@ -460,6 +468,52 @@ impl SurfaceSortieState {
         }
         let planet = &self.world.planets[self.pilots[player].planet];
         planet.position + self.access_up(player) * (planet.radius * BODY_BOUNDS_RADIUS_SCALE)
+    }
+
+    /// Measured entrances, independently unavailable without floor/clearance.
+    /// The on-foot pilot is excluded from its own entrance clearance test.
+    fn boarding_access(&self, player: usize) -> [Option<(Vec2, Vec2)>; 2] {
+        let pilot = &self.pilots[player];
+        let ship = &self.world.ships[pilot.vehicle.0];
+        let spec = Self::spec();
+        let clear = self.world.physics.world.capsule_clearance_test(
+            spec.half_segment,
+            spec.radius + 0.04,
+            spec.collision_groups,
+            Some(pilot_physics_id(pilot.owner)),
+        );
+        if self.world.terrain.planets.contains_key(&pilot.planet) {
+            let Some(body) = self
+                .world
+                .physics
+                .world
+                .motion(self.world.physics.ship_body(pilot.vehicle.0))
+            else {
+                return [None; 2];
+            };
+            return self
+                .material_boarding_with_clearance(
+                    pilot.planet,
+                    ship.form,
+                    body.position,
+                    body.angle,
+                    clear,
+                )
+                .map(|hit| hit.map(|h| (h.point, h.normal)));
+        }
+        let planet = &self.world.planets[pilot.planet];
+        [0, 1].map(|side| {
+            let hatch = ship.position
+                + physics::ship_pivot(ship.form)
+                + hatch_offset(ship.form, side).rotate_radians(ship.rotation_radians);
+            let up = (hatch - planet.position).normalized();
+            let point = planet.position + up * (planet.radius * BODY_BOUNDS_RADIUS_SCALE);
+            clear(
+                point + up * (spec.half_height() + 0.12),
+                rotation_for_direction(up),
+            )
+            .then_some((point, up))
+        })
     }
 
     fn spec() -> SpacelingSpec {
@@ -510,21 +564,15 @@ impl SurfaceSortieState {
         if !self.vehicle_settled(player) {
             return TransferResult::ShipNotSettled;
         }
-        if self
-            .world
-            .terrain
-            .planets
-            .contains_key(&self.pilots[player].planet)
-            && self.material_access(player).is_none()
-        {
-            return TransferResult::ExitBlocked;
-        }
         if let Some(snapshot) = self.spaceling_snapshot(player) {
-            if snapshot
-                .motion
-                .position
-                .distance_to(self.access_position(player))
-                > BOARDING_RANGE
+            let entrances = self.boarding_access(player);
+            if entrances.iter().all(Option::is_none) {
+                return TransferResult::ExitBlocked;
+            }
+            if !entrances
+                .iter()
+                .flatten()
+                .any(|(point, _)| snapshot.motion.position.distance_to(*point) <= BOARDING_RANGE)
             {
                 return TransferResult::TooFar;
             }
@@ -540,6 +588,15 @@ impl SurfaceSortieState {
                 return TransferResult::MustBeSupported;
             }
         } else {
+            if self
+                .world
+                .terrain
+                .planets
+                .contains_key(&self.pilots[player].planet)
+                && self.material_access(player).is_none()
+            {
+                return TransferResult::ExitBlocked;
+            }
             let spec = Self::spec();
             let up = self.access_up(player);
             let position = self.access_position(player) + up * (spec.half_height() + 0.12);

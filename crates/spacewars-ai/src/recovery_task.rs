@@ -699,7 +699,7 @@ impl RecoverShipTask {
             };
         if p.transfer == TransferResult::Ready
             || standing_route == Some(false)
-            || p.hatch.is_some()
+            || p.boarding_hatches.iter().any(Option::is_some)
                 && p.landing.phase == LandingPhase::Landed
                 && p.landing.planet == Some(p.planet.index)
                 && self.telemetry.return_failure != Some(ShipReturnFailure::NoStandingRoute)
@@ -738,7 +738,8 @@ impl RecoverShipTask {
                         .is_some_and(|planet| planet != p.planet.index)
             }
             Some(ShipReturnFailure::NoGroundedHatch | ShipReturnFailure::UnsettledShip) => {
-                (p.hatch.is_none() || p.transfer == TransferResult::ShipNotSettled)
+                (p.boarding_hatches.iter().all(Option::is_none)
+                    || p.transfer == TransferResult::ShipNotSettled)
                     && p.landing.planet == Some(p.planet.index)
                     && p.landing.descent_speed.abs() < 1.0
                     && p.landing.lateral_speed.abs() < 1.0

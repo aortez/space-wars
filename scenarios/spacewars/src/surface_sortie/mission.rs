@@ -25,6 +25,7 @@ pub struct LandingSurveyStamp {
 
 #[derive(Debug, Clone, Copy)]
 pub struct MissionSensorRequest {
+    pub destination_cover: Option<destination_cover::DestinationCoverRequest>,
     pub site: Option<LandingSiteId>,
     pub last_survey: Option<LandingSurveyStamp>,
     pub objective_planning: landing_objective::ObjectivePlanning,
@@ -64,6 +65,10 @@ impl LandingSurveyCadence {
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionObservationV1 {
+    /// Absent means not requested. Remote samples are separate from the local
+    /// approach planet and never authorize landing or ground actions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_cover: Option<destination_cover::DestinationCoverObservation>,
     pub version: u32,
     /// Finished-match priorities are opt-in; historical capture labs retain
     /// their original itinerary and survival rules.
@@ -74,6 +79,9 @@ pub struct MissionObservationV1 {
     pub planets: Vec<PilotPlanetObservation>,
     /// A flight obstacle only; it never becomes a landing or claim destination.
     pub sun: Option<MissionObstacle>,
+    /// The arena encloses flight space. Unlike a planet, its navigable side is
+    /// inside the radius. The physical wall is a polygonal approximation.
+    pub boundary: MissionBoundary,
     /// Actual opponent motion, including during on-foot or pod recovery.
     /// Weapon eligibility remains in the local combat observation.
     pub opponent: Option<MissionOpponent>,
@@ -88,6 +96,12 @@ pub struct MissionOpponent {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct MissionObstacle {
     pub position: Vec2,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct MissionBoundary {
+    pub center: Vec2,
     pub radius: f32,
 }
 
@@ -289,6 +303,7 @@ impl SurfaceSortieState {
         self.mission_observation_with_cadence(
             player,
             MissionSensorRequest {
+                destination_cover: None,
                 objective_planning: Default::default(),
                 site,
                 last_survey: None,
@@ -312,10 +327,7 @@ impl SurfaceSortieState {
         request: MissionSensorRequest,
         cadence: LandingSurveyCadence,
     ) -> MissionObservationV1 {
-        assert_eq!(
-            request.objective_planning,
-            landing_objective::ObjectivePlanning::JointRoundTrip
-        );
+        assert!(!request.objective_planning.is_legacy());
         self.mission_observation_profile(player, request, cadence, false)
     }
 
@@ -396,6 +408,9 @@ impl SurfaceSortieState {
             flag_approach,
         );
         MissionObservationV1 {
+            destination_cover: request
+                .destination_cover
+                .map(destination_cover::DestinationCoverObservation::pending),
             version: 1,
             match_rules: self.round.is_some(),
             local: self.tactical_sortie_observation_profile(
@@ -409,6 +424,10 @@ impl SurfaceSortieState {
                 position: sun.position,
                 radius: sun.radius * BODY_BOUNDS_RADIUS_SCALE,
             }),
+            boundary: MissionBoundary {
+                center: Vec2::splat(self.world.config.universe_radius as f32),
+                radius: self.world.config.universe_radius as f32,
+            },
             opponent: self.pilots.iter().find_map(|other| {
                 if other.owner == self.pilots[player].owner
                     || other.vitals.is_some_and(|v| !v.alive())
@@ -443,6 +462,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mission_boundary_exposes_the_enclosing_world_without_a_query() {
+        for state in [
+            SurfaceSortieScenario::init_material_combat(42),
+            SurfaceSortieScenario::init_material_arena_trial(2, false, 0.0),
+        ] {
+            let before = state.world.physics.world.snapshot_bytes().unwrap();
+            let o = state.mission_observation(0, None);
+            let radius = state.world.config.universe_radius as f32;
+            assert_eq!(
+                o.boundary,
+                MissionBoundary {
+                    center: Vec2::splat(radius),
+                    radius
+                }
+            );
+            assert_eq!(before, state.world.physics.world.snapshot_bytes().unwrap());
+        }
+    }
+
+    #[test]
     fn scheduled_surveys_are_staggered_and_keep_selected_sites_and_live_gates_current() {
         let mut state = SurfaceSortieScenario::init_material_combat(42);
         let dt = Duration::from_nanos(16_666_667);
@@ -453,6 +492,7 @@ mod tests {
             let before = state.world.physics.world.snapshot_bytes().unwrap();
             for seat in 0..2 {
                 let request = MissionSensorRequest {
+                    destination_cover: None,
                     objective_planning: Default::default(),
                     site: None,
                     last_survey: last[seat],
@@ -489,6 +529,7 @@ mod tests {
                     other => panic!("unexpected query {other:?}"),
                 }
                 let request = MissionSensorRequest {
+                    destination_cover: None,
                     objective_planning: Default::default(),
                     site: Some(selected),
                     last_survey: last[seat],
@@ -524,6 +565,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         let site = state.pilot_observation(0, None).sites[0];
         let mut request = MissionSensorRequest {
+            destination_cover: None,
             objective_planning: Default::default(),
             site: Some(site.id),
             last_survey: Some(LandingSurveyStamp {
@@ -641,6 +683,7 @@ mod tests {
         SurfaceSortieScenario::step(&mut state, &[], dt);
         assert_eq!(state.world.ships[0].form, ShipForm::EscapePod);
         let request = MissionSensorRequest {
+            destination_cover: None,
             objective_planning: Default::default(),
             site: None,
             last_survey: Some(LandingSurveyStamp {

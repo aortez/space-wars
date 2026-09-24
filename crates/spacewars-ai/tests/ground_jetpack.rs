@@ -124,9 +124,10 @@ fn lost_ship_pod_crossing_countercapture_rebuild_board_and_depart_use_shared_phy
 }
 
 #[test]
-fn ordinary_navigator_crosses_both_ways_claims_and_returns_through_the_real_hatch() {
+fn ordinary_navigator_crosses_claims_and_boards_opposite_entrance_without_return_flight() {
     for seat in 0..2 {
-        for edit in [false, true] {
+        for (edit, continuous_walk) in [(false, false), (true, false), (false, true), (true, true)]
+        {
             let mut state = SurfaceSortieScenario::init_material_jetpack(42, 2);
             let owner = PlayerId::from_index(seat).unwrap();
             let context = BrainReset {
@@ -189,7 +190,7 @@ fn ordinary_navigator_crosses_both_ways_claims_and_returns_through_the_real_hatc
                 assert_ne!(
                     task.telemetry().goal,
                     GroundGoal::Blocked,
-                    "seat={seat} edit={edit}: {:?}",
+                    "seat={seat} edit={edit} continuous_walk={continuous_walk}: {:?}",
                     task.telemetry()
                 );
                 if task.telemetry().goal == GroundGoal::Arrived {
@@ -203,8 +204,13 @@ fn ordinary_navigator_crosses_both_ways_claims_and_returns_through_the_real_hatc
                     {
                         crossings += task.telemetry().jetpack_crossings;
                         task = GroundNavigationTask::new(context, GroundDestination::Hatch);
+                        task.set_continuous_walk(continuous_walk);
                         returning = true;
                     } else if returning && o.flight.pilot.transfer == TransferResult::Ready {
+                        let p = &o.flight.pilot;
+                        let actor = p.actor.unwrap().position;
+                        assert!(actor.distance_to(p.boarding_hatches[1].unwrap()) <= 3.0);
+                        assert!(actor.distance_to(p.hatch.unwrap()) > 3.0);
                         action.interact_held = true;
                     }
                 }
@@ -215,10 +221,14 @@ fn ordinary_navigator_crosses_both_ways_claims_and_returns_through_the_real_hatc
                     break;
                 }
             }
-            assert!(complete, "seat={seat} edit={edit}: {:?}", task.telemetry());
+            assert!(
+                complete,
+                "seat={seat} edit={edit} continuous_walk={continuous_walk}: {:?}",
+                task.telemetry()
+            );
             assert_eq!(
-                crossings, 2,
-                "the navigator must select flight in both directions"
+                crossings, 1,
+                "the opposite entrance removes the return flight, while the outbound crossing remains"
             );
             assert_eq!(edited, edit);
             assert!(state.terrain_diagnostics().issues.is_empty());

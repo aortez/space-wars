@@ -461,5 +461,91 @@ impl SurfaceSortieState {
     }
 }
 
+/// Controlled initial conditions for the prospective parked-ship route trial.
+/// Only setup installs an opposing flag; capture and boarding then use ordinary
+/// physics and actions. The second parked ship blocks the long walk around.
+impl SurfaceSortieScenario {
+    pub fn init_material_flag_crossing_trial(seed: u64, player: usize) -> SurfaceSortieState {
+        assert!(player < 2);
+        let mut state =
+            Self::init_material_surface(seed, 2, engine_terrain::TerrainSurface::Interpolated);
+        state.enable_jetpacks();
+        Self::finish_flag_crossing_trial(state, player)
+    }
+
+    /// Controlled orbital initial conditions; all later movement, crossing,
+    /// capture and boarding use the ordinary shared world and controls.
+    pub fn init_material_moving_crossing_trial(
+        seed: u64,
+        player: usize,
+        radius: f32,
+        spin: f32,
+        orbit: f32,
+    ) -> SurfaceSortieState {
+        assert!(player < 2 && (30.0..=128.0).contains(&radius));
+        assert!(spin.is_finite() && orbit.is_finite());
+        let mut world = Self::init(SurfaceMotionPreset::Orbit, seed).world;
+        let planet = &mut world.planets[0];
+        planet.radius = radius;
+        planet.mass = 18.0 / (60.0 * GRAVITY) * (radius * BODY_BOUNDS_RADIUS_SCALE + 0.9).powi(2);
+        planet.wrapper_omega = spin;
+        planet.orbit_omega = orbit;
+        world.sun.as_mut().unwrap().mass =
+            orbit.powi(2) * planet.orbit_radius.powi(3) / (60.0 * GRAVITY);
+        let state = Self::on_surface(world, SurfaceMotionPreset::Orbit, 0, Vec2::Y, None);
+        let mut state =
+            Self::material_surface_on(state, 2, engine_terrain::TerrainSurface::Interpolated);
+        state.enable_jetpacks();
+        Self::finish_flag_crossing_trial(state, player)
+    }
+
+    fn finish_flag_crossing_trial(
+        mut state: SurfaceSortieState,
+        player: usize,
+    ) -> SurfaceSortieState {
+        for _ in 0..120 {
+            Self::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        }
+        let plan = state
+            .crossing_plan(player, jetpack::CrossingDirection::Left)
+            .expect("initial crossing corridor");
+        let map = state
+            .survey_ground_with_gravity(
+                player,
+                plan.planet,
+                0..ground_navigation::GROUND_SAMPLES as u16,
+                false,
+                18.2,
+            )
+            .unwrap();
+        let node = map
+            .nodes
+            .iter()
+            .min_by(|a, b| {
+                a.position
+                    .distance_to(plan.destination)
+                    .total_cmp(&b.position.distance_to(plan.destination))
+            })
+            .unwrap();
+        let terrain = state.world.terrain.planets.get(&plan.planet).unwrap();
+        let footing = terrain
+            .geometry
+            .contact_cell(&terrain.field, node.position, node.normal)
+            .expect("retained initial flag footing");
+        let enemy = PlayerId::from_index(1 - player).unwrap();
+        state.world.planets[plan.planet].owner_id = Some(enemy.index());
+        state.claims[plan.planet].flag = Some(PlanetFlag {
+            player: enemy,
+            anchor: FlagAnchor {
+                position: node.position,
+                normal: node.normal,
+                footing: Some(footing),
+                surface_revision: plan.revision,
+            },
+        });
+        state
+    }
+}
+
 #[cfg(test)]
 mod tests;

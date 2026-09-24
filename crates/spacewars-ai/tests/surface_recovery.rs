@@ -264,6 +264,7 @@ fn rebuild_flight_keeps_its_destination_until_ownership_changes() {
     o.ground.as_mut().unwrap().edges.clear();
     let site = o.rebuild.as_ref().unwrap().site.unwrap();
     o.jetpack = Some(JetpackNavigationObservation {
+        vehicle_forecast: None,
         reference_velocity: Vec2::ZERO,
         charge: 1.0,
         burning: false,
@@ -849,6 +850,7 @@ fn ship_on_other_planet() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     p.landing.supported_feet = 2;
     p.landing.planet = Some(p.planet.index + 1);
     p.hatch = Some(p.ship.position);
+    p.boarding_hatches = [p.hatch, None];
     p.transfer = scenario_spacewars::surface_sortie::TransferResult::TooFar;
     (task, o)
 }
@@ -870,6 +872,7 @@ fn cramped_return() -> (RecoverShipTask, RecoveryTaskObservationV1) {
     p.actor.as_mut().unwrap().velocity = Vec2::ZERO;
     p.actor_up = Vec2::Y;
     p.hatch = Some(Vec2::new(10.0, 60.0));
+    p.boarding_hatches = [p.hatch, None];
     p.landing.planet = Some(p.planet.index);
     o.jetpack = None;
     o.ground = Some(GroundMap {
@@ -1040,6 +1043,7 @@ fn an_unsettled_nearby_ship_waits_before_replacement_but_moving_ships_do_not_qua
         p.landing.supported_feet = 0;
         p.landing.lateral_speed = if moving { 5.0 } else { 0.0 };
         p.hatch = None;
+        p.boarding_hatches = [p.hatch, None];
         task.step(&o);
         assert_eq!(task.telemetry().scuttle_attempts, 0);
         o.flight.pilot.tick += 901;

@@ -13,7 +13,181 @@ walk measurements across requests. A further opt-in
 paths despite unrelated obstacle motion and preserves partial measurements while
 waiting for candidate refresh. Default v10 remains synchronous; failed routes
 under asteroid pressure, broader sensor coverage and strategic planning remain
-future work.
+future work. The experimental v11 [powered landing routes](../bot-jetpack-landing.md)
+now have [moving-planet prediction and physical calibration](../bot-moving-flight-planning.md).
+This establishes another tactical action for later mission scoring; it does not
+yet establish a stronger match policy. The [asteroid-pressure investigation](../bot-asteroid-objective-diagnosis.md)
+found useful partial v11 candidates cancelled by scalar jump-gravity changes,
+alongside genuinely negative measured v10 routes. The next tactical slice is
+now implemented as [candidate validity under changing scalar gravity](../bot-jump-gravity-dependencies.md).
+It preserves independent paths but reveals that completed surveys can arrive
+between landing scans with no current sites to select. The
+[landing-scan handoff](../bot-landing-survey-handoff.md) now joins those results
+to current sites and completes physical enemy-flag captures in quiet paired
+replays. The optional [early-candidate adapter](../bot-early-objective-candidates.md)
+now publishes finished positive routes with bounded fresh landing clearance
+before the whole survey completes. In the remaining asteroid case it selects a
+powered route at tick 6,604, but still loses the ship at 6,611. Quiet capture and
+return remain intact. The [contested-approach investigation](../bot-contested-approach.md)
+tested a late damage-triggered switch to combat and rejected it: both triggered
+replays shortened pilot survival. An optional
+[pursuit disengagement task](../bot-pursuit-disengagement.md) now compares seven
+escape directions and establishes separation in four activated physical trials.
+The ordinary transfer handoff gives that separation back; one asteroid case
+still loses its pilot much earlier. This task remains headless and disabled by
+default. The [successor-flight investigation](../bot-disengagement-handoff.md)
+now forecasts the actual transfer controller's turning and braking costs.
+Its automatic handoff rule is rejected after two win-to-loss regressions; a
+read-only probe remains for calibration. The opponent's coasting approximation
+can both overstate and understate danger. The subsequent
+[opponent-response calibration](../bot-opponent-response-forecast.md) improves
+the pursuit forecast and exposes a missing arena-wall constraint. The read-only
+probe now flags boundary-margin entry, and mission observations expose the
+enclosing arena. A separate [boundary-guidance experiment](../bot-boundary-escape.md)
+now avoids the three recorded wall cases, but also loses a quiet acceptance
+match. It remains opt-in; the older escape and default policies are preserved.
+Braking-only and reflected-direction ablations also regress. The
+[remote destination-cover probe](../bot-destination-cover.md) now measures a
+four-site shortlist using only query quota left after local planning. Fourteen
+complete matched replays preserve controls and local work. It distinguishes
+covered, exposed and unavailable ground, and retains explicit sample age and
+invalidation. A [budgeted successor comparison](../bot-successor-comparison.md)
+now evaluates the first flight leg toward those sites, continued escape within
+its deadline, and combat against independent opponent hypotheses. It uses only
+remaining graph allowance and leaves controls unchanged. Current revalidation,
+capture/return feasibility and combat outcome evidence are still required before
+ranking complete successors or promoting a new policy.
+The [physical continuation matrix](../bot-successor-continuation.md) now tests
+those first legs from three exact handoff states. Pursuit range-entry predictions
+are close in the main-seed trials, but no staging point is reached within six
+seconds, asteroid edits invalidate two approaches, and immediate survival does
+not rank eventual outcomes. The [bounded capture-trip experiment](../bot-successor-sortie.md)
+now reaches three staging points and one actual landing in nine contested site
+trials. That pilot neutralizes the enemy flag but times out while raising its own;
+none completes capture and return. An isolated physical fixture completes the
+whole trip. A dense replay identifies repeated self-interruption while raising
+the own flag. The [own-flag handoff fix](../bot-claim-handoff.md) now completes
+that raise and starts a freshly planned return. Eight fresh paired comparisons
+preserve match outcomes and completed-trip counts, with one capture/return
+finishing earlier. The recorded long return still exceeds its host task clock.
+The [walking investigation](../bot-return-walking.md) rejects a faster steering
+experiment: fixed-control clones and a two-body reduction expose sinking and
+stalls on moving compound terrain. The [CCD velocity correction](../moving-ground-ccd.md)
+now removes those reproduced stalls while retaining the controller. Its
+controlled return reaches the final waypoint with no emergency jumps but still
+expires before boarding. The [guarded walking retry](../bot-return-completion.md)
+now completes that controlled return through boarding and departure with 17.55
+seconds left on the unchanged clock. Fresh production comparisons retain a
+win-to-loss regression despite faster boarding in the changed match; the extra
+held-out cases do not activate the new input. The first
+[complete-trip timing and exposure analysis](../bot-trip-calibration.md) now
+separates phase costs in dense recordings. It finds a remaining outbound
+waypoint slowdown, omitted landing/claim/departure costs and an exposure counter
+that stops on foot. The [guarded outbound walking trial](../bot-outbound-walking.md)
+now reduces the recorded long outbound leg from 30.33 to 14.30 seconds, with
+actual claiming and return. Two activated matched configurations change from
+losses to wins; the small known sample does not establish strategic strength.
+The first [read-only trip estimator](../bot-trip-estimate.md) now freezes phase
+costs at the observed landing choice. Eight independent-world runs yield 29
+completed numeric comparisons with 2.48-second median absolute error, mostly
+for very short ground trips. Terrain/site changes cause landing underestimates
+up to 25 seconds; failed approaches and remote/powered costs remain explicit.
+The [rolling diagnostic](../bot-rolling-trip-estimate.md) now separates evidence
+refresh from approach restarts, preserves elapsed retry time and exposes native
+capture limits. Twelve new runs verify the accounting; timing accuracy remains
+mixed when a retry is already close to touchdown. The
+[phase-aware diagnostic](../bot-phase-landing-estimate.md) now separates observed
+flight phases and retry context. Eight fresh runs reduce the 15-second
+checkpoint's paired median trip error from 5.41 to 0.28 seconds. A 29.90-second
+underestimate followed by nine further terrain-driven replans preserves the
+need for an interruption-risk model. The [long-ground validation](../bot-long-ground-validation.md)
+now retains 48 independent matches and all 212 attempts. Only three original
+choices are long walks; all exceed the calibration domain and fail, revealing
+a blocked posture recovery and a route whose nominal duration exceeds its task
+clock. The [controlled-ground fixture](../bot-controlled-ground.md) now retains
+32 generated distance/direction/seat trials. Six completed trips remain walks,
+with a 4.17-second median ground-cost underestimate; a powered return, unavailable
+setups and a shorter posture failure remain separate. The
+[independent walking calibration](../bot-walking-calibration.md) now fits fixed
+overhead and distance multipliers on eight new worlds, then freezes them before
+six-world validation. Fourteen paired ground intervals reduce median error from
+2.83 to 0.87 seconds; a newly covered slow return remains underestimated by 15.76
+seconds. The [composed estimator](../bot-composed-trip-estimate.md) now reduces
+whole-trip error from 3.41 to 1.16 seconds on nine paired controlled completions
+at the 15-second checkpoint. Strictly replacing all walking costs loses ordinary
+short-walk coverage; initial controlled forecasts also trail the original model.
+The [walking-regime validation](../bot-walking-regimes.md) now restores short-walk
+coverage on seven new worlds while preserving every strict numeric forecast.
+Eleven controlled completions improve median initial trip error from 4.35 to
+1.74 seconds versus phase-only. The [flight-progress investigation](../bot-flight-progress.md)
+now separates long, progressing approaches from abandoned plans using 56 existing
+recordings. High/receding arrivals need state-conditioned approach timing; the
+large normal miss mostly reflects seven cover retries. The offline
+[approach-state prototype](../bot-approach-state-estimate.md) has now completed
+forty new simulations: it restores two long-approach forecasts, but loses initial
+coverage and worsens the paired median on six normal approach checkpoints.
+Remaining-approach timing is closer than its later flight tail. Keep the strict
+candidate offline. The explicit [duration-first expiry rule](../bot-approach-expiry.md)
+now preserves all 1,573 previously numeric sampled forecasts in forty further
+simulations and adds six controlled checkpoint estimates across three new worlds
+with 0.98-second median whole-trip error. This closes the approach-support
+selection experiment. The [landing-tail diagnosis](../bot-landing-tail.md) now
+separates ordinary alignment/descent/contact from interruptions across 136 known
+recordings. Typical uninterrupted tails contain roughly six seconds of descent;
+foot clearance is strongly associated with that duration. The large 53.98-second
+miss contains five native replans plus four site-acquisition markers, and some
+other replans occur after physical touchdown. The explicit
+[clearance-based descent component](../bot-descent-clearance.md) now passes forty
+new simulations. At the first +1-second descent sample, paired median landing
+error improves from 0.50 to 0.22 seconds in normal matches and 1.03 to 0.59 seconds
+in controlled trials. Strict replacement loses 34 normal and eight controlled
+forecasts at descent entry, while a new retry forecast misses seven future native
+replans by 26 seconds. The explicit [descent composition rule](../bot-descent-regimes.md)
+now restores early coverage on seven further worlds: all declared checkpoints
+retain the coarse model's numeric coverage, while 1,087 common numeric strict
+forecasts remain exact. Normal +15-second whole-trip median error improves
+0.57 to 0.14 seconds on 27 paired completions. Seven other sampled observations
+still become unknown for invalid rays or missing site evidence. This closes the
+descent-selection experiment; use the combined variant as the offline timing
+baseline. The [interruption-risk investigation](../bot-landing-interruption-risk.md)
+now examines 216 known recordings on 39 worlds, including failed and censored
+attempts. At normal first-choice +15 seconds, 19/33 attempts with a native
+prelanding replan in the preceding five seconds are interrupted again within
+ten seconds, versus 23/217 without one. The association varies by phase; it is
+not an estimated success probability. Physical landing ends exposure, grounded
+replans stay separate, and 212 attempts with no observed landing choice remain
+outside this forecast's population. Progress/contact failure examples are too
+sparse for a general rule. The [first probability comparison](../bot-landing-risk-probability.md)
+now passes 56 new simulations on eleven independent worlds. On 74 normal
++15-second forecasts, a supported recency refinement reduces multiclass Brier
+0.38048 → 0.36695 and interruption Brier 0.12552 → 0.11889 with unchanged coverage.
+Most of the gain comes from seven circling cases; equal-world log loss worsens
+slightly and sparse settling/control cells stay unknown. Keep both models
+offline. The [site-acquisition audit](../bot-site-acquisition.md) now separates
+the seventy normal attempts without a choice: 52 end before arrival, mostly for
+combat; eighteen arrive and accumulate 633 seconds of waiting. Their 1,034 native
+objective invalidations precede any selected site. Completed jobs can fail
+publication or return no usable route while the waiting ship repeatedly climbs
+out of the approach frame. The [native acquisition diagnostics](../bot-acquisition-diagnostics.md)
+now separate those causes in seven known reproductions, preserving all 279,289
+control/physics trace rows and planner work. Negative searches repeatedly fail
+publication after region or scalar-gravity changes; other usable ground routes
+fail solar approach/departure checks. The opt-in
+[bounded acquisition experiment](../bot-bounded-acquisition.md) now adds a
+thirty-second deadline and local waiting guidance. Seven known and sixteen
+fresh matched configurations retain winners and the controlled long-wait
+completion; normal completed trips increase by two and one respectively.
+Waiting and approach-frame exits decrease, but one known pilot dies earlier in
+recovery. Preserve the experiment and evidence without changing defaults. This
+closes the current tactical checkpoint; broader promotion and strategy belong
+in follow-up work rather than extending the acquisition investigation.
+Remote transfer and extension beyond fixed forecast
+checkpoints remain prerequisites for mission selection; timing and controllers
+are still unchanged.
+Retry calibration is still sparse and these estimates do not change bot controls.
+Longer commitment is not uniformly better, and forecast tails remain unsupported.
+Eager route delivery or a successful local escape alone does not establish a
+successful powered sortie or justify promoting either experimental adapter.
 
 Before extending the powered-route model, the
 [cockpit and spaceling scale slice](../spaceling-cockpit-scale.md) integrates

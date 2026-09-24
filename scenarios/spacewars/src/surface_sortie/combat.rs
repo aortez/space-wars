@@ -97,6 +97,8 @@ pub struct TacticalSortieObservationV1 {
     pub landing_objective: Option<landing_objective::LandingObjectiveSurvey>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub objective_work: Option<live_planning::ObjectiveWorkState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub objective_evidence: Option<live_planning::ObjectiveWorkEvidence>,
     pub sun: Option<SolarHazard>,
     /// Prescribed circular motion about the sun, absent for linear fixtures.
     pub planet_orbit_omega: Option<f32>,
@@ -200,6 +202,16 @@ impl SurfaceSortieState {
         )
     }
 
+    pub fn tactical_sortie_observation_for_live_profile(
+        &self,
+        player: usize,
+        query: LandingSiteQuery,
+        planning: landing_objective::ObjectivePlanning,
+    ) -> TacticalSortieObservationV1 {
+        assert!(!planning.is_legacy());
+        self.tactical_sortie_observation_profile(player, query, planning, false)
+    }
+
     pub(super) fn tactical_sortie_observation_profile(
         &self,
         player: usize,
@@ -209,51 +221,22 @@ impl SurfaceSortieState {
     ) -> TacticalSortieObservationV1 {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("tactical_sortie_observation");
-        let combat = self.combat_observation_with_query(player, query);
+        let mut combat = self.combat_observation_with_query(player, query);
+        if planning == landing_objective::ObjectivePlanning::JetpackRoundTrip {
+            self.add_vehicle_forecast(player, &mut combat.recovery);
+        }
         let cover: Vec<_> = combat
             .recovery
             .flight
             .pilot
             .sites
             .iter()
-            .map(|site| {
-                let occluded = |height| {
-                    let Some(enemy) = combat.target else {
-                        return true;
-                    };
-                    let pilot = &self.pilots[enemy.owner.index()];
-                    if pilot.body.is_some()
-                        || self.world.ships[pilot.vehicle.0].form != ShipForm::Ship
-                    {
-                        return true; // This survivor has no ship weapons.
-                    }
-                    let target = site.vehicle_position + site.normal * height;
-                    let delta = target - enemy.motion.position;
-                    let vehicle = self.pilots[enemy.owner.index()].vehicle.0;
-                    self.world
-                        .physics
-                        .cast_laser(
-                            vehicle,
-                            enemy.motion.position,
-                            delta.normalized(),
-                            delta.length(),
-                        )
-                        .is_some_and(|hit| {
-                            hit.target
-                                == Some(MechanicalEntity::Body(BodyId::Planet(site.id.planet)))
-                        })
-                };
-                LandingCover {
-                    site: site.id,
-                    grounded: occluded(7.0),
-                    approach: occluded(30.0),
-                    departure: occluded(60.0),
-                }
-            })
+            .map(|site| self.landing_cover_with_queries(site, combat.target, || true))
             .collect();
         TacticalSortieObservationV1 {
             version: 1,
             objective_work: None,
+            objective_evidence: None,
             landing_objective: objective_surveys
                 .then(|| {
                     self.landing_objective_survey(

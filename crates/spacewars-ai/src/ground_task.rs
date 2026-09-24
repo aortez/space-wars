@@ -79,6 +79,8 @@ impl GroundGoal {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct GroundTelemetry {
     pub policy: &'static str,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub continuous_walk: bool,
     pub destination: GroundDestination,
     pub goal: GroundGoal,
     pub reason: Option<&'static str>,
@@ -110,6 +112,7 @@ pub struct GroundTelemetry {
 #[derive(Debug, Clone)]
 pub struct GroundNavigationTask {
     joint_flag: bool,
+    powered_flag: bool,
     flag_survey_tick: Option<u64>,
     context: BrainReset,
     telemetry: GroundTelemetry,
@@ -137,10 +140,12 @@ impl GroundNavigationTask {
     pub fn new(context: BrainReset, destination: GroundDestination) -> Self {
         Self {
             joint_flag: false,
+            powered_flag: false,
             flag_survey_tick: None,
             context,
             telemetry: GroundTelemetry {
                 policy: "ground_navigation_v10",
+                continuous_walk: false,
                 destination,
                 goal: GroundGoal::Survey,
                 reason: None,
@@ -189,15 +194,31 @@ impl GroundNavigationTask {
             rejoin: None,
         }
     }
+    pub fn with_vehicle_forecasts(context: BrainReset, destination: GroundDestination) -> Self {
+        let mut task = Self::new(context, destination);
+        task.powered_flag = true;
+        task.telemetry.policy = "ground_navigation_v12";
+        task
+    }
     pub fn telemetry(&self) -> &GroundTelemetry {
         &self.telemetry
     }
+    /// Maintain walking speed through ordinary route interiors. Endpoints,
+    /// sharp turns, jumps and unsupported motion retain proportional steering.
+    /// Like other control changes, this takes effect on the next uncached tick.
+    pub fn set_continuous_walk(&mut self, enabled: bool) {
+        self.telemetry.continuous_walk = enabled;
+    }
     pub fn reset(&mut self, context: BrainReset) {
+        let continuous_walk = self.telemetry.continuous_walk;
         *self = if self.joint_flag {
-            Self::with_flag_approach(context, None)
+            Self::with_flag_planning(context, None, self.powered_flag)
+        } else if self.powered_flag {
+            Self::with_vehicle_forecasts(context, self.telemetry.destination)
         } else {
             Self::new(context, self.telemetry.destination)
         };
+        self.telemetry.continuous_walk = continuous_walk;
     }
     pub fn is_crossing(&self) -> bool {
         self.crossing_task.is_some() || self.settling_after_interrupt
@@ -323,7 +344,9 @@ impl GroundNavigationTask {
             }
             return action;
         }
-        if self.telemetry.destination == GroundDestination::Hatch && p.hatch.is_some() {
+        if self.telemetry.destination == GroundDestination::Hatch
+            && p.boarding_hatches.iter().any(Option::is_some)
+        {
             self.hatch_missing_since = None;
         }
         let mut target = match self.telemetry.destination {
@@ -334,7 +357,20 @@ impl GroundNavigationTask {
                 .filter(|c| c.owner != Some(p.owner))
                 .and_then(|c| c.flag)
                 .map(|flag| flag.position),
-            GroundDestination::Hatch => p.hatch,
+            GroundDestination::Hatch => {
+                // Keep a selected entrance while following its route. If it is
+                // lost, the next plan searches both remaining entrances again.
+                let retained = self
+                    .telemetry
+                    .target
+                    .filter(|_| !self.telemetry.path.is_empty())
+                    .map(|t| p.planet.motion.position + t.rotate_radians(p.planet.motion.angle))
+                    .and_then(|t| {
+                        p.nearest_boarding_hatch(t)
+                            .filter(|h| h.distance_to(t) <= 0.5)
+                    });
+                retained.or_else(|| p.nearest_boarding_hatch(actor.position))
+            }
             GroundDestination::Rebuild { planet, position } => {
                 if planet != p.planet.index {
                     self.block("rebuild footing is on another planet");
@@ -534,8 +570,9 @@ impl GroundNavigationTask {
             }
             self.last_plan_tick = Some(map.tick);
             self.telemetry.replans += 1;
-            let (route, crossing) =
+            let (route, crossing, selected_target) =
                 self.route_with_jetpack(map, foot, target_local.unwrap(), range, o);
+            self.telemetry.target = Some(selected_target);
             self.crossing_plan = crossing;
             self.telemetry.route = Some(route.diagnostics.clone());
             if !route.path.is_empty() {
@@ -578,7 +615,7 @@ impl GroundNavigationTask {
             && p.supported_planet == Some(p.planet.index)
             && p.balanced
         {
-            self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, plan.clone()));
+            self.crossing_task = Some(JetpackCrossingPilot::traversal(self.context, *plan));
             return self.follow_crossing(o);
         }
         let node_id = self.telemetry.path[index];
@@ -628,6 +665,43 @@ impl GroundNavigationTask {
         // It still needs a physical jump after ordinary walking stops advancing.
         let overhead_step = stuck && (next - actor.position).dot(p.actor_up) > 0.2;
         action.horizontal = (error * 1.8 / 5.0).clamp(-1.0, 1.0);
+        // Interior samples mark continued walking, not separate stopping
+        // points. Keep the measured route and its ordinary waypoint checks;
+        // only remove their repeated proportional slowdown on forward legs.
+        if self.telemetry.continuous_walk
+            && p.supported_planet == Some(p.planet.index)
+            && p.balanced
+            && error.abs() > 0.25
+            && index > 0
+            && index + 1 < self.telemetry.path.len()
+            && self.telemetry.path[index - 1..=index + 1]
+                .windows(2)
+                .all(|pair| {
+                    map.edges.iter().any(|edge| {
+                        edge.from == pair[0]
+                            && edge.to == pair[1]
+                            && edge.kind == GroundEdgeKind::Walk
+                    })
+                })
+            && let Some(previous) = map
+                .nodes
+                .iter()
+                .find(|n| n.id == self.telemetry.path[index - 1])
+            && let Some(following) = map
+                .nodes
+                .iter()
+                .find(|n| n.id == self.telemetry.path[index + 1])
+        {
+            let incoming = node.position - previous.position;
+            let outgoing = following.position - node.position;
+            let local_right = right.rotate_radians(-p.planet.motion.angle);
+            if incoming.dot(outgoing) > 0.0
+                && incoming.dot(local_right) * error > 0.0
+                && outgoing.dot(local_right) * error > 0.0
+            {
+                action.horizontal = error.signum();
+            }
+        }
         self.telemetry.goal = if p.supported_planet.is_some() {
             GroundGoal::Walk
         } else {

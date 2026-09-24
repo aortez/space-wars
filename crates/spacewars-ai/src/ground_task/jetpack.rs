@@ -14,14 +14,34 @@ impl GroundNavigationTask {
         target: Vec2,
         range: f32,
         o: &RecoveryTaskObservationV1,
-    ) -> (GroundRoute, Option<CrossingPlan>) {
+    ) -> (GroundRoute, Option<CrossingPlan>, Vec2) {
+        let p = &o.flight.pilot;
+        let hatches = p.boarding_hatches.map(|h| {
+            h.map(|point| (point - p.planet.motion.position).rotate_radians(-p.planet.motion.angle))
+        });
+        let selected_target = |r: &GroundRoute| {
+            if self.telemetry.destination != GroundDestination::Hatch {
+                return target;
+            }
+            r.path
+                .last()
+                .and_then(|id| map.nodes.iter().find(|n| n.id == *id))
+                .and_then(|node| {
+                    let center = node.position + node.position.normalized() * HALF_HEIGHT;
+                    hatches
+                        .into_iter()
+                        .flatten()
+                        .min_by(|a, b| a.distance_to(center).total_cmp(&b.distance_to(center)))
+                })
+                .unwrap_or(target)
+        };
         let route = |routes: &GroundRoutes<'_>| {
             if let Some(plan) = self.telemetry.flag_approach.filter(|plan| !plan.reached) {
                 // A narrow footing target preserves the selected node even if
                 // another footing is already in the flag's interaction radius.
                 routes.route(foot, plan.endpoint.position, 0.01)
             } else if self.telemetry.destination == GroundDestination::Hatch {
-                routes.route_to_hatch(foot, target)
+                routes.route_to_hatches(foot, hatches)
             } else if self.telemetry.destination == GroundDestination::Flag {
                 routes.route_to_actor_target(foot, target, range)
             } else {
@@ -38,28 +58,54 @@ impl GroundNavigationTask {
             }
         };
         let direct = route(&map.routes());
+        let direct_target = selected_target(&direct);
         let Some(jetpack) = &o.jetpack else {
-            return (direct, None);
+            return (direct, None, direct_target);
         };
         if !jetpack.surveyed
             || !jetpack.charge.is_finite()
             || !(0.0..=1.0).contains(&jetpack.charge)
             || jetpack.terrain_crossings.len() > MAX_TERRAIN_CROSSINGS
         {
-            return (direct, None);
+            return (direct, None, direct_target);
         }
         let mut graph = map.clone();
         let mut flights = Vec::new();
-        for plan in jetpack
-            .crossing
+        let approved = jetpack
+            .vehicle_forecast
+            .filter(|c| c.valid_for(map) && c.valid_at(p.tick));
+        let candidates: Vec<_> = if self.powered_flag {
+            approved.iter().map(|c| c.plan).collect()
+        } else {
+            jetpack
+                .crossing
+                .iter()
+                .chain(&jetpack.terrain_crossings)
+                .copied()
+                .collect()
+        };
+        for plan in candidates
             .iter()
-            .chain(&jetpack.terrain_crossings)
             .filter(|plan| valid_plan(plan, map))
-            .flat_map(|plan| [plan.clone(), plan.reversed()])
+            .flat_map(|plan| [*plan, plan.reversed()])
         {
             // A measured direct ground edge is cheaper. Keep one unambiguous
             // flight per node pair when a vehicle and gap survey overlap.
-            if let Some((from, to)) = graph.connect_jetpack(plan.start, plan.destination) {
+            let connected = if self.powered_flag {
+                approved.map(|c| {
+                    let edges = c.edges();
+                    let edge = if plan.direction == c.plan.direction {
+                        edges[0]
+                    } else {
+                        edges[1]
+                    };
+                    graph.edges.push(edge);
+                    (edge.from, edge.to)
+                })
+            } else {
+                graph.connect_jetpack(plan.start, plan.destination)
+            };
+            if let Some((from, to)) = connected {
                 flights.push((from, to, plan));
             }
         }
@@ -73,22 +119,27 @@ impl GroundNavigationTask {
         {
             // Only nearby powered crossings are surveyed. Walk/fly through the
             // known portion, then survey again from its end before continuing.
-            combined = routes.route_toward_actor_target(foot, target, range);
+            combined = if self.telemetry.destination == GroundDestination::Hatch {
+                routes.route_toward_hatches(foot, hatches)
+            } else {
+                routes.route_toward_actor_target(foot, target, range)
+            };
         }
         if cost(&combined) + 2.0 < cost(&direct) {
+            let combined_target = selected_target(&combined);
             for (i, pair) in combined.path.windows(2).enumerate() {
                 if let Some((_, _, plan)) = flights
                     .iter()
                     .find(|(a, b, _)| *a == pair[0] && *b == pair[1])
                 {
-                    let plan = plan.clone();
+                    let plan = *plan;
                     combined.path.truncate(i + 1);
-                    return (combined, Some(plan));
+                    return (combined, Some(plan), combined_target);
                 }
             }
-            return (combined, None);
+            return (combined, None, combined_target);
         }
-        (direct, None)
+        (direct, None, direct_target)
     }
 
     pub(super) fn follow_crossing(&mut self, o: &RecoveryTaskObservationV1) -> SurfaceSortieAction {
@@ -101,6 +152,12 @@ impl GroundNavigationTask {
             return self.interrupt_crossing(p.tick);
         }
         let old = task.telemetry().plan.as_ref().unwrap();
+        if self.powered_flag
+            && jetpack.surveyed
+            && jetpack.vehicle_forecast.is_none_or(|f| !f.valid_at(p.tick))
+        {
+            return self.interrupt_crossing(p.tick);
+        }
         let observation = jetpack.for_crossing(p, old);
         if jetpack.surveyed {
             if observation

@@ -11,6 +11,10 @@ mod mission_metrics;
 mod physics_profile;
 #[path = "support/planning_probe.rs"]
 mod planning_probe;
+#[path = "support/successor_continuation.rs"]
+mod successor_continuation;
+#[path = "support/successor_probe.rs"]
+mod successor_probe;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -65,6 +69,11 @@ fn main() {
     let mut physics_profile = (arg("--profile-physics", "false") == "true")
         .then(physics_profile::PhysicsProfile::default);
     let trace = arg("--trace", "false") == "true";
+    let trace_ground_contacts = arg("--trace-ground-contacts", "false") == "true";
+    assert!(
+        !trace_ground_contacts || trace,
+        "ground contact tracing needs --trace true"
+    );
     let timing_csv = arg("--timing-csv", "false") == "true";
     let mut planning_probe = (arg("--probe-planning-budget", "false") == "true")
         .then(planning_probe::PlanningProbe::default);
@@ -96,6 +105,17 @@ fn main() {
         "--require-finish needs --match true"
     );
     let probe_ground_start = arg("--probe-ground-start", "false") == "true";
+    let probe_ground_tick = match arg("--probe-ground-tick", "none").as_str() {
+        "none" => None,
+        tick => Some(
+            tick.parse::<u64>()
+                .expect("ground probe tick must be an integer"),
+        ),
+    };
+    assert!(
+        !probe_ground_start || probe_ground_tick.is_none(),
+        "choose automatic or explicit ground probing"
+    );
     let mut probed_ground_start = false;
     let require_route = arg("--require-route", "false") == "true";
     let require_hunt = arg("--require-hunt", "false") == "true";
@@ -181,15 +201,65 @@ fn main() {
     });
     let selected_policies: [MissionPolicy; 2] = ["--p1-policy", "--p2-policy"]
         .map(|flag| arg(flag, "material_mission_v9").parse().unwrap());
+    let acquisition_seats = match arg("--bounded-acquisition-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--bounded-acquisition-seats must be none, 0, 1 or both"),
+    };
+    let disengagement_seats = match arg("--disengagement-seats", "none").as_str() {
+        "none" => [false, false],
+        "0" => [true, false],
+        "1" => [false, true],
+        "both" => [true, true],
+        _ => panic!("--disengagement-seats must be none, 0, 1 or both"),
+    };
+    let cover_probe = arg("--probe-destination-cover", "false") == "true";
+    let compare_successors = arg("--probe-successors", "false") == "true";
+    assert!(
+        !compare_successors || cover_probe,
+        "successor comparison requires --probe-destination-cover true"
+    );
+    let mut successor_probe =
+        compare_successors.then(|| successor_probe::SuccessorProbe::new(&out));
+    let mut continuation = successor_continuation::ContinuationRun::from_args(&out);
+    assert!(
+        continuation.is_none() || (compare_successors && mode == "duel" && match_rules),
+        "physical continuations require successor probes and a duel with match rules"
+    );
+    assert!(
+        !cover_probe || live_planning.is_some(),
+        "destination cover requires --live-objective-planning true"
+    );
+    assert!(
+        !cover_probe
+            || (0..2).any(|i| disengagement_seats[i]
+                && live_planning
+                    .as_ref()
+                    .is_some_and(|live| live.enabled_for(i))
+                && !selected_policies[i].objective_planning().is_legacy()),
+        "destination cover requires an enabled planner escape seat"
+    );
+    let handoff_probe = arg("--probe-disengagement-handoff", "false") == "true";
+    let boundary_guidance = arg("--disengagement-boundary", "false") == "true";
+    assert!(
+        !handoff_probe || disengagement_seats.contains(&true),
+        "handoff probe requires --disengagement-seats"
+    );
+    assert!(
+        !boundary_guidance || disengagement_seats.contains(&true),
+        "boundary guidance requires --disengagement-seats"
+    );
     assert!(
         live_planning.as_ref().is_none_or(|live| {
             (0..2).any(|i| {
                 live.enabled_for(i)
-                    && selected_policies[i] == MissionPolicy::Planner
+                    && !selected_policies[i].objective_planning().is_legacy()
                     && (i == seat || mode == "duel")
             })
         }),
-        "live objective planning needs an active v10 seat"
+        "live objective planning needs an active planner seat"
     );
     assert!(
         !verify_on_foot_surveys || selected_policies == [MissionPolicy::Legacy; 2],
@@ -204,6 +274,11 @@ fn main() {
             },
             breaks,
         )
+        .with_bounded_acquisition(acquisition_seats[i])
+        .with_pursuit_disengagement(disengagement_seats[i])
+        .with_disengagement_handoff_probe(disengagement_seats[i] && handoff_probe)
+        .with_disengagement_boundary_guidance(disengagement_seats[i] && boundary_guidance)
+        .with_destination_cover_probe(disengagement_seats[i] && cover_probe)
     });
     // Independent policy state consumes the original observations and must
     // emit identical encoded controls on every tick. This work is not timed.
@@ -271,6 +346,7 @@ fn main() {
         let mut policy_times = [0.0; 2];
         let mut ground_nodes = [0; 2];
         let mut landing_queries = ["not_observed"; 2];
+        let mut successor_construction_ms = 0.0;
         for i in 0..2 {
             let owner = PlayerId::from_index(i).unwrap();
             if i == seat || mode == "duel" {
@@ -286,11 +362,18 @@ fn main() {
                 let clock = Instant::now();
                 let mut observe = || {
                     if let Some(live) = live_planning.as_mut().filter(|live| {
-                        live.enabled_for(i) && selected_policies[i] == MissionPolicy::Planner
+                        live.enabled_for(i)
+                            && !selected_policies[i].objective_planning().is_legacy()
                     }) {
                         let mut o =
                             state.mission_observation_for_live_planning(i, request, cadence);
-                        live.observe(&state, i, &mut o.local);
+                        live.observe(&state, i, &mut o.local, request.objective_planning);
+                        live.observe_destination_cover(
+                            &state,
+                            i,
+                            &mut o,
+                            request.destination_cover,
+                        );
                         o
                     } else {
                         state.mission_observation_with_cadence(i, request, cadence)
@@ -341,9 +424,19 @@ fn main() {
                     objective_sensors.push(sensor_ms);
                 }
                 let clock = Instant::now();
-                let mut intent = pilots[i].intent(&o);
+                let mut intent = if let Some(trial) = &mut continuation {
+                    trial.intent(i, &mut pilots[i], &o)
+                } else {
+                    pilots[i].intent(&o)
+                };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
+                if let Some(probe) = &mut successor_probe {
+                    successor_construction_ms += probe.observe(i, &pilots[i], &o);
+                }
+                if let Some(trial) = &mut continuation {
+                    trial.record(i, &pilots[i], &state, &o, intent);
+                }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
                     let mut original = if reference_site == site {
@@ -405,9 +498,11 @@ fn main() {
                     .as_ref()
                     .and_then(|c| c.ground.as_ref())
                     .or_else(|| telemetry.recovery.as_ref().and_then(|r| r.ground.as_ref()));
-                if probe_ground_start && !probed_ground_start && i == seat
-                    && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting))
+                if !probed_ground_start && i == seat
+                    && (probe_ground_tick == Some(tick)
+                        || probe_ground_start && ground.and_then(|g| g.route.as_ref()).is_some_and(|r| r.failure == Some(scenario_spacewars::surface_sortie::ground_navigation::GroundRouteFailure::NoStartFooting)))
                 {
+                    assert!(p.actor.is_some(), "ground probe requires an on-foot actor");
                     ground_start_probe::run(&state, i, &out);
                     probed_ground_start = true;
                 }
@@ -441,34 +536,34 @@ fn main() {
                         || posture_key != last_posture[i]
                         || o.local.landing_objective.is_some())
                 {
-                    serde_json::to_writer(
-                        &mut *trace,
-                        &json!({
-                            "version": 1, "tick": tick, "seat": i,
-                            "observation": o, "actions": intent.encode(owner),
-                            "controls": {"turn": intent.flight.controls.horizontal,
-                                "thrust": intent.flight.controls.primary_held,
-                                "brake": intent.flight.controls.brake_held},
-                            "mission": pilots[i].telemetry(),
-                            "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
-                            "posture": posture.map(|s| json!({
-                                "balance": format!("{:?}", s.balance),
-                                "get_up_result": format!("{:?}", s.get_up_result),
-                                "get_up_attempts": s.get_up_attempts,
-                                "recovery_progress": s.recovery_progress,
-                                "settled_seconds": s.settled_seconds,
-                                "knockdowns": s.knockdowns, "recoveries": s.recoveries,
-                                "support": s.support.map(|contact| json!({
-                                    "collider": format!("{:?}", contact.collider),
-                                    "position": contact.position, "normal": contact.normal,
-                                    "local_surface": {"position": contact.local_surface.position, "normal": contact.local_surface.normal},
-                                    "velocity": contact.velocity, "spin": contact.angular_velocity,
-                                    "separation": contact.separation,
-                                })),
+                    let mut record = json!({
+                        "version": 1, "tick": tick, "seat": i,
+                        "observation": o, "actions": intent.encode(owner),
+                        "controls": {"turn": intent.flight.controls.horizontal,
+                            "thrust": intent.flight.controls.primary_held,
+                            "brake": intent.flight.controls.brake_held},
+                        "mission": pilots[i].telemetry(),
+                        "landing_diagnostics": state.landing_diagnostics(i, p.sites.first()),
+                        "posture": posture.map(|s| json!({
+                            "balance": format!("{:?}", s.balance),
+                            "get_up_result": format!("{:?}", s.get_up_result),
+                            "get_up_attempts": s.get_up_attempts,
+                            "recovery_progress": s.recovery_progress,
+                            "settled_seconds": s.settled_seconds,
+                            "knockdowns": s.knockdowns, "recoveries": s.recoveries,
+                            "support": s.support.map(|contact| json!({
+                                "collider": format!("{:?}", contact.collider),
+                                "position": contact.position, "normal": contact.normal,
+                                "local_surface": {"position": contact.local_surface.position, "normal": contact.local_surface.normal},
+                                "velocity": contact.velocity, "spin": contact.angular_velocity,
+                                "separation": contact.separation,
                             })),
-                        }),
-                    )
-                    .unwrap();
+                        })),
+                    });
+                    if trace_ground_contacts {
+                        record["ground_contacts"] = state.ground_contact_diagnostics(i);
+                    }
+                    serde_json::to_writer(&mut *trace, &record).unwrap();
                     writeln!(trace).unwrap();
                 }
                 last_posture[i] = posture_key;
@@ -489,9 +584,16 @@ fn main() {
                 actions.extend(intent.encode(owner));
             }
         }
-        let planning_ms = live_planning
-            .as_mut()
-            .map_or(0.0, |live| live.advance(state.tick()));
+        let mut planning_ms = successor_construction_ms
+            + live_planning
+                .as_mut()
+                .map_or(0.0, |live| live.advance(&state));
+        if let Some(probe) = &mut successor_probe {
+            planning_ms += probe.advance(
+                state.tick(),
+                live_planning.as_ref().unwrap().remaining_work(),
+            );
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -631,8 +733,23 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if acquisition_seats.contains(&true) {
+        report["bounded_acquisition"] = json!({
+            "profile": spacewars_ai::tactical_sortie::ACQUISITION_WAIT_PROFILE,
+            "enabled_seats": acquisition_seats,
+            "deadline_ticks": spacewars_ai::tactical_sortie::ACQUISITION_DEADLINE_TICKS,
+        });
+    }
+    report["pursuit_disengagement"] = json!({"enabled_seats":disengagement_seats,"probe_handoff":handoff_probe,
+            "boundary_guidance":boundary_guidance,"destination_cover_probe":cover_probe});
     if let Some(live) = &mut live_planning {
         report["live_objective_planning"] = live.report();
+    }
+    if let Some(probe) = &mut successor_probe {
+        report["successor_comparison"] = probe.report();
+    }
+    if let Some(trial) = &mut continuation {
+        report["successor_continuation"] = trial.report(&state, &pilots[trial.actor()]);
     }
     report["landing_survey_hz"] = json!(survey_hz);
     report["landing_queries"] = json!(landing_query_counts);
@@ -678,6 +795,10 @@ fn main() {
         json!({"physics_ok":report["physics_ok"],"distinct_departures":completed,"steps":report["steps"],"sensors":report["sensors"]})
     );
     assert!(report["physics_ok"] == true, "physical audit failed");
+    assert!(
+        probe_ground_tick.is_none() || probed_ground_start,
+        "requested ground probe tick was not reached"
+    );
     if require_finish {
         assert!(
             state.match_outcome().is_some(),
