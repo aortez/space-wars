@@ -259,7 +259,7 @@ fn a_disturbed_warmup_is_discarded_and_retried() {
     // the same floor, this is not an uncontaminated vertical calibration.
     event.world.as_mut().unwrap().apply_velocity_delta(
         DUCK_BODY,
-        Vec2::new(event.radius * 20.0, 0.0),
+        Vec2::new(event.radius * 20.0 * event.direction, 0.0),
         true,
     );
     while event.controller.heights.count < 2 {
@@ -358,14 +358,15 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
         let Some(crate::events::ActiveEvent::Duck(event)) = &mut state.active_event else {
             panic!()
         };
+        let fallen = event.physics_position(Vec2::new(
+            event.width * 0.5,
+            event.layout.floor_y - event.radius * 6.0,
+        ));
+        let obstruction =
+            event.physics_position(Vec2::new(event.width * 0.15, event.layout.floor_y + 100.0));
         let world = event.world.as_mut().unwrap();
         if fall {
-            world.set_pose(
-                DUCK_BODY,
-                Vec2::new(event.width * 0.5, event.layout.floor_y - event.radius * 6.0),
-                0.0,
-                true,
-            );
+            world.set_pose(DUCK_BODY, fallen, 0.0, true);
         } else {
             // A real unjumpable obstruction, not a mock of the completion path.
             let id = PhysicsId::new(999);
@@ -373,7 +374,7 @@ fn a_fall_and_a_blocked_runner_recover_within_the_catalog_bound() {
                 BodyId::new(id, BodyRole::PRIMARY),
                 BodySpec {
                     kind: BodyKind::Fixed,
-                    position: Vec2::new(event.width * 0.15, event.layout.floor_y + 100.0),
+                    position: obstruction,
                     ..BodySpec::default()
                 },
                 &[ColliderSpec::cuboid(

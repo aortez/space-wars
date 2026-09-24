@@ -25,6 +25,11 @@ pub(super) fn render_arena(frame: &mut RenderFrame, event: &DuckEvent, opacity: 
     if opacity <= 0.0 {
         return;
     }
+    if let Some(drain) = event.drain_floor {
+        // Preserve the original bank geometry and edge styling on handoff.
+        render_floor(frame, drain.geometry(), event.layout.pitch, opacity);
+        return;
+    }
     let layout = event.layout;
     let radius = event.radius;
     let orange = RenderColor::rgb(1.0, 0.48, 0.08);

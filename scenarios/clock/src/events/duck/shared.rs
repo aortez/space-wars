@@ -95,14 +95,15 @@ impl DuckEvent {
 
     pub fn rejoin_arena(&mut self, session_id: u64, seat: u8) {
         assert!(self.arena_claimed && self.player.is_none());
-        self.player = Some(PlayerControl {
+        if self.entry_arena_opacity.is_some() {
+            self.entry_arena_opacity = Some(self.arena_opacity());
+        }
+        self.player = Some(PlayerControl::new(
             session_id,
             seat,
-            move_milli: 0,
-            jump_held: false,
-            jump_pending: false,
-            facing: 1.0,
-        });
+            1.0,
+            OPENING_TICKS + PLAYER_EXIT_DELAY_TICKS,
+        ));
         self.tick = 0;
         self.jumps = 0;
         self.outcome = None;
@@ -114,11 +115,23 @@ impl DuckEvent {
     }
 
     pub fn arena_opacity(&self) -> f32 {
-        if self.arena_claimed {
+        if let Some(initial) = self.entry_arena_opacity {
+            let opacity =
+                initial + (1.0 - initial) * (self.tick as f32 / OPENING_TICKS as f32).min(1.0);
+            if self.phase == EventPhase::Resetting && !self.arena_claimed {
+                opacity * self.course_opacity()
+            } else {
+                opacity
+            }
+        } else if self.arena_claimed {
             1.0
         } else {
             self.course_opacity()
         }
+    }
+
+    pub fn preserve_arena_opacity(&mut self, opacity: f32) {
+        self.entry_arena_opacity = Some(opacity);
     }
 
     fn step_unoccupied_arena(&mut self, panels_advanced: bool) {

@@ -26,6 +26,7 @@ pub(crate) struct FallingEvent {
     tick: u64,
     mechanics: Mechanics,
     letters: Option<[LetterState; 2]>,
+    standalone_floor: Option<crate::floor::DrainGeometry>,
 }
 
 impl FallingEvent {
@@ -42,6 +43,7 @@ impl FallingEvent {
             tick: 0,
             mechanics: Mechanics::Standalone(Some(Box::new(world))),
             letters,
+            standalone_floor: context.floor.drain(),
         }
     }
 
@@ -63,7 +65,35 @@ impl FallingEvent {
                 arena,
             },
             letters,
+            standalone_floor: None,
         }
+    }
+
+    pub fn join_player(&mut self, seed: u64, session: u64, seat: u8) -> Option<Box<DuckEvent>> {
+        let Mechanics::Standalone(world) = &mut self.mechanics else {
+            return None;
+        };
+        let drain = self
+            .standalone_floor
+            .take()
+            .expect("standalone Falling floor");
+        let (world, bodies) = match world.take() {
+            Some(world) => {
+                let (world, bodies) = world.into_parts();
+                (world, Some(bodies))
+            }
+            // The bars are already visual-only during reformation.
+            None => (FallingWorld::arena(drain), None),
+        };
+        let mut duck = Box::new(DuckEvent::new_drain_player(
+            drain, seed, session, seat, world,
+        ));
+        if let Some(bodies) = &bodies {
+            bodies.match_gravity(duck.arena_world_mut());
+        }
+        let arena = PlayerArena::claim(&mut duck);
+        self.mechanics = Mechanics::Player { bodies, arena };
+        Some(duck)
     }
 
     fn letters_for(context: &EventContext<'_>) -> Option<[LetterState; 2]> {

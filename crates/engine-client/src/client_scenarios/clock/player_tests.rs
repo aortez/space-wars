@@ -3,7 +3,9 @@ use crate::input::{GameKey, GamepadSeatInput};
 use engine_common::ClockEventProfile;
 
 mod falling;
+mod join;
 mod meltdown;
+mod takeover;
 
 fn scenario(viewport: Viewport) -> ClockClientScenario {
     let mut state = ClockScenario::init(

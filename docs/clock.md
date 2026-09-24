@@ -512,8 +512,9 @@ Physical cabinet mappings are documented in [Picade controls](picade.md).
 ### Player-controlled duck visits
 
 Press **D** on the keyboard, **North (Y)** on a gamepad, or the Picade's
-**bottom-right blue** button to start a visit. Press it again to dismiss your
-duck. **Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
+**bottom-right blue** button to start a visit or take over the automatic duck
+already on screen. Press it again to dismiss your duck.
+**Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
 jumps. Picade's working **bottom-middle yellow** is Jump. Keyboard belongs to
 P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
 cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
@@ -521,18 +522,39 @@ Release movement/jump controls after starting or resuming before taking control.
 Touch still opens pause; this first slice does not add touch movement buttons.
 
 This is one player duck in the existing Clock, not another launcher scenario.
-Its visit is separate from the timed event scheduler. Starting replaces a
-standalone Falling, Meltdown or AI Duck event, recovers its face/water/physics,
-and opens a seeded course; an active visual event continues. Joining Rain instead
-preserves its current arena, water, panels and event ID, whether it uses a player
-course or the ordinary responsive floor. The
-player drives the **same dry movement actuator, gravity, jump impulse and circular
-body shape** used by Careful/Flowing AI; those existing brains and automatic Duck
-timings are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
+Its visit is separate from the timed event scheduler. Starting during Falling,
+ordinary Meltdown or Rain joins the current arena without resetting the event,
+its moving objects, water, floor or event ID. An active visual event continues;
+starting from idle opens a seeded course. Starting during the automatic Duck
+event takes control of that same visit; only developer water-lab previews are
+recovered/replaced. The player drives the **same dry movement actuator, gravity,
+jump impulse and circular body shape** used by Careful/Flowing AI. Those brains,
+movement tuning and automatic event duration are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
 through the same acceleration limit, including airborne braking. Horizontal
 input is screen-relative even when the entrance/course is mirrored. A physical
 rear wall keeps the player in view. The opposite exit appears after entry closes;
 walk through it to finish. Missing a gap ends the visit too.
+
+**Taking over an automatic duck:** The existing course, body/collider, mass,
+position, velocity, contacts, facing, jump count and entrance animation all stay
+intact, including mid-jump. The automatic event slot enters its usual cooldown
+without recreating the actor or advancing physics. The player owns the same
+visit thereafter, so compatible events can run alongside it. A closed exit
+starts opening within 44 ticks (after entrance opening if still entering); an
+already-open exit stays open. The bot's 35-second timeout no longer applies.
+If the duck has already fallen or exited and is fading out, the button instead
+starts a fresh visit. A second press dismisses; it does **not** hand control back
+to the bot.
+
+Both controllers now share screen/world-space physics and the same buoyant
+circle from spawn. Course planning still uses entrance-relative observations;
+the Careful/Flowing decision algorithms are unchanged. Takeover switches the
+command source and adds the player's entrance safety wall, not a replacement
+physics world. Dry automatic visits still have one dynamic body and do no water
+queries. Tests cover both entrance directions/profiles, opening/running/jumping/
+exiting, exact body/contact continuity, normal bounded braking, controller-neutral
+gating, event composition and cleanup. Raster captures compare the takeover frame
+pixel-for-pixel on Picade, HyperPixel and portrait layouts.
 
 A fresh **grounded** jump press is required: no held-button auto-hop, opening
 jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
@@ -595,7 +617,7 @@ the same bodies, and the floor gently closes using the existing rate/clearance
 rules without allocating a dummy water world. A later shower builds its empty
 pools at that retained pose; it does not snap the panels back to horizontal.
 This is still one-way buoyancy/drag. Meltdown can also reuse these retained panels;
-the automatic AI Duck course remains separate.
+new automatic AI Duck visits wait until the player leaves.
 
 **Falling alongside a player:** Falling is available to the automatic schedule,
 Next Event, previews and CLI triggers during a visit. Its lit bars and AM/PM
@@ -622,9 +644,20 @@ After 210 falling ticks the event removes **only its batch** before the 90-tick
 visual reformation, so there are no invisible bars flying back through the duck.
 A duck formerly standing on a bar becomes airborne normally. Finishing or
 replacing Falling preserves a live player; if nobody remains, the last floor
-claim and world are released. Joining a *standalone* Falling event still replaces
-that old arena with a new player course; in-place joining currently applies to
-Rain and previously shared Falling/Meltdown arenas.
+claim and world are released.
+
+**Joining standalone Falling:** The existing Rapier world moves into the player
+arena intact, retaining every body, collider, contact, mass, pose and velocity.
+The two original floor banks and side walls remain; no obstacle course appears.
+World gravity adopts the duck's calibrated acceleration, and the existing bars'
+per-body scales compensate to retain their 400-unit acceleration. This is a
+bounded, one-time change, not a second simulation or per-tick reconstruction.
+The duck exits at the visible far door's threshold, before its backing wall;
+both walls remain physical for the falling bars. Joining during reformation
+creates only the original terrain, never resurrecting the visual-only bars.
+The retained drain arena has at most **35 bodies / 124 colliders** with the duck
+and all bars/letters, and **5 / 5** afterward. It can host later Rain/Meltdown
+events on the same real banks and gap.
 
 Regression coverage includes actual bar/duck impact and grounded jumping, one
 world step versus an isolated-player baseline, zero-dt pause, first-frame pose
@@ -660,6 +693,25 @@ world-wide contact list. Each world steps once per fixed tick, including entry,
 empty-arena simulation and cleanup. At tick 420 all remaining solid bodies are
 removed and explicitly reclaimed before visual reformation; water reclamation
 and the latest-time recovery retain the normal 510-tick envelope.
+
+**Joining standalone Meltdown:** Keep the actual water world, its pools/parcels,
+material ledger, floor actuator and event tick. Promote only surviving released
+cells to bodies at their existing position, angle, linear velocity and spin.
+Unreleased cells keep their original seeded release times and have no colliders
+yet; already melted or escaped material is never recreated. Promotion itself
+steps neither physics nor water. From then on the blocks interact physically,
+so their subsequent motion can differ from the lightweight standalone animation.
+Unvisited Meltdown retains the cheaper ballistic path.
+
+An adopted arena's visibility is separate from the new duck's entrance animation.
+Its floor cannot blink away if the event ends while the door is opening. Joining
+a fading Meltdown smoothly restores the current panel opacity over the 36-tick
+entrance, preserving both the first visible frame and the actual panel pose.
+Tests cover early/mid/last-tick entry, exact pre/post-join render geometry and
+material state, body-motion handoff, calibrated jumping, single stepping,
+dismiss/rejoin, subsequent events, deterministic replay and cleanup. Production
+raster/vector captures exercise live and late entry on Picade, HyperPixel and
+portrait layouts; the world raster is unchanged at the join action itself.
 
 Falling and Meltdown share the same arena lease lifecycle. Leaving retains the
 exact world for the event; rejoining uses a fresh session without resetting

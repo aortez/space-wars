@@ -4,8 +4,10 @@ use events::duck::planner::Surface;
 
 mod composition;
 mod falling;
+mod join;
 mod rain;
 mod responsive;
+mod takeover;
 
 fn ready(aspect: f32, seed: u64) -> ClockState {
     let mut state = ClockScenario::init(
@@ -381,17 +383,22 @@ fn replacing_events_and_player_visits_resize_and_repeated_cleanup_are_bounded() 
             );
             assert_eq!(
                 state.event_kind(),
-                active_at_spawn.filter(|kind| *kind == ClockEventKind::Rain
-                    || !EVENT_CATALOG[*kind as usize].uses_floor())
+                active_at_spawn.filter(|kind| *kind != ClockEventKind::Duck)
             );
             assert_eq!(
                 state.rain_state().is_some(),
                 active_at_spawn == Some(ClockEventKind::Rain)
             );
-            assert!(state.meltdown_state().is_none());
-            assert_eq!(state.body_count(), 0, "old world dropped before opening");
+            assert_eq!(
+                state.meltdown_state().is_some(),
+                active_at_spawn == Some(ClockEventKind::Meltdown)
+            );
+            assert!(
+                state.body_count() <= 128,
+                "existing physical events are adopted"
+            );
             ticks(&mut state, 60);
-            assert!(state.body_count() <= 9);
+            assert!(state.body_count() <= 128);
             ClockScenario::step(&mut state, &[ClockAction::next_event()], Duration::ZERO);
             assert!(state.player_duck_state().is_some());
             assert_eq!(state.event_id(), event_id + 1);

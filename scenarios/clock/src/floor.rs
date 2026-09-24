@@ -67,11 +67,15 @@ impl FloorManager {
     }
 
     pub fn acquire_player(&mut self) {
-        if self.owner == Some(FloorOwner::Event(ClockEventKind::Rain)) {
+        if let Some(FloorOwner::Event(
+            kind @ (ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown),
+        )) = self.owner
+        {
             self.owner = Some(FloorOwner::PlayerArena {
                 player: true,
-                event: Some(ClockEventKind::Rain),
+                event: Some(kind),
             });
+            self.mode = ClockFloorMode::EventOwned;
             return;
         }
         if let Some(FloorOwner::PlayerArena { player, event }) = &mut self.owner {
@@ -189,6 +193,10 @@ impl FloorGeometry {
 pub(crate) struct DrainGeometry(FloorGeometry);
 
 impl DrainGeometry {
+    pub fn geometry(self) -> FloorGeometry {
+        self.0
+    }
+
     pub fn layout(self) -> Layout {
         self.0.layout
     }
