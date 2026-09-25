@@ -23,6 +23,13 @@ impl MissionPolicy {
             Self::JetpackPlanner => "material_mission_v11",
         }
     }
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Legacy => "Legacy bot v9",
+            Self::Planner => "Planner bot v10",
+            Self::JetpackPlanner => "Jetpack bot v11",
+        }
+    }
     pub fn objective_planning(self) -> ObjectivePlanning {
         match self {
             Self::Legacy => ObjectivePlanning::Legacy,

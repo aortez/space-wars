@@ -68,6 +68,21 @@ struct MaterialMissionClientScenario {
     evaluation: MissionEvaluator,
     surveys: LiveObjectivePlanner,
 }
+impl MaterialMissionClientScenario {
+    fn append_controller_hud(&self, frames: &mut [RenderFrame], viewport: Viewport) {
+        for seat in 0..2 {
+            let identity = if self.bots[seat] {
+                self.pilots[seat].policy().display_name()
+            } else {
+                "Human"
+            };
+            super::hud::append_controller_identity(frames, viewport, seat, identity);
+            if self.bots[seat] {
+                pilot_hud_for(frames, seat, &self.pilots[seat].label());
+            }
+        }
+    }
+}
 fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
     let registration = match (duel, arena) {
         (false, false) => &TRAVEL_REGISTRATION,
@@ -246,9 +261,7 @@ impl ClientScenario for MaterialMissionClientScenario {
     }
     fn render_frames(&self, renderer: RenderBackend, viewport: Viewport) -> Vec<RenderFrame> {
         let mut frames = self.sortie.render_frames(renderer, viewport);
-        for seat in (0..2).filter(|&seat| self.bots[seat]) {
-            pilot_hud_for(&mut frames, seat, &self.pilots[seat].label());
-        }
+        self.append_controller_hud(&mut frames, viewport);
         frames
     }
     fn frame_layout(&self) -> FrameLayout {
@@ -256,9 +269,7 @@ impl ClientScenario for MaterialMissionClientScenario {
     }
     fn render_frames_reference(&self, viewport: Viewport) -> Option<Vec<RenderFrame>> {
         let mut frames = self.sortie.render_frames_reference(viewport)?;
-        for seat in (0..2).filter(|&seat| self.bots[seat]) {
-            pilot_hud_for(&mut frames, seat, &self.pilots[seat].label());
-        }
+        self.append_controller_hud(&mut frames, viewport);
         Some(frames)
     }
     fn is_game_over(&self) -> bool {
