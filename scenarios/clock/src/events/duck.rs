@@ -3,6 +3,8 @@
 
 pub(crate) mod arena;
 mod controller;
+#[cfg(test)]
+mod debris_tests;
 mod drain;
 mod flow;
 pub(crate) mod planner;
@@ -517,13 +519,25 @@ impl DuckEvent {
         let Some(world) = &mut self.world else { return };
         let motion = world.motion(DUCK_BODY).expect("live duck body");
         let screen = self.direction;
-        let support_velocity = if grounded {
+        let contact = if grounded {
             world
                 .surface_contacts(DUCK_COLLIDER)
                 .find(|c| c.normal.y > 0.7 && c.separation <= self.radius * 0.05)
-                .map_or(Vec2::ZERO, |c| c.velocity)
         } else {
-            Vec2::ZERO
+            None
+        };
+        let support_velocity = contact.map_or(Vec2::ZERO, |c| c.velocity);
+        let debris = if self.player.is_none() && support.is_none() {
+            contact
+                .and_then(|c| world.collider_body(c.collider))
+                .and_then(|body| world.body_solid_bounds(body))
+                .map(|(min, max)| {
+                    let a = min.x * screen + self.width * 0.5;
+                    let b = max.x * screen + self.width * 0.5;
+                    (Vec2::new(a.min(b), min.y), Vec2::new(a.max(b), max.y))
+                })
+        } else {
+            None
         };
         let observed = Observation {
             position: Vec2::new(
@@ -535,6 +549,7 @@ impl DuckEvent {
                 motion.linear_velocity.y - support_velocity.y,
             ),
             support_velocity: Vec2::new(support_velocity.x * screen, support_velocity.y),
+            debris,
             grounded,
             blocked: world.surface_contacts(DUCK_COLLIDER).any(|contact| {
                 (contact.normal.x.abs() > 0.3 || contact.normal.y < -0.3)

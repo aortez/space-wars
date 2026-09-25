@@ -1007,6 +1007,48 @@ Duck + Falling overlap, telemetry recorded one lost-support recovery (127 ticks)
 six confirmed landings and subsequent exit navigation. Demo, Heavy rain and 5%
 volume were retained; no OS flash, reboot or other cabinet update was needed.
 
+#### Settled-debris escape
+
+A follow-up fixes a specific zero-steering stall: a duck standing on a digit
+body above the center of a course span used to "land" on the imagined floor
+underneath it forever. A real-Rapier regression reproduces this without waiting
+for event cleanup to remove the supporting block.
+
+After 18 consecutive clear, low-relative-speed contact ticks near its old
+target, recovery excludes the supporting body's footprint from landing targets.
+The engine exposes a read-only `body_solid_bounds` query over that body's parts
+(including local offsets/rotation, excluding sensors), not a world scan. The
+duck chooses a clear part of a reachable bank, walks off when possible, or uses
+the existing single grounded escape jump. It remembers the chosen side through
+takeoff so contact loss or tiny block motion cannot steer it back onto the block
+or oscillate between left and right. Stable ground or water recovery clears this
+memory. Targets above the debris remain eligible; fully obscured or unreachable
+banks do not authorize blind jumps. This is still bounded reactive recovery,
+not general navigation through piles of moving debris.
+
+The physical fixture covers both personalities, both entrance orientations and
+three block widths. All 12 recover on real course contacts in **47–78 ticks**
+(0.78–1.30 seconds), then make a subsequent planned landing while the debris
+remains in the world. Additional tests cover removal, transient/pinned contacts,
+takeoff memory, water preemption, stable-ground reset and unsafe-bank rejection.
+
+Against the merged #110 baseline, the paired 240-visit sweep retains **239 exact
+outcomes and departure ticks**, including every dry/rain-only/clear-weather case.
+Mixed results are 29 exits, 20 falls and 23 timeouts. The one changed case,
+`portrait:1:flowing:medium:mixed`, recovers but later falls during Meltdown
+(tick 1201) instead of timing out (tick 2070). This targeted stall fix is not
+an aggregate survival improvement; that remaining hazard case is kept visible,
+not removed from the matrix. Existing smoke/recovery exit assertions are unchanged.
+
+Validation: **1,901 workspace/all-target tests passed** (47 opt-in tests skipped),
+the 240-visit paired sweep and 392-course paired dry stress passed, as did strict
+Clock Clippy, formatting and 28 CI-harness tests. Rapier Clippy is clean with its
+pre-existing `collapsible_else_if` warning in `spaceling.rs` allowed; that file is
+unchanged. The release client/CLI were fast-deployed to **sw-picade-2 only**;
+installed hashes matched the bundle (`824b4d172756…` client, `9d8c8db88d85…` CLI).
+Live 1024×768 Clock playback reported 60 FPS/UPS and zero service restarts.
+Demo/Heavy rain settings were preserved; no OS flash or reboot was required.
+
 #### Other shared-visit coverage
 
 Headless model tests cover mirroring, movement, real exits and missed gaps,

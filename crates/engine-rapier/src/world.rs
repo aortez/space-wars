@@ -894,6 +894,29 @@ impl PhysicsWorld {
         self.raw.bodies.get(handle).map(body_motion)
     }
 
+    /// Current world-space min/max of one body's enabled solid colliders.
+    /// Allocation-free and local to that body's parts; sensors do not enlarge
+    /// physical support. Uses the current body pose even before the next step.
+    pub fn body_solid_bounds(&self, id: BodyId) -> Option<(Vec2, Vec2)> {
+        let body = self.raw.bodies.get(self.body_handle(id)?)?;
+        body.colliders()
+            .iter()
+            .filter_map(|handle| self.raw.colliders.get(*handle))
+            .filter(|collider| collider.is_enabled() && !collider.is_sensor())
+            .map(|collider| {
+                let pose =
+                    body.position() * collider.position_wrt_parent().copied().unwrap_or_default();
+                let bounds = collider.shape().compute_aabb(&pose);
+                (from_rapier(bounds.mins), from_rapier(bounds.maxs))
+            })
+            .reduce(|(min, max), (next_min, next_max)| {
+                (
+                    Vec2::new(min.x.min(next_min.x), min.y.min(next_min.y)),
+                    Vec2::new(max.x.max(next_max.x), max.y.max(next_max.y)),
+                )
+            })
+    }
+
     /// Velocity at a world-space point, accounting for an off-center mass.
     /// `BodyMotion::position` is the body origin, whereas its linear velocity
     /// is Rapier's center-of-mass velocity. They need not coincide.
@@ -2814,6 +2837,46 @@ mod tests {
         world.step(1.0 / 60.0);
 
         assert!(world.motion(dynamic).unwrap().linear_velocity.x > 0.0);
+    }
+
+    #[test]
+    fn solid_bounds_combine_parts_use_current_pose_and_exclude_sensors() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (entity, body, first) = ball_ids(1);
+        let mut left = ColliderSpec::cuboid(first, 2.0, 1.0);
+        left.local_position = Vec2::new(-3.0, 0.0);
+        let mut right = ColliderSpec::cuboid(ColliderId::new(entity, BALL_COLLIDER, 1), 1.0, 2.0);
+        right.local_position = Vec2::new(3.0, 0.0);
+        let mut sensor = ColliderSpec::ball(ColliderId::new(entity, BALL_COLLIDER, 2), 100.0);
+        sensor.sensor = true;
+        assert!(world.insert_body(body, BodySpec::default(), &[left, right, sensor]));
+        assert_eq!(
+            world.body_solid_bounds(body),
+            Some((Vec2::new(-5.0, -2.0), Vec2::new(4.0, 2.0)))
+        );
+        world.set_pose(
+            body,
+            Vec2::new(10.0, 20.0),
+            std::f32::consts::FRAC_PI_2,
+            true,
+        );
+        let before = world.snapshot_bytes().unwrap();
+        let (min, max) = world.body_solid_bounds(body).unwrap();
+        assert!(min.distance_to(Vec2::new(8.0, 15.0)) < 1e-4);
+        assert!(max.distance_to(Vec2::new(12.0, 24.0)) < 1e-4);
+        assert_eq!(world.snapshot_bytes().unwrap(), before);
+        world.remove_entity(entity);
+        assert_eq!(world.body_solid_bounds(body), None);
+    }
+
+    #[test]
+    fn sensor_only_body_has_no_solid_bounds() {
+        let mut world = PhysicsWorld::new(PhysicsWorldConfig::default());
+        let (_, body, collider) = ball_ids(1);
+        let mut sensor = ColliderSpec::ball(collider, 1.0);
+        sensor.sensor = true;
+        assert!(world.insert_body(body, BodySpec::default(), &[sensor]));
+        assert_eq!(world.body_solid_bounds(body), None);
     }
 
     #[test]

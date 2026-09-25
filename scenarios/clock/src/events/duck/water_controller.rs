@@ -158,6 +158,7 @@ mod tests {
         };
         let mut observed = Observation {
             support_velocity: Vec2::ZERO,
+            debris: None,
             position: Vec2::new(115.0, 5.0),
             velocity: Vec2::new(50.0, 0.0),
             grounded: false,
