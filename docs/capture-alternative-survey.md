@@ -138,6 +138,30 @@ priority. Python accounting tests cover partial comparisons and reject trace
 changes beyond the two declared ID fields. Independent review found no remaining
 runtime blocker and prompted the explicit client-budget distinction above.
 
+## Pi validation
+
+Runtime commit `cee36b77f01babde9bacba18982e197fdd1f9f84` was built and deployed
+to `sw-picade.local` with `./update.sh --fast --target sw-picade.local`.
+The matching client/CLI bundle passed compatibility and installed-hash checks;
+the kiosk was active with zero automatic restarts. Saved v9-versus-v10 automatic
+matches and the 30-second launcher delay were preserved.
+
+At match tick 1,456, the native dispatcher had completed 162 successful site
+checks using 10,206 queries. Both bots published remote evidence. P1's report
+at source tick 1,428 compared a 23.57-second current-trip reference with a
+32.52-second neutral alternative, retained an unknown third destination, and
+withheld `preferred_by_time`. A screenshot confirmed visible autoplay. These
+are functional live checks, not a paired Pi performance benchmark.
+
+Installed SHA-256 values:
+
+- `engine-client`: `d939890cdaab60197e88d88a7a1e85291add6ecfacf4ab380277f0a974fc92ee`
+- `spacewars-cli`: `5e95011079b0f0f7fa5c52f21ebb605721536c6dc9b451a5d3af8532a6095dda`
+
+The deployment log, manifest, status samples and screenshot are retained with
+the local artifacts below. The documentation follow-up does not change the
+installed runtime identity.
+
 ## Reproduction
 
 ```sh
