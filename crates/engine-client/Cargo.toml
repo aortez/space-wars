@@ -32,6 +32,7 @@ directories = { workspace = true }
 gilrs = { workspace = true }
 png = { workspace = true }
 sha2 = { workspace = true }
+serde_json = { workspace = true }
 slint = { workspace = true }
 # Local, opt-in software-renderer observation hooks for the presentation lab.
 i-slint-core = { version = "=1.13.1", default-features = false, features = ["experimental", "software-renderer"] }
@@ -45,7 +46,6 @@ slint-build = { workspace = true }
 
 [dev-dependencies]
 serde = { workspace = true }
-serde_json = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 bytemuck = { version = "1.13.1", features = ["derive"] }

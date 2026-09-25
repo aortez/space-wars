@@ -209,6 +209,16 @@ budgets for several bots, and a foundation for bot control beyond this specific
 mission. These remain design constraints for extending the initial comparison
 registry and implementing the shared planning scheduler.
 
+The first broader-planning integration is now an
+[observational capture-mission evaluator](../capture-mission-evaluation.md).
+It compares the current destination and two alternatives under a shared quota,
+using frozen local timing references, the real match clock, and explicit unknown
+costs. Four on/off pairs preserve complete physical traces. Only 17 of 67
+visits have numeric predictions, and no ordinary run supplies a fully measured
+choice between multiple destinations. This establishes the native reporting
+and comparison path; collecting alternative evidence and changing mission
+selection remain separate behavioral work.
+
 ## Current boundary and missing information
 
 `MaterialMissionPilot` already coordinates persistent mission tasks. Recovery,

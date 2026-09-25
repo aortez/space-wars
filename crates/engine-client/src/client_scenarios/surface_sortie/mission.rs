@@ -1,4 +1,5 @@
 use super::*;
+use spacewars_ai::mission_evaluation::{DEFAULT_WORK, MissionEvaluator};
 use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
 use std::time::Instant;
 
@@ -57,6 +58,7 @@ struct MaterialMissionClientScenario {
     registration: &'static ScenarioRegistration,
     seed: u64,
     profile: profiling::Profile,
+    evaluation: MissionEvaluator,
 }
 fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
     let registration = match (duel, arena) {
@@ -91,6 +93,7 @@ fn create_with_seats(
         registration,
         seed,
         profile: profiling::Profile::default(),
+        evaluation: MissionEvaluator::new(2),
         pilots: std::array::from_fn(|seat| {
             MissionBot::new(
                 if registration.id == MATCH_REGISTRATION.id
@@ -200,7 +203,10 @@ impl ClientScenario for MaterialMissionClientScenario {
             );
             sample.policies[seat] = clock.elapsed();
             sample.seats[seat] = Some(profiling::Seat::read(&o, site));
+            self.evaluation.observe(&o, self.pilots[seat].telemetry());
         }
+        self.evaluation
+            .advance(self.sortie.state.tick(), DEFAULT_WORK);
         let clock = Instant::now();
         let result = self.sortie.step(&actions, dt);
         sample.scenario = clock.elapsed();
@@ -264,7 +270,14 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .state
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
-            self.profile.diagnostics(&self.pilots),
+            format_args!(
+                "{}\nmission_evaluation_model={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}",
+                self.profile.diagnostics(&self.pilots),
+                spacewars_ai::mission_evaluation::MODEL,
+                self.evaluation.charged_total,
+                serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_1)).unwrap(),
+                serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_2)).unwrap()
+            ),
             self.sortie.runtime_diagnostics(),
         )
     }

@@ -13,6 +13,7 @@ pub mod flight_pilot;
 pub mod ground_task;
 pub mod jetpack_crossing;
 mod landing_safety;
+pub mod mission_evaluation;
 pub mod mission_pilot;
 pub mod mission_policy;
 pub mod pilot;
