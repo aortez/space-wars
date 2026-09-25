@@ -229,6 +229,7 @@ fn isolated_trip_physically_reaches_its_site_captures_returns_and_records_depart
             status: CoverStatus::Measured,
             reason: None,
             measurement: Some(CoverMeasurement {
+                climb_clear: None,
                 tick: p.tick,
                 revision: p.planet.revision,
                 planet: p.planet.motion,

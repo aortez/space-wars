@@ -7,7 +7,7 @@ use engine_common::Scenario;
 use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, SurfaceSortieState};
 use std::time::Duration;
 
-fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
+pub(super) fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
     let mut state = SurfaceSortieScenario::init_material_match(42);
     SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
     let bot = MissionBot::new(
@@ -23,6 +23,7 @@ fn fixture() -> (SurfaceSortieState, MissionObservationV1, MissionBot) {
 }
 fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvidence {
     LocalEvidence {
+        remote: false,
         key: PlanetKey::read(planet),
         site: LandingSiteId {
             planet: planet.index,
@@ -44,7 +45,7 @@ fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) -> LocalEvide
         reason: None,
     }
 }
-fn finish(report: MissionEvaluation) -> MissionEvaluation {
+pub(super) fn finish(report: MissionEvaluation) -> MissionEvaluation {
     let mut job = EvaluationJob {
         report,
         cursor: 0,

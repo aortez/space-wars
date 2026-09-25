@@ -76,6 +76,7 @@ impl MaterialMissionPilot {
             });
         }
         DestinationCoverRequest {
+            sample_climb: false,
             generation: p.tick,
             candidates,
         }

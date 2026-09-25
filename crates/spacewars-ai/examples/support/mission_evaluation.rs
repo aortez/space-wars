@@ -14,6 +14,7 @@ use std::{
 
 pub struct EvaluationRun {
     pub evaluator: MissionEvaluator,
+    pub alternative_survey: bool,
     file: BufWriter<File>,
     written: [Option<u64>; 2],
     budget: u32,
@@ -27,8 +28,20 @@ impl EvaluationRun {
             "false" => false,
             _ => panic!("--evaluate-missions must be true or false"),
         };
+        let alternative_survey = match super::arg("--survey-capture-alternative", "false").as_str()
+        {
+            "true" => true,
+            "false" => false,
+            _ => panic!("--survey-capture-alternative must be true or false"),
+        };
+        assert!(
+            !alternative_survey
+                || (enabled && super::arg("--live-objective-planning", "false") == "true"),
+            "alternative survey requires mission evaluation and shared live planning"
+        );
         enabled.then(|| Self {
             evaluator: MissionEvaluator::new(2),
+            alternative_survey,
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
@@ -70,6 +83,7 @@ impl EvaluationRun {
         self.file.flush().unwrap();
         json!({
             "model":MODEL, "observational":true, "requested_shared_budget":self.budget,
+            "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
             "pending": ([PlayerId::PLAYER_1,PlayerId::PLAYER_2].map(|p| self.evaluator.pending(p))),

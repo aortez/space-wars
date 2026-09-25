@@ -215,9 +215,12 @@ It compares the current destination and two alternatives under a shared quota,
 using frozen local timing references, the real match clock, and explicit unknown
 costs. Four on/off pairs preserve complete physical traces. Only 17 of 67
 visits have numeric predictions, and no ordinary run supplies a fully measured
-choice between multiple destinations. This establishes the native reporting
-and comparison path; collecting alternative evidence and changing mission
-selection remain separate behavioral work.
+choice between multiple destinations. The follow-up
+[alternative survey](../capture-alternative-survey.md) now produces 1,020
+multi-destination reports across four new paired matches, with unchanged controls
+and local allocations. It surveys one neutral alternative under bounded query
+fuel. The 564 fully covered comparisons all retain the current destination;
+changing mission selection remains separate behavioral work.
 
 ## Current boundary and missing information
 
@@ -234,11 +237,12 @@ roughly 19 ms of ground connection construction and 14–16 ms of route searches
 Connections dominate accumulated sensor time; graph searches amplify the worst
 pauses. Improving only Dijkstra will leave substantial work in world queries.
 
-The current mission observation exposes whether match rules apply, but not a
-remaining match time field. Clock-aware strategy therefore needs an explicit
-observation-contract extension. Detailed ground evidence currently concerns
-the approach planet, not every possible destination. A remote planet must
-remain an estimated opportunity until the bot obtains relevant measurements.
+Mission observations now expose authoritative remaining match time, ownership,
+pilot health/alive state and match completion. Detailed ground-route evidence
+still concerns the approach planet. The
+[bounded alternative survey](../capture-alternative-survey.md) adds neutral
+remote landing, hatch and sampled climb evidence; it does not measure flagged
+ground routes or grant permission to execute a future trip.
 
 ## Decision layers
 

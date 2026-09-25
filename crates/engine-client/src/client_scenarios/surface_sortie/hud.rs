@@ -283,6 +283,31 @@ pub(super) fn bot_diagnostics_enabled() -> bool {
     *ENABLED.get_or_init(|| std::env::var("SPACEWARS_BOT_HUD").is_ok_and(|v| v == "1"))
 }
 
+pub(super) fn append_controller_identity(
+    frames: &mut [RenderFrame],
+    viewport: Viewport,
+    player: usize,
+    text: &str,
+) {
+    let players = frames.len() / 2;
+    let Some(overlay) = frames.last_mut() else {
+        return;
+    };
+    let pane = viewport.split_horizontally(players)[player];
+    let vitals = player_hud_layout(pane, player).vitals;
+    // Identity stays visible above the instruments, independently of optional
+    // planner diagnostics and the pilot's ship/on-foot/recovery state.
+    label(
+        overlay,
+        (vitals.x, vitals.y - 18.0),
+        text,
+        LIGHT,
+        12.0,
+        false,
+        vitals.width,
+    );
+}
+
 pub(super) fn append_bot_diagnostic(frames: &mut [RenderFrame], player: usize, text: &str) {
     let players = frames.len() / 2;
     let Some(overlay) = frames.last_mut() else {
