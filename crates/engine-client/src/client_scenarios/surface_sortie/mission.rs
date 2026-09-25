@@ -270,7 +270,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .state
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
-            format!(
+            format_args!(
                 "{}\nmission_evaluation_model={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}",
                 self.profile.diagnostics(&self.pilots),
                 spacewars_ai::mission_evaluation::MODEL,

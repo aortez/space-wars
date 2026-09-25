@@ -127,6 +127,12 @@ and bot memory over 1,200 physical ticks for each of v9/v10/v11. Two analysis
 tests cover frozen prediction selection, failed outcomes, material changes, and
 invalid joins. AI Clippy passed with warnings denied.
 
+An additional all-targets client Clippy run found one new nested-format warning,
+which was fixed without changing diagnostic output. The focused client mission
+tests passed again after that cleanup. Client-wide warnings-denied lint remains
+blocked by pre-existing warnings in profiling, input, rendering, host functions,
+and tests; it is not claimed as a clean check here.
+
 Independent review found and resolved reuse of a previous visit's elapsed time,
 insufficient evidence invalidation, lost route provenance, and double-counted
 local approach travel. The reviewer also prompted preserving new files in the
