@@ -235,6 +235,53 @@ fn host_cancels_material_flag_gravity_and_expired_results_without_rewriting_froz
 }
 
 #[test]
+fn published_result_expires_without_cancelling_its_starved_refresh() {
+    let (_, mut o, bot) = fixture();
+    o.local.combat.recovery.flight.pilot.queries_ready = false;
+    let mut host = MissionEvaluator::new(2);
+    for tick in 1..=3 {
+        o.local.combat.recovery.flight.pilot.tick = tick;
+        host.observe(&o, bot.telemetry());
+        host.advance(tick, DEFAULT_WORK);
+    }
+    assert_eq!(host.latest(PlayerId::PLAYER_1).unwrap().source_tick, 1);
+
+    let refresh_tick = 1 + REFRESH_TICKS;
+    for tick in 4..=MAX_RESULT_AGE + 2 {
+        o.local.combat.recovery.flight.pilot.tick = tick;
+        host.observe(&o, bot.telemetry());
+        // Start the refresh, then let higher-priority work consume the quota.
+        host.advance(
+            tick,
+            Work {
+                graph: u32::from(tick == refresh_tick),
+                physics_queries: 0,
+            },
+        );
+        if tick <= MAX_RESULT_AGE + 1 {
+            assert_eq!(host.latest(PlayerId::PLAYER_1).unwrap().source_tick, 1);
+        } else {
+            assert!(host.latest(PlayerId::PLAYER_1).is_none());
+        }
+    }
+    assert!(host.pending(PlayerId::PLAYER_1));
+    assert_eq!(host.cancelled_total, 0);
+
+    for tick in MAX_RESULT_AGE + 3..=MAX_RESULT_AGE + 6 {
+        o.local.combat.recovery.flight.pilot.tick = tick;
+        host.observe(&o, bot.telemetry());
+        host.advance(tick, DEFAULT_WORK);
+        if let Some(report) = host.latest(PlayerId::PLAYER_1) {
+            assert_eq!(report.source_tick, refresh_tick);
+            assert_eq!(host.completed_total, 2);
+            assert_eq!(host.cancelled_total, 0);
+            return;
+        }
+    }
+    panic!("the still-valid refresh should finish when its budget returns");
+}
+
+#[test]
 fn pending_reports_use_pinned_dependencies_and_cancel_changed_route_support() {
     let (_, mut o, bot) = fixture();
     o.local.combat.recovery.flight.pilot.queries_ready = false;

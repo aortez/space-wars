@@ -345,19 +345,26 @@ impl MissionEvaluator {
                     .zip(&dependencies.planets)
                     .any(|(a, b)| !a.matches(b))
         });
-        let expired = state
+        let request_expired = state
             .submitted_tick
             .is_some_and(|tick| p.tick.saturating_sub(tick) > MAX_RESULT_AGE);
-        if changed || expired {
-            if let Some(token) = state.pending.take() {
-                self.queue.cancel(token);
-                self.cancelled_total += 1;
-            }
+        let result_expired = state
+            .latest
+            .as_ref()
+            .is_some_and(|report| p.tick.saturating_sub(report.source_tick) > MAX_RESULT_AGE);
+        if (changed || request_expired)
+            && let Some(token) = state.pending.take()
+        {
+            self.queue.cancel(token);
+            self.cancelled_total += 1;
+        }
+        // Submitting a refresh does not renew the previously published result.
+        if changed || result_expired {
             state.latest = None;
         }
         if state.pending.is_some()
             || (!changed
-                && !expired
+                && !request_expired
                 && state
                     .submitted_tick
                     .is_some_and(|tick| p.tick.saturating_sub(tick) < REFRESH_TICKS))
