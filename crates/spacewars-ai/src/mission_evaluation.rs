@@ -17,7 +17,10 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 mod model;
+mod survey;
 use model::{LocalEvidence, PlanetKey};
+#[cfg(test)]
+mod survey_tests;
 #[cfg(test)]
 mod tests;
 
@@ -175,6 +178,7 @@ impl PlanningJob for EvaluationJob {
 
 #[derive(Clone, PartialEq)]
 struct EvidenceIdentity {
+    remote: bool,
     site: LandingSiteId,
     costs: Option<PhaseCosts>,
     reason: Option<&'static str>,
@@ -197,6 +201,7 @@ struct Dependencies {
 }
 #[derive(Clone, Default)]
 struct ActorState {
+    survey: Option<survey::AlternativeSurvey>,
     last_tick: Option<u64>,
     submitted_tick: Option<u64>,
     dependencies: Option<Dependencies>,
@@ -239,6 +244,24 @@ impl MissionEvaluator {
         self.actors
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
+    }
+    /// Optional demand for the host's existing remote-query dispatcher. Call
+    /// after controls; this never changes the bot's own sensor request.
+    pub fn alternative_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::destination_cover::DestinationCoverRequest>
+    {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        survey::request(
+            &mut self.actors.entry(actor).or_default().survey,
+            o,
+            mission,
+        )
     }
     pub fn observe(&mut self, o: &MissionObservationV1, mission: &MissionTelemetry) {
         let p = &o.local.combat.recovery.flight.pilot;
@@ -289,9 +312,20 @@ impl MissionEvaluator {
                     .planets
                     .iter()
                     .any(|key| key.matches(&sample.key))
-                && (sample.key.planet != p.planet.index
+                && (!sample.remote || p.queries_ready)
+                && (sample.remote
+                    || sample.key.planet != p.planet.index
                     || (sample.gravity - dependencies.gravity).abs() <= 0.01)
         });
+        if let Some(sample) = survey::evidence(&state.survey, o) {
+            state
+                .evidence
+                .retain(|old| old.key.planet != sample.key.planet);
+            if state.evidence.len() == MAX_PLANETS {
+                state.evidence.remove(0);
+            }
+            state.evidence.push(sample);
+        }
         if let Some(mut sample) = model::observe_local(o, mission) {
             if let Some(old) = state.evidence.iter().find(|old| old.site == sample.site)
                 && let (Some((visit, tick)), Some((new_visit, _))) = (old.choice, sample.choice)
@@ -311,6 +345,7 @@ impl MissionEvaluator {
             .evidence
             .iter()
             .map(|s| EvidenceIdentity {
+                remote: s.remote,
                 site: s.site,
                 costs: s.costs.clone(),
                 reason: s.reason,
@@ -323,7 +358,7 @@ impl MissionEvaluator {
         if !state
             .evidence
             .iter()
-            .any(|s| s.key.planet == p.planet.index && s.costs.is_some())
+            .any(|s| !s.remote && s.key.planet == p.planet.index && s.costs.is_some())
         {
             dependencies.gravity = 0.0;
         }
@@ -431,6 +466,37 @@ fn selection_tick(mission: &MissionTelemetry) -> Option<u64> {
         .map(|e| e.tick)
 }
 
+fn candidate_planets<'a>(
+    o: &'a MissionObservationV1,
+    mission: &MissionTelemetry,
+) -> Vec<&'a PilotPlanetObservation> {
+    let p = &o.local.combat.recovery.flight.pilot;
+    let mut options: Vec<&PilotPlanetObservation> = o
+        .planets
+        .iter()
+        .take(MAX_PLANETS)
+        .filter(|planet| {
+            Some(planet.index) == mission.target
+                || planet
+                    .claim
+                    .as_ref()
+                    .is_none_or(|c| c.owner != Some(p.owner))
+        })
+        .collect();
+    options.sort_by(|a, b| {
+        (Some(b.index) == mission.target)
+            .cmp(&(Some(a.index) == mission.target))
+            .then_with(|| {
+                p.ship
+                    .position
+                    .distance_to(a.motion.position)
+                    .total_cmp(&p.ship.position.distance_to(b.motion.position))
+            })
+            .then_with(|| a.index.cmp(&b.index))
+    });
+    options
+}
+
 fn snapshot(
     o: &MissionObservationV1,
     mission: &MissionTelemetry,
@@ -459,29 +525,7 @@ fn snapshot(
     } else {
         None
     };
-    let mut options: Vec<&PilotPlanetObservation> = o
-        .planets
-        .iter()
-        .take(MAX_PLANETS)
-        .filter(|planet| {
-            Some(planet.index) == mission.target
-                || planet
-                    .claim
-                    .as_ref()
-                    .is_none_or(|c| c.owner != Some(p.owner))
-        })
-        .collect();
-    options.sort_by(|a, b| {
-        (Some(b.index) == mission.target)
-            .cmp(&(Some(a.index) == mission.target))
-            .then_with(|| {
-                p.ship
-                    .position
-                    .distance_to(a.motion.position)
-                    .total_cmp(&p.ship.position.distance_to(b.motion.position))
-            })
-            .then_with(|| a.index.cmp(&b.index))
-    });
+    let mut options = candidate_planets(o, mission);
     let truncated = o.planets.len() > MAX_PLANETS || options.len() > MAX_OPTIONS;
     options.truncate(MAX_OPTIONS);
     let own_count = o.match_context.as_ref().map_or_else(
@@ -544,7 +588,9 @@ fn snapshot(
                 evidence_age_ticks: sample.map(|s| p.tick - s.tick),
                 route_source_tick: sample.and_then(|s| s.route_source_tick),
                 route_validated_tick: sample.and_then(|s| s.route_validated_tick),
-                evidence_kind: if sample.is_some_and(|s| s.tick == p.tick) {
+                evidence_kind: if sample.is_some_and(|s| s.remote) {
+                    "remote landing, hatch and climb samples; live feasibility unknown"
+                } else if sample.is_some_and(|s| s.tick == p.tick) {
                     "current local measurement"
                 } else {
                     "historical timing reference; live feasibility unknown"

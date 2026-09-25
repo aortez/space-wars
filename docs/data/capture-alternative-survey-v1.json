@@ -1,0 +1,1082 @@
+{
+  "binary_sha256": "0f2eb1820c877d35d5728bfa6ea428832fb291fe135466be1f073c70e85513c2",
+  "simulated_minutes": 67.25722222222223,
+  "query_checks": 807,
+  "query_mean": 63.00867410161091,
+  "query_max": 65,
+  "pairs": [
+    {
+      "case": "world0-asteroids0",
+      "round": {
+        "elapsed_seconds": 494.66667656,
+        "finished_tick": 29680,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 29680,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 94.1936264038086,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -2.166090488433838,
+                  "position": {
+                    "x": 1049.554443359375,
+                    "y": 14.915157318115234
+                  },
+                  "spin": 185.285888671875,
+                  "velocity": {
+                    "x": -1.5128021240234375,
+                    "y": -138.2997283935547
+                  }
+                },
+                "closing_speed": 153.5272979736328,
+                "impulse": 42.940269470214844,
+                "normal": {
+                  "x": 0.17901581525802612,
+                  "y": -0.9838461875915527
+                },
+                "on_foot": true,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 1049.7255859375,
+                  "y": 13.439973831176758
+                }
+              },
+              "tick": 29680
+            },
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 105.33332344,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "evaluation": {
+        "alternative_survey": true,
+        "cancelled": 2072,
+        "charged": 10874,
+        "completed": 2634,
+        "construction": {
+          "count": 59360,
+          "max_ms": 0.005861,
+          "mean_ms": 0.00036239427223718683,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00029099999999999997,
+          "p95_ms": 0.0008320000000000001,
+          "p99_ms": 0.001232
+        },
+        "dispatch": {
+          "count": 29680,
+          "max_ms": 0.002976,
+          "mean_ms": 0.0001694207210242568,
+          "over_16_67_ms": 0,
+          "p50_ms": 9.999999999999999e-05,
+          "p95_ms": 0.000651,
+          "p99_ms": 0.000982
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "trace_comparison": {
+        "rows": 59360,
+        "rows_with_different_job_ids": 14072,
+        "normalized_sha256": "5b49d86d018682c716b36b6ecd5a75659a6dd24d097edeb6b4726342f56067d9",
+        "all_other_fields_identical": true,
+        "normalized_fields": [
+          "observation.local.objective_evidence.generation",
+          "mission.capture.acquisition.generation"
+        ],
+        "normalization": "present opaque IDs only; absent IDs, ticks, payloads and all other fields retained"
+      },
+      "raw_trace_hashes": [
+        {
+          "sha256": "d034957cdee16141725563bfa2ff68467cf2bbcad3a2258cfce8bbdbc55ef6c0"
+        },
+        {
+          "sha256": "90afa19d1009b5a7aa224d7316a1072e6fbfa37becebaaeb1fefe6841c711113"
+        }
+      ],
+      "allocation_audit": {
+        "local_allocations_identical": true,
+        "local_rows": 14054,
+        "charges": [
+          {
+            "landing_objective_graph": 13750804,
+            "landing_objective_queries": 1749802
+          },
+          {
+            "destination_cover_graph": 0,
+            "destination_cover_queries": 12215,
+            "landing_objective_graph": 13750804,
+            "landing_objective_queries": 1749802
+          }
+        ]
+      },
+      "survey": {
+        "cancelled": 3,
+        "checks": 193,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 193,
+        "no_landing": 0,
+        "physics_queries": 12215,
+        "submitted": 3
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 2634,
+          "numeric_alternative_records": 165,
+          "candidate_records": 4234,
+          "numeric_candidate_records": 1718,
+          "reports_with_multiple_numeric_destinations": 15,
+          "complete_shortlist_comparisons": 774
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1674,
+          "ship or pilot recovery required": 675,
+          "capture already landed; retain its return task": 94,
+          "objective route unmeasured": 70,
+          "site round trip unmeasured": 3
+        },
+        "visits": 15,
+        "visits_with_numeric_prediction": 10,
+        "visit_outcomes": {
+          "completed": 7,
+          "abandoned": 3
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 5.366666000000002,
+        "completed_max_absolute_error_seconds": 54.633334000000005,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "baseline_predictions": {
+        "coverage": {
+          "reports": 2585,
+          "numeric_alternative_records": 0,
+          "candidate_records": 4099,
+          "numeric_candidate_records": 1543,
+          "complete_shortlist_comparisons": 764
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1714,
+          "ship or pilot recovery required": 675,
+          "capture already landed; retain its return task": 94,
+          "objective route unmeasured": 70,
+          "site round trip unmeasured": 3
+        },
+        "visits": 15,
+        "visits_with_numeric_prediction": 9,
+        "visit_outcomes": {
+          "completed": 7,
+          "abandoned": 2
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 5.366666000000002,
+        "completed_max_absolute_error_seconds": 54.633334000000005,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "comparison_example": [
+        {
+          "actor": "player_1",
+          "source_tick": 674,
+          "preferred_by_time": null,
+          "candidates": [
+            {
+              "planet": 1,
+              "current": true,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 143.09868,
+              "travel_seconds": 0.3014888,
+              "site": {
+                "planet": 1,
+                "bearing": 24
+              },
+              "evidence_tick": 674,
+              "evidence_age_ticks": 0,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "current local measurement",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 25.068155,
+              "reference_exceeds_match_time": false
+            },
+            {
+              "planet": 0,
+              "current": false,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 385.44324,
+              "travel_seconds": 7.403765,
+              "site": {
+                "planet": 0,
+                "bearing": 49
+              },
+              "evidence_tick": 662,
+              "evidence_age_ticks": 12,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "remote landing, hatch and climb samples; live feasibility unknown",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 32.170433,
+              "reference_exceeds_match_time": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "world0-asteroids3",
+      "round": {
+        "elapsed_seconds": 323.050006461,
+        "finished_tick": 19383,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 19383,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 55.0233039855957,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -1.766411304473877,
+                  "position": {
+                    "x": 731.3091430664062,
+                    "y": 780.8751220703125
+                  },
+                  "spin": 109.5712661743164,
+                  "velocity": {
+                    "x": 31.471134185791016,
+                    "y": 30.603822708129883
+                  }
+                },
+                "closing_speed": 57.546485900878906,
+                "impulse": 36.4290771484375,
+                "normal": {
+                  "x": 0.8185358047485352,
+                  "y": 0.5744553804397583
+                },
+                "on_foot": false,
+                "other_id": null,
+                "other_kind": "sun",
+                "other_motion": {
+                  "angle": 0.0,
+                  "position": {
+                    "x": 897.0,
+                    "y": 897.0
+                  },
+                  "spin": 0.0,
+                  "velocity": {
+                    "x": 0.0,
+                    "y": 0.0
+                  }
+                },
+                "point": {
+                  "x": 733.3060302734375,
+                  "y": 782.1181640625
+                }
+              },
+              "tick": 19383
+            },
+            "protected_until_tick": 18904
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 276.949993539,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "evaluation": {
+        "alternative_survey": true,
+        "cancelled": 1485,
+        "charged": 8477,
+        "completed": 2019,
+        "construction": {
+          "count": 38766,
+          "max_ms": 0.00541,
+          "mean_ms": 0.00041225922199865405,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00033099999999999997,
+          "p95_ms": 0.0008810000000000001,
+          "p99_ms": 0.001553
+        },
+        "dispatch": {
+          "count": 19383,
+          "max_ms": 0.003327,
+          "mean_ms": 0.000201675592013625,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00011,
+          "p95_ms": 0.0008010000000000001,
+          "p99_ms": 0.001122
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "trace_comparison": {
+        "rows": 38766,
+        "rows_with_different_job_ids": 12739,
+        "normalized_sha256": "fba43ed9ba242b0b51551bfa13333e69926ec81be1125bed34a876a51e0c4ea8",
+        "all_other_fields_identical": true,
+        "normalized_fields": [
+          "observation.local.objective_evidence.generation",
+          "mission.capture.acquisition.generation"
+        ],
+        "normalization": "present opaque IDs only; absent IDs, ticks, payloads and all other fields retained"
+      },
+      "raw_trace_hashes": [
+        {
+          "sha256": "0fe580c74341086be0835b68d201367428de760c14d2d16adc5acc99b21fa18c"
+        },
+        {
+          "sha256": "256811e49d3aee332b8db952730a48f0d9fd6e7ff63e23564e52e38c9c989df6"
+        }
+      ],
+      "allocation_audit": {
+        "local_allocations_identical": true,
+        "local_rows": 12618,
+        "charges": [
+          {
+            "landing_objective_graph": 25592723,
+            "landing_objective_queries": 3048631
+          },
+          {
+            "destination_cover_graph": 0,
+            "destination_cover_queries": 12278,
+            "landing_objective_graph": 25592723,
+            "landing_objective_queries": 3048631
+          }
+        ]
+      },
+      "survey": {
+        "cancelled": 6,
+        "checks": 194,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 194,
+        "no_landing": 0,
+        "physics_queries": 12278,
+        "submitted": 6
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 2019,
+          "numeric_alternative_records": 145,
+          "candidate_records": 3516,
+          "numeric_candidate_records": 1244,
+          "reports_with_multiple_numeric_destinations": 16,
+          "complete_shortlist_comparisons": 401
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1867,
+          "ship or pilot recovery required": 127,
+          "capture already landed; retain its return task": 153,
+          "objective route unmeasured": 78,
+          "site round trip unmeasured": 42,
+          "powered or jumping trip outside timing calibration": 5
+        },
+        "visits": 13,
+        "visits_with_numeric_prediction": 7,
+        "visit_outcomes": {
+          "completed": 5,
+          "abandoned": 2
+        },
+        "predictions_with_material_changes": 5,
+        "completed_median_absolute_error_seconds": 5.333332666666667,
+        "completed_max_absolute_error_seconds": 96.93333333333332,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "baseline_predictions": {
+        "coverage": {
+          "reports": 1970,
+          "numeric_alternative_records": 0,
+          "candidate_records": 3381,
+          "numeric_candidate_records": 1088,
+          "complete_shortlist_comparisons": 390
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1888,
+          "ship or pilot recovery required": 127,
+          "capture already landed; retain its return task": 153,
+          "objective route unmeasured": 78,
+          "site round trip unmeasured": 42,
+          "powered or jumping trip outside timing calibration": 5
+        },
+        "visits": 13,
+        "visits_with_numeric_prediction": 6,
+        "visit_outcomes": {
+          "completed": 5,
+          "abandoned": 1
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 5.333332666666667,
+        "completed_max_absolute_error_seconds": 96.93333333333332,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "comparison_example": [
+        {
+          "actor": "player_1",
+          "source_tick": 674,
+          "preferred_by_time": null,
+          "candidates": [
+            {
+              "planet": 1,
+              "current": true,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 143.09868,
+              "travel_seconds": 0.3014888,
+              "site": {
+                "planet": 1,
+                "bearing": 24
+              },
+              "evidence_tick": 674,
+              "evidence_age_ticks": 0,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "current local measurement",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 25.068155,
+              "reference_exceeds_match_time": false
+            },
+            {
+              "planet": 0,
+              "current": false,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 385.44324,
+              "travel_seconds": 7.403765,
+              "site": {
+                "planet": 0,
+                "bearing": 49
+              },
+              "evidence_tick": 662,
+              "evidence_age_ticks": 12,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "remote landing, hatch and climb samples; live feasibility unknown",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 32.170433,
+              "reference_exceeds_match_time": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "world1-asteroids0",
+      "round": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          1,
+          2
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 82.05989074707031,
+            "last_damage": {
+              "amount": 17.940109252929688,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": -1.1347544193267822,
+                  "position": {
+                    "x": 891.076171875,
+                    "y": 851.9083862304688
+                  },
+                  "spin": 0.16206836700439453,
+                  "velocity": {
+                    "x": -2.326796770095825,
+                    "y": -20.33436393737793
+                  }
+                },
+                "closing_speed": 16.485027313232422,
+                "impulse": 3.7683873176574707,
+                "normal": {
+                  "x": -0.7139445543289185,
+                  "y": -0.7002023458480835
+                },
+                "on_foot": true,
+                "other_id": 1,
+                "other_kind": "planet",
+                "other_motion": {
+                  "angle": -0.04575616866350174,
+                  "position": {
+                    "x": 793.3162841796875,
+                    "y": 756.8906860351562
+                  },
+                  "spin": -0.03948211669921875,
+                  "velocity": {
+                    "x": 9.580077171325684,
+                    "y": -8.90625
+                  }
+                },
+                "point": {
+                  "x": 890.6849365234375,
+                  "y": 851.5694580078125
+                }
+              },
+              "tick": 19163
+            },
+            "protected_until_tick": 16094
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "evaluation": {
+        "alternative_survey": true,
+        "cancelled": 2056,
+        "charged": 12745,
+        "completed": 3524,
+        "construction": {
+          "count": 72000,
+          "max_ms": 0.021310000000000003,
+          "mean_ms": 0.0007576961388888972,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.000521,
+          "p95_ms": 0.001713,
+          "p99_ms": 0.0029960000000000004
+        },
+        "dispatch": {
+          "count": 36000,
+          "max_ms": 0.006181,
+          "mean_ms": 0.0003271632777777891,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.000221,
+          "p95_ms": 0.000972,
+          "p99_ms": 0.002114
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "trace_comparison": {
+        "rows": 72000,
+        "rows_with_different_job_ids": 21369,
+        "normalized_sha256": "401a868d0cabd2b32dc74702ad331cf08a066e86b7d8e812f2b84d157f55bf07",
+        "all_other_fields_identical": true,
+        "normalized_fields": [
+          "observation.local.objective_evidence.generation",
+          "mission.capture.acquisition.generation"
+        ],
+        "normalization": "present opaque IDs only; absent IDs, ticks, payloads and all other fields retained"
+      },
+      "raw_trace_hashes": [
+        {
+          "sha256": "398daed16e0187d7cb6a5316bdec4aeedba232eccee71be90bc6b251f5682e86"
+        },
+        {
+          "sha256": "cc36c9c26e293be52abfde3a90a503bf43f046e644fbb23b04d10b83265dcd92"
+        }
+      ],
+      "allocation_audit": {
+        "local_allocations_identical": true,
+        "local_rows": 21289,
+        "charges": [
+          {
+            "landing_objective_graph": 23014434,
+            "landing_objective_queries": 2909920
+          },
+          {
+            "destination_cover_graph": 0,
+            "destination_cover_queries": 12410,
+            "landing_objective_graph": 23014434,
+            "landing_objective_queries": 2909920
+          }
+        ]
+      },
+      "survey": {
+        "cancelled": 12,
+        "checks": 198,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 198,
+        "no_landing": 0,
+        "physics_queries": 12410,
+        "submitted": 12
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 3524,
+          "numeric_alternative_records": 594,
+          "candidate_records": 5455,
+          "numeric_candidate_records": 2649,
+          "reports_with_multiple_numeric_destinations": 495,
+          "complete_shortlist_comparisons": 1160
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1839,
+          "ship or pilot recovery required": 536,
+          "capture already landed; retain its return task": 149,
+          "objective route unmeasured": 166,
+          "site round trip unmeasured": 7,
+          "walking or claim reference outside calibration": 61,
+          "powered or jumping trip outside timing calibration": 48
+        },
+        "visits": 21,
+        "visits_with_numeric_prediction": 13,
+        "visit_outcomes": {
+          "completed": 6,
+          "abandoned": 6,
+          "unfinished": 1
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 8.604540000000002,
+        "completed_max_absolute_error_seconds": 36.092392999999994,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "baseline_predictions": {
+        "coverage": {
+          "reports": 3477,
+          "numeric_alternative_records": 0,
+          "candidate_records": 5329,
+          "numeric_candidate_records": 2019,
+          "complete_shortlist_comparisons": 863
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 2343,
+          "ship or pilot recovery required": 536,
+          "capture already landed; retain its return task": 149,
+          "objective route unmeasured": 166,
+          "site round trip unmeasured": 7,
+          "walking or claim reference outside calibration": 61,
+          "powered or jumping trip outside timing calibration": 48
+        },
+        "visits": 21,
+        "visits_with_numeric_prediction": 12,
+        "visit_outcomes": {
+          "abandoned": 5,
+          "completed": 6,
+          "unfinished": 1
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 9.191666333333334,
+        "completed_max_absolute_error_seconds": 36.092392999999994,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "comparison_example": [
+        {
+          "actor": "player_1",
+          "source_tick": 851,
+          "preferred_by_time": 0,
+          "candidates": [
+            {
+              "planet": 0,
+              "current": true,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": false,
+              "distance": 578.49585,
+              "travel_seconds": 9.146827,
+              "site": {
+                "planet": 0,
+                "bearing": 34
+              },
+              "evidence_tick": 57,
+              "evidence_age_ticks": 794,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "remote landing, hatch and climb samples; live feasibility unknown",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 33.913494,
+              "reference_exceeds_match_time": false
+            },
+            {
+              "planet": 2,
+              "current": false,
+              "revision": 0,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": false,
+              "distance": 1611.4697,
+              "travel_seconds": 37.34192,
+              "site": {
+                "planet": 2,
+                "bearing": 38
+              },
+              "evidence_tick": 850,
+              "evidence_age_ticks": 1,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "remote landing, hatch and climb samples; live feasibility unknown",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 62.108585,
+              "reference_exceeds_match_time": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "world1-asteroids3",
+      "round": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 92.24518585205078,
+            "last_damage": {
+              "amount": 0.04538802430033684,
+              "cause": "laser",
+              "contact": null,
+              "tick": 22523
+            },
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "evaluation": {
+        "alternative_survey": true,
+        "cancelled": 1051,
+        "charged": 11071,
+        "completed": 3563,
+        "construction": {
+          "count": 72000,
+          "max_ms": 0.007182999999999999,
+          "mean_ms": 0.0006234320694444196,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.000511,
+          "p95_ms": 0.001382,
+          "p99_ms": 0.001813
+        },
+        "dispatch": {
+          "count": 36000,
+          "max_ms": 0.004117,
+          "mean_ms": 0.00026847652777777767,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00018099999999999998,
+          "p95_ms": 0.000992,
+          "p99_ms": 0.001403
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "trace_comparison": {
+        "rows": 72000,
+        "rows_with_different_job_ids": 3676,
+        "normalized_sha256": "f4b2682b066c9455ca93523b8b323c3040477647fb4b18d87c8f0e93a87cd0cc",
+        "all_other_fields_identical": true,
+        "normalized_fields": [
+          "observation.local.objective_evidence.generation",
+          "mission.capture.acquisition.generation"
+        ],
+        "normalization": "present opaque IDs only; absent IDs, ticks, payloads and all other fields retained"
+      },
+      "raw_trace_hashes": [
+        {
+          "sha256": "1e39fe9cb0869cb0f9189e5050bd23a68b661c9741769d54942172c289d8e425"
+        },
+        {
+          "sha256": "4f095f7eb8d9d72a6b694507b7d49e1bf29b70ca199dd04aac2157d2153467f5"
+        }
+      ],
+      "allocation_audit": {
+        "local_allocations_identical": true,
+        "local_rows": 3588,
+        "charges": [
+          {
+            "landing_objective_graph": 8880222,
+            "landing_objective_queries": 613015
+          },
+          {
+            "destination_cover_graph": 0,
+            "destination_cover_queries": 13945,
+            "landing_objective_graph": 8880222,
+            "landing_objective_queries": 613015
+          }
+        ]
+      },
+      "survey": {
+        "cancelled": 8,
+        "checks": 222,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 222,
+        "no_landing": 0,
+        "physics_queries": 13945,
+        "submitted": 8
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 3563,
+          "numeric_alternative_records": 618,
+          "candidate_records": 5532,
+          "numeric_candidate_records": 2734,
+          "reports_with_multiple_numeric_destinations": 494,
+          "complete_shortlist_comparisons": 1875
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 979,
+          "ship or pilot recovery required": 1680,
+          "capture already landed; retain its return task": 51,
+          "objective route unmeasured": 26,
+          "walking or claim reference outside calibration": 59,
+          "site round trip unmeasured": 3
+        },
+        "visits": 6,
+        "visits_with_numeric_prediction": 4,
+        "visit_outcomes": {
+          "abandoned": 2,
+          "completed": 2
+        },
+        "predictions_with_material_changes": 4,
+        "completed_median_absolute_error_seconds": 25.125000000000004,
+        "completed_max_absolute_error_seconds": 46.61666733333334,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "baseline_predictions": {
+        "coverage": {
+          "reports": 3507,
+          "numeric_alternative_records": 0,
+          "candidate_records": 5381,
+          "numeric_candidate_records": 2116,
+          "complete_shortlist_comparisons": 1619
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1446,
+          "ship or pilot recovery required": 1680,
+          "capture already landed; retain its return task": 51,
+          "objective route unmeasured": 26,
+          "walking or claim reference outside calibration": 59,
+          "site round trip unmeasured": 3
+        },
+        "visits": 6,
+        "visits_with_numeric_prediction": 4,
+        "visit_outcomes": {
+          "abandoned": 2,
+          "completed": 2
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 25.125000000000004,
+        "completed_max_absolute_error_seconds": 46.61666733333334,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      },
+      "comparison_example": [
+        {
+          "actor": "player_2",
+          "source_tick": 1806,
+          "preferred_by_time": null,
+          "candidates": [
+            {
+              "planet": 0,
+              "current": true,
+              "revision": 3,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 250.60292,
+              "travel_seconds": 0.0,
+              "site": {
+                "planet": 0,
+                "bearing": 12
+              },
+              "evidence_tick": 1806,
+              "evidence_age_ticks": 0,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "current local measurement",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 24.766666,
+              "reference_exceeds_match_time": false
+            },
+            {
+              "planet": 2,
+              "current": false,
+              "revision": 1,
+              "observed_owner": null,
+              "ownership_known": true,
+              "adds_ownership": true,
+              "first_rebuild_foothold": true,
+              "distance": 827.76324,
+              "travel_seconds": 16.718065,
+              "site": {
+                "planet": 2,
+                "bearing": 34
+              },
+              "evidence_tick": 1793,
+              "evidence_age_ticks": 13,
+              "route_source_tick": null,
+              "route_validated_tick": null,
+              "evidence_kind": "remote landing, hatch and climb samples; live feasibility unknown",
+              "local": {
+                "landing": 17.866667,
+                "exit": 0.016666668,
+                "outbound": 0.06666667,
+                "claim": 3.0166667,
+                "return_board": 0.033333335,
+                "departure": 3.766667
+              },
+              "unknown_reason": null,
+              "total_seconds": 41.484734,
+              "reference_exceeds_match_time": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

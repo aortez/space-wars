@@ -26,6 +26,7 @@ pub(super) fn fixture() -> (MaterialMissionPilot, MissionObservationV1) {
                 status: CoverStatus::Stale,
                 reason: Some("physics advanced"),
                 measurement: Some(CoverMeasurement {
+                    climb_clear: None,
                     tick: tick - 1,
                     revision: planet.revision,
                     planet: planet.motion,

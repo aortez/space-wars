@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import copy
 
 SPEC = importlib.util.spec_from_file_location("capture_evaluation",
     Path(__file__).resolve().parents[1] / "compare-capture-evaluation.py")
@@ -20,6 +21,42 @@ def row(selected, source, prediction, planet=0):
 
 
 class PredictionAccounting(unittest.TestCase):
+    def test_trace_normalization_preserves_changes_beyond_opaque_job_id(self):
+        original = {"observation": {"local": {"objective_evidence": {"generation": 1, "request_tick": 60}}},
+                    "actions": [1], "tick": 70}
+        changed = copy.deepcopy(original)
+        changed["observation"]["local"]["objective_evidence"]["generation"] = 4
+        self.assertEqual(TOOL.normalize_survey_trace(copy.deepcopy(original)), TOOL.normalize_survey_trace(changed))
+        for path, value in [("generation", None), ("request_tick", 61)]:
+            changed = copy.deepcopy(original)
+            changed["observation"]["local"]["objective_evidence"][path] = value
+            self.assertNotEqual(TOOL.normalize_survey_trace(copy.deepcopy(original)), TOOL.normalize_survey_trace(changed))
+        changed = copy.deepcopy(original)
+        changed["actions"] = [2]
+        self.assertNotEqual(TOOL.normalize_survey_trace(copy.deepcopy(original)), TOOL.normalize_survey_trace(changed))
+        original["mission"] = {"capture": {"acquisition": {"generation": 1, "measurement_tick": 50}}}
+        changed = copy.deepcopy(original)
+        changed["mission"]["capture"]["acquisition"]["generation"] = 4
+        self.assertEqual(TOOL.normalize_survey_trace(copy.deepcopy(original)), TOOL.normalize_survey_trace(changed))
+        changed["mission"]["capture"]["acquisition"]["measurement_tick"] = 51
+        self.assertNotEqual(TOOL.normalize_survey_trace(copy.deepcopy(original)), TOOL.normalize_survey_trace(changed))
+
+    def test_partial_two_destination_comparison_is_not_a_complete_ranking(self):
+        evaluation = row(1, 2, 10)
+        alternative = dict(evaluation["candidates"][0], current=False, planet=1)
+        unknown = dict(alternative, planet=2, total_seconds=None, unknown_reason="unmeasured")
+        report = {"metrics": [{"visits": [
+            {"planet": 0, "selected_tick": 1, "departed_tick": None, "abandoned_tick": None},
+        ]}, {"visits": []}]}
+        one = TOOL.prediction_results(report, [evaluation])
+        self.assertEqual(one["coverage"].get("reports_with_multiple_numeric_destinations", 0), 0)
+        evaluation["candidates"] += [alternative, unknown]
+        two = TOOL.prediction_results(report, [evaluation])
+        self.assertEqual(two["coverage"]["reports_with_multiple_numeric_destinations"], 1)
+        self.assertEqual(two["coverage"]["numeric_alternative_records"], 1)
+        self.assertEqual(two["coverage"].get("complete_shortlist_comparisons", 0), 0)
+        self.assertEqual(len(two["attempts"]), 1, "alternatives have no execution outcome")
+
     def test_first_numeric_prediction_is_frozen_and_failures_remain_in_denominator(self):
         report = {"metrics": [{"visits": [
             {"planet": 0, "selected_tick": 1, "departed_tick": 901, "abandoned_tick": None},
