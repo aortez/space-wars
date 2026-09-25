@@ -139,6 +139,31 @@ local approach travel. The reviewer also prompted preserving new files in the
 experiment patch and reporting subsequent material changes. The final review
 found no remaining blockers.
 
+## Pi deployment
+
+The final runtime commit `5a4b8df4b417e78cb00a07e59eafe34db0a88ebe` was built
+and installed on `sw-picade.local` with
+`./update.sh --fast --target sw-picade.local`.
+The matching client/CLI bundle passed compatibility and health
+checks. Installed SHA-256 values matched the bundle:
+
+- `engine-client`: `7e8028b3a88f0352b1c50d7a1e33675f863b5a5a42350ce745c4d7a9cfd57d15`
+- `spacewars-cli`: `e5beadc0d6e1fa3647c4f43880d5364dae4d9c5d00ff81cce965f2ecb3ace97f`
+
+The service was active with zero automatic restarts. The saved 30-second
+autostart, v9-versus-v10 bots, 900-second match limit, and raster settings were
+preserved. Both bots published fresh reports while the world and match clock
+advanced. A live v9 sample at tick 2,749 supplied a 24.77-second local trip
+reference, kept both unmeasured alternatives unknown, and correctly withheld
+`preferred_by_time`. The earlier install also completed a round and automatically
+started another. Screenshots confirmed the visible match, and the final service
+journal had no errors or panics. These are live smoke checks, not a paired Pi
+performance benchmark.
+
+Local deployment, status samples, journal, bundle manifest, and screenshots are
+retained in `target/capture-mission-evaluation/`. The follow-up commit only
+records documentation; the installed runtime identity remains the one above.
+
 ## Limits and next decision
 
 This is a tested observational integration, not a stronger controller. Sparse
