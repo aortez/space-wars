@@ -16,6 +16,8 @@ pub(super) mod benchmark;
 #[cfg(test)]
 mod floor_tests;
 #[cfg(test)]
+mod layout_tests;
+#[cfg(test)]
 mod meridiem_tests;
 #[cfg(test)]
 mod player_tests;
@@ -751,7 +753,7 @@ mod tests {
                         let x = (viewport.width * 0.5
                             + (world_width * 0.5 - 2.0 * radius) * side * scale)
                             as usize;
-                        let y = (viewport.height * 0.5 - (-163.2 + 4.1 * radius) * scale) as usize;
+                        let y = (viewport.height * 0.92 - 4.1 * radius * scale) as usize;
                         let frame_pixel = pixels.as_slice()[y * pixels.width() as usize + x];
                         let visible =
                             frame_pixel.r > 40 && frame_pixel.g > 80 && frame_pixel.b > 100;

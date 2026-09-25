@@ -67,6 +67,7 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
         BACKGROUND_LAYER,
         rectangle(layout.bounds_min, layout.bounds_max, BACKGROUND_COLOR, None),
     );
+    render_canopy(&mut frame, layout);
     if let Some(event) = shared_mechanics_arena(state) {
         let opacity = if state.duck_visit.is_some() {
             event.arena_opacity()
@@ -242,6 +243,32 @@ fn render_floor(
             ),
         );
     }
+}
+
+fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
+    // Background framing only: no ceiling body or extra water support. Rain
+    // begins below this band, while event notices remain readable over it.
+    frame.push_primitive(
+        ARENA_LAYER,
+        rectangle(
+            RenderPoint::new(layout.bounds_min.x, layout.canopy_y),
+            layout.bounds_max,
+            FLOOR_COLOR,
+            None,
+        ),
+    );
+    frame.push_primitive(
+        ARENA_LAYER,
+        rectangle(
+            RenderPoint::new(layout.bounds_min.x, layout.canopy_y),
+            RenderPoint::new(
+                layout.bounds_max.x,
+                layout.canopy_y + (layout.pitch * 0.10).clamp(1.5, 3.0),
+            ),
+            FLOOR_EDGE_COLOR,
+            None,
+        ),
+    );
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
@@ -455,8 +482,8 @@ mod tests {
             .iter()
             .map(|layer| layer.primitives.len())
             .sum::<usize>();
-        // One background, one closed floor slab and edge, 96 cells, two dots.
-        assert_eq!(primitive_count, 101);
+        // One background, floor/canopy slabs and edges, 96 cells, two dots.
+        assert_eq!(primitive_count, 103);
     }
 
     #[test]

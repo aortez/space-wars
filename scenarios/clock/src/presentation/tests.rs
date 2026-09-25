@@ -142,7 +142,7 @@ fn custom_message_is_latched_and_shared_by_every_text_recipe() {
             for p in &polygon.points {
                 assert!(p.x.is_finite() && p.y.is_finite());
                 assert!(p.x >= layout.bounds_min.x + 7.9999 && p.x <= layout.bounds_max.x - 7.9999);
-                assert!(p.y >= layout.floor_y + 7.9999 && p.y <= layout.bounds_max.y - 27.9999);
+                assert!(p.y >= layout.floor_y + 7.9999 && p.y <= layout.canopy_y - 7.9999);
             }
         }
         step(&mut state, MARQUEE_TICKS / 2);
@@ -165,7 +165,7 @@ fn clock_geometry_has_stable_routes_and_reuses_its_buffer() {
             content: content.bounds,
             viewport: Bounds {
                 min: Vec2::new(layout.bounds_min.x + 8.0, layout.floor_y + 8.0),
-                max: Vec2::new(layout.bounds_max.x - 8.0, layout.bounds_max.y - 28.0),
+                max: Vec2::new(layout.bounds_max.x - 8.0, layout.canopy_y - 8.0),
             },
             center: Vec2::new(0.0, layout.face_origin.y + 4.5 * layout.pitch),
             pitch: layout.pitch,
@@ -350,7 +350,7 @@ fn all_recipes_are_bounded_deterministic_clipped_and_restore_the_exact_face() {
                 let layout = crate::layout::Layout::new(aspect);
                 let bounds = Bounds {
                     min: Vec2::new(layout.bounds_min.x + 8.0, layout.floor_y + 8.0),
-                    max: Vec2::new(layout.bounds_max.x - 8.0, layout.bounds_max.y - 28.0),
+                    max: Vec2::new(layout.bounds_max.x - 8.0, layout.canopy_y - 8.0),
                 };
                 for layer in &frame.layers {
                     for primitive in &layer.primitives {

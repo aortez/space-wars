@@ -30,6 +30,8 @@ const SOURCE_LIMIT: usize = PARCELS - RELEASE_SLOTS - 2;
 const OPEN_TICKS: u64 = 36;
 const CLOSE_TICKS: u64 = 24;
 const DEPTH_TICKS: u64 = 30;
+const DROP_SPEED: f32 = 220.0;
+const DROP_DURATION: f64 = 0.06;
 
 pub(crate) enum RainArena {
     Responsive(ResponsiveFloor),
@@ -357,6 +359,9 @@ impl RainEvent {
         // screen-sized blob. Pending budget is not yet liquid; status/benchmarks
         // continue to show it until injected. One drop is at most one cell area.
         let volume = (pending / count as f64).min(f64::from(self.layout.pitch * 0.8).powi(2));
+        // Parcels are finite patches, not points. Keep the whole initial drop
+        // or streak below the canopy without clipping away any visible water.
+        let source_depth = (DROP_SPEED * DROP_DURATION as f32 * 0.5).max((volume as f32).sqrt());
         for _ in 0..count {
             let half = self.layout.bounds_max.x;
             let fraction = self.source.next_fraction();
@@ -364,11 +369,11 @@ impl RainEvent {
                 .add_falling(Parcel {
                     position: Vec2::new(
                         (fraction * 2.0 - 1.0) * half * 0.99,
-                        self.layout.bounds_max.y - 1.0,
+                        self.layout.canopy_y - source_depth,
                     ),
-                    velocity: Vec2::new(0.0, -220.0),
+                    velocity: Vec2::new(0.0, -DROP_SPEED),
                     volume,
-                    duration: 0.06,
+                    duration: DROP_DURATION,
                     horizontal_bounds: Some([f64::from(-half), f64::from(half)]),
                 })
                 .expect("rain fits reserved source budget");

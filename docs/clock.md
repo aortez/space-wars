@@ -8,11 +8,52 @@ reads the system clock. Configure the device's timezone/NTP as described in
 Implementation checkpoint for [#19](https://github.com/aortez/space-wars/issues/19):
 the useful clock, Falling and Color Cycle are merged, as are Meltdown (#52),
 Duck and composed Marquee/saved text (#53), and time-change-triggered Digit Slide.
-The issue's September 6 resume notes predate those deliveries. The current Duck
-upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
+The Duck upgrade (#69) adds calibrated platform planning and generated wall-tag courses;
 Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
 flashlight/glow polish and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
+
+## Layout
+
+The fixed four-slot digit face is centered on both screen axes. Empty leading
+hour slots keep their position in 12-hour mode, so a reading change does not
+recenter the clock. AM/PM remains just below the face's right edge. Digit cell
+sizes and horizontal spacing retain the previous responsive size budget.
+
+Matching dark bands occupy the top and bottom **8%** of the display. The floor
+was previously 16% high; its actual surface, colliders, course anchors and water
+beds now move down together. The upper band is a decorative **rain canopy**, not
+a solid ceiling or another water pool. Finite rain parcels start beneath its
+underside, with room for their initial streak/drop extent; amount, cadence and
+parcel limits are unchanged. Marquee content clips inside the two bands, while
+event notices and the player label can use the top band. No new physics bodies
+are needed; the canopy adds just two draw primitives.
+
+At 1024×768 the floor is approximately 61 pixels high instead of 123, and the
+digit face moves down approximately 54 pixels. Headless production-renderer
+captures cover Picade, HyperPixel and portrait, both time formats, and idle,
+Rain, Falling, Meltdown and Marquee:
+
+```sh
+SPACEWARS_CLOCK_ARTIFACTS=/tmp/clock-layout \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  centered_clock_and_symmetric_framing
+```
+
+Tests check centered face pixels, matching band bounds, AM/PM clearance,
+unchanged cell sizes, rain emission below the canopy, and event framing in both
+render adapters. This changes the arena geometry, so identical seeds can have
+different duck/hazard encounters; see the centered-arena checkpoint below.
+
+Real-device captures from **sw-picade-2** (1024×768, release build):
+
+| Centered idle face | Heavy Rain below the canopy |
+| --- | --- |
+| ![Centered Clock on Picade](screenshots/clock/picade-centered-clock.png) | ![Heavy Rain on Picade](screenshots/clock/picade-centered-rain.png) |
+
+Additional fixed-reading production-renderer fixtures: [HyperPixel, 800×480](screenshots/clock/hyperpixel-centered-clock-fixture.png)
+and [portrait, 480×800](screenshots/clock/portrait-centered-clock-fixture.png).
+These two are headless layout captures, not deployments to additional devices.
 
 ## Events
 
@@ -979,8 +1020,8 @@ timeouts rose from 12 to 24, and four previously exiting cases now fell. Of the
 survival improvement, **not a per-seed monotonic improvement** or a timeout fix.
 The longest dry stationary stretch was 152 ticks (2.53 seconds).
 
-Two specific previously falling cases are required to recover, make further
-planned landings and exit: `picade:42:careful:light:mixed` (loose digit debris over
+Before the centered layout, two specific previously falling cases were required
+to recover, make further planned landings and exit: `picade:42:careful:light:mixed` (loose digit debris over
 a gap) and `hyperpixel:0:flowing:light:mixed` (collision-disrupted flight). The
 original `picade:42:flowing:heavy:mixed` trace remains useful negative evidence:
 an overhead impact interrupts a jump, a second impact pushes it off the edge,
@@ -1048,6 +1089,51 @@ unchanged. The release client/CLI were fast-deployed to **sw-picade-2 only**;
 installed hashes matched the bundle (`824b4d172756…` client, `9d8c8db88d85…` CLI).
 Live 1024×768 Clock playback reported 60 FPS/UPS and zero service restarts.
 Demo/Heavy rain settings were preserved; no OS flash or reboot was required.
+
+#### Centered-arena regression checkpoint
+
+The centered face, lower floor and canopy emission height change falling-body
+and water arrival times relative to the course. Neither duck controller nor
+movement tuning was changed. Re-running the same 240 cases against #112 gives:
+
+| Sequence | Visits | #112 exit / fall / timeout | Centered exit / fall / timeout |
+|---|---:|---:|---:|
+| Dry | 24 | 24 / 0 / 0 | 24 / 0 / 0 |
+| Rain cleared | 72 | 72 / 0 / 0 | 72 / 0 / 0 |
+| Rain | 72 | 11 / 1 / 60 | 0 / 1 / 71 |
+| Mixed | 72 | 29 / 20 / 23 | 30 / 26 / 16 |
+
+Every dry and clear-weather control still exits; all cases retain replay,
+resource bounds, material accounting and cleanup checks. Rain-only visits still
+have the existing 35-second duck deadline inside a 42-second shower. This visual
+change is **not an AI improvement**: some mixed encounters improve, others now
+fall, and more rain-only visits time out. No cases were removed from the matrix.
+
+The fast recovery fixtures were reselected for the new physical geometry without
+weakening their recovery, subsequent-landing, inactivity or exit assertions:
+the six Heavy mixed smoke cases use seed 0 on Picade/HyperPixel and retain seed
+42 in portrait. The focused Picade Careful/Light collision-recovery case uses
+seed 1 instead of 42; HyperPixel Flowing/Light retains seed 0. All older cases
+remain in the full matrix, including Picade seed 42's earlier hit over a gap.
+The 12 authored, real-physics settled-debris fixtures still require escape and a
+new planned landing while the supporting debris remains present.
+
+Local validation: **1,914 workspace/all-target tests passed**, with 47 opt-in
+tests skipped; the 240-visit paired matrix and 392-course paired dry stress also
+passed. All 31 Clock client/renderer tests passed, and the production PNGs were
+visually inspected at Picade, HyperPixel and portrait sizes. Formatting and
+strict scoped Clock Clippy passed. Client-wide strict Clippy still reports
+existing lints in unchanged host/render/input/mission files; those are outside
+this layout change.
+
+The release client/CLI were then fast-deployed to **sw-picade-2 only**. Installed
+hashes matched the bundle (`6a6380792796…` client, `9d8c8db88d85…` CLI), and the
+saved-settings hash remained unchanged. Live Heavy Rain reported 59.9 FPS/UPS;
+subsequent automatic playback reported 60 FPS/UPS with zero service restarts.
+Idle and Heavy Rain screenshots above were captured on the device and visually
+inspected; the Rain snapshot includes the floating rubber duck. This was an
+automated device smoke check, not a human playtest. No OS flash or reboot was
+required, and Demo/Heavy Rain playback was left running.
 
 #### Other shared-visit coverage
 
