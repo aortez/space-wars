@@ -847,9 +847,9 @@ and was left running its normal automatic schedule.
 
 The follow-up lab uses the real scenario, controller, Rapier and water solver,
 with fixed 60 Hz steps and **no renderer, sleep or wall-clock assertions**.
-The regular workspace suite runs eight visits: six mixed sequences covering
+The regular workspace suite runs ten visits: six mixed sequences covering
 Careful/Flowing on Picade, landscape HyperPixel and portrait, plus two focused
-clear-weather recovery cases. They check actual recovery and new landings,
+clear-weather and two collision-recovery cases. They check actual recovery and new landings,
 bounded dry inactivity, successful exits in known fixtures, replay and cleanup.
 The larger **240-visit sweep is ignored by default** and available through the
 manual **Clock mixed-event regression** Actions workflow. Existing PR UI coverage
@@ -884,11 +884,23 @@ SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression" \
 JSON reports contain stable `case_id`s, outcomes/ticks, the active event and
 controller behavior at departure, wet interruptions/recoveries, time since last
 recovery, subsequent confirmed landings, peak resource counts and the last live
-duck state before reset removes its body. The dry-inactivity measure counts ticks
+duck state before reset removes its body. Schema-2 reports also include collision
+recovery counters and subsequent landings. Each row's `trace_file` points to a
+separate, test-only JSON artifact containing the last **120 live ticks** before
+departure: actual position/velocity, up to eight solver contacts (entity ID,
+normal, surface velocity, separation), course support, behavior, jump target and
+recovery state. Sampling is post-physics; the behavior/plan is the command decision
+that preceded that step. Coordinates are entrance-relative X and world Y; the
+artifact includes the static course spans/heights and body radius. Course entity
+IDs start at 1000, Falling digit bodies at 3000, Meltdown blocks at 4000.
+The trace has **no production runtime or logging cost**. Files are written once
+per case instead of repeatedly serializing the full sweep's contact histories.
+
+The dry-inactivity measure counts ticks
 without horizontal travel of one body diameter, excludes water recovery, and
 includes ordinary stationary warm-up jumps; it is not by itself a "stuck" verdict.
 Partial reports identify completed versus expected visits if a later case fails.
-Normal CI uploads the two smoke reports with `linux-test-timings`; the manual
+Normal CI uploads the three smoke/recovery reports and traces with `linux-test-timings`; the manual
 workflow uploads the sweep report and a short outcome table. Artifacts are kept
 for 14 days. Keep baseline/candidate reports in different directories when
 comparing changes. To replay a single reported case without the full sweep:
@@ -898,6 +910,8 @@ SPACEWARS_CLOCK_REGRESSION_CASE=picade:42:flowing:heavy:mixed \
 SPACEWARS_CLOCK_REGRESSION_DIR="$PWD/target/clock-regression-one" \
   cargo test --locked -p scenario-clock --profile ci mixed_event_sweep -- --ignored --nocapture
 jq '.rows[] | {case_id, metrics, terminal_duck}' target/clock-regression-one/mixed-sweep.json
+jq '.steps[] | {tick, position, velocity, support, contacts, behavior, recovery}' \
+  target/clock-regression-one/mixed-sweep-picade-42-flowing-heavy-mixed.trace.json
 ```
 
 Baseline (2026-09-23, unchanged controller and 35-second visit limit):
@@ -921,12 +935,77 @@ around physical event debris and any bounded wet-time allowance remain separate
 behavior experiments. Falls/timeouts in the broader hazard cases are measured
 outcomes, not blanket test failures; dry and clear-weather exits are required.
 
-Local validation: **1,777 workspace/all-target tests passed**; scoped Clock
+#### Bounded collision recovery
+
+The follow-up controller recognizes an interrupted jump (side/overhead contact),
+an unexpected landing, loose-debris support, or loss of support outside a planned
+jump. It discards only the transient route, retaining learned capabilities and
+the Careful/Flowing personality. `seeking-support` steers toward a known fixed
+course span using actual velocity, measured gravity/acceleration, a descending
+ballistic intercept and acceleration-limited horizontal reach. Moving-support
+velocity is included. The search is allocation-free and scans at most seven
+surfaces, at most twice per tick; there is no debris navigation graph or extra
+physics step. Stable support, low speed and three clear contact frames return
+control to the normal planner. Water recovery retains priority.
+
+A real grounded contact permits **one emergency jump per recovery** if a ledge
+cannot be braked on or loose debris provides no reachable walking/falling landing.
+Ceiling/side contact inhibits that jump. The same player actuator still limits
+speed/acceleration and requires grounding: no midair impulse, teleportation,
+collision immunity or visit-time extension. This is reactive footing recovery,
+not falling-block avoidance or a guarantee that an estimated landing remains
+unobstructed. An unreachable bank remains unreachable.
+
+Clock state schema **16** adds `duck.navigation.recovery`: active/target state,
+interrupted-jump/lost-support/unstable-support/wrong-landing counts, successful
+recoveries, ticks spent recovering/without a reachable target and escape jumps.
+These counters are separate from ordinary planned-landings and water recovery.
+The optional field defaults to empty when reading older diagnostics.
+
+Re-running the identical 240-visit matrix on 2026-09-24:
+
+| Sequence | Visits | Exited | Fell | Timed out |
+|---|---:|---:|---:|---:|
+| Dry | 24 | 24 | 0 | 0 |
+| Rain cleared | 72 | 72 | 0 | 0 |
+| Rain | 72 | 11 | 1 | 60 |
+| Mixed | 72 | 29 | 19 | 24 |
+
+All 168 non-mixed cases retained their exact outcomes **and departure ticks**;
+none invoked collision recovery. Mixed falls decreased from 33 to 19, with 76
+successful footing recoveries and 14 emergency jumps. The tradeoff is real:
+timeouts rose from 12 to 24, and four previously exiting cases now fell. Of the
+33 previous falls, 12 now exit and six survive until timeout. This is an aggregate
+survival improvement, **not a per-seed monotonic improvement** or a timeout fix.
+The longest dry stationary stretch was 152 ticks (2.53 seconds).
+
+Two specific previously falling cases are required to recover, make further
+planned landings and exit: `picade:42:careful:light:mixed` (loose digit debris over
+a gap) and `hyperpixel:0:flowing:light:mixed` (collision-disrupted flight). The
+original `picade:42:flowing:heavy:mixed` trace remains useful negative evidence:
+an overhead impact interrupts a jump, a second impact pushes it off the edge,
+and it still falls. Recovering the original route cannot prevent every later hit.
+
+Previous lab-only validation (#109): **1,777 workspace/all-target tests passed**; scoped Clock
 Clippy, formatting, workflow parsing and the CI summary generator passed. The
 eight normal cases took **0.91 seconds**, and the replayed 240-visit sweep took
 **44.50 seconds** on the development host (execution only, not CI guarantees).
 Single-case selection was checked both for a valid case and fail-closed rejection
 of an unknown ID. No runtime code or Pi settings changed in this lab-only pass.
+
+Collision-recovery validation: **1,892 workspace/all-target tests passed**
+(47 opt-in tests skipped), plus the 240-visit paired sweep (**45.82 seconds**)
+and the 392-course paired Careful/Flowing stress test (**4.51 seconds**). Strict
+scoped Clippy, formatting and 28 CI-harness unit tests passed. Existing missed
+landing classification and the six mixed smoke cases remain enforced.
+
+Fast-deployed the release client/CLI to **sw-picade-2 only**. Both installed
+hashes matched the bundle (`b504d8bf4ec5…` client, `9d8c8db88d85…` CLI), schema
+16 was active, the service reported zero restarts, and a 1024×768 screenshot
+and live status showed about 60 FPS/UPS at raster scale 2. During a live automatic
+Duck + Falling overlap, telemetry recorded one lost-support recovery (127 ticks),
+six confirmed landings and subsequent exit navigation. Demo, Heavy rain and 5%
+volume were retained; no OS flash, reboot or other cabinet update was needed.
 
 #### Other shared-visit coverage
 
@@ -1177,7 +1256,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **15** and reports scenario-instance revision,
+`clock state` uses schema version **16** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
@@ -1266,7 +1345,7 @@ switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. V
 are rejected; observation remains version 1.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 15, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 16, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1283,7 +1362,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 15, `event`
+tick. A raw `clock trigger` request must include schema version 16, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

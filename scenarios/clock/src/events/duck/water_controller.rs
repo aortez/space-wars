@@ -14,19 +14,10 @@ pub(in crate::events::duck) struct WaterNavigation {
 
 impl Controller {
     pub fn facing(&self) -> f32 {
-        self.water.facing.unwrap_or(self.direction)
-    }
-
-    fn interrupt_route(&mut self) {
-        self.trial = None;
-        self.previous_speed = 0.0;
-        self.jumped = 0;
-        self.target_obstacle = None;
-        self.navigator.plan = None;
-        self.navigator.flight_tick = None;
-        self.navigator.airborne = false;
-        self.navigator.retry = 0;
-        self.navigator.reason = None;
+        self.water
+            .facing
+            .or(self.recovery.facing)
+            .unwrap_or(self.direction)
     }
 
     pub fn decide_water(
@@ -41,6 +32,7 @@ impl Controller {
                 return None;
             }
             self.interrupt_route();
+            self.recovery.clear();
             self.water.active = true;
             self.water.facing = Some(self.direction);
             self.water.stats.interruptions += 1;
@@ -165,6 +157,7 @@ mod tests {
             floor: 0.0,
         };
         let mut observed = Observation {
+            support_velocity: Vec2::ZERO,
             position: Vec2::new(115.0, 5.0),
             velocity: Vec2::new(50.0, 0.0),
             grounded: false,

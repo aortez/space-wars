@@ -698,6 +698,22 @@ pub enum ClockDuckBehavior {
     Blocked,
     Paddling,
     Recovering,
+    SeekingSupport,
+}
+
+/// Collision recovery is separate from water recovery and ordinary jump plans.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockDuckRecoveryState {
+    pub active: bool,
+    pub interrupted_jumps: u32,
+    pub lost_support: u32,
+    pub unstable_support: u32,
+    pub wrong_landings: u32,
+    pub recoveries: u32,
+    pub ticks: u64,
+    pub no_target_ticks: u64,
+    pub escape_jumps: u32,
+    pub target_surface: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -814,6 +830,8 @@ pub struct ClockDuckNavigationState {
     pub planning: Option<ClockDuckPlanningState>,
     #[serde(default)]
     pub water: ClockDuckWaterState,
+    #[serde(default)]
+    pub recovery: ClockDuckRecoveryState,
 }
 
 /// Temporary course/controller telemetry. Position is in thousandths of render

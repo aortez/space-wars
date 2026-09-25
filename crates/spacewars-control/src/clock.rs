@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 15;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 16;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -763,6 +763,15 @@ mod tests {
             exit_open_milli: 700,
             outcome: Some(engine_common::ClockDuckOutcome::Exited),
             navigation: Some(engine_common::ClockDuckNavigationState {
+                recovery: engine_common::ClockDuckRecoveryState {
+                    active: true,
+                    interrupted_jumps: 2,
+                    recoveries: 1,
+                    ticks: 60,
+                    no_target_ticks: 3,
+                    target_surface: Some(2),
+                    ..Default::default()
+                },
                 water: engine_common::ClockDuckWaterState {
                     interruptions: 1,
                     recoveries: 1,
@@ -772,7 +781,7 @@ mod tests {
                 },
                 jump_profile: engine_common::ClockDuckJumpProfile::Flowing,
                 course_seed: 42,
-                behavior: engine_common::ClockDuckBehavior::Exiting,
+                behavior: engine_common::ClockDuckBehavior::SeekingSupport,
                 facing_right: false,
                 wall_tags: [2, 2],
                 calibrated_jumps: 2,
@@ -884,6 +893,7 @@ mod tests {
             .as_object_mut()
             .unwrap();
         navigation.remove("jump_profile");
+        navigation.remove("recovery");
         let planning = navigation["planning"].as_object_mut().unwrap();
         for field in [
             "running_jumps",
@@ -899,6 +909,10 @@ mod tests {
         plan.remove("next_target");
         let older = ClockState::from_json(&careful_payload.to_string()).unwrap();
         let navigation = older.duck.unwrap().navigation.unwrap();
+        assert_eq!(
+            navigation.recovery,
+            engine_common::ClockDuckRecoveryState::default()
+        );
         assert_eq!(
             navigation.jump_profile,
             engine_common::ClockDuckJumpProfile::Careful
