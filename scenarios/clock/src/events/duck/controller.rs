@@ -18,6 +18,8 @@ pub(super) struct Observation {
     pub position: Vec2,
     pub velocity: Vec2,
     pub support_velocity: Vec2,
+    /// Supporting foreign body's bounds, in entrance-relative X / world Y.
+    pub debris: Option<(Vec2, Vec2)>,
     pub grounded: bool,
     pub blocked: bool,
     pub support: Option<usize>,

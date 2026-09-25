@@ -289,6 +289,7 @@ fn speed_measurement_excludes_airborne_blocked_and_accelerating_motion() {
             controller.decide(
                 Observation {
                     support_velocity: Vec2::ZERO,
+                    debris: None,
                     position: Vec2::new(128.0, event.layout.floor_y + event.radius),
                     velocity: Vec2::new(
                         if accelerating {
@@ -318,6 +319,7 @@ fn movement_accelerates_and_brakes_without_instantly_reversing_or_air_jumping() 
     let movement = Movement::new(800.0, 8.0);
     let mut observed = Observation {
         support_velocity: Vec2::ZERO,
+        debris: None,
         position: Vec2::ZERO,
         velocity: Vec2::new(movement.run_speed, -10.0),
         grounded: false,
