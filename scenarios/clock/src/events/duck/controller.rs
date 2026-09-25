@@ -8,6 +8,8 @@ use super::flow;
 use super::planner::{self, Capabilities, Course, Plan};
 use super::{DT, Obstacle};
 
+#[path = "recovery_controller.rs"]
+mod recovery;
 #[path = "water_controller.rs"]
 mod water;
 
@@ -15,6 +17,7 @@ mod water;
 pub(super) struct Observation {
     pub position: Vec2,
     pub velocity: Vec2,
+    pub support_velocity: Vec2,
     pub grounded: bool,
     pub blocked: bool,
     pub support: Option<usize>,
@@ -132,6 +135,7 @@ pub(super) struct Controller {
     pub accelerations: Samples,
     pub navigator: Navigator,
     pub water: water::WaterNavigation,
+    pub recovery: recovery::Recovery,
     trial: Option<JumpTrial>,
     previous_speed: f32,
     jumped: u8,
@@ -152,6 +156,7 @@ impl Controller {
             accelerations: Samples::default(),
             navigator: Navigator::default(),
             water: water::WaterNavigation::default(),
+            recovery: recovery::Recovery::default(),
             trial: None,
             previous_speed: 0.0,
             jumped: 0,
@@ -318,7 +323,32 @@ pub(super) struct Navigator {
     retry: u32,
 }
 
+impl Navigator {
+    fn record_miss(&mut self, x: f32, landing_x: f32, direction: f32, radius: f32) {
+        let distance = (x - landing_x) * direction;
+        if distance < -radius {
+            self.undershoots += 1;
+        } else if distance > radius {
+            self.overshoots += 1;
+        } else {
+            self.wrong_surface += 1;
+        }
+    }
+}
+
 impl Controller {
+    fn interrupt_route(&mut self) {
+        self.trial = None;
+        self.previous_speed = 0.0;
+        self.jumped = 0;
+        self.target_obstacle = None;
+        self.navigator.plan = None;
+        self.navigator.flight_tick = None;
+        self.navigator.airborne = false;
+        self.navigator.retry = 0;
+        self.navigator.reason = None;
+    }
+
     pub fn capabilities(&self) -> Option<Capabilities> {
         Some(Capabilities {
             height: self.heights.median()?,
@@ -352,6 +382,9 @@ impl Controller {
                 jump: false,
             };
         };
+        if let Some(command) = self.decide_recovery(observed, context, capabilities) {
+            return command;
+        }
         let pace = |target: f32, maximum: f32| {
             let distance = target - observed.position.x;
             let speed =
@@ -383,14 +416,12 @@ impl Controller {
                     }
                     self.behavior = ClockDuckBehavior::Landing;
                 } else {
-                    let distance = (observed.position.x - plan.landing.x) * self.direction;
-                    if distance < -radius {
-                        self.navigator.undershoots += 1;
-                    } else if distance > radius {
-                        self.navigator.overshoots += 1;
-                    } else {
-                        self.navigator.wrong_surface += 1;
-                    }
+                    self.navigator.record_miss(
+                        observed.position.x,
+                        plan.landing.x,
+                        self.direction,
+                        radius,
+                    );
                 }
                 self.navigator.plan = None;
                 self.navigator.flight_tick = None;

@@ -18,6 +18,8 @@ mod takeover_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+pub(crate) mod trace;
+#[cfg(test)]
 mod water_tests;
 
 use controller::{Command, Controller, CourseContext, Gait, Movement, Observation};
@@ -532,6 +534,7 @@ impl DuckEvent {
                 (motion.linear_velocity.x - support_velocity.x) * screen,
                 motion.linear_velocity.y - support_velocity.y,
             ),
+            support_velocity: Vec2::new(support_velocity.x * screen, support_velocity.y),
             grounded,
             blocked: world.surface_contacts(DUCK_COLLIDER).any(|contact| {
                 (contact.normal.x.abs() > 0.3 || contact.normal.y < -0.3)
@@ -811,6 +814,7 @@ impl DuckEvent {
             exit_open_milli: (exit * 1000.0).round() as u32,
             outcome: self.outcome,
             navigation: self.player.is_none().then(|| ClockDuckNavigationState {
+                recovery: self.controller.recovery.stats,
                 water: self.controller.water.stats,
                 jump_profile: self.controller.profile,
                 course_seed: self.seed,
