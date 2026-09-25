@@ -1,0 +1,330 @@
+{
+  "binary_sha256": "8104dcc91fc5cc66d60baeed07fee5124e751da0284d1b5c23017019d62557f5",
+  "pairs": [
+    {
+      "case": "world0-asteroids0",
+      "identical_trace": {
+        "sha256": "53cf9ecd5abf5ebfaa6a3dd71b79985ef8b4b2ef034c75c258dc00de7fc4c2ae"
+      },
+      "round": {
+        "elapsed_seconds": 299.850005997,
+        "finished_tick": 17991,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          1,
+          2
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 300.149994003,
+        "time_limit_seconds": 600.0
+      },
+      "evaluation": {
+        "cancelled": 560,
+        "charged": 5140,
+        "completed": 1204,
+        "construction": {
+          "count": 35982,
+          "max_ms": 0.009318,
+          "mean_ms": 0.0003073858040131086,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00025100000000000003,
+          "p95_ms": 0.000592,
+          "p99_ms": 0.0016929999999999998
+        },
+        "dispatch": {
+          "count": 17991,
+          "max_ms": 0.0025450000000000004,
+          "mean_ms": 0.00011164554499472419,
+          "over_16_67_ms": 0,
+          "p50_ms": 4.9999999999999996e-05,
+          "p95_ms": 0.000361,
+          "p99_ms": 0.001473
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 1204,
+          "candidate_records": 2858,
+          "numeric_candidate_records": 556
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 2045,
+          "ship or pilot recovery required": 174,
+          "capture already landed; retain its return task": 64,
+          "objective route unmeasured": 8,
+          "site round trip unmeasured": 11
+        },
+        "visits": 16,
+        "visits_with_numeric_prediction": 5,
+        "visit_outcomes": {
+          "completed": 3,
+          "abandoned": 2
+        },
+        "predictions_with_material_changes": 1,
+        "completed_median_absolute_error_seconds": 14.816666000000001,
+        "completed_max_absolute_error_seconds": 24.850000666666666,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      }
+    },
+    {
+      "case": "world0-asteroids3",
+      "identical_trace": {
+        "sha256": "7f375ccd6087b2f8b173a3b3b78393780dd5f154617a7555d649eda59eea0d4f"
+      },
+      "round": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": "draw",
+        "owned_planets": [
+          1,
+          1
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0
+      },
+      "evaluation": {
+        "cancelled": 550,
+        "charged": 8414,
+        "completed": 2273,
+        "construction": {
+          "count": 72000,
+          "max_ms": 0.024687,
+          "mean_ms": 0.0003570079027777638,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.000281,
+          "p95_ms": 0.000741,
+          "p99_ms": 0.0016929999999999998
+        },
+        "dispatch": {
+          "count": 36000,
+          "max_ms": 0.005830999999999999,
+          "mean_ms": 0.0001197723055555495,
+          "over_16_67_ms": 0,
+          "p50_ms": 4e-05,
+          "p95_ms": 0.0006010000000000001,
+          "p99_ms": 0.001322
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 2273,
+          "candidate_records": 5087,
+          "numeric_candidate_records": 547
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 3114,
+          "ship or pilot recovery required": 963,
+          "capture already landed; retain its return task": 64,
+          "objective route unmeasured": 388,
+          "site round trip unmeasured": 11
+        },
+        "visits": 20,
+        "visits_with_numeric_prediction": 4,
+        "visit_outcomes": {
+          "completed": 3,
+          "abandoned": 1
+        },
+        "predictions_with_material_changes": 2,
+        "completed_median_absolute_error_seconds": 15.699999333333334,
+        "completed_max_absolute_error_seconds": 18.999999999999996,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      }
+    },
+    {
+      "case": "world1-asteroids0",
+      "identical_trace": {
+        "sha256": "97d04915e87af727ee7ae47d401f681e8ff078b6fdb3f136f58554dc8e658373"
+      },
+      "round": {
+        "elapsed_seconds": 430.50000861,
+        "finished_tick": 25830,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 169.49999139,
+        "time_limit_seconds": 600.0
+      },
+      "evaluation": {
+        "cancelled": 603,
+        "charged": 5630,
+        "completed": 1794,
+        "construction": {
+          "count": 51660,
+          "max_ms": 0.006372,
+          "mean_ms": 0.0002017258226868054,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00016,
+          "p95_ms": 0.00041,
+          "p99_ms": 0.000792
+        },
+        "dispatch": {
+          "count": 25830,
+          "max_ms": 0.0038469999999999997,
+          "mean_ms": 6.913855981416265e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2.9999999999999997e-05,
+          "p95_ms": 0.000351,
+          "p99_ms": 0.000671
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 1794,
+          "candidate_records": 2698,
+          "numeric_candidate_records": 707,
+          "complete_shortlist_comparisons": 647
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1297,
+          "ship or pilot recovery required": 393,
+          "capture already landed; retain its return task": 90,
+          "objective route unmeasured": 204,
+          "site round trip unmeasured": 7
+        },
+        "visits": 14,
+        "visits_with_numeric_prediction": 3,
+        "visit_outcomes": {
+          "abandoned": 1,
+          "completed": 2
+        },
+        "predictions_with_material_changes": 0,
+        "completed_median_absolute_error_seconds": 2.516666333333335,
+        "completed_max_absolute_error_seconds": 2.5499993333333357,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      }
+    },
+    {
+      "case": "world1-asteroids3",
+      "identical_trace": {
+        "sha256": "5a01fd48e25e3cd1cd80908d9b90ec611ef1fcda01158765f02455ee28943542"
+      },
+      "round": {
+        "elapsed_seconds": 415.16667497,
+        "finished_tick": 24910,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          1,
+          2
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 184.83332503,
+        "time_limit_seconds": 600.0
+      },
+      "evaluation": {
+        "cancelled": 1022,
+        "charged": 5751,
+        "completed": 1282,
+        "construction": {
+          "count": 49820,
+          "max_ms": 0.005029,
+          "mean_ms": 0.00016338751505421306,
+          "over_16_67_ms": 0,
+          "p50_ms": 0.00013099999999999999,
+          "p95_ms": 0.000351,
+          "p99_ms": 0.000702
+        },
+        "dispatch": {
+          "count": 24910,
+          "max_ms": 0.002084,
+          "mean_ms": 5.721983139300836e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 0.000241,
+          "p99_ms": 0.0006519999999999999
+        },
+        "maximum_shared_budget": 4,
+        "model": "capture_mission_reference_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "requested_shared_budget": 4,
+        "scope": "candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
+      },
+      "predictions": {
+        "coverage": {
+          "reports": 1282,
+          "candidate_records": 2475,
+          "numeric_candidate_records": 295,
+          "complete_shortlist_comparisons": 3
+        },
+        "unknown_reasons": {
+          "remote or local surface unmeasured": 1745,
+          "ship or pilot recovery required": 311,
+          "capture already landed; retain its return task": 105,
+          "objective route unmeasured": 17,
+          "site round trip unmeasured": 2
+        },
+        "visits": 17,
+        "visits_with_numeric_prediction": 5,
+        "visit_outcomes": {
+          "abandoned": 2,
+          "completed": 3
+        },
+        "predictions_with_material_changes": 3,
+        "completed_median_absolute_error_seconds": 6.466666,
+        "completed_max_absolute_error_seconds": 29.31636666666666,
+        "scope": "first numeric current-mission forecast only; success-conditioned references; failures stay in coverage/outcomes, not completed-duration errors; alternatives have no observed outcome"
+      }
+    }
+  ],
+  "source_revision": "36f5ab748dce3f77ad20850b73be7cd1641cf27b",
+  "source_patch_artifact": "target/capture-mission-evaluation/matrix/tested.patch",
+  "matrix": {
+    "seconds_limit": 600,
+    "asteroid_intervals": [
+      0,
+      3
+    ],
+    "policy_order_world_0": [
+      "material_mission_v10",
+      "material_mission_v11"
+    ],
+    "policy_order_world_1": [
+      "material_mission_v11",
+      "material_mission_v10"
+    ],
+    "seeds": {
+      "0": 14290288550150632427,
+      "1": 8962094517875893068
+    }
+  }
+}

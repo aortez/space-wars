@@ -24,6 +24,7 @@ pub struct SuccessorProbe {
     cancelled: u64,
     charged: u64,
     step_cap: u32,
+    pub last_charged: u32,
     construction_ms: Vec<f64>,
     dispatch_ms: Vec<f64>,
 }
@@ -47,6 +48,7 @@ impl SuccessorProbe {
             cancelled: 0,
             charged: 0,
             step_cap: super::arg("--successor-step-cap", "128").parse().unwrap(),
+            last_charged: 0,
             construction_ms: Vec::new(),
             dispatch_ms: Vec::new(),
         }
@@ -110,6 +112,7 @@ impl SuccessorProbe {
         assert_eq!(report.charged.physics_queries, 0);
         assert!(report.charged.graph <= remaining.graph);
         self.charged += u64::from(report.charged.graph);
+        self.last_charged = report.charged.graph;
         for row in report.jobs {
             let actor = row.request.actor as usize;
             let source = self.pending[&actor].1;

@@ -1,0 +1,81 @@
+{
+  "model": "capture_mission_reference_v1",
+  "source_model": "capture-trip-empirical-v1",
+  "source_policy": "material_mission_v11",
+  "source_runtime": "43764580869c1ad56e6b7e9c4b7a21f485496220",
+  "source_profile_sha256": "23c9a12bec8eec532f750a1b9b67295cd4dd96380435155b4439503bbc881f06",
+  "cells": {
+    "no_flag/landing": {
+      "median_seconds": 17.866666666666667,
+      "reference_domain_seconds": null,
+      "samples": 15
+    },
+    "no_flag/exit": {
+      "median_seconds": 0.016666666666666666,
+      "reference_domain_seconds": null,
+      "samples": 15
+    },
+    "no_flag/outbound": {
+      "median_seconds": 0.06666666666666667,
+      "reference_domain_seconds": null,
+      "samples": 15
+    },
+    "no_flag/claim": {
+      "median_seconds": 0.016666666666666607,
+      "reference_domain_seconds": [
+        3.0,
+        3.0
+      ],
+      "samples": 15
+    },
+    "no_flag/return_board": {
+      "median_seconds": 0.03333333333333333,
+      "reference_domain_seconds": null,
+      "samples": 15
+    },
+    "no_flag/departure": {
+      "median_seconds": 3.7666666666666666,
+      "reference_domain_seconds": null,
+      "samples": 15
+    },
+    "walk/landing": {
+      "median_seconds": 23.033333333333335,
+      "reference_domain_seconds": null,
+      "samples": 7
+    },
+    "walk/exit": {
+      "median_seconds": 0.016666666666666666,
+      "reference_domain_seconds": null,
+      "samples": 7
+    },
+    "walk/outbound": {
+      "median_seconds": 0.15833333333333333,
+      "reference_domain_seconds": [
+        0.0,
+        10.599817657470703
+      ],
+      "samples": 7
+    },
+    "walk/claim": {
+      "median_seconds": -0.008333333333333304,
+      "reference_domain_seconds": [
+        6.0,
+        6.0
+      ],
+      "samples": 5
+    },
+    "walk/return_board": {
+      "median_seconds": 0.03333333333333333,
+      "reference_domain_seconds": [
+        0.0,
+        10.118012237548829
+      ],
+      "samples": 5
+    },
+    "walk/departure": {
+      "median_seconds": 3.816666666666667,
+      "reference_domain_seconds": null,
+      "samples": 5
+    }
+  }
+}

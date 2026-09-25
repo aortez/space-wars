@@ -5,6 +5,8 @@ mod ground_start_probe;
 mod landing_cadence_probe;
 #[path = "support/live_planning.rs"]
 mod live_planning;
+#[path = "support/mission_evaluation.rs"]
+mod mission_evaluation;
 #[path = "support/mission_metrics.rs"]
 mod mission_metrics;
 #[path = "support/physics_profile.rs"]
@@ -152,6 +154,7 @@ fn main() {
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
+    let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -431,6 +434,9 @@ fn main() {
                 };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
+                if let Some(evaluator) = &mut mission_evaluation {
+                    successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
+                }
                 if let Some(probe) = &mut successor_probe {
                     successor_construction_ms += probe.observe(i, &pilots[i], &o);
                 }
@@ -594,6 +600,19 @@ fn main() {
                 live_planning.as_ref().unwrap().remaining_work(),
             );
         }
+        if let Some(evaluator) = &mut mission_evaluation {
+            let mut remaining = live_planning
+                .as_ref()
+                .map_or(spacewars_ai::mission_evaluation::DEFAULT_WORK, |live| {
+                    live.remaining_work()
+                });
+            remaining.graph = remaining.graph.saturating_sub(
+                successor_probe
+                    .as_ref()
+                    .map_or(0, |probe| probe.last_charged),
+            );
+            planning_ms += evaluator.advance(state.tick(), remaining);
+        }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
         steps.push(clock.elapsed().as_secs_f64() * 1000.0);
@@ -733,6 +752,9 @@ fn main() {
         "asteroids":state.asteroid_pressure(),"asteroid_events":asteroid_events,
         "claim_footing_recoveries":claim_footing_recoveries});
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
+    if let Some(evaluator) = &mut mission_evaluation {
+        report["mission_evaluation"] = evaluator.report();
+    }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({
             "profile": spacewars_ai::tactical_sortie::ACQUISITION_WAIT_PROFILE,

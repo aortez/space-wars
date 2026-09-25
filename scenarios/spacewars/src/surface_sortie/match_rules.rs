@@ -241,6 +241,19 @@ impl SurfaceSortieState {
         })
     }
 
+    pub(super) fn mission_match_context(&self) -> Option<mission::MissionMatchContext> {
+        let round = self.round.as_ref()?;
+        Some(mission::MissionMatchContext {
+            remaining_seconds: round
+                .time_limit
+                .map(|limit| limit.saturating_sub(round.elapsed).as_secs_f64()),
+            owned_planets: self.owned_planet_counts(),
+            pilots_alive: std::array::from_fn(|i| self.pilots[i].vitals.unwrap().alive()),
+            pilot_health: std::array::from_fn(|i| self.pilots[i].vitals.unwrap().health),
+            finished: round.outcome.is_some(),
+        })
+    }
+
     /// Evaluate both pilots only after all damage in the shared physics step.
     pub(super) fn finish_round(&mut self, evaluate_timeout: bool) -> bool {
         let owned = self.owned_planet_counts();

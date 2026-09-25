@@ -64,6 +64,16 @@ impl LandingSurveyCadence {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct MissionMatchContext {
+    /// None is an unlimited match; absence of the whole context is a lab.
+    pub remaining_seconds: Option<f64>,
+    pub owned_planets: [usize; 2],
+    pub pilots_alive: [bool; 2],
+    pub pilot_health: [f32; 2],
+    pub finished: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct MissionObservationV1 {
     /// Absent means not requested. Remote samples are separate from the local
     /// approach planet and never authorize landing or ground actions.
@@ -73,6 +83,8 @@ pub struct MissionObservationV1 {
     /// Finished-match priorities are opt-in; historical capture labs retain
     /// their original itinerary and survival rules.
     pub match_rules: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_context: Option<MissionMatchContext>,
     pub local: TacticalSortieObservationV1,
     /// Cheap world context. Only the current approach planet receives detailed
     /// landing/ground surveys; these bounds never authorize surface actions.
@@ -413,6 +425,7 @@ impl SurfaceSortieState {
                 .map(destination_cover::DestinationCoverObservation::pending),
             version: 1,
             match_rules: self.round.is_some(),
+            match_context: self.mission_match_context(),
             local: self.tactical_sortie_observation_profile(
                 player,
                 query,
