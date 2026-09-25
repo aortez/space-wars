@@ -1,7 +1,14 @@
 use super::*;
+use engine_core::planning::Work;
+use scenario_spacewars::surface_sortie::live_planning::LiveObjectivePlanner;
 use spacewars_ai::mission_evaluation::{DEFAULT_WORK, MissionEvaluator};
 use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
 use std::time::Instant;
+
+const OBSERVATION_WORK: Work = Work {
+    graph: DEFAULT_WORK.graph,
+    physics_queries: 384,
+};
 
 mod profiling;
 
@@ -59,6 +66,7 @@ struct MaterialMissionClientScenario {
     seed: u64,
     profile: profiling::Profile,
     evaluation: MissionEvaluator,
+    surveys: LiveObjectivePlanner,
 }
 fn create(seed: u64, settings: &Settings, duel: bool, arena: bool) -> Box<dyn ClientScenario> {
     let registration = match (duel, arena) {
@@ -94,6 +102,7 @@ fn create_with_seats(
         seed,
         profile: profiling::Profile::default(),
         evaluation: MissionEvaluator::new(2),
+        surveys: LiveObjectivePlanner::new(2, OBSERVATION_WORK),
         pilots: std::array::from_fn(|seat| {
             MissionBot::new(
                 if registration.id == MATCH_REGISTRATION.id
@@ -189,7 +198,7 @@ impl ClientScenario for MaterialMissionClientScenario {
         for seat in (0..2).filter(|&seat| self.bots[seat]) {
             let site = self.pilots[seat].site_request();
             let clock = Instant::now();
-            let o = self.sortie.state.mission_observation_with_cadence(
+            let mut o = self.sortie.state.mission_observation_with_cadence(
                 seat,
                 self.pilots[seat].sensor_request(),
                 Default::default(),
@@ -203,10 +212,26 @@ impl ClientScenario for MaterialMissionClientScenario {
             );
             sample.policies[seat] = clock.elapsed();
             sample.seats[seat] = Some(profiling::Seat::read(&o, site));
+            let clock = Instant::now();
+            let request = self
+                .evaluation
+                .alternative_request(&o, self.pilots[seat].telemetry());
+            self.surveys
+                .observe_destination_cover(&self.sortie.state, seat, &mut o, request);
             self.evaluation.observe(&o, self.pilots[seat].telemetry());
+            sample.planning += clock.elapsed();
         }
-        self.evaluation
-            .advance(self.sortie.state.tick(), DEFAULT_WORK);
+        let clock = Instant::now();
+        let allocation = self.surveys.advance_with_state(&self.sortie.state).unwrap();
+        self.evaluation.advance(
+            self.sortie.state.tick(),
+            Work {
+                graph: OBSERVATION_WORK.graph - allocation.charged.graph,
+                physics_queries: OBSERVATION_WORK.physics_queries
+                    - allocation.charged.physics_queries,
+            },
+        );
+        sample.planning += clock.elapsed();
         let clock = Instant::now();
         let result = self.sortie.step(&actions, dt);
         sample.scenario = clock.elapsed();
@@ -271,12 +296,13 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_evaluation_model={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}",
+                "{}\nmission_evaluation_model={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}",
                 self.profile.diagnostics(&self.pilots),
                 spacewars_ai::mission_evaluation::MODEL,
                 self.evaluation.charged_total,
                 serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_1)).unwrap(),
-                serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_2)).unwrap()
+                serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_2)).unwrap(),
+                serde_json::to_string(self.surveys.destination_cover_telemetry()).unwrap()
             ),
             self.sortie.runtime_diagnostics(),
         )
@@ -298,6 +324,62 @@ mod tests {
     use engine_common::SpacewarsController::{Human, PlannerBot, RuleBot};
     use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
+
+    #[test]
+    fn alternative_surveys_preserve_live_v9_v10_controls_and_physical_round() {
+        let mut settings = Settings::default();
+        settings.spacewars.player_1_controller = RuleBot;
+        settings.spacewars.player_2_controller = PlannerBot;
+        settings.material_combat.asteroids.interval_seconds = 3;
+        let create = || {
+            create_match(
+                42,
+                &settings,
+                Viewport::new(800.0, 480.0),
+                ScenarioStartMode::Normal,
+                &ScenarioAsset::None,
+            )
+            .unwrap()
+        };
+        let mut baseline = create();
+        let mut surveyed = create();
+        let baseline = baseline
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap();
+        let surveyed = surveyed
+            .as_any_mut()
+            .downcast_mut::<MaterialMissionClientScenario>()
+            .unwrap();
+        // Zero query fuel leaves the native synchronous controls and evaluator
+        // intact while denying only the observational remote measurements.
+        baseline.surveys = LiveObjectivePlanner::new(2, Work::default());
+        for _ in 0..180 * 60 {
+            let dt = Duration::from_nanos(16_666_667);
+            baseline.step(&[], dt);
+            surveyed.step(&[], dt);
+            for seat in 0..2 {
+                assert_eq!(
+                    baseline.pilots[seat].telemetry(),
+                    surveyed.pilots[seat].telemetry()
+                );
+                assert_eq!(
+                    baseline.sortie.state.observation(seat),
+                    surveyed.sortie.state.observation(seat)
+                );
+            }
+            assert_eq!(baseline.is_game_over(), surveyed.is_game_over());
+            if baseline.is_game_over() {
+                break;
+            }
+        }
+        assert_eq!(baseline.surveys.destination_cover_telemetry().checks, 0);
+        assert!(surveyed.surveys.destination_cover_telemetry().measured > 0);
+        assert_eq!(
+            baseline.sortie.state.match_observation(),
+            surveyed.sortie.state.match_observation()
+        );
+    }
 
     #[test]
     #[ignore = "explicit three-minute normal-entry versus arena comparison"]

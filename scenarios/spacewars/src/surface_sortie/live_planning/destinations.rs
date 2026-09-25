@@ -185,7 +185,14 @@ impl Destinations {
                 continue;
             }
             let fuel = QueryFuel::default();
-            let measurement = measure(state, player, candidate.id, request.opponent, &fuel);
+            let measurement = measure(
+                state,
+                player,
+                candidate.id,
+                request.opponent,
+                request.request.sample_climb,
+                &fuel,
+            );
             let finding = measurement.finding;
             candidate.measurement = Some(measurement);
             candidate.status = match finding {
@@ -212,6 +219,7 @@ pub(super) fn measure(
     player: usize,
     id: pilot::LandingSiteId,
     enemy: Option<combat::CombatTarget>,
+    sample_climb: bool,
     fuel: &QueryFuel,
 ) -> CoverMeasurement {
     let site = state.vehicle_landing_site_with_queries(player, id, false, || fuel.charge());
@@ -223,6 +231,19 @@ pub(super) fn measure(
         .as_ref()
         .filter(|_| !fuel.exhausted() && armed)
         .map(|site| state.landing_cover_with_queries(site, enemy, || fuel.charge()));
+    let climb_clear = site
+        .as_ref()
+        .filter(|_| sample_climb && !fuel.exhausted())
+        .map(|site| {
+            [7.0, 30.0, 60.0].into_iter().all(|height| {
+                fuel.charge()
+                    && state.world.physics.surface_hull_fits_at(
+                        state.pilots[player].vehicle.0,
+                        site.vehicle_position + site.normal * height,
+                        rotation_for_direction(site.normal),
+                    )
+            })
+        });
     let finding = if fuel.exhausted() {
         CoverFinding::Incomplete
     } else if site.is_none() {
@@ -260,5 +281,6 @@ pub(super) fn measure(
         finding,
         site: (!fuel.exhausted()).then_some(site).flatten(),
         cover: (!fuel.exhausted()).then_some(cover).flatten(),
+        climb_clear: (!fuel.exhausted()).then_some(climb_clear).flatten(),
     }
 }
