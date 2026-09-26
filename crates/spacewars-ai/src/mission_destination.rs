@@ -71,22 +71,7 @@ impl MaterialMissionPilot {
         probe: &mut DestinationProbeResult,
     ) {
         let p = &o.local.combat.recovery.flight.pilot;
-        let result = if self.telemetry.target.is_none() {
-            Err("no current destination")
-        } else if self.telemetry.target == Some(probe.destination) {
-            Err("destination already selected")
-        } else if !o.planets.iter().any(|planet| {
-            planet.index == probe.destination
-                && planet
-                    .claim
-                    .as_ref()
-                    .is_none_or(|claim| claim.owner != Some(p.owner))
-        }) {
-            Err("destination missing or already owned")
-        } else {
-            self.destination_gate(o, probe.destination)
-        };
-        probe.reason = result.err();
+        probe.reason = self.transfer_probe_gate(o, probe.destination).err();
         probe.accepted = probe.reason.is_none();
         if probe.accepted {
             self.switch_destination(
@@ -94,6 +79,31 @@ impl MaterialMissionPilot {
                 probe.destination,
                 "experimental destination nomination",
             );
+        }
+    }
+
+    /// Read-only nomination gates for offline source discovery. Passing these
+    /// does not override higher-priority controls or promise an accepted probe.
+    pub fn transfer_probe_gate(
+        &self,
+        o: &MissionObservationV1,
+        destination: usize,
+    ) -> Result<(), &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.telemetry.target.is_none() {
+            Err("no current destination")
+        } else if self.telemetry.target == Some(destination) {
+            Err("destination already selected")
+        } else if !o.planets.iter().any(|planet| {
+            planet.index == destination
+                && planet
+                    .claim
+                    .as_ref()
+                    .is_none_or(|claim| claim.owner != Some(p.owner))
+        }) {
+            Err("destination missing or already owned")
+        } else {
+            self.destination_gate(o, destination)
         }
     }
 
@@ -382,5 +392,92 @@ mod tests {
             0
         );
         assert!(bot.recovery.is_some());
+    }
+
+    fn calibration_fixture() -> (MaterialMissionPilot, MissionObservationV1) {
+        use scenario_spacewars::surface_sortie::combat::CombatTarget;
+        let (mut bot, mut o, _) = fixture(MissionPolicy::ValuePlanner);
+        o.match_rules = true;
+        o.sun = None;
+        for planet in &mut o.planets {
+            if let Some(claim) = &mut planet.claim {
+                claim.owner = None;
+            }
+        }
+        bot.selected_tick = 99;
+        bot.destination_switched = true;
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 100;
+        let mut motion = p.ship;
+        motion.position += Vec2::X * 100.0;
+        o.local.combat.target = Some(CombatTarget {
+            owner: PlayerId::PLAYER_2,
+            motion,
+            health: 10.0,
+            health_fraction: 0.1,
+            ship_form: Some(ShipForm::Ship),
+            visible: true,
+            ground_occluded: false,
+        });
+        (bot, o)
+    }
+
+    #[test]
+    fn calibration_defers_only_new_pursuit_without_setting_a_cooldown_or_sticky_mode() {
+        let (mut bot, mut o) = calibration_fixture();
+        let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+        let mut normal = bot.clone();
+        normal.intent_with_evaluation(&o, &evaluator);
+        assert!(normal.telemetry.pursuit.is_some());
+        bot.intent_for_transfer_calibration(&o, &evaluator, 1, 99);
+        assert!(bot.telemetry.pursuit.is_none());
+        assert_eq!(bot.telemetry.target, Some(1));
+        assert_eq!(bot.next_pursuit_tick, 0);
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent_with_evaluation(&o, &evaluator);
+        assert_eq!(bot.telemetry.pursuit.as_ref().unwrap().started_tick, 101);
+    }
+
+    #[test]
+    fn calibration_preserves_trip_identity_safety_and_existing_pursuit_maintenance() {
+        use scenario_spacewars::surface_sortie::mission::MissionObstacle;
+        let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+        for mutation in 0..8 {
+            let (mut bot, mut o) = calibration_fixture();
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            match mutation {
+                0 => bot.selected_tick -= 1,
+                1 => bot.telemetry.target = Some(0),
+                2 => p.tick = 99,
+                3 => p.tick = 99 + 3601,
+                4 => p.ship_available = false,
+                5 => {
+                    o.sun = Some(MissionObstacle {
+                        position: p.ship.position - Vec2::Y * 10.0,
+                        radius: 50.0,
+                    })
+                }
+                6 | 7 => {
+                    bot.telemetry.pursuit = Some(MissionPursuit {
+                        started_tick: if mutation == 6 { 99 } else { 0 },
+                        last_visible_tick: 99,
+                        reason: "test existing pursuit",
+                    })
+                }
+                _ => unreachable!(),
+            }
+            if mutation == 7 {
+                o.local.combat.recovery.flight.pilot.tick = PURSUIT_BUDGET_TICKS;
+            }
+            let mut normal = bot.clone();
+            let expected = normal.intent_with_evaluation(&o, &evaluator);
+            let actual = bot.intent_for_transfer_calibration(&o, &evaluator, 1, 99);
+            assert_eq!(expected, actual, "mutation {mutation}");
+            assert_eq!(normal.telemetry(), bot.telemetry(), "mutation {mutation}");
+            assert_eq!(
+                normal.next_pursuit_tick, bot.next_pursuit_tick,
+                "mutation {mutation}"
+            );
+        }
     }
 }

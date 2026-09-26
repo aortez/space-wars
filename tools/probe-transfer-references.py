@@ -90,7 +90,7 @@ def f32_identity(value):
 def audit_geometry(source, diagnostic):
     g = diagnostic['geometry']
     bodies = {b['index']: b for b in source['bodies']}
-    body, target, frame = bodies[g['body']], bodies[diagnostic['destination']], bodies[source['frame']]
+    target, frame = bodies[diagnostic['destination']], bodies[source['frame']]
     vec = lambda p: (p['x'], p['y'])
     add = lambda a, b: tuple(x + y for x, y in zip(a, b))
     sub = lambda a, b: tuple(x - y for x, y in zip(a, b))
@@ -109,13 +109,27 @@ def audit_geometry(source, diagnostic):
     assert g['leg'] in {'climb', 'transfer'}
     start, end = (vec(ship['position']), launch) if g['leg'] == 'climb' else (launch, entry)
     assert close(vec(g['from']), start) and close(vec(g['to']), end)
-    assert g['body'] != (source['frame'] if g['leg'] == 'climb' else diagnostic['destination'])
+    assert (diagnostic['completed_stages'] is not None) == (g['leg'] == 'transfer')
+    if g['check'] == 'boundary':
+        assert g['body'] is None and diagnostic['reason'] == 'transfer requires unmodelled boundary guidance'
+        center = vec(source['boundary']['center'])
+        assert close(vec(g['obstacle_from']), center) and close(vec(g['obstacle_to']), center)
+        assert math.isclose(g['threshold'], source['boundary']['radius'] - 65, abs_tol=0.0001)
+        separation = max(math.dist(vec(g['from']), center), math.dist(vec(g['to']), center))
+        assert math.isclose(g['separation'], separation, abs_tol=0.002) and separation > g['threshold']
+        return
+    if g['check'] == 'sun':
+        body = source['sun']
+        assert g['body'] is None and diagnostic['reason'] == 'transfer requires an unmodelled solar detour'
+    else:
+        assert g['check'] in {'static_planet', 'moving_planet'}
+        assert g['body'] != (source['frame'] if g['leg'] == 'climb' else diagnostic['destination'])
+        body = bodies[g['body']]
     assert math.isclose(g['threshold'], body['radius'] + 65, abs_tol=0.0001)
     assert close(vec(g['obstacle_from']), vec(body['position']))
-    assert g['check'] in {'static_planet', 'moving_planet'}
-    assert (diagnostic['completed_stages'] is not None) == (g['leg'] == 'transfer')
-    if g['check'] == 'static_planet':
-        assert diagnostic['reason'] == 'transfer requires an unmodelled planet detour'
+    if g['check'] in {'static_planet', 'sun'}:
+        if g['check'] == 'static_planet':
+            assert diagnostic['reason'] == 'transfer requires an unmodelled planet detour'
         obstacle_end = vec(body['position'])
     else:
         assert diagnostic['reason'] == 'moving body requires an unmodelled transfer detour'
@@ -178,9 +192,18 @@ def audit_probe(case, probe, trace):
     assert source is not None and source['tick'] == case['source_tick']
     d = source['diagnostic']
     assert d['destination'] == case['destination'] and d['reason'] == case['expected_reason']
-    assert d['reference'] is None and d['geometry'] is not None
-    g = d['geometry']
-    audit_geometry(case['transfer_source'], d)
+    if 'expected_diagnostic' in case:
+        assert f32_identity(d) == f32_identity(case['expected_diagnostic'])
+    if d['reference'] is not None:
+        assert d['reason'] is None and d['geometry'] is None
+        assert d['reference'] == d['completed_stages']
+        seconds = [d['reference'][k] for k in ['settle_seconds', 'turn_seconds', 'climb_seconds', 'cruise_seconds']]
+        assert all(math.isfinite(t) and t >= 0 for t in seconds) and sum(seconds) <= 30.00001
+    elif d['geometry'] is not None:
+        audit_geometry(case['transfer_source'], d)
+    else:
+        assert d['reason'] in {'transfer frame unmeasured', 'transfer destination unmeasured',
+                               'transfer control authority unmodelled', 'transfer exceeds short direct reference horizon'}
     outcome = probe['outcome']
     elapsed = outcome['tick'] - case['source_tick']
     assert outcome['elapsed_ticks'] == elapsed and 0 <= elapsed <= 3600
@@ -228,6 +251,17 @@ def audit_probe(case, probe, trace):
                 health_at_source=trace[0]['health'], health_at_end=trace[-1]['health'])
 
 
+def probe_args(case):
+    return ['--world', 'generated', '--seed', str(case['condition']['seed']), '--mode', 'duel',
+            '--match', 'true', '--seat', '0', '--asteroid-interval', str(case['condition']['interval']),
+            '--p1-policy', f"material_mission_v{case['condition']['policies'][0]}",
+            '--p2-policy', f"material_mission_v{case['condition']['policies'][1]}",
+            '--trace', 'true', '--trace-start-tick', '0', '--trace-end-tick', '36002',
+            '--survey-capture-flags', 'true', '--shadow-capture-flags', 'true',
+            '--probe-transfer-seat', str(case['seat']), '--probe-transfer-tick', str(case['source_tick']),
+            '--probe-transfer-destination', str(case['destination'])]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--reference', type=Path, required=True)
@@ -247,14 +281,7 @@ def main():
     expected = reference_prefixes(opts.reference, cases)
     for c in cases:
         condition = c['condition']
-        args = ['--world', 'generated', '--seed', str(condition['seed']), '--mode', 'duel',
-            '--match', 'true', '--seat', '0', '--asteroid-interval', str(condition['interval']),
-            '--p1-policy', f"material_mission_v{condition['policies'][0]}",
-            '--p2-policy', f"material_mission_v{condition['policies'][1]}",
-            '--trace', 'true', '--trace-start-tick', '0', '--trace-end-tick', '36002',
-            '--survey-capture-flags', 'true', '--shadow-capture-flags', 'true',
-            '--probe-transfer-seat', str(c['seat']), '--probe-transfer-tick', str(c['source_tick']),
-            '--probe-transfer-destination', str(c['destination'])]
+        args = probe_args(c)
         run = F.D.run(opts.binary, opts.out, c['name'], args, c['seat'], seconds=c['source_tick'] // 60 + 61)
         root = opts.out / c['name']
         report = json.loads((root / 'report.json').read_text())
