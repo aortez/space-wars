@@ -1,0 +1,1363 @@
+{
+  "schema": 1,
+  "plan": [
+    {
+      "name": "regression-on",
+      "group": "regression",
+      "mode": "on",
+      "seed": 186767996776005237,
+      "interval": 0,
+      "policies": [
+        10,
+        13
+      ]
+    },
+    {
+      "name": "world0-asteroids0-on",
+      "group": "world0-asteroids0",
+      "mode": "on",
+      "seed": 15460202873486447603,
+      "interval": 0,
+      "policies": [
+        13,
+        13
+      ]
+    },
+    {
+      "name": "world0-asteroids3-on",
+      "group": "world0-asteroids3",
+      "mode": "on",
+      "seed": 15460202873486447603,
+      "interval": 3,
+      "policies": [
+        13,
+        13
+      ]
+    },
+    {
+      "name": "world1-asteroids0-on",
+      "group": "world1-asteroids0",
+      "mode": "on",
+      "seed": 3491156488288037499,
+      "interval": 0,
+      "policies": [
+        13,
+        13
+      ]
+    },
+    {
+      "name": "world1-asteroids3-on",
+      "group": "world1-asteroids3",
+      "mode": "on",
+      "seed": 3491156488288037499,
+      "interval": 3,
+      "policies": [
+        13,
+        13
+      ]
+    }
+  ],
+  "runs": {
+    "regression-on": {
+      "physics_ok": true,
+      "elapsed_ticks": 21005,
+      "first_claim_tick": 2395,
+      "first_boarded_tick": 2397,
+      "first_departed_tick": 2654,
+      "all_owned_tick": 13120,
+      "completed_sorties": 5,
+      "completed_recoveries": 0,
+      "destination_planning": {
+        "last_switch": null,
+        "switches": 0
+      },
+      "visits": [
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 1201,
+          "boarded_tick": 2397,
+          "claimed_tick": 2395,
+          "departed_tick": 2654,
+          "landed_tick": 2208,
+          "planet": 1,
+          "reason": null,
+          "selected_tick": 1
+        },
+        {
+          "abandoned_tick": 2669,
+          "arrived_tick": null,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 0,
+          "reason": "pausing travel for nearby opponent",
+          "selected_tick": 2655
+        },
+        {
+          "abandoned_tick": 7632,
+          "arrived_tick": 5598,
+          "boarded_tick": 7399,
+          "claimed_tick": 7397,
+          "departed_tick": 7631,
+          "landed_tick": 7100,
+          "planet": 0,
+          "reason": "pausing travel for nearby opponent",
+          "selected_tick": 4469
+        },
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 9500,
+          "boarded_tick": 11033,
+          "claimed_tick": 11031,
+          "departed_tick": 11258,
+          "landed_tick": 10665,
+          "planet": 1,
+          "reason": null,
+          "selected_tick": 9432
+        },
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 11994,
+          "boarded_tick": 13122,
+          "claimed_tick": 13120,
+          "departed_tick": 13347,
+          "landed_tick": 12934,
+          "planet": 2,
+          "reason": null,
+          "selected_tick": 11259
+        },
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 14074,
+          "boarded_tick": 16203,
+          "claimed_tick": 16081,
+          "departed_tick": 16429,
+          "landed_tick": 15525,
+          "planet": 0,
+          "reason": null,
+          "selected_tick": 13348
+        },
+        {
+          "abandoned_tick": 16985,
+          "arrived_tick": null,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 1,
+          "reason": "pausing travel for nearby opponent",
+          "selected_tick": 16430
+        },
+        {
+          "abandoned_tick": 19085,
+          "arrived_tick": 18960,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 1,
+          "reason": "left destination approach frame",
+          "selected_tick": 18785
+        },
+        {
+          "abandoned_tick": 19311,
+          "arrived_tick": 19251,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 1,
+          "reason": "left destination approach frame",
+          "selected_tick": 19086
+        },
+        {
+          "abandoned_tick": 19664,
+          "arrived_tick": null,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 1,
+          "reason": "pausing travel for nearby opponent",
+          "selected_tick": 19312
+        }
+      ],
+      "round": {
+        "elapsed_seconds": 350.083340335,
+        "finished_tick": 21005,
+        "outcome": {
+          "winner": "player_2"
+        },
+        "owned_planets": [
+          0,
+          2
+        ],
+        "pilots": [
+          {
+            "death_tick": 21005,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 9.403366088867188,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": 1.5118259191513062,
+                  "position": {
+                    "x": 1469.3685302734375,
+                    "y": 56.631431579589844
+                  },
+                  "spin": -45.54358673095703,
+                  "velocity": {
+                    "x": 35.416961669921875,
+                    "y": -106.79203033447266
+                  }
+                },
+                "closing_speed": 125.56719207763672,
+                "impulse": 150.457763671875,
+                "normal": {
+                  "x": 0.30597007274627686,
+                  "y": -0.9520411491394043
+                },
+                "on_foot": false,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 1470.0362548828125,
+                  "y": 55.49100112915039
+                }
+              },
+              "tick": 21005
+            },
+            "protected_until_tick": 18843
+          },
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 249.916659665,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "queries": {
+        "cancelled": 6,
+        "checks": 381,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 326,
+        "no_landing": 55,
+        "physics_queries": 20366,
+        "submitted": 6
+      },
+      "evaluation_work": 17759,
+      "command": [
+        "/home/data/workspace/space-wars2/target/release/examples/surface_mission_soak",
+        "--seconds",
+        "600",
+        "--live-objective-planning",
+        "true",
+        "--live-objective-seats",
+        "none",
+        "--objective-graph-budget",
+        "4",
+        "--objective-query-budget",
+        "384",
+        "--evaluate-missions",
+        "true",
+        "--survey-capture-alternative",
+        "true",
+        "--out",
+        "target/capture-flag-survey/value-shadow-final/regression-on",
+        "--world",
+        "generated",
+        "--seed",
+        "186767996776005237",
+        "--mode",
+        "duel",
+        "--match",
+        "true",
+        "--seat",
+        "0",
+        "--asteroid-interval",
+        "0",
+        "--p1-policy",
+        "material_mission_v10",
+        "--p2-policy",
+        "material_mission_v13",
+        "--trace",
+        "true",
+        "--trace-start-tick",
+        "0",
+        "--trace-end-tick",
+        "36002",
+        "--survey-capture-flags",
+        "true",
+        "--shadow-capture-flags",
+        "true",
+        "--require-finish",
+        "true",
+        "--timing-csv",
+        "true"
+      ],
+      "report_sha256": "c13ad3225521e1a0482ac3cf0893fd484f0dc8508419852e5aae94dc83976631",
+      "maximum_remote_queries_per_tick": 126,
+      "controller_trace_sha256": "087e0c6e4f5549b8aee929498d28a8c7368ea271eb989c28083bd83580edb741",
+      "evaluation_sha256": "f42b1ba6f876bdd56a313204523f0eba1ef26bbd5a5c24752ada434261fe920f",
+      "comparison": {
+        "reports": 0,
+        "used_references": 0,
+        "unique_surveys_used": 0,
+        "numeric_candidates_added": 0,
+        "complete_value_comparisons": 0,
+        "preference_changes": [],
+        "admissions_rejected": {},
+        "candidate_unknown": {},
+        "used": [],
+        "scope": "Repeated historical comparisons are not independent opportunities or strength evidence."
+      },
+      "shadow": {
+        "charged": 0,
+        "completed": 0,
+        "construction": {
+          "count": 42010,
+          "max_ms": 0.0016530000000000002,
+          "mean_ms": 4.7845322542248505e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 4e-05,
+          "p95_ms": 9.999999999999999e-05,
+          "p99_ms": 0.00015
+        },
+        "deferred_source_observations": 0,
+        "dispatch": {
+          "count": 21005,
+          "max_ms": 0.0009609999999999999,
+          "mean_ms": 2.029483456320204e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 2.9999999999999997e-05,
+          "p99_ms": 4e-05
+        },
+        "model": "capture_flag_value_shadow_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "scope": "historical paired value comparison; never controls; after all surveys using remaining shared graph work; zero physics queries; construction outside graph quota; trace IO excluded"
+      },
+      "work": {
+        "shadow_graph": 0,
+        "maximum_combined_graph": 4,
+        "physics_queries_added": 0
+      },
+      "shadow_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "shadow_work_sha256": "6bde550409bc6c3c7ad621df0146cee2516ca1915cdf9fe54e92721c4085b9f5",
+      "exact_existing_controls_evaluator_physics_surveys_and_work": true
+    },
+    "world0-asteroids0-on": {
+      "physics_ok": true,
+      "elapsed_ticks": 36000,
+      "first_claim_tick": 2297,
+      "first_boarded_tick": 2299,
+      "first_departed_tick": 2519,
+      "all_owned_tick": null,
+      "completed_sorties": 1,
+      "completed_recoveries": 0,
+      "destination_planning": {
+        "last_switch": null,
+        "switches": 0
+      },
+      "visits": [
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 965,
+          "boarded_tick": 2299,
+          "claimed_tick": 2297,
+          "departed_tick": 2519,
+          "landed_tick": 2027,
+          "planet": 0,
+          "reason": null,
+          "selected_tick": 1
+        },
+        {
+          "abandoned_tick": 3093,
+          "arrived_tick": null,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 2,
+          "reason": "ship or surface recovery required",
+          "selected_tick": 2520
+        }
+      ],
+      "round": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          2,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 12.452618598937988,
+            "last_damage": {
+              "amount": 0.04815596714615822,
+              "cause": "laser",
+              "contact": null,
+              "tick": 21216
+            },
+            "protected_until_tick": 3882
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "queries": {
+        "cancelled": 5,
+        "checks": 294,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 294,
+        "no_landing": 0,
+        "physics_queries": 18276,
+        "submitted": 5
+      },
+      "evaluation_work": 39117,
+      "command": [
+        "/home/data/workspace/space-wars2/target/release/examples/surface_mission_soak",
+        "--seconds",
+        "600",
+        "--live-objective-planning",
+        "true",
+        "--live-objective-seats",
+        "none",
+        "--objective-graph-budget",
+        "4",
+        "--objective-query-budget",
+        "384",
+        "--evaluate-missions",
+        "true",
+        "--survey-capture-alternative",
+        "true",
+        "--out",
+        "target/capture-flag-survey/value-shadow-final/world0-asteroids0-on",
+        "--world",
+        "generated",
+        "--seed",
+        "15460202873486447603",
+        "--mode",
+        "duel",
+        "--match",
+        "true",
+        "--seat",
+        "0",
+        "--asteroid-interval",
+        "0",
+        "--p1-policy",
+        "material_mission_v13",
+        "--p2-policy",
+        "material_mission_v13",
+        "--trace",
+        "true",
+        "--trace-start-tick",
+        "0",
+        "--trace-end-tick",
+        "36002",
+        "--survey-capture-flags",
+        "true",
+        "--shadow-capture-flags",
+        "true",
+        "--require-finish",
+        "true",
+        "--timing-csv",
+        "true"
+      ],
+      "report_sha256": "74bf07e6a93e73f0d8875277cc3e6223d484fe5eae59c0d3bb9f33074fff0717",
+      "maximum_remote_queries_per_tick": 127,
+      "controller_trace_sha256": "c9f02034e02ac16c393ae15b69a131a06149f37d0fc6f79760afddcb5560b9c2",
+      "evaluation_sha256": "52c57b73e892ad58b6c23f64a3d7c1069c66d7f375470043af0e147c66a4a609",
+      "comparison": {
+        "reports": 0,
+        "used_references": 0,
+        "unique_surveys_used": 0,
+        "numeric_candidates_added": 0,
+        "complete_value_comparisons": 0,
+        "preference_changes": [],
+        "admissions_rejected": {},
+        "candidate_unknown": {},
+        "used": [],
+        "scope": "Repeated historical comparisons are not independent opportunities or strength evidence."
+      },
+      "shadow": {
+        "charged": 0,
+        "completed": 0,
+        "construction": {
+          "count": 72000,
+          "max_ms": 0.003767,
+          "mean_ms": 5.8120472222247775e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 4.9999999999999996e-05,
+          "p95_ms": 0.000111,
+          "p99_ms": 0.00015099999999999998
+        },
+        "deferred_source_observations": 0,
+        "dispatch": {
+          "count": 36000,
+          "max_ms": 0.002765,
+          "mean_ms": 2.325425000000536e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 4e-05,
+          "p99_ms": 5.1e-05
+        },
+        "model": "capture_flag_value_shadow_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "scope": "historical paired value comparison; never controls; after all surveys using remaining shared graph work; zero physics queries; construction outside graph quota; trace IO excluded"
+      },
+      "work": {
+        "shadow_graph": 0,
+        "maximum_combined_graph": 4,
+        "physics_queries_added": 0
+      },
+      "shadow_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "shadow_work_sha256": "043e1ae7cfe617db3a4a3ddee24ca9fa2c4cbb279f03189ed1621eebc6524356",
+      "exact_existing_controls_evaluator_physics_surveys_and_work": true
+    },
+    "world0-asteroids3-on": {
+      "physics_ok": true,
+      "elapsed_ticks": 14774,
+      "first_claim_tick": 2236,
+      "first_boarded_tick": 2246,
+      "first_departed_tick": 2493,
+      "all_owned_tick": null,
+      "completed_sorties": 1,
+      "completed_recoveries": 0,
+      "destination_planning": {
+        "last_switch": null,
+        "switches": 0
+      },
+      "visits": [
+        {
+          "abandoned_tick": null,
+          "arrived_tick": 965,
+          "boarded_tick": 2246,
+          "claimed_tick": 2236,
+          "departed_tick": 2493,
+          "landed_tick": 2050,
+          "planet": 0,
+          "reason": null,
+          "selected_tick": 1
+        },
+        {
+          "abandoned_tick": 3127,
+          "arrived_tick": null,
+          "boarded_tick": null,
+          "claimed_tick": null,
+          "departed_tick": null,
+          "landed_tick": null,
+          "planet": 2,
+          "reason": "ship or surface recovery required",
+          "selected_tick": 2494
+        }
+      ],
+      "round": {
+        "elapsed_seconds": 246.233338258,
+        "finished_tick": 14774,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 14774,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 16.827659606933594,
+              "cause": "missile",
+              "contact": {
+                "actor_motion": {
+                  "angle": 0.3879632353782654,
+                  "position": {
+                    "x": 990.4440307617188,
+                    "y": 1454.582763671875
+                  },
+                  "spin": 0.09302844107151031,
+                  "velocity": {
+                    "x": -22.876253128051758,
+                    "y": 7.6128411293029785
+                  }
+                },
+                "closing_speed": 146.82444763183594,
+                "impulse": 81.07579803466797,
+                "normal": {
+                  "x": -0.13390526175498962,
+                  "y": -0.9909942746162415
+                },
+                "on_foot": false,
+                "other_id": 100292,
+                "other_kind": "missile",
+                "other_motion": {
+                  "angle": -2.7769219875335693,
+                  "position": {
+                    "x": 994.287353515625,
+                    "y": 1449.984130859375
+                  },
+                  "spin": 2.0,
+                  "velocity": {
+                    "x": -289.4378356933594,
+                    "y": 201.8206329345703
+                  }
+                },
+                "point": {
+                  "x": 989.7352294921875,
+                  "y": 1453.611083984375
+                }
+              },
+              "tick": 14774
+            },
+            "protected_until_tick": 4245
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 353.766661742,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "queries": {
+        "cancelled": 9,
+        "checks": 198,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 198,
+        "no_landing": 0,
+        "physics_queries": 12539,
+        "submitted": 9
+      },
+      "evaluation_work": 24742,
+      "command": [
+        "/home/data/workspace/space-wars2/target/release/examples/surface_mission_soak",
+        "--seconds",
+        "600",
+        "--live-objective-planning",
+        "true",
+        "--live-objective-seats",
+        "none",
+        "--objective-graph-budget",
+        "4",
+        "--objective-query-budget",
+        "384",
+        "--evaluate-missions",
+        "true",
+        "--survey-capture-alternative",
+        "true",
+        "--out",
+        "target/capture-flag-survey/value-shadow-final/world0-asteroids3-on",
+        "--world",
+        "generated",
+        "--seed",
+        "15460202873486447603",
+        "--mode",
+        "duel",
+        "--match",
+        "true",
+        "--seat",
+        "0",
+        "--asteroid-interval",
+        "3",
+        "--p1-policy",
+        "material_mission_v13",
+        "--p2-policy",
+        "material_mission_v13",
+        "--trace",
+        "true",
+        "--trace-start-tick",
+        "0",
+        "--trace-end-tick",
+        "36002",
+        "--survey-capture-flags",
+        "true",
+        "--shadow-capture-flags",
+        "true",
+        "--require-finish",
+        "true",
+        "--timing-csv",
+        "true"
+      ],
+      "report_sha256": "d7347611afdf68b3fdb48f1a6a0b746d3a19fb8d58ae29da6bff986c28770e5b",
+      "maximum_remote_queries_per_tick": 127,
+      "controller_trace_sha256": "89eb1a759d1d77ec34c014bf263744e3cae64e676bd64c5c80aae6c79931f305",
+      "evaluation_sha256": "a746c228b7781fba970b719f76151d2b2f9fda85ea5bfeeeb7a91ae3264a2bc6",
+      "comparison": {
+        "reports": 1,
+        "used_references": 1,
+        "unique_surveys_used": 1,
+        "numeric_candidates_added": 0,
+        "complete_value_comparisons": 0,
+        "preference_changes": [],
+        "admissions_rejected": {},
+        "candidate_unknown": {
+          "transfer requires an unmodelled planet detour": 1
+        },
+        "used": [
+          {
+            "actor": "player_1",
+            "source_tick": 5193,
+            "site": {
+              "planet": 0,
+              "bearing": 55
+            },
+            "comparison_source": 5952,
+            "admitted_tick": 5954,
+            "reference_seconds": null,
+            "reason": "transfer requires an unmodelled planet detour"
+          }
+        ],
+        "scope": "Repeated historical comparisons are not independent opportunities or strength evidence."
+      },
+      "shadow": {
+        "charged": 3,
+        "completed": 1,
+        "construction": {
+          "count": 29548,
+          "max_ms": 0.002434,
+          "mean_ms": 6.134736699606782e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 4.9999999999999996e-05,
+          "p95_ms": 0.00013099999999999999,
+          "p99_ms": 0.000171
+        },
+        "deferred_source_observations": 1,
+        "dispatch": {
+          "count": 14774,
+          "max_ms": 0.002014,
+          "mean_ms": 2.3449912007576432e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 4e-05,
+          "p99_ms": 4.9999999999999996e-05
+        },
+        "model": "capture_flag_value_shadow_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "scope": "historical paired value comparison; never controls; after all surveys using remaining shared graph work; zero physics queries; construction outside graph quota; trace IO excluded"
+      },
+      "work": {
+        "shadow_graph": 3,
+        "maximum_combined_graph": 4,
+        "physics_queries_added": 0
+      },
+      "shadow_sha256": "1bb438367ea641dd761053fc4277f291e8df1c97ef9fd20b91bd04fea261b7c8",
+      "shadow_work_sha256": "e7289502a66309581b8cb48d9d6f781d2a7efef77de8509baa4084d33aa64e3a",
+      "exact_existing_controls_evaluator_physics_surveys_and_work": true
+    },
+    "world1-asteroids0-on": {
+      "physics_ok": true,
+      "elapsed_ticks": 36000,
+      "first_claim_tick": 1854,
+      "first_boarded_tick": 1856,
+      "first_departed_tick": 2090,
+      "all_owned_tick": null,
+      "completed_sorties": 1,
+      "completed_recoveries": 0,
+      "destination_planning": {
+        "last_switch": null,
+        "switches": 0
+      },
+      "visits": [
+        {
+          "abandoned_tick": 2091,
+          "arrived_tick": 651,
+          "boarded_tick": 1856,
+          "claimed_tick": 1854,
+          "departed_tick": 2090,
+          "landed_tick": 1668,
+          "planet": 1,
+          "reason": "ship or surface recovery required",
+          "selected_tick": 1
+        }
+      ],
+      "round": {
+        "elapsed_seconds": 600.0,
+        "finished_tick": 36000,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          3,
+          0
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": null,
+            "health": 91.84417724609375,
+            "last_damage": {
+              "amount": 0.04746450111269951,
+              "cause": "laser",
+              "contact": null,
+              "tick": 17202
+            },
+            "protected_until_tick": 3040
+          }
+        ],
+        "reason": "time_limit",
+        "remaining_seconds": 0.0,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "queries": {
+        "cancelled": 3,
+        "checks": 178,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 178,
+        "no_landing": 0,
+        "physics_queries": 11148,
+        "submitted": 3
+      },
+      "evaluation_work": 38047,
+      "command": [
+        "/home/data/workspace/space-wars2/target/release/examples/surface_mission_soak",
+        "--seconds",
+        "600",
+        "--live-objective-planning",
+        "true",
+        "--live-objective-seats",
+        "none",
+        "--objective-graph-budget",
+        "4",
+        "--objective-query-budget",
+        "384",
+        "--evaluate-missions",
+        "true",
+        "--survey-capture-alternative",
+        "true",
+        "--out",
+        "target/capture-flag-survey/value-shadow-final/world1-asteroids0-on",
+        "--world",
+        "generated",
+        "--seed",
+        "3491156488288037499",
+        "--mode",
+        "duel",
+        "--match",
+        "true",
+        "--seat",
+        "0",
+        "--asteroid-interval",
+        "0",
+        "--p1-policy",
+        "material_mission_v13",
+        "--p2-policy",
+        "material_mission_v13",
+        "--trace",
+        "true",
+        "--trace-start-tick",
+        "0",
+        "--trace-end-tick",
+        "36002",
+        "--survey-capture-flags",
+        "true",
+        "--shadow-capture-flags",
+        "true",
+        "--require-finish",
+        "true",
+        "--timing-csv",
+        "true"
+      ],
+      "report_sha256": "81ece37d03ffc80b466ab8a013b7140445d5d8e9ee657dc3edc8f81d03d33ccc",
+      "maximum_remote_queries_per_tick": 126,
+      "controller_trace_sha256": "6d0cbccc9061c41e5d3e1c1c2d4e409f903e9ba27af103dcd7c31ea7d486a178",
+      "evaluation_sha256": "da418222798a3b7d3af0fc0a66d104f22d3afb33c1b1fb75072a61e356c63a9d",
+      "comparison": {
+        "reports": 37,
+        "used_references": 15,
+        "unique_surveys_used": 1,
+        "numeric_candidates_added": 0,
+        "complete_value_comparisons": 0,
+        "preference_changes": [],
+        "admissions_rejected": {
+          "flag survey unpublished": 44
+        },
+        "candidate_unknown": {
+          "moving body requires an unmodelled transfer detour": 15,
+          "transfer requires an unmodelled planet detour": 15,
+          "remote or local surface unmeasured": 31
+        },
+        "used": [
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 3816,
+            "admitted_tick": 3818,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 3876,
+            "admitted_tick": 3878,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 3934,
+            "admitted_tick": 3938,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 3997,
+            "admitted_tick": 3999,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4057,
+            "admitted_tick": 4059,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4129,
+            "admitted_tick": 4131,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4199,
+            "admitted_tick": 4201,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4261,
+            "admitted_tick": 4263,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4321,
+            "admitted_tick": 4323,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4377,
+            "admitted_tick": 4383,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4440,
+            "admitted_tick": 4443,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4503,
+            "admitted_tick": 4505,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4559,
+            "admitted_tick": 4565,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4622,
+            "admitted_tick": 4625,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          },
+          {
+            "actor": "player_1",
+            "source_tick": 3471,
+            "site": {
+              "planet": 1,
+              "bearing": 6
+            },
+            "comparison_source": 4685,
+            "admitted_tick": 4687,
+            "reference_seconds": null,
+            "reason": "moving body requires an unmodelled transfer detour"
+          }
+        ],
+        "scope": "Repeated historical comparisons are not independent opportunities or strength evidence."
+      },
+      "shadow": {
+        "charged": 126,
+        "completed": 37,
+        "construction": {
+          "count": 72000,
+          "max_ms": 0.003968,
+          "mean_ms": 5.677516666668605e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 4.9999999999999996e-05,
+          "p95_ms": 0.00012100000000000001,
+          "p99_ms": 0.00016999999999999999
+        },
+        "deferred_source_observations": 0,
+        "dispatch": {
+          "count": 36000,
+          "max_ms": 0.001874,
+          "mean_ms": 2.4583083333341606e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 4e-05,
+          "p99_ms": 5.9999999999999995e-05
+        },
+        "model": "capture_flag_value_shadow_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "scope": "historical paired value comparison; never controls; after all surveys using remaining shared graph work; zero physics queries; construction outside graph quota; trace IO excluded"
+      },
+      "work": {
+        "shadow_graph": 126,
+        "maximum_combined_graph": 4,
+        "physics_queries_added": 0
+      },
+      "shadow_sha256": "6f3680359973d0455eb0e344a9b898b3efe0a565d26a87d804da871674be3fee",
+      "shadow_work_sha256": "358a5c569cd24074838fe0596c97874e1b6ff30f6bfcec9da7f085446d70273e",
+      "exact_existing_controls_evaluator_physics_surveys_and_work": true
+    },
+    "world1-asteroids3-on": {
+      "physics_ok": true,
+      "elapsed_ticks": 3134,
+      "first_claim_tick": 1905,
+      "first_boarded_tick": 1907,
+      "first_departed_tick": 2167,
+      "all_owned_tick": null,
+      "completed_sorties": 1,
+      "completed_recoveries": 0,
+      "destination_planning": {
+        "last_switch": null,
+        "switches": 0
+      },
+      "visits": [
+        {
+          "abandoned_tick": 2168,
+          "arrived_tick": 691,
+          "boarded_tick": 1907,
+          "claimed_tick": 1905,
+          "departed_tick": 2167,
+          "landed_tick": 1719,
+          "planet": 1,
+          "reason": "ship or surface recovery required",
+          "selected_tick": 1
+        }
+      ],
+      "round": {
+        "elapsed_seconds": 52.233334378,
+        "finished_tick": 3134,
+        "outcome": {
+          "winner": "player_1"
+        },
+        "owned_planets": [
+          0,
+          1
+        ],
+        "pilots": [
+          {
+            "death_tick": null,
+            "health": 100.0,
+            "last_damage": null,
+            "protected_until_tick": 0
+          },
+          {
+            "death_tick": 3134,
+            "health": 0.0,
+            "last_damage": {
+              "amount": 58.848915100097656,
+              "cause": "impact",
+              "contact": {
+                "actor_motion": {
+                  "angle": 1.3229008913040161,
+                  "position": {
+                    "x": 451.1795959472656,
+                    "y": 119.69971466064453
+                  },
+                  "spin": -98.32318878173828,
+                  "velocity": {
+                    "x": -2.665480613708496,
+                    "y": -21.983013153076172
+                  }
+                },
+                "closing_speed": 50.962615966796875,
+                "impulse": 65.50536346435547,
+                "normal": {
+                  "x": -0.48573365807533264,
+                  "y": -0.8741069436073303
+                },
+                "on_foot": false,
+                "other_id": null,
+                "other_kind": "world",
+                "other_motion": null,
+                "point": {
+                  "x": 450.67022705078125,
+                  "y": 118.14544677734375
+                }
+              },
+              "tick": 3134
+            },
+            "protected_until_tick": 2915
+          }
+        ],
+        "reason": "pilot_death",
+        "remaining_seconds": 547.766665622,
+        "time_limit_seconds": 600.0,
+        "version": 2
+      },
+      "queries": {
+        "cancelled": 5,
+        "checks": 166,
+        "deferred": {},
+        "incomplete": 0,
+        "max_retained": 2,
+        "measured": 149,
+        "no_landing": 17,
+        "physics_queries": 9421,
+        "submitted": 5
+      },
+      "evaluation_work": 7568,
+      "command": [
+        "/home/data/workspace/space-wars2/target/release/examples/surface_mission_soak",
+        "--seconds",
+        "600",
+        "--live-objective-planning",
+        "true",
+        "--live-objective-seats",
+        "none",
+        "--objective-graph-budget",
+        "4",
+        "--objective-query-budget",
+        "384",
+        "--evaluate-missions",
+        "true",
+        "--survey-capture-alternative",
+        "true",
+        "--out",
+        "target/capture-flag-survey/value-shadow-final/world1-asteroids3-on",
+        "--world",
+        "generated",
+        "--seed",
+        "3491156488288037499",
+        "--mode",
+        "duel",
+        "--match",
+        "true",
+        "--seat",
+        "0",
+        "--asteroid-interval",
+        "3",
+        "--p1-policy",
+        "material_mission_v13",
+        "--p2-policy",
+        "material_mission_v13",
+        "--trace",
+        "true",
+        "--trace-start-tick",
+        "0",
+        "--trace-end-tick",
+        "36002",
+        "--survey-capture-flags",
+        "true",
+        "--shadow-capture-flags",
+        "true",
+        "--require-finish",
+        "true",
+        "--timing-csv",
+        "true"
+      ],
+      "report_sha256": "60824b87b291ef2dd74d7448eb571b001f7f2a10313a585db67c85c684c7384c",
+      "maximum_remote_queries_per_tick": 126,
+      "controller_trace_sha256": "9d94c375dcc8ad4759b9322df736542ff1c008bfad2997e2d38eff46077b205c",
+      "evaluation_sha256": "d2618262ba2fb103f0c2e47c700d9b5ca56456c29efc5da8a2483130792118ef",
+      "comparison": {
+        "reports": 0,
+        "used_references": 0,
+        "unique_surveys_used": 0,
+        "numeric_candidates_added": 0,
+        "complete_value_comparisons": 0,
+        "preference_changes": [],
+        "admissions_rejected": {},
+        "candidate_unknown": {},
+        "used": [],
+        "scope": "Repeated historical comparisons are not independent opportunities or strength evidence."
+      },
+      "shadow": {
+        "charged": 0,
+        "completed": 0,
+        "construction": {
+          "count": 6268,
+          "max_ms": 0.002705,
+          "mean_ms": 4.4077377153796365e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2.9999999999999997e-05,
+          "p95_ms": 8.999999999999999e-05,
+          "p99_ms": 0.00013
+        },
+        "deferred_source_observations": 0,
+        "dispatch": {
+          "count": 3134,
+          "max_ms": 0.00037099999999999996,
+          "mean_ms": 2.0063497128270015e-05,
+          "over_16_67_ms": 0,
+          "p50_ms": 2e-05,
+          "p95_ms": 2.1e-05,
+          "p99_ms": 4e-05
+        },
+        "model": "capture_flag_value_shadow_v1",
+        "observational": true,
+        "pending": [
+          false,
+          false
+        ],
+        "scope": "historical paired value comparison; never controls; after all surveys using remaining shared graph work; zero physics queries; construction outside graph quota; trace IO excluded"
+      },
+      "work": {
+        "shadow_graph": 0,
+        "maximum_combined_graph": 4,
+        "physics_queries_added": 0
+      },
+      "shadow_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "shadow_work_sha256": "a6ba34103eec4dcd4a00e02f5f613e4c31fc260287e6e7c9fe9c8da94a34d29d",
+      "exact_existing_controls_evaluator_physics_surveys_and_work": true
+    }
+  },
+  "scope": "Fixed engineering replays, not new strength trials. Existing controls, evaluator, physics, surveys and their work must stay exact. Only the last-priority shadow consumes additional remaining graph work.",
+  "source_commit": "194270ec21c83db383feee56bd8b17175b8d3274",
+  "source_dirty": false,
+  "binary_sha256": "b27372a636fefe45b6eb04823f06625c27b8b857ba09307697cbcf047bd37a27",
+  "reference_source": "207d07ae500ac1915a2b2917e532bba178704ccb",
+  "reference_summary_sha256": "cfb437ab4bd461c1cc86464ec4211deff818d2046d3e1fffd0e0b17590bd9161"
+}

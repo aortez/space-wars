@@ -1,5 +1,8 @@
 # Local publication of historical flag surveys
 
+Follow-up: [historical flag value shadow](capture-flag-value-shadow.md) compares
+these sources in a separate evaluator without changing ordinary v13 decisions.
+
 The [geometry investigation](capture-flag-geometry.md) found two completed
 walking surveys rejected by motion outside every diagnostic envelope. This
 slice records the queries actually issued and validates their local geometry
@@ -197,8 +200,7 @@ Both were verified on-device. The kiosk is active without automatic restarts,
 retains P1 v10 / P2 v13 automatic matches, and exposes the new local-validation
 telemetry. No bot brain or launcher setting was added or changed.
 
-The next integration should define freshness/admission rules for this historical
-enemy-alternative evidence in the value evaluator, using shadow comparisons
-before a new control policy. The evidence here establishes a narrow valid
-measurement path; longer walks, broader coverage and strategy improvements
-remain unproven.
+The [shadow follow-up](capture-flag-value-shadow.md) defines admission rules and
+compares this historical evidence before enabling a new control policy. The
+evidence here establishes a narrow valid measurement path; longer walks, broader
+coverage and strategy improvements remain unproven.
