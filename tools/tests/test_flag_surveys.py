@@ -8,6 +8,13 @@ SPEC.loader.exec_module(TOOL)
 
 
 class FlagSurveyAccounting(unittest.TestCase):
+    def test_a_missing_sample_cannot_silently_reduce_coverage(self):
+        samples = [dict(reason=None), dict(reason="outside patch")]
+        telemetry = dict(completed=2, walking_round_trips=1, unknown={"outside patch": 1})
+        TOOL.validate_sample_counts(samples, telemetry)
+        with self.assertRaises(AssertionError):
+            TOOL.validate_sample_counts(samples[:1], telemetry)
+
     def test_plan_preserves_frozen_regression_and_pairs_all_fresh_conditions(self):
         rows = TOOL.plan()
         self.assertEqual(len(rows), 11)
