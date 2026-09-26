@@ -26,7 +26,8 @@ pub use diagnostics::{
 mod early_candidates;
 mod flag_survey;
 pub use flag_survey::{
-    FlagSurveyPlanner, FlagSurveyRequest, FlagSurveySample, FlagSurveyTelemetry,
+    FlagSurveyEnvelope, FlagSurveyGeometry, FlagSurveyPlanner, FlagSurveyRequest, FlagSurveySample,
+    FlagSurveyTelemetry,
 };
 mod objective_job;
 mod query_budget;

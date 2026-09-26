@@ -233,3 +233,171 @@ fn hollow_boundary_and_query_groups_do_not_fill_unmeasured_space() {
     };
     assert!(snapshot.validate_areas(&world, frame(), &[separate]).valid);
 }
+
+#[test]
+fn rejection_details_preserve_old_and_new_envelope_overlaps_and_replacements() {
+    let (mut world, body, collider) = world(Vec2::Y * 5.0);
+    let snapshot = world.query_snapshot();
+    let right = QueryArea {
+        minimum: Vec2::new(4.0, -1.0),
+        maximum: Vec2::new(6.0, 1.0),
+        ..area()
+    };
+    world.set_pose(body, Vec2::X * 5.0, 0.0, true);
+    world.step(1.0 / 60.0);
+    let before = world.snapshot_bytes().unwrap();
+    let report = snapshot.diagnose_region(&world, region(), &[area(), right]);
+    assert_eq!(world.snapshot_bytes().unwrap(), before);
+    assert!(report.complete);
+    assert!(!snapshot.validate_region(&world, region()).valid);
+    assert_eq!(report.region_changes, 1);
+    assert_eq!(report.area_changes, vec![1, 1]);
+    assert_eq!(report.changes[0].areas, vec![0, 1]);
+    assert_eq!(
+        report.changes[0].previous.as_ref().unwrap().position,
+        Vec2::Y * 5.0
+    );
+    assert_eq!(
+        report.changes[0].current.as_ref().unwrap().position,
+        Vec2::X * 5.0
+    );
+    assert!(report.changes[0].motion_bound.unwrap() > 7.0);
+    assert_eq!(report.unsupported_tests, 0);
+    assert_eq!(
+        report,
+        snapshot.diagnose_region(&world.clone(), region(), &[area(), right])
+    );
+
+    assert!(world.replace_colliders(body, collider.role, &[ColliderSpec::ball(collider, 0.4)]));
+    world.step(1.0 / 60.0);
+    let report = snapshot.diagnose_region(&world, region(), &[area(), right]);
+    assert_eq!(report.region_changes, 2);
+    assert_eq!(
+        report
+            .changes
+            .iter()
+            .filter(|c| c.previous.is_none())
+            .count(),
+        1
+    );
+    assert_eq!(
+        report
+            .changes
+            .iter()
+            .filter(|c| c.current.is_none())
+            .count(),
+        1
+    );
+    assert!(
+        report.changes.iter().all(
+            |c| c.previous.as_ref().or(c.current.as_ref()).unwrap().collider == Some(collider)
+        )
+    );
+}
+
+#[test]
+fn rejection_details_are_bounded_without_truncating_totals() {
+    let (mut world, _, _) = world(Vec2::Y * 20.0);
+    let snapshot = world.query_snapshot();
+    for id in 2..14 {
+        let body = BodyId::new(PhysicsId::new(id), BodyRole::PRIMARY);
+        assert!(world.insert_body(
+            body,
+            BodySpec {
+                kind: BodyKind::Fixed,
+                position: Vec2::Y * 5.0,
+                ..Default::default()
+            },
+            &[ColliderSpec::ball(
+                ColliderId::new(body.entity, ColliderRole::PRIMARY, 0),
+                0.3
+            )]
+        ));
+    }
+    world.step(1.0 / 60.0);
+    let report = snapshot.diagnose_region(&world, region(), &[area()]);
+    assert!(report.complete);
+    assert_eq!(report.changed_colliders, 12);
+    assert_eq!(report.region_changes, 12);
+    assert_eq!(report.area_changes, vec![12]);
+    assert_eq!(report.changes.len(), 8);
+    assert_eq!(report.omitted_changes, 4);
+    assert_eq!(report.area_tests, 24);
+
+    let invalid = snapshot.diagnose_region(
+        &world,
+        QueryRegion {
+            current_angle: f32::NAN,
+            ..region()
+        },
+        &[area()],
+    );
+    assert!(!invalid.complete);
+    assert_eq!(invalid.unavailable, Some("invalid frame or bounds"));
+    assert!(invalid.changes.is_empty());
+    let full = snapshot.diagnose_region(&world, region(), &[area(); 9]);
+    assert!(!full.complete);
+    assert_eq!(full.unavailable, Some("area or exclusion capacity"));
+}
+
+#[test]
+fn diagnostic_scan_and_acceptance_agree_on_motion_filters_and_lifecycle() {
+    let (source, body, collider) = world(Vec2::Y * 5.0);
+    let snapshot = source.query_snapshot();
+    for case in 0..9 {
+        let mut world = source.clone();
+        let mut region = region();
+        match case {
+            0 => {}
+            1 => {
+                world.remove_entity(body.entity);
+            }
+            2..=4 => {
+                let mut spec = ColliderSpec::ball(collider, 0.4);
+                if case == 3 {
+                    spec.sensor = true;
+                }
+                if case == 4 {
+                    spec.collision_groups = CollisionGroups::NONE;
+                }
+                world.replace_colliders(body, collider.role, &[spec]);
+            }
+            5 => {
+                world.set_pose(body, Vec2::Y * 20.0, 0.0, true);
+            }
+            6 => {
+                region.current_position = Vec2::new(100.0, 20.0);
+                region.current_angle = 0.3;
+                world.set_pose(
+                    body,
+                    region.current_position + (Vec2::Y * 5.0).rotate_radians(0.3),
+                    0.3,
+                    true,
+                );
+            }
+            7 => {
+                for (_, collider) in world.raw.colliders.iter_mut() {
+                    collider.set_enabled(false);
+                }
+            }
+            _ => {
+                world.set_pose(body, Vec2::Y * 6.0, 0.0, true);
+            }
+        }
+        world.step(1.0 / 60.0);
+        for exclude in [false, true] {
+            let ids = [body.entity];
+            let region = QueryRegion {
+                excluded: if exclude { &ids } else { &[] },
+                ..region
+            };
+            let report = snapshot.diagnose_region(&world, region, &[area()]);
+            assert!(report.complete);
+            assert_eq!(
+                snapshot.validate_region(&world, region).valid,
+                report.region_changes == 0,
+                "case {case}, exclude {exclude}"
+            );
+        }
+    }
+}
