@@ -533,3 +533,83 @@ impl PlanningJob for ObjectiveSurveyJob {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ground_navigation::{GroundEdge, GroundEdgeKind, GroundNode};
+
+    #[test]
+    fn walking_rise_limit_is_rechecked_within_scalar_gravity_tolerance() {
+        let state = SurfaceSortieScenario::init_capture_destination_trial(42, 0, false, 0.8);
+        let observation = state.mission_observation(
+            0,
+            Some(LandingSiteId {
+                planet: 0,
+                bearing: pilot::LANDING_SITE_COUNT,
+            }),
+        );
+        let mut pilot = observation.local.combat.recovery.flight.pilot;
+        pilot.planet = observation.planets[1].clone();
+        let objective = LandingObjective::read(&pilot).unwrap();
+        let bearing = (((-objective.position.x)
+            .atan2(objective.position.y)
+            .rem_euclid(std::f32::consts::TAU)
+            * f32::from(pilot::LANDING_SITE_COUNT)
+            / std::f32::consts::TAU)
+            .round() as u8
+            + 1)
+            % pilot::LANDING_SITE_COUNT;
+        pilot.sites = vec![
+            state
+                .vehicle_landing_site(0, LandingSiteId { planet: 1, bearing }, false)
+                .unwrap(),
+        ];
+        let mut job = state
+            .objective_job(
+                0,
+                &pilot,
+                &[],
+                Arc::new(state.world.physics.world.query_snapshot()),
+                None,
+                false,
+            )
+            .unwrap();
+
+        // A positive walking edge can sit exactly at the builder's rise limit.
+        // Its reverse remains a valid walk as gravity increases.
+        let rise = 0.25;
+        job.base = Some(Arc::new(GroundMap {
+            version: 1,
+            actor: pilot.owner,
+            planet: pilot.planet.index,
+            revision: pilot.planet.revision,
+            tick: pilot.tick,
+            nodes: [64.0, 64.0 + rise]
+                .into_iter()
+                .enumerate()
+                .map(|(id, height)| GroundNode {
+                    id: id as u16,
+                    position: Vec2::Y * height,
+                    normal: Vec2::Y,
+                })
+                .collect(),
+            edges: [(0, 1), (1, 0)]
+                .into_iter()
+                .map(|(from, to)| GroundEdge {
+                    from,
+                    to,
+                    kind: GroundEdgeKind::Walk,
+                    length: rise,
+                })
+                .collect(),
+            rejected: Vec::new(),
+        }));
+        let source_gravity = SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * rise) * 0.75;
+        let current_gravity = source_gravity + 0.005;
+        assert!((current_gravity - source_gravity).abs() <= 0.01);
+        assert!(job.walking_rise_valid(source_gravity));
+        assert!(job.walking_rise_valid(source_gravity * 0.5));
+        assert!(!job.walking_rise_valid(current_gravity));
+    }
+}
