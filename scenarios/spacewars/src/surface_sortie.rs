@@ -45,6 +45,7 @@ pub mod return_trial;
 #[cfg(feature = "sensor-profile")]
 pub mod sensor_profile;
 pub(crate) mod solar;
+pub mod transfer_environment;
 mod travel;
 pub use claim::{
     PlanetClaimObservation, PlanetClaimPhase, PlanetClaimStatus, PlanetFlagObservation,

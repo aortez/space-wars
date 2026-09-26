@@ -1,5 +1,6 @@
 //! One explicit destination nomination in a deterministic replay. This is an
 //! offline intervention, not a policy recommendation or a planner-budget job.
+use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::{
     ShipForm,
     surface_sortie::{PilotLocation, SurfaceSortieState, mission::MissionObservationV1},
@@ -15,6 +16,7 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
+    time::Instant,
 };
 
 pub struct TransferProbeRun {
@@ -26,12 +28,23 @@ pub struct TransferProbeRun {
     trace: BufWriter<File>,
     defer_pursuit: bool,
     control_comparison: Option<Value>,
+    forecast_enabled: bool,
+    forecast: Option<Value>,
 }
 
 impl TransferProbeRun {
     pub fn from_args(out: &Path) -> Option<Self> {
         let destination = super::arg("--probe-transfer-destination", "none");
+        let forecast_enabled = match super::arg("--forecast-transfer", "false").as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!("--forecast-transfer must be true or false"),
+        };
         if destination == "none" {
+            assert!(
+                !forecast_enabled,
+                "transfer forecast needs a source nomination"
+            );
             assert_eq!(super::arg("--probe-transfer-tick", "none"), "none");
             assert_eq!(super::arg("--probe-transfer-seat", "none"), "none");
             assert_eq!(
@@ -68,6 +81,8 @@ impl TransferProbeRun {
             trace: BufWriter::new(File::create(out.join("transfer-probe.jsonl")).unwrap()),
             defer_pursuit,
             control_comparison: None,
+            forecast_enabled,
+            forecast: None,
         })
     }
 
@@ -133,6 +148,39 @@ impl TransferProbeRun {
         }
         let p = &o.local.combat.recovery.flight.pilot;
         let t = bot.telemetry();
+        if self.forecast_enabled && p.tick == self.tick && self.forecast.is_none() {
+            let started = Instant::now();
+            let environment = if self.source.as_ref().unwrap()["nomination"]["accepted"] == true {
+                state.transfer_environment()
+            } else {
+                Err("source nomination refused")
+            };
+            let source_environment = environment.as_ref().ok().cloned();
+            let result = environment
+                .and_then(|environment| bot.forecast_nominated_transfer(o, environment, 3600));
+            let construction_ms = started.elapsed().as_secs_f64() * 1000.0;
+            let started = Instant::now();
+            self.forecast = Some(match result {
+                Ok(mut job) => {
+                    let mut charged = 0_u64;
+                    while let Some(work) = job.next_work() {
+                        assert_eq!(work, WorkKind::Graph);
+                        job.step();
+                        charged += 1;
+                    }
+                    assert_eq!(charged, job.output().unwrap().charged_graph);
+                    json!({"environment":source_environment,"source_actions":intent.encode(p.owner),
+                        "report":job.output(),"unknown":null,"construction_ms":construction_ms,
+                        "prediction_ms":started.elapsed().as_secs_f64()*1000.0,
+                        "charged_graph":charged,"physics_queries":0})
+                }
+                Err(reason) => {
+                    json!({"environment":source_environment,"report":null,"unknown":reason,
+                    "source_actions":intent.encode(p.owner),"construction_ms":construction_ms,
+                    "prediction_ms":started.elapsed().as_secs_f64()*1000.0,"charged_graph":0,"physics_queries":0})
+                }
+            });
+        }
         let contacts = state.landing_diagnostics(seat, None);
         let damage = state.damage_observation(seat);
         let solver_contact = contacts["hull"]["count"].as_u64().unwrap_or(0) > 0
@@ -229,6 +277,7 @@ impl TransferProbeRun {
         json!({"schema":1,"seat":self.seat,"source_tick":self.tick,"destination":self.destination,
             "source":self.source,"outcome":self.outcome,"horizon_ticks":3600,
             "pursuit_policy":if self.defer_pursuit {"defer_new"} else {"ordinary"},
+            "forecast":self.forecast,
             "scope":"Solver contacts include positive separation and do not prove impact. External destination nomination retains controller gates. Optional defer_new suppresses new pursuit only during the nominated transfer after its source tick; existing pursuit, recovery and safety retain priority. Source is pre-intent; terminal next_actions are not executed. Measures handoff, not landing/capture or match strength. Same-state ordinary-control comparisons are not independent physical trajectories. Diagnostic work and IO are outside live planner fuel."})
     }
 }
