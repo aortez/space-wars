@@ -1,5 +1,42 @@
 use super::*;
 
+#[test]
+fn proposed_hull_bounds_use_the_rotated_shape_and_shape_identity_ignores_only_pose() {
+    let (mut world, body, id) = world(Vec2::ZERO);
+    let points = vec![
+        Vec2::new(-8.0, -1.0),
+        Vec2::new(6.0, -2.0),
+        Vec2::new(1.0, 3.0),
+    ];
+    let shape = ColliderSpec::convex_polygon(id, points.clone());
+    assert!(world.replace_colliders(body, id.role, std::slice::from_ref(&shape)));
+    world.step(1.0 / 60.0);
+    let snapshot = world.query_snapshot();
+    let position = Vec2::new(5.0, 20.0);
+    let anchor = Vec2::new(10.0, 3.0);
+    let area = world
+        .collider_query_area(id, position, 0.73, anchor, -0.41)
+        .unwrap();
+    for p in points {
+        let p = (position + p.rotate_radians(0.73) - anchor).rotate_radians(0.41);
+        assert!(p.x >= area.minimum.x - 0.0001 && p.x <= area.maximum.x + 0.0001);
+        assert!(p.y >= area.minimum.y - 0.0001 && p.y <= area.maximum.y + 0.0001);
+    }
+    world.set_pose(body, Vec2::new(100.0, 50.0), 2.0, true);
+    world.step(1.0 / 60.0);
+    assert!(snapshot.collider_shape_matches(&world, id));
+    assert!(world.replace_colliders(body, id.role, &[shape]));
+    assert!(
+        !snapshot.collider_shape_matches(&world, id),
+        "same semantic ID is not shape identity"
+    );
+    assert!(
+        world
+            .collider_query_area(id, position, f32::NAN, anchor, 0.0)
+            .is_none()
+    );
+}
+
 fn frame() -> QueryFrame<'static> {
     QueryFrame {
         previous_position: Vec2::ZERO,

@@ -2,6 +2,8 @@
 use super::*;
 use engine_core::planning::{PlanningJob, WorkKind};
 use engine_rapier::world::{CapsuleQuery, QuerySnapshot, RayCastOptions, RayHit};
+use query_footprint::QueryFootprint;
+use std::cell::RefCell;
 use std::sync::Arc;
 
 #[derive(Clone, Copy)]
@@ -77,6 +79,7 @@ pub(crate) struct GroundMeasurements {
     planet: usize,
     revision: u64,
     pub tick: u64,
+    pub footprint: Option<RefCell<QueryFootprint>>,
     nodes: [Option<Measurement<Result<GroundNode, GroundNodeRejection>>>; GROUND_SAMPLES],
     walks: [[Option<Measurement<bool>>; 2]; GROUND_SAMPLES],
 }
@@ -127,6 +130,7 @@ impl SurfaceSortieState {
             planet,
             revision,
             tick: self.world.tick,
+            footprint: None,
             nodes: [None; GROUND_SAMPLES],
             walks: [[None; 2]; GROUND_SAMPLES],
         });
@@ -164,6 +168,27 @@ impl GroundSurveyJob {
             (center + GROUND_SAMPLES as u16 - half_width) % GROUND_SAMPLES as u16,
             half_width * 2 + 1,
         ));
+        self.measurements.footprint = Some(RefCell::new(QueryFootprint::new(
+            self.measurements.position,
+            self.measurements.angle,
+        )));
+        if self.measurements.nodes.iter().any(Option::is_some)
+            || self
+                .measurements
+                .walks
+                .iter()
+                .flatten()
+                .any(Option::is_some)
+        {
+            // Retained queries predate this capture. Never certify a partial
+            // footprint if a future caller starts a patch from warm evidence.
+            self.measurements
+                .footprint
+                .as_ref()
+                .unwrap()
+                .borrow_mut()
+                .complete = false;
+        }
         self
     }
     fn node_count(&self) -> u16 {
@@ -191,6 +216,15 @@ impl GroundSurveyJob {
         self.measurements.position + point.rotate_radians(self.measurements.angle)
     }
     fn clear(&self, point: Vec2) -> bool {
+        if let Some(footprint) = &self.measurements.footprint {
+            let spec = SurfaceSortieState::spec();
+            footprint.borrow_mut().capsule(
+                self.world(point),
+                rotation_for_direction(point.normalized().rotate_radians(self.measurements.angle)),
+                spec.half_segment,
+                spec.radius + 0.02,
+            );
+        }
         self.measurements.capsule.is_clear(
             &self.measurements.snapshot,
             self.world(point),
@@ -198,6 +232,9 @@ impl GroundSurveyJob {
         )
     }
     fn ray(&self, origin: Vec2, direction: Vec2, distance: f32) -> Option<RayHit> {
+        if let Some(footprint) = &self.measurements.footprint {
+            footprint.borrow_mut().ray(origin, direction, distance);
+        }
         self.measurements
             .snapshot
             .cast_ray(

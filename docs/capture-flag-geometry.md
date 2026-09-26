@@ -5,9 +5,10 @@ results in generated worlds that failed publication geometry validation. That
 check covers an entire planet plus 80 units. Its rejection did not identify the
 changed objects or distinguish nearby query changes from unrelated motion.
 
-This extension keeps the circular acceptance gate and planner allocation
-unchanged. It adds diagnostics after a geometry rejection. No new evidence
-enters the value evaluator or controls, and no rejection becomes acceptance.
+The initial diagnostic extension kept the circular acceptance gate and planner
+allocation unchanged. Its results below are historical. The subsequent
+[local validation slice](capture-flag-local-validation.md) captures actual query
+dependencies and retains this circular gate as a comparison diagnostic.
 
 ## Diagnostic boundary
 

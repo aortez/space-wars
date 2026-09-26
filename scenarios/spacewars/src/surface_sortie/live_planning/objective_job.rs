@@ -251,6 +251,31 @@ impl ObjectiveSurveyJob {
     pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
         &self.dependencies
     }
+    pub(super) fn walking_footprint(&self) -> Option<query_footprint::QueryFootprint> {
+        self.measurements
+            .as_ref()?
+            .footprint
+            .as_ref()
+            .map(|f| f.borrow().clone())
+    }
+    pub(super) fn walking_rise_valid(&self, gravity: f32) -> bool {
+        let Some(map) = &self.base else { return false };
+        let max_rise =
+            SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * gravity.max(1.0)) * 0.75;
+        // Recheck the builder's scalar-gravity precondition even for walks.
+        // The flag patch has at most 17 nodes/32 directed edges. Check all of
+        // its positive walks; no negative or optimality claim is published.
+        map.edges.iter().all(|edge| {
+            let Some(from) = map.nodes.iter().find(|n| n.id == edge.from) else {
+                return false;
+            };
+            let Some(to) = map.nodes.iter().find(|n| n.id == edge.to) else {
+                return false;
+            };
+            (to.position - from.position).dot((to.position + from.position).normalized())
+                <= max_rise
+        })
+    }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
         match &self.phase {
             Phase::Ground(job) => job.reused(),
