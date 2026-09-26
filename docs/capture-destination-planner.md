@@ -6,7 +6,8 @@ destination with a sufficiently shorter supported capture trip. It reuses
 v10's local flight, landing, joint walking/return, combat and recovery tasks.
 It does not include the v11 jetpack-planning experiment or promote a new default.
 
-Both player selectors offer **destination bot v12**, saved as `destination-bot`.
+Both player selectors offer **mission v12** (the destination planner), saved as
+`destination-bot`.
 Automatic matches retain it, and the HUD names each seat's actual policy.
 Legacy v9 and Planner v10 remain selectable and do not consume proposals.
 
@@ -98,6 +99,73 @@ unsupported mirrored approaches that retain v10. CI also checks exact control
 fallback with zero evaluator fuel through a full flagged capture/return, unsafe
 descent and touchdown gates, expiry and dependency changes, reset/replay,
 controller persistence and the native host's unchanged v9/v10 round.
+
+## Results at `5cbd780`
+
+The [compact comparison record](data/capture-destination-planner-v1.json) retains
+all 24 runs, commands, binary/report hashes, visits, failed attempts and work
+counts. They cover 72 simulated minutes; all physics audits passed. Measured
+remote work peaked at 126 queries in a tick, below the shared 384 allowance.
+
+| Supported physical case | First claim, v10 → v12 | First departure after boarding, v10 → v12 | All planets owned, v10 → v12 |
+| --- | ---: | ---: | ---: |
+| P1, ordinary layout | 52.55 → 38.98 s | 72.50 → 42.75 s | 96.33 → 101.85 s |
+| P2, mirrored layout | 55.77 → 47.07 s | 76.05 → 50.78 s | 115.77 → 112.55 s |
+
+Each changes destination once, while the old target remains nearer. The new
+neutral trip physically lands, captures, boards and departs. In the first case
+the source comparison predicts 46.90 seconds for continuing the flagged trip
+versus 28.65 for the neutral alternative. Actual remaining time until departure
+is 59.97 seconds for v10 and 30.22 for v12. These outcomes do not calibrate the
+guard or timing constants; no values were fitted to these trials.
+
+The first foothold/return improves, but the itinerary tradeoff is visible: the
+first case secures all planets 5.52 seconds later. Finishing both full round
+trips is also later in both supported cases (121.78 versus 100.12 seconds, and
+132.83 versus 119.70). Choosing an easier first mission is not equivalent to
+optimizing the full match.
+
+The other two controlled mirror cases retain unsupported/stalled flagged
+approaches and have no switches. All eight generated-match pairs also have no
+switches. Their recorded physical milestones, final pilots/planets, combat,
+asteroid events and audit outcomes match v10. Across the eight experimental
+generated runs, 158 completed preferences favor the current target and 2,004
+reports have no complete preference. These repeated reports are correlated;
+they establish fallback coverage, not a strength improvement.
+
+Artifacts are in `target/capture-destination-planner/matrix`; the earlier
+bearing exploration is under `explore` and is excluded from the comparison
+matrix. In particular, unsupported powered/jumping routes stay unknown.
+
+## Validation and Picade deployment
+
+The final runtime at `3a49860` differs from the comparison build only in the
+shortened picker label and its UI expectations/documentation. Validation covers:
+
+- All 90 workspace test targets: **1,927 passed, 47 existing ignored, no
+  failures**. The initial workspace command was terminated during the older
+  mission endurance tests; those three remaining physical targets, the AI
+  examples, and the CLI/control targets were completed in separate commands.
+- The new physical destination tests, the native v9/v10 control parity test,
+  and controller persistence checks passed. The ignored display-dependent
+  functional tests were compiled, but were not run locally without a display.
+- Formatting and strict AI Clippy passed with the CI Rust 1.89.0 toolchain;
+  the Python suite passed all 329 tests.
+- All 24 three-minute comparison runs passed their physics audits and query
+  limits, with exact recorded physical outcome comparisons for no-switch pairs.
+
+`./update.sh --fast --target sw-picade.local` installed the final runtime without
+an OS reboot. The installed client/CLI hashes matched the deployment manifest;
+the kiosk remained active with no service restarts after installation. A real
+1024×768 screenshot confirmed that **mission v12** fits the selector and that
+the match HUD reads **Planner bot v10** for P1 and **Destination bot v12** for P2.
+After returning to the launcher, its saved thirty-second idle countdown
+automatically launched that pairing. Autoplay remains enabled on the device.
+
+Local logs and screenshots are under `target/capture-destination-planner`,
+including `workspace-tests.log`, `remaining-physical-tests.log`,
+`examples-tests.log`, `control-cli-tests.log`, `deploy-final.log`,
+`pi-settings-final.png`, `pi-live-final.png` and `pi-autoplay-final.txt`.
 
 ## Follow-up
 
