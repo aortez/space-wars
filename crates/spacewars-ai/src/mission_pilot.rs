@@ -23,6 +23,10 @@ use serde::Serialize;
 mod destination;
 pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, DestinationSwitch};
 
+#[path = "mission_transfer_forecast.rs"]
+mod transfer_forecast;
+pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferForecastReport};
+
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{
