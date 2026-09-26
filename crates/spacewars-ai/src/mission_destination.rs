@@ -16,6 +16,8 @@ pub struct DestinationSwitch {
     pub to: usize,
     pub current_seconds: f32,
     pub destination_seconds: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<crate::mission_evaluation::ValueDecision>,
 }
 
 impl MaterialMissionPilot {
@@ -27,7 +29,7 @@ impl MaterialMissionPilot {
         let p = &o.local.combat.recovery.flight.pilot;
         let up = (p.ship.position - p.planet.motion.position).normalized();
         let falling = (-(p.ship.velocity - p.planet.motion.velocity).dot(up)).max(0.0);
-        if self.policy != crate::mission_policy::MissionPolicy::DestinationPlanner
+        if !self.policy.selects_destination()
             || self.destination_switched
             || choice.tick != p.tick
             || self.telemetry.target != Some(choice.current)
@@ -51,7 +53,12 @@ impl MaterialMissionPilot {
         }
         // Drop only the uncommitted approach. The ordinary transfer controller
         // must travel there and acquire/validate its own landing and hatch.
-        self.event(p.tick, "replan", Some("shorter supported capture trip"));
+        let reason = if choice.value.is_some() {
+            "better supported capture value"
+        } else {
+            "shorter supported capture trip"
+        };
+        self.event(p.tick, "replan", Some(reason));
         self.telemetry.replans += 1;
         self.capture = None;
         self.solar_detour = None;
@@ -71,8 +78,9 @@ impl MaterialMissionPilot {
             to: choice.destination,
             current_seconds: choice.current_seconds,
             destination_seconds: choice.destination_seconds,
+            value: choice.value,
         });
-        self.event(p.tick, "selected", Some("shorter supported capture trip"));
+        self.event(p.tick, "selected", Some(reason));
         self.goal(MissionGoal::Select, p.tick);
     }
 }
@@ -127,16 +135,17 @@ mod tests {
             destination: 0,
             current_seconds: 60.0,
             destination_seconds: 30.0,
+            value: None,
         };
         (bot, o, choice)
     }
 
     #[test]
-    fn only_v12_switches_and_it_switches_once_per_trip() {
+    fn destination_policies_switch_once_per_trip() {
         for policy in MissionPolicy::ALL {
             let (mut bot, mut o, choice) = fixture(policy);
             bot.apply_destination_selection(&o, choice);
-            if policy != MissionPolicy::DestinationPlanner {
+            if !policy.selects_destination() {
                 assert_eq!(bot.telemetry.target, Some(1));
                 continue;
             }
