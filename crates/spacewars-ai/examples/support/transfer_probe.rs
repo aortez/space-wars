@@ -116,6 +116,7 @@ impl TransferProbeRun {
             // Interruption takes precedence over same-tick arrival. An arrival
             // is the real coordinator handoff, including its queries_ready gate.
             let outcome = if !p.ship_available
+                || p.ship_health <= 0.0
                 || p.ship_form != ShipForm::Ship
                 || p.location == PilotLocation::OnFoot
             {
@@ -139,7 +140,9 @@ impl TransferProbeRun {
         }
         serde_json::to_writer(&mut self.trace, &json!({
             "tick":p.tick,"ship":p.ship,"frame":p.planet.index,"target":t.target,"goal":t.goal,
-            "queries_ready":p.queries_ready,"health":p.ship_health,"form":p.ship_form,"location":p.location,
+            "queries_ready":p.queries_ready,"ship_available":p.ship_available,
+            "recovery_active":t.goal == MissionGoal::Recover || t.recovery.is_some(),
+            "match_finished":state.match_outcome().is_some(),"health":p.ship_health,"form":p.ship_form,"location":p.location,
             "planets":o.planets.iter().map(|planet| json!({"index":planet.index,"motion":planet.motion,"radius":planet.radius})).collect::<Vec<_>>(),
             "avoidance":t.avoidance,"reason":t.reason,"arrived":arrived,
             "solver_contact":solver_contact,"debris_contact":debris_contact,"damage":damage,
