@@ -30,7 +30,7 @@ on subsequent ticks; they are never forced again. No supported costs or evaluate
 switch telemetry are fabricated.
 
 Require exact original trace bytes strictly before the source, exact observations
-for both players at the source, the exact pinned `TransferSource`, and unchanged
+for both players at the source, the exact pinned `TransferSource` (bit identity for its f32 fields), and unchanged
 ordinary evaluator reports before the source. The opponent's source controls
 must also match; for a refusal both source control records must match. The bot's
 same-tick command cache makes this pre-intent intervention boundary essential.
@@ -40,6 +40,7 @@ The cap is sixty simulated seconds. Stop at the actual `arrived` event (includin
 Conservatively stop on any solver surface contact or new debris contact as well.
 Solver contacts include speculative positive separations and do **not** establish
 impact. Loss/contact takes precedence over arrival on the same observation.
+A match ending after a physics step is recorded before another control tick.
 Terminal controls in the trace are not executed. Timeouts/interruption/refusals
 are censored outcomes, never numeric costs.
 
