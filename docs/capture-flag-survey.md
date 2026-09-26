@@ -90,10 +90,57 @@ worlds or a strength trial. The initial logs remain under
 `target/capture-flag-survey/finished/`; optimized replays use `optimized/`.
 Both are retained in [the comparison record](data/capture-flag-survey-v1.json).
 
+## Replay results at `a4bfee1`
+
+All 11 matches again finished: seven by pilot death and four by the ten-minute
+deadline, totaling 67.45 simulated minutes. All physical audits passed. All six
+paired comparisons retained identical per-tick controller traces, evaluator
+bytes and recorded physical outcomes. Each replay also matches its corresponding
+initial study's trace and evaluator hashes. The largest combined allocation was
+four graph operations and 127 physical queries in a tick, within 4/384.
+
+| Survey result | Initial index | Sparse index |
+| --- | ---: | ---: |
+| Recorded regression: site checks started / completed | 4 / 3 | 5 / 5 |
+| Recorded regression: validated walking trips | 1 | 2 |
+| Recorded regression: cancelled jobs | 1 | 0 |
+| Recorded regression: total graph work | 1,823 | 1,287 |
+| Recorded regression: total physical queries | 989 | 1,475 |
+| Four generated conditions: checks started / completed | 6 / 3 | 6 / 4 |
+| Four generated conditions: validated walking trips | 0 | 0 |
+| Four generated conditions: cancelled jobs | 3 | 2 |
+
+The shorter index allows another regression trip to finish, and subsequently
+another site to be checked. That raises its total physical query count even
+though a fixed survey's queries are unchanged. The first shared positive goes
+from 946 to 445 elapsed ticks. This is a reduction in work and simulated survey
+latency, not a measured frame-rate or playing-strength improvement.
+
+Coverage remains limited. Of the six generated-condition checks, two lack
+landing/boarding/climb evidence, two complete walking routes but fail publication
+geometry validation, and two are cancelled when the request changes. Two of the
+four conditions start no survey at all. Earlier completion converts one
+cancellation into a diagnosed geometry rejection; it does not establish a valid
+enemy alternative in these worlds. No constants or utility weights were tuned.
+
 Focused tests cover both seats, wraparound patch equivalence to the original
 full survey, quota exhaustion, clone/cancellation/expiry, authoritative ownership
 and a newly blocked high climb sample. A native three-minute paired test checks
 v13 evaluation, controller telemetry and physics with the observer off/on.
+Final local validation passed 476 scenario tests, 155 AI tests, the native paired
+test and 339 Python analysis tests. Independent review covered geometry freshness,
+shared work accounting and the sparse index equivalence.
+
+## Next investigation
+
+Keep this evidence observational. Before connecting enemy alternatives to v13's
+value comparison, record which changed geometry invalidates these completed
+routes and whether it affects the actual landing, hull, hatch, climb or walking
+queries. The current whole-planet validation is deliberately conservative;
+its rejection alone cannot distinguish a blocked route from irrelevant motion.
+Any narrower validation must still detect new obstacles and changed long-body
+rotations across all those query footprints. Retain these worlds as regressions
+and use new predeclared worlds for any later behavior or strength comparison.
 
 ## Reproduction
 
@@ -104,6 +151,11 @@ python3 tools/compare-flag-surveys.py \
   --baseline target/capture-flag-survey/baseline-v13 \
   --out target/capture-flag-survey/finished
 ```
+
+The frozen v13 executable came from `b6e74f3`, using the same release build
+command; preserve that executable before building this branch. Its SHA-256 and
+both study binaries' hashes are in the comparison record. Use a new output
+directory for each replay; the runner refuses to overwrite an earlier study.
 
 Headless surveying is opt-in with `--survey-capture-flags true`; it requires
 mission evaluation and the shared live planner. The native client runs it only
