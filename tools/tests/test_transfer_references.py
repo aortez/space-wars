@@ -70,6 +70,33 @@ class TransferReferenceAudit(unittest.TestCase):
         self.assertEqual(T.f32_identity(1.8), T.f32_identity(1.7999999523162842))
         self.assertNotEqual(T.f32_identity(1.8), T.f32_identity(1.8000001))
 
+    def test_supported_horizon_and_other_geometry_are_retained(self):
+        for kind in ['supported', 'horizon', 'sun', 'boundary']:
+            case, probe, trace = fixture()
+            d = probe['source']['diagnostic']
+            if kind == 'supported':
+                case['expected_reason'] = d['reason'] = None
+                d['reference'] = copy.deepcopy(d['completed_stages'])
+                d['geometry'] = None
+            elif kind == 'horizon':
+                case['expected_reason'] = d['reason'] = 'transfer exceeds short direct reference horizon'
+                d['geometry'] = None
+                d['completed_stages']['cruise_seconds'] = 100
+            else:
+                g = d['geometry']
+                g['check'], g['body'] = kind, None
+                if kind == 'sun':
+                    case['expected_reason'] = d['reason'] = 'transfer requires an unmodelled solar detour'
+                    case['transfer_source']['sun'] = dict(position=dict(x=0, y=120), radius=5)
+                    g.update(obstacle_from=dict(x=0, y=120), obstacle_to=dict(x=0, y=120), threshold=70, separation=0)
+                else:
+                    case['expected_reason'] = d['reason'] = 'transfer requires unmodelled boundary guidance'
+                    case['transfer_source']['boundary'] = dict(center=dict(x=0, y=0), radius=200)
+                    g.update(obstacle_from=dict(x=0, y=0), obstacle_to=dict(x=0, y=0), threshold=135,
+                             separation=(g['to']['x']**2 + g['to']['y']**2)**0.5)
+            with self.subTest(kind=kind):
+                self.assertTrue(T.audit_probe(case, probe, trace)['accepted'])
+
     def test_refusal_is_retained_and_never_timed_as_a_flight(self):
         case, probe, trace = fixture()
         probe['source']['nomination'] = dict(accepted=False, reason='capture committed')

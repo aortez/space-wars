@@ -23,6 +23,8 @@ mod successor_continuation;
 mod successor_probe;
 #[path = "support/transfer_probe.rs"]
 mod transfer_probe;
+#[path = "support/transfer_sources.rs"]
+mod transfer_sources;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -163,6 +165,7 @@ fn main() {
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
+    let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -453,6 +456,9 @@ fn main() {
                 }
                 if o.local.landing_objective.is_some() {
                     objective_sensors.push(sensor_ms);
+                }
+                if let Some(sources) = &mut transfer_sources {
+                    sources.observe(i, &pilots[i], &o);
                 }
                 let clock = Instant::now();
                 let nominated = transfer_probe.as_mut().and_then(|probe| {
@@ -845,6 +851,9 @@ fn main() {
     if let Some(probe) = &mut transfer_probe {
         report["termination"] = json!("transfer_probe_finished");
         report["transfer_probe"] = probe.finish(&state, &pilots[probe.seat()]);
+    }
+    if let Some(sources) = &mut transfer_sources {
+        report["transfer_sources"] = sources.report();
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({
