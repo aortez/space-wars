@@ -348,7 +348,7 @@ fn unsupported_transfer_and_short_clock_remain_unknown_or_ineligible() {
         } else {
             // Both the augmented route and the baseline use this frozen source.
             o.boundary.radius = 1.0;
-            base.transfer_source = Some(TransferSource::read(&o));
+            base.transfer_source = Some(TransferSource::from_observation(&o));
         }
         let mut shadow = FlagValueShadow::new(1);
         shadow.observe(&o, &evaluator, Some(request), &[&sample]);
