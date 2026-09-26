@@ -34,6 +34,36 @@ pub struct TransferReference {
     pub climb_seconds: f32,
     pub cruise_seconds: f32,
 }
+
+/// Opt-in, offline explanation of the first failed reference check. A rejected
+/// staged sum is not a usable trip cost, even when all arithmetic completed.
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
+pub struct TransferDiagnostic {
+    pub destination: usize,
+    pub reference: Option<TransferReference>,
+    pub reason: Option<&'static str>,
+    /// Only the initial settle, turn and climb; later phases are uncomputed.
+    pub climb_stages: Option<TransferReference>,
+    pub completed_stages: Option<TransferReference>,
+    pub geometry: Option<TransferRejection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TransferRejection {
+    pub check: &'static str,
+    pub leg: &'static str,
+    pub body: Option<usize>,
+    pub from: Vec2,
+    pub to: Vec2,
+    pub obstacle_from: Vec2,
+    pub obstacle_to: Vec2,
+    /// Planning margin, not measured hull/contact clearance. For a boundary
+    /// this is the maximum permitted radius, rather than a keep-out radius.
+    pub threshold: f32,
+    /// Geometric segment separation; moving sweeps are not time synchronized.
+    /// For a boundary this is the farthest endpoint's distance from its center.
+    pub separation: f32,
+}
 impl TransferReference {
     pub fn total(self) -> f32 {
         self.settle_seconds + self.turn_seconds + self.climb_seconds + self.cruise_seconds
@@ -41,7 +71,7 @@ impl TransferReference {
 }
 
 impl TransferSource {
-    pub(super) fn read(o: &MissionObservationV1) -> Self {
+    pub fn from_observation(o: &MissionObservationV1) -> Self {
         let f = &o.local.combat.recovery.flight;
         Self {
             ship: f.pilot.ship,
@@ -87,6 +117,28 @@ impl TransferSource {
     }
 
     pub(super) fn estimate(&self, destination: usize) -> Result<TransferReference, &'static str> {
+        self.calculate(destination, &mut None)
+    }
+
+    /// Diagnostic harness only: one ordinary analytic calculation, no world
+    /// queries, rollout or changed acceptance. Not dispatched by the live bot.
+    pub fn diagnose(&self, destination: usize) -> TransferDiagnostic {
+        let mut diagnostic = TransferDiagnostic {
+            destination,
+            ..Default::default()
+        };
+        match self.calculate(destination, &mut Some(&mut diagnostic)) {
+            Ok(reference) => diagnostic.reference = Some(reference),
+            Err(reason) => diagnostic.reason = Some(reason),
+        }
+        diagnostic
+    }
+
+    fn calculate(
+        &self,
+        destination: usize,
+        diagnostic: &mut Option<&mut TransferDiagnostic>,
+    ) -> Result<TransferReference, &'static str> {
         let frame = self
             .bodies
             .iter()
@@ -115,6 +167,9 @@ impl TransferSource {
             && self.ship.position.distance_to(target.position) < target.radius + 105.0
             && relative.length() < 18.0
         {
+            if let Some(d) = diagnostic {
+                d.completed_stages = Some(TransferReference::default());
+            }
             return Ok(TransferReference::default());
         }
         // Stage 1: settle momentum in the current frame. Stage 2: climb to the
@@ -133,7 +188,10 @@ impl TransferSource {
         if climb > 0.0 {
             result.turn_seconds += turn_seconds(heading, up, self.ship.spin, limits);
             result.climb_seconds = rest_to_rest(climb, acceleration.min(brake), 18.0);
-            self.check_leg(self.ship.position, launch, frame.index)?;
+            if let Some(d) = diagnostic {
+                d.climb_stages = Some(result);
+            }
+            self.check_leg(self.ship.position, launch, frame.index, "climb", diagnostic)?;
             heading = up;
         }
         // Stage 3: transfer to the existing 85-unit entry ring, accounting for
@@ -153,7 +211,10 @@ impl TransferSource {
             acceleration.min(brake),
             38.0_f32.min(limits.cruise_speed - 10.0),
         );
-        self.check_leg(launch, entry, target.index)?;
+        if let Some(d) = diagnostic {
+            d.completed_stages = Some(result);
+        }
+        self.check_leg(launch, entry, target.index, "transfer", diagnostic)?;
         if !result.total().is_finite() || result.total() > 30.0 {
             return Err("transfer exceeds short direct reference horizon");
         }
@@ -165,14 +226,35 @@ impl TransferSource {
                 continue;
             }
             let end = body.position + (body.velocity - target.velocity) * elapsed;
-            if segment_distance(body.position, end, launch, entry) < body.radius + 65.0 {
+            let separation = segment_distance(body.position, end, launch, entry);
+            if separation < body.radius + 65.0 {
+                if let Some(d) = diagnostic {
+                    d.geometry = Some(TransferRejection {
+                        check: "moving_planet",
+                        leg: "transfer",
+                        body: Some(body.index),
+                        from: launch,
+                        to: entry,
+                        obstacle_from: body.position,
+                        obstacle_to: end,
+                        threshold: body.radius + 65.0,
+                        separation,
+                    });
+                }
                 return Err("moving body requires an unmodelled transfer detour");
             }
         }
         Ok(result)
     }
 
-    fn check_leg(&self, from: Vec2, to: Vec2, destination: usize) -> Result<(), &'static str> {
+    fn check_leg(
+        &self,
+        from: Vec2,
+        to: Vec2,
+        destination: usize,
+        leg: &'static str,
+        diagnostic: &mut Option<&mut TransferDiagnostic>,
+    ) -> Result<(), &'static str> {
         let delta = to - from;
         for body in &self.bodies {
             if body.index == destination {
@@ -183,21 +265,62 @@ impl TransferSource {
             {
                 continue;
             }
-            if crate::landing_safety::distance_to_segment(body.position, from, to)
-                < body.radius + 65.0
-            {
+            let separation = crate::landing_safety::distance_to_segment(body.position, from, to);
+            if separation < body.radius + 65.0 {
+                if let Some(d) = diagnostic {
+                    d.geometry = Some(TransferRejection {
+                        check: "static_planet",
+                        leg,
+                        body: Some(body.index),
+                        from,
+                        to,
+                        obstacle_from: body.position,
+                        obstacle_to: body.position,
+                        threshold: body.radius + 65.0,
+                        separation,
+                    });
+                }
                 return Err("transfer requires an unmodelled planet detour");
             }
         }
-        if self.sun.is_some_and(|sun| {
-            crate::landing_safety::distance_to_segment(sun.position, from, to) < sun.radius + 65.0
-        }) {
-            return Err("transfer requires an unmodelled solar detour");
+        if let Some(sun) = self.sun {
+            let separation = crate::landing_safety::distance_to_segment(sun.position, from, to);
+            if separation < sun.radius + 65.0 {
+                if let Some(d) = diagnostic {
+                    d.geometry = Some(TransferRejection {
+                        check: "sun",
+                        leg,
+                        body: None,
+                        from,
+                        to,
+                        obstacle_from: sun.position,
+                        obstacle_to: sun.position,
+                        threshold: sun.radius + 65.0,
+                        separation,
+                    });
+                }
+                return Err("transfer requires an unmodelled solar detour");
+            }
         }
         if [from, to]
             .iter()
             .any(|point| point.distance_to(self.boundary.center) > self.boundary.radius - 65.0)
         {
+            if let Some(d) = diagnostic {
+                d.geometry = Some(TransferRejection {
+                    check: "boundary",
+                    leg,
+                    body: None,
+                    from,
+                    to,
+                    obstacle_from: self.boundary.center,
+                    obstacle_to: self.boundary.center,
+                    threshold: self.boundary.radius - 65.0,
+                    separation: from
+                        .distance_to(self.boundary.center)
+                        .max(to.distance_to(self.boundary.center)),
+                });
+            }
             return Err("transfer requires unmodelled boundary guidance");
         }
         Ok(())
@@ -357,5 +480,65 @@ mod tests {
             s.estimate(1).unwrap_err(),
             "moving body requires an unmodelled transfer detour"
         );
+    }
+
+    #[test]
+    fn diagnostics_preserve_acceptance_and_mark_incomplete_climb_arithmetic() {
+        let mut s = source();
+        let ordinary = s.estimate(1).unwrap();
+        let d = s.diagnose(1);
+        assert_eq!(d.reference, Some(ordinary));
+        assert_eq!(d.completed_stages, Some(ordinary));
+        assert!(d.reason.is_none() && d.geometry.is_none());
+        s.bodies.push(Body {
+            index: 2,
+            position: Vec2::new(0.0, 150.0),
+            velocity: Vec2::ZERO,
+            radius: 10.0,
+        });
+        let d = s.diagnose(1);
+        assert_eq!(d.reason, s.estimate(1).err());
+        assert!(d.reference.is_none() && d.completed_stages.is_none());
+        assert!(d.climb_stages.unwrap().climb_seconds > 0.0);
+        let g = d.geometry.unwrap();
+        assert_eq!(
+            (g.check, g.leg, g.body),
+            ("static_planet", "climb", Some(2))
+        );
+        assert!(g.separation < g.threshold);
+        s.bodies[2].position = Vec2::new(120.0, 400.0);
+        s.bodies[2].velocity = Vec2::new(0.0, -50.0);
+        let d = s.diagnose(1);
+        assert_eq!(d.reason, s.estimate(1).err());
+        assert!(d.reference.is_none() && d.completed_stages.is_some());
+        let g = d.geometry.unwrap();
+        assert_eq!(
+            (g.check, g.leg, g.body),
+            ("moving_planet", "transfer", Some(2))
+        );
+        assert_ne!(g.obstacle_from, g.obstacle_to);
+    }
+
+    #[test]
+    fn diagnostic_reasons_match_every_non_planet_rejection() {
+        for mutation in 0..5 {
+            let mut s = source();
+            match mutation {
+                0 => s.gravity = Vec2::Y * 50.0,
+                1 => {
+                    s.sun = Some(MissionObstacle {
+                        position: Vec2::new(120.0, 160.0),
+                        radius: 20.0,
+                    })
+                }
+                2 => s.boundary.radius = 200.0,
+                3 => s.bodies[1].position = Vec2::new(1500.0, 200.0),
+                4 => s.frame = 123,
+                _ => unreachable!(),
+            }
+            let d = s.diagnose(1);
+            assert!(d.reference.is_none());
+            assert_eq!(d.reason, Some(s.estimate(1).unwrap_err()));
+        }
     }
 }

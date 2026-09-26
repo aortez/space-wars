@@ -30,6 +30,7 @@ pub(crate) struct ObjectiveSurveyJob {
     measurements: Option<Box<GroundMeasurements>>,
     reused: ReusedGroundWork,
     local_dependencies: bool,
+    walk_patch: bool,
     radius: f32,
     dependencies: Vec<(Option<LandingSiteId>, Vec<QueryArea>)>,
     candidates: Vec<Candidate>,
@@ -172,6 +173,7 @@ impl SurfaceSortieState {
             measurements: None,
             reused: ReusedGroundWork::default(),
             local_dependencies,
+            walk_patch: false,
             radius: p.planet.radius,
             dependencies: Vec::new(),
             candidates,
@@ -219,6 +221,14 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn with_walk_patch(mut self, center: u16, half_width: u16) -> Self {
+        let Phase::Ground(job) = std::mem::replace(&mut self.phase, Phase::Done) else {
+            panic!("restrict a survey before dispatch");
+        };
+        self.phase = Phase::Ground(Box::new((*job).with_walk_patch(center, half_width)));
+        self.walk_patch = true;
+        self
+    }
     /// Only finished positive candidates have complete path dependencies.
     /// Omitted alternatives remain unknown until the full job completes.
     pub(crate) fn positive_candidates(&self) -> Option<LandingObjectiveSurvey> {
@@ -240,6 +250,31 @@ impl ObjectiveSurveyJob {
     }
     pub(crate) fn dependencies(&self) -> &[(Option<LandingSiteId>, Vec<QueryArea>)] {
         &self.dependencies
+    }
+    pub(super) fn walking_footprint(&self) -> Option<query_footprint::QueryFootprint> {
+        self.measurements
+            .as_ref()?
+            .footprint
+            .as_ref()
+            .map(|f| f.borrow().clone())
+    }
+    pub(super) fn walking_rise_valid(&self, gravity: f32) -> bool {
+        let Some(map) = &self.base else { return false };
+        let max_rise =
+            SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * gravity.max(1.0)) * 0.75;
+        // Recheck the builder's scalar-gravity precondition even for walks.
+        // The flag patch has at most 17 nodes/32 directed edges. Check all of
+        // its positive walks; no negative or optimality claim is published.
+        map.edges.iter().all(|edge| {
+            let Some(from) = map.nodes.iter().find(|n| n.id == edge.from) else {
+                return false;
+            };
+            let Some(to) = map.nodes.iter().find(|n| n.id == edge.to) else {
+                return false;
+            };
+            (to.position - from.position).dot((to.position + from.position).normalized())
+                <= max_rise
+        })
     }
     pub(crate) fn reused(&self) -> ReusedGroundWork {
         match &self.phase {
@@ -356,13 +391,18 @@ impl PlanningJob for ObjectiveSurveyJob {
                     let map = Arc::new(j.take_map());
                     self.candidate_map = Some(Arc::clone(&map));
                     let hatch = self.candidates[self.index].hatch;
-                    self.phase = Phase::Trip(Box::new(GroundRoundTripJob::with_hatches(
+                    let trip = GroundRoundTripJob::with_hatches(
                         map,
                         hatch,
                         self.result.objective.position,
                         self.result.objective.range,
                         self.candidates[self.index].boarding_hatches,
-                    )));
+                    );
+                    self.phase = Phase::Trip(Box::new(if self.walk_patch {
+                        trip.with_sparse_prefix()
+                    } else {
+                        trip
+                    }));
                 }
             }
             Phase::Trip(j) => {
@@ -491,5 +531,85 @@ impl PlanningJob for ObjectiveSurveyJob {
             }
             Phase::Done => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ground_navigation::{GroundEdge, GroundEdgeKind, GroundNode};
+
+    #[test]
+    fn walking_rise_limit_is_rechecked_within_scalar_gravity_tolerance() {
+        let state = SurfaceSortieScenario::init_capture_destination_trial(42, 0, false, 0.8);
+        let observation = state.mission_observation(
+            0,
+            Some(LandingSiteId {
+                planet: 0,
+                bearing: pilot::LANDING_SITE_COUNT,
+            }),
+        );
+        let mut pilot = observation.local.combat.recovery.flight.pilot;
+        pilot.planet = observation.planets[1].clone();
+        let objective = LandingObjective::read(&pilot).unwrap();
+        let bearing = (((-objective.position.x)
+            .atan2(objective.position.y)
+            .rem_euclid(std::f32::consts::TAU)
+            * f32::from(pilot::LANDING_SITE_COUNT)
+            / std::f32::consts::TAU)
+            .round() as u8
+            + 1)
+            % pilot::LANDING_SITE_COUNT;
+        pilot.sites = vec![
+            state
+                .vehicle_landing_site(0, LandingSiteId { planet: 1, bearing }, false)
+                .unwrap(),
+        ];
+        let mut job = state
+            .objective_job(
+                0,
+                &pilot,
+                &[],
+                Arc::new(state.world.physics.world.query_snapshot()),
+                None,
+                false,
+            )
+            .unwrap();
+
+        // A positive walking edge can sit exactly at the builder's rise limit.
+        // Its reverse remains a valid walk as gravity increases.
+        let rise = 0.25;
+        job.base = Some(Arc::new(GroundMap {
+            version: 1,
+            actor: pilot.owner,
+            planet: pilot.planet.index,
+            revision: pilot.planet.revision,
+            tick: pilot.tick,
+            nodes: [64.0, 64.0 + rise]
+                .into_iter()
+                .enumerate()
+                .map(|(id, height)| GroundNode {
+                    id: id as u16,
+                    position: Vec2::Y * height,
+                    normal: Vec2::Y,
+                })
+                .collect(),
+            edges: [(0, 1), (1, 0)]
+                .into_iter()
+                .map(|(from, to)| GroundEdge {
+                    from,
+                    to,
+                    kind: GroundEdgeKind::Walk,
+                    length: rise,
+                })
+                .collect(),
+            rejected: Vec::new(),
+        }));
+        let source_gravity = SurfaceSortieState::spec().jump_speed.powi(2) / (2.0 * rise) * 0.75;
+        let current_gravity = source_gravity + 0.005;
+        assert!((current_gravity - source_gravity).abs() <= 0.01);
+        assert!(job.walking_rise_valid(source_gravity));
+        assert!(job.walking_rise_valid(source_gravity * 0.5));
+        assert!(!job.walking_rise_valid(current_gravity));
     }
 }

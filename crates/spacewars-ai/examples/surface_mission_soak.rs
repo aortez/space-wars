@@ -1,4 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/flag_survey.rs"]
+mod flag_survey;
+#[path = "support/flag_value_shadow.rs"]
+mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -17,6 +21,10 @@ mod planning_probe;
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
 mod successor_probe;
+#[path = "support/transfer_probe.rs"]
+mod transfer_probe;
+#[path = "support/transfer_sources.rs"]
+mod transfer_sources;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -155,6 +163,9 @@ fn main() {
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
+    let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
+    let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
+    let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -446,8 +457,21 @@ fn main() {
                 if o.local.landing_objective.is_some() {
                     objective_sensors.push(sensor_ms);
                 }
+                if let Some(sources) = &mut transfer_sources {
+                    sources.observe(i, &pilots[i], &o);
+                }
                 let clock = Instant::now();
-                let mut intent = if let Some(trial) = &mut continuation {
+                let nominated = transfer_probe.as_mut().and_then(|probe| {
+                    probe.intent(
+                        i,
+                        &mut pilots[i],
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    )
+                });
+                let mut intent = if let Some(intent) = nominated {
+                    intent
+                } else if let Some(trial) = &mut continuation {
                     trial.intent(i, &mut pilots[i], &o)
                 } else if let Some(evaluation) = &mission_evaluation {
                     pilots[i].intent_with_evaluation(&o, &evaluation.evaluator)
@@ -461,6 +485,9 @@ fn main() {
                 }
                 if let Some(trial) = &mut continuation {
                     trial.record(i, &pilots[i], &state, &o, intent);
+                }
+                if let Some(probe) = &mut transfer_probe {
+                    probe.record(i, &pilots[i], &state, &o, intent);
                 }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
@@ -614,6 +641,21 @@ fn main() {
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
                     successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
+                    if let Some(flags) = &mut flag_survey {
+                        let clock = Instant::now();
+                        let flag_request =
+                            evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
+                        flags.planner.observe(&state, i, &o, flag_request);
+                        if let Some(shadow) = &mut flags.shadow {
+                            shadow.observe(
+                                &o,
+                                &evaluator.evaluator,
+                                flag_request,
+                                &flags.planner.samples(),
+                            );
+                        }
+                        successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    }
                 }
             } else if mode == "intercept" {
                 let clock = Instant::now();
@@ -626,6 +668,9 @@ fn main() {
                 policy_times[i] = *policies.last().unwrap();
                 actions.extend(intent.encode(owner));
             }
+        }
+        if transfer_probe.as_ref().is_some_and(|probe| probe.done()) {
+            break;
         }
         let mut planning_ms = successor_construction_ms
             + live_planning
@@ -649,6 +694,14 @@ fn main() {
                     .map_or(0, |probe| probe.last_charged),
             );
             planning_ms += evaluator.advance(state.tick(), remaining);
+            if let Some(flags) = &mut flag_survey {
+                remaining.graph -= evaluator.last_charged.graph;
+                planning_ms += flags.advance(
+                    &state,
+                    remaining,
+                    live_planning.as_ref().unwrap().physical_actors(),
+                );
+            }
         }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
@@ -791,6 +844,16 @@ fn main() {
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
     if let Some(evaluator) = &mut mission_evaluation {
         report["mission_evaluation"] = evaluator.report();
+    }
+    if let Some(flags) = &mut flag_survey {
+        report["flag_survey"] = flags.report();
+    }
+    if let Some(probe) = &mut transfer_probe {
+        report["termination"] = json!("transfer_probe_finished");
+        report["transfer_probe"] = probe.finish(&state, &pilots[probe.seat()]);
+    }
+    if let Some(sources) = &mut transfer_sources {
+        report["transfer_sources"] = sources.report();
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({

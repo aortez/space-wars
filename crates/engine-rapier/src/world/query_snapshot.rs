@@ -3,7 +3,9 @@ use super::*;
 use rapier2d::{parry::query::DefaultQueryDispatcher, prelude::QueryPipeline};
 
 mod areas;
-pub use areas::{AreaValidation, QueryArea, QueryFrame};
+pub use areas::{
+    AreaValidation, QueryArea, QueryChange, QueryColliderState, QueryFrame, RegionChanges,
+};
 
 #[derive(Clone)]
 pub struct QuerySnapshot {

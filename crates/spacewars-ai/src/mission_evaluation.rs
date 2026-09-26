@@ -17,14 +17,17 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_survey;
+mod flag_value_shadow;
 mod model;
 mod selection;
 mod survey;
 mod transfer;
 mod value;
+pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use selection::CaptureSelection;
-pub use transfer::{TransferReference, TransferSource};
+pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
 pub use value::{CaptureValue, ValueComparison, ValueDecision};
 #[cfg(test)]
 mod survey_tests;
@@ -247,6 +250,7 @@ struct Dependencies {
 #[derive(Clone, Default)]
 struct ActorState {
     survey: Option<survey::AlternativeSurvey>,
+    flag_survey: Option<flag_survey::RequestState>,
     last_tick: Option<u64>,
     submitted_tick: Option<u64>,
     dependencies: Option<Dependencies>,
@@ -293,6 +297,23 @@ impl MissionEvaluator {
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
     }
+    /// Separate observational experiment. Its results are deliberately not
+    /// admitted to evaluation/selection until coverage and timing are tested.
+    pub fn flag_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest> {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        flag_survey::request(
+            &mut self.actors.entry(actor).or_default().flag_survey,
+            o,
+            mission,
+        )
+    }
     /// Optional demand for the host's existing remote-query dispatcher. Call
     /// after controls; this never changes the bot's own sensor request.
     pub fn alternative_request(
@@ -331,7 +352,7 @@ impl MissionEvaluator {
         state.last_tick = Some(p.tick);
         let mut dependencies = Dependencies {
             policy: mission.policy,
-            transfer: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+            transfer: value::enabled(mission.policy).then(|| TransferSource::from_observation(o)),
             planets: o
                 .planets
                 .iter()
@@ -719,7 +740,8 @@ fn snapshot(
             },
             preferred: None,
         }),
-        transfer_source: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+        transfer_source: value::enabled(mission.policy)
+            .then(|| TransferSource::from_observation(o)),
         comparison_reason: "pending",
         charged_work: 0,
     }

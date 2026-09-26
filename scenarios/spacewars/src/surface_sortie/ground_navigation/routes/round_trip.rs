@@ -139,6 +139,7 @@ enum Phase {
     Nodes(usize),
     CountEdges(usize),
     Prefix(usize),
+    SparsePrefix(usize, usize, usize),
     IndexEdges(usize),
     Forward,
     ReturnSources(usize),
@@ -180,6 +181,7 @@ pub struct GroundRoundTripJob<'a> {
     phase: Phase,
     result: GroundRoundTrip,
     work: GroundTripWork,
+    sparse_prefix: Option<Vec<u16>>,
 }
 impl GroundRoundTripJob<'static> {
     pub fn new(map: Arc<GroundMap>, start: Vec2, target: Vec2, range: f32, hatch: Vec2) -> Self {
@@ -236,7 +238,24 @@ impl<'a> GroundRoundTripJob<'a> {
                 endpoint: None,
             },
             work: GroundTripWork::default(),
+            sparse_prefix: None,
         }
+    }
+    /// Opt-in tiny walking patches. Preparation is bounded by 33 nodes/66
+    /// edges, like the constructor's fixed arrays, outside charged indexing.
+    /// Dispatch then visits each present node once instead of all 512 IDs.
+    /// Existing profiles retain their original prefix work and scheduling.
+    pub(crate) fn with_sparse_prefix(mut self) -> Self {
+        assert!(self.map.nodes.len() <= 33 && self.map.edges.len() <= 66);
+        assert!(self.extra.iter().all(Option::is_none));
+        let mut ids: Vec<_> = self.map.nodes.iter().map(|n| n.id).collect();
+        ids.sort_unstable();
+        assert!(ids.windows(2).all(|pair| pair[0] != pair[1]));
+        assert!(self.map.edges.iter().all(|e| e.kind == GroundEdgeKind::Walk
+            && ids.binary_search(&e.from).is_ok()
+            && ids.binary_search(&e.to).is_ok()));
+        self.sparse_prefix = Some(ids);
+        self
     }
     /// Exactly one explicit crossing pair; arbitrary Jetpack edges in the map
     /// remain excluded. Positive edge costs prevent repeated flights per leg.
@@ -312,6 +331,80 @@ impl<'a> GroundRoundTripJob<'a> {
     }
     fn distance(&self, node: GroundNode, target: Vec2) -> f32 {
         (node.position + node.position.normalized() * self.height).distance_to(target)
+    }
+}
+
+#[cfg(test)]
+mod sparse_tests {
+    use super::*;
+
+    #[test]
+    fn sparse_prefix_preserves_complete_and_failed_trips_with_wraparound_ids() {
+        for count in [0, 1, 2, 17, 33] {
+            for one_way in [false, true] {
+                for gap in [false, true] {
+                    let mut nodes: Vec<_> = (0..count)
+                        .map(|i| GroundNode {
+                            id: (504 + i) % GROUND_SAMPLES as u16,
+                            position: Vec2::new(f32::from(i), 60.0),
+                            normal: Vec2::Y,
+                        })
+                        .collect();
+                    let mut edges = Vec::new();
+                    for (i, pair) in nodes.windows(2).enumerate() {
+                        if gap && i == usize::from(count / 2) {
+                            continue;
+                        }
+                        edges.push(GroundEdge {
+                            from: pair[0].id,
+                            to: pair[1].id,
+                            kind: GroundEdgeKind::Walk,
+                            length: 1.0,
+                        });
+                        if !one_way {
+                            edges.push(GroundEdge {
+                                from: pair[1].id,
+                                to: pair[0].id,
+                                kind: GroundEdgeKind::Walk,
+                                length: 1.0,
+                            });
+                        }
+                    }
+                    nodes.reverse();
+                    let map = Arc::new(GroundMap {
+                        version: 1,
+                        actor: PlayerId::PLAYER_1,
+                        planet: 0,
+                        revision: 0,
+                        tick: 0,
+                        nodes,
+                        edges,
+                        rejected: vec![],
+                    });
+                    let start = Vec2::new(0.0, 60.0);
+                    let end = Vec2::new(f32::from(count.saturating_sub(1)), 60.5);
+                    let mut dense = GroundRoundTripJob::new(map, start, end, 1.0, start);
+                    let mut sparse = dense.clone().with_sparse_prefix();
+                    for job in [&mut dense, &mut sparse] {
+                        while job.next_work().is_some() {
+                            job.step();
+                        }
+                    }
+                    assert_eq!(
+                        dense.output(),
+                        sparse.output(),
+                        "nodes={count}, directed={one_way}, gap={gap}"
+                    );
+                    assert!(sparse.work().operations <= dense.work().operations);
+                    if dense.output().unwrap().endpoint.is_some() {
+                        assert_eq!(
+                            dense.work().operations - sparse.work().operations,
+                            512 - u64::from(count)
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 fn empty_diagnostics() -> GroundRouteDiagnostics {
@@ -404,7 +497,11 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                     self.work.indexed_edges += 1;
                     self.phase = Phase::CountEdges(i + 1);
                 } else {
-                    self.phase = Phase::Prefix(1);
+                    self.phase = if self.sparse_prefix.is_some() {
+                        Phase::SparsePrefix(0, 0, 0)
+                    } else {
+                        Phase::Prefix(1)
+                    };
                 }
             }
             Phase::Prefix(i) => {
@@ -414,6 +511,22 @@ impl PlanningJob for GroundRoundTripJob<'_> {
                     self.next[i] = self.offsets[i];
                     self.reverse_next[i] = self.reverse_offsets[i];
                     self.phase = Phase::Prefix(i + 1);
+                } else {
+                    self.phase = Phase::IndexEdges(0);
+                }
+            }
+            Phase::SparsePrefix(i, forward, backward) => {
+                if let Some(&id) = self.sparse_prefix.as_ref().unwrap().get(i) {
+                    let id = usize::from(id);
+                    let end = forward + self.offsets[id + 1];
+                    let reverse_end = backward + self.reverse_offsets[id + 1];
+                    self.offsets[id] = forward;
+                    self.offsets[id + 1] = end;
+                    self.reverse_offsets[id] = backward;
+                    self.reverse_offsets[id + 1] = reverse_end;
+                    self.next[id] = forward;
+                    self.reverse_next[id] = backward;
+                    self.phase = Phase::SparsePrefix(i + 1, end, reverse_end);
                 } else {
                     self.phase = Phase::IndexEdges(0);
                 }

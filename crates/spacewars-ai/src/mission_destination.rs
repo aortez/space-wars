@@ -20,6 +20,13 @@ pub struct DestinationSwitch {
     pub value: Option<crate::mission_evaluation::ValueDecision>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DestinationProbeResult {
+    pub destination: usize,
+    pub accepted: bool,
+    pub reason: Option<&'static str>,
+}
+
 impl MaterialMissionPilot {
     pub(super) fn apply_destination_selection(
         &mut self,
@@ -27,27 +34,11 @@ impl MaterialMissionPilot {
         choice: CaptureSelection,
     ) {
         let p = &o.local.combat.recovery.flight.pilot;
-        let up = (p.ship.position - p.planet.motion.position).normalized();
-        let falling = (-(p.ship.velocity - p.planet.motion.velocity).dot(up)).max(0.0);
-        if !self.policy.selects_destination()
-            || self.destination_switched
-            || choice.tick != p.tick
+        if choice.tick != p.tick
             || self.telemetry.target != Some(choice.current)
             || self.selected_tick != choice.selected_tick
             || self.capture.as_ref().and_then(|c| c.telemetry().site) != choice.site
-            || self.recovery.is_some()
-            || p.landing.phase != LandingPhase::Flying
-            || p.landing.supported_feet != 0
-            || p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius
-                < 35.0 + falling * falling / 50.0
-            || self
-                .deferred
-                .iter()
-                .any(|(index, until)| *index == choice.destination && p.tick < *until)
-            || self
-                .capture
-                .as_ref()
-                .is_some_and(|c| !uncommitted(c.telemetry()))
+            || self.destination_gate(o, choice.destination).is_err()
         {
             return;
         }
@@ -58,17 +49,7 @@ impl MaterialMissionPilot {
         } else {
             "shorter supported capture trip"
         };
-        self.event(p.tick, "replan", Some(reason));
-        self.telemetry.replans += 1;
-        self.capture = None;
-        self.solar_detour = None;
-        self.pursuit_climb = None;
-        self.departure_obstacle = None;
-        self.telemetry.target = Some(choice.destination);
-        self.selected_tick = p.tick;
-        self.progress_tick = p.tick;
-        self.best_distance = f32::INFINITY;
-        self.destination_switched = true;
+        self.switch_destination(p.tick, choice.destination, reason);
         let telemetry = self.telemetry.destination_planning.as_mut().unwrap();
         telemetry.switches += 1;
         telemetry.last_switch = Some(DestinationSwitch {
@@ -80,8 +61,103 @@ impl MaterialMissionPilot {
             destination_seconds: choice.destination_seconds,
             value: choice.value,
         });
-        self.event(p.tick, "selected", Some(reason));
-        self.goal(MissionGoal::Select, p.tick);
+    }
+
+    /// Explicit experiment at the normal selection point. This bypasses only
+    /// value/evidence admission, never controller commitment or safety gates.
+    pub(super) fn apply_destination_probe(
+        &mut self,
+        o: &MissionObservationV1,
+        probe: &mut DestinationProbeResult,
+    ) {
+        let p = &o.local.combat.recovery.flight.pilot;
+        probe.reason = self.transfer_probe_gate(o, probe.destination).err();
+        probe.accepted = probe.reason.is_none();
+        if probe.accepted {
+            self.switch_destination(
+                p.tick,
+                probe.destination,
+                "experimental destination nomination",
+            );
+        }
+    }
+
+    /// Read-only nomination gates for offline source discovery. Passing these
+    /// does not override higher-priority controls or promise an accepted probe.
+    pub fn transfer_probe_gate(
+        &self,
+        o: &MissionObservationV1,
+        destination: usize,
+    ) -> Result<(), &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.telemetry.target.is_none() {
+            Err("no current destination")
+        } else if self.telemetry.target == Some(destination) {
+            Err("destination already selected")
+        } else if !o.planets.iter().any(|planet| {
+            planet.index == destination
+                && planet
+                    .claim
+                    .as_ref()
+                    .is_none_or(|claim| claim.owner != Some(p.owner))
+        }) {
+            Err("destination missing or already owned")
+        } else {
+            self.destination_gate(o, destination)
+        }
+    }
+
+    fn destination_gate(
+        &self,
+        o: &MissionObservationV1,
+        destination: usize,
+    ) -> Result<(), &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let up = (p.ship.position - p.planet.motion.position).normalized();
+        let falling = (-(p.ship.velocity - p.planet.motion.velocity).dot(up)).max(0.0);
+        if !self.policy.selects_destination() {
+            Err("policy does not select destinations")
+        } else if self.destination_switched {
+            Err("already switched this trip")
+        } else if self.recovery.is_some() {
+            Err("recovery active")
+        } else if p.landing.phase != LandingPhase::Flying || p.landing.supported_feet != 0 {
+            Err("landing or supported")
+        } else if p.ship.position.distance_to(p.planet.motion.position) - p.planet.radius
+            < 35.0 + falling * falling / 50.0
+        {
+            Err("below switching altitude")
+        } else if self
+            .deferred
+            .iter()
+            .any(|(index, until)| *index == destination && p.tick < *until)
+        {
+            Err("destination deferred")
+        } else if self
+            .capture
+            .as_ref()
+            .is_some_and(|c| !uncommitted(c.telemetry()))
+        {
+            Err("capture committed")
+        } else {
+            Ok(())
+        }
+    }
+
+    fn switch_destination(&mut self, tick: u64, destination: usize, reason: &'static str) {
+        self.event(tick, "replan", Some(reason));
+        self.telemetry.replans += 1;
+        self.capture = None;
+        self.solar_detour = None;
+        self.pursuit_climb = None;
+        self.departure_obstacle = None;
+        self.telemetry.target = Some(destination);
+        self.selected_tick = tick;
+        self.progress_tick = tick;
+        self.best_distance = f32::INFINITY;
+        self.destination_switched = true;
+        self.event(tick, "selected", Some(reason));
+        self.goal(MissionGoal::Select, tick);
     }
 }
 
@@ -222,6 +298,82 @@ mod tests {
     }
 
     #[test]
+    fn nomination_does_not_fabricate_supported_switches_and_cannot_repeat_a_tick() {
+        let (mut bot, o, _) = fixture(MissionPolicy::ValuePlanner);
+        let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+        let (intent, result) = bot.intent_with_destination_probe(&o, &evaluator, 0);
+        assert!(result.accepted, "{result:?}");
+        assert_eq!(bot.telemetry.target, Some(0));
+        assert_eq!(
+            bot.telemetry
+                .destination_planning
+                .as_ref()
+                .unwrap()
+                .switches,
+            0
+        );
+        assert!(
+            bot.telemetry
+                .events
+                .iter()
+                .any(|event| event.kind == "selected"
+                    && event.reason == Some("experimental destination nomination"))
+        );
+        let saved = bot.telemetry.clone();
+        let (same, refused) = bot.intent_with_destination_probe(&o, &evaluator, 1);
+        assert_eq!(same, intent);
+        assert!(!refused.accepted);
+        assert_eq!(
+            refused.reason,
+            Some("control already issued for source tick")
+        );
+        assert_eq!(bot.telemetry, saved);
+    }
+
+    #[test]
+    fn refused_nomination_retains_ordinary_controls_and_priority() {
+        for mutation in 0..7 {
+            let (mut bot, mut o, _) = fixture(MissionPolicy::ValuePlanner);
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            let destination = match mutation {
+                0 => {
+                    p.landing.supported_feet = 1;
+                    0
+                }
+                1 => {
+                    p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 20.0);
+                    0
+                }
+                2 => {
+                    bot.deferred.push((0, p.tick + 1));
+                    0
+                }
+                3 => {
+                    bot.destination_switched = true;
+                    0
+                }
+                4 => {
+                    p.controls_armed = false;
+                    0
+                }
+                5 => {
+                    p.ship_available = false;
+                    0
+                }
+                6 => 123,
+                _ => unreachable!(),
+            };
+            let mut ordinary = bot.clone();
+            let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+            let expected = ordinary.intent_with_evaluation(&o, &evaluator);
+            let (intent, result) = bot.intent_with_destination_probe(&o, &evaluator, destination);
+            assert!(!result.accepted, "mutation {mutation}");
+            assert_eq!(intent, expected, "mutation {mutation}");
+            assert_eq!(bot.telemetry, ordinary.telemetry, "mutation {mutation}");
+        }
+    }
+
+    #[test]
     fn recovery_and_repeated_control_ticks_have_priority_over_proposals() {
         let (mut bot, mut o, choice) = fixture(MissionPolicy::DestinationPlanner);
         let first = bot.intent_with_planning(&o, None, Some(choice));
@@ -240,5 +392,92 @@ mod tests {
             0
         );
         assert!(bot.recovery.is_some());
+    }
+
+    fn calibration_fixture() -> (MaterialMissionPilot, MissionObservationV1) {
+        use scenario_spacewars::surface_sortie::combat::CombatTarget;
+        let (mut bot, mut o, _) = fixture(MissionPolicy::ValuePlanner);
+        o.match_rules = true;
+        o.sun = None;
+        for planet in &mut o.planets {
+            if let Some(claim) = &mut planet.claim {
+                claim.owner = None;
+            }
+        }
+        bot.selected_tick = 99;
+        bot.destination_switched = true;
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        p.tick = 100;
+        let mut motion = p.ship;
+        motion.position += Vec2::X * 100.0;
+        o.local.combat.target = Some(CombatTarget {
+            owner: PlayerId::PLAYER_2,
+            motion,
+            health: 10.0,
+            health_fraction: 0.1,
+            ship_form: Some(ShipForm::Ship),
+            visible: true,
+            ground_occluded: false,
+        });
+        (bot, o)
+    }
+
+    #[test]
+    fn calibration_defers_only_new_pursuit_without_setting_a_cooldown_or_sticky_mode() {
+        let (mut bot, mut o) = calibration_fixture();
+        let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+        let mut normal = bot.clone();
+        normal.intent_with_evaluation(&o, &evaluator);
+        assert!(normal.telemetry.pursuit.is_some());
+        bot.intent_for_transfer_calibration(&o, &evaluator, 1, 99);
+        assert!(bot.telemetry.pursuit.is_none());
+        assert_eq!(bot.telemetry.target, Some(1));
+        assert_eq!(bot.next_pursuit_tick, 0);
+        o.local.combat.recovery.flight.pilot.tick += 1;
+        bot.intent_with_evaluation(&o, &evaluator);
+        assert_eq!(bot.telemetry.pursuit.as_ref().unwrap().started_tick, 101);
+    }
+
+    #[test]
+    fn calibration_preserves_trip_identity_safety_and_existing_pursuit_maintenance() {
+        use scenario_spacewars::surface_sortie::mission::MissionObstacle;
+        let evaluator = crate::mission_evaluation::MissionEvaluator::new(2);
+        for mutation in 0..8 {
+            let (mut bot, mut o) = calibration_fixture();
+            let p = &mut o.local.combat.recovery.flight.pilot;
+            match mutation {
+                0 => bot.selected_tick -= 1,
+                1 => bot.telemetry.target = Some(0),
+                2 => p.tick = 99,
+                3 => p.tick = 99 + 3601,
+                4 => p.ship_available = false,
+                5 => {
+                    o.sun = Some(MissionObstacle {
+                        position: p.ship.position - Vec2::Y * 10.0,
+                        radius: 50.0,
+                    })
+                }
+                6 | 7 => {
+                    bot.telemetry.pursuit = Some(MissionPursuit {
+                        started_tick: if mutation == 6 { 99 } else { 0 },
+                        last_visible_tick: 99,
+                        reason: "test existing pursuit",
+                    })
+                }
+                _ => unreachable!(),
+            }
+            if mutation == 7 {
+                o.local.combat.recovery.flight.pilot.tick = PURSUIT_BUDGET_TICKS;
+            }
+            let mut normal = bot.clone();
+            let expected = normal.intent_with_evaluation(&o, &evaluator);
+            let actual = bot.intent_for_transfer_calibration(&o, &evaluator, 1, 99);
+            assert_eq!(expected, actual, "mutation {mutation}");
+            assert_eq!(normal.telemetry(), bot.telemetry(), "mutation {mutation}");
+            assert_eq!(
+                normal.next_pursuit_tick, bot.next_pursuit_tick,
+                "mutation {mutation}"
+            );
+        }
     }
 }

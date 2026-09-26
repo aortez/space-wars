@@ -639,6 +639,19 @@ impl SpacewarsPhysics {
         ship_entity(index)
     }
 
+    pub(super) fn surface_hull_id(&self, index: usize) -> ColliderId {
+        collider_id(ship_entity(index), SHIP_HULL_ROLE, 0)
+    }
+
+    /// Inputs to the proposed hull/feet clearance query, independent of pose.
+    pub(super) fn surface_preview_geometry(
+        &self,
+        index: usize,
+        ship: &ShipState,
+    ) -> Vec<ColliderSpec> {
+        surface_ship_colliders(ship_entity(index), ship, true)
+    }
+
     pub(super) fn surface_vehicle_outline(
         &self,
         index: usize,
@@ -1838,7 +1851,7 @@ fn ordered_entity_pair(
     if a <= b { (a, b) } else { (b, a) }
 }
 
-fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
+pub(super) fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
     match entity.value() {
         WORLD_ENTITY_VALUE => Some(MechanicalEntity::World),
         SUN_ENTITY_VALUE => Some(MechanicalEntity::Body(BodyId::Sun)),

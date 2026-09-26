@@ -24,6 +24,11 @@ pub use diagnostics::{
     ObjectiveWorkEvidence, PublicationDecision, PublicationEvidence, RouteResultCounts,
 };
 mod early_candidates;
+mod flag_survey;
+pub use flag_survey::{
+    FlagSurveyEnvelope, FlagSurveyGeometry, FlagSurveyPlanner, FlagSurveyRequest, FlagSurveySample,
+    FlagSurveyTelemetry, FlagSurveyValidation,
+};
 mod objective_job;
 mod query_budget;
 pub use destinations::DestinationCoverTelemetry;
