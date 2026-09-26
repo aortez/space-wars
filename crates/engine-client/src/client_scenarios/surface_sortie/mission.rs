@@ -1,6 +1,6 @@
 use super::*;
 use engine_core::planning::Work;
-use scenario_spacewars::surface_sortie::live_planning::LiveObjectivePlanner;
+use scenario_spacewars::surface_sortie::live_planning::{FlagSurveyPlanner, LiveObjectivePlanner};
 use spacewars_ai::mission_evaluation::{DEFAULT_WORK, MissionEvaluator};
 use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
 use std::time::Instant;
@@ -67,6 +67,7 @@ struct MaterialMissionClientScenario {
     profile: profiling::Profile,
     evaluation: MissionEvaluator,
     surveys: LiveObjectivePlanner,
+    flag_surveys: Option<FlagSurveyPlanner>,
 }
 impl MaterialMissionClientScenario {
     fn append_controller_hud(&self, frames: &mut [RenderFrame], viewport: Viewport) {
@@ -118,6 +119,12 @@ fn create_with_seats(
         profile: profiling::Profile::default(),
         evaluation: MissionEvaluator::new(2),
         surveys: LiveObjectivePlanner::new(2, OBSERVATION_WORK),
+        flag_surveys: [
+            settings.spacewars.player_1_controller,
+            settings.spacewars.player_2_controller,
+        ]
+        .contains(&engine_common::SpacewarsController::ValueBot)
+        .then(|| FlagSurveyPlanner::new(2)),
         pilots: std::array::from_fn(|seat| {
             MissionBot::new(
                 if registration.id == MATCH_REGISTRATION.id {
@@ -239,11 +246,20 @@ impl ClientScenario for MaterialMissionClientScenario {
             self.surveys
                 .observe_destination_cover(&self.sortie.state, seat, &mut o, request);
             self.evaluation.observe(&o, self.pilots[seat].telemetry());
+            if let Some(flags) = &mut self.flag_surveys {
+                let request = if self.pilots[seat].policy() == MissionPolicy::ValuePlanner {
+                    self.evaluation
+                        .flag_request(&o, self.pilots[seat].telemetry())
+                } else {
+                    None
+                };
+                flags.observe(&self.sortie.state, seat, &o, request);
+            }
             sample.planning += clock.elapsed();
         }
         let clock = Instant::now();
         let allocation = self.surveys.advance_with_state(&self.sortie.state).unwrap();
-        self.evaluation.advance(
+        let evaluated = self.evaluation.advance(
             self.sortie.state.tick(),
             Work {
                 graph: OBSERVATION_WORK.graph - allocation.charged.graph,
@@ -251,6 +267,23 @@ impl ClientScenario for MaterialMissionClientScenario {
                     - allocation.charged.physics_queries,
             },
         );
+        if let Some(flags) = &mut self.flag_surveys {
+            let busy: Vec<_> = allocation
+                .jobs
+                .iter()
+                .filter(|j| j.charged.physics_queries > 0)
+                .map(|j| j.request.actor as usize)
+                .collect();
+            flags.advance(
+                &self.sortie.state,
+                Work {
+                    graph: OBSERVATION_WORK.graph - allocation.charged.graph - evaluated.graph,
+                    physics_queries: OBSERVATION_WORK.physics_queries
+                        - allocation.charged.physics_queries,
+                },
+                &busy,
+            );
+        }
         sample.planning += clock.elapsed();
         let clock = Instant::now();
         let result = self.sortie.step(&actions, dt);
@@ -312,7 +345,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}",
+                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}",
                 self.profile.diagnostics(&self.pilots),
                 serde_json::to_string(&self.pilots.each_ref().map(|p| {
                     spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
@@ -321,7 +354,12 @@ impl ClientScenario for MaterialMissionClientScenario {
                 self.evaluation.charged_total,
                 serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_1)).unwrap(),
                 serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_2)).unwrap(),
-                serde_json::to_string(self.surveys.destination_cover_telemetry()).unwrap()
+                serde_json::to_string(self.surveys.destination_cover_telemetry()).unwrap(),
+                serde_json::to_string(&self.flag_surveys.as_ref().map(|s| serde_json::json!({
+                    "model":"remote_flag_walk_patch_v1", "observational":true,
+                    "telemetry":s.telemetry(), "samples":s.samples(),
+                })))
+                .unwrap()
             ),
             self.sortie.runtime_diagnostics(),
         )
@@ -882,4 +920,59 @@ mod tests {
             }
         }
     }
+}
+#[test]
+fn flag_surveys_preserve_v13_controls_evaluation_and_physics() {
+    let mut settings = Settings::default();
+    settings.spacewars.player_1_controller = engine_common::SpacewarsController::ValueBot;
+    settings.spacewars.player_2_controller = engine_common::SpacewarsController::ValueBot;
+    let create = || {
+        create_match(
+            7681320818318960200,
+            &settings,
+            Viewport::new(800.0, 480.0),
+            ScenarioStartMode::Normal,
+            &ScenarioAsset::None,
+        )
+        .unwrap()
+    };
+    let mut baseline = create();
+    let mut surveyed = create();
+    let baseline = baseline
+        .as_any_mut()
+        .downcast_mut::<MaterialMissionClientScenario>()
+        .unwrap();
+    let surveyed = surveyed
+        .as_any_mut()
+        .downcast_mut::<MaterialMissionClientScenario>()
+        .unwrap();
+    baseline.flag_surveys = None;
+    for _ in 0..180 * 60 {
+        let dt = Duration::from_nanos(16_666_667);
+        baseline.step(&[], dt);
+        surveyed.step(&[], dt);
+        for seat in 0..2 {
+            let owner = PlayerId::from_index(seat).unwrap();
+            assert_eq!(
+                baseline.pilots[seat].telemetry(),
+                surveyed.pilots[seat].telemetry()
+            );
+            assert_eq!(
+                baseline.evaluation.latest(owner),
+                surveyed.evaluation.latest(owner)
+            );
+            assert_eq!(
+                baseline.sortie.state.observation(seat),
+                surveyed.sortie.state.observation(seat)
+            );
+        }
+        if baseline.is_game_over() {
+            break;
+        }
+    }
+    assert!(surveyed.flag_surveys.as_ref().unwrap().telemetry().started > 0);
+    assert_eq!(
+        baseline.sortie.state.match_observation(),
+        surveyed.sortie.state.match_observation()
+    );
 }

@@ -1,4 +1,6 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/flag_survey.rs"]
+mod flag_survey;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -155,6 +157,7 @@ fn main() {
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
+    let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -614,6 +617,13 @@ fn main() {
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
                     successor_construction_ms += evaluator.observe(&o, pilots[i].telemetry());
+                    if let Some(flags) = &mut flag_survey {
+                        let clock = Instant::now();
+                        let flag_request =
+                            evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
+                        flags.planner.observe(&state, i, &o, flag_request);
+                        successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    }
                 }
             } else if mode == "intercept" {
                 let clock = Instant::now();
@@ -649,6 +659,14 @@ fn main() {
                     .map_or(0, |probe| probe.last_charged),
             );
             planning_ms += evaluator.advance(state.tick(), remaining);
+            if let Some(flags) = &mut flag_survey {
+                remaining.graph -= evaluator.last_charged.graph;
+                planning_ms += flags.advance(
+                    &state,
+                    remaining,
+                    live_planning.as_ref().unwrap().physical_actors(),
+                );
+            }
         }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
@@ -791,6 +809,9 @@ fn main() {
     report["policy_configuration"] = json!(selected_policies.map(|p| p.descriptor()));
     if let Some(evaluator) = &mut mission_evaluation {
         report["mission_evaluation"] = evaluator.report();
+    }
+    if let Some(flags) = &mut flag_survey {
+        report["flag_survey"] = flags.report();
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({

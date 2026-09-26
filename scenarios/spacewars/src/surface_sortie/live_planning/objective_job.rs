@@ -219,6 +219,13 @@ impl SurfaceSortieState {
     }
 }
 impl ObjectiveSurveyJob {
+    pub(super) fn with_walk_patch(mut self, center: u16, half_width: u16) -> Self {
+        let Phase::Ground(job) = std::mem::replace(&mut self.phase, Phase::Done) else {
+            panic!("restrict a survey before dispatch");
+        };
+        self.phase = Phase::Ground(Box::new((*job).with_walk_patch(center, half_width)));
+        self
+    }
     /// Only finished positive candidates have complete path dependencies.
     /// Omitted alternatives remain unknown until the full job completes.
     pub(crate) fn positive_candidates(&self) -> Option<LandingObjectiveSurvey> {
