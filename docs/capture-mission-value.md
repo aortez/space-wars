@@ -79,4 +79,84 @@ deadline. The four world seeds, reused controls and mirrored policy seats
 are not independent samples. No timing constants or utility weights are fit
 to these outcomes. Failures and unchanged matches are retained.
 
-Results, device validation and final review are pending.
+## Results at `b6e74f3`
+
+The [machine-readable results](data/capture-mission-value-v1.json) retain the
+plan, commands, binary/report hashes, both players, unknown evidence, outcomes
+and timings. All **43 matches finished**, representing 269.99 simulated
+minutes: 38 ended by pilot death and five by the match deadline. All physical
+audits passed. The largest recorded remote allocation was 126 queries in a
+tick, within 384; candidate work continued to receive only the graph budget
+left by the existing dispatcher.
+
+| Fresh same-seat comparison against v10 | v12 | v13 |
+| --- | ---: | ---: |
+| Wins / losses | 8 / 8 | 8 / 8 |
+| Accepted destination switches | 0 | 0 |
+| Pairs with identical recorded physical outcomes | 16 / 16 | 16 / 16 |
+| Completed sorties | 46 | 46 |
+| Completed recoveries | 9 | 9 |
+| Ships lost / pilot deaths | 13 / 7 | 13 / 7 |
+
+The v10 same-seat controls were also 8–8. These results establish fallback
+parity, **not a strength improvement**. The physical fixture separately
+demonstrates an accepted v13 switch, earlier first capture, boarding and
+departure in each seat; the ownership-value tradeoff is covered by evaluator
+tests. A slower enemy capture selected for its value has not yet been observed
+in these generated matches.
+
+The known regression is distinct from that fresh sample. V12 still switches
+at tick 9527 and loses. V13 makes no switch and exactly reproduces v10's
+recorded physical outcome, winning at tick 21005. At source tick 9525 its
+current enemy capture is 33.385 seconds / two ownership units. The alternative
+is **unknown because a moving-body sweep requires an unmodelled detour**;
+there is no complete value recommendation. This is a successful conservative
+fallback, not evidence that the new transfer timing or value ranking caused
+the win. Both v10 and v12 also reproduced the earlier study's physical
+results and byte-identical evaluation logs.
+
+Coverage is the present limit. Across the 16 experimental fresh seats, v13
+published 89,708 reports, including 2,563 with multiple numeric destinations
+and 2,580 complete value preferences, but **zero alternative value
+preferences**. V12 had one alternative time preference and accepted none.
+Missing surface evidence dominates; v13 also rejects unsupported static and
+moving detours. V13 reports much more frequently because motion revokes the
+pinned source. Report counts are not comparable independent opportunities.
+
+On this desktop, mean evaluator construction per observation was 0.173 μs for
+v12 matches and 0.229 μs for v13 matches; shared dispatch per tick was 0.047 μs
+and 0.133 μs respectively. These are weighted means of instrumented headless
+runs, excluding synchronous sensors, rendering and JSON output. They are not
+Pi FPS measurements. More frequent evaluation remains bounded, but avoiding
+unnecessary refresh while inactive is a possible follow-up.
+
+Validation passed: 154 AI unit tests; the two physical integration tests
+(now exercising v12 and v13 in both seats and exact no-result fallback); six
+native mission tests with one existing long test ignored; settings persistence;
+336 Python tests; workspace compilation for all targets; Rust formatting and
+strict AI Clippy. Independent review found and resolved a missing moving-body
+sweep check and aggregate model labels that still named v12. Follow-up review
+found no outstanding issue in the code, model claims or comparison accounting.
+
+## Next investigation
+
+Keep v13 selectable while retaining v10/v12. Before tuning weights or claiming
+strength, improve the evidence that makes alternatives comparable:
+
+1. Use the recorded missing-surface and route reasons to identify where an
+   affordable alternative survey could produce a full trip, including enemy
+   flag return routes.
+2. Measure a small set of actual transfer phases against the staged references.
+   Extend support for a specific detour/frame transition only with an explicit
+   bounded model and physical replay; unknown geometry should remain unknown.
+3. Add a physical case where the slower enemy capture wins on ownership value,
+   then predeclare new generated worlds. Retain the present seeds as regressions,
+   not a new strength test set.
+
+Raw reports and logs are under `target/capture-mission-value/finished/`.
+`regression-verification.json` in its parent directory records the frozen
+policy comparison and the source-tick decision window. The committed JSON
+includes the critical tick and hashes. Re-run with a fresh output directory;
+the runner refuses to overwrite an existing study.
+
+Device validation is pending.
