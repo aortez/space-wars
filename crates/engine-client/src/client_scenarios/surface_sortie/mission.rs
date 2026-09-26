@@ -372,6 +372,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                     "model":"capture_flag_value_shadow_v1", "observational":true,
                     "charged":self.flag_value_shadow.charged_total,
                     "completed":self.flag_value_shadow.completed_total,
+                    "deferred_source_observations":self.flag_value_shadow.deferred_source_total,
                     "p1":self.flag_value_shadow.latest(PlayerId::PLAYER_1),
                     "p2":self.flag_value_shadow.latest(PlayerId::PLAYER_2),
                 }))
@@ -942,9 +943,10 @@ fn flag_surveys_preserve_v13_controls_evaluation_and_physics() {
     let mut settings = Settings::default();
     settings.spacewars.player_1_controller = engine_common::SpacewarsController::ValueBot;
     settings.spacewars.player_2_controller = engine_common::SpacewarsController::ValueBot;
+    settings.material_combat.asteroids.interval_seconds = 0;
     let create = || {
         create_match(
-            7681320818318960200,
+            3491156488288037499,
             &settings,
             Viewport::new(800.0, 480.0),
             ScenarioStartMode::Normal,
@@ -963,6 +965,7 @@ fn flag_surveys_preserve_v13_controls_evaluation_and_physics() {
         .downcast_mut::<MaterialMissionClientScenario>()
         .unwrap();
     baseline.flag_surveys = None;
+    let mut shadow_used_survey = false;
     for _ in 0..180 * 60 {
         let dt = Duration::from_nanos(16_666_667);
         baseline.step(&[], dt);
@@ -981,12 +984,17 @@ fn flag_surveys_preserve_v13_controls_evaluation_and_physics() {
                 baseline.sortie.state.observation(seat),
                 surveyed.sortie.state.observation(seat)
             );
+            shadow_used_survey |= surveyed
+                .flag_value_shadow
+                .latest(owner)
+                .is_some_and(|r| r.admissions.iter().any(|a| a.used));
         }
         if baseline.is_game_over() {
             break;
         }
     }
     assert!(surveyed.flag_surveys.as_ref().unwrap().telemetry().started > 0);
+    assert!(shadow_used_survey);
     assert_eq!(
         baseline.sortie.state.match_observation(),
         surveyed.sortie.state.match_observation()
