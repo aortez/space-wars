@@ -10,7 +10,7 @@ use crate::{
 pub(super) fn viewport(layout: Layout) -> Bounds {
     Bounds {
         min: Vec2::new(layout.bounds_min.x + 8.0, layout.floor_y + 8.0),
-        max: Vec2::new(layout.bounds_max.x - 8.0, layout.bounds_max.y - 28.0),
+        max: Vec2::new(layout.bounds_max.x - 8.0, layout.canopy_y - 8.0),
     }
 }
 

@@ -14,6 +14,31 @@ fn display() -> DisplaySnapshot {
 }
 
 #[test]
+fn rain_emits_below_the_canopy_and_above_the_centered_digits_without_extra_physics() {
+    for aspect in [0.25, 0.6, 1024.0 / 768.0, 800.0 / 480.0, 4.0] {
+        for seed in [0, 7, 19] {
+            let layout = Layout::new(aspect);
+            let mut event = RainEvent::new(layout, seed, ClockRainAmount::Heavy, display());
+            // Force a bounded final batch, including the largest deferred drop.
+            event.tick = RAINING_TICKS;
+            event.emit_rain();
+            assert!(!event.water.parcels().is_empty());
+            for drop in event.water.parcels() {
+                let half_height = (drop.velocity.length() * drop.duration as f32 * 0.5)
+                    .max((drop.volume as f32).sqrt());
+                assert!(drop.position.y + half_height <= layout.canopy_y + 1e-4);
+                assert!(drop.position.y - half_height > -layout.face_origin.y);
+                assert_eq!(drop.velocity, Vec2::new(0.0, -220.0));
+            }
+            assert_eq!(event.physics_counts(), (0, 0));
+            let stats = event.water.stats();
+            assert!(stats.injected > 0.0);
+            assert!((stats.injected - stats.in_flight).abs() < 1e-8);
+        }
+    }
+}
+
+#[test]
 fn responsive_floor_ignores_digit_weight_and_defers_atomically_when_full() {
     let layout = Layout::new(4.0 / 3.0);
     let mut event = RainEvent::new(layout, 0, ClockRainAmount::Heavy, display());

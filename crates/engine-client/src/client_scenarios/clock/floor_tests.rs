@@ -61,7 +61,7 @@ fn managed_floor_is_visible_in_renderer_inputs_and_reported_in_clock_state() {
                 .unwrap();
             // At event tick zero there is no material in the lower floor strip.
             // Rain and Meltdown start flat/closed until water arrives.
-            let row = pixels.height() as usize * 92 / 100;
+            let row = pixels.height() as usize * 96 / 100;
             let width = pixels.width() as usize;
             let bank = pixels.as_slice()[row * width + width / 10];
             let center = pixels.as_slice()[row * width + width / 2];
