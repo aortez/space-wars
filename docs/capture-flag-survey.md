@@ -48,12 +48,17 @@ existing 8,192-body/collider limits but remain synchronous, outside operation
 fuel. Their time is separately recorded. The quota is not a whole-bot CPU or
 frame-time guarantee. Queue tokens have a separate diagnostic namespace.
 
-The fixed 512-entry index phase in the current round-trip search is significant
-at this budget. The focused physical-geometry fixture requires 943 graph
+The fixed 512-entry index phase in the original round-trip search is significant
+at this budget. The initial physical-geometry fixture required 943 graph
 operations and 517 queries, completing in 942 ticks with full leftover fuel in
-both seats. Review estimated that a connected 33-node patch would exceed the
-30-second cap; this experiment uses 17. Sparse indexing is a possible follow-up,
-subject to measured coverage.
+both seats. The final remote job indexes only present nodes: the same route
+needs **442 graph operations and the same 517 queries**, completing in 441 ticks
+(7.35 simulated seconds). Existing policies retain the original index work.
+The sparse option is restricted to at most 33 nodes/66 walking edges; bounded
+ID sorting and validation join the constructor's fixed preparation outside
+charged indexing. Dispatch charges each present prefix entry separately.
+Tests compare complete, one-way, disconnected and empty sparse graphs with
+the original search, including IDs that wrap through zero.
 
 ## Predeclared validation
 
@@ -71,6 +76,19 @@ hashed before compression. New allocation logs must account for every query
 and graph operation and retain the earlier stages' use of the shared budget.
 Completed positives, failures, cancellations and starvation are all retained.
 The question is evidence coverage and cost, not wins against the baseline.
+
+The initial study at `52fcaf3` finished all 11 matches (67.45 simulated minutes)
+with healthy physics and exact parity in all six comparisons. The regression
+produced one validated remote walking trip. The four fresh enabled conditions
+started six site checks: three jobs were cancelled before completion, two sites
+lacked landing/boarding/climb evidence, and one completed walking trip failed
+publication geometry validation. No fresh positive was published.
+
+That result motivated the sparse index optimization above. The same complete
+plan is replayed after it as an **engineering regression**, not new independent
+worlds or a strength trial. The initial logs remain under
+`target/capture-flag-survey/finished/`; optimized replays use `optimized/`.
+Both are retained in [the comparison record](data/capture-flag-survey-v1.json).
 
 Focused tests cover both seats, wraparound patch equivalence to the original
 full survey, quota exhaustion, clone/cancellation/expiry, authoritative ownership

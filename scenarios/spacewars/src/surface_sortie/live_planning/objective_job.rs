@@ -30,6 +30,7 @@ pub(crate) struct ObjectiveSurveyJob {
     measurements: Option<Box<GroundMeasurements>>,
     reused: ReusedGroundWork,
     local_dependencies: bool,
+    walk_patch: bool,
     radius: f32,
     dependencies: Vec<(Option<LandingSiteId>, Vec<QueryArea>)>,
     candidates: Vec<Candidate>,
@@ -172,6 +173,7 @@ impl SurfaceSortieState {
             measurements: None,
             reused: ReusedGroundWork::default(),
             local_dependencies,
+            walk_patch: false,
             radius: p.planet.radius,
             dependencies: Vec::new(),
             candidates,
@@ -224,6 +226,7 @@ impl ObjectiveSurveyJob {
             panic!("restrict a survey before dispatch");
         };
         self.phase = Phase::Ground(Box::new((*job).with_walk_patch(center, half_width)));
+        self.walk_patch = true;
         self
     }
     /// Only finished positive candidates have complete path dependencies.
@@ -363,13 +366,18 @@ impl PlanningJob for ObjectiveSurveyJob {
                     let map = Arc::new(j.take_map());
                     self.candidate_map = Some(Arc::clone(&map));
                     let hatch = self.candidates[self.index].hatch;
-                    self.phase = Phase::Trip(Box::new(GroundRoundTripJob::with_hatches(
+                    let trip = GroundRoundTripJob::with_hatches(
                         map,
                         hatch,
                         self.result.objective.position,
                         self.result.objective.range,
                         self.candidates[self.index].boarding_hatches,
-                    )));
+                    );
+                    self.phase = Phase::Trip(Box::new(if self.walk_patch {
+                        trip.with_sparse_prefix()
+                    } else {
+                        trip
+                    }));
                 }
             }
             Phase::Trip(j) => {
