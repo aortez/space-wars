@@ -536,10 +536,11 @@ pub enum ClockEventKind {
     Marquee = 4,
     DigitSlide = 5,
     Rain = 6,
+    Crow = 7,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -547,6 +548,7 @@ impl ClockEventKind {
         Self::Marquee,
         Self::DigitSlide,
         Self::Rain,
+        Self::Crow,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -558,6 +560,7 @@ impl ClockEventKind {
             Self::Marquee => "marquee",
             Self::DigitSlide => "digit-slide",
             Self::Rain => "rain",
+            Self::Crow => "crow",
         }
     }
 
@@ -570,6 +573,7 @@ impl ClockEventKind {
             Self::Marquee => "Marquee",
             Self::DigitSlide => "Digit Slide",
             Self::Rain => "Rain",
+            Self::Crow => "Crow",
         }
     }
 }
@@ -585,6 +589,7 @@ pub struct ClockEvents {
     pub marquee: bool,
     pub digit_slide: bool,
     pub rain: bool,
+    pub crow: bool,
 }
 
 impl Default for ClockEvents {
@@ -597,6 +602,7 @@ impl Default for ClockEvents {
             marquee: true,
             digit_slide: true,
             rain: true,
+            crow: true,
         }
     }
 }
@@ -611,6 +617,44 @@ impl ClockEvents {
             ClockEventKind::Marquee => self.marquee,
             ClockEventKind::DigitSlide => self.digit_slide,
             ClockEventKind::Rain => self.rain,
+            ClockEventKind::Crow => self.crow,
+        }
+    }
+}
+
+/// Bounded kinematic visitor diagnostics, independent of the timed animation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockCrowState {
+    pub visit_id: u64,
+    pub phase: ClockCrowPhase,
+    pub phase_tick: u64,
+    pub age_ticks: u64,
+    pub position_milli: [i32; 2],
+    pub facing_right: bool,
+    /// Digit slot, grid column, grid row of the intended foot support.
+    pub target: Option<[u8; 3]>,
+    pub hops: u32,
+    pub escapes: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClockCrowPhase {
+    Entering,
+    Perched,
+    Hopping,
+    Flying,
+    Leaving,
+}
+
+impl ClockCrowPhase {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Entering => "entering",
+            Self::Perched => "perched",
+            Self::Hopping => "hopping",
+            Self::Flying => "flying",
+            Self::Leaving => "leaving",
         }
     }
 }

@@ -12,6 +12,7 @@ The Duck upgrade (#69) adds calibrated platform planning and generated wall-tag 
 Rain (#79) adds variable showers and a passive floating rubber duck. Storm effects,
 flashlight/glow polish and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
+Crow (#84) adds a lightweight, independent visitor to the digit face.
 
 ## Layout
 
@@ -114,7 +115,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Marquee**, and **Rain** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, and **Rain** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -127,8 +128,8 @@ can also be changed live through **Pause → Clock Controls**, without relaunchi
 
 One global periodic schedule selects one enabled, eligible event, avoiding the previous
 kind when another is eligible. Adding event types does not multiply the trigger
-rate. Timed animations never overlap. Duck is an admission into a separately
-timed visit: admitting it immediately releases the animation slot into cooldown,
+rate. Timed animations never overlap. Duck and Crow are admissions into separately
+timed visits: admitting either from idle immediately releases the animation slot into cooldown,
 so an ordinary subsequent event can play on its course. After completion or cancellation, there is a shared
 2-second cooldown, followed by a new idle wait for periodic events. Digit Slide
 preserves the pending periodic deadline instead of restarting that wait; a
@@ -147,6 +148,76 @@ the Off profile still disables every automatic event.
 | `marquee` | Composed content motion and lighting, no physics | 12 s, including 0.75 s fades | 20 s |
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
+| `crow` | One kinematic visitor, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
+
+### Crow visitor
+
+Enable **Crow** in Clock settings, or select **Crow → Preview & Resume** in
+Clock Controls. Next Event includes it in the normal enabled-event cycle.
+Previewing a crow adds one visitor without cancelling an active animation;
+previewing it again leaves the existing visit and its deadline unchanged.
+Disabling the switch prevents future automatic admissions, not the current visit.
+
+The crow flies in above the face, lands on an exposed lit block, pauses, and
+occasionally hops along its row or flies to another digit. Only the topmost lit
+block in each digit column is a perch; feet use the rendered block's actual top.
+Time/format changes revalidate the target even while paused, without advancing
+its position or age. Falling, Meltdown, Digit Slide and Marquee withdraw the
+perches and make it depart. Rain and Color Cycle can coexist, as can a player or
+automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
+one-resident admission limit prevent lingering or accumulating birds.
+
+This is a **kinematic visual actor**, not a rigid body: it adds no Rapier bodies,
+colliders, fluid displacement or duck collisions. At most 24 candidate perches
+are inspected per update. Seeded choices and fixed-tick motion replay exactly.
+Flight lifts above the face before crossing and descending; moving-obstacle
+avoidance, physical reactions and player control remain future work.
+
+`clock state` exposes `crow` separately from the timed `event_kind`: visit ID,
+phase (`entering`, `perched`, `hopping`, `flying`, `leaving`), phase/age ticks,
+position, facing, target `[digit slot, column, row]`, hop and support-loss counts.
+The catalog's `blocked_by_crow` identifies a duplicate admission. From idle:
+
+```sh
+spacewars-cli clock trigger crow
+spacewars-cli clock wait --event crow --phase perched --timeout 10s
+spacewars-cli screenshot /tmp/clock-crow.png
+```
+
+With `--event crow`, an optional `--event-id` matches its stable **visit ID**,
+even if a later timed animation increments the global admission counter.
+As with other events, the guarded CLI trigger requires idle/unpaused gameplay;
+menu Preview or Next Event can add a crow during an existing animation.
+
+Headless captures use the production raster path and native text overlay, not
+device screenshots. The fixture also exports SVGs and covers portrait, flight,
+hopping, departure, Rain and player-duck coexistence:
+
+```sh
+SPACEWARS_CROW_ARTIFACTS=/tmp/clock-crow \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  clock_crow_renders
+```
+
+| Picade-sized hop | HyperPixel-sized perch |
+| --- | --- |
+| ![Crow hopping above Clock digits](screenshots/clock/picade-crow-hopping.png) | ![Crow perched on a Clock digit](screenshots/clock/hyperpixel-crow-perched.png) |
+
+**Device validation (2026-09-25):** Fast-deployed the matching release client/CLI
+to **sw-picade-2 only** (Pi 4, 1024×768, raster scale 2.0), without rebooting.
+Phase-aware captures verified entering, perched and hopping states, plus the
+same crow visit during Heavy Rain. A later automatic visit reported one
+support-loss escape and entered `leaving` during Meltdown. The kiosk remained
+on the new PID with no unexpected service restarts; live status returned
+60 FPS / 60 UPS during rain and at the final health check. The near-perch sample
+following screenshot capture was 57.5 FPS / 59.5 UPS, not a sustained benchmark.
+Existing Demo/Heavy Rain, 12-hour/date and 5% volume settings were preserved;
+the only saved-settings addition was `crow = true`.
+
+Actual device captures: [flight](screenshots/clock/picade-crow-flight-device.png),
+[perched](screenshots/clock/picade-crow-perched-device.png),
+[hopping](screenshots/clock/picade-crow-hopping-device.png), and
+[rain](screenshots/clock/picade-crow-rain-device.png).
 
 ### Managed floor and drain
 
@@ -608,9 +679,10 @@ floor. Holding does not repeat; menu/launch handoffs require released controls.
 The event name appears for two seconds of simulation time. Off disables automatic
 scheduling, not this manual action. Individual disabled events are skipped;
 if all are disabled, a brief “No events enabled” notice replaces no event.
-During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide and Rain without
+During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
-you to wait for the duck to leave (or take control and dismiss it). Preferences are unchanged. The Clock action protocol is version 7; `NextEvent`
+you to wait for the duck to leave (or take control and dismiss it). Another Crow
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 8; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1440,7 +1512,7 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **16** and reports scenario-instance revision,
+`clock state` uses schema version **18** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
 `exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
@@ -1522,17 +1594,17 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 16 and
-older requests are rejected. The internal Clock action payload is version 7;
-event ordinals 0–5 are unchanged and Rain is 6. Configure contains seven
+after completion or cancellation. Use matching client/CLI builds: schema 17 and
+older requests are rejected. The internal Clock action payload is version 8;
+event ordinals 0–6 are unchanged and Crow is 7. Configure contains eight
 switch bits, validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 and 1–32 message bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–6
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–7
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 17, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 18, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1549,8 +1621,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 17, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 18, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, or `crow`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification

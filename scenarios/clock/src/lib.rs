@@ -5,6 +5,9 @@ mod autonomous_tests;
 mod calendar;
 #[cfg(test)]
 mod calendar_tests;
+mod crow;
+#[cfg(test)]
+mod crow_tests;
 pub use calendar::ClockDate;
 #[cfg(test)]
 mod digit_slide_tests;
@@ -55,7 +58,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 7;
+pub const CLOCK_ACTION_VERSION: u16 = 8;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -152,7 +155,8 @@ impl ClockAction {
                 | (u8::from(settings.events.duck) << 3)
                 | (u8::from(settings.events.marquee) << 4)
                 | (u8::from(settings.events.digit_slide) << 5)
-                | (u8::from(settings.events.rain) << 6),
+                | (u8::from(settings.events.rain) << 6)
+                | (u8::from(settings.events.crow) << 7),
         );
         payload.push(settings.marquee_preset as u8);
         payload.push(settings.rain_amount as u8);
@@ -222,9 +226,7 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 9..=MAX_CONFIGURE_BYTES)
-                if payload[4] <= 127 && payload[7] <= 1 =>
-            {
+            (CLOCK_ACTION_CONFIGURE, 9..=MAX_CONFIGURE_BYTES) if payload[7] <= 1 => {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -245,6 +247,7 @@ impl ClockAction {
                         marquee: payload[4] & 16 != 0,
                         digit_slide: payload[4] & 32 != 0,
                         rain: payload[4] & 64 != 0,
+                        crow: payload[4] & 128 != 0,
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[6]))?,
@@ -411,6 +414,7 @@ pub struct ClockState {
     // One physical visit, independent of the event scheduler and command source.
     // Automatic ducks keep their own bounded lifetime; players may stay longer.
     duck_visit: Option<Box<events::duck::DuckEvent>>,
+    crow_visit: Option<crow::CrowVisit>,
     player_duck_sequence: u64,
     player_seed: u64,
 }
@@ -479,6 +483,7 @@ impl ClockState {
         // A resize changes both anchors and floor geometry. Recover immediately
         // instead of leaving bodies in the old arena or teleporting colliders.
         self.finish_duck_visit();
+        self.finish_crow_visit();
         if self.active_event.is_some() {
             self.finish_event();
         }
@@ -556,6 +561,24 @@ impl ClockState {
             _ => None,
         }
     }
+    pub fn crow_state(&self) -> Option<engine_common::ClockCrowState> {
+        self.crow_visit.as_ref().map(crow::CrowVisit::diagnostics)
+    }
+
+    pub fn event_blocked_by_crow(&self, kind: ClockEventKind) -> bool {
+        kind == ClockEventKind::Crow && self.crow_visit.is_some()
+    }
+
+    fn event_blocked(&self, kind: ClockEventKind) -> bool {
+        self.event_blocked_by_duck(kind) || self.event_blocked_by_crow(kind)
+    }
+
+    fn finish_crow_visit(&mut self) {
+        if self.crow_visit.take().is_some() {
+            self.schedule.retire(ClockEventKind::Crow);
+            self.sync_event_schedule();
+        }
+    }
     pub fn digit_slide_state(&self) -> Option<engine_common::ClockDigitSlideState> {
         match self.active_event.as_ref()? {
             ActiveEvent::DigitSlide(event) => Some(event.diagnostics()),
@@ -574,13 +597,17 @@ impl ClockState {
     }
 
     fn trigger_event(&mut self, kind: ClockEventKind) {
-        if self.can_trigger_event() && !self.event_blocked_by_duck(kind) {
+        if self.can_trigger_event() && !self.event_blocked(kind) {
             self.start_event(kind);
         }
     }
 
     fn preview_event(&mut self, kind: ClockEventKind) {
         if self.reading.is_some() {
+            if self.event_blocked_by_crow(kind) {
+                self.event_notice = Some(("Crow is already visiting", self.schedule.tick + 120));
+                return;
+            }
             if self.event_blocked_by_duck(kind) {
                 self.event_notice = Some((
                     if self.player_duck_session().is_some() {
@@ -594,7 +621,9 @@ impl ClockState {
             }
             // A deliberate preview replaces an event, including its temporary
             // physics/appearance, but keeps the instance, clock and event IDs.
-            self.finish_event();
+            if kind != ClockEventKind::Crow {
+                self.finish_event();
+            }
             self.start_event(kind);
         }
     }
@@ -607,7 +636,7 @@ impl ClockState {
         let start = self.last_started_event.map_or(0, |kind| kind as usize + 1);
         let next = (0..kinds.len())
             .map(|offset| kinds[(start + offset) % kinds.len()])
-            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked_by_duck(*kind));
+            .find(|kind| self.config.events.enabled(*kind) && !self.event_blocked(*kind));
         let message = if let Some(kind) = next {
             // The preview path owns cancellation/restoration for every event.
             // Manual cycling ignores automatic cooldowns, not enabled switches.
@@ -619,6 +648,8 @@ impl ClockState {
                 .any(|kind| self.config.events.enabled(kind))
         {
             "Waiting for the duck to leave"
+        } else if self.crow_visit.is_some() && self.config.events.crow {
+            "Crow is already visiting"
         } else {
             "No events enabled"
         };
@@ -634,9 +665,21 @@ impl ClockState {
         kind: ClockEventKind,
         previous_display: Option<DisplaySnapshot>,
     ) {
-        debug_assert!(!self.event_blocked_by_duck(kind));
+        debug_assert!(!self.event_blocked(kind));
         self.last_started_event = Some(kind);
         self.event_notice = None;
+        if kind == ClockEventKind::Crow {
+            let seed = self.schedule.admit_resident(kind);
+            self.crow_visit = Some(crow::CrowVisit::new(
+                Layout::new(self.aspect_ratio()),
+                seed,
+                self.schedule.event_id,
+                &self.segments,
+                self.event_kind(),
+            ));
+            self.sync_event_schedule();
+            return;
+        }
         let seed = self.schedule.start(kind);
         let layout = Layout::new(self.aspect_ratio());
         if kind == ClockEventKind::Duck {
@@ -785,6 +828,12 @@ impl ClockState {
         {
             self.finish_duck_visit();
         }
+        let kind = self.event_kind();
+        if let Some(crow) = &mut self.crow_visit
+            && crow.step(&self.segments, kind)
+        {
+            self.finish_crow_visit();
+        }
     }
 
     /// Reports whether the event already stepped the visit's mechanics world.
@@ -886,6 +935,7 @@ impl Scenario for ClockScenario {
             last_started_event: None,
             event_notice: None,
             duck_visit: None,
+            crow_visit: None,
             player_duck_sequence: 0,
             player_seed: seed ^ 0x504c_4159_4455_434b,
         }
@@ -905,7 +955,13 @@ impl Scenario for ClockScenario {
         }
         // The fixed-timestep host supplies one tick per call. Zero duration is
         // used to synchronize inputs/control actions without advancing physics.
-        if !dt.is_zero() {
+        if dt.is_zero() {
+            let kind = state.event_kind();
+            if let Some(crow) = &mut state.crow_visit {
+                crow.synchronize(&state.segments, kind);
+            }
+        } else {
+            // The visitor revalidates support after the timed event updates it.
             state.advance_tick();
         }
         StepResult::default()

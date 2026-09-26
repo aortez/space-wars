@@ -5,6 +5,74 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
+    run_functional_test("clock-crow", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_guarded("launcher.settings.clock.crow.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.crow.next"),
+            Some("Off")
+        );
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        assert_eq!(initial.profile, "off");
+        assert!(!initial.settings.events.crow);
+        // Explicit triggers work when the saved automatic switch is Off. The
+        // socket wait observes admission, not a narrow animation timing window.
+        harness.clock_trigger_event(&initial, ClockEventKind::Crow);
+        let predicate =
+            ClockTriggerRequest::new(&initial, ClockEventKind::Crow).started_predicate();
+        let result = harness
+            .client
+            .wait_for_clock_state(&predicate, TRANSITION_TIMEOUT);
+        let admitted = harness.require_clock("crow admission", result);
+        let visit_id = admitted.crow.unwrap().visit_id;
+        assert_eq!(admitted.event_kind, None);
+        assert_eq!((admitted.body_count, admitted.collider_count), (0, 0));
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        let page = harness.change_clock_setting("pause.clock.crow", "On", &page);
+        let configured = harness.clock_state();
+        assert!(configured.settings.events.crow);
+        assert_eq!(configured.crow, paused.crow);
+        // A second preview resumes, but does not replace/extend the resident.
+        let mut page = page;
+        for _ in 0..ClockEventKind::Crow as usize {
+            page = harness.activate_guarded("pause.clock.preview-event.next", &page);
+        }
+        assert_eq!(
+            control_value(&page, "pause.clock.preview-event.next"),
+            Some("Crow")
+        );
+        harness.capture_screenshot("clock-crow-controls.png");
+        harness.activate_guarded("pause.clock.preview", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        assert_eq!(harness.clock_state().crow.unwrap().visit_id, visit_id);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert!(restarted.crow.is_none());
+        assert_eq!(restarted.settings, configured.settings);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn digit_slide_controls_preview_cleanup_and_persistence() {
     run_functional_test("clock-digit-slide", |harness| {
         let state = harness.wait_until_ready();
@@ -142,6 +210,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.rain",
             "pause.clock.falling",
             "pause.clock.preview-event",
+            "pause.clock.crow",
             "pause.clock.marquee",
         ] {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -414,6 +483,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.color-cycle", "Off", &page);
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.crow", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -760,6 +830,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
+            "launcher.settings.clock.crow.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {
@@ -842,6 +913,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.color-cycle.next",
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
+            "launcher.settings.clock.crow.next",
             "launcher.settings.clock.marquee.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));
@@ -860,7 +932,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
 impl FunctionalHarness {
     fn assert_clock_stays_paused(&mut self, paused: &ClockState) {
         assert!(paused.paused);
-        assert!(paused.event_kind.is_some() || paused.duck.is_some());
+        assert!(paused.event_kind.is_some() || paused.duck.is_some() || paused.crow.is_some());
         let predicate = ClockStatePredicate {
             scenario_revision: paused.scenario_revision,
             lifecycle: Some(paused.lifecycle.clone()),

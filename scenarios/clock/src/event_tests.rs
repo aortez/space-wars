@@ -14,6 +14,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 marquee: false,
                 digit_slide: false,
                 rain: false,
+                crow: false,
             },
             ..ClockConfig::default()
         },
@@ -246,11 +247,11 @@ fn arena_side_walls_keep_falling_cell_geometry_inside_the_view() {
 
 #[test]
 fn timed_events_obey_the_same_lifecycle_and_cleanup_contract() {
-    // Duck admission has an independent visit/cooldown contract, covered in
-    // autonomous_tests; it deliberately does not occupy the timed-event slot.
+    // Resident visitors have independent admission/cooldown contracts, covered
+    // in autonomous_tests and crow_tests; neither occupies the timed-event slot.
     for definition in EVENT_CATALOG
         .into_iter()
-        .filter(|d| d.kind != ClockEventKind::Duck)
+        .filter(|d| !matches!(d.kind, ClockEventKind::Duck | ClockEventKind::Crow))
     {
         let kind = definition.kind;
         let mut state = ready(ClockEventProfile::Off, 9);
@@ -408,11 +409,13 @@ fn mixed_events_replay_schedule_color_and_physics_exactly() {
         assert_eq!(a.palette(), b.palette());
         assert_eq!(a.meltdown_state(), b.meltdown_state());
         assert_eq!(a.duck_state(), b.duck_state());
+        assert_eq!(a.crow_state(), b.crow_state());
         assert_eq!(a.marquee_state(), b.marquee_state());
         if let Some(kind) = a.event_kind() {
             seen[kind as usize] = true;
         }
         seen[ClockEventKind::Duck as usize] |= a.duck_state().is_some();
+        seen[ClockEventKind::Crow as usize] |= a.crow_state().is_some();
     }
     for definition in EVENT_CATALOG {
         assert_eq!(

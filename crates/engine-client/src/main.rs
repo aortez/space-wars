@@ -782,6 +782,7 @@ fn show_launcher(
     window.set_launcher_clock_color_cycle_enabled(settings.clock.events.color_cycle);
     window.set_launcher_clock_meltdown_enabled(settings.clock.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.clock.events.duck);
+    window.set_launcher_clock_crow_enabled(settings.clock.events.crow);
     window.set_launcher_clock_marquee_enabled(settings.clock.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.clock.events.digit_slide);
     window.set_launcher_clock_rain_enabled(settings.clock.events.rain);
@@ -1445,7 +1446,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 5,
-        "clock" => 14,
+        "clock" => 15,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1689,6 +1690,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 13 {
+        window.set_launcher_clock_crow_enabled(!window.get_launcher_clock_crow_enabled());
+        return;
+    }
     if focus == 12 {
         window.set_launcher_clock_show_date(!window.get_launcher_clock_show_date());
         return;
@@ -2300,6 +2305,7 @@ fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String>
             color_cycle: window.get_launcher_clock_color_cycle_enabled(),
             meltdown: window.get_launcher_clock_meltdown_enabled(),
             duck: window.get_launcher_clock_duck_enabled(),
+            crow: window.get_launcher_clock_crow_enabled(),
             marquee: window.get_launcher_clock_marquee_enabled(),
             digit_slide: window.get_launcher_clock_digit_slide_enabled(),
             rain: window.get_launcher_clock_rain_enabled(),
@@ -3145,6 +3151,7 @@ mod tests {
                     marquee: false,
                     digit_slide: false,
                     rain: false,
+                    crow: false,
                 },
                 marquee_preset: engine_common::ClockMarqueePreset::TextRibbon,
                 marquee_message: "CUSTOM TEXT".parse().unwrap(),

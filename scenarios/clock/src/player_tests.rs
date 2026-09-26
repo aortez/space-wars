@@ -20,6 +20,7 @@ fn ready(aspect: f32, seed: u64) -> ClockState {
                 falling: false,
                 meltdown: false,
                 rain: false,
+                crow: false,
                 ..Default::default()
             },
             ..Default::default()
@@ -210,6 +211,7 @@ fn disabled_events_and_off_profile_do_not_disable_player_visits_or_change_prefer
         marquee: false,
         digit_slide: false,
         rain: false,
+        crow: false,
     };
     ClockScenario::step(
         &mut state,

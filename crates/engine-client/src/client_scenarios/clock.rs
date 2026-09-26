@@ -223,6 +223,7 @@ impl ClientScenario for ClockClientScenario {
                     enabled: self.state.event_enabled(event.kind),
                     blocked_by_player: self.state.event_blocked_by_player(event.kind),
                     blocked_by_duck: self.state.event_blocked_by_duck(event.kind),
+                    blocked_by_crow: self.state.event_blocked_by_crow(event.kind),
                     automatic_ready_at_tick: self.state.event_ready_at_tick(event.kind),
                 })
                 .collect(),
@@ -235,6 +236,7 @@ impl ClientScenario for ClockClientScenario {
             floor: self.state.floor_mode(),
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
+            crow: self.state.crow_state(),
             player_duck: self.state.player_duck_state(),
             automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),

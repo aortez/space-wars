@@ -619,6 +619,9 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
             assert_eq!(state.last_started_event, Some(kind));
             if kind == ClockEventKind::Duck {
                 assert!(state.duck_state().is_some());
+            } else if kind == ClockEventKind::Crow {
+                assert!(state.crow_state().is_some());
+                assert_eq!(state.event_kind(), Some(ClockEventKind::Rain));
             } else {
                 assert_eq!(state.event_kind(), Some(kind));
             }

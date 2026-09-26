@@ -668,6 +668,15 @@ fn validate_clock_trigger(
             ControlFailureCode::ActionUnavailable,
             "This event needs the duck's arena; wait for departure, or take control and dismiss the duck",
         ))
+    } else if clock
+        .events
+        .iter()
+        .any(|event| event.kind == request.event && event.blocked_by_crow)
+    {
+        Some((
+            ControlFailureCode::ActionUnavailable,
+            "A crow is already visiting; wait for departure",
+        ))
     } else if !clock.can_trigger {
         Some((
             ControlFailureCode::ActionUnavailable,
@@ -988,6 +997,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),
             clock_meltdown_enabled: window.get_launcher_clock_meltdown_enabled(),
             clock_duck_enabled: window.get_launcher_clock_duck_enabled(),
+            clock_crow_enabled: window.get_launcher_clock_crow_enabled(),
             clock_marquee_enabled: window.get_launcher_clock_marquee_enabled(),
             clock_digit_slide_enabled: window.get_launcher_clock_digit_slide_enabled(),
             clock_rain: if window.get_launcher_clock_rain_enabled() {
@@ -1126,6 +1136,27 @@ mod tests {
                 result.unwrap();
             }
         }
+        scenario.step(
+            &[ClockAction::preview_event(ClockEventKind::Crow)],
+            Duration::ZERO,
+        );
+        for _ in 0..121 {
+            scenario.step(&[], Duration::from_millis(16));
+        }
+        clock = scenario.clock_state().unwrap();
+        clock.scenario_revision = 7;
+        assert!(clock.can_trigger);
+        let request = ClockTriggerRequest::new(&clock, ClockEventKind::Crow);
+        let failure = validate_clock_trigger(&request, &ui, &clock).unwrap_err();
+        assert_eq!(failure.code, ControlFailureCode::ActionUnavailable);
+        assert!(failure.message.contains("crow is already visiting"));
+        assert_eq!(failure.current_clock_state, Some(clock.clone()));
+        validate_clock_trigger(
+            &ClockTriggerRequest::new(&clock, ClockEventKind::Rain),
+            &ui,
+            &clock,
+        )
+        .unwrap();
         let request = ClockTriggerRequest::new(&clock, ClockEventKind::Marquee);
         ui.screen = UiScreen::PauseMain;
         assert_eq!(

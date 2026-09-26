@@ -33,7 +33,7 @@ pub enum ClockCommand {
     },
     /// Preview an event from idle, including with Off or that event disabled.
     Trigger {
-        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide or rain.
+        /// Event ID: falling, color-cycle, meltdown, duck, marquee, digit-slide, rain or crow.
         #[arg(value_parser = parse_event)]
         event: ClockEventKind,
         /// Reject a stale Clock instance; defaults to the current instance.
@@ -53,10 +53,11 @@ pub enum ClockCommand {
     Wait {
         #[arg(long, value_parser = ["idle", "active", "cooldown"])]
         lifecycle: Option<String>,
-        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing"])]
+        #[arg(long, value_parser = ["falling", "reforming", "cycling", "melting", "draining", "opening", "running", "exiting", "resetting", "presenting", "sliding", "raining", "clearing", "entering", "perched", "hopping", "flying", "leaving"])]
         phase: Option<String>,
         #[arg(long, value_parser = parse_event)]
         event: Option<ClockEventKind>,
+        /// Admission ID; with --event crow, matches its stable visit ID.
         #[arg(long)]
         event_id: Option<u64>,
         #[arg(long, default_value_t = 0)]
@@ -103,7 +104,7 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
             } else {
                 for event in state.events {
                     println!(
-                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={})",
+                        "{} — {} ({}, {} ticks; trigger={}, automatic={}, reuse delay={} ticks, ready at={}, blocked by duck={}, blocked by crow={})",
                         event.kind.as_str(),
                         event.label,
                         event.effect,
@@ -112,7 +113,8 @@ pub fn run(client: &ControlClient, command: ClockCommand) -> Result<(), CliError
                         event.enabled,
                         event.cooldown_ticks,
                         event.automatic_ready_at_tick,
-                        event.blocked_by_duck
+                        event.blocked_by_duck,
+                        event.blocked_by_crow
                     );
                 }
             }
@@ -258,6 +260,19 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         );
         if let Some(error) = &state.settings_error {
             println!("Settings warning: {error}");
+        }
+        if let Some(crow) = &state.crow {
+            println!(
+                "Crow #{}: {}, age={} phase tick={}, position={:?}, target={:?}, hops={}, escapes={}",
+                crow.visit_id,
+                crow.phase.as_str(),
+                crow.age_ticks,
+                crow.phase_tick,
+                crow.position_milli,
+                crow.target,
+                crow.hops,
+                crow.escapes
+            );
         }
         let world_vector =
             |value: Option<[i32; 2]>| value.map(|[x, y]| [x as f64 / 1000.0, y as f64 / 1000.0]);

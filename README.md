@@ -33,7 +33,7 @@ The local launcher includes the following scenarios and presets:
   seven-segment square cells. The deterministic scenario receives versioned
   clock readings from its client adapter. Lit segments occasionally fall as
   rigid bars, collide with the floor, and reform with the latest time. Choose
-  Off, Calm, or Demo in Settings and enable Falling, Color Cycle, Meltdown, Duck,
+  Off, Calm, or Demo in Settings and enable Falling, Color Cycle, Meltdown, Duck, Crow,
   Marquee, Digit Slide, and Rain individually. Rain has Light/Medium/Heavy/Varied
   amounts and a passive rubber duck that floats with the current into the drain.
   Events share a deterministic, non-overlapping schedule; Color Cycle changes
@@ -41,6 +41,8 @@ The local launcher includes the following scenarios and presets:
   a bounded pool that drains through the floor before the face reforms.
   Duck runs and jumps a tiny seeded obstacle course beneath the readable clock,
   using one dynamic body and guaranteed arena cleanup.
+  A lightweight crow flies in, perches and hops on lit digit tops, then leaves;
+  it takes flight when its support disappears and adds no physics bodies.
   **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
   a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
   (Picade: bottom-middle yellow). Falling, Meltdown, Color Cycle, Marquee, Digit Slide and Rain

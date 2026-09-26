@@ -9,6 +9,124 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn clock_crow_renders_visible_perches_hops_and_shared_events_on_device_layouts() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    let output = std::env::var_os("SPACEWARS_CROW_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        for name in ["entering", "perched", "hopping", "rain", "duck", "leaving"] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: viewport.aspect_ratio(),
+                    event_profile: ClockEventProfile::Off,
+                    rain_amount: engine_common::ClockRainAmount::Heavy,
+                    show_date: true,
+                    ..Default::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(12, 34, 0)
+                        .unwrap()
+                        .with_date(ClockDate::new(2026, 9, 25).unwrap()),
+                )],
+                Duration::ZERO,
+            );
+            let baseline = crate::thruster_visual_tests::raster(
+                &ClockScenario::render_frame(&state),
+                viewport,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Crow)],
+                Duration::ZERO,
+            );
+            let ticks = if name == "entering" { 65 } else { 105 };
+            for _ in 0..ticks {
+                ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+            }
+            if name == "hopping" {
+                for _ in 0..400 {
+                    if state
+                        .crow_state()
+                        .is_some_and(|c| c.phase.as_str() == "hopping" && c.phase_tick >= 12)
+                    {
+                        break;
+                    }
+                    ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+                }
+                assert_eq!(state.crow_state().unwrap().phase.as_str(), "hopping");
+            } else if matches!(name, "rain" | "duck" | "leaving") {
+                let action = match name {
+                    "rain" => ClockAction::preview_event(ClockEventKind::Rain),
+                    "duck" => ClockAction::toggle_player_duck(1),
+                    _ => ClockAction::preview_event(ClockEventKind::Falling),
+                };
+                ClockScenario::step(&mut state, &[action], Duration::ZERO);
+                for _ in 0..if name == "leaving" { 20 } else { 180 } {
+                    ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+                }
+            } else {
+                assert_eq!(state.crow_state().unwrap().phase.as_str(), name);
+            }
+            assert!(state.crow_state().is_some());
+            let frame = ClockScenario::render_frame(&state);
+            let pixels = crate::thruster_visual_tests::raster(&frame, viewport);
+            if matches!(name, "entering" | "perched" | "hopping") {
+                let changed = pixels
+                    .as_slice()
+                    .iter()
+                    .zip(baseline.as_slice())
+                    .filter(|(a, b)| a != b)
+                    .count();
+                assert!(
+                    changed > 80,
+                    "{width}x{height} {name}: crow must reach visible pixels, got {changed}"
+                );
+            }
+            let vector = crate::thruster_visual_tests::svg(&frame, viewport);
+            assert!(!vector.contains("NaN") && !vector.contains("inf"));
+            reset_panels(&ui);
+            let overlay = crate::render::raster_text_overlay(
+                std::slice::from_ref(&frame),
+                viewport,
+                FrameLayout::EqualHorizontal,
+            );
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(pixels));
+            ui.set_primitives(Rc::new(slint::VecModel::from(overlay)).into());
+            let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(screenshot.make_mut_slice(), width as usize);
+            });
+            if let Some(output) = &output {
+                let stem = format!("crow-{width}x{height}-{name}");
+                crate::thruster_visual_tests::write_png(
+                    &output.join(format!("{stem}.png")),
+                    &screenshot,
+                );
+                std::fs::write(output.join(format!("{stem}.svg")), vector).unwrap();
+            }
+        }
+    }
+}
+
+#[test]
 fn clock_calendar_date_renders_in_band_through_native_text_overlay() {
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{ClockEventKind, ClockEventProfile, Scenario};

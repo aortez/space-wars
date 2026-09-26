@@ -57,13 +57,18 @@ fn next_cycles_enabled_events_in_all_profiles_without_changing_preferences() {
             .into_iter()
             .filter(|kind| settings.events.enabled(*kind))
             .collect();
-        let repeated = enabled.iter().filter(|kind| **kind != ClockEventKind::Duck);
+        let repeated = enabled
+            .iter()
+            .filter(|kind| !matches!(kind, ClockEventKind::Duck | ClockEventKind::Crow));
         for kind in enabled.iter().chain(repeated) {
             next(&mut state);
             assert_eq!(state.last_started_event, Some(*kind));
             if *kind == ClockEventKind::Duck {
                 assert!(state.duck_state().is_some());
                 assert_eq!(state.event_kind(), None);
+            } else if *kind == ClockEventKind::Crow {
+                assert!(state.crow_state().is_some());
+                assert_eq!(state.event_kind(), Some(ClockEventKind::Rain));
             } else {
                 assert_eq!(state.event_kind(), Some(*kind));
             }
@@ -83,6 +88,7 @@ fn no_enabled_events_is_a_bounded_noop_and_feedback_expires_only_while_running()
         marquee: false,
         digit_slide: false,
         rain: false,
+        crow: false,
     };
     next(&mut state);
     assert_eq!(state.event_id(), 0);
@@ -127,6 +133,7 @@ fn replacing_each_live_event_recovers_its_resources_and_keeps_the_latest_time() 
             marquee: false,
             digit_slide: false,
             rain: false,
+            crow: false,
         };
         ClockScenario::step(
             &mut state,
@@ -184,6 +191,7 @@ fn next_after_automatic_or_preview_events_follows_the_last_started_kind() {
             marquee: true,
             digit_slide: true,
             rain: true,
+            crow: true,
         };
         ClockScenario::step(
             &mut state,

@@ -22,6 +22,7 @@ pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
     window.set_launcher_clock_color_cycle_enabled(settings.events.color_cycle);
     window.set_launcher_clock_meltdown_enabled(settings.events.meltdown);
     window.set_launcher_clock_duck_enabled(settings.events.duck);
+    window.set_launcher_clock_crow_enabled(settings.events.crow);
     window.set_launcher_clock_marquee_enabled(settings.events.marquee);
     window.set_launcher_clock_digit_slide_enabled(settings.events.digit_slide);
     window.set_launcher_clock_rain_enabled(settings.events.rain);
@@ -139,6 +140,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
 fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
     match index {
         13 => settings.show_date = !settings.show_date,
+        14 => settings.events.crow = !settings.events.crow,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -220,7 +222,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=13) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=14) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),

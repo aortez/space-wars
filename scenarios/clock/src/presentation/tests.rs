@@ -444,7 +444,7 @@ fn resize_and_preview_replacement_release_content_and_restore_latest_time() {
         );
         assert_eq!(
             state.marquee_state().is_some(),
-            kind == ClockEventKind::Marquee
+            matches!(kind, ClockEventKind::Marquee | ClockEventKind::Crow)
         );
         state.set_aspect_ratio(0.75);
         assert_eq!(state.marquee_state(), None);
