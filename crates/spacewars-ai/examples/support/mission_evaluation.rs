@@ -2,7 +2,7 @@ use engine_core::planning::Work;
 use scenario_spacewars::{PlayerId, surface_sortie::mission::MissionObservationV1};
 use serde_json::{Value, json};
 use spacewars_ai::{
-    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator},
+    mission_evaluation::{DEFAULT_WORK, MODEL, MissionEvaluator, model_for_policy},
     mission_pilot::MissionTelemetry,
 };
 use std::{
@@ -81,8 +81,10 @@ impl EvaluationRun {
     }
     pub fn report(&mut self) -> Value {
         self.file.flush().unwrap();
-        json!({
-            "model":MODEL, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| super::arg(flag, "material_mission_v9") == "material_mission_v12"), "requested_shared_budget":self.budget,
+        let models = ["--p1-policy", "--p2-policy"]
+            .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
+        let mut report = json!({
+            "model":if models[0] == models[1] { models[0] } else { "mixed" }, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| matches!(super::arg(flag, "material_mission_v9").as_str(), "material_mission_v12" | "material_mission_v13")), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,
@@ -90,6 +92,10 @@ impl EvaluationRun {
             "construction":super::timing(self.construction_ms.clone()),
             "dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"candidate evaluation only; zero world queries; dispatched after existing planning; synchronous sensors and bounded snapshot construction are outside charged work"
-        })
+        });
+        if models != [MODEL; 2] {
+            report["models_by_seat"] = json!(models);
+        }
+        report
     }
 }

@@ -185,8 +185,8 @@ impl MaterialMissionPilot {
                 combat: None,
                 pursuit: None,
                 disengagement: None,
-                destination_planning: (policy
-                    == crate::mission_policy::MissionPolicy::DestinationPlanner)
+                destination_planning: policy
+                    .selects_destination()
                     .then(DestinationPlanningTelemetry::default),
             },
             capture: None,
@@ -324,14 +324,16 @@ impl MaterialMissionPilot {
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
         self.intent_with_continuation(o, None)
     }
-    /// Experimental v12 consumes only a completed, revalidated comparison.
+    /// Experimental destination policies consume only a completed, revalidated comparison.
     /// Other identities follow their original path even when evidence is ready.
     pub fn intent_with_evaluation(
         &mut self,
         o: &MissionObservationV1,
         evaluator: &crate::mission_evaluation::MissionEvaluator,
     ) -> CombatIntent {
-        let selection = (self.policy == crate::mission_policy::MissionPolicy::DestinationPlanner)
+        let selection = self
+            .policy
+            .selects_destination()
             .then(|| evaluator.selection(o, &self.telemetry))
             .flatten();
         self.intent_with_planning(o, None, selection)

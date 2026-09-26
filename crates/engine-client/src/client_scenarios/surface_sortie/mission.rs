@@ -130,6 +130,7 @@ fn create_with_seats(
                         engine_common::SpacewarsController::DestinationBot => {
                             MissionPolicy::DestinationPlanner
                         }
+                        engine_common::SpacewarsController::ValueBot => MissionPolicy::ValuePlanner,
                         _ => MissionPolicy::Legacy,
                     }
                 } else {
@@ -311,9 +312,12 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_evaluation_model={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}",
+                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}",
                 self.profile.diagnostics(&self.pilots),
-                spacewars_ai::mission_evaluation::MODEL,
+                serde_json::to_string(&self.pilots.each_ref().map(|p| {
+                    spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
+                }))
+                .unwrap(),
                 self.evaluation.charged_total,
                 serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_1)).unwrap(),
                 serde_json::to_string(&self.evaluation.latest(PlayerId::PLAYER_2)).unwrap(),
@@ -336,7 +340,9 @@ impl ClientScenario for MaterialMissionClientScenario {
 mod tests {
     use super::*;
     use crate::input::{GamepadInput, GamepadSeatInput};
-    use engine_common::SpacewarsController::{DestinationBot, Human, PlannerBot, RuleBot};
+    use engine_common::SpacewarsController::{
+        DestinationBot, Human, PlannerBot, RuleBot, ValueBot,
+    };
     use scenario_spacewars::surface_sortie::match_rules::{MatchEndReason, MatchOutcome};
     use std::{cell::RefCell, rc::Rc};
 
@@ -484,6 +490,11 @@ mod tests {
             [PlannerBot, PlannerBot],
             [PlannerBot, RuleBot],
             [RuleBot, PlannerBot],
+            [ValueBot, Human],
+            [Human, ValueBot],
+            [ValueBot, ValueBot],
+            [ValueBot, DestinationBot],
+            [DestinationBot, ValueBot],
             [DestinationBot, Human],
             [Human, DestinationBot],
             [DestinationBot, DestinationBot],
@@ -522,6 +533,7 @@ mod tests {
                 let policy = match controller {
                     PlannerBot => MissionPolicy::Planner,
                     DestinationBot => MissionPolicy::DestinationPlanner,
+                    ValueBot => MissionPolicy::ValuePlanner,
                     _ => MissionPolicy::Legacy,
                 };
                 assert_eq!(client.pilots[seat].telemetry().policy, policy.id());
