@@ -150,14 +150,14 @@ in the patch. The diagnostic model reports `observational: true`.
 
 ## Next investigation
 
-Keep this evidence observational. Before connecting enemy alternatives to v13's
-value comparison, record which changed geometry invalidates these completed
-routes and whether it affects the actual landing, hull, hatch, climb or walking
-queries. The current whole-planet validation is deliberately conservative;
-its rejection alone cannot distinguish a blocked route from irrelevant motion.
-Any narrower validation must still detect new obstacles and changed long-body
-rotations across all those query footprints. Retain these worlds as regressions
-and use new predeclared worlds for any later behavior or strength comparison.
+The [geometry investigation](capture-flag-geometry.md) now explains both recorded
+rejections: all changed colliders touching the broad circular gate lie outside
+the eight conservative source envelopes. Acceptance and controls are unchanged.
+Before connecting enemy alternatives to v13's value comparison, prove complete
+local dependencies for their positive queries and non-query predicates. Narrower
+validation must still detect new obstacles and changed long-body rotations, with
+the original source age. Retain these worlds as regressions and use new
+predeclared worlds for any later behavior or strength comparison.
 
 ## Reproduction
 
