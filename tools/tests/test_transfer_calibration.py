@@ -85,6 +85,26 @@ class CalibrationAudit(unittest.TestCase):
             self.assertEqual(result['deferred_observations'], 1)
             self.assertEqual(result['deferred_executed_observations'], 0)
 
+    def test_missing_body_contact_diagnostics_preserve_loss(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case, normal, controlled = pair_fixture(Path(tmp))
+            for root in [normal, controlled]:
+                probe = C.T.rows(root / 'transfer-probe.jsonl')
+                probe[-1].update(ship_available=False, solver_contacts=None, goal='recover', recovery_active=True, arrived=False)
+                probe[-1]['terminal']['reason'] = 'ship_or_pilot_lost'
+                (root / 'transfer-probe.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in probe))
+                report = json.loads((root / 'report.json').read_text())
+                report['transfer_probe']['outcome'] = probe[-1]['terminal']
+                (root / 'report.json').write_text(json.dumps(report))
+                raw = list(C.read_trace(root))
+                raw[-2]['landing_diagnostics'] = None
+                raw[-2]['observation']['local']['combat']['recovery']['flight']['pilot']['ship_available'] = False
+                raw[-2]['mission'].update(goal='recover', recovery={}, events=[])
+                with gzip.open(root / 'trace.jsonl.gz', 'wt') as f:
+                    f.writelines(json.dumps(r)+'\n' for r in raw)
+            result = C.audit_pair(case, normal, controlled)
+            self.assertEqual(result['controlled_outcome']['reason'], 'ship_or_pilot_lost')
+
     def test_no_suppression_cannot_hide_a_terminal_physical_change(self):
         with tempfile.TemporaryDirectory() as tmp:
             case, normal, controlled = pair_fixture(Path(tmp))

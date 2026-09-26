@@ -79,8 +79,14 @@ def audit_controls(case, root, trace):
         arrived = any(e['tick'] == r['tick'] and e['kind'] == 'arrived' and e['planet'] == case['destination'] for e in m['events'])
         assert r['arrived'] == arrived
         contacts = r['solver_contacts']
-        if c: assert all(contacts[k] == c['landing_diagnostics'][k] for k in ['hull', 'feet', 'landing'])
-        assert r['solver_contact'] == (contacts['hull']['count'] > 0 or any(f['count'] > 0 for f in contacts['feet']))
+        if contacts is None:
+            if c: assert c['landing_diagnostics'] is None
+            assert not r['solver_contact']
+            assert r['terminal'] and r['terminal']['reason'] in {'ship_or_pilot_lost', 'match_finished'}
+            assert r['match_finished'] or not r['ship_available'] or r['health'] <= 0 or r['form'] != 'ship' or r['location'] == 'on_foot'
+        else:
+            if c: assert all(contacts[k] == c['landing_diagnostics'][k] for k in ['hull', 'feet', 'landing'])
+            assert r['solver_contact'] == (contacts['hull']['count'] > 0 or any(f['count'] > 0 for f in contacts['feet']))
         assert r['debris_contact'] == ((r['damage']['last_contact_tick'] or 0) > case['source_tick'])
     return len(trace)
 
