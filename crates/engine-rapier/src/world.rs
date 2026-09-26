@@ -223,7 +223,7 @@ pub struct CompoundChild {
     pub angle: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct CollisionGroups {
     pub memberships: u32,
     pub filter: u32,

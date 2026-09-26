@@ -222,7 +222,26 @@ pub(super) fn measure(
     sample_climb: bool,
     fuel: &QueryFuel,
 ) -> CoverMeasurement {
-    let site = state.vehicle_landing_site_with_queries(player, id, false, || fuel.charge());
+    measure_with_query_observer(state, player, id, enemy, sample_climb, fuel, |_| {})
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn measure_with_query_observer(
+    state: &SurfaceSortieState,
+    player: usize,
+    id: pilot::LandingSiteId,
+    enemy: Option<combat::CombatTarget>,
+    sample_climb: bool,
+    fuel: &QueryFuel,
+    record: impl Fn(pilot::LandingQuery),
+) -> CoverMeasurement {
+    let site = state.vehicle_landing_site_with_query_observer(player, id, false, |query| {
+        if !fuel.charge() {
+            return false;
+        }
+        record(query);
+        true
+    });
     let armed = enemy.is_some_and(|e| {
         let p = &state.pilots[e.owner.index()];
         p.body.is_none() && state.world.ships[p.vehicle.0].form == ShipForm::Ship
@@ -236,12 +255,17 @@ pub(super) fn measure(
         .filter(|_| sample_climb && !fuel.exhausted())
         .map(|site| {
             [7.0, 30.0, 60.0].into_iter().all(|height| {
-                fuel.charge()
-                    && state.world.physics.surface_hull_fits_at(
-                        state.pilots[player].vehicle.0,
-                        site.vehicle_position + site.normal * height,
-                        rotation_for_direction(site.normal),
-                    )
+                if !fuel.charge() {
+                    return false;
+                }
+                let position = site.vehicle_position + site.normal * height;
+                let angle = rotation_for_direction(site.normal);
+                record(pilot::LandingQuery::Hull { position, angle });
+                state.world.physics.surface_hull_fits_at(
+                    state.pilots[player].vehicle.0,
+                    position,
+                    angle,
+                )
             })
         });
     let finding = if fuel.exhausted() {

@@ -184,12 +184,20 @@ fn tiny_rotation_of_a_long_collider_revokes_publication() {
     let p = observation(&state, 0).planets[1].clone();
     let entity = PhysicsId::new(987654322);
     let body = RapierBodyId::new(entity, BodyRole::PRIMARY);
-    let origin = p.motion.position + Vec2::new(70.0, 10000.0);
+    let site = state
+        .vehicle_landing_site(0, request.candidates[0], false)
+        .unwrap();
+    // The long collider starts between the +7/+30 climb poses, inside their
+    // captured hull union but without obstructing either original query.
+    let direction = Vec2::new(site.normal.y, -site.normal.x);
+    let angle = rotation_for_direction(direction);
+    let origin = site.vehicle_position + site.normal * 18.0 + direction * 10000.0;
     assert!(state.world.physics.world.insert_body(
         body,
         BodySpec {
             kind: BodyKind::Fixed,
             position: origin,
+            angle,
             ..Default::default()
         },
         &[ColliderSpec::cuboid(
@@ -206,7 +214,7 @@ fn tiny_rotation_of_a_long_collider_revokes_publication() {
         .world
         .physics
         .world
-        .set_pose(body, origin, 0.00001, true);
+        .set_pose(body, origin, angle + 0.00001, true);
     state.world.physics.world.step(1.0 / 60.0);
     let region = || QueryRegion {
         previous_position: p.motion.position,
@@ -293,6 +301,12 @@ fn patch_finishes_under_real_quota_in_both_seats_and_is_read_only() {
             sample.completed_tick - sample.source_tick
         );
         assert_eq!(sample.reason, None);
+        assert!(
+            sample
+                .validation
+                .as_ref()
+                .is_some_and(|v| v.complete && v.predicates_valid && v.geometry.valid)
+        );
         assert!(sample.geometry.is_none());
         assert_eq!(planner.telemetry().geometry_diagnostics, 0);
         assert!(sample.graph < MAX_FLAG_SURVEY_AGE);
@@ -301,6 +315,344 @@ fn patch_finishes_under_real_quota_in_both_seats_and_is_read_only() {
         assert_eq!(sample.route.as_ref().unwrap().outbound.jumps, 0);
         assert_eq!(state.world.physics.world.snapshot_bytes().unwrap(), before);
     }
+}
+
+fn completed_source(
+    empty_other_vehicle: bool,
+) -> (
+    SurfaceSortieState,
+    PilotObservationV1,
+    Pending,
+    ObjectiveSurveyJob,
+    LandingObjectiveRoute,
+) {
+    let (mut state, request) = fixture(0);
+    if empty_other_vehicle {
+        let other = state.pilots[1].vehicle.0;
+        let entity = state.world.physics.surface_vehicle_entity(other);
+        let roles: std::collections::BTreeSet<_> = state
+            .world
+            .physics
+            .world
+            .collider_ids()
+            .filter(|c| c.entity == entity)
+            .map(|c| c.role)
+            .collect();
+        for role in roles {
+            assert!(state.world.physics.world.replace_colliders(
+                state.world.physics.ship_body(other),
+                role,
+                &[]
+            ));
+        }
+    }
+    freeze(&mut state);
+    let mut planner = FlagSurveyPlanner::new(2);
+    tick(&mut state, &mut planner, 0, request, WORK);
+    let actor = &planner.actors[&0];
+    let mut pending = actor.pending.as_ref().unwrap().clone();
+    let mut p = actor.pilot.clone();
+    // A tighter interaction range prevents this controlled fixture's hatch
+    // node from already being a destination. Runtime rules are unchanged.
+    p.planet.claim.as_mut().unwrap().flag_interaction_range = 1.2;
+    p.sites = vec![pending.sample.measurement.site.unwrap()];
+    let objective = LandingObjective::read(&p).unwrap();
+    let center = ((-objective.position.x)
+        .atan2(objective.position.y)
+        .rem_euclid(std::f32::consts::TAU)
+        * ground_navigation::GROUND_SAMPLES as f32
+        / std::f32::consts::TAU)
+        .round() as u16
+        % ground_navigation::GROUND_SAMPLES as u16;
+    let mut job = state
+        .objective_job_with_planning(
+            0,
+            &p,
+            &[],
+            Arc::clone(&pending.snapshot),
+            None,
+            false,
+            ObjectivePlanning::JointRoundTrip,
+        )
+        .unwrap()
+        .with_walk_patch(center, PATCH_HALF_WIDTH);
+    pending.source = local::Source::new(&state, 0, &p, pending.source.footprint.clone());
+    while job.next_work().is_some() {
+        job.step();
+    }
+    let route = job.output().unwrap().sites[0].clone();
+    assert!(route.cost().is_some());
+    assert!(
+        route.outbound.length > 2.0,
+        "exercise several outward edges (the endpoint is already in boarding range): {route:?}"
+    );
+    (state, p, pending, job, route)
+}
+
+fn freeze(state: &mut SurfaceSortieState) {
+    let bodies: Vec<_> = state.world.physics.world.motions().map(|b| b.id).collect();
+    for body in bodies {
+        state
+            .world
+            .physics
+            .world
+            .set_body_kind(body, BodyKind::Fixed, true);
+    }
+    state.world.physics.world.step(1.0 / 60.0);
+}
+
+fn blocker(state: &mut SurfaceSortieState, point: Vec2) -> (RapierBodyId, ColliderId) {
+    let entity = PhysicsId::new(987654323);
+    let body = RapierBodyId::new(entity, BodyRole::PRIMARY);
+    let collider = ColliderId::new(entity, ColliderRole::PRIMARY, 0);
+    assert!(state.world.physics.world.insert_body(
+        body,
+        BodySpec {
+            kind: BodyKind::Fixed,
+            position: point,
+            ..Default::default()
+        },
+        &[ColliderSpec::ball(collider, 0.05)]
+    ));
+    (body, collider)
+}
+
+#[test]
+fn local_capture_covers_nonzero_walk_and_every_query_class() {
+    let (state, p, pending, job, route) = completed_source(false);
+    let base = pending
+        .source
+        .validate(&state, 0, &p, &pending, &job, &route);
+    assert!(base.complete && base.predicates_valid && base.geometry.valid);
+    assert_eq!(base.source_areas.len(), 5);
+    assert!(base.captured_queries > 0 && base.walking_queries > 0);
+    for area in &base.source_areas {
+        let mut changed = state.clone();
+        let point = p.planet.motion.position
+            + ((area.minimum + area.maximum) * 0.5).rotate_radians(p.planet.motion.angle);
+        blocker(&mut changed, point);
+        let check = pending
+            .source
+            .validate(&changed, 0, &p, &pending, &job, &route);
+        assert!(check.predicates_valid, "{:?}", check.predicate_failure);
+        assert!(
+            !check.geometry.valid,
+            "new obstacle inside captured area {area:?}"
+        );
+    }
+}
+
+#[test]
+fn unrelated_motion_inside_old_circle_can_publish_with_identical_work() {
+    let (mut state, request) = fixture(0);
+    freeze(&mut state);
+    let frame = observation(&state, 0).planets[1].motion;
+    // The opposite hemisphere is in the old planetary gate but outside the
+    // actual landing and flag-patch queries.
+    let up = request.objective.position.normalized();
+    let (body, _) = blocker(&mut state, frame.position - up * 65.0);
+    state.world.physics.world.step(1.0 / 60.0);
+    let mut planner = FlagSurveyPlanner::new(2);
+    tick(&mut state, &mut planner, 0, request, WORK);
+    let mut baseline = planner.clone();
+    let mut original = state.clone();
+    state
+        .world
+        .physics
+        .world
+        .set_pose(body, frame.position - up * 66.0, 0.0, true);
+    state.world.physics.world.step(1.0 / 60.0);
+    for _ in 0..MAX_FLAG_SURVEY_AGE {
+        assert_eq!(
+            tick(&mut state, &mut planner, 0, request, WORK),
+            tick(&mut original, &mut baseline, 0, request, WORK)
+        );
+        if !planner.samples().is_empty() {
+            break;
+        }
+    }
+    let sample = planner.samples()[0];
+    assert_eq!(sample.reason, None);
+    assert!(!sample.geometry.as_ref().unwrap().acceptance_prefix.valid);
+    assert!(sample.validation.as_ref().unwrap().geometry.valid);
+    assert_eq!(planner.telemetry().local_rescued, 1);
+    assert_eq!(sample.source_tick, baseline.samples()[0].source_tick);
+}
+
+#[test]
+fn nearby_vehicle_predicate_can_fail_without_a_local_collider_change() {
+    let (mut state, p, pending, job, route) = completed_source(true);
+    let site = pending.sample.measurement.site.unwrap();
+    let other = state.pilots[1].vehicle.0;
+    let body = state.world.physics.ship_body(other);
+    // A live body without colliders isolates the body-center predicate,
+    // which cannot be inferred from collider intersections.
+    let right = Vec2::new(site.normal.y, -site.normal.x);
+    let target = site.vehicle_position - right * 15.9;
+    state
+        .world
+        .physics
+        .world
+        .set_pose(body, target, rotation_for_direction(site.normal), true);
+    state.world.physics.world.step(1.0 / 60.0);
+    let check = pending
+        .source
+        .validate(&state, 0, &p, &pending, &job, &route);
+    assert_eq!(
+        check.predicate_failure,
+        Some("landing vehicle neighborhood occupied")
+    );
+    assert!(
+        check.geometry.valid,
+        "fixture must isolate the non-query predicate"
+    );
+}
+
+#[test]
+fn raw_hull_replacement_and_preview_changes_withhold_publication() {
+    let (state, p, pending, job, route) = completed_source(false);
+    for change in 0..3 {
+        let mut changed = state.clone();
+        if change == 0 {
+            let hull = changed.world.physics.surface_hull_id(0);
+            assert!(changed.world.physics.world.replace_colliders(
+                changed.world.physics.ship_body(0),
+                hull.role,
+                &[ColliderSpec::ball(hull, 1.0)]
+            ));
+        } else if change == 1 {
+            changed.world.ships[0].wing_theta += 0.1;
+        } else {
+            // The replacement's collision groups follow the pilot owner,
+            // independently of the retained live ship's assembly.
+            changed.pilots[0].owner = PlayerId::PLAYER_2;
+        }
+        let check = pending
+            .source
+            .validate(&changed, 0, &p, &pending, &job, &route);
+        assert_eq!(
+            check.predicate_failure,
+            Some("source vehicle geometry changed"),
+            "change {change}"
+        );
+    }
+}
+
+#[test]
+fn dirty_queries_radius_gravity_and_incomplete_capture_remain_unknown() {
+    let (state, p, pending, job, route) = completed_source(false);
+    for change in 0..4 {
+        let mut changed = state.clone();
+        let mut p = p.clone();
+        let mut pending = pending.clone();
+        let expected = match change {
+            0 => {
+                changed.world.physics.material_queries_dirty = true;
+                "material queries unavailable"
+            }
+            1 => {
+                p.planet.radius += 0.01;
+                "source objective or radius changed"
+            }
+            2 => {
+                changed.world.planets[p.planet.index].mass *= 2.0;
+                "source scalar gravity changed"
+            }
+            _ => {
+                pending.source.footprint.complete = false;
+                "query dependency capture incomplete"
+            }
+        };
+        let check = pending
+            .source
+            .validate(&changed, 0, &p, &pending, &job, &route);
+        assert_eq!(check.predicate_failure, Some(expected));
+        assert!(!check.predicates_valid);
+    }
+}
+
+#[test]
+fn endpoint_range_is_rechecked_inside_objective_matching_tolerance() {
+    let (state, mut p, mut pending, job, route) = completed_source(false);
+    let node = route.endpoint.unwrap();
+    let center =
+        node.position + node.position.normalized() * SurfaceSortieState::spec().half_height();
+    let distance = center.distance_to(LandingObjective::read(&p).unwrap().position);
+    p.planet.claim.as_mut().unwrap().flag_interaction_range = distance + 0.2 + 0.00004;
+    pending.source = local::Source::new(&state, 0, &p, pending.source.footprint.clone());
+    let old = LandingObjective::read(&p).unwrap();
+    assert!(
+        pending
+            .source
+            .validate(&state, 0, &p, &pending, &job, &route)
+            .predicates_valid
+    );
+    p.planet.claim.as_mut().unwrap().flag_interaction_range -= 0.00008;
+    assert!(LiveObjectivePlanner::same_objective(
+        old,
+        LandingObjective::read(&p).unwrap()
+    ));
+    assert_eq!(
+        pending
+            .source
+            .validate(&state, 0, &p, &pending, &job, &route)
+            .predicate_failure,
+        Some("source objective or radius changed")
+    );
+}
+
+#[test]
+fn recording_both_hatches_and_settling_queries_preserves_atomic_measurement() {
+    let (state, request) = fixture(0);
+    let ordinary_fuel = QueryFuel::default();
+    let ordinary =
+        destinations::measure(&state, 0, request.candidates[0], None, true, &ordinary_fuel);
+    let fuel = QueryFuel::default();
+    let events = std::cell::RefCell::new(Vec::new());
+    let recorded = destinations::measure_with_query_observer(
+        &state,
+        0,
+        request.candidates[0],
+        None,
+        true,
+        &fuel,
+        |q| events.borrow_mut().push(q),
+    );
+    assert_eq!(ordinary, recorded);
+    assert_eq!(ordinary_fuel.used(), fuel.used());
+    assert_eq!(
+        events.borrow().len(),
+        fuel.used() as usize,
+        "no armed opponent/cover queries in this fixture"
+    );
+    let site = recorded.site.unwrap();
+    assert!(site.boarding_hatches.iter().all(Option::is_some));
+    assert!(site.hatch_has_settling_margin);
+    let frame = recorded.planet;
+    let fp = std::cell::RefCell::new(query_footprint::QueryFootprint::new(
+        frame.position,
+        frame.angle,
+    ));
+    for &event in events.borrow().iter() {
+        local::record(&state, 0, &fp, event, frame);
+    }
+    let fp = fp.into_inner();
+    assert!(fp.complete);
+    let local = |p: Vec2| (p - frame.position).rotate_radians(-frame.angle);
+    let contains = |area: QueryArea, point: Vec2| {
+        point.x >= area.minimum.x
+            && point.x <= area.maximum.x
+            && point.y >= area.minimum.y
+            && point.y <= area.maximum.y
+    };
+    for h in site.boarding_hatches.into_iter().flatten() {
+        assert!(contains(fp.areas[0].unwrap(), local(h)));
+        assert!(contains(
+            fp.areas[1].unwrap(),
+            local(h + site.normal * SurfaceSortieState::spec().half_height())
+        ));
+    }
+    assert!(fp.queries[0] > 5 && fp.queries[1] > 5 && fp.queries[2] == 6);
 }
 
 #[test]

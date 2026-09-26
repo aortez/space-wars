@@ -37,11 +37,41 @@ fn relative_motion_bound(a: &Collider, b: &Collider, old_frame: &Pose, new_frame
 
 /// Conservative query bounds in the anchor's local frame. Callers must cover
 /// every physical query supporting the result, including edge interiors.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct QueryArea {
     pub minimum: Vec2,
     pub maximum: Vec2,
     pub groups: CollisionGroups,
+}
+
+impl PhysicsWorld {
+    /// Bounds of the actual shape used by `collider_fits_at`, expressed in a
+    /// caller's anchor frame. This reads geometry, without running a query.
+    pub fn collider_query_area(
+        &self,
+        id: ColliderId,
+        position: Vec2,
+        angle: f32,
+        anchor_position: Vec2,
+        anchor_angle: f32,
+    ) -> Option<QueryArea> {
+        if !finite_vec2(position)
+            || !finite_vec2(anchor_position)
+            || !angle.is_finite()
+            || !anchor_angle.is_finite()
+        {
+            return None;
+        }
+        let collider = self.raw.colliders.get(self.collider_handle(id)?)?;
+        let anchor = Pose::new(to_rapier(anchor_position), anchor_angle);
+        let pose = anchor.inv_mul(&Pose::new(to_rapier(position), angle));
+        let bounds = collider.shape().compute_aabb(&pose);
+        Some(QueryArea {
+            minimum: from_rapier(bounds.mins),
+            maximum: from_rapier(bounds.maxs),
+            groups: CollisionGroups::ALL,
+        })
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -62,6 +92,22 @@ pub struct AreaValidation {
 }
 
 impl QuerySnapshot {
+    /// Immutable query-shape identity and filtering, ignoring its moving pose.
+    /// Replacement with even an identical shape deliberately invalidates this.
+    pub fn collider_shape_matches(&self, world: &PhysicsWorld, id: ColliderId) -> bool {
+        let Some(handle) = world.collider_handle(id) else {
+            return false;
+        };
+        let (Some(old), Some(new)) = (self.colliders.get(handle), world.raw.colliders.get(handle))
+        else {
+            return false;
+        };
+        old.user_data == new.user_data
+            && old.collision_groups() == new.collision_groups()
+            && old.is_sensor() == new.is_sensor()
+            && old.is_enabled() == new.is_enabled()
+    }
+
     /// Validate selected query areas, including geometry entering or leaving
     /// them. This is synchronous dependency work, outside a planner's dispatch
     /// allowance; report both its time and the intersection-test count.

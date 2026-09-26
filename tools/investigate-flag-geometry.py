@@ -14,8 +14,11 @@ F = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(F)
 
 
-def validate_diagnostics(samples, telemetry):
-    rejected = [s for s in samples if s["reason"] == "geometry changed since source measurement"]
+def validate_diagnostics(samples, telemetry, *, local_validation=False):
+    # Local publication can rescue a circular rejection or reject an area
+    # outside that circle. Preserve the old strict contract for old studies.
+    rejected = [s for s in samples if s.get("geometry") is not None] if local_validation else [
+        s for s in samples if s["reason"] == "geometry changed since source measurement"]
     assert all(s.get("geometry") is None for s in samples if s not in rejected)
     assert len(rejected) == telemetry["geometry_diagnostics"]
     stage_counts, kinds = Counter(), Counter()

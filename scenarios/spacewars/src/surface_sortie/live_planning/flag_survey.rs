@@ -10,6 +10,8 @@ pub const MAX_FLAG_SURVEY_AGE: u64 = 30 * 60;
 const PATCH_HALF_WIDTH: u16 = 8;
 mod geometry;
 pub use geometry::{FlagSurveyEnvelope, FlagSurveyGeometry};
+mod local;
+pub use local::FlagSurveyValidation;
 
 #[cfg(test)]
 mod tests;
@@ -41,6 +43,9 @@ pub struct FlagSurveySample {
     pub reason: Option<&'static str>,
     /// Explanation of a rejected circular gate, never evidence for acceptance.
     pub geometry: Option<FlagSurveyGeometry>,
+    /// Walking/landing publication only. Cover and opponent measurements retain
+    /// their source timestamp and are never certified by this validation.
+    pub validation: Option<FlagSurveyValidation>,
     pub graph: u64,
     pub physics_queries: u64,
 }
@@ -69,6 +74,12 @@ pub struct FlagSurveyTelemetry {
     pub diagnostic_region_changes: u64,
     pub diagnostic_omitted_changes: u64,
     pub diagnostic_incomplete: u64,
+    pub local_checks: u64,
+    pub local_area_tests: u64,
+    pub local_ms: f64,
+    pub local_setup_ms: f64,
+    pub local_rescued: u64,
+    pub local_withheld: u64,
     pub max_completion_ticks: u64,
     pub deferred: BTreeMap<&'static str, u64>,
     pub unknown: BTreeMap<&'static str, u64>,
@@ -80,6 +91,7 @@ struct Pending {
     snapshot: Arc<QuerySnapshot>,
     sample: FlagSurveySample,
     envelopes: Vec<FlagSurveyEnvelope>,
+    source: local::Source,
 }
 
 #[derive(Clone)]
@@ -306,7 +318,19 @@ impl FlagSurveyPlanner {
                 continue;
             }
             let fuel = QueryFuel::default();
-            let measurement = destinations::measure(state, player, id, actor.opponent, true, &fuel);
+            let footprint = std::cell::RefCell::new(query_footprint::QueryFootprint::new(
+                actor.pilot.planet.motion.position,
+                actor.pilot.planet.motion.angle,
+            ));
+            let measurement = destinations::measure_with_query_observer(
+                state,
+                player,
+                id,
+                actor.opponent,
+                true,
+                &fuel,
+                |query| local::record(state, player, &footprint, query, actor.pilot.planet.motion),
+            );
             queries -= fuel.used();
             let sample = FlagSurveySample {
                 actor: actor.pilot.owner,
@@ -320,6 +344,7 @@ impl FlagSurveyPlanner {
                 route: None,
                 reason: None,
                 geometry: None,
+                validation: None,
                 graph: 0,
                 physics_queries: u64::from(fuel.used()),
             };
@@ -386,10 +411,14 @@ impl FlagSurveyPlanner {
                     ),
                 );
                 self.telemetry.diagnostic_setup_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                let clock = Instant::now();
+                let source = local::Source::new(state, player, &p, footprint.into_inner());
+                self.telemetry.local_setup_ms += clock.elapsed().as_secs_f64() * 1000.0;
                 actor.pending = Some(Pending {
                     token,
                     snapshot,
                     envelopes,
+                    source,
                     sample,
                 });
                 token
@@ -472,12 +501,9 @@ impl FlagSurveyPlanner {
                     .snapshot
                     .validate_region(&state.world.physics.world, region);
                 self.telemetry.geometry_area_tests += validation.area_tests;
-                let valid = !state.world.physics.material_queries_dirty && validation.valid;
+                let whole_valid = !state.world.physics.material_queries_dirty && validation.valid;
                 self.telemetry.geometry_ms += clock.elapsed().as_secs_f64() * 1000.0;
-                if valid {
-                    pending.sample.validated_tick = Some(tick);
-                    None
-                } else {
+                if !whole_valid {
                     let clock = Instant::now();
                     let detail = geometry::diagnose(state, &pending, region, validation);
                     self.telemetry.geometry_diagnostics += 1;
@@ -487,8 +513,32 @@ impl FlagSurveyPlanner {
                     self.telemetry.diagnostic_incomplete += u64::from(!detail.report.complete);
                     self.telemetry.diagnostic_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     pending.sample.geometry = Some(detail);
-                    Some("geometry changed since source measurement")
                 }
+                let clock = Instant::now();
+                let local = pending.source.validate(
+                    state,
+                    row.request.actor as usize,
+                    &actor.pilot,
+                    &pending,
+                    &job,
+                    route.as_ref().unwrap(),
+                );
+                self.telemetry.local_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                self.telemetry.local_checks += 1;
+                self.telemetry.local_area_tests += local.geometry.area_tests;
+                let valid = local.predicates_valid && local.geometry.valid;
+                self.telemetry.local_rescued += u64::from(valid && !whole_valid);
+                self.telemetry.local_withheld += u64::from(!valid && whole_valid);
+                let reason = if valid {
+                    pending.sample.validated_tick = Some(tick);
+                    None
+                } else {
+                    local
+                        .predicate_failure
+                        .or(Some("geometry changed since source measurement"))
+                };
+                pending.sample.validation = Some(local);
+                reason
             };
             pending.sample.route = route;
             Self::finish(actor, pending.sample, tick, reason, &mut self.telemetry);

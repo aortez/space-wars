@@ -6,6 +6,26 @@ use engine_rapier::world::RayHit;
 pub const PILOT_OBSERVATION_VERSION: u32 = 1;
 pub const LANDING_SITE_COUNT: u8 = 64;
 
+/// One charged query in the site check. Preview queries use only the retained
+/// hypothetical vehicle geometry; the other variants query the live world.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum LandingQuery {
+    MaterialRay {
+        origin: Vec2,
+        direction: Vec2,
+        distance: f32,
+    },
+    Hull {
+        position: Vec2,
+        angle: f32,
+    },
+    Capsule {
+        position: Vec2,
+        angle: f32,
+    },
+    Preview,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct LandingSiteId {
     pub planet: usize,
@@ -268,6 +288,16 @@ impl SurfaceSortieState {
         pod: bool,
         charge: impl Fn() -> bool,
     ) -> Option<PilotLandingSite> {
+        self.vehicle_landing_site_with_query_observer(player, id, pod, |_| charge())
+    }
+
+    pub(super) fn vehicle_landing_site_with_query_observer(
+        &self,
+        player: usize,
+        id: LandingSiteId,
+        pod: bool,
+        charge: impl Fn(LandingQuery) -> bool,
+    ) -> Option<PilotLandingSite> {
         #[cfg(feature = "sensor-profile")]
         let _profile = super::sensor_profile::Scope::new("vehicle_landing_site");
         if id.bearing >= LANDING_SITE_COUNT || self.world.physics.material_queries_dirty {
@@ -282,13 +312,17 @@ impl SurfaceSortieState {
         let right = Vec2::new(up.y, -up.x);
         let origin = frame.position + up * (self.world.planets[id.planet].radius + 10.0);
         let ground = |origin, direction, length| {
-            charge()
-                .then(|| {
-                    self.world
-                        .physics
-                        .material_ground_ray(id.planet, origin, direction, length)
-                })
-                .flatten()
+            charge(LandingQuery::MaterialRay {
+                origin,
+                direction,
+                distance: length,
+            })
+            .then(|| {
+                self.world
+                    .physics
+                    .material_ground_ray(id.planet, origin, direction, length)
+            })
+            .flatten()
         };
         let foot_span = if pod { 0.7 } else { 3.0 };
         let left = ground(origin - right * foot_span, -up, 35.0)?;
@@ -312,12 +346,14 @@ impl SurfaceSortieState {
                 #[cfg(feature = "sensor-profile")]
                 let _profile = super::sensor_profile::Scope::new("landing_hull_placement");
                 [-0.75, 0.0, 0.75].into_iter().all(|offset| {
-                    charge()
+                    let position =
+                        vehicle_position + Vec2::new(normal.y, -normal.x) * offset - normal * 0.2;
+                    let angle = rotation_for_direction(normal);
+                    charge(LandingQuery::Hull { position, angle })
                         && self.world.physics.surface_hull_fits_at(
                             self.pilots[player].vehicle.0,
-                            vehicle_position + Vec2::new(normal.y, -normal.x) * offset
-                                - normal * 0.2,
-                            rotation_for_direction(normal),
+                            position,
+                            angle,
                         )
                 })
             }
@@ -326,16 +362,7 @@ impl SurfaceSortieState {
         }
         // Other pilots' vehicles occupy space even though they cannot be
         // mistaken for material ground by the footing rays.
-        if self.pilots.iter().enumerate().any(|(index, pilot)| {
-            index != player
-                && !self.world.ships[pilot.vehicle.0].dead
-                && self
-                    .world
-                    .physics
-                    .world
-                    .motion(self.world.physics.ship_body(pilot.vehicle.0))
-                    .is_some_and(|body| body.position.distance_to(vehicle_position) < 16.0)
-        }) {
+        if !self.landing_vehicle_neighborhood_clear(player, vehicle_position) {
             return None;
         }
         // Check the belly and the exit floor separately. Rays stop on fragments,
@@ -392,9 +419,11 @@ impl SurfaceSortieState {
                     return clear;
                 }
             }
-            let clear = charge()
-                && world_clear(point, rotation)
-                && charge()
+            let clear = charge(LandingQuery::Capsule {
+                position: point,
+                angle: rotation,
+            }) && world_clear(point, rotation)
+                && charge(LandingQuery::Preview)
                 && vehicle_clear(point, rotation, position, angle);
             last_clearance.set(Some((query, clear)));
             clear
@@ -483,6 +512,19 @@ impl SurfaceSortieState {
                     &ground,
                 )
                 .map(|hit| hit.map(|h| h.point)),
+        })
+    }
+
+    pub(super) fn landing_vehicle_neighborhood_clear(&self, player: usize, position: Vec2) -> bool {
+        !self.pilots.iter().enumerate().any(|(index, pilot)| {
+            index != player
+                && !self.world.ships[pilot.vehicle.0].dead
+                && self
+                    .world
+                    .physics
+                    .world
+                    .motion(self.world.physics.ship_body(pilot.vehicle.0))
+                    .is_some_and(|body| body.position.distance_to(position) < 16.0)
         })
     }
 }
