@@ -6,6 +6,8 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import math
+import struct
 from pathlib import Path
 import shutil
 import subprocess
@@ -72,6 +74,75 @@ def reference_prefixes(reference, cases):
     return expected
 
 
+def f32_identity(value):
+    """Typed Rust f32 serialization and serde_json::Value use different decimals.
+    Compare the represented f32 bits, never a floating-point tolerance.
+    """
+    if isinstance(value, float):
+        return struct.pack('!f', value)
+    if isinstance(value, dict):
+        return {k: f32_identity(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [f32_identity(v) for v in value]
+    return value
+
+
+def audit_geometry(source, diagnostic):
+    g = diagnostic['geometry']
+    bodies = {b['index']: b for b in source['bodies']}
+    body, target, frame = bodies[g['body']], bodies[diagnostic['destination']], bodies[source['frame']]
+    vec = lambda p: (p['x'], p['y'])
+    add = lambda a, b: tuple(x + y for x, y in zip(a, b))
+    sub = lambda a, b: tuple(x - y for x, y in zip(a, b))
+    mul = lambda a, n: tuple(x * n for x in a)
+    dot = lambda a, b: sum(x * y for x, y in zip(a, b))
+    unit = lambda a: mul(a, 1 / math.hypot(*a))
+    close = lambda a, b: math.dist(a, b) <= 0.002
+    ship = source['ship']
+    relative = sub(vec(ship['velocity']), vec(frame['velocity']))
+    radial = sub(vec(ship['position']), vec(frame['position']))
+    up = unit(radial)
+    falling = max(-dot(relative, up), 0)
+    climb = max(70 + falling * falling / 50 - (math.hypot(*radial) - frame['radius']), 0)
+    launch = add(vec(ship['position']), mul(up, climb))
+    entry = add(vec(target['position']), mul(unit(sub(launch, vec(target['position']))), target['radius'] + 85))
+    assert g['leg'] in {'climb', 'transfer'}
+    start, end = (vec(ship['position']), launch) if g['leg'] == 'climb' else (launch, entry)
+    assert close(vec(g['from']), start) and close(vec(g['to']), end)
+    assert g['body'] != (source['frame'] if g['leg'] == 'climb' else diagnostic['destination'])
+    assert math.isclose(g['threshold'], body['radius'] + 65, abs_tol=0.0001)
+    assert close(vec(g['obstacle_from']), vec(body['position']))
+    assert g['check'] in {'static_planet', 'moving_planet'}
+    assert (diagnostic['completed_stages'] is not None) == (g['leg'] == 'transfer')
+    if g['check'] == 'static_planet':
+        assert diagnostic['reason'] == 'transfer requires an unmodelled planet detour'
+        obstacle_end = vec(body['position'])
+    else:
+        assert diagnostic['reason'] == 'moving body requires an unmodelled transfer detour'
+        assert g['leg'] == 'transfer'
+        stages = diagnostic['completed_stages']
+        seconds = sum(stages[k] for k in ['settle_seconds', 'turn_seconds', 'climb_seconds', 'cruise_seconds'])
+        assert math.isfinite(seconds) and 0 <= seconds <= 30
+        obstacle_end = add(vec(body['position']), mul(sub(vec(body['velocity']), vec(target['velocity'])), seconds))
+    assert close(vec(g['obstacle_to']), obstacle_end)
+
+    def point_segment(p, a, b):
+        delta = sub(b, a)
+        t = max(0, min(1, dot(sub(p, a), delta) / max(dot(delta, delta), 1e-30)))
+        return math.dist(p, add(a, mul(delta, t)))
+    a, b, c, d = vec(g['obstacle_from']), vec(g['obstacle_to']), vec(g['from']), vec(g['to'])
+    cross = lambda a, b: a[0] * b[1] - a[1] * b[0]
+    denominator = cross(sub(b, a), sub(d, c))
+    intersects = abs(denominator) > 1e-7 and (0 <= cross(sub(c, a), sub(d, c)) / denominator <= 1
+                                           and 0 <= cross(sub(c, a), sub(b, a)) / denominator <= 1)
+    separation = 0 if intersects else min(point_segment(a, c, d), point_segment(b, c, d),
+                                         point_segment(c, a, b), point_segment(d, a, b))
+    # Independent double arithmetic compared to f32 geometry; never used for
+    # source identity or to change the reference's acceptance.
+    assert math.isclose(g['separation'], separation, abs_tol=0.002)
+    assert g['separation'] < g['threshold']
+
+
 def audit_prefix(root, case, expected, probe):
     digest = hashlib.sha256()
     count = 0
@@ -93,7 +164,7 @@ def audit_prefix(root, case, expected, probe):
         assert source_rows[seat]['observation'] == expected['source_rows'][seat]['observation'], 'changed source observation'
         if seat != case['seat'] or not probe['source']['nomination']['accepted']:
             assert source_rows[seat] == expected['source_rows'][seat], 'refused/opponent source control changed'
-    assert probe['source']['transfer_source'] == case['transfer_source'], 'wrong pinned reference'
+    assert f32_identity(probe['source']['transfer_source']) == f32_identity(case['transfer_source']), 'wrong pinned reference'
     evaluations = [r for r in rows(root / 'mission-evaluations.jsonl') if r['completed_tick'] < case['source_tick']]
     assert evaluations == expected['evaluations'], 'changed original evaluator prefix'
     return dict(exact_prefix=True, prefix_rows=count, prefix_sha256=digest.hexdigest(),
@@ -109,9 +180,7 @@ def audit_probe(case, probe, trace):
     assert d['destination'] == case['destination'] and d['reason'] == case['expected_reason']
     assert d['reference'] is None and d['geometry'] is not None
     g = d['geometry']
-    assert g['separation'] < g['threshold'] and g['body'] is not None
-    assert g['check'] in {'static_planet', 'moving_planet'}
-    assert (d['completed_stages'] is not None) == (g['leg'] == 'transfer')
+    audit_geometry(case['transfer_source'], d)
     outcome = probe['outcome']
     elapsed = outcome['tick'] - case['source_tick']
     assert outcome['elapsed_ticks'] == elapsed and 0 <= elapsed <= 3600
@@ -123,9 +192,19 @@ def audit_probe(case, probe, trace):
         assert outcome['reason'] == 'nomination_refused' and elapsed == 0
     else:
         assert trace[0]['target'] == case['destination']
-        assert all(r['target'] == case['destination'] for r in trace[:-1])
-        assert not any(r['arrived'] or r['solver_contact'] or r['debris_contact'] for r in trace[:-1])
+        def terminal_reason(row):
+            if row['match_finished']: return 'match_finished'
+            if not row['ship_available'] or row['health'] <= 0 or row['form'] != 'ship' or row['location'] == 'on_foot':
+                return 'ship_or_pilot_lost'
+            if row['recovery_active']: return 'recovery'
+            if row['solver_contact'] or row['debris_contact']: return 'solver_or_debris_contact'
+            if row['arrived']: return 'arrived'
+            if row['target'] != case['destination']: return 'retargeted'
+            if row['tick'] >= case['source_tick'] + 3600: return 'timeout'
+            return None
+        assert all(terminal_reason(r) is None for r in trace[:-1])
         last = trace[-1]
+        assert terminal_reason(last) == outcome['reason']
         if outcome['reason'] == 'arrived':
             assert last['arrived'] and last['queries_ready']
             assert not last['solver_contact'] and not last['debris_contact']
