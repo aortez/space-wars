@@ -394,6 +394,33 @@ fn pending_refresh_cannot_renew_the_baseline_transfer_source() {
 }
 
 #[test]
+fn new_publication_waits_for_ordinary_refresh_without_consuming_cadence() {
+    let (mut o, mut evaluator, request, mut sample) = fixture();
+    sample.completed_tick = 101;
+    sample.validated_tick = Some(101);
+    let mut shadow = FlagValueShadow::new(1);
+    shadow.observe(&o, &evaluator, Some(request), &[&sample]);
+    assert_eq!(shadow.deferred_source_total, 1);
+    assert!(!shadow.pending(PlayerId::PLAYER_1));
+    assert_eq!(shadow.advance(102, DEFAULT_WORK), Work::default());
+    assert!(shadow.actors[&0].submitted.is_none());
+    o.local.combat.recovery.flight.pilot.tick = 103;
+    let state = evaluator.actors.get_mut(&0).unwrap();
+    state.last_tick = Some(103);
+    state.latest.as_mut().unwrap().source_tick = 102;
+    state.latest.as_mut().unwrap().completed_tick = Some(103);
+    shadow.observe(&o, &evaluator, Some(request), &[&sample]);
+    assert!(shadow.pending(PlayerId::PLAYER_1));
+    shadow.advance(103, DEFAULT_WORK);
+    shadow.advance(104, DEFAULT_WORK);
+    let report = shadow.latest(PlayerId::PLAYER_1).unwrap();
+    assert!(report.admissions[0].used);
+    assert_eq!(report.admitted_tick, 103);
+    assert_eq!(report.baseline.source_tick, 102);
+    assert_eq!(report.admissions[0].source_tick, 60);
+}
+
+#[test]
 fn survey_source_expiry_during_dispatch_is_independent_of_baseline_age() {
     let (mut o, mut evaluator, request, sample) = fixture();
     o.local.combat.recovery.flight.pilot.tick = 1859;

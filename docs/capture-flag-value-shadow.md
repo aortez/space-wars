@@ -57,6 +57,12 @@ Observation, bounded report copying and trace serialization are outside graph
 fuel; construction and dispatch timings are reported separately. This is not a
 whole-bot CPU budget.
 
+When the only newly usable publication is newer than the baseline, admission
+waits for an ordinary evaluator refresh without consuming the cadence slot.
+It neither includes future evidence nor requests extra baseline work. The
+`deferred_source_observations` count measures waiting observations, not distinct
+survey sources or independent decision opportunities.
+
 ## Predeclared validation
 
 Unit tests cover successful ownership comparison, unchanged baseline inputs,
@@ -86,3 +92,27 @@ python3 tools/compare-flag-value-shadow.py \
 Use a new output directory; the runner refuses to overwrite a study. Results
 will distinguish admitted references, distinct surveys, newly numeric candidate
 costs, complete comparisons and changed historical rankings.
+
+## Initial replay and source scheduling
+
+The [first record](data/capture-flag-value-shadow-initial-v1.json), at `e13ec54`,
+preserved all five trajectories and existing survey work. It produced 38 reports,
+15 admitted references to one distinct survey and no numeric alternative totals
+or complete rankings. Every admitted alternative required an unmodelled moving
+body transfer detour. Shadow work totaled 129 graph steps and zero queries.
+
+The other generated positive exposed a scheduling gap. Its survey completed at
+tick 5950; admission at 5951 used baseline source 5948, correctly withholding
+future evidence but consuming the one-second cadence slot. Baseline source 5952
+completed at 5953. The planet's revision changed from 14 to 15 at 5965, before
+another slot. The explicit source wait described above fixes this sampling gap
+without requesting more baseline work or relaxing the temporal rule. The same
+five cases are replayed, rather than selecting just this case.
+
+The initial `flag evidence unavailable at comparison source` reason included
+one future publication and 44 encounters with two unpublished negative surveys.
+Those 44 are not future samples. The final version reports unpublished evidence
+separately. Independent review also strengthened the audit to reject dropped
+shortlist members, altered phase constants/value units, repeated baseline
+sources and unreconciled graph work. All five initial raw runs passed those
+stronger checks as well.
