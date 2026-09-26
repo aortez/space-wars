@@ -9,6 +9,7 @@ use crate::{
 };
 use engine_core::Vec2;
 
+mod crow;
 mod digit_slide;
 mod duck;
 mod floor;
@@ -189,6 +190,9 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
 }
 
 fn render_player_and_course(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    if let Some(visit) = &state.crow_visit {
+        crow::render(frame, visit, layout);
+    }
     // Kept outside the marquee's face fade and early return. The duck/course
     // retain their own opacity and geometry while clock content transforms.
     if let Some(event) = state.duck_scene() {

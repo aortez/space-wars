@@ -44,9 +44,10 @@ impl FloorManager {
             ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
                 ClockFloorMode::EventOwned
             }
-            ClockEventKind::ColorCycle | ClockEventKind::Marquee | ClockEventKind::DigitSlide => {
-                ClockFloorMode::Closed
-            }
+            ClockEventKind::ColorCycle
+            | ClockEventKind::Marquee
+            | ClockEventKind::DigitSlide
+            | ClockEventKind::Crow => ClockFloorMode::Closed,
         };
     }
 

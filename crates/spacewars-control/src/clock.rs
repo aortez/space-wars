@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 17;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 18;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -23,6 +23,8 @@ pub struct ClockEventInfo {
     pub blocked_by_player: bool,
     /// An existing automatic or player visit temporarily owns the arena.
     pub blocked_by_duck: bool,
+    #[serde(default)]
+    pub blocked_by_crow: bool,
     pub automatic_ready_at_tick: u64,
 }
 
@@ -48,8 +50,10 @@ pub struct ClockState {
     pub floor: engine_common::ClockFloorMode,
     pub meltdown: Option<engine_common::ClockMeltdownState>,
     pub duck: Option<engine_common::ClockDuckState>,
+    #[serde(default)]
+    pub crow: Option<engine_common::ClockCrowState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
-    /// Duck compatibility leaves no enabled automatic event kinds. Profile
+    /// Visitor compatibility leaves no enabled automatic event kinds. Profile
     /// Off is distinct; per-event restrictions also apply to manual requests.
     pub automatic_events_suspended: bool,
     pub marquee: Option<engine_common::ClockMarqueeState>,
@@ -90,12 +94,13 @@ pub struct ClockTriggerRequest {
 }
 
 impl ClockTriggerRequest {
-    /// Queue acknowledgement is not admission. Ducks become resident visits;
+    /// Queue acknowledgement is not admission. Ducks/crows become resident visits;
     /// unlike timed animations, they do not remain in the Active lifecycle.
     pub fn started_predicate(&self) -> ClockStatePredicate {
         ClockStatePredicate {
             scenario_revision: self.expected_scenario_revision,
-            lifecycle: (self.event != ClockEventKind::Duck).then(|| "active".into()),
+            lifecycle: (!matches!(self.event, ClockEventKind::Duck | ClockEventKind::Crow))
+                .then(|| "active".into()),
             event_kind: Some(self.event),
             phase: None,
             event_id: Some(self.expected_event_id.saturating_add(1)),
@@ -182,14 +187,24 @@ impl ClockStatePredicate {
         let kind_matches = self.event_kind.is_none_or(|kind| {
             if kind == ClockEventKind::Duck {
                 duck.is_some()
+            } else if kind == ClockEventKind::Crow {
+                state.crow.is_some()
             } else {
                 Some(kind) == state.event_kind
             }
         });
-        let phase = duck
+        let crow = (self.event_kind == Some(ClockEventKind::Crow))
+            .then_some(state.crow.as_ref())
+            .flatten();
+        let phase = crow.map(|crow| crow.phase.as_str()).or(duck
             .map(|duck| duck.phase.as_str())
-            .or(state.phase.as_deref());
-        let phase_tick = duck.map_or(state.phase_tick, |duck| duck.phase_tick);
+            .or(state.phase.as_deref()));
+        let phase_tick = crow.map_or_else(
+            || duck.map_or(state.phase_tick, |duck| duck.phase_tick),
+            |crow| crow.phase_tick,
+        );
+        // A later animation must not invalidate a wait for this crow visit.
+        let event_id = crow.map_or(state.event_id, |crow| crow.visit_id);
         state.scenario_revision == self.scenario_revision
             && self
                 .lifecycle
@@ -200,7 +215,7 @@ impl ClockStatePredicate {
                 .phase
                 .as_ref()
                 .is_none_or(|expected| Some(expected.as_str()) == phase)
-            && self.event_id.is_none_or(|id| id == state.event_id)
+            && self.event_id.is_none_or(|id| id == event_id)
             && phase_tick >= self.min_phase_tick
     }
 }
@@ -392,6 +407,7 @@ mod tests {
             floor: engine_common::ClockFloorMode::Closed,
             meltdown: None,
             duck: None,
+            crow: None,
             player_duck: None,
             automatic_events_suspended: false,
             marquee: None,
@@ -746,6 +762,81 @@ mod tests {
     }
 
     #[test]
+    fn crow_admission_waits_track_its_own_phase_and_identity_during_other_events() {
+        let mut state = clock_state();
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Crow);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        let started = request.started_predicate();
+        assert!(!started.matches(&state));
+        state.event_id += 1;
+        state.crow = Some(engine_common::ClockCrowState {
+            visit_id: state.event_id,
+            phase: engine_common::ClockCrowPhase::Entering,
+            phase_tick: 0,
+            age_ticks: 0,
+            position_milli: [10_000, 120_000],
+            facing_right: true,
+            target: Some([2, 1, 0]),
+            hops: 0,
+            escapes: 0,
+        });
+        for lifecycle in ["cooldown", "idle", "active"] {
+            state.lifecycle = lifecycle.into();
+            assert!(started.matches(&state));
+        }
+        state.event_id += 1;
+        let crow = state.crow.as_mut().unwrap();
+        crow.phase = engine_common::ClockCrowPhase::Perched;
+        crow.phase_tick = 12;
+        crow.age_ticks = 112;
+        let predicate = ClockStatePredicate {
+            phase: Some("perched".into()),
+            min_phase_tick: 12,
+            ..started
+        };
+        assert!(predicate.matches(&state));
+        assert!(
+            !ClockStatePredicate {
+                min_phase_tick: 13,
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        assert!(
+            !ClockStatePredicate {
+                event_id: Some(state.event_id),
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        assert!(
+            !ClockStatePredicate {
+                scenario_revision: 9,
+                ..predicate.clone()
+            }
+            .matches(&state)
+        );
+        assert_eq!(
+            ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+            state
+        );
+        assert_eq!(ClockEventKind::Crow as u8, 7);
+        state.crow = None;
+        assert!(!predicate.matches(&state));
+        let mut value = serde_json::to_value(&state).unwrap();
+        value.as_object_mut().unwrap().remove("crow");
+        assert!(
+            ClockState::from_json(&value.to_string())
+                .unwrap()
+                .crow
+                .is_none()
+        );
+    }
+
+    #[test]
     fn duck_diagnostics_and_named_trigger_round_trip() {
         let mut state = clock_state();
         state.event_kind = Some(ClockEventKind::Rain);
@@ -974,6 +1065,7 @@ mod tests {
             enabled: true,
             blocked_by_player: false,
             blocked_by_duck: false,
+            blocked_by_crow: false,
             automatic_ready_at_tick: 0,
         });
         assert_eq!(

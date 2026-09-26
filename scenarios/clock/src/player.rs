@@ -59,10 +59,10 @@ impl ClockState {
     }
 
     pub fn automatic_events_suspended(&self) -> bool {
-        self.duck_visit.is_some()
+        (self.duck_visit.is_some() || self.crow_visit.is_some())
             && !ClockEventKind::ALL
                 .into_iter()
-                .any(|kind| self.config.events.enabled(kind) && !self.event_blocked_by_duck(kind))
+                .any(|kind| self.config.events.enabled(kind) && !self.event_blocked(kind))
     }
 
     pub fn event_blocked_by_player(&self, kind: ClockEventKind) -> bool {
@@ -78,7 +78,7 @@ impl ClockState {
 
     pub(super) fn sync_event_schedule(&mut self) {
         // Filter the runtime schedule, never the user's saved preferences.
-        let enabled = |kind| self.config.events.enabled(kind) && !self.event_blocked_by_duck(kind);
+        let enabled = |kind| self.config.events.enabled(kind) && !self.event_blocked(kind);
         let effective = ClockEvents {
             falling: enabled(ClockEventKind::Falling),
             color_cycle: enabled(ClockEventKind::ColorCycle),
@@ -87,6 +87,7 @@ impl ClockState {
             marquee: enabled(ClockEventKind::Marquee),
             digit_slide: enabled(ClockEventKind::DigitSlide),
             rain: enabled(ClockEventKind::Rain),
+            crow: enabled(ClockEventKind::Crow),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

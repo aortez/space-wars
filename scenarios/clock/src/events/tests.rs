@@ -13,6 +13,7 @@ fn catalog_covers_every_kind_once_and_has_bounded_timing() {
         assert_eq!(EVENT_CATALOG[kind as usize].kind, kind);
         let max_duration = match definition.kind {
             ClockEventKind::Duck => 35 * 60,
+            ClockEventKind::Crow => 22 * 60,
             ClockEventKind::Rain => 42 * 60,
             _ => 12 * 60,
         };
@@ -58,6 +59,7 @@ fn automatic_selection_respects_enablement_and_each_events_reuse_delay() {
             marquee: kind == ClockEventKind::Marquee,
             digit_slide: false,
             rain: kind == ClockEventKind::Rain,
+            crow: kind == ClockEventKind::Crow,
         };
         let mut schedule = EventSchedule::new(ClockEventProfile::Demo, enabled, 2);
         let wait = schedule.next_event_tick.unwrap();
@@ -94,6 +96,7 @@ fn off_and_an_empty_enabled_set_never_schedule_automatic_events() {
                 marquee: false,
                 digit_slide: false,
                 rain: false,
+                crow: false,
             },
         ),
     ] {
@@ -138,6 +141,7 @@ fn slide_only_configuration_never_schedules_periodic_work() {
         marquee: false,
         digit_slide: true,
         rain: false,
+        crow: false,
     };
     let mut schedule = EventSchedule::new(ClockEventProfile::Calm, events, 4);
     assert_eq!(schedule.next_event_tick, None);

@@ -392,6 +392,7 @@ mod tests {
                 marquee: false,
                 digit_slide: false,
                 rain: false,
+                crow: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -467,6 +468,27 @@ mod tests {
                 assert_eq!(settings.clock, restored.clock);
             }
         }
+    }
+
+    #[test]
+    fn pre_crow_settings_enable_the_visitor_without_changing_saved_choices() {
+        let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\n").unwrap();
+        assert!(settings.clock.events.crow);
+        assert!(settings.clock.show_date);
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
+        for event in engine_common::ClockEventKind::ALL {
+            assert_eq!(
+                settings.clock.events.enabled(event),
+                event == engine_common::ClockEventKind::Crow
+            );
+        }
+        let mut saved = settings;
+        saved.clock.events.crow = false;
+        let restored: Settings = toml::from_str(&toml::to_string(&saved).unwrap()).unwrap();
+        assert_eq!(restored.clock, saved.clock);
     }
 
     #[test]

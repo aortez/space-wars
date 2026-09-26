@@ -506,6 +506,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-color-cycle-enabled: true;
     in-out property <bool> launcher-clock-meltdown-enabled: true;
     in-out property <bool> launcher-clock-duck-enabled: true;
+    in-out property <bool> launcher-clock-crow-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
@@ -1220,7 +1221,8 @@ export component MainWindow inherits Window {
                 }
                 ChoiceRow {
                     y: 168px;
-                    width: parent.width;
+                    x: 0px;
+                    width: parent.width - 98px;
                     height: 48px;
                     label: "Preview Event";
                     value: root.clock-event-labels[root.clock-preview-index];
@@ -1228,6 +1230,16 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     previous => { root.ingame-clock-adjust(4, -1); }
                     next => { root.ingame-clock-adjust(4, 1); }
+                }
+                MenuButton {
+                    x: parent.width - 90px;
+                    y: 168px;
+                    width: 90px;
+                    height: 48px;
+                    text: "Crow\n" + (root.launcher-clock-crow-enabled ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 14;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(14, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -1256,7 +1268,7 @@ export component MainWindow inherits Window {
                     y: 276px;
                     width: parent.width;
                     height: 20px;
-                    text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : "Saved. Preview replaces the current event, even if Off.";
+                    text: root.clock-controls-pending ? "Applying…" : root.settings-save-pending ? "Saving settings…" : root.clock-settings-error != "" ? root.clock-settings-error : "Saved. Preview runs now, even if Off.";
                     color: root.clock-settings-error != "" ? #ffb0a0 : #80d8ff;
                     font-size: 13px;
                     overflow: elide;
@@ -2014,40 +2026,40 @@ export component MainWindow inherits Window {
                             }
                         }
 
-                        ChoiceRow {
+                        MenuButton {
                             x: 0px;
                             y: 208px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 16px) / 3;
                             height: 48px;
-                            label: "Meltdown";
-                            value: root.launcher-clock-meltdown-enabled ? "On" : "Off";
+                            text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 7;
-                            previous => {
-                                root.launcher-settings-focus-index = 7;
-                                root.ui-action(2);
-                            }
-                            next => {
+                            activated => {
                                 root.launcher-settings-focus-index = 7;
                                 root.ui-action(3);
                             }
                         }
 
-                        ChoiceRow {
-                            x: parent.width / 2 + 6px;
+                        MenuButton {
+                            x: (parent.width + 8px) / 3;
                             y: 208px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 16px) / 3;
                             height: 48px;
-                            label: "Duck";
-                            value: root.launcher-clock-duck-enabled ? "On" : "Off";
+                            text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 8;
-                            previous => {
-                                root.launcher-settings-focus-index = 8;
-                                root.ui-action(2);
-                            }
-                            next => {
+                            activated => {
                                 root.launcher-settings-focus-index = 8;
                                 root.ui-action(3);
                             }
+                        }
+
+                        MenuButton {
+                            x: 2 * (parent.width + 8px) / 3;
+                            y: 208px;
+                            width: (parent.width - 16px) / 3;
+                            height: 48px;
+                            text: "Crow\n" + (root.launcher-clock-crow-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 13;
+                            activated => { root.launcher-settings-focus-index = 13; root.ui-action(3); }
                         }
 
                         ChoiceRow {

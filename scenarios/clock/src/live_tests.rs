@@ -26,7 +26,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..128 {
+            for bits in 0..256 {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
                         time_format,
@@ -43,6 +43,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             marquee: bits & 16 != 0,
                             digit_slide: bits & 32 != 0,
                             rain: bits & 64 != 0,
+                            crow: bits & 128 != 0,
                         },
                     };
                     assert_eq!(
@@ -88,15 +89,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     };
     // Exercise the current encoding too, rather than rejecting these merely
     // because they have an older version prefix.
-    for (offset, invalid) in [
-        (2, 13),
-        (3, 3),
-        (4, 128),
-        (5, 255),
-        (6, 4),
-        (7, 2),
-        (8, 0xff),
-    ] {
+    for (offset, invalid) in [(2, 13), (3, 3), (5, 255), (6, 4), (7, 2), (8, 0xff)] {
         let mut bytes = payload.clone();
         bytes[offset] = invalid;
         assert_eq!(ClockAction::decode(&Action::scenario(kind, bytes)), None);
@@ -140,6 +133,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             marquee: false,
             digit_slide: false,
             rain: false,
+            crow: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,

@@ -169,6 +169,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: crate::rain::RAIN_TICKS,
         cooldown_ticks: 45 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Crow,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::Appearance,
+        duration_ticks: crate::crow::CROW_TICKS,
+        cooldown_ticks: 30 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -206,6 +213,7 @@ impl ActiveEvent {
                 config.water_lab,
             ))),
             ClockEventKind::Duck => unreachable!("a duck admission creates an independent visit"),
+            ClockEventKind::Crow => unreachable!("a crow admission creates an independent visit"),
             ClockEventKind::Marquee => Self::Marquee(Box::new(MarqueeEvent::new(
                 config.marquee_preset,
                 config.marquee_message,
@@ -430,6 +438,22 @@ impl EventSchedule {
             && (self.lifecycle == EventLifecycle::Idle || self.preserve_periodic_deadline)
         {
             self.schedule_next();
+        }
+    }
+
+    /// Admit a resident without replacing a currently running timed animation.
+    /// The global ID counts admissions; each resident keeps its own ID and age.
+    pub fn admit_resident(&mut self, kind: ClockEventKind) -> u64 {
+        if self.lifecycle == EventLifecycle::Active {
+            self.event_id += 1;
+            self.retire(kind);
+            self.seed
+                .wrapping_add(self.event_id - 1)
+                .wrapping_add((kind as u64) << 32)
+        } else {
+            let seed = self.start(kind);
+            self.finish(kind);
+            seed
         }
     }
 

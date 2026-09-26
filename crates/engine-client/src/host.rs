@@ -119,10 +119,9 @@ impl ScenarioControls {
     pub fn request_clock_event(&mut self, event: engine_common::ClockEventKind) -> bool {
         if !self.clock_state().is_some_and(|state| {
             state.can_trigger
-                && state
-                    .events
-                    .iter()
-                    .any(|entry| entry.kind == event && !entry.blocked_by_duck)
+                && state.events.iter().any(|entry| {
+                    entry.kind == event && !entry.blocked_by_duck && !entry.blocked_by_crow
+                })
         }) {
             return false;
         }
@@ -2497,6 +2496,28 @@ mod tests {
     const TEST_VIEWPORT: Viewport = Viewport::new(1280.0, 720.0);
 
     #[test]
+    fn crow_visit_rejects_duplicate_trigger_but_leaves_other_events_available() {
+        use engine_common::ClockEventKind;
+        use scenario_clock::{ClockAction, ClockReading};
+        let mut scenario = hosted_scenario("clock", 42).unwrap();
+        scenario.step(
+            &[
+                ClockAction::set_reading(ClockReading::new(12, 34, 0).unwrap()),
+                ClockAction::preview_event(ClockEventKind::Crow),
+            ],
+            Duration::ZERO,
+        );
+        for _ in 0..121 {
+            scenario.step(&[], Duration::from_millis(16));
+        }
+        let mut controls = ScenarioControls::default();
+        controls.publish_clock_state(&scenario, 7, false);
+        assert!(controls.clock_state().unwrap().can_trigger);
+        assert!(!controls.request_clock_event(ClockEventKind::Crow));
+        assert!(controls.request_clock_event(ClockEventKind::Rain));
+    }
+
+    #[test]
     fn player_duck_allows_shared_events_but_not_private_arena_requests() {
         use engine_common::ClockEventKind;
         use scenario_clock::{ClockAction, ClockReading};
@@ -2519,6 +2540,7 @@ mod tests {
                     | ClockEventKind::Marquee
                     | ClockEventKind::DigitSlide
                     | ClockEventKind::Rain
+                    | ClockEventKind::Crow
             );
             assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
             if expected {

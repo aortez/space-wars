@@ -128,6 +128,7 @@ fn ordinary_demo_schedule_can_rain_on_an_existing_automatic_duck() {
         marquee: false,
         digit_slide: false,
         rain: true,
+        crow: false,
     };
     state.configure(settings);
     for _ in 0..800 {
