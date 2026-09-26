@@ -24,6 +24,8 @@ pub struct TransferProbeRun {
     source: Option<Value>,
     outcome: Option<Value>,
     trace: BufWriter<File>,
+    defer_pursuit: bool,
+    control_comparison: Option<Value>,
 }
 
 impl TransferProbeRun {
@@ -32,6 +34,10 @@ impl TransferProbeRun {
         if destination == "none" {
             assert_eq!(super::arg("--probe-transfer-tick", "none"), "none");
             assert_eq!(super::arg("--probe-transfer-seat", "none"), "none");
+            assert_eq!(
+                super::arg("--probe-transfer-pursuit", "ordinary"),
+                "ordinary"
+            );
             return None;
         }
         let seat: usize = super::arg("--probe-transfer-seat", "0").parse().unwrap();
@@ -48,6 +54,11 @@ impl TransferProbeRun {
         assert_eq!(super::arg("--evaluate-missions", "false"), "true");
         assert_eq!(super::arg("--continue-successor", "none"), "none");
         assert_eq!(super::arg("--require-finish", "false"), "false");
+        let defer_pursuit = match super::arg("--probe-transfer-pursuit", "ordinary").as_str() {
+            "ordinary" => false,
+            "defer_new" => true,
+            _ => panic!("--probe-transfer-pursuit must be ordinary or defer_new"),
+        };
         Some(Self {
             seat,
             tick,
@@ -55,6 +66,8 @@ impl TransferProbeRun {
             source: None,
             outcome: None,
             trace: BufWriter::new(File::create(out.join("transfer-probe.jsonl")).unwrap()),
+            defer_pursuit,
+            control_comparison: None,
         })
     }
 
@@ -66,7 +79,28 @@ impl TransferProbeRun {
         evaluator: &MissionEvaluator,
     ) -> Option<CombatIntent> {
         let p = &o.local.combat.recovery.flight.pilot;
-        if seat != self.seat || p.tick != self.tick || self.source.is_some() {
+        if seat != self.seat {
+            return None;
+        }
+        if self.defer_pursuit && self.source.is_some() && !self.done() && p.tick > self.tick {
+            // Same-state comparison only: this clone does not evolve a second
+            // world and never supplies controls to the physics step.
+            let mut ordinary = bot.clone();
+            let normal = ordinary.intent_with_evaluation(o, evaluator);
+            let intent =
+                bot.intent_for_transfer_calibration(o, evaluator, self.destination, self.tick);
+            let t = ordinary.telemetry();
+            self.control_comparison = Some(json!({
+                "ordinary_new_pursuit":t.pursuit.as_ref().is_some_and(|pursuit| pursuit.started_tick == p.tick),
+                "deferred_new_pursuit":t.pursuit.as_ref().is_some_and(|pursuit| pursuit.started_tick == p.tick)
+                    && bot.telemetry().pursuit.is_none(),
+                "ordinary_goal":t.goal,"ordinary_target":t.target,"ordinary_actions":normal.encode(p.owner),
+                "ordinary_pursuit":t.pursuit,"same_intent":normal == intent,
+                "same_mission":ordinary.telemetry() == bot.telemetry(),
+            }));
+            return Some(intent);
+        }
+        if p.tick != self.tick || self.source.is_some() {
             return None;
         }
         // Capture before intent: the pilot's same-tick command cache must not
@@ -148,6 +182,7 @@ impl TransferProbeRun {
             "solver_contact":solver_contact,"debris_contact":debris_contact,"damage":damage,
             "solver_contacts":contacts,"next_actions":intent.encode(p.owner),
             "terminal":self.outcome,
+            "pursuit_control":self.control_comparison.take(),
         })).unwrap();
         writeln!(self.trace).unwrap();
     }
@@ -193,6 +228,7 @@ impl TransferProbeRun {
         self.trace.flush().unwrap();
         json!({"schema":1,"seat":self.seat,"source_tick":self.tick,"destination":self.destination,
             "source":self.source,"outcome":self.outcome,"horizon_ticks":3600,
-            "scope":"Solver contact stops include positive-separation speculative contacts; they do not prove impact. Externally nominated destination; controller gates and priorities retained. Source is pre-intent; terminal next_actions are not executed. Measures transfer handoff only, not the reference's rest-to-rest endpoint, landing, capture or match strength. Diagnostic computation/IO are outside live planning fuel."})
+            "pursuit_policy":if self.defer_pursuit {"defer_new"} else {"ordinary"},
+            "scope":"Solver contacts include positive separation and do not prove impact. External destination nomination retains controller gates. Optional defer_new suppresses new pursuit only during the nominated transfer after its source tick; existing pursuit, recovery and safety retain priority. Source is pre-intent; terminal next_actions are not executed. Measures handoff, not landing/capture or match strength. Same-state ordinary-control comparisons are not independent physical trajectories. Diagnostic work and IO are outside live planner fuel."})
     }
 }
