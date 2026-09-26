@@ -101,7 +101,6 @@ impl Source {
             Some("source objective or radius changed")
         } else if !current_gravity.is_finite()
             || !self.gravity.is_finite()
-            || (current_gravity - self.gravity).abs() > 0.01
             || !job.walking_rise_valid(current_gravity)
         {
             Some("source scalar gravity changed")
