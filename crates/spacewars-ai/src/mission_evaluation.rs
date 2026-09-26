@@ -17,6 +17,7 @@ use scenario_spacewars::{
 use serde::Serialize;
 use std::collections::BTreeMap;
 
+mod flag_survey;
 mod model;
 mod selection;
 mod survey;
@@ -247,6 +248,7 @@ struct Dependencies {
 #[derive(Clone, Default)]
 struct ActorState {
     survey: Option<survey::AlternativeSurvey>,
+    flag_survey: Option<flag_survey::RequestState>,
     last_tick: Option<u64>,
     submitted_tick: Option<u64>,
     dependencies: Option<Dependencies>,
@@ -292,6 +294,23 @@ impl MissionEvaluator {
         self.actors
             .get(&(actor.index() as u64))
             .is_some_and(|s| s.pending.is_some())
+    }
+    /// Separate observational experiment. Its results are deliberately not
+    /// admitted to evaluation/selection until coverage and timing are tested.
+    pub fn flag_request(
+        &mut self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Option<scenario_spacewars::surface_sortie::live_planning::FlagSurveyRequest> {
+        let actor = o.local.combat.recovery.flight.pilot.owner.index() as u64;
+        if !self.actors.contains_key(&actor) && self.actors.len() >= self.capacity {
+            return None;
+        }
+        flag_survey::request(
+            &mut self.actors.entry(actor).or_default().flag_survey,
+            o,
+            mission,
+        )
     }
     /// Optional demand for the host's existing remote-query dispatcher. Call
     /// after controls; this never changes the bot's own sensor request.
