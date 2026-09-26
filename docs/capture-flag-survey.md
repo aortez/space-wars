@@ -27,9 +27,12 @@ patch or a required jump remains unknown. This is neither a full-planet route
 search nor proof that an omitted route is impossible.
 
 Each actor keeps at most one pending snapshot and two historical samples. The
-source expires after 30 seconds. Each completed positive result rechecks a
+source expires after 30 seconds. The initial completed positive result rechecked a
 conservative whole-planet region extending 80 units above the nominal radius,
 covering the original landing rays, hull, both entrances, climbing and walking.
+The [local validation extension](capture-flag-local-validation.md) now captures
+the issued query areas and validates source predicates, retaining that circle
+only for comparison diagnostics.
 Its publication tick does not renew its source tick. Subsequent delivery is
 historical evidence, never current feasibility or permission to fly or capture.
 Changed ownership/flag/material, landing, recovery and absent demand retire it.
