@@ -49,7 +49,9 @@ fn create(
     if mode == ScenarioStartMode::Normal
         && matches!(
             settings.spacewars.player_2_controller,
-            SpacewarsController::PlannerBot | SpacewarsController::DestinationBot
+            SpacewarsController::PlannerBot
+                | SpacewarsController::DestinationBot
+                | SpacewarsController::ValueBot
         )
     {
         return Err(ScenarioCreateError::RuntimeInitialization { name: "spacewars-classic", detail: "Planner bot requires the material Spacewars match. Choose legacy bot or human for Classic.".into() });

@@ -235,8 +235,8 @@ fn main() {
         compare_successors.then(|| successor_probe::SuccessorProbe::new(&out));
     let mut continuation = successor_continuation::ContinuationRun::from_args(&out);
     assert!(
-        continuation.is_none() || !selected_policies.contains(&MissionPolicy::DestinationPlanner),
-        "v12 destination planning is not supported with --continue-successor"
+        continuation.is_none() || !selected_policies.iter().any(|p| p.selects_destination()),
+        "destination planning is not supported with --continue-successor"
     );
     assert!(
         continuation.is_none() || (compare_successors && mode == "duel" && match_rules),

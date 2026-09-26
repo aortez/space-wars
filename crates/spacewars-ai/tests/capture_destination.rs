@@ -105,9 +105,14 @@ impl Run {
 
 #[test]
 fn native_selector_uses_a_measured_farther_trip_and_physically_claims_boards_and_departs() {
-    for (seat, mirror) in [(0, false), (1, true)] {
+    for (seat, mirror, policy) in [
+        (0, false, MissionPolicy::DestinationPlanner),
+        (1, true, MissionPolicy::DestinationPlanner),
+        (0, false, MissionPolicy::ValuePlanner),
+        (1, true, MissionPolicy::ValuePlanner),
+    ] {
         let mut baseline = Run::new(MissionPolicy::Planner, seat, mirror);
-        let mut experiment = Run::new(MissionPolicy::DestinationPlanner, seat, mirror);
+        let mut experiment = Run::new(policy, seat, mirror);
         for _ in 0..100 * 60 {
             let a = baseline.step(seat);
             let b = experiment.step(seat);
@@ -149,56 +154,67 @@ fn native_selector_uses_a_measured_farther_trip_and_physically_claims_boards_and
                 .telemetry()
                 .events
                 .iter()
-                .any(|e| e.kind == "replan" && e.reason == Some("shorter supported capture trip"))
+                .any(|e| e.kind == "replan"
+                    && e.reason
+                        == Some(if policy == MissionPolicy::ValuePlanner {
+                            "better supported capture value"
+                        } else {
+                            "shorter supported capture trip"
+                        }))
         );
     }
 }
 
 #[test]
 fn no_completed_comparison_is_exact_v10_fallback_through_flag_capture() {
-    let mut run = Run::new(MissionPolicy::Planner, 0, false);
-    let mut experiment = MissionBot::new(
+    for policy in [
         MissionPolicy::DestinationPlanner,
-        BrainReset {
-            actor: PlayerId::PLAYER_1,
-            episode_seed: 42,
-        },
-        Default::default(),
-    );
-    let mut evaluator = MissionEvaluator::new(1);
-    for _ in 0..90 * 60 {
-        let a = run.bot.sensor_request();
-        let b = experiment.sensor_request();
-        assert_eq!(a.site, b.site);
-        assert_eq!(a.objective_planning, b.objective_planning);
-        assert_eq!(a.last_survey, b.last_survey);
-        assert_eq!(a.destination_cover, b.destination_cover);
-        let o = run.state.mission_observation_with_cadence(
-            0,
-            run.bot.sensor_request(),
+        MissionPolicy::ValuePlanner,
+    ] {
+        let mut run = Run::new(MissionPolicy::Planner, 0, false);
+        let mut experiment = MissionBot::new(
+            policy,
+            BrainReset {
+                actor: PlayerId::PLAYER_1,
+                episode_seed: 42,
+            },
             Default::default(),
         );
-        let expected = run.bot.intent(&o);
-        assert_eq!(experiment.intent_with_evaluation(&o, &evaluator), expected);
-        evaluator.observe(&o, experiment.telemetry());
+        let mut evaluator = MissionEvaluator::new(1);
+        for _ in 0..90 * 60 {
+            let a = run.bot.sensor_request();
+            let b = experiment.sensor_request();
+            assert_eq!(a.site, b.site);
+            assert_eq!(a.objective_planning, b.objective_planning);
+            assert_eq!(a.last_survey, b.last_survey);
+            assert_eq!(a.destination_cover, b.destination_cover);
+            let o = run.state.mission_observation_with_cadence(
+                0,
+                run.bot.sensor_request(),
+                Default::default(),
+            );
+            let expected = run.bot.intent(&o);
+            assert_eq!(experiment.intent_with_evaluation(&o, &evaluator), expected);
+            evaluator.observe(&o, experiment.telemetry());
+            assert_eq!(
+                evaluator.advance(run.state.tick(), Work::default()),
+                Work::default()
+            );
+            SurfaceSortieScenario::step(&mut run.state, &expected.encode(PlayerId::PLAYER_1), DT);
+        }
+        assert!(run.bot.telemetry().completed_sorties > 0);
         assert_eq!(
-            evaluator.advance(run.state.tick(), Work::default()),
-            Work::default()
+            experiment.telemetry().completed_sorties,
+            run.bot.telemetry().completed_sorties
         );
-        SurfaceSortieScenario::step(&mut run.state, &expected.encode(PlayerId::PLAYER_1), DT);
+        assert_eq!(
+            experiment
+                .telemetry()
+                .destination_planning
+                .as_ref()
+                .unwrap()
+                .switches,
+            0
+        );
     }
-    assert!(run.bot.telemetry().completed_sorties > 0);
-    assert_eq!(
-        experiment.telemetry().completed_sorties,
-        run.bot.telemetry().completed_sorties
-    );
-    assert_eq!(
-        experiment
-            .telemetry()
-            .destination_planning
-            .as_ref()
-            .unwrap()
-            .switches,
-        0
-    );
 }

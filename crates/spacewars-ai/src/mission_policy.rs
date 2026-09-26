@@ -15,20 +15,27 @@ pub enum MissionPolicy {
     JetpackPlanner,
     #[serde(rename = "material_mission_v12")]
     DestinationPlanner,
+    #[serde(rename = "material_mission_v13")]
+    ValuePlanner,
 }
 impl MissionPolicy {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Legacy,
         Self::Planner,
         Self::JetpackPlanner,
         Self::DestinationPlanner,
+        Self::ValuePlanner,
     ];
+    pub fn selects_destination(self) -> bool {
+        matches!(self, Self::DestinationPlanner | Self::ValuePlanner)
+    }
     pub fn id(self) -> &'static str {
         match self {
             Self::Legacy => "material_mission_v9",
             Self::Planner => "material_mission_v10",
             Self::JetpackPlanner => "material_mission_v11",
             Self::DestinationPlanner => "material_mission_v12",
+            Self::ValuePlanner => "material_mission_v13",
         }
     }
     pub fn display_name(self) -> &'static str {
@@ -37,12 +44,15 @@ impl MissionPolicy {
             Self::Planner => "Planner bot v10",
             Self::JetpackPlanner => "Jetpack bot v11",
             Self::DestinationPlanner => "Destination bot v12",
+            Self::ValuePlanner => "Value bot v13",
         }
     }
     pub fn objective_planning(self) -> ObjectivePlanning {
         match self {
             Self::Legacy => ObjectivePlanning::Legacy,
-            Self::Planner | Self::DestinationPlanner => ObjectivePlanning::JointRoundTrip,
+            Self::Planner | Self::DestinationPlanner | Self::ValuePlanner => {
+                ObjectivePlanning::JointRoundTrip
+            }
             Self::JetpackPlanner => ObjectivePlanning::JetpackRoundTrip,
         }
     }
@@ -54,6 +64,7 @@ impl MissionPolicy {
                 Self::Planner => "mission_cadenced_joint_routes_v1",
                 Self::JetpackPlanner => "mission_cadenced_jetpack_routes_v1",
                 Self::DestinationPlanner => "mission_cadenced_joint_routes_capture_choice_v1",
+                Self::ValuePlanner => "mission_cadenced_joint_routes_capture_value_v1",
             },
             // Cadence bounds frequency, not work. No equal-budget claim yet.
             planning_work_quota: None,
@@ -64,7 +75,7 @@ impl std::str::FromStr for MissionPolicy {
     type Err = String;
     fn from_str(id: &str) -> Result<Self, Self::Err> {
         Self::ALL.into_iter().find(|p| p.id() == id)
-            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9, material_mission_v10, material_mission_v11 or material_mission_v12"))
+            .ok_or_else(|| format!("unknown mission policy {id:?}; expected material_mission_v9, material_mission_v10, material_mission_v11, material_mission_v12 or material_mission_v13"))
     }
 }
 #[derive(Debug, Clone, Copy, Serialize)]
