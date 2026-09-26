@@ -8,6 +8,8 @@ use query_budget::{QueryFuel, SITE_QUERY_CAP};
 
 pub const MAX_FLAG_SURVEY_AGE: u64 = 30 * 60;
 const PATCH_HALF_WIDTH: u16 = 8;
+mod geometry;
+pub use geometry::{FlagSurveyEnvelope, FlagSurveyGeometry};
 
 #[cfg(test)]
 mod tests;
@@ -37,6 +39,8 @@ pub struct FlagSurveySample {
     pub measurement: CoverMeasurement,
     pub route: Option<LandingObjectiveRoute>,
     pub reason: Option<&'static str>,
+    /// Explanation of a rejected circular gate, never evidence for acceptance.
+    pub geometry: Option<FlagSurveyGeometry>,
     pub graph: u64,
     pub physics_queries: u64,
 }
@@ -58,6 +62,13 @@ pub struct FlagSurveyTelemetry {
     pub geometry_checks: u64,
     pub geometry_area_tests: u64,
     pub geometry_ms: f64,
+    pub geometry_diagnostics: u64,
+    pub diagnostic_setup_ms: f64,
+    pub diagnostic_ms: f64,
+    pub diagnostic_area_tests: u64,
+    pub diagnostic_region_changes: u64,
+    pub diagnostic_omitted_changes: u64,
+    pub diagnostic_incomplete: u64,
     pub max_completion_ticks: u64,
     pub deferred: BTreeMap<&'static str, u64>,
     pub unknown: BTreeMap<&'static str, u64>,
@@ -68,6 +79,7 @@ struct Pending {
     token: RequestToken,
     snapshot: Arc<QuerySnapshot>,
     sample: FlagSurveySample,
+    envelopes: Vec<FlagSurveyEnvelope>,
 }
 
 #[derive(Clone)]
@@ -307,6 +319,7 @@ impl FlagSurveyPlanner {
                 measurement,
                 route: None,
                 reason: None,
+                geometry: None,
                 graph: 0,
                 physics_queries: u64::from(fuel.used()),
             };
@@ -358,9 +371,25 @@ impl FlagSurveyPlanner {
                         job,
                     )
                     .unwrap();
+                let clock = Instant::now();
+                let envelopes = geometry::envelopes(
+                    &sample.measurement,
+                    actor.request.objective,
+                    actor.pilot.planet.radius,
+                    physics::SpacewarsPhysics::surface_vehicle_clearance_radius(
+                        &state.world.ships[state.pilots[player].vehicle.0],
+                    )
+                    .max(
+                        physics::SpacewarsPhysics::surface_vehicle_clearance_radius(
+                            &state.replacement_ship(player),
+                        ),
+                    ),
+                );
+                self.telemetry.diagnostic_setup_ms += clock.elapsed().as_secs_f64() * 1000.0;
                 actor.pending = Some(Pending {
                     token,
                     snapshot,
+                    envelopes,
                     sample,
                 });
                 token
@@ -423,23 +452,25 @@ impl FlagSurveyPlanner {
                 let now = actor.pilot.planet.motion;
                 // Includes the initial landing rays, hull settling, both hatch
                 // corridors and the highest (+60) climb sample with hull margin.
-                let validation = pending.snapshot.validate_region(
-                    &state.world.physics.world,
-                    QueryRegion {
-                        previous_position: old.position,
-                        previous_angle: old.angle,
-                        current_position: now.position,
-                        current_angle: now.angle,
-                        radius: actor.pilot.planet.radius + 80.0,
-                        groups: CollisionGroups::ALL,
-                        excluded: &[
-                            pilot_physics_id(actor.pilot.owner),
-                            state.world.physics.surface_vehicle_entity(
-                                state.pilots[row.request.actor as usize].vehicle.0,
-                            ),
-                        ],
-                    },
-                );
+                let excluded = [
+                    pilot_physics_id(actor.pilot.owner),
+                    state
+                        .world
+                        .physics
+                        .surface_vehicle_entity(state.pilots[row.request.actor as usize].vehicle.0),
+                ];
+                let region = QueryRegion {
+                    previous_position: old.position,
+                    previous_angle: old.angle,
+                    current_position: now.position,
+                    current_angle: now.angle,
+                    radius: actor.pilot.planet.radius + 80.0,
+                    groups: CollisionGroups::ALL,
+                    excluded: &excluded,
+                };
+                let validation = pending
+                    .snapshot
+                    .validate_region(&state.world.physics.world, region);
                 self.telemetry.geometry_area_tests += validation.area_tests;
                 let valid = !state.world.physics.material_queries_dirty && validation.valid;
                 self.telemetry.geometry_ms += clock.elapsed().as_secs_f64() * 1000.0;
@@ -447,6 +478,15 @@ impl FlagSurveyPlanner {
                     pending.sample.validated_tick = Some(tick);
                     None
                 } else {
+                    let clock = Instant::now();
+                    let detail = geometry::diagnose(state, &pending, region, validation);
+                    self.telemetry.geometry_diagnostics += 1;
+                    self.telemetry.diagnostic_area_tests += detail.report.area_tests;
+                    self.telemetry.diagnostic_region_changes += detail.report.region_changes;
+                    self.telemetry.diagnostic_omitted_changes += detail.report.omitted_changes;
+                    self.telemetry.diagnostic_incomplete += u64::from(!detail.report.complete);
+                    self.telemetry.diagnostic_ms += clock.elapsed().as_secs_f64() * 1000.0;
+                    pending.sample.geometry = Some(detail);
                     Some("geometry changed since source measurement")
                 }
             };

@@ -1838,7 +1838,7 @@ fn ordered_entity_pair(
     if a <= b { (a, b) } else { (b, a) }
 }
 
-fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
+pub(super) fn classify_entity(entity: PhysicsId) -> Option<MechanicalEntity> {
     match entity.value() {
         WORLD_ENTITY_VALUE => Some(MechanicalEntity::World),
         SUN_ENTITY_VALUE => Some(MechanicalEntity::Body(BodyId::Sun)),

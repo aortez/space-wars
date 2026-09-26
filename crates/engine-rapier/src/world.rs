@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 
 mod query_snapshot;
 pub use query_snapshot::{
-    AreaValidation, CapsuleQuery, QueryArea, QueryFrame, QueryRegion, QuerySnapshot,
+    AreaValidation, CapsuleQuery, QueryArea, QueryChange, QueryColliderState, QueryFrame,
+    QueryRegion, QuerySnapshot, RegionChanges,
 };
 
 const SNAPSHOT_VERSION: u32 = 1;

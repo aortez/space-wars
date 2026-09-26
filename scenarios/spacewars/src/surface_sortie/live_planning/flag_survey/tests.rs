@@ -240,6 +240,16 @@ fn tiny_rotation_of_a_long_collider_revokes_publication() {
         Some("geometry changed since source measurement")
     );
     assert!(planner.telemetry().geometry_area_tests > 0);
+    let detail = planner.samples()[0].geometry.as_ref().unwrap();
+    assert!(detail.report.complete);
+    assert!(!detail.acceptance_prefix.valid);
+    assert!(detail.report.changes.iter().any(|c| {
+        c.current
+            .as_ref()
+            .and_then(|s| s.collider)
+            .is_some_and(|id| id.entity == entity)
+            && c.motion_bound.is_some_and(|d| d > 0.002)
+    }));
 }
 
 #[test]
@@ -283,6 +293,8 @@ fn patch_finishes_under_real_quota_in_both_seats_and_is_read_only() {
             sample.completed_tick - sample.source_tick
         );
         assert_eq!(sample.reason, None);
+        assert!(sample.geometry.is_none());
+        assert_eq!(planner.telemetry().geometry_diagnostics, 0);
         assert!(sample.graph < MAX_FLAG_SURVEY_AGE);
         assert_eq!(sample.validated_tick, Some(sample.completed_tick));
         assert_eq!(sample.measurement.tick, sample.source_tick);
@@ -364,6 +376,33 @@ fn changed_climb_geometry_withholds_an_otherwise_complete_walk() {
     );
     assert!(sample.route.as_ref().unwrap().cost().is_some());
     assert_eq!(sample.validated_tick, None);
+    let detail = sample.geometry.as_ref().unwrap();
+    assert!(detail.report.complete);
+    assert_eq!(detail.report.omitted_changes, 0);
+    let climb = detail
+        .envelopes
+        .iter()
+        .position(|a| a.name == "climb_60")
+        .unwrap();
+    let change = detail
+        .report
+        .changes
+        .iter()
+        .find(|c| {
+            c.current
+                .as_ref()
+                .and_then(|s| s.collider)
+                .is_some_and(|id| id.entity == entity)
+        })
+        .unwrap();
+    assert!(change.previous.is_none());
+    assert!(change.areas.contains(&climb));
+    assert_eq!(detail.report.area_changes[climb], 1);
+    assert_eq!(planner.telemetry().geometry_diagnostics, 1);
+    assert_eq!(
+        planner.telemetry().diagnostic_area_tests,
+        detail.report.area_tests
+    );
 }
 
 #[test]

@@ -4,8 +4,36 @@ use rapier2d::parry::{
     shape::{Ball, Cuboid},
 };
 
+mod diagnostics;
 #[cfg(test)]
 mod tests;
+pub use diagnostics::{QueryChange, QueryColliderState, RegionChanges};
+
+fn same_geometry(a: &Collider, b: &Collider, old_frame: &Pose, new_frame: &Pose) -> bool {
+    if a.user_data != b.user_data
+        || a.collision_groups() != b.collision_groups()
+        || a.is_sensor() != b.is_sensor()
+        || a.is_enabled() != b.is_enabled()
+    {
+        return false;
+    }
+    // Generational handle equality establishes immutable shape identity.
+    // Include rotation about distant collider origins, not just translation.
+    relative_motion_bound(a, b, old_frame, new_frame) <= 0.002
+}
+
+fn relative_motion_bound(a: &Collider, b: &Collider, old_frame: &Pose, new_frame: &Pose) -> f32 {
+    let bounds = a.shape().compute_local_aabb();
+    let extent = bounds.mins.abs().max(bounds.maxs.abs()).length();
+    let a = old_frame.inv_mul(a.position());
+    let b = new_frame.inv_mul(b.position());
+    (a.translation - b.translation).length()
+        + 2.0
+            * ((a.rotation.angle() - b.rotation.angle()) * 0.5)
+                .sin()
+                .abs()
+            * extent
+}
 
 /// Conservative query bounds in the anchor's local frame. Callers must cover
 /// every physical query supporting the result, including edge interiors.
@@ -25,7 +53,7 @@ pub struct QueryFrame<'a> {
     pub excluded: &'a [PhysicsId],
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 pub struct AreaValidation {
     pub valid: bool,
     pub changed_colliders: u64,
@@ -129,29 +157,6 @@ impl QuerySnapshot {
         }
         let old_frame = Pose::new(to_rapier(region.previous_position), region.previous_angle);
         let new_frame = Pose::new(to_rapier(region.current_position), region.current_angle);
-        let same = |a: &Collider, b: &Collider| {
-            if a.user_data != b.user_data
-                || a.collision_groups() != b.collision_groups()
-                || a.is_sensor() != b.is_sensor()
-                || a.is_enabled() != b.is_enabled()
-            {
-                return false;
-            }
-            // Generational handle equality establishes immutable shape identity.
-            // Bound angular displacement using the collider's own extent, even
-            // when its origin lies well outside the selected route.
-            let bounds = a.shape().compute_local_aabb();
-            let extent = bounds.mins.abs().max(bounds.maxs.abs()).length();
-            let a = old_frame.inv_mul(a.position());
-            let b = new_frame.inv_mul(b.position());
-            (a.translation - b.translation).length()
-                + 2.0
-                    * ((a.rotation.angle() - b.rotation.angle()) * 0.5)
-                        .sin()
-                        .abs()
-                    * extent
-                <= 0.002
-        };
         let touches = |collider: &Collider, frame: &Pose, tests: &mut u64| {
             if !collider.is_enabled()
                 || collider.is_sensor()
@@ -164,7 +169,7 @@ impl QuerySnapshot {
         };
         for (handle, old) in self.colliders.iter() {
             let current = world.raw.colliders.get(handle);
-            if current.is_some_and(|new| same(old, new)) {
+            if current.is_some_and(|new| same_geometry(old, new, &old_frame, &new_frame)) {
                 continue;
             }
             report.changed_colliders += 1;
