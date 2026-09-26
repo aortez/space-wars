@@ -9,6 +9,11 @@ use std::str;
 use engine_common::Settings;
 use tempfile::NamedTempFile;
 
+mod document;
+use document::Document;
+#[cfg(test)]
+mod recovery_tests;
+
 /// Environment variable that overrides the platform-default config directory.
 ///
 /// Used by the Pi kiosk build (wants `/var/lib/spacewars/`) and by tests.
@@ -34,6 +39,12 @@ pub enum LoadStatus {
     /// The file was readable, but needs writeback to include defaults or
     /// normalized formatting.
     Migrated,
+    /// Individual fields (or malformed collection records) were defaulted;
+    /// unrelated preferences were retained. The original file is backed up.
+    RecoveredFields {
+        backup_path: PathBuf,
+        fields: Vec<String>,
+    },
     /// The file was malformed. A byte-for-byte backup was written and defaults
     /// should replace the original file.
     RecoveredMalformed {
@@ -57,6 +68,9 @@ pub enum SettingsError {
     Io(io::Error),
     /// TOML serialization failed.
     Serialize(toml::ser::Error),
+    /// The document parsed but safe, bounded field recovery could not finish.
+    /// Leave the original file untouched rather than resetting everything.
+    Recovery(toml::de::Error),
     /// Too many malformed-file backup names already exist.
     BackupPathExhausted(PathBuf),
 }
@@ -67,6 +81,7 @@ impl core::fmt::Display for SettingsError {
             Self::NoConfigDir => write!(f, "could not resolve a config directory"),
             Self::Io(e) => write!(f, "settings I/O error: {e}"),
             Self::Serialize(e) => write!(f, "settings serialize error: {e}"),
+            Self::Recovery(e) => write!(f, "could not safely recover settings: {e}"),
             Self::BackupPathExhausted(path) => {
                 write!(
                     f,
@@ -83,6 +98,7 @@ impl std::error::Error for SettingsError {
         match self {
             Self::Io(e) => Some(e),
             Self::Serialize(e) => Some(e),
+            Self::Recovery(e) => Some(e),
             Self::NoConfigDir | Self::BackupPathExhausted(_) => None,
         }
     }
@@ -119,7 +135,8 @@ pub fn settings_path() -> Result<PathBuf, SettingsError> {
     Ok(config_dir()?.join(SETTINGS_FILENAME))
 }
 
-/// Load settings from disk. Missing fields or groups are filled from defaults.
+/// Load settings from disk. Missing/invalid fields or groups use the defaults
+/// declared on Settings and its nested types. Unknown keys survive saves.
 ///
 /// Callers should write the returned settings back when
 /// [`LoadStatus::needs_writeback`] is true.
@@ -140,19 +157,26 @@ fn load_settings_from_bytes(path: &Path, bytes: &[u8]) -> Result<LoadedSettings,
         Err(e) => return recover_malformed(path, bytes, e.to_string()),
     };
 
-    match toml::from_str::<Settings>(text) {
-        Ok(mut settings) => {
-            settings.audio = settings.audio.normalized();
-            let normalized = serialize_settings(&settings)?;
-            let status = if normalized.as_bytes() == bytes {
-                LoadStatus::Existing
-            } else {
-                LoadStatus::Migrated
-            };
-            Ok(LoadedSettings { settings, status })
+    let root = match toml::de::DeTable::parse(text) {
+        Ok(root) => root,
+        Err(e) => return recover_malformed(path, bytes, e.to_string()),
+    };
+    let document = Document::decode(root).map_err(SettingsError::Recovery)?;
+    let normalized = document::serialize(&document.settings, Some(&document))?;
+    let status = if !document.repaired.is_empty() {
+        LoadStatus::RecoveredFields {
+            backup_path: write_malformed_backup(path, bytes)?,
+            fields: document.repaired,
         }
-        Err(e) => recover_malformed(path, bytes, e.to_string()),
-    }
+    } else if normalized.as_bytes() == bytes {
+        LoadStatus::Existing
+    } else {
+        LoadStatus::Migrated
+    };
+    Ok(LoadedSettings {
+        settings: document.settings,
+        status,
+    })
 }
 
 fn recover_malformed(
@@ -170,8 +194,9 @@ fn recover_malformed(
     })
 }
 
-/// Save settings using a temp file in the destination directory, fsync, then an
-/// atomic replace.
+/// Save through a temp file, fsync and atomic replace. Re-read the existing
+/// document to preserve unknown keys even when callers clear optional fields.
+/// Never overwrite an unreadable file, and back up invalid input first.
 pub fn save_settings(settings: &Settings, path: &Path) -> Result<(), SettingsError> {
     let parent = path
         .parent()
@@ -180,7 +205,32 @@ pub fn save_settings(settings: &Settings, path: &Path) -> Result<(), SettingsErr
 
     fs::create_dir_all(parent)?;
 
-    let text = serialize_settings(settings)?;
+    let bytes = match fs::read(path) {
+        Ok(bytes) => Some(bytes),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
+        Err(e) => return Err(e.into()),
+    };
+    let previous = if let Some(bytes) = bytes.as_deref() {
+        let root = str::from_utf8(bytes)
+            .ok()
+            .and_then(|text| toml::de::DeTable::parse(text).ok());
+        match root {
+            Some(root) => {
+                let document = Document::decode(root).map_err(SettingsError::Recovery)?;
+                if !document.repaired.is_empty() {
+                    write_malformed_backup(path, bytes)?;
+                }
+                Some(document)
+            }
+            None => {
+                write_malformed_backup(path, bytes)?;
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let text = document::serialize(settings, previous.as_ref())?;
     let mut temp = NamedTempFile::new_in(parent)?;
     temp.write_all(text.as_bytes())?;
     temp.as_file_mut().sync_all()?;
@@ -190,10 +240,6 @@ pub fn save_settings(settings: &Settings, path: &Path) -> Result<(), SettingsErr
         .map_err(io::Error::from)?;
     sync_parent_dir(parent)?;
     Ok(())
-}
-
-fn serialize_settings(settings: &Settings) -> Result<String, SettingsError> {
-    Ok(toml::to_string_pretty(settings)?)
 }
 
 fn write_malformed_backup(path: &Path, bytes: &[u8]) -> Result<PathBuf, SettingsError> {
@@ -216,7 +262,13 @@ fn write_malformed_backup(path: &Path, bytes: &[u8]) -> Result<PathBuf, Settings
                 }
                 return Ok(backup_path);
             }
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                // Load and its immediate writeback see the same invalid bytes.
+                // Reuse that backup instead of creating one on every retry.
+                if fs::read(&backup_path).is_ok_and(|existing| existing == bytes) {
+                    return Ok(backup_path);
+                }
+            }
             Err(e) => return Err(e.into()),
         }
     }
@@ -259,6 +311,86 @@ mod tests {
     use super::*;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn unsupported_bot_defaults_only_that_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let original = r#"
+last_scenario = "spacewars"
+[audio]
+master_volume = 0.05
+muted = true
+[autostart]
+enabled = true
+activity = "spacewars-bots"
+[launch]
+seed = 12616578969279246616
+raster_scale = 2.0
+[spacewars]
+player_1_controller = "planner-bot"
+player_2_controller = "value-bot"
+player_health_percent = 200
+"#;
+        fs::write(&path, original).unwrap();
+        let loaded = load_settings(&path).unwrap();
+        assert_eq!(loaded.settings.audio.master_volume, 0.05);
+        assert!(loaded.settings.audio.muted);
+        assert!(loaded.settings.autostart.enabled);
+        assert_eq!(loaded.settings.autostart.activity, "spacewars-bots");
+        assert_eq!(loaded.settings.launch.seed, 12616578969279246616);
+        assert_eq!(loaded.settings.launch.raster_scale, 2.0);
+        assert_eq!(
+            loaded.settings.spacewars.player_1_controller,
+            SpacewarsController::PlannerBot
+        );
+        assert_eq!(
+            loaded.settings.spacewars.player_2_controller,
+            SpacewarsSettings::default().player_2_controller
+        );
+        assert_eq!(loaded.settings.spacewars.player_health_percent, 200);
+        save_settings(&loaded.settings, &path).unwrap();
+        let reloaded = load_settings(&path).unwrap();
+        assert_eq!(reloaded.status, LoadStatus::Existing);
+        assert_eq!(reloaded.settings.launch.seed, loaded.settings.launch.seed);
+        assert_eq!(reloaded.settings.audio, loaded.settings.audio);
+    }
+
+    #[test]
+    fn saves_preserve_unknown_settings_but_allow_clearing_known_options() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        fs::write(
+            &path,
+            r#"
+last_scenario = "clock"
+future_root = [1, "two"]
+[audio]
+master_volume = 0.05
+future_device = "cabinet"
+[nes]
+selected_rom_id = "test-rom"
+future_palette = "warm"
+[future_section]
+enabled = true
+"#,
+        )
+        .unwrap();
+        let mut loaded = load_settings(&path).unwrap();
+        loaded.settings.audio.master_volume = 0.10;
+        loaded.settings.last_scenario = None;
+        loaded.settings.nes.selected_rom_id = None;
+        save_settings(&loaded.settings, &path).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        let stored: toml::Table = toml::from_str(&text).unwrap();
+        assert_eq!(stored["audio"]["future_device"].as_str(), Some("cabinet"));
+        assert_eq!(stored["nes"]["future_palette"].as_str(), Some("warm"));
+        assert_eq!(stored["future_root"].as_array().unwrap().len(), 2);
+        assert_eq!(stored["future_section"]["enabled"].as_bool(), Some(true));
+        assert!(!stored.contains_key("last_scenario"));
+        assert!(stored["nes"].get("selected_rom_id").is_none());
+        assert_eq!(load_settings(&path).unwrap().status, LoadStatus::Existing);
+    }
 
     #[test]
     fn fps_counter_defaults_off_and_persists_without_resetting_other_settings() {
@@ -307,23 +439,30 @@ mod tests {
     }
 
     #[test]
-    fn malformed_clock_message_is_backed_up_not_silently_truncated() {
+    fn invalid_clock_message_is_backed_up_and_only_that_field_is_defaulted() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.toml");
         for text in ["", "   ", "é", "A_B", &"A".repeat(33)] {
-            let original = format!("[clock]\nmarquee_message = {text:?}\n");
+            let original = format!(
+                "[clock]\nmarquee_message = {text:?}\nshow_date = true\nevent_profile = 'off'\n"
+            );
             fs::write(&path, &original).unwrap();
             let loaded = load_settings(&path).unwrap();
-            let LoadStatus::RecoveredMalformed {
+            let LoadStatus::RecoveredFields {
                 backup_path,
-                reason,
+                fields,
             } = loaded.status
             else {
                 panic!()
             };
-            assert!(reason.contains("Clock message"));
+            assert_eq!(fields, ["clock.marquee_message"]);
             assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
             assert_eq!(loaded.settings.clock.marquee_message.as_str(), "SPACE WARS");
+            assert!(loaded.settings.clock.show_date);
+            assert_eq!(
+                loaded.settings.clock.event_profile,
+                engine_common::ClockEventProfile::Off
+            );
         }
     }
 

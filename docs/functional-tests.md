@@ -73,6 +73,10 @@ check live gain/mute and pause/resume independence. The shared background-writer
 tests use explicit channel gates, not storage-speed expectations, to verify
 ordered, coalesced saves and that an old completion cannot acknowledge a newer
 pending snapshot.
+The fresh-process portion also supplies an unsupported bot choice and a future
+audio setting: startup must retain audio/FPS preferences, warn and default only
+the bot field, and preserve the unknown key through the next UI save. See
+[settings compatibility and recovery](settings.md).
 
 The Device Info workflow opens the same read-only panel from launcher and pause,
 waits for a completed sample, scrolls through the public API, and verifies that

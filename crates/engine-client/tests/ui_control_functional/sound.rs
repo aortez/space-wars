@@ -145,6 +145,19 @@ fn sound_controls_persist_across_scenarios_restart_and_process_restart() {
             assert!(Instant::now() < deadline, "client did not quit");
             thread::sleep(POLL_INTERVAL);
         }
+        // Reproduce a downgrade/parallel-checkout configuration: a newer bot
+        // enum must not reset the volume, mute, FPS preference, or unknown keys.
+        let mut input: toml::Table = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        input["spacewars"]
+            .as_table_mut()
+            .unwrap()
+            .insert("player_2_controller".into(), "future-bot".into());
+        input["audio"]
+            .as_table_mut()
+            .unwrap()
+            .insert("future_device".into(), "cabinet-speaker".into());
+        let original = toml::to_string_pretty(&input).unwrap();
+        fs::write(&path, &original).unwrap();
         let log = File::create(harness.run_path().join("restarted-client.log")).unwrap();
         harness.child = OwnedChild(
             Command::new(env!("CARGO_BIN_EXE_engine-client"))
@@ -165,6 +178,25 @@ fn sound_controls_persist_across_scenarios_restart_and_process_restart() {
         assert_eq!(control_value(&sound, "sound.mute"), Some("on"));
         assert_eq!(control_value(&sound, "sound.save-status"), Some("saved"));
         assert_eq!(control_value(&sound, "settings.fps-counter"), Some("on"));
+        assert_eq!(
+            fs::read_to_string(path.with_file_name("settings.toml.bad")).unwrap(),
+            original
+        );
+        let log = fs::read_to_string(harness.run_path().join("restarted-client.log")).unwrap();
+        assert!(log.contains("spacewars.player_2_controller"));
+        assert!(log.contains("other preferences preserved"));
+        harness.activate_guarded("sound.volume.next", &sound);
+        let sound = harness.wait_sound_save("saved");
+        assert_eq!(control_value(&sound, "sound.volume.next"), Some("11%"));
+        let stored: toml::Table = toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            stored["audio"]["future_device"].as_str(),
+            Some("cabinet-speaker")
+        );
+        assert_eq!(
+            stored["spacewars"]["player_2_controller"].as_str(),
+            Some("human")
+        );
     });
 }
 

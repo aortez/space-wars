@@ -641,6 +641,10 @@ with `SLINT_BACKEND`; `--kiosk` remains available when booting directly into the
 saved scenario is preferred. The same settings directory can also be selected
 with `SPACEWARS_CONFIG_DIR`.
 
+Settings use declared defaults for missing fields and recover invalid fields
+without resetting unrelated preferences. Unknown keys survive saves; rejected
+input is backed up before replacement. See [settings compatibility](docs/settings.md).
+
 See [`docs/pi-kiosk.md`](docs/pi-kiosk.md) for the current Pi runbook and
 example systemd service. The Yocto image scaffold is under [`yocto/`](yocto/).
 

@@ -2691,6 +2691,19 @@ fn log_settings_load_status(path: &Path, status: &LoadStatus) {
             path = %path.display(),
             "loaded settings; normalized writeback required."
         ),
+        LoadStatus::RecoveredFields {
+            backup_path,
+            fields,
+        } => {
+            for field in fields {
+                tracing::warn!(
+                    path = %path.display(),
+                    backup_path = %backup_path.display(),
+                    field,
+                    "invalid setting defaulted (or invalid collection record skipped); other preferences preserved."
+                );
+            }
+        }
         LoadStatus::RecoveredMalformed {
             backup_path,
             reason,

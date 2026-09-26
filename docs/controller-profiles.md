@@ -58,6 +58,10 @@ A profile cannot repair a switch that produces no input events.
 Profiles live in `controls.controller_profiles` in the local settings TOML
 (`/data/spacewars/config/settings.toml` on kiosks). They are not checked into
 source control or copied between cabinets by the app update process.
+The shared [settings recovery rules](settings.md) preserve unknown settings and
+default invalid fields without resetting unrelated preferences. Structurally
+malformed profile records are skipped with a backup and warning, not partially
+applied; valid sibling profiles survive.
 
 Identity uses the backend-schema version, OS, gilrs UUID, vendor/product IDs,
 and OS-reported name—not a temporary connection ID, port order, or player seat.
