@@ -53,6 +53,8 @@ def charge(row):
 
 def coverage(path):
     samples = [json.loads(line) for line in (path / "flag-survey.jsonl").open()]
+    telemetry = json.loads((path / "report.json").read_text())["flag_survey"]["telemetry"]
+    validate_sample_counts(samples, telemetry)
     keys = [(s["actor"], s["source_tick"], s["site"]["bearing"]) for s in samples]
     assert len(keys) == len(set(keys))
     for sample in samples:
@@ -74,6 +76,12 @@ def coverage(path):
                 unknown=dict(Counter(s["reason"] for s in samples if s["reason"])),
                 maximum_combined_work=maxima, flag_work=totals,
                 positive_samples=[s for s in samples if s["reason"] is None])
+
+
+def validate_sample_counts(samples, telemetry):
+    assert len(samples) == telemetry["completed"]
+    assert sum(s["reason"] is None for s in samples) == telemetry["walking_round_trips"]
+    assert dict(Counter(s["reason"] for s in samples if s["reason"])) == telemetry["unknown"]
 
 
 def main():
