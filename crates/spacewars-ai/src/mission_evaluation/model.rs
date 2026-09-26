@@ -9,6 +9,9 @@ pub(super) struct PlanetKey {
     known: bool,
     flag: Option<(PlayerId, Vec2)>,
     stage_seconds: Option<f32>,
+    // Retained for the historical shadow; ordinary matching remains unchanged.
+    radius: f32,
+    flag_range: Option<f32>,
 }
 impl PlanetKey {
     pub fn read(planet: &PilotPlanetObservation) -> Self {
@@ -24,6 +27,11 @@ impl PlanetKey {
                 )
             }),
             stage_seconds: planet.claim.as_ref().map(|c| c.stage_required_seconds),
+            radius: planet.radius,
+            flag_range: planet
+                .claim
+                .as_ref()
+                .map(|c| c.flag_interaction_range - 0.2),
         }
     }
     pub fn matches(&self, other: &Self) -> bool {
@@ -37,6 +45,24 @@ impl PlanetKey {
                 (None, None) => true,
                 _ => false,
             }
+    }
+    pub fn flag_identity_matches(&self, objective: LandingObjective, radius: f32) -> bool {
+        let Some((owner, position)) = self.flag else {
+            return false;
+        };
+        self.known
+            && self.owner == Some(owner)
+            && self.radius == radius
+            && self
+                .stage_seconds
+                .is_some_and(|v| v.is_finite() && (v - 3.0).abs() <= 0.001)
+            && self.planet == objective.planet
+            && self.revision == objective.revision
+            && owner == objective.owner
+            && position.distance_to(objective.position) <= 0.002
+            && self
+                .flag_range
+                .is_some_and(|v| (v - objective.range).abs() <= 0.0001)
     }
 }
 
@@ -113,6 +139,14 @@ pub(super) fn local_costs(
         .take(8)
         .find(|r| r.site == Some(site))
         .ok_or("site round trip unmeasured")?;
+    walking_costs(route, claim.stage_required_seconds)
+}
+
+/// Shared phase calibration for local routes and the historical flag shadow.
+pub(super) fn walking_costs(
+    route: &scenario_spacewars::surface_sortie::landing_objective::LandingObjectiveRoute,
+    stage_seconds: f32,
+) -> Result<PhaseCosts, &'static str> {
     if route.cost().is_none() {
         return Err("round trip incomplete");
     }
@@ -129,7 +163,8 @@ pub(super) fn local_costs(
     let returning = returning.length / 5.0;
     if !(0.0..=10.599_817).contains(&outbound)
         || !(0.0..=10.118_012).contains(&returning)
-        || (claim.stage_required_seconds - 3.0).abs() > 0.001
+        || !stage_seconds.is_finite()
+        || (stage_seconds - 3.0).abs() > 0.001
     {
         return Err("walking or claim reference outside calibration");
     }
