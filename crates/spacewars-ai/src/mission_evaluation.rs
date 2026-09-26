@@ -18,11 +18,13 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 mod flag_survey;
+mod flag_value_shadow;
 mod model;
 mod selection;
 mod survey;
 mod transfer;
 mod value;
+pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use selection::CaptureSelection;
 pub use transfer::{TransferReference, TransferSource};

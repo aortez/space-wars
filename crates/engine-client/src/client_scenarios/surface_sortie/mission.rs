@@ -1,7 +1,7 @@
 use super::*;
 use engine_core::planning::Work;
 use scenario_spacewars::surface_sortie::live_planning::{FlagSurveyPlanner, LiveObjectivePlanner};
-use spacewars_ai::mission_evaluation::{DEFAULT_WORK, MissionEvaluator};
+use spacewars_ai::mission_evaluation::{DEFAULT_WORK, FlagValueShadow, MissionEvaluator};
 use spacewars_ai::mission_policy::{MissionBot, MissionPolicy};
 use std::time::Instant;
 
@@ -68,6 +68,7 @@ struct MaterialMissionClientScenario {
     evaluation: MissionEvaluator,
     surveys: LiveObjectivePlanner,
     flag_surveys: Option<FlagSurveyPlanner>,
+    flag_value_shadow: FlagValueShadow,
 }
 impl MaterialMissionClientScenario {
     fn append_controller_hud(&self, frames: &mut [RenderFrame], viewport: Viewport) {
@@ -118,6 +119,7 @@ fn create_with_seats(
         seed,
         profile: profiling::Profile::default(),
         evaluation: MissionEvaluator::new(2),
+        flag_value_shadow: FlagValueShadow::new(2),
         surveys: LiveObjectivePlanner::new(2, OBSERVATION_WORK),
         flag_surveys: [
             settings.spacewars.player_1_controller,
@@ -254,6 +256,8 @@ impl ClientScenario for MaterialMissionClientScenario {
                     None
                 };
                 flags.observe(&self.sortie.state, seat, &o, request);
+                self.flag_value_shadow
+                    .observe(&o, &self.evaluation, request, &flags.samples());
             }
             sample.planning += clock.elapsed();
         }
@@ -274,14 +278,18 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .filter(|j| j.charged.physics_queries > 0)
                 .map(|j| j.request.actor as usize)
                 .collect();
-            flags.advance(
-                &self.sortie.state,
+            let remaining = Work {
+                graph: OBSERVATION_WORK.graph - allocation.charged.graph - evaluated.graph,
+                physics_queries: OBSERVATION_WORK.physics_queries
+                    - allocation.charged.physics_queries,
+            };
+            let surveyed = flags.advance(&self.sortie.state, remaining, &busy).unwrap();
+            self.flag_value_shadow.advance(
+                self.sortie.state.tick(),
                 Work {
-                    graph: OBSERVATION_WORK.graph - allocation.charged.graph - evaluated.graph,
-                    physics_queries: OBSERVATION_WORK.physics_queries
-                        - allocation.charged.physics_queries,
+                    graph: remaining.graph - surveyed.charged.graph,
+                    physics_queries: 0,
                 },
-                &busy,
             );
         }
         sample.planning += clock.elapsed();
@@ -345,7 +353,7 @@ impl ClientScenario for MaterialMissionClientScenario {
                 .match_result_message()
                 .unwrap_or_else(|| "in_progress".into()),
             format_args!(
-                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}",
+                "{}\nmission_evaluation_models={}\nmission_evaluation_work={}\nmission_evaluation_p1={}\nmission_evaluation_p2={}\nmission_alternative_survey={}\nmission_flag_survey={}\nmission_flag_value_shadow={}",
                 self.profile.diagnostics(&self.pilots),
                 serde_json::to_string(&self.pilots.each_ref().map(|p| {
                     spacewars_ai::mission_evaluation::model_for_policy(p.telemetry().policy)
@@ -359,6 +367,14 @@ impl ClientScenario for MaterialMissionClientScenario {
                     "model":"remote_flag_walk_patch_v1", "observational":true,
                     "telemetry":s.telemetry(), "samples":s.samples(),
                 })))
+                .unwrap(),
+                serde_json::to_string(&serde_json::json!({
+                    "model":"capture_flag_value_shadow_v1", "observational":true,
+                    "charged":self.flag_value_shadow.charged_total,
+                    "completed":self.flag_value_shadow.completed_total,
+                    "p1":self.flag_value_shadow.latest(PlayerId::PLAYER_1),
+                    "p2":self.flag_value_shadow.latest(PlayerId::PLAYER_2),
+                }))
                 .unwrap()
             ),
             self.sortie.runtime_diagnostics(),

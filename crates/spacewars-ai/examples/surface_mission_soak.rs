@@ -1,6 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/flag_survey.rs"]
 mod flag_survey;
+#[path = "support/flag_value_shadow.rs"]
+mod flag_value_shadow;
 #[path = "support/ground_start_probe.rs"]
 mod ground_start_probe;
 #[path = "support/landing_cadence_probe.rs"]
@@ -622,6 +624,14 @@ fn main() {
                         let flag_request =
                             evaluator.evaluator.flag_request(&o, pilots[i].telemetry());
                         flags.planner.observe(&state, i, &o, flag_request);
+                        if let Some(shadow) = &mut flags.shadow {
+                            shadow.observe(
+                                &o,
+                                &evaluator.evaluator,
+                                flag_request,
+                                &flags.planner.samples(),
+                            );
+                        }
                         successor_construction_ms += clock.elapsed().as_secs_f64() * 1000.0;
                     }
                 }
