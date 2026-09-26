@@ -10,6 +10,7 @@ use std::{
 
 pub struct FlagSurveyRun {
     pub planner: FlagSurveyPlanner,
+    pub shadow: Option<super::flag_value_shadow::ShadowRun>,
     samples: BufWriter<File>,
     work: BufWriter<File>,
     written: std::collections::BTreeSet<(usize, u64, u8)>,
@@ -22,6 +23,15 @@ impl FlagSurveyRun {
             "false" => false,
             _ => panic!("--survey-capture-flags must be true or false"),
         };
+        let shadow = super::arg("--shadow-capture-flags", "false");
+        assert!(
+            matches!(shadow.as_str(), "true" | "false"),
+            "--shadow-capture-flags must be true or false"
+        );
+        assert!(
+            enabled || shadow == "false",
+            "flag shadow requires flag surveys"
+        );
         assert!(
             !enabled
                 || ["--evaluate-missions", "--live-objective-planning"]
@@ -31,6 +41,7 @@ impl FlagSurveyRun {
         );
         enabled.then(|| Self {
             planner: FlagSurveyPlanner::new(2),
+            shadow: super::flag_value_shadow::ShadowRun::from_args(out),
             samples: BufWriter::new(File::create(out.join("flag-survey.jsonl")).unwrap()),
             work: BufWriter::new(File::create(out.join("flag-survey-work.jsonl")).unwrap()),
             written: Default::default(),
@@ -59,14 +70,26 @@ impl FlagSurveyRun {
                 writeln!(self.samples).unwrap();
             }
         }
-        ms
+        ms + self.shadow.as_mut().map_or(0.0, |shadow| {
+            shadow.advance(
+                state.tick(),
+                Work {
+                    graph: remaining.graph - allocation.charged.graph,
+                    physics_queries: 0,
+                },
+            )
+        })
     }
     pub fn report(&mut self) -> Value {
         self.samples.flush().unwrap();
         self.work.flush().unwrap();
-        json!({"model":"remote_flag_walk_patch_v1", "observational":true,
+        let mut report = json!({"model":"remote_flag_walk_patch_v1", "observational":true,
             "telemetry":self.planner.telemetry(), "dispatch":super::timing(self.dispatch_ms.clone()),
             "scope":"17 contour samples, walking only, one snapshot per site; after evaluator with remaining shared work; results never enter controls",
-            "timing_scope":"dispatch includes snapshot construction and publication geometry validation; those stages are outside operation quotas; trace IO excluded"})
+            "timing_scope":"dispatch includes snapshot construction and publication geometry validation; those stages are outside operation quotas; trace IO excluded"});
+        if let Some(shadow) = &mut self.shadow {
+            report["shadow"] = shadow.report();
+        }
+        report
     }
 }
