@@ -105,6 +105,12 @@ in captured screenshots and reported approximately 60 FPS/UPS. Existing settings
 migrated with Date Off; enabling it through the live controls persisted only
 `clock.show_date = true`, preserving each device's other preferences.
 
+Actual device screenshots from that release build:
+
+| Picade, 1024×768 / 12-hour | HyperPixel, 800×480 / 24-hour |
+| --- | --- |
+| ![Clock date on sw-picade-2](screenshots/clock/picade-calendar-date.png) | ![Clock date on spacewars HyperPixel](screenshots/clock/hyperpixel-calendar-date.png) |
+
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
