@@ -465,6 +465,58 @@ impl SurfaceSortieState {
 /// Only setup installs an opposing flag; capture and boarding then use ordinary
 /// physics and actions. The second parked ship blocks the long walk around.
 impl SurfaceSortieScenario {
+    /// Two physical destinations for a mission-choice experiment. The initial
+    /// opposing flag is anchored in retained material; subsequent travel,
+    /// destruction, claim and boarding all use the ordinary shared simulation.
+    pub fn init_capture_destination_trial(
+        seed: u64,
+        player: usize,
+        mirror: bool,
+        flag_bearing: f32,
+    ) -> SurfaceSortieState {
+        assert!(player < 2 && flag_bearing.is_finite());
+        let mut state = Self::init_material_travel_surface_trial(
+            seed,
+            mirror,
+            0.0,
+            engine_terrain::TerrainSurface::Interpolated,
+        );
+        Self::step(&mut state, &[], Duration::from_nanos(16_666_667));
+        let planet = 1 - player;
+        let frame = motion::SurfaceFrame::read(&state.world.physics, planet);
+        let up = Vec2::Y.rotate_radians(flag_bearing);
+        let radius = state.world.planets[planet].radius * BODY_BOUNDS_RADIUS_SCALE;
+        let hit = state
+            .world
+            .physics
+            .material_ground_ray(
+                planet,
+                frame.position + up * (radius + 20.0),
+                -up,
+                radius + 20.0,
+            )
+            .expect("initial flag stands on retained material");
+        let position = (hit.point - frame.position).rotate_radians(-frame.angle);
+        let normal = hit.normal.rotate_radians(-frame.angle);
+        let terrain = &state.world.terrain.planets[&planet];
+        let footing = terrain
+            .geometry
+            .contact_cell(&terrain.field, position, normal)
+            .expect("initial flag has material footing");
+        let enemy = PlayerId::from_index(1 - player).unwrap();
+        state.world.planets[planet].owner_id = Some(enemy.index());
+        state.claims[planet].flag = Some(PlanetFlag {
+            player: enemy,
+            anchor: FlagAnchor {
+                position,
+                normal,
+                footing: Some(footing),
+                surface_revision: terrain.field.revision(),
+            },
+        });
+        state
+    }
+
     pub fn init_material_flag_crossing_trial(seed: u64, player: usize) -> SurfaceSortieState {
         assert!(player < 2);
         let mut state =

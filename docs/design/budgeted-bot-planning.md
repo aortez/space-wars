@@ -220,7 +220,10 @@ choice between multiple destinations. The follow-up
 multi-destination reports across four new paired matches, with unchanged controls
 and local allocations. It surveys one neutral alternative under bounded query
 fuel. The 564 fully covered comparisons all retain the current destination;
-changing mission selection remains separate behavioral work.
+the experimental [v12 destination selector](../capture-destination-planner.md)
+now consumes that evidence at guarded prelanding boundaries. v9/v10 remain
+pinned. The first physical comparisons measure earlier footholds and complete
+trips; they do not yet establish a win-rate or survival improvement.
 
 ## Current boundary and missing information
 

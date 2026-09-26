@@ -82,7 +82,7 @@ impl EvaluationRun {
     pub fn report(&mut self) -> Value {
         self.file.flush().unwrap();
         json!({
-            "model":MODEL, "observational":true, "requested_shared_budget":self.budget,
+            "model":MODEL, "observational": !["--p1-policy", "--p2-policy"].into_iter().any(|flag| super::arg(flag, "material_mission_v9") == "material_mission_v12"), "requested_shared_budget":self.budget,
             "alternative_survey":self.alternative_survey,
             "maximum_shared_budget":DEFAULT_WORK.graph, "charged":self.evaluator.charged_total,
             "completed":self.evaluator.completed_total, "cancelled":self.evaluator.cancelled_total,

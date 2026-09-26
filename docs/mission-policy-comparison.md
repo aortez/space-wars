@@ -9,7 +9,7 @@ to use the existing shared tasks.
 
 ## Selecting the policies
 
-Ordinary Spacewars exposes `human`, `legacy bot` and `planner bot` for each
+Ordinary Spacewars exposes `human`, `legacy bot`, `planner bot` and the experimental `mission v12` for each
 player. Any human/bot or bot/bot combination is supported, including two planner
 bots. Choices persist across restart. Automatic matches retain selected bots
 and fill human seats with the legacy bot. Historical lab registrations remain
@@ -20,6 +20,7 @@ material planner and reports an error if its P2 selection is the planner.
 | --- | --- | --- |
 | Legacy bot | `material_mission_v9` | Cheapest outward endpoint, then check return |
 | Planner bot | `material_mission_v10` | Joint outward and return endpoint selection |
+| Mission v12 | `material_mission_v12` | v10 local tasks plus guarded [capture-destination selection](capture-destination-planner.md) |
 
 The persisted legacy value remains `rule-bot`; `rule bot` is still accepted by
 the launcher parser as a legacy label. The new saved value is `planner-bot`.

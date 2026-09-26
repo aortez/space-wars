@@ -38,10 +38,11 @@ impl LivePlanningRun {
                 .unwrap(),
         };
         let seats = match super::arg("--live-objective-seats", "both").as_str() {
+            "none" => vec![],
             "both" => vec![0, 1],
             "0" => vec![0],
             "1" => vec![1],
-            _ => panic!("--live-objective-seats must be both, 0 or 1"),
+            _ => panic!("--live-objective-seats must be both, none, 0 or 1"),
         };
         let planner = match super::arg("--reuse-objective-ground", "false").as_str() {
             "false" => LiveObjectivePlanner::new(2, work),
@@ -82,6 +83,10 @@ impl LivePlanningRun {
     }
     pub fn enabled_for(&self, seat: usize) -> bool {
         self.seats.contains(&seat)
+    }
+    #[allow(dead_code)] // The mission runner also supports native synchronous local sensing.
+    pub fn destination_enabled_for(&self, seat: usize) -> bool {
+        self.seats.is_empty() || self.enabled_for(seat)
     }
     #[allow(dead_code)] // Only the mission runner has successor jobs.
     pub fn remaining_work(&self) -> Work {

@@ -19,6 +19,10 @@ use scenario_spacewars::{
 };
 use serde::Serialize;
 
+#[path = "mission_destination.rs"]
+mod destination;
+pub use destination::{DestinationPlanningTelemetry, DestinationSwitch};
+
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{
@@ -94,6 +98,8 @@ pub struct MissionTelemetry {
     pub pursuit: Option<MissionPursuit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disengagement: Option<MissionDisengagement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination_planning: Option<DestinationPlanningTelemetry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -141,6 +147,7 @@ pub struct MaterialMissionPilot {
     next_pursuit_tick: u64,
     last_survey: Option<LandingSurveyStamp>,
     pub(crate) bounded_acquisition: bool,
+    destination_switched: bool,
 }
 
 impl MaterialMissionPilot {
@@ -178,6 +185,9 @@ impl MaterialMissionPilot {
                 combat: None,
                 pursuit: None,
                 disengagement: None,
+                destination_planning: (policy
+                    == crate::mission_policy::MissionPolicy::DestinationPlanner)
+                    .then(DestinationPlanningTelemetry::default),
             },
             capture: None,
             recovery: None,
@@ -198,6 +208,7 @@ impl MaterialMissionPilot {
             next_pursuit_tick: 0,
             last_survey: None,
             bounded_acquisition: false,
+            destination_switched: false,
         }
     }
     pub fn reset(&mut self, context: BrainReset) {
@@ -313,10 +324,30 @@ impl MaterialMissionPilot {
     pub fn intent(&mut self, o: &MissionObservationV1) -> CombatIntent {
         self.intent_with_continuation(o, None)
     }
+    /// Experimental v12 consumes only a completed, revalidated comparison.
+    /// Other identities follow their original path even when evidence is ready.
+    pub fn intent_with_evaluation(
+        &mut self,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+    ) -> CombatIntent {
+        let selection = (self.policy == crate::mission_policy::MissionPolicy::DestinationPlanner)
+            .then(|| evaluator.selection(o, &self.telemetry))
+            .flatten();
+        self.intent_with_planning(o, None, selection)
+    }
     fn intent_with_continuation(
         &mut self,
         o: &MissionObservationV1,
+        continuation: Option<&mut SuccessorContinuation>,
+    ) -> CombatIntent {
+        self.intent_with_planning(o, continuation, None)
+    }
+    fn intent_with_planning(
+        &mut self,
+        o: &MissionObservationV1,
         mut continuation: Option<&mut SuccessorContinuation>,
+        selection: Option<crate::mission_evaluation::CaptureSelection>,
     ) -> CombatIntent {
         let c = &o.local.combat;
         let f = &c.recovery.flight;
@@ -346,7 +377,7 @@ impl MaterialMissionPilot {
                 form: p.ship_form,
             });
         }
-        let result = self.choose_with_continuation(o, continuation.as_deref_mut());
+        let result = self.choose_with_continuation(o, continuation.as_deref_mut(), selection);
         self.telemetry.capture = self.capture.as_ref().map(|c| c.telemetry().clone());
         self.telemetry.recovery = self.recovery.as_ref().map(|r| r.telemetry().clone());
         self.previous_tick = Some(p.tick);
@@ -357,12 +388,13 @@ impl MaterialMissionPilot {
         result
     }
     fn choose(&mut self, o: &MissionObservationV1) -> CombatIntent {
-        self.choose_with_continuation(o, None)
+        self.choose_with_continuation(o, None, None)
     }
     fn choose_with_continuation(
         &mut self,
         o: &MissionObservationV1,
         mut continuation: Option<&mut SuccessorContinuation>,
+        selection: Option<crate::mission_evaluation::CaptureSelection>,
     ) -> CombatIntent {
         self.telemetry.avoidance = None;
         self.telemetry.opponent = None;
@@ -478,6 +510,9 @@ impl MaterialMissionPilot {
                 self.reconsider(p.tick, "destination already secured", false);
             }
         }
+        if let Some(selection) = selection {
+            self.apply_destination_selection(o, selection);
+        }
         if self.telemetry.target.is_none() {
             self.deferred.retain(|(_, until)| p.tick < *until);
             let candidates: Vec<_> = o
@@ -504,6 +539,7 @@ impl MaterialMissionPilot {
                         .total_cmp(&b.motion.position.distance_to(p.ship.position))
                 });
             if let Some(planet) = selected {
+                self.destination_switched = false;
                 self.telemetry.target = Some(planet.index);
                 self.selected_tick = p.tick;
                 self.progress_tick = p.tick;

@@ -1308,6 +1308,7 @@ pub enum SpacewarsController {
     Human,
     RuleBot,
     PlannerBot,
+    DestinationBot,
 }
 impl SpacewarsController {
     /// Automatic matches fill human seats but retain an explicitly chosen bot.
