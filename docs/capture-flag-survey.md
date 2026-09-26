@@ -155,12 +155,14 @@ in the patch. The diagnostic model reports `observational: true`.
 
 The [geometry investigation](capture-flag-geometry.md) now explains both recorded
 rejections: all changed colliders touching the broad circular gate lie outside
-the eight conservative source envelopes. Acceptance and controls are unchanged.
-Before connecting enemy alternatives to v13's value comparison, prove complete
-local dependencies for their positive queries and non-query predicates. Narrower
-validation must still detect new obstacles and changed long-body rotations, with
-the original source age. Retain these worlds as regressions and use new
-predeclared worlds for any later behavior or strength comparison.
+the eight conservative source envelopes. The subsequent
+[captured local validation](capture-flag-local-validation.md) accepts both cases
+after checking actual query bounds and the non-query predicates, while retaining
+source age and new-obstacle/long-rotation protections. Controls remain unchanged.
+Next, define admission/freshness rules for consuming that historical enemy
+alternative evidence in the value evaluator, with shadow comparisons before a
+new controller policy. Retain these worlds as regressions and use new
+predeclared worlds for later coverage or strength claims.
 
 ## Reproduction
 
