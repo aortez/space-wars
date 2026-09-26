@@ -357,6 +357,15 @@ mod tests {
         let path = dir.path().join("settings.toml");
         fs::write(&path, "[clock]\ntime_format = \"12-hour\"\n").unwrap();
         let mut loaded = load_settings(&path).unwrap();
+        assert!(!loaded.settings.clock.show_date);
+        for show_date in [true, false] {
+            loaded.settings.clock.show_date = show_date;
+            save_settings(&loaded.settings, &path).unwrap();
+            assert_eq!(
+                load_settings(&path).unwrap().settings.clock.show_date,
+                show_date
+            );
+        }
         assert_eq!(
             loaded.settings.clock.event_profile,
             engine_common::ClockEventProfile::Calm

@@ -309,6 +309,8 @@ pub enum ClockTimeFormat {
 #[serde(default)]
 pub struct ClockSettings {
     pub time_format: ClockTimeFormat,
+    /// Optional local weekday/date in the Clock's upper band; off in old settings.
+    pub show_date: bool,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,

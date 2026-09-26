@@ -11,6 +11,7 @@ use spacewars_control::UiAction;
 use crate::{MainWindow, host, ui_navigation};
 
 pub(crate) fn publish_settings(window: &MainWindow, settings: ClockSettings) {
+    window.set_launcher_clock_show_date(settings.show_date);
     window.set_launcher_clock_time_format(
         crate::clock_time_format_label(settings.time_format).into(),
     );
@@ -129,6 +130,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
         old_events = ?previous.events, new_events = ?next.events,
         old_rain = ?previous.rain_amount, new_rain = ?next.rain_amount,
         old_format = ?previous.time_format, new_format = ?next.time_format,
+        old_show_date = previous.show_date, new_show_date = next.show_date,
         old_marquee = ?previous.marquee_preset, new_marquee = ?next.marquee_preset,
         message_changed = previous.marquee_message != next.marquee_message,
         "Clock settings changed.");
@@ -136,6 +138,7 @@ pub(crate) fn log_settings_change(previous: ClockSettings, next: ClockSettings, 
 
 fn adjusted_settings(mut settings: ClockSettings, index: i32, delta: i32) -> Option<ClockSettings> {
     match index {
+        13 => settings.show_date = !settings.show_date,
         0 => {
             settings.time_format = match settings.time_format {
                 ClockTimeFormat::TwelveHour => ClockTimeFormat::TwentyFourHour,
@@ -217,7 +220,7 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
                 );
             }
         }
-        UiAction::Confirm if index <= 4 || matches!(index, 7..=12) => {
+        UiAction::Confirm if index <= 4 || matches!(index, 7..=13) => {
             window.invoke_ingame_clock_adjust(index, 1)
         }
         UiAction::Confirm if index == 6 => window.invoke_ingame_clock_preview(),
@@ -232,6 +235,20 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
 mod tests {
     use super::*;
     use engine_common::ClockRainAmount;
+
+    #[test]
+    fn date_control_changes_only_visibility_and_toggles_back() {
+        let original = ClockSettings::default();
+        let enabled = adjusted_settings(original, 13, 1).unwrap();
+        assert_eq!(
+            enabled,
+            ClockSettings {
+                show_date: true,
+                ..original
+            }
+        );
+        assert_eq!(adjusted_settings(enabled, 13, -1), Some(original));
+    }
 
     #[test]
     fn rain_choice_cycles_both_ways_and_preserves_amount_while_disabled() {

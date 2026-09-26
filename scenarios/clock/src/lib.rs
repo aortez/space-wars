@@ -2,6 +2,10 @@
 
 #[cfg(test)]
 mod autonomous_tests;
+mod calendar;
+#[cfg(test)]
+mod calendar_tests;
+pub use calendar::ClockDate;
 #[cfg(test)]
 mod digit_slide_tests;
 mod digits;
@@ -51,7 +55,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 6;
+pub const CLOCK_ACTION_VERSION: u16 = 7;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -60,18 +64,19 @@ pub const CLOCK_ACTION_NEXT_EVENT: u32 = 6;
 pub const CLOCK_ACTION_TOGGLE_PLAYER_DUCK: u32 = 7;
 pub const CLOCK_ACTION_PLAYER_DUCK_INPUT: u32 = 8;
 pub use player::ClockDuckInput;
-pub const CLOCK_OBSERVATION_VERSION: u16 = 1;
+pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 7 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 8 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
     hour: u8,
     minute: u8,
     second: u8,
+    date: Option<ClockDate>,
 }
 
 impl ClockReading {
@@ -81,6 +86,7 @@ impl ClockReading {
                 hour,
                 minute,
                 second,
+                date: None,
             })
         } else {
             None
@@ -97,6 +103,15 @@ impl ClockReading {
 
     pub const fn second(self) -> u8 {
         self.second
+    }
+
+    pub const fn with_date(mut self, date: ClockDate) -> Self {
+        self.date = Some(date);
+        self
+    }
+
+    pub const fn date(self) -> Option<ClockDate> {
+        self.date
     }
 }
 
@@ -141,6 +156,7 @@ impl ClockAction {
         );
         payload.push(settings.marquee_preset as u8);
         payload.push(settings.rain_amount as u8);
+        payload.push(u8::from(settings.show_date));
         payload.extend_from_slice(settings.marquee_message.as_str().as_bytes());
         Action::scenario(CLOCK_ACTION_CONFIGURE, payload)
     }
@@ -158,9 +174,14 @@ impl ClockAction {
     }
 
     pub fn set_reading(reading: ClockReading) -> Action {
-        let mut payload = Vec::with_capacity(5);
+        let mut payload = Vec::with_capacity(9);
         payload.extend_from_slice(&CLOCK_ACTION_VERSION.to_le_bytes());
         payload.extend_from_slice(&[reading.hour, reading.minute, reading.second]);
+        if let Some(date) = reading.date {
+            let [year, month, day] = date.parts();
+            payload.extend_from_slice(&year.to_le_bytes());
+            payload.extend_from_slice(&[month as u8, day as u8]);
+        }
         Action::scenario(CLOCK_ACTION_SET_READING, payload)
     }
 
@@ -183,6 +204,16 @@ impl ClockAction {
             (CLOCK_ACTION_SET_READING, 5) => {
                 ClockReading::new(payload[2], payload[3], payload[4]).map(Self::SetReading)
             }
+            (CLOCK_ACTION_SET_READING, 9) => {
+                let date = ClockDate::new(
+                    u16::from_le_bytes([payload[5], payload[6]]),
+                    payload[7],
+                    payload[8],
+                )?;
+                Some(Self::SetReading(
+                    ClockReading::new(payload[2], payload[3], payload[4])?.with_date(date),
+                ))
+            }
             (CLOCK_ACTION_TRIGGER_EVENT, 3) => ClockEventKind::ALL
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
@@ -191,7 +222,9 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 8..=MAX_CONFIGURE_BYTES) if payload[4] <= 127 => {
+            (CLOCK_ACTION_CONFIGURE, 9..=MAX_CONFIGURE_BYTES)
+                if payload[4] <= 127 && payload[7] <= 1 =>
+            {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -215,7 +248,8 @@ impl ClockAction {
                     },
                     marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
                     rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[6]))?,
-                    marquee_message: std::str::from_utf8(&payload[7..]).ok()?.parse().ok()?,
+                    show_date: payload[7] != 0,
+                    marquee_message: std::str::from_utf8(&payload[8..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -317,6 +351,7 @@ pub struct ClockConfig {
     /// None selects a seeded course pattern, independently of personality.
     pub duck_course_pattern: Option<engine_common::ClockDuckCoursePattern>,
     pub time_format: ClockTimeFormat,
+    pub show_date: bool,
     pub event_profile: ClockEventProfile,
     pub events: ClockEvents,
     pub marquee_preset: ClockMarqueePreset,
@@ -333,6 +368,7 @@ impl Default for ClockConfig {
             duck_jump_profile: None,
             duck_course_pattern: None,
             time_format: ClockTimeFormat::TwentyFourHour,
+            show_date: false,
             event_profile: ClockEventProfile::default(),
             events: ClockEvents::default(),
             marquee_preset: ClockMarqueePreset::default(),
@@ -351,6 +387,7 @@ impl ClockConfig {
             duck_jump_profile: self.duck_jump_profile,
             duck_course_pattern: self.duck_course_pattern,
             time_format: self.time_format,
+            show_date: self.show_date,
             event_profile: self.event_profile,
             events: self.events,
             marquee_preset: self.marquee_preset,
@@ -363,6 +400,7 @@ impl ClockConfig {
 pub struct ClockState {
     config: ClockConfig,
     reading: Option<ClockReading>,
+    date_label: Option<String>,
     display: DisplaySnapshot,
     segments: Vec<SegmentState>,
     schedule: EventSchedule,
@@ -381,6 +419,7 @@ impl ClockState {
     pub fn settings(&self) -> ClockSettings {
         ClockSettings {
             time_format: self.config.time_format,
+            show_date: self.config.show_date,
             event_profile: self.config.event_profile,
             events: self.config.events,
             marquee_preset: self.config.marquee_preset,
@@ -391,6 +430,7 @@ impl ClockState {
 
     fn configure(&mut self, settings: ClockSettings) {
         self.config.time_format = settings.time_format;
+        self.config.show_date = settings.show_date;
         self.config.event_profile = settings.event_profile;
         self.config.events = settings.events;
         self.config.marquee_preset = settings.marquee_preset;
@@ -404,6 +444,10 @@ impl ClockState {
 
     pub fn reading(&self) -> Option<ClockReading> {
         self.reading
+    }
+
+    pub fn date_label(&self) -> Option<&str> {
+        self.date_label.as_deref()
     }
 
     pub fn display(&self) -> DisplaySnapshot {
@@ -780,9 +824,21 @@ impl ClockState {
                 let seconds = |r: ClockReading| {
                     u32::from(r.hour()) * 3600 + u32::from(r.minute()) * 60 + u32::from(r.second())
                 };
-                let delta = (seconds(reading) + 86400 - seconds(old)) % 86400;
+                let delta = match (old.date, reading.date) {
+                    (Some(old_date), Some(date)) => {
+                        i64::from(date.ordinal() - old_date.ordinal()) * 86400
+                            + i64::from(seconds(reading))
+                            - i64::from(seconds(old))
+                    }
+                    // Time-only fixtures retain the midnight wrap behavior.
+                    (None, None) => i64::from((seconds(reading) + 86400 - seconds(old)) % 86400),
+                    _ => return false,
+                };
                 (1..=3).contains(&delta)
             });
+        if self.reading.and_then(ClockReading::date) != reading.date {
+            self.date_label = reading.date.map(ClockDate::label);
+        }
         self.reading = Some(reading);
         self.display = next;
         // A second changed target supersedes a slide instead of letting old
@@ -821,6 +877,7 @@ impl Scenario for ClockScenario {
         ClockState {
             config: config.normalized(),
             reading: None,
+            date_label: None,
             display: DisplaySnapshot::unsynchronized(),
             segments: digits::create_segments(),
             schedule: EventSchedule::new(config.event_profile, config.events, seed),
@@ -855,7 +912,7 @@ impl Scenario for ClockScenario {
     }
 
     fn observe(state: &Self::State) -> Observation {
-        let mut payload = Vec::with_capacity(8);
+        let mut payload = Vec::with_capacity(12);
         payload.extend_from_slice(&CLOCK_OBSERVATION_VERSION.to_le_bytes());
         payload.push(u8::from(state.reading.is_some()));
         if let Some(reading) = state.reading {
@@ -867,6 +924,14 @@ impl Scenario for ClockScenario {
             ClockTimeFormat::TwelveHour => 12,
             ClockTimeFormat::TwentyFourHour => 24,
         });
+        payload.push(u8::from(state.config.show_date));
+        let [year, month, day] = state
+            .reading
+            .and_then(ClockReading::date)
+            .map(ClockDate::parts)
+            .unwrap_or([0; 3]);
+        payload.extend_from_slice(&year.to_le_bytes());
+        payload.extend_from_slice(&[month as u8, day as u8]);
         Observation { payload }
     }
 
@@ -990,7 +1055,7 @@ mod tests {
         );
         assert_eq!(
             ClockScenario::observe(&state).payload,
-            vec![1, 0, 0, 255, 255, 255, 12]
+            vec![2, 0, 0, 255, 255, 255, 12, 0, 0, 0, 0, 0]
         );
         ClockScenario::step(
             &mut state,
@@ -999,7 +1064,7 @@ mod tests {
         );
         assert_eq!(
             ClockScenario::observe(&state).payload,
-            vec![1, 0, 1, 23, 59, 58, 12]
+            vec![2, 0, 1, 23, 59, 58, 12, 0, 0, 0, 0, 0]
         );
     }
 

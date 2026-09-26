@@ -9,6 +9,108 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn clock_calendar_date_renders_in_band_through_native_text_overlay() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{ClockEventKind, ClockEventProfile, Scenario};
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        let mut state = ClockScenario::init(
+            ClockConfig {
+                aspect_ratio: viewport.aspect_ratio(),
+                show_date: true,
+                event_profile: ClockEventProfile::Off,
+                ..Default::default()
+            },
+            42,
+        );
+        ClockScenario::step(
+            &mut state,
+            &[ClockAction::set_reading(
+                ClockReading::new(23, 58, 0)
+                    .unwrap()
+                    .with_date(ClockDate::new(2026, 9, 30).unwrap()),
+            )],
+            Duration::ZERO,
+        );
+        for (name, event) in [
+            ("idle", None),
+            ("rain", Some(ClockEventKind::Rain)),
+            ("marquee", Some(ClockEventKind::Marquee)),
+        ] {
+            if let Some(event) = event {
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::preview_event(event)],
+                    Duration::ZERO,
+                );
+                for _ in 0..120 {
+                    ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+                }
+            }
+            reset_panels(&ui);
+            ui.set_launcher_scenario("clock".into());
+            let frame = ClockScenario::render_frame(&state);
+            let frames = [frame];
+            let overlay =
+                crate::render::raster_text_overlay(&frames, viewport, FrameLayout::EqualHorizontal);
+            let vector = crate::render::scene_presentation_from_frames_with_layout(
+                &frames,
+                viewport,
+                FrameLayout::EqualHorizontal,
+            );
+            let text = overlay
+                .iter()
+                .find(|p| p.text == "WEDNESDAY · SEPTEMBER 30")
+                .unwrap();
+            assert!(vector.main_primitives.iter().any(|p| p == text));
+            let pixels = crate::thruster_visual_tests::raster(&frames[0], viewport);
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(pixels));
+            ui.set_primitives(Rc::new(slint::VecModel::from(overlay)).into());
+            let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(screenshot.make_mut_slice(), width as usize);
+            });
+            let label: Vec<_> = screenshot
+                .as_slice()
+                .iter()
+                .enumerate()
+                .filter(|(i, p)| {
+                    *i / (width as usize) < height as usize * 7 / 100
+                        && p.r > 80
+                        && p.g > 120
+                        && p.b > 120
+                })
+                .map(|(i, _)| (i % width as usize, i / width as usize))
+                .collect();
+            assert!(label.len() > 100, "date text must reach real Slint pixels");
+            assert!(
+                label
+                    .iter()
+                    .all(|&(x, y)| x > 3 && x + 3 < width as usize && y > 1)
+            );
+            if let Some(directory) = std::env::var_os("SPACEWARS_CALENDAR_ARTIFACTS") {
+                let directory = std::path::PathBuf::from(directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                crate::thruster_visual_tests::write_png(
+                    &directory.join(format!("calendar-{width}x{height}-{name}.png")),
+                    &screenshot,
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn retained_text_updates_match_replaced_models_and_full_repaints() {
     use crate::{PrimitiveKind, ScenePrimitive, host::update_raster_text_overlay};
     use slint::{Color, ModelRc, VecModel};

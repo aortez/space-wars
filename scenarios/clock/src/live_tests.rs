@@ -30,6 +30,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
                         time_format,
+                        show_date: bits % 2 != 0,
                         event_profile,
                         marquee_preset,
                         rain_amount: ClockRainAmount::ALL[bits % ClockRainAmount::ALL.len()],
@@ -81,6 +82,25 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             Some(ClockAction::PreviewEvent(kind))
         );
     }
+    let Action::Scenario { kind, payload } = ClockAction::configure(ClockSettings::default())
+    else {
+        panic!()
+    };
+    // Exercise the current encoding too, rather than rejecting these merely
+    // because they have an older version prefix.
+    for (offset, invalid) in [
+        (2, 13),
+        (3, 3),
+        (4, 128),
+        (5, 255),
+        (6, 4),
+        (7, 2),
+        (8, 0xff),
+    ] {
+        let mut bytes = payload.clone();
+        bytes[offset] = invalid;
+        assert_eq!(ClockAction::decode(&Action::scenario(kind, bytes)), None);
+    }
     for payload in [
         vec![4, 0],
         vec![4, 0, 6],
@@ -110,6 +130,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
     let counts = (state.body_count(), state.collider_count());
     let settings = ClockSettings {
         time_format: ClockTimeFormat::TwelveHour,
+        show_date: true,
         event_profile: ClockEventProfile::Off,
         events: ClockEvents {
             falling: false,
