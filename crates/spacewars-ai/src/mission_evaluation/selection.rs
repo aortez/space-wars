@@ -258,4 +258,84 @@ mod tests {
         o.local.combat.recovery.flight.pilot.tick = MAX_EVIDENCE_AGE + 1;
         assert!(evaluator.selection(&o, &mission).is_none());
     }
+
+    #[test]
+    fn local_cost_consumption_rechecks_route_cover_hatch_and_ground_gravity() {
+        use scenario_spacewars::surface_sortie::{combat::LandingCover, pilot::LandingSiteQuery};
+        let (mut evaluator, mut o, mission) = fixture();
+        o.local.combat.recovery.flight.pilot.planet = o.planets[0].clone();
+        let site = super::super::tests::add_flagged_route(&mut o);
+        o.planets[0] = o.local.combat.recovery.flight.pilot.planet.clone();
+        // Keep the remote reference decisively cheaper; this test exercises
+        // consumption of a published local route, not destination geometry.
+        o.planets[1].motion.position =
+            o.local.combat.recovery.flight.pilot.ship.position + Vec2::X * 200.0;
+        let (_, measured, _) = super::super::tests::fixture();
+        let mut landing = measured.local.combat.recovery.flight.pilot.sites[0];
+        landing.id = site;
+        landing.revision = o.planets[0].revision;
+        landing.boarding_hatches = [Some(Vec2::Y), None];
+        o.local.combat.recovery.flight.pilot.sites = vec![landing];
+        o.local.combat.recovery.flight.pilot.site_query = LandingSiteQuery::Selected(site);
+        o.local.cover = vec![LandingCover {
+            site,
+            grounded: true,
+            approach: true,
+            departure: true,
+        }];
+        o.local.objective_gravity = 5.0;
+        for tick in 3..=4 {
+            o.local.combat.recovery.flight.pilot.tick = tick;
+            o.local.landing_objective.as_mut().unwrap().validated_tick = Some(tick);
+            evaluator.observe(&o, &mission);
+            evaluator.advance(tick, DEFAULT_WORK);
+        }
+        assert!(
+            evaluator.selection(&o, &mission).is_some(),
+            "{:?}",
+            evaluator.latest(PlayerId::PLAYER_1)
+        );
+        assert!(
+            evaluator.actors[&0]
+                .latest_evidence
+                .iter()
+                .any(|s| !s.remote)
+        );
+        for mutation in 0..10 {
+            let mut changed = o.clone();
+            match mutation {
+                0 => changed.local.objective_gravity += 0.02,
+                1 => changed.local.cover[0].grounded = false,
+                2 => changed.local.cover[0].approach = false,
+                3 => changed.local.cover[0].departure = false,
+                4 => {
+                    changed.local.combat.recovery.flight.pilot.sites[0].boarding_hatches = [None; 2]
+                }
+                5 => changed.local.combat.recovery.flight.pilot.sites.clear(),
+                6 => changed.local.landing_objective.as_mut().unwrap().tick += 1,
+                7 => changed.local.landing_objective.as_mut().unwrap().sites[0].returning = None,
+                8 => {
+                    changed.local.landing_objective.as_mut().unwrap().sites[0]
+                        .outbound
+                        .length += 1.0
+                }
+                9 => changed.local.combat.recovery.flight.pilot.planet.revision += 1,
+                _ => unreachable!(),
+            }
+            assert!(
+                evaluator.selection(&changed, &mission).is_none(),
+                "mutation {mutation}"
+            );
+        }
+        // Ordinary ship gravity drift and a short route-survey gap are allowed,
+        // but cannot renew the route or conceal newly blocked boarding/cover.
+        o.local.combat.recovery.flight.pilot.gravity += Vec2::X * 100.0;
+        o.local.landing_objective = None;
+        assert!(evaluator.selection(&o, &mission).is_some());
+        o.local.cover[0].departure = false;
+        assert!(evaluator.selection(&o, &mission).is_none());
+        o.local.cover[0].departure = true;
+        o.local.combat.recovery.flight.pilot.tick = 32;
+        assert!(evaluator.selection(&o, &mission).is_none());
+    }
 }
