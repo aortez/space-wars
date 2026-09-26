@@ -21,6 +21,8 @@ mod planning_probe;
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
 mod successor_probe;
+#[path = "support/transfer_probe.rs"]
+mod transfer_probe;
 use engine_common::{
     CombatBreakSettings, MaterialAsteroidSettings, MaterialAsteroidSeverity, Scenario,
 };
@@ -160,6 +162,7 @@ fn main() {
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
     let mut mission_evaluation = mission_evaluation::EvaluationRun::from_args(&out);
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
+    let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -452,7 +455,17 @@ fn main() {
                     objective_sensors.push(sensor_ms);
                 }
                 let clock = Instant::now();
-                let mut intent = if let Some(trial) = &mut continuation {
+                let nominated = transfer_probe.as_mut().and_then(|probe| {
+                    probe.intent(
+                        i,
+                        &mut pilots[i],
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    )
+                });
+                let mut intent = if let Some(intent) = nominated {
+                    intent
+                } else if let Some(trial) = &mut continuation {
                     trial.intent(i, &mut pilots[i], &o)
                 } else if let Some(evaluation) = &mission_evaluation {
                     pilots[i].intent_with_evaluation(&o, &evaluation.evaluator)
@@ -466,6 +479,9 @@ fn main() {
                 }
                 if let Some(trial) = &mut continuation {
                     trial.record(i, &pilots[i], &state, &o, intent);
+                }
+                if let Some(probe) = &mut transfer_probe {
+                    probe.record(i, &pilots[i], &state, &o, intent);
                 }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
@@ -647,6 +663,9 @@ fn main() {
                 actions.extend(intent.encode(owner));
             }
         }
+        if transfer_probe.as_ref().is_some_and(|probe| probe.done()) {
+            break;
+        }
         let mut planning_ms = successor_construction_ms
             + live_planning
                 .as_mut()
@@ -822,6 +841,10 @@ fn main() {
     }
     if let Some(flags) = &mut flag_survey {
         report["flag_survey"] = flags.report();
+    }
+    if let Some(probe) = &mut transfer_probe {
+        report["termination"] = json!("transfer_probe_finished");
+        report["transfer_probe"] = probe.finish(&state, &pilots[probe.seat()]);
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({

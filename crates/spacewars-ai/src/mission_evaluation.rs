@@ -27,7 +27,7 @@ mod value;
 pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use selection::CaptureSelection;
-pub use transfer::{TransferReference, TransferSource};
+pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
 pub use value::{CaptureValue, ValueComparison, ValueDecision};
 #[cfg(test)]
 mod survey_tests;
@@ -352,7 +352,7 @@ impl MissionEvaluator {
         state.last_tick = Some(p.tick);
         let mut dependencies = Dependencies {
             policy: mission.policy,
-            transfer: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+            transfer: value::enabled(mission.policy).then(|| TransferSource::from_observation(o)),
             planets: o
                 .planets
                 .iter()
@@ -740,7 +740,8 @@ fn snapshot(
             },
             preferred: None,
         }),
-        transfer_source: value::enabled(mission.policy).then(|| TransferSource::read(o)),
+        transfer_source: value::enabled(mission.policy)
+            .then(|| TransferSource::from_observation(o)),
         comparison_reason: "pending",
         charged_work: 0,
     }
