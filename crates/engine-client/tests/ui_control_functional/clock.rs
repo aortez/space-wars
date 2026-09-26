@@ -136,8 +136,16 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
         // controls and therefore legitimately change its revision.
         let mut page = harness.state();
         // D-pad reaches Marquee and its recipe without triggering gameplay.
-        for _ in 0..5 {
+        for expected in [
+            "pause.clock.event-profile",
+            "pause.clock.show-date",
+            "pause.clock.rain",
+            "pause.clock.falling",
+            "pause.clock.preview-event",
+            "pause.clock.marquee",
+        ] {
             page = harness.press_guarded(UiAction::Down, &page);
+            assert_eq!(page.selected_control.as_deref(), Some(expected));
         }
         assert_eq!(
             page.selected_control.as_deref(),
@@ -408,7 +416,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
         let configured = harness.clock_state();
+        assert!(configured.settings.show_date);
+        assert!(configured.date.is_some() && configured.date_label.is_some());
         assert_eq!(configured.scenario_revision, initial.scenario_revision);
         assert_eq!(configured.event_id, paused.event_id);
         assert_eq!(configured.phase_tick, paused.phase_tick);
@@ -456,6 +467,12 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!(page.screen, UiScreen::PauseClock);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
+        assert_eq!(
+            page.selected_control.as_deref(),
+            Some("pause.clock.show-date")
+        );
+        assert_eq!(control_value(&page, "pause.clock.show-date"), Some("On"));
+        let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Down, &page);
         let page = harness.press_guarded(UiAction::Right, &page);
         assert_eq!(
@@ -489,6 +506,10 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         assert_eq!(
             control_value(&page, "launcher.settings.clock.event-profile.next"),
             Some("Off")
+        );
+        assert_eq!(
+            control_value(&page, "launcher.settings.clock.show-date.next"),
+            Some("On")
         );
         harness.activate_guarded("launcher.settings.start", &page);
         harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
