@@ -14,9 +14,9 @@ fn normal_spacewars_all_player_choices_persist_across_restart_and_both_renderers
             ("planner bot", "legacy bot", "raster"),
             ("legacy bot", "planner bot", "vector"),
             ("planner bot", "planner bot", "raster"),
-            ("destination bot v12", "planner bot", "vector"),
-            ("planner bot", "destination bot v12", "raster"),
-            ("destination bot v12", "destination bot v12", "raster"),
+            ("mission v12", "planner bot", "vector"),
+            ("planner bot", "mission v12", "raster"),
+            ("mission v12", "mission v12", "raster"),
         ] {
             state = harness.activate_guarded("launcher.settings", &state);
             assert_eq!(
