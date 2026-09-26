@@ -159,4 +159,25 @@ policy comparison and the source-tick decision window. The committed JSON
 includes the critical tick and hashes. Re-run with a fresh output directory;
 the runner refuses to overwrite an existing study.
 
-Device validation is pending.
+## Device validation
+
+Deployed runtime `a803dbc` to **sw-picade.local** using the app-only updater.
+Remote client/CLI hashes matched the built bundle; the kiosk remained active
+with zero restarts after installation. Saved P1 `planner-bot` (v10) and P2
+`value-bot` (v13), then verified a fresh launcher-idle automatic match used
+those policies and the two correct evaluator model IDs. The existing
+30-second countdown, 15-minute matches, combat breaks, asteroid setting and
+2× raster scale were retained.
+
+The launcher commits scenario choices when **Play World** is used; backing
+out of its settings screen alone does not save them. Validation included that
+save path and a subsequent automatic launch. Screenshots confirmed the
+**value v13** picker and both **Planner bot v10 / Value bot v13** HUD labels.
+One live sample showed 34.5 FPS / 60.1 UPS at 1024×768 with 2× raster rendering;
+this is a health observation, not a controlled comparison of bot performance.
+
+Device evidence is retained beside the study: `deploy.log`,
+`pi-saved-settings.toml`, `pi-autoplay.status`, `pi-health.txt`,
+`pi-settings.png` and `pi-match.png`. The final independent data review checked
+all raw report hashes, outcomes, regression interpretation, coverage and
+weighted timing arithmetic and found no inaccurate claims.
