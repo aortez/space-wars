@@ -555,7 +555,7 @@ fn dirty_queries_radius_gravity_and_incomplete_capture_remain_unknown() {
                 "source objective or radius changed"
             }
             2 => {
-                changed.world.planets[p.planet.index].mass *= 2.0;
+                changed.world.planets[p.planet.index].mass = f32::NAN;
                 "source scalar gravity changed"
             }
             _ => {
