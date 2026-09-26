@@ -15,6 +15,7 @@ use std::{
 pub struct EvaluationRun {
     pub evaluator: MissionEvaluator,
     pub alternative_survey: bool,
+    pub last_charged: Work,
     file: BufWriter<File>,
     written: [Option<u64>; 2],
     budget: u32,
@@ -42,6 +43,7 @@ impl EvaluationRun {
         enabled.then(|| Self {
             evaluator: MissionEvaluator::new(2),
             alternative_survey,
+            last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
@@ -65,6 +67,7 @@ impl EvaluationRun {
             physics_queries: 0,
         };
         let charged = self.evaluator.advance(tick, allowed);
+        self.last_charged = charged;
         assert!(charged.graph <= allowed.graph && charged.physics_queries == 0);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
