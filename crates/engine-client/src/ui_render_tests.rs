@@ -9,6 +9,133 @@ struct TestPlatform(Rc<RefCell<Vec<Rc<MinimalSoftwareWindow>>>>);
 type MenuCase = (&'static str, fn(&MainWindow));
 
 #[test]
+fn clock_explosion_captures_warning_burst_reformation_and_controls_on_device_layouts() {
+    use crate::render::{FrameLayout, Viewport};
+    use engine_common::{ClockEventKind, ClockEventProfile, ClockTimeFormat, Scenario};
+    use scenario_clock::{ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario};
+    use std::time::Duration;
+    let windows = Rc::new(RefCell::new(Vec::new()));
+    slint::platform::set_platform(Box::new(TestPlatform(windows.clone()))).unwrap();
+    let ui = MainWindow::new().unwrap();
+    ui.show().unwrap();
+    let windows = windows.borrow();
+    let output = std::env::var_os("SPACEWARS_EXPLOSION_ARTIFACTS").map(std::path::PathBuf::from);
+    if let Some(output) = &output {
+        std::fs::create_dir_all(output).unwrap();
+    }
+    for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
+        windows[0].set_size(PhysicalSize::new(width, height));
+        let viewport = Viewport::new(width as f32, height as f32);
+        for (name, elapsed) in [
+            ("warning", 18),
+            ("burst", 54),
+            ("bounce", 170),
+            ("reforming", 288),
+            ("recovered", 336),
+            ("duck", 90),
+            ("controls", 18),
+        ] {
+            let mut state = ClockScenario::init(
+                ClockConfig {
+                    aspect_ratio: viewport.aspect_ratio(),
+                    event_profile: ClockEventProfile::Off,
+                    time_format: ClockTimeFormat::TwelveHour,
+                    show_date: true,
+                    ..Default::default()
+                },
+                42,
+            );
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::set_reading(
+                    ClockReading::new(12, 58, 0)
+                        .unwrap()
+                        .with_date(ClockDate::new(2026, 9, 26).unwrap()),
+                )],
+                Duration::ZERO,
+            );
+            let baseline = crate::thruster_visual_tests::raster(
+                &ClockScenario::render_frame(&state),
+                viewport,
+            );
+            if name == "duck" {
+                ClockScenario::step(
+                    &mut state,
+                    &[ClockAction::toggle_player_duck(1)],
+                    Duration::ZERO,
+                );
+                for _ in 0..90 {
+                    ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+                }
+            }
+            ClockScenario::step(
+                &mut state,
+                &[ClockAction::preview_event(ClockEventKind::Explosion)],
+                Duration::ZERO,
+            );
+            for _ in 0..elapsed {
+                ClockScenario::step(&mut state, &[], Duration::from_millis(16));
+            }
+            let frame = ClockScenario::render_frame(&state);
+            let pixels = crate::thruster_visual_tests::raster(&frame, viewport);
+            let changed = pixels
+                .as_slice()
+                .iter()
+                .zip(baseline.as_slice())
+                .filter(|(a, b)| a != b)
+                .count();
+            if name == "recovered" {
+                assert_eq!(changed, 0);
+            } else {
+                assert!(changed > 100);
+            }
+            let vector = crate::thruster_visual_tests::svg(&frame, viewport);
+            assert!(!vector.contains("NaN") && !vector.contains("inf"));
+            reset_panels(&ui);
+            ui.set_raster_visible(true);
+            ui.set_raster_frame(Image::from_rgb8(pixels));
+            ui.set_primitives(
+                Rc::new(slint::VecModel::from(crate::render::raster_text_overlay(
+                    std::slice::from_ref(&frame),
+                    viewport,
+                    FrameLayout::EqualHorizontal,
+                )))
+                .into(),
+            );
+            if name == "controls" {
+                ui.set_launcher_scenario("clock".into());
+                ui.set_ingame_menu_visible(true);
+                ui.set_ingame_clock_visible(true);
+                ui.set_ingame_clock_focus_index(15);
+                ui.set_clock_event_labels(
+                    Rc::new(slint::VecModel::from(
+                        ClockEventKind::ALL
+                            .iter()
+                            .map(|kind| kind.label().into())
+                            .collect::<Vec<_>>(),
+                    ))
+                    .into(),
+                );
+                ui.set_clock_preview_index(ClockEventKind::Explosion as i32);
+            }
+            let mut screenshot = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            windows[0].request_redraw();
+            windows[0].draw_if_needed(|renderer| {
+                renderer.render(screenshot.make_mut_slice(), width as usize);
+            });
+            if let Some(output) = &output {
+                let stem = format!("explosion-{width}x{height}-{name}");
+                crate::thruster_visual_tests::write_png(
+                    &output.join(format!("{stem}.png")),
+                    &screenshot,
+                );
+                std::fs::write(output.join(format!("{stem}.svg")), vector).unwrap();
+            }
+        }
+    }
+}
+
+#[test]
 fn clock_crow_renders_visible_perches_hops_and_shared_events_on_device_layouts() {
     use crate::render::{FrameLayout, Viewport};
     use engine_common::{ClockEventKind, ClockEventProfile, Scenario};

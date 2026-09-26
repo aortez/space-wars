@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 pub const CLOCK_STATE_COMMAND: &str = "clock state";
 pub const CLOCK_TRIGGER_COMMAND: &str = "clock trigger";
 pub const CLOCK_MESSAGE_COMMAND: &str = "clock message";
-pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 18;
+pub const CLOCK_STATE_SCHEMA_VERSION: u32 = 19;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockEventInfo {
@@ -52,6 +52,8 @@ pub struct ClockState {
     pub duck: Option<engine_common::ClockDuckState>,
     #[serde(default)]
     pub crow: Option<engine_common::ClockCrowState>,
+    #[serde(default)]
+    pub explosion: Option<engine_common::ClockExplosionState>,
     pub player_duck: Option<engine_common::ClockPlayerDuckState>,
     /// Visitor compatibility leaves no enabled automatic event kinds. Profile
     /// Off is distinct; per-event restrictions also apply to manual requests.
@@ -408,6 +410,7 @@ mod tests {
             meltdown: None,
             duck: None,
             crow: None,
+            explosion: None,
             player_duck: None,
             automatic_events_suspended: false,
             marquee: None,
@@ -759,6 +762,59 @@ mod tests {
         assert_eq!(material.floor_open_milli, 0);
         assert_eq!(material.floor_load_milli, 0);
         assert_eq!(material.floor_motion_deferrals, 0);
+    }
+
+    #[test]
+    fn explosion_diagnostics_and_phase_waits_round_trip() {
+        let mut state = clock_state();
+        let request = ClockTriggerRequest::new(&state, ClockEventKind::Explosion);
+        assert_eq!(
+            ClockTriggerRequest::from_json(&request.to_json().unwrap()).unwrap(),
+            request
+        );
+        assert!(!request.started_predicate().matches(&state));
+        state.event_id += 1;
+        state.lifecycle = "active".into();
+        state.event_kind = Some(ClockEventKind::Explosion);
+        state.explosion = Some(engine_common::ClockExplosionState {
+            cells: 80,
+            live_cells: 80,
+            max_cells: 119,
+            shared_arena: true,
+        });
+        for phase in ["warning", "exploding", "reforming"] {
+            state.phase = Some(phase.into());
+            state.phase_tick = 12;
+            let predicate = ClockStatePredicate {
+                phase: Some(phase.into()),
+                min_phase_tick: 12,
+                ..request.started_predicate()
+            };
+            assert!(predicate.matches(&state));
+            assert!(
+                !ClockStatePredicate {
+                    min_phase_tick: 13,
+                    ..predicate
+                }
+                .matches(&state)
+            );
+            assert_eq!(
+                ClockState::from_json(&state.to_json().unwrap()).unwrap(),
+                state
+            );
+        }
+        assert_eq!(ClockEventKind::Explosion as u8, 8);
+        let mut old_request = request.clone();
+        old_request.schema_version = 18;
+        assert!(old_request.to_json().is_err());
+        let mut value = serde_json::to_value(&state).unwrap();
+        value.as_object_mut().unwrap().remove("explosion");
+        assert!(
+            ClockState::from_json(&value.to_string())
+                .unwrap()
+                .explosion
+                .is_none()
+        );
     }
 
     #[test]

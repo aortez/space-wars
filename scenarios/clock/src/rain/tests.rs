@@ -626,6 +626,8 @@ fn clock_stays_live_while_raining_or_draining_and_pause_resize_replace_clean_up(
                 assert_eq!(state.event_kind(), Some(kind));
             }
         }
+        // Rain need not remain the last catalog entry as new events are added.
+        state.preview_event(ClockEventKind::Rain);
         assert_eq!(state.rain_state().unwrap().amount, ClockRainAmount::Light);
         assert!(matches!(state.active_event, Some(ActiveEvent::Rain(_))));
         state.set_aspect_ratio(0.6);

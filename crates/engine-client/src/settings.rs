@@ -393,6 +393,7 @@ mod tests {
                 digit_slide: false,
                 rain: false,
                 crow: false,
+                explosion: false,
             };
             save_settings(&loaded.settings, &path).unwrap();
             assert_eq!(
@@ -482,13 +483,36 @@ mod tests {
         for event in engine_common::ClockEventKind::ALL {
             assert_eq!(
                 settings.clock.events.enabled(event),
-                event == engine_common::ClockEventKind::Crow
+                matches!(
+                    event,
+                    engine_common::ClockEventKind::Crow | engine_common::ClockEventKind::Explosion
+                )
             );
         }
         let mut saved = settings;
         saved.clock.events.crow = false;
         let restored: Settings = toml::from_str(&toml::to_string(&saved).unwrap()).unwrap();
         assert_eq!(restored.clock, saved.clock);
+    }
+
+    #[test]
+    fn pre_explosion_settings_preserve_old_choices_and_default_only_the_new_switch() {
+        let settings: Settings = toml::from_str("[clock]\nevent_profile = 'off'\nshow_date = true\n[clock.events]\nfalling = false\ncolor_cycle = false\nmeltdown = false\nduck = false\nmarquee = false\ndigit_slide = false\nrain = false\ncrow = false\n").unwrap();
+        assert_eq!(
+            settings.clock.event_profile,
+            engine_common::ClockEventProfile::Off
+        );
+        assert!(settings.clock.show_date);
+        for kind in engine_common::ClockEventKind::ALL {
+            assert_eq!(
+                settings.clock.events.enabled(kind),
+                kind == engine_common::ClockEventKind::Explosion
+            );
+        }
+        let mut settings = settings;
+        settings.clock.events.explosion = false;
+        let loaded: Settings = toml::from_str(&toml::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(loaded.clock, settings.clock);
     }
 
     #[test]

@@ -123,6 +123,7 @@ component PlayerStatusPanel inherits Rectangle {
 
 component MenuButton inherits Rectangle {
     in property <string> text;
+    in property <length> text-padding: 12px;
     in property <bool> selected: false;
     in property <bool> enabled: true;
     in property <bool> primary: false;
@@ -136,8 +137,8 @@ component MenuButton inherits Rectangle {
     opacity: root.enabled ? 1 : 0.5;
 
     Text {
-        x: 12px;
-        width: parent.width - 24px;
+        x: root.text-padding;
+        width: parent.width - 2 * root.text-padding;
         height: parent.height;
         text: root.text;
         color: button-touch.pressed || root.selected ? #ffffff : #d9e1ec;
@@ -309,7 +310,7 @@ component ChoiceRow inherits Rectangle {
 
     Text {
         x: 14px;
-        width: parent.width * (root.label-fraction - 0.02);
+        width: Math.max(0px, parent.width * (root.label-fraction - 0.02));
         height: parent.height;
         text: root.label;
         color: #c7d0dc;
@@ -507,6 +508,7 @@ export component MainWindow inherits Window {
     in-out property <bool> launcher-clock-meltdown-enabled: true;
     in-out property <bool> launcher-clock-duck-enabled: true;
     in-out property <bool> launcher-clock-crow-enabled: true;
+    in-out property <bool> launcher-clock-explosion-enabled: true;
     in-out property <bool> launcher-clock-marquee-enabled: true;
     in-out property <bool> launcher-clock-digit-slide-enabled: true;
     in-out property <bool> launcher-clock-rain-enabled: true;
@@ -1222,9 +1224,10 @@ export component MainWindow inherits Window {
                 ChoiceRow {
                     y: 168px;
                     x: 0px;
-                    width: parent.width - 98px;
+                    width: parent.width - 196px;
                     height: 48px;
-                    label: "Preview Event";
+                    label: parent.width < 480px ? "" : "Preview";
+                    label-fraction: parent.width < 480px ? 0 : 0.22;
                     value: root.clock-event-labels[root.clock-preview-index];
                     selected: root.ingame-clock-focus-index == 4;
                     enabled: !root.clock-controls-pending;
@@ -1232,7 +1235,7 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(4, 1); }
                 }
                 MenuButton {
-                    x: parent.width - 90px;
+                    x: parent.width - 188px;
                     y: 168px;
                     width: 90px;
                     height: 48px;
@@ -1240,6 +1243,17 @@ export component MainWindow inherits Window {
                     selected: root.ingame-clock-focus-index == 14;
                     enabled: !root.clock-controls-pending;
                     activated => { root.ingame-clock-adjust(14, 1); }
+                }
+                MenuButton {
+                    x: parent.width - 90px;
+                    y: 168px;
+                    width: 90px;
+                    height: 48px;
+                    text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
+                    text-padding: 6px;
+                    selected: root.ingame-clock-focus-index == 15;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(15, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -2029,7 +2043,7 @@ export component MainWindow inherits Window {
                         MenuButton {
                             x: 0px;
                             y: 208px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Meltdown\n" + (root.launcher-clock-meltdown-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 7;
@@ -2040,9 +2054,9 @@ export component MainWindow inherits Window {
                         }
 
                         MenuButton {
-                            x: (parent.width + 8px) / 3;
+                            x: (parent.width + 8px) / 4;
                             y: 208px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Duck\n" + (root.launcher-clock-duck-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 8;
@@ -2053,13 +2067,23 @@ export component MainWindow inherits Window {
                         }
 
                         MenuButton {
-                            x: 2 * (parent.width + 8px) / 3;
+                            x: 2 * (parent.width + 8px) / 4;
                             y: 208px;
-                            width: (parent.width - 16px) / 3;
+                            width: (parent.width - 24px) / 4;
                             height: 48px;
                             text: "Crow\n" + (root.launcher-clock-crow-enabled ? "On" : "Off");
                             selected: root.launcher-settings-focus-index == 13;
                             activated => { root.launcher-settings-focus-index = 13; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 3 * (parent.width + 8px) / 4;
+                            y: 208px;
+                            width: (parent.width - 24px) / 4;
+                            height: 48px;
+                            text: "Explosion\n" + (root.launcher-clock-explosion-enabled ? "On" : "Off");
+                            text-padding: 6px;
+                            selected: root.launcher-settings-focus-index == 14;
+                            activated => { root.launcher-settings-focus-index = 14; root.ui-action(3); }
                         }
 
                         ChoiceRow {

@@ -237,6 +237,7 @@ impl ClientScenario for ClockClientScenario {
             meltdown: self.state.meltdown_state(),
             duck: self.state.duck_state(),
             crow: self.state.crow_state(),
+            explosion: self.state.explosion_state(),
             player_duck: self.state.player_duck_state(),
             automatic_events_suspended: self.state.automatic_events_suspended(),
             marquee: self.state.marquee_state(),

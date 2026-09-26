@@ -811,6 +811,21 @@ mod tests {
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "meltdown"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "duck"]).is_ok());
         assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "crow"]).is_ok());
+        assert!(Args::try_parse_from(["spacewars-cli", "clock", "trigger", "explosion"]).is_ok());
+        for phase in ["warning", "exploding", "reforming"] {
+            assert!(
+                Args::try_parse_from([
+                    "spacewars-cli",
+                    "clock",
+                    "wait",
+                    "--event",
+                    "explosion",
+                    "--phase",
+                    phase
+                ])
+                .is_ok()
+            );
+        }
         for phase in ["entering", "perched", "hopping", "flying", "leaving"] {
             assert!(
                 Args::try_parse_from([
