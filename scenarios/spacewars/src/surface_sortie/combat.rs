@@ -95,6 +95,10 @@ pub struct TacticalSortieObservationV1 {
     pub combat: CombatObservationV2,
     pub cover: Vec<LandingCover>,
     pub landing_objective: Option<landing_objective::LandingObjectiveSurvey>,
+    /// The same conservative acceleration at the flag used by ground-route
+    /// surveys. It is independent of the observing ship's altitude; zero when
+    /// there is no flag objective. This is cheap source math, not a query/solve.
+    pub objective_gravity: f32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub objective_work: Option<live_planning::ObjectiveWorkState>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -237,6 +241,7 @@ impl SurfaceSortieState {
             version: 1,
             objective_work: None,
             objective_evidence: None,
+            objective_gravity: self.objective_gravity(&combat.recovery.flight.pilot),
             landing_objective: objective_surveys
                 .then(|| {
                     self.landing_objective_survey(

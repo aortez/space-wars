@@ -1,4 +1,5 @@
-//! Observational capture comparisons. No controller or mutable world is held.
+//! Bounded capture comparisons. No controller or mutable world is held.
+//! v12 can consume a validated report; retained policies remain observational.
 //! One charged step evaluates one candidate; a final step compares at most three.
 use crate::mission_pilot::MissionTelemetry;
 use engine_core::{
@@ -17,8 +18,10 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 mod model;
+mod selection;
 mod survey;
 use model::{LocalEvidence, PlanetKey};
+pub(crate) use selection::CaptureSelection;
 #[cfg(test)]
 mod survey_tests;
 #[cfg(test)]
@@ -208,6 +211,9 @@ struct ActorState {
     evidence: Vec<LocalEvidence>,
     pending: Option<RequestToken>,
     latest: Option<MissionEvaluation>,
+    latest_dependencies: Option<Dependencies>,
+    latest_evidence: Vec<LocalEvidence>,
+    submitted_evidence: Vec<LocalEvidence>,
 }
 
 /// Shared, capacity-limited diagnostic queue. Construction visits at most eight
@@ -296,7 +302,7 @@ impl MissionEvaluator {
                 .match_context
                 .as_ref()
                 .is_some_and(|m| m.finished || !m.pilots_alive[p.owner.index()]),
-            gravity: p.gravity.length(),
+            gravity: o.local.objective_gravity,
             selected_tick: selection_tick(mission),
             selected_site: mission.capture.as_ref().and_then(|c| c.site),
             landed: mission
@@ -327,6 +333,14 @@ impl MissionEvaluator {
             state.evidence.push(sample);
         }
         if let Some(mut sample) = model::observe_local(o, mission) {
+            // Native route surveys are cadenced. Missing work between surveys
+            // is not a fresh negative measurement and cannot renew its age.
+            if let Some(old) = state.evidence.iter().find(|old| old.site == sample.site)
+                && sample.reason == Some("objective route unmeasured")
+                && model::route_cadence_gap(o, old)
+            {
+                sample = old.clone();
+            }
             if let Some(old) = state.evidence.iter().find(|old| old.site == sample.site)
                 && let (Some((visit, tick)), Some((new_visit, _))) = (old.choice, sample.choice)
                 && visit == new_visit
@@ -407,6 +421,7 @@ impl MissionEvaluator {
             return;
         }
         let report = snapshot(o, mission, &state.evidence);
+        state.submitted_evidence = state.evidence.clone();
         state.dependencies = Some(dependencies);
         let token = self
             .queue
@@ -450,6 +465,8 @@ impl MissionEvaluator {
                 let state = self.actors.get_mut(&row.request.actor).unwrap();
                 state.pending = None;
                 state.latest = Some(report);
+                state.latest_dependencies = state.dependencies.clone();
+                state.latest_evidence = state.submitted_evidence.clone();
                 self.completed_total += 1;
             }
         }

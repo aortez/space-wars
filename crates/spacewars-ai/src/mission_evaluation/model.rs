@@ -54,6 +54,19 @@ pub(super) struct LocalEvidence {
     pub route_validated_tick: Option<u64>,
 }
 
+pub(super) fn route_cadence_gap(o: &MissionObservationV1, sample: &LocalEvidence) -> bool {
+    let p = &o.local.combat.recovery.flight.pilot;
+    o.local.landing_objective.is_none()
+        && o.local.objective_work.is_none()
+        && sample.costs.is_some()
+        && sample.reason.is_none()
+        && sample.route_source_tick.is_some_and(|tick| {
+            tick <= p.tick
+                && p.tick - tick
+                    < scenario_spacewars::surface_sortie::ground_navigation::GROUND_REFRESH_TICKS
+        })
+}
+
 pub(super) fn no_flag_costs() -> PhaseCosts {
     PhaseCosts {
         landing: 17.866_667,
@@ -172,7 +185,7 @@ pub(super) fn observe_local(
         key: PlanetKey::read(&p.planet),
         site: site.id,
         tick: p.tick,
-        gravity: p.gravity.length(),
+        gravity: o.local.objective_gravity,
         costs: costs.as_ref().ok().cloned(),
         reason: costs.err(),
         choice: (selected == Some(site.id)).then(|| {

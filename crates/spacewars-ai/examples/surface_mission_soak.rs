@@ -150,7 +150,7 @@ fn main() {
     assert!(["quiet", "intercept", "duel", "hunt", "pursuit"].contains(&mode.as_str()));
     assert!(!require_hunt || mode == "hunt" || mode == "pursuit");
     assert!((1..=180).contains(&prepare_seconds));
-    assert!(["fixed", "generated"].contains(&world_kind.as_str()));
+    assert!(["fixed", "generated", "destination"].contains(&world_kind.as_str()));
     let out = PathBuf::from(arg("--out", "/tmp/surface-mission"));
     fs::create_dir_all(&out).unwrap();
     let mut live_planning = live_planning::LivePlanningRun::from_args(&out);
@@ -190,6 +190,13 @@ fn main() {
                 },
             )
         }
+    } else if world_kind == "destination" {
+        SurfaceSortieScenario::init_capture_destination_trial(
+            seed,
+            seat,
+            mirror,
+            arg("--flag-bearing", "1.2").parse().unwrap(),
+        )
     } else {
         SurfaceSortieScenario::init_material_travel_trial(seed, mirror, bearing)
     };
@@ -256,11 +263,14 @@ fn main() {
     );
     assert!(
         live_planning.as_ref().is_none_or(|live| {
-            (0..2).any(|i| {
-                live.enabled_for(i)
-                    && !selected_policies[i].objective_planning().is_legacy()
-                    && (i == seat || mode == "duel")
-            })
+            mission_evaluation
+                .as_ref()
+                .is_some_and(|e| e.alternative_survey)
+                || (0..2).any(|i| {
+                    live.enabled_for(i)
+                        && !selected_policies[i].objective_planning().is_legacy()
+                        && (i == seat || mode == "duel")
+                })
         }),
         "live objective planning needs an active planner seat"
     );
@@ -435,6 +445,8 @@ fn main() {
                 let clock = Instant::now();
                 let mut intent = if let Some(trial) = &mut continuation {
                     trial.intent(i, &mut pilots[i], &o)
+                } else if let Some(evaluation) = &mission_evaluation {
+                    pilots[i].intent_with_evaluation(&o, &evaluation.evaluator)
                 } else {
                     pilots[i].intent(&o)
                 };
@@ -586,7 +598,9 @@ fn main() {
                 if let Some(evaluator) = &mut mission_evaluation {
                     if evaluator.alternative_survey
                         && request.destination_cover.is_none()
-                        && let Some(live) = live_planning.as_mut().filter(|l| l.enabled_for(i))
+                        && let Some(live) = live_planning
+                            .as_mut()
+                            .filter(|l| l.destination_enabled_for(i))
                     {
                         let clock = Instant::now();
                         let request = evaluator
