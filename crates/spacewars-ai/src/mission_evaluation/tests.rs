@@ -391,8 +391,7 @@ fn match_clock_context_distinguishes_labs_unlimited_and_finished_matches() {
     assert!(result.preferred_by_time.is_none());
 }
 
-#[test]
-fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes() {
+pub(super) fn add_flagged_route(o: &mut MissionObservationV1) -> LandingSiteId {
     use scenario_spacewars::surface_sortie::{
         PlanetFlagObservation,
         ground_navigation::GroundRouteDiagnostics,
@@ -400,7 +399,6 @@ fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes
             LandingObjective, LandingObjectiveRoute, LandingObjectiveSurvey, ObjectivePlanning,
         },
     };
-    let (_, mut o, _) = fixture();
     let p = &mut o.local.combat.recovery.flight.pilot;
     let site = LandingSiteId {
         planet: p.planet.index,
@@ -444,6 +442,13 @@ fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes
         }],
         actual: None,
     });
+    site
+}
+
+#[test]
+fn timing_model_rejects_unmeasured_stale_foreign_partial_powered_and_long_routes() {
+    let (_, mut o, _) = fixture();
+    let site = add_flagged_route(&mut o);
     let valid = o.clone();
     assert!(model::local_costs(&o, site).is_ok());
     for mutation in 0..7 {

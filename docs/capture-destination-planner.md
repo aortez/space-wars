@@ -137,6 +137,35 @@ Artifacts are in `target/capture-destination-planner/matrix`; the earlier
 bearing exploration is under `explore` and is excluded from the comparison
 matrix. In particular, unsupported powered/jumping routes stay unknown.
 
+## Finished-match comparison protocol
+
+Before examining new outcomes, the next comparison declares four worlds from
+the first eight SHA-256 bytes, little-endian, of
+`native-destination-finished-v1:0` through `:3`:
+`1342523865096599469`, `3849100356505807845`, `186767996776005237`, and
+`4311410596101621856`. Each world runs quiet and with mixed asteroids every
+three seconds. Each condition gets one v10/v10 control and two experimental
+matches with v12 in opposite seats: **24 runs and 16 matched comparisons**.
+The same control is reused for its two seat comparisons, not counted as two
+independent games. Every run must reach pilot death or the existing ten-minute
+match timer; unfinished runs cannot count as draws. The Pi's saved fifteen-minute
+autoplay timer remains separate from this headless comparison.
+
+```sh
+cargo build --release -p spacewars-ai --example surface_mission_soak
+python3 tools/compare-capture-destinations.py --finished-matches
+```
+
+Native synchronous local sensing and the four-unit/384-query shared remote
+allowance stay fixed. The runner records all planned conditions before execution,
+rotates execution order, retains both pilots' deaths/health, ownership, complete
+and abandoned visits, recovery, long phases, every recorded destination switch,
+and incomplete evaluation counts. It compares the initial world and recorded
+physical outcomes against the same-seat control; a no-switch run must match.
+Parameters are not fitted to these worlds. Wins, survival and the later itinerary
+will be read together with how often v12 actually changes a decision. Four worlds
+are diagnostic coverage, not a precise general win-rate estimate.
+
 ## Validation and Picade deployment
 
 The final runtime at `3a49860` differs from the comparison build only in the
@@ -176,6 +205,14 @@ remaining itinerary. Preserve the unsupported mirrored cases as regressions;
 do not assign invented costs just to produce a choice. The frozen v10 baseline,
 query caps and retained failed attempts make that comparison repeatable.
 
-Independent subagent review was attempted twice but failed with an API
-authentication error before reviewing files. Local review and tests do not
-replace that outstanding independent review.
+Independent review succeeded on retry after the earlier authentication failures.
+It found that the headless successor-continuation option bypassed v12's
+evaluator consumption while still reporting v12. The runner now explicitly
+rejects that unsupported combination in either seat. Direct consumption tests
+also cover changed local routes, ground gravity, hatches, cover and cadence
+expiry, beyond the physical successful-path tests.
+
+Review of the finished-match tool caught policy labels embedded inside damage
+events. Physical comparison now excludes only those events' diagnostic mission
+telemetry, retaining their tick, seat and complete vitals. A regression verifies
+that different labels compare equal while different physical damage does not.
