@@ -982,6 +982,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             pizza_spawn_rate: window.get_launcher_pizza_spawn_rate_text().to_string(),
             expedition_players: window.get_launcher_expedition_players().to_string(),
             clock_time_format: window.get_launcher_clock_time_format().to_string(),
+            clock_show_date: window.get_launcher_clock_show_date(),
             clock_event_profile: window.get_launcher_clock_event_profile().to_string(),
             clock_falling_enabled: window.get_launcher_clock_falling_enabled(),
             clock_color_cycle_enabled: window.get_launcher_clock_color_cycle_enabled(),

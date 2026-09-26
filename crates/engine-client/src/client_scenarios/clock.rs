@@ -1,9 +1,11 @@
 use std::cell::Cell;
 use std::time::Duration;
 
-use chrono::{Local, Timelike};
+use chrono::{Datelike, Local, Timelike};
 use engine_common::{Action, RenderFrame, Scenario, Settings, StepResult, TickModel};
-use scenario_clock::{ClockAction, ClockConfig, ClockReading, ClockScenario, ClockState};
+use scenario_clock::{
+    ClockAction, ClockConfig, ClockDate, ClockReading, ClockScenario, ClockState,
+};
 
 use super::{
     ClientScenario, RenderBackend, ScenarioAsset, ScenarioCapabilities, ScenarioCreateError,
@@ -86,6 +88,7 @@ fn create(
                     .as_deref(),
             ),
             time_format: settings.clock.time_format,
+            show_date: settings.clock.show_date,
             duck_course_pattern: duck_course_pattern(
                 std::env::var("SPACEWARS_CLOCK_DUCK_COURSE").ok().as_deref(),
             ),
@@ -242,6 +245,12 @@ impl ClientScenario for ClockClientScenario {
                 .reading()
                 .map(|reading| [reading.hour(), reading.minute(), reading.second()]),
             display_digits: self.state.display().digits,
+            date: self
+                .state
+                .reading()
+                .and_then(ClockReading::date)
+                .map(ClockDate::parts),
+            date_label: self.state.date_label().map(str::to_owned),
             can_trigger: self.state.can_trigger_event(),
             trigger_pending: false,
             settings_pending: false,
@@ -281,9 +290,18 @@ impl ClientScenario for ClockClientScenario {
 }
 
 fn local_clock_reading() -> ClockReading {
-    let now = Local::now();
-    ClockReading::new(now.hour() as u8, now.minute() as u8, now.second() as u8)
-        .expect("chrono always returns a valid local clock reading")
+    clock_reading_from_local(Local::now())
+}
+
+fn clock_reading_from_local<T: chrono::TimeZone>(now: chrono::DateTime<T>) -> ClockReading {
+    let reading = ClockReading::new(now.hour() as u8, now.minute() as u8, now.second() as u8)
+        .expect("chrono always returns a valid local clock reading");
+    // One local sample supplies both halves. An out-of-range civil year hides
+    // the date rather than crashing an otherwise useful time display.
+    let date = u16::try_from(now.year())
+        .ok()
+        .and_then(|year| ClockDate::new(year, now.month() as u8, now.day() as u8));
+    date.map_or(reading, |date| reading.with_date(date))
 }
 
 #[cfg(test)]
@@ -293,9 +311,51 @@ mod tests {
     use super::*;
 
     #[test]
+    fn local_date_and_time_share_one_sample_across_offsets_and_dst_corrections() {
+        use chrono::{FixedOffset, TimeZone, Utc};
+        let utc = Utc.with_ymd_and_hms(2026, 1, 1, 0, 30, 0).unwrap();
+        for (offset, date, time) in [
+            (-8 * 3600, [2025, 12, 31], [16, 30, 0]),
+            (0, [2026, 1, 1], [0, 30, 0]),
+            (14 * 3600, [2026, 1, 1], [14, 30, 0]),
+        ] {
+            let reading = clock_reading_from_local(
+                utc.with_timezone(&FixedOffset::east_opt(offset).unwrap()),
+            );
+            assert_eq!(reading.date().unwrap().parts(), date);
+            assert_eq!([reading.hour(), reading.minute(), reading.second()], time);
+        }
+        for offset in [-7 * 3600, -8 * 3600] {
+            let local = FixedOffset::east_opt(offset)
+                .unwrap()
+                .with_ymd_and_hms(2026, 11, 1, 1, 30, 0)
+                .unwrap();
+            let reading = clock_reading_from_local(local);
+            assert_eq!(reading.date().unwrap().parts(), [2026, 11, 1]);
+            assert_eq!(reading.hour(), 1);
+        }
+    }
+
+    #[test]
+    fn calendar_weekdays_match_chrono_through_a_full_gregorian_cycle() {
+        let mut day = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let end = chrono::NaiveDate::from_ymd_opt(2400, 1, 1).unwrap();
+        while day < end {
+            let date =
+                ClockDate::new(day.year() as u16, day.month() as u8, day.day() as u8).unwrap();
+            assert_eq!(
+                date.label(),
+                day.format("%A · %B %-d").to_string().to_uppercase()
+            );
+            day = day.succ_opt().unwrap();
+        }
+    }
+
+    #[test]
     fn factory_applies_a_valid_initial_local_reading_and_settings() {
         let mut settings = Settings::default();
         settings.clock.time_format = ClockTimeFormat::TwelveHour;
+        settings.clock.show_date = true;
         let scenario = create(
             17,
             &settings,
@@ -310,6 +370,8 @@ mod tests {
             .unwrap();
 
         assert!(scenario.state.reading().is_some());
+        assert!(scenario.state.reading().unwrap().date().is_some());
+        assert!(scenario.state.settings().show_date);
         assert_eq!(scenario.state.time_format(), ClockTimeFormat::TwelveHour);
         assert_eq!(scenario.state.aspect_ratio(), 800.0 / 480.0);
     }
@@ -339,6 +401,11 @@ mod tests {
             ClockAction::decode(&actions[0]),
             Some(ClockAction::SetReading(second))
         );
+        let today = second.with_date(ClockDate::new(2026, 9, 25).unwrap());
+        let tomorrow = second.with_date(ClockDate::new(2026, 9, 26).unwrap());
+        assert_eq!(scenario.actions_for_reading(today).len(), 1);
+        assert!(scenario.actions_for_reading(today).is_empty());
+        assert_eq!(scenario.actions_for_reading(tomorrow).len(), 1);
     }
 
     #[test]

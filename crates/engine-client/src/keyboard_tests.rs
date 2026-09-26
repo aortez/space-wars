@@ -542,6 +542,10 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     assert_eq!(adjusted.get(), None);
     key(&window, Key::DownArrow);
     key(&window, Key::DownArrow);
+    assert_eq!(window.get_ingame_clock_focus_index(), 13);
+    key(&window, Key::Return);
+    assert_eq!(adjusted.get(), Some((13, 1)));
+    key(&window, Key::DownArrow);
     assert_eq!(window.get_ingame_clock_focus_index(), 12);
     key(&window, Key::DownArrow);
     key(&window, Key::RightArrow);
@@ -588,6 +592,8 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     click(&window, 649.0, 110.0);
     assert_eq!(adjusted.get(), Some((1, 1)));
     click(&window, 649.0, 166.0);
+    assert_eq!(adjusted.get(), Some((13, 1)));
+    click(&window, 529.0, 166.0);
     assert_eq!(adjusted.get(), Some((12, 1)));
     click(&window, 175.0, 334.0);
     assert_eq!(adjusted.get(), Some((9, 1)));
@@ -599,6 +605,9 @@ fn backend_neutral_keyboard_reaches_clock_settings_and_does_not_repeat_shortcuts
     window.set_launcher_settings_visible(true);
     assert!(window.get_launcher_clock_digit_slide_enabled());
     click(&window, 728.0, 168.0);
+    assert!(window.get_launcher_clock_show_date());
+    assert_eq!(window.get_launcher_settings_focus_index(), 12);
+    click(&window, 649.0, 220.0);
     assert!(!window.get_launcher_clock_digit_slide_enabled());
     assert_eq!(window.get_launcher_settings_focus_index(), 3);
     key(&window, Key::DownArrow);
@@ -955,6 +964,89 @@ fn keyboard_return_to_launcher_releases_input_before_invoking_ui_callback() {
     });
     key(&window, "q");
     pump_until(|| returned.get());
+    timer.stop();
+}
+
+#[test]
+fn calendar_date_live_control_reaches_host_and_persists_without_restarting() {
+    slint::platform::set_platform(Box::new(TestPlatform)).unwrap();
+    let window = MainWindow::new().unwrap();
+    window
+        .window()
+        .set_size(slint::LogicalSize::new(800.0, 480.0));
+    window.set_launcher_visible(false);
+    window.set_launcher_scenario("clock".into());
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("settings.toml");
+    let mut initial = Settings::default();
+    initial.clock.event_profile = engine_common::ClockEventProfile::Off;
+    let settings = Arc::new(RwLock::new(initial.clone()));
+    let writer = settings_writer::SettingsWriter::new(path.clone()).unwrap();
+    let controls = host::new_scenario_controls();
+    clock_controls::publish_settings(&window, initial.clock);
+    clock_controls::install(
+        &window,
+        Rc::clone(&controls),
+        Arc::clone(&settings),
+        writer.clone(),
+    );
+    window.show().unwrap();
+    let timer = host::start_scenario_loop(
+        &window,
+        "clock",
+        4242,
+        host::ScenarioLoopOptions {
+            renderer: host::RenderBackend::Raster,
+            controls: Some(Rc::clone(&controls)),
+            settings: initial,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    window.invoke_ingame_clock_open();
+    pump_until(|| controls.borrow().clock_state().is_some_and(|s| s.paused));
+    let before = controls.borrow().clock_state().unwrap();
+    for show_date in [true, false, true] {
+        window.invoke_ingame_clock_adjust(13, 1);
+        pump_until(|| {
+            controls
+                .borrow()
+                .clock_state()
+                .is_some_and(|s| s.settings.show_date == show_date && !s.settings_pending)
+        });
+        assert_eq!(window.get_launcher_clock_show_date(), show_date);
+        assert_eq!(settings.read().unwrap().clock.show_date, show_date);
+        let after = controls.borrow().clock_state().unwrap();
+        assert_eq!(after.scenario_revision, before.scenario_revision);
+        assert_eq!(after.simulation_tick, before.simulation_tick);
+        assert!(after.date.is_some() && after.date_label.is_some());
+        assert_eq!((after.body_count, after.collider_count), (0, 0));
+    }
+    timer.stop();
+    // Flush through the real writer, then reload using the normal settings path.
+    writer
+        .save_blocking(settings.read().unwrap().clone())
+        .unwrap();
+    let reloaded = settings::load_settings(&path).unwrap().settings;
+    assert!(reloaded.clock.show_date);
+    let timer = host::start_scenario_loop(
+        &window,
+        "clock",
+        4242,
+        host::ScenarioLoopOptions {
+            renderer: host::RenderBackend::Raster,
+            controls: Some(Rc::clone(&controls)),
+            settings: reloaded,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    pump_until(|| {
+        controls
+            .borrow()
+            .clock_state()
+            .is_some_and(|s| !s.paused && s.settings.show_date)
+    });
     timer.stop();
 }
 

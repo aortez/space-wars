@@ -55,6 +55,62 @@ Additional fixed-reading production-renderer fixtures: [HyperPixel, 800×480](sc
 and [portrait, 480×800](screenshots/clock/portrait-centered-clock-fixture.png).
 These two are headless layout captures, not deployments to additional devices.
 
+## Optional weekday and date
+
+Enable **Clock → Scenario Settings → Show Date**, or **Pause → Clock Controls →
+Date**, to display a quiet line such as `FRIDAY · SEPTEMBER 25` in the upper band.
+It defaults to **Off**, including when loading older settings. The saved
+`clock.show_date` boolean is independent of 12/24-hour format and event cadence.
+Keyboard, controller, touch and guarded CLI UI activation use the same controls:
+`launcher.settings.clock.show-date.next` and `pause.clock.show-date`.
+
+The first pass uses English weekday/month names and omits the year from the
+visible line; it is not a calendar screen or a new scheduled event. The label
+stays live through Rain, Falling, Meltdown and Marquee without becoming debris.
+Event notices temporarily replace it, and controlling a duck gives the upper
+band to the player label. Dismissing the duck restores the current date.
+
+The host takes **one local timestamp** for both date and time. A validated
+Gregorian `ClockDate` travels in the same typed `ClockReading` action; the
+scenario does not read wall time or guess that a day elapsed. Midnight,
+month/year rollover, leap days, timezone changes and backward corrections use
+the latest supplied reading. Years 1–9999 are supported; a missing or unsupported
+date hides the label while preserving the ordinary clock. Time-only test and
+benchmark readings remain supported. Dated readings distinguish a genuine
+near-contiguous midnight from a multi-day correction when deciding to animate
+Digit Slide. Pause still freezes the scenario; resume/control synchronization
+uses the current local date without replaying missed days.
+
+The formatted label is cached until the civil date changes. When visible it
+adds **one text primitive**, no bodies, water supports, timers or randomness.
+Toggling it neither advances an event nor replaces its physics. `clock state`
+reports `date` as `[year, month, day]`, `date_label` (even when hidden) and
+`settings.show_date`.
+
+Coverage includes a full 400-year Gregorian-cycle comparison against Chrono,
+month/year/leap-century boundaries, local UTC offsets, repeated DST-hour readings,
+atomic/malformed actions, settings migration and persistence, every event's
+paused state, both render adapters and real Slint text pixels at 800×480,
+1024×768 and 480×800. Export the display-free native-renderer previews with:
+
+```sh
+SPACEWARS_CALENDAR_ARTIFACTS=/tmp/clock-calendar \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  clock_calendar_date_renders_in_band_through_native_text_overlay
+```
+
+Release-device smoke check: `sw-picade-2.local` (1024×768, 12-hour) and
+`spacewars.local` (800×480 HyperPixel, 24-hour) both displayed the date cleanly
+in captured screenshots and reported approximately 60 FPS/UPS. Existing settings
+migrated with Date Off; enabling it through the live controls persisted only
+`clock.show_date = true`, preserving each device's other preferences.
+
+Actual device screenshots from that release build:
+
+| Picade, 1024×768 / 12-hour | HyperPixel, 800×480 / 24-hour |
+| --- | --- |
+| ![Clock date on sw-picade-2](screenshots/clock/picade-calendar-date.png) | ![Clock date on spacewars HyperPixel](screenshots/clock/hyperpixel-calendar-date.png) |
+
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
@@ -554,7 +610,7 @@ scheduling, not this manual action. Individual disabled events are skipped;
 if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide and Rain without
 replacing the duck. If all enabled events need the arena, a brief notice asks
-you to wait for the duck to leave (or take control and dismiss it). Preferences are unchanged. The Clock action protocol is version 6; `NextEvent`
+you to wait for the duck to leave (or take control and dismiss it). Preferences are unchanged. The Clock action protocol is version 7; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1466,14 +1522,17 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 14 and
-older requests are rejected. The internal Clock action payload is version 6;
+after completion or cancellation. Use matching client/CLI builds: schema 16 and
+older requests are rejected. The internal Clock action payload is version 7;
 event ordinals 0–5 are unchanged and Rain is 6. Configure contains seven
-switch bits, validated recipe and rain-amount bytes, and 1–32 message bytes. Version 1–5 actions
-are rejected; observation remains version 1.
+switch bits, validated recipe and rain-amount bytes, a `show_date` byte (0/1),
+and 1–32 message bytes. Reading actions contain either three time bytes or those
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–6
+actions are rejected. Observation version 2 appends `show_date`, year/month/day
+to the existing time/format fields; an absent date is four zero bytes.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 16, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 17, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1490,7 +1549,7 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 16, `event`
+tick. A raw `clock trigger` request must include schema version 17, `event`
 (`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, or `rain`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 

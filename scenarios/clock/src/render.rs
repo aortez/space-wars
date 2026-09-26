@@ -62,6 +62,20 @@ pub fn render_frame(state: &ClockState) -> RenderFrame {
                 anchor: TextAnchor::Center,
             }),
         );
+    } else if state.config.show_date
+        && state.player_duck_session().is_none()
+        && let Some(label) = state.date_label()
+    {
+        frame.push_primitive(
+            100,
+            RenderPrimitive::Text(RenderText {
+                position: RenderPoint::new(0.0, (layout.bounds_max.y + layout.canopy_y) * 0.5),
+                text: label.into(),
+                color: LABEL_COLOR,
+                size: 18.0,
+                anchor: TextAnchor::Center,
+            }),
+        );
     }
     frame.push_primitive(
         BACKGROUND_LAYER,

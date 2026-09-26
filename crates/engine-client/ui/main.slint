@@ -500,6 +500,7 @@ export component MainWindow inherits Window {
     in-out property <string> launcher-pizza-desired-balls-text: "24";
     in-out property <string> launcher-pizza-spawn-rate-text: "0.10";
     in-out property <string> launcher-clock-time-format: "24-hour";
+    in-out property <bool> launcher-clock-show-date: false;
     in-out property <string> launcher-clock-event-profile: "Calm";
     in-out property <bool> launcher-clock-falling-enabled: true;
     in-out property <bool> launcher-clock-color-cycle-enabled: true;
@@ -1146,8 +1147,9 @@ export component MainWindow inherits Window {
                     next => { root.ingame-clock-adjust(1, 1); }
                 }
                 ChoiceRow {
+                    x: 0px;
                     y: 56px;
-                    width: parent.width;
+                    width: parent.width - 120px;
                     height: 48px;
                     label: "Rain";
                     value: root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off";
@@ -1155,6 +1157,16 @@ export component MainWindow inherits Window {
                     enabled: !root.clock-controls-pending;
                     previous => { root.ingame-clock-adjust(12, -1); }
                     next => { root.ingame-clock-adjust(12, 1); }
+                }
+                MenuButton {
+                    x: parent.width - 112px;
+                    y: 56px;
+                    width: 112px;
+                    height: 48px;
+                    text: "Date\n" + (root.launcher-clock-show-date ? "On" : "Off");
+                    selected: root.ingame-clock-focus-index == 13;
+                    enabled: !root.clock-controls-pending;
+                    activated => { root.ingame-clock-adjust(13, 1); }
                 }
                 MenuButton {
                     x: 0px;
@@ -1928,19 +1940,19 @@ export component MainWindow inherits Window {
                             y: 52px;
                             width: (parent.width - 12px) / 2;
                             height: 48px;
-                            label: "Digit Slide";
-                            value: root.launcher-clock-digit-slide-enabled ? "On" : "Off";
-                            selected: root.launcher-settings-focus-index == 3;
-                            previous => { root.launcher-settings-focus-index = 3; root.ui-action(2); }
-                            next => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
+                            label: "Show Date";
+                            value: root.launcher-clock-show-date ? "On" : "Off";
+                            selected: root.launcher-settings-focus-index == 12;
+                            previous => { root.launcher-settings-focus-index = 12; root.ui-action(2); }
+                            next => { root.launcher-settings-focus-index = 12; root.ui-action(3); }
                         }
 
                         MenuButton {
                             x: 0px;
                             y: 104px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 16px) / 3;
                             height: 48px;
-                            text: "Events: " + root.launcher-clock-event-profile;
+                            text: "Events\n" + root.launcher-clock-event-profile;
                             selected: root.launcher-settings-focus-index == 4;
                             activated => {
                                 root.launcher-settings-focus-index = 4;
@@ -1948,13 +1960,22 @@ export component MainWindow inherits Window {
                             }
                         }
                         MenuButton {
-                            x: parent.width / 2 + 6px;
+                            x: (parent.width + 8px) / 3;
                             y: 104px;
-                            width: (parent.width - 12px) / 2;
+                            width: (parent.width - 16px) / 3;
                             height: 48px;
-                            text: "Rain: " + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
+                            text: "Rain\n" + (root.launcher-clock-rain-enabled ? root.launcher-clock-rain-amount : "Off");
                             selected: root.launcher-settings-focus-index == 11;
                             activated => { root.launcher-settings-focus-index = 11; root.ui-action(3); }
+                        }
+                        MenuButton {
+                            x: 2 * (parent.width + 8px) / 3;
+                            y: 104px;
+                            width: (parent.width - 16px) / 3;
+                            height: 48px;
+                            text: "Digit Slide\n" + (root.launcher-clock-digit-slide-enabled ? "On" : "Off");
+                            selected: root.launcher-settings-focus-index == 3;
+                            activated => { root.launcher-settings-focus-index = 3; root.ui-action(3); }
                         }
 
                         ChoiceRow {

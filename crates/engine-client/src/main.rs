@@ -774,6 +774,7 @@ fn show_launcher(
     window.set_launcher_clock_time_format(SharedString::from(clock_time_format_label(
         settings.clock.time_format,
     )));
+    window.set_launcher_clock_show_date(settings.clock.show_date);
     window.set_launcher_clock_event_profile(SharedString::from(clock_event_profile_label(
         settings.clock.event_profile,
     )));
@@ -1444,7 +1445,7 @@ fn launcher_settings_item_count(window: &MainWindow) -> i32 {
         | "spacewars-terrain-travel-duel"
         | "spacewars-terrain-arena"
         | "spacewars-terrain-arena-duel" => 5,
-        "clock" => 13,
+        "clock" => 14,
         "falling" => 1,
         "nes" => 2,
         "surface-expedition"
@@ -1688,6 +1689,10 @@ fn adjust_pizza_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
 }
 
 fn adjust_clock_launcher_setting(window: &MainWindow, focus: i32, delta: i32) {
+    if focus == 12 {
+        window.set_launcher_clock_show_date(!window.get_launcher_clock_show_date());
+        return;
+    }
     if focus == 11 {
         let current = if window.get_launcher_clock_rain_enabled() {
             window.get_launcher_clock_rain_amount()
@@ -2283,6 +2288,7 @@ fn pizza_setup_from_window(window: &MainWindow) -> Result<PizzaSettings, String>
 
 fn clock_setup_from_window(window: &MainWindow) -> Result<ClockSettings, String> {
     Ok(ClockSettings {
+        show_date: window.get_launcher_clock_show_date(),
         time_format: clock_time_format_from_label(
             window.get_launcher_clock_time_format().as_str(),
         )?,
@@ -3129,6 +3135,7 @@ mod tests {
             nes_rom_id: Some("abc123".into()),
             clock: ClockSettings {
                 time_format: ClockTimeFormat::TwelveHour,
+                show_date: true,
                 event_profile: ClockEventProfile::Demo,
                 events: engine_common::ClockEvents {
                     falling: false,

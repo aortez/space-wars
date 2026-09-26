@@ -104,6 +104,7 @@ pub(crate) struct UiInventoryContext {
     pub(crate) pizza_desired_balls: String,
     pub(crate) pizza_spawn_rate: String,
     pub(crate) clock_time_format: String,
+    pub(crate) clock_show_date: bool,
     pub(crate) clock_event_profile: String,
     pub(crate) clock_falling_enabled: bool,
     pub(crate) clock_color_cycle_enabled: bool,
@@ -549,6 +550,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 &context.clock_event_profile,
             );
             for (id, enabled) in [
+                ("launcher.settings.clock.show-date", context.clock_show_date),
                 (
                     "launcher.settings.clock.falling",
                     context.clock_falling_enabled,
@@ -596,6 +598,7 @@ fn launcher_settings_inventory(context: &UiInventoryContext) -> UiInventory {
                 "launcher.settings.clock.marquee",
                 "launcher.settings.clock.marquee-preset",
                 "launcher.settings.clock.rain",
+                "launcher.settings.clock.show-date",
                 "launcher.settings.back",
             ]
         }
@@ -886,6 +889,10 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     push_choice(&mut controls, "pause.clock.rain", &context.clock_rain);
+    controls.push(
+        UiControl::new("pause.clock.show-date", "Show Date", true)
+            .with_value(if context.clock_show_date { "On" } else { "Off" }),
+    );
     for control in &mut controls {
         control.enabled = !context.clock_controls_pending;
     }
@@ -905,6 +912,7 @@ fn pause_clock_inventory(context: &UiInventoryContext) -> UiInventory {
                 "pause.clock.marquee-preset",
                 "pause.clock.digit-slide",
                 "pause.clock.rain",
+                "pause.clock.show-date",
             ],
             context.ingame_clock_focus_index,
         ),
@@ -950,6 +958,7 @@ mod tests {
             pizza_desired_balls: "75".into(),
             pizza_spawn_rate: "0.10".into(),
             clock_time_format: "24-hour".into(),
+            clock_show_date: false,
             clock_event_profile: "Calm".into(),
             clock_falling_enabled: true,
             clock_color_cycle_enabled: true,
@@ -1185,7 +1194,7 @@ mod tests {
                 "launcher.settings.spacewars.player-2",
             ),
             ("pizza", 10, "launcher.settings.pizza.spawn-rate"),
-            ("clock", 26, "launcher.settings.clock.duck"),
+            ("clock", 28, "launcher.settings.clock.duck"),
             ("rover-lab", 6, "launcher.settings.raster-scale"),
             (
                 "spacewars-surface-blocks",
@@ -1429,7 +1438,7 @@ mod tests {
             inventory.selected_control.as_deref(),
             Some("pause.clock.color-cycle")
         );
-        assert_eq!(inventory.controls.len(), 18);
+        assert_eq!(inventory.controls.len(), 19);
         assert!(inventory.controls.iter().all(|control| control.enabled));
         context.clock_controls_pending = true;
         let pending = inventory_for_screen(UiScreen::PauseClock, &context);
