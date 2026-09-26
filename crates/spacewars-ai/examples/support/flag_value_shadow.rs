@@ -80,6 +80,7 @@ impl ShadowRun {
         self.work.flush().unwrap();
         json!({"model":"capture_flag_value_shadow_v1", "observational":true,
             "charged":self.shadow.charged_total, "completed":self.shadow.completed_total,
+            "deferred_source_observations":self.shadow.deferred_source_total,
             "pending":([PlayerId::PLAYER_1,PlayerId::PLAYER_2].map(|p| self.shadow.pending(p))),
             "construction":super::timing(self.construction_ms.clone()),
             "dispatch":super::timing(self.dispatch_ms.clone()),

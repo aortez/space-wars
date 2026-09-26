@@ -78,6 +78,9 @@ pub struct FlagValueShadow {
     last_advance: Option<u64>,
     pub charged_total: u64,
     pub completed_total: u64,
+    /// Observations waiting for a baseline that can include a new publication.
+    /// Repeated ticks are not independent decision opportunities.
+    pub deferred_source_total: u64,
 }
 impl FlagValueShadow {
     pub fn new(capacity: usize) -> Self {
@@ -88,6 +91,7 @@ impl FlagValueShadow {
             last_advance: None,
             charged_total: 0,
             completed_total: 0,
+            deferred_source_total: 0,
         }
     }
     pub fn latest(&self, actor: PlayerId) -> Option<&FlagValueShadowReport> {
@@ -184,12 +188,18 @@ impl FlagValueShadow {
         }
         let mut admissions = Vec::new();
         let mut accepted = Vec::new();
+        let mut awaiting_source = false;
         for sample in samples {
             let key = dependencies
                 .planets
                 .iter()
                 .find(|k| k.planet == sample.site.planet);
             let costs = admit(o, base, request, sample, key);
+            awaiting_source |= costs == Err("flag evidence unavailable at comparison source")
+                && sample.reason.is_none()
+                && sample.validated_tick == Some(sample.completed_tick)
+                && sample.completed_tick > base.source_tick
+                && sample.completed_tick <= p.tick;
             let index = admissions.len();
             admissions.push(FlagShadowAdmission {
                 site: sample.site,
@@ -205,6 +215,13 @@ impl FlagValueShadow {
             if let Ok(costs) = costs {
                 accepted.push((index, sample, costs));
             }
+        }
+        // A new positive publication must not consume the cadence slot with a
+        // baseline that predates it. Wait for an ordinary evaluator refresh;
+        // never insert future evidence or request/accelerate that refresh.
+        if accepted.is_empty() && awaiting_source {
+            self.deferred_source_total += 1;
+            return;
         }
         // One alternative planet, at most two sites: smallest calibrated walking
         // cost, then newest source and bearing. Existing local evidence wins.
@@ -342,12 +359,14 @@ fn admit(
     {
         return Err("flag request identity changed");
     }
+    if s.validated_tick.is_none() {
+        return Err("flag survey unpublished");
+    }
     if s.source_tick > s.completed_tick
-        || s.completed_tick > base.source_tick
         || s.validated_tick != Some(s.completed_tick)
         || s.measurement.tick != s.source_tick
     {
-        return Err("flag evidence unavailable at comparison source");
+        return Err("flag survey timestamps inconsistent");
     }
     if s.source_tick > p.tick || p.tick - s.source_tick > MAX_EVIDENCE_AGE {
         return Err("flag source expired");
@@ -450,7 +469,11 @@ fn admit(
     {
         return Err("flag endpoint no longer in interaction range");
     }
-    model::walking_costs(route, claim.stage_required_seconds)
+    let costs = model::walking_costs(route, claim.stage_required_seconds)?;
+    if s.completed_tick > base.source_tick {
+        return Err("flag evidence unavailable at comparison source");
+    }
+    Ok(costs)
 }
 
 #[cfg(test)]

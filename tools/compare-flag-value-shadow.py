@@ -5,6 +5,7 @@ from collections import Counter
 import gzip
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
 import subprocess
@@ -28,10 +29,13 @@ def validate_reports(reports, evaluations, samples):
     surveys = {(s["actor"], s["source_tick"], s["site"]["bearing"]): s for s in samples}
     rejections, unknown = Counter(), Counter()
     used, changed, complete, numeric_added = [], [], 0, 0
-    last_admission = {}
+    last_admission, seen_sources = {}, set()
     for r in reports:
         assert r["model"] == "capture_flag_value_shadow_v1" and r["observational"]
         b, a = r["baseline"], r["augmented"]
+        identity = (r["actor"], b["source_tick"])
+        assert identity not in seen_sources
+        seen_sources.add(identity)
         assert b == baselines[(r["actor"], b["source_tick"])]
         assert b["policy"] == "material_mission_v13"
         assert b["source_tick"] <= b["completed_tick"] <= r["admitted_tick"] <= r["completed_tick"]
@@ -42,6 +46,10 @@ def validate_reports(reports, evaluations, samples):
         assert a["transfer_source"] == b["transfer_source"]
         assert a["match_context"] == b["match_context"]
         assert len(a["candidates"]) <= 3
+        assert [c["planet"] for c in a["candidates"]] == [c["planet"] for c in b["candidates"]]
+        derived = {"model", "completed_tick", "charged_work", "candidates", "fastest_supported",
+                   "preferred_by_time", "value_comparison", "comparison_reason"}
+        assert {k: v for k, v in a.items() if k not in derived} == {k: v for k, v in b.items() if k not in derived}
         assert a["charged_work"] == len(a["candidates"]) + 1
         assert a["completed_tick"] == r["completed_tick"]
         assert len(r["admissions"]) <= 2
@@ -68,8 +76,29 @@ def validate_reports(reports, evaluations, samples):
             assert old["unknown_reason"] in {"remote or local surface unmeasured", "objective route unmeasured", "site round trip unmeasured"}
             assert new["site"] == s["site"] and new["evidence_tick"] == s["source_tick"]
             assert new["route_source_tick"] == s["source_tick"] and new["route_validated_tick"] == s["validated_tick"]
-            assert abs(new["local"]["outbound"] - (s["route"]["outbound"]["length"] / 5 + 0.15833333)) < 1e-5
-            assert abs(new["local"]["return_board"] - (s["route"]["returning"]["length"] / 5 + 2 / 60)) < 1e-5
+            costs = dict(landing=23.033333, exit=1/60,
+                         outbound=s["route"]["outbound"]["length"] / 5 + 0.15833333,
+                         claim=6 - 0.5/60, return_board=s["route"]["returning"]["length"] / 5 + 2/60,
+                         departure=3.8166666)
+            assert set(new["local"]) == set(costs)
+            assert all(math.isclose(new["local"][k], v, abs_tol=1e-5) for k, v in costs.items())
+            modified = {"site", "local", "unknown_reason", "evidence_tick", "evidence_age_ticks",
+                        "route_source_tick", "route_validated_tick", "evidence_kind", "travel_seconds",
+                        "transfer", "total_seconds", "reference_exceeds_match_time", "value"}
+            assert {k: v for k, v in old.items() if k not in modified} == {k: v for k, v in new.items() if k not in modified}
+            assert {k: v for k, v in old["value"].items() if k != "seconds_per_unit"} == {
+                k: v for k, v in new["value"].items() if k != "seconds_per_unit"}
+            if new["unknown_reason"] is not None:
+                assert new["total_seconds"] is None and new["value"]["seconds_per_unit"] is None
+            else:
+                transfer = new["transfer"]
+                assert math.isclose(new["travel_seconds"], sum(transfer[k] for k in
+                    ["settle_seconds", "turn_seconds", "climb_seconds", "cruise_seconds"]), abs_tol=1e-4)
+                assert math.isclose(new["total_seconds"], sum(costs.values()) + new["travel_seconds"], abs_tol=1e-4)
+                units = new["value"]["priority_units"]
+                assert units > 0 and math.isclose(new["value"]["seconds_per_unit"], new["total_seconds"] / units, abs_tol=1e-5)
+                remaining = b["match_context"].get("remaining_seconds") if b["match_context"] else None
+                assert new["reference_exceeds_match_time"] == (new["total_seconds"] > remaining if remaining is not None else None)
             numeric_added += new["total_seconds"] is not None
             used.append(dict(actor=r["actor"], source_tick=s["source_tick"], site=s["site"],
                              comparison_source=b["source_tick"], admitted_tick=r["admitted_tick"],
@@ -86,6 +115,12 @@ def validate_reports(reports, evaluations, samples):
             assert r["completed_tick"] - b["source_tick"] <= 120
             assert all(r["completed_tick"] - i["source_tick"] <= 1800 for i in r["admissions"] if i["used"])
             assert r["preference_changed"] == (preference(b) != preference(a))
+        supported = all(c["total_seconds"] is not None for c in a["candidates"])
+        eligible = [(c["value"]["seconds_per_unit"], c["planet"]) for c in a["candidates"]
+                    if c["total_seconds"] is not None and c.get("reference_exceeds_match_time") is not True]
+        expected = min(eligible)[1] if (eligible and supported and not a.get("inactive_reason")
+                                       and not a.get("candidates_truncated") and not r["completion_reason"]) else None
+        assert preference(a) == expected
         if preference(a) is not None:
             complete += 1
         if r["preference_changed"]:
@@ -99,7 +134,7 @@ def validate_reports(reports, evaluations, samples):
                 scope="Repeated historical comparisons are not independent opportunities or strength evidence.")
 
 
-def validate_work(flag_rows, shadow_rows, summary):
+def validate_work(flag_rows, shadow_rows, summary, reports):
     assert len(flag_rows) == len(shadow_rows)
     total, maximum = 0, 0
     for flag, shadow in zip(flag_rows, shadow_rows):
@@ -112,6 +147,8 @@ def validate_work(flag_rows, shadow_rows, summary):
         total += charged["graph"]
         maximum = max(maximum, previous["graph"] + charged["graph"])
     assert total == summary["charged"]
+    completed_work = sum(r["augmented"]["charged_work"] for r in reports)
+    assert 0 <= total - completed_work <= 3 * sum(summary["pending"])
     return dict(shadow_graph=total, maximum_combined_graph=maximum, physics_queries_added=0)
 
 
@@ -153,7 +190,7 @@ def main():
         run["comparison"] = validate_reports(shadows, rows(path / "mission-evaluations.jsonl"), rows(path / "flag-survey.jsonl"))
         run["shadow"] = report["flag_survey"]["shadow"]
         assert len(shadows) == run["shadow"]["completed"]
-        run["work"] = validate_work(rows(path / "flag-survey-work.jsonl"), rows(path / "flag-value-shadow-work.jsonl"), run["shadow"])
+        run["work"] = validate_work(rows(path / "flag-survey-work.jsonl"), rows(path / "flag-value-shadow-work.jsonl"), run["shadow"], shadows)
         run["shadow_sha256"] = F.digest(path / "flag-value-shadow.jsonl")
         run["shadow_work_sha256"] = F.digest(path / "flag-value-shadow-work.jsonl")
         run["exact_existing_controls_evaluator_physics_surveys_and_work"] = True
