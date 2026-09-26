@@ -5,6 +5,71 @@ use spacewars_control::{
 
 #[test]
 #[ignore = "requires an explicit display; CI runs this test under Xvfb"]
+fn explosion_controls_pause_recovery_and_restart_preserve_settings() {
+    run_functional_test("clock-explosion", |harness| {
+        let state = harness.wait_until_ready();
+        let state = harness.activate_until_scenario("clock", state);
+        let state = harness.activate_guarded("launcher.settings", &state);
+        let state =
+            harness.activate_guarded("launcher.settings.clock.event-profile.previous", &state);
+        let state = harness.activate_guarded("launcher.settings.clock.explosion.previous", &state);
+        assert_eq!(
+            control_value(&state, "launcher.settings.clock.explosion.next"),
+            Some("Off")
+        );
+        harness.activate_guarded("launcher.settings.start", &state);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, state.revision);
+        let initial = harness.clock_state();
+        assert_eq!(initial.profile, "off");
+        assert!(!initial.settings.events.explosion);
+        // Explicit admission bypasses the saved automatic-event switch. Exact
+        // subsecond warning timing is covered by deterministic core tests.
+        harness.clock_trigger_event(&initial, ClockEventKind::Explosion);
+        let exploding = harness.clock_wait(&initial, "exploding", 1, 0);
+        let debris = exploding.explosion.unwrap();
+        assert_eq!(debris.live_cells, debris.cells);
+        assert!(debris.cells > 0 && debris.cells <= debris.max_cells);
+        assert_eq!(exploding.body_count, debris.cells as usize + 4);
+        harness.activate_guarded("gameplay.clock-controls", &gameplay);
+        let page = harness.wait_clock_screen(UiScreen::PauseClock, gameplay.revision);
+        let paused = harness.clock_state();
+        harness.assert_clock_stays_paused(&paused);
+        let mut page = harness.change_clock_setting("pause.clock.explosion", "On", &page);
+        let configured = harness.clock_state();
+        assert!(configured.settings.events.explosion);
+        assert_eq!(configured.explosion, paused.explosion);
+        assert_eq!(configured.phase_tick, paused.phase_tick);
+        harness.capture_screenshot("clock-explosion-controls.png");
+        page = harness.activate_guarded("pause.clock.back", &page);
+        harness.activate_guarded("pause.resume", &page);
+        let gameplay = harness.wait_clock_screen(UiScreen::Gameplay, page.revision);
+        let recovered = harness.clock_wait(&initial, "idle", 1, 0);
+        assert!(recovered.explosion.is_none());
+        assert_eq!((recovered.body_count, recovered.collider_count), (0, 0));
+        assert_eq!(recovered.next_event_tick, None);
+        assert_eq!(recovered.settings, configured.settings);
+
+        harness.clock_trigger_event(&recovered, ClockEventKind::Explosion);
+        harness.clock_wait(&initial, "exploding", 2, 0);
+        harness.pause_guarded(&gameplay);
+        let menu = harness.wait_clock_screen(UiScreen::PauseMain, gameplay.revision);
+        harness.activate_guarded("pause.restart", &menu);
+        harness.wait_clock_screen(UiScreen::Gameplay, menu.revision);
+        let restarted = harness.clock_state();
+        assert_ne!(restarted.scenario_revision, initial.scenario_revision);
+        assert!(restarted.explosion.is_none());
+        assert_eq!((restarted.body_count, restarted.collider_count), (0, 0));
+        assert_eq!(restarted.settings, configured.settings);
+        let saved: engine_common::Settings = toml::from_str(
+            &fs::read_to_string(harness.run_path().join("config/settings.toml")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved.clock, configured.settings);
+    });
+}
+
+#[test]
+#[ignore = "requires an explicit display; CI runs this test under Xvfb"]
 fn crow_trigger_pause_settings_and_restart_preserve_the_resident_contract() {
     run_functional_test("clock-crow", |harness| {
         let state = harness.wait_until_ready();
@@ -211,6 +276,7 @@ fn marquee_recipes_preview_pause_persist_and_restore_live_clock() {
             "pause.clock.falling",
             "pause.clock.preview-event",
             "pause.clock.crow",
+            "pause.clock.explosion",
             "pause.clock.marquee",
         ] {
             page = harness.press_guarded(UiAction::Down, &page);
@@ -484,6 +550,7 @@ fn live_clock_controls_preserve_events_preview_and_persist_across_restart_and_re
         page = harness.change_clock_setting("pause.clock.meltdown", "Off", &page);
         page = harness.change_clock_setting("pause.clock.duck", "Off", &page);
         page = harness.change_clock_setting("pause.clock.crow", "Off", &page);
+        page = harness.change_clock_setting("pause.clock.explosion", "Off", &page);
         page = harness.change_clock_setting("pause.clock.marquee", "Off", &page);
         page = harness.change_clock_setting("pause.clock.rain.previous", "Off", &page);
         page = harness.change_clock_setting("pause.clock.show-date", "On", &page);
@@ -831,6 +898,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.crow.next",
+            "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.marquee.next",
             "launcher.settings.clock.digit-slide.next",
         ] {
@@ -914,6 +982,7 @@ fn color_cycle_preview_preserves_time_and_resets_after_pause_restart_and_relaunc
             "launcher.settings.clock.meltdown.next",
             "launcher.settings.clock.duck.next",
             "launcher.settings.clock.crow.next",
+            "launcher.settings.clock.explosion.next",
             "launcher.settings.clock.marquee.next",
         ] {
             assert_eq!(control_value(&settings, id), Some("Off"));

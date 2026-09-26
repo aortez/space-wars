@@ -88,6 +88,7 @@ impl ClockState {
             digit_slide: enabled(ClockEventKind::DigitSlide),
             rain: enabled(ClockEventKind::Rain),
             crow: enabled(ClockEventKind::Crow),
+            explosion: enabled(ClockEventKind::Explosion),
         };
         self.schedule
             .configure(self.config.event_profile, effective);

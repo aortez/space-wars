@@ -12,6 +12,7 @@ use engine_core::Vec2;
 mod crow;
 mod digit_slide;
 mod duck;
+mod explosion;
 mod floor;
 mod marquee;
 mod meltdown;
@@ -290,6 +291,10 @@ fn render_canopy(frame: &mut RenderFrame, layout: Layout) {
 }
 
 fn render_segments(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
+    if let Some(crate::events::ActiveEvent::Explosion(event)) = &state.active_event {
+        explosion::render(frame, state, event, layout);
+        return;
+    }
     if let Some(crate::events::ActiveEvent::DigitSlide(event)) = &state.active_event {
         digit_slide::render(frame, event, layout, state.palette());
         return;

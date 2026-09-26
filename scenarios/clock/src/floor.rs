@@ -40,7 +40,7 @@ impl FloorManager {
         );
         self.owner = Some(FloorOwner::Event(kind));
         self.mode = match kind {
-            ClockEventKind::Falling => ClockFloorMode::DrainOpen,
+            ClockEventKind::Falling | ClockEventKind::Explosion => ClockFloorMode::DrainOpen,
             ClockEventKind::Meltdown | ClockEventKind::Duck | ClockEventKind::Rain => {
                 ClockFloorMode::EventOwned
             }
@@ -66,7 +66,10 @@ impl FloorManager {
 
     pub fn acquire_visit(&mut self) {
         if let Some(FloorOwner::Event(
-            kind @ (ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown),
+            kind @ (ClockEventKind::Rain
+            | ClockEventKind::Falling
+            | ClockEventKind::Meltdown
+            | ClockEventKind::Explosion),
         )) = self.owner
         {
             self.owner = Some(FloorOwner::VisitArena {
@@ -107,7 +110,10 @@ impl FloorManager {
     pub fn acquire_visit_event(&mut self, kind: ClockEventKind) {
         assert!(matches!(
             kind,
-            ClockEventKind::Rain | ClockEventKind::Falling | ClockEventKind::Meltdown
+            ClockEventKind::Rain
+                | ClockEventKind::Falling
+                | ClockEventKind::Meltdown
+                | ClockEventKind::Explosion
         ));
         let Some(FloorOwner::VisitArena { event, .. }) = &mut self.owner else {
             panic!("shared event requires a visit arena");

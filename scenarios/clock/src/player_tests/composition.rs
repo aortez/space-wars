@@ -63,6 +63,7 @@ fn next_event_cycles_compatible_events_and_blocked_previews_do_not_evict_anythin
     settings.events.meltdown = true;
     settings.events.rain = true;
     settings.events.crow = true;
+    settings.events.explosion = true;
     state.configure(settings);
     let session = state.player_duck_state();
     for cycle in 0..3 {
