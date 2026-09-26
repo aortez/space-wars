@@ -100,14 +100,16 @@ class FinishedMatchAccounting(unittest.TestCase):
                        candidates=[{"total_seconds": 30}, {"total_seconds": 10},
                                    {"total_seconds": None, "unknown_reason": "unmeasured"}])
         complete = dict(partial, actor="player_2", preferred_by_time=1, candidates=partial["candidates"][:2])
+        unselected = dict(complete, current_target=None)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "evaluations.jsonl"
-            path.write_text("\n".join(json.dumps(r) for r in [partial, complete]))
+            path.write_text("\n".join(json.dumps(r) for r in [partial, complete, unselected]))
             p1, p2 = TOOL.evaluation_coverage(path)
         self.assertEqual(p1["counts"]["multiple_numeric_destinations"], 1)
         self.assertEqual(p1["counts"].get("complete_preferences", 0), 0)
         self.assertEqual(p1["unknown_candidates"], {"unmeasured": 1})
         self.assertEqual(p2["counts"]["alternative_preferences"], 1)
+        self.assertEqual(p2["counts"]["preferences_without_current_target"], 1)
 
 
 if __name__ == "__main__":

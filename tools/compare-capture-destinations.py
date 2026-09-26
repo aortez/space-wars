@@ -126,7 +126,10 @@ def evaluation_coverage(path):
             count["inactive_reports"] += row["inactive_reason"] is not None
             if row["preferred_by_time"] is not None:
                 count["complete_preferences"] += 1
-                count["alternative_preferences"] += row["preferred_by_time"] != row["current_target"]
+                if row["current_target"] is None:
+                    count["preferences_without_current_target"] += 1
+                else:
+                    count["alternative_preferences"] += row["preferred_by_time"] != row["current_target"]
             count["multiple_numeric_destinations"] += sum(
                 c["total_seconds"] is not None for c in row["candidates"]) >= 2
             for candidate in row["candidates"]:

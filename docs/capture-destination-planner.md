@@ -166,6 +166,11 @@ Parameters are not fitted to these worlds. Wins, survival and the later itinerar
 will be read together with how often v12 actually changes a decision. Four worlds
 are diagnostic coverage, not a precise general win-rate estimate.
 
+The [completed results](capture-destination-finished-matches.md) retain fifteen
+unchanged comparisons and one slower trip that changes a win into a loss. They
+identify transfer timing and ownership value as the next planning work; v12
+remains experimental.
+
 ## Validation and Picade deployment
 
 The final runtime at `3a49860` differs from the comparison build only in the
@@ -199,9 +204,10 @@ including `workspace-tests.log`, `remaining-physical-tests.log`,
 ## Follow-up
 
 Keep the experiment selectable until broader evidence warrants promotion.
-The next useful extension is targeted coverage of missing destination costs,
-followed by explicit comparison of first foothold, enemy-flag removal and the
-remaining itinerary. Preserve the unsupported mirrored cases as regressions;
+The finished-match comparison makes transfer cost and the value of first
+foothold versus enemy-flag removal the next useful planning slice. Missing
+destination costs remain a coverage limitation. Preserve the slower natural
+match and unsupported mirrored cases as regressions;
 do not assign invented costs just to produce a choice. The frozen v10 baseline,
 query caps and retained failed attempts make that comparison repeatable.
 
