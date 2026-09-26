@@ -76,3 +76,105 @@ python3 tools/probe-transfer-references.py \
 The runner refuses an existing output directory and writes all 31 cases before
 execution. Reports retain source/binary hashes, commands, per-tick trajectories,
 first rejection geometry, prefix/source audit results and every outcome.
+
+## Results at `18fcddc`
+
+[The complete record](data/capture-transfer-probes-v1.json) retains all 31 probes,
+commands, pinned sources, diagnostic geometry, raw-log hashes and audit results.
+All **267,008 pre-intervention seat-control records** match the frozen traces.
+Both source observations, f32 transfer inputs and ordinary evaluator prefixes
+match for every case. These counts include deliberately repeated prefixes.
+
+| Alternative | Nominated | Allowed to switch | Arrived | Interrupted by pursuit | Refused by controller |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| World 0, enemy planet 0 | 1 | 1 | 1 | 0 | 0 |
+| World 1, enemy planet 1 | 15 | 4 | 0 | 4 | 11 |
+| World 1, neutral planet 2 | 15 | 4 | 0 | 4 | 11 |
+
+Sixteen refusals came from landing/support gates, six from switching altitude.
+All nine accepted nominations stop before the cap: there are no timeout,
+contact, recovery or match-ending outcomes in this set.
+
+### A conservative static rejection
+
+World 0 reaches the ordinary landing handoff at tick 6343, **391 ticks / 6.52
+seconds** after nomination. Its source reference rejects the *departure* planet
+1 on the transfer leg: segment separation 207.31 versus a radius-plus-margin of
+211.00. The source's complete stage arithmetic sums to 8.93 seconds, but remains
+rejected and is not a usable cost or an equal-endpoint timing prediction.
+
+The physical branch issues no explicit avoidance waypoint, changes approach
+frame once, preserves ship health (36.29), and records no solver/debris contact.
+Its closest sampled ship-center distance above the departure planet's nominal
+radius is 66.96, above the reference's 65-unit margin. This establishes one
+conservative rejection relative to the observed controller path. It does not
+prove that reducing the margin or accepting other straight references is safe.
+
+### Moving-body timing remains censored
+
+Every World 1 rejection involves departure planet 0. Enemy-planet trips reject
+its moving sweep; neutral-planet trips reject its static overlap with the direct
+corridor. All eight eligible branches switch to hunting a nearby vulnerable
+opponent at tick 4189, after 3.20–6.22 seconds. The ordinary coordinator's events
+explicitly record `pausing travel for nearby opponent` and `pursuit_started`.
+These are priority interruptions, not failed transfers or arrival-time samples.
+No branch has changed its approach frame by the interruption.
+
+The four neutral branches record avoidance of planet 0 for 133, 101, 63 and 29
+observations respectively. Their controls and trajectories differ from the
+paired enemy branches; they are not duplicate trajectories despite sharing the
+interruption tick. Launching still occupies most observations in both groups.
+Three of those four neutral references already have stage arithmetic above the
+30-second model horizon, although the earlier static rejection is the first
+reported failure. Fixing one rejection therefore need not make a cost numeric.
+
+### Interpretation and next experiment
+
+Keep current acceptance and rankings unchanged. The useful next calibration is
+an explicitly controlled transfer trial that distinguishes climb, detour and
+frame handoff, with combat interruption recorded separately. Use the frozen
+cases as regressions, add switch-eligible sources outside these two worlds, and
+compare a bounded candidate model against ordinary physical guidance before it
+can influence v13. If a later experiment suppresses pursuit to measure transfer
+in isolation, label that as a second intervention; it cannot replace these live
+priority outcomes or establish match strength.
+
+This slice supplies exact failure geometry and a reusable physical probe. It
+adds no live planning steps, no new finite mission costs and no policy version.
+
+## Validation and audit corrections
+
+168 AI tests, 352 Python tests, formatting and strict AI Clippy pass. The native
+three-minute flag/shadow observer test passes with exact ordinary controls,
+evaluation and physics and an actual shadow admission.
+
+Independent review identified speculative contact labeling, incomplete terminal
+precedence checks, and insufficient reconciliation of blocker geometry. The
+final audit checks all nonterminal rows, source-body identity, radius margin,
+launch/entry endpoints, target-relative sweep and independently recomputed
+segment separation. Geometry comparison allows 0.002 units for double versus
+f32 arithmetic; source identity uses exact f32 bits, without a tolerance.
+
+The first execution (`transfer-probes-v1`, runtime `9130447`) stopped after its
+first physical branch when the source audit compared short typed-f32 JSON
+numbers with promoted-f64 JSON numbers. Controls and observations matched; all
+24 differing decimal fields represented identical f32 bits. The incomplete
+record remains available. The full unchanged 31-case plan was rerun at
+`18fcddc` into `transfer-probes-v2` after correcting serialization identity and
+adding the terminal audit fields; the committed record is that complete rerun.
+
+Independent final review rechecked all 31 report and raw trace hashes, all frozen
+prefixes, and all 2,688 probe observations against the ordinary controller trace.
+The arrival endpoint is at range 229.89 versus the 235.76 handoff limit, with
+relative speed 16.16 versus the limit of 18. Outcome counts, refusal reasons,
+pursuit events and detour counts match the raw records.
+
+Runtime `18fcddc` was built and deployed to **sw-picade.local** with the fast
+application updater. Installed client SHA-256 is
+`8d910131b31483bb74e990352b3bc284c1326c64b25168c63df77594c0716548`;
+the unchanged CLI hash is
+`0d33f4d82a80df22cec0a56d74a3903d4fe05fe389100c2b174f752f4a4ca1f3`.
+The kiosk is active (PID 587, zero service restarts after the update). Status
+confirms P1 v10 / P2 v13, an automatic running Spacewars session and the existing
+flag/value-shadow diagnostics. The new nomination and geometry probes are
+headless options, so there is no new live behavior or device setting to enable.
