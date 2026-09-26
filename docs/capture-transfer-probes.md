@@ -142,6 +142,10 @@ priority outcomes or establish match strength.
 This slice supplies exact failure geometry and a reusable physical probe. It
 adds no live planning steps, no new finite mission costs and no policy version.
 
+The [controlled follow-up](capture-transfer-calibration.md) now retains all nine
+eligible historical cases and eight fresh alternatives. It separates new-pursuit
+interruption from physical handoff without changing live priorities or costs.
+
 ## Validation and audit corrections
 
 168 AI tests, 352 Python tests, formatting and strict AI Clippy pass. The native
