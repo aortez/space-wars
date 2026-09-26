@@ -132,3 +132,73 @@ A targeted regression accepts a walk at its rise limit, accepts a large gravity
 decrease, and rejects an increase of 0.005 that crosses that limit. Finite
 source/current gravity remains required. The same predeclared five conditions
 are replayed below, rather than selecting only the rescued cases.
+
+## Final replay at `207d07a`
+
+All five runs completed with healthy physics, totaling 30.81 simulated minutes.
+The [complete comparison record](data/capture-flag-local-v1.json) retains the
+plan, commands, source/binary hashes, each full validation record and accounting.
+All five retain exact controller traces, evaluator bytes, physical and mission
+outcomes, original measurements/routes and per-tick work logs.
+
+| Recorded condition | Previously published / now published | Rescued by local checks |
+| --- | ---: | ---: |
+| v10/v13 regression | 2 / 2 | 0 |
+| World 0, quiet | 0 / 0 | 0 |
+| World 0, three-second asteroids | 0 / 1 | 1 |
+| World 1, quiet | 0 / 1 | 1 |
+| World 1, three-second asteroids | 0 / 0 | 0 |
+
+Both newly accepted cases are the earlier geometry rejections: planet 0/bearing
+55 at source/completion ticks 5193/5950, and planet 1/bearing 6 at 3471/3814.
+Their walking distances remain 0/0 and 0.379/0 units. The regression's two
+retained positives also remain 0/0. These are adjacent flag/boarding cases,
+not evidence for long walks, broad generated-world coverage or bot strength.
+No measured route, endpoint, source tick or completion tick changed.
+
+Each of the four completed candidates captured 40 live world-query footprints
+and 418 walking world-query footprints, compressed into five conservative
+unions. Hypothetical assembly checks and historical cover remain in the
+original charged-query totals. Across all five runs, planner work is unchanged
+at 2,199 graph operations and 3,444 physical queries. Maximum combined use is
+four graph operations and 127 queries in one tick, within the shared 4/384 cap.
+
+The four local publication scans perform 40 shape intersection tests in total;
+their measured desktop time totals 0.0458 ms. Retaining non-query source inputs
+totals 0.00418 ms across these runs. Capture arithmetic remains inside ordinary
+dispatch time. Builds/tests ran concurrently, the sample count is small, and
+this is not an isolated CPU benchmark or Pi FPS claim. The broad-circle scan
+and diagnostic work remain present; this slice targets valid evidence, not
+frame-rate optimization.
+
+Local validation passed 100 physics tests, 485 scenario tests, 155 AI tests and
+344 Python tests. Focused tests cover a 2.187-unit outward walk (return already
+within boarding range), capture of both hatches and settling probes, physical
+blockers in each query class, the +60 climb, a body-center-only vehicle conflict,
+raw/current-preview/replacement geometry changes, endpoint range inside match
+tolerance, exact rise-threshold changes, expiry, unavailable capture and long
+collider rotation. Recording preserves the atomic measurement and query count;
+the unrelated-motion fixture preserves every per-tick allocation.
+
+Independent review found no correctness or blocking issue. Its suggested
+within-tolerance gravity regression was added, and the walking dependency proof
+was independently checked before removing the generic scalar cutoff. Formatting
+and strict physics/AI Clippy passed with the known physics
+`collapsible_else_if` warning allowed. A broader strict scenario Clippy run also
+reported existing warnings in unchanged code; it is not claimed clean.
+
+The final native three-minute observer-off/on test also passed with identical
+v13 controls, evaluator output and physical state. Runtime `207d07a` was deployed
+to `sw-picade.local` using the app-only updater. The installed client hash is
+`1c58a33d4bc5c7b18562f3fbf4c5e2dde45913661e74455fc27dc2422e1aef07`;
+the CLI hash remains
+`0d33f4d82a80df22cec0a56d74a3903d4fe05fe389100c2b174f752f4a4ca1f3`.
+Both were verified on-device. The kiosk is active without automatic restarts,
+retains P1 v10 / P2 v13 automatic matches, and exposes the new local-validation
+telemetry. No bot brain or launcher setting was added or changed.
+
+The next integration should define freshness/admission rules for this historical
+enemy-alternative evidence in the value evaluator, using shadow comparisons
+before a new control policy. The evidence here establishes a narrow valid
+measurement path; longer walks, broader coverage and strategy improvements
+remain unproven.
