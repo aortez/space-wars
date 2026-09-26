@@ -2541,6 +2541,7 @@ mod tests {
                     | ClockEventKind::DigitSlide
                     | ClockEventKind::Rain
                     | ClockEventKind::Crow
+                    | ClockEventKind::Explosion
             );
             assert_eq!(controls.request_clock_event(event), expected, "{event:?}");
             if expected {

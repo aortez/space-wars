@@ -37,6 +37,23 @@ pub(super) fn pixel(frame: &mut RenderFrame, center: Vec2, side: f32, angle: f32
 
 pub(super) fn render(frame: &mut RenderFrame, state: &ClockState, layout: Layout) {
     let latest = state.display().meridiem.map(Glyph::for_label);
+    if let Some(ActiveEvent::Explosion(event)) = &state.active_event {
+        // Source pixels belong to the event. Fade in only the latest label as
+        // those pixels return, including AM/PM and 12/24-hour changes mid-burst.
+        let opacity = super::explosion::progress(event);
+        for glyph in latest.into_iter().flatten() {
+            for cell in glyph.cells() {
+                pixel(
+                    frame,
+                    glyph.cell_center(layout, cell),
+                    layout.pitch * PIXEL_SIZE,
+                    0.0,
+                    opacity,
+                );
+            }
+        }
+        return;
+    }
     if let Some(ActiveEvent::Falling(event)) = &state.active_event {
         if event.phase() == EventPhase::Falling {
             for letter in event.letters().into_iter().flatten() {

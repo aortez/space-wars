@@ -15,6 +15,8 @@ mod digits;
 #[cfg(test)]
 mod event_tests;
 mod events;
+#[cfg(test)]
+mod explosion_tests;
 mod floor;
 #[cfg(test)]
 mod floor_tests;
@@ -58,7 +60,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 8;
+pub const CLOCK_ACTION_VERSION: u16 = 9;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -72,7 +74,7 @@ pub const CLOCK_OBSERVATION_VERSION: u16 = 2;
 const DEFAULT_ASPECT_RATIO: f32 = 800.0 / 480.0;
 const MIN_ASPECT_RATIO: f32 = 0.25;
 const MAX_ASPECT_RATIO: f32 = 4.0;
-const MAX_CONFIGURE_BYTES: usize = 8 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
+const MAX_CONFIGURE_BYTES: usize = 9 + engine_common::MAX_CLOCK_MESSAGE_BYTES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockReading {
@@ -148,16 +150,10 @@ impl ClockAction {
             ClockEventProfile::Calm => 1,
             ClockEventProfile::Demo => 2,
         });
-        payload.push(
-            u8::from(settings.events.falling)
-                | (u8::from(settings.events.color_cycle) << 1)
-                | (u8::from(settings.events.meltdown) << 2)
-                | (u8::from(settings.events.duck) << 3)
-                | (u8::from(settings.events.marquee) << 4)
-                | (u8::from(settings.events.digit_slide) << 5)
-                | (u8::from(settings.events.rain) << 6)
-                | (u8::from(settings.events.crow) << 7),
-        );
+        let flags = ClockEventKind::ALL.into_iter().fold(0u16, |flags, kind| {
+            flags | (u16::from(settings.events.enabled(kind)) << kind as u8)
+        });
+        payload.extend_from_slice(&flags.to_le_bytes());
         payload.push(settings.marquee_preset as u8);
         payload.push(settings.rain_amount as u8);
         payload.push(u8::from(settings.show_date));
@@ -226,7 +222,9 @@ impl ClockAction {
                 .into_iter()
                 .find(|kind| *kind as u8 == payload[2])
                 .map(Self::PreviewEvent),
-            (CLOCK_ACTION_CONFIGURE, 9..=MAX_CONFIGURE_BYTES) if payload[7] <= 1 => {
+            (CLOCK_ACTION_CONFIGURE, 10..=MAX_CONFIGURE_BYTES)
+                if payload[5] <= 1 && payload[8] <= 1 =>
+            {
                 Some(Self::Configure(ClockSettings {
                     time_format: match payload[2] {
                         12 => ClockTimeFormat::TwelveHour,
@@ -248,11 +246,12 @@ impl ClockAction {
                         digit_slide: payload[4] & 32 != 0,
                         rain: payload[4] & 64 != 0,
                         crow: payload[4] & 128 != 0,
+                        explosion: payload[5] & 1 != 0,
                     },
-                    marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[5]))?,
-                    rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[6]))?,
-                    show_date: payload[7] != 0,
-                    marquee_message: std::str::from_utf8(&payload[8..]).ok()?.parse().ok()?,
+                    marquee_preset: *ClockMarqueePreset::ALL.get(usize::from(payload[6]))?,
+                    rain_amount: *ClockRainAmount::ALL.get(usize::from(payload[7]))?,
+                    show_date: payload[8] != 0,
+                    marquee_message: std::str::from_utf8(&payload[9..]).ok()?.parse().ok()?,
                 }))
             }
             _ => None,
@@ -565,6 +564,13 @@ impl ClockState {
         self.crow_visit.as_ref().map(crow::CrowVisit::diagnostics)
     }
 
+    pub fn explosion_state(&self) -> Option<engine_common::ClockExplosionState> {
+        match self.active_event.as_ref()? {
+            ActiveEvent::Explosion(event) => Some(event.diagnostics()),
+            _ => None,
+        }
+    }
+
     pub fn event_blocked_by_crow(&self, kind: ClockEventKind) -> bool {
         kind == ClockEventKind::Crow && self.crow_visit.is_some()
     }
@@ -717,8 +723,10 @@ impl ClockState {
             self.active_event = Some(ActiveEvent::Rain(Box::new(rain)));
             return;
         }
-        if matches!(kind, ClockEventKind::Falling | ClockEventKind::Meltdown)
-            && let Some(duck) = &mut self.duck_visit
+        if matches!(
+            kind,
+            ClockEventKind::Falling | ClockEventKind::Meltdown | ClockEventKind::Explosion
+        ) && let Some(duck) = &mut self.duck_visit
         {
             self.floor.acquire_visit_event(kind);
             let context = EventContext {
@@ -730,6 +738,9 @@ impl ClockState {
             self.active_event = Some(match kind {
                 ClockEventKind::Falling => ActiveEvent::Falling(
                     events::falling::FallingEvent::with_visit(context, seed, duck),
+                ),
+                ClockEventKind::Explosion => ActiveEvent::Explosion(
+                    events::explosion::ExplosionEvent::with_visit(context, seed, duck),
                 ),
                 ClockEventKind::Meltdown => ActiveEvent::Meltdown(Box::new(
                     events::meltdown::MeltdownEvent::with_visit(context, seed, duck),
@@ -849,6 +860,9 @@ impl ClockState {
         };
         let finished = match event {
             ActiveEvent::Falling(falling) => falling.step(context, self.duck_visit.as_deref_mut()),
+            ActiveEvent::Explosion(explosion) => {
+                explosion.step(context, self.duck_visit.as_deref_mut())
+            }
             ActiveEvent::Meltdown(meltdown) => {
                 meltdown.step_with_visit(context, self.duck_visit.as_deref_mut())
             }

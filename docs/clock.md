@@ -13,6 +13,7 @@ Rain (#79) adds variable showers and a passive floating rubber duck. Storm effec
 flashlight/glow polish and multiple concurrent timed animations remain future work.
 Player and automatic duck visits can already share one timed event's scene.
 Crow (#84) adds a lightweight, independent visitor to the digit face.
+Explosion (#76) scatters individual lit cells as bouncing rigid-body debris.
 
 ## Layout
 
@@ -115,7 +116,7 @@ Actual device screenshots from that release build:
 ## Events
 
 Choose **Clock → Settings → Event Profile** using touch, keyboard, or gamepad.
-The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, and **Rain** controls select the periodic event mix.
+The **Falling**, **Color Cycle**, **Meltdown**, **Duck**, **Crow**, **Marquee**, **Rain**, and **Explosion** controls select the periodic event mix.
 **Digit Slide** enables minute-change transitions. All switches
 default to On and are saved with the other Clock settings. These values
 can also be changed live through **Pause → Clock Controls**, without relaunching.
@@ -149,6 +150,78 @@ the Off profile still disables every automatic event.
 | `digit-slide` | Changed digits roll down inside clipped slots, no physics | 0.8 s | 2 s |
 | `rain` | Variable showers, pools and a passive rubber duck | 20 s rain + 20 s drain + 2 s cleanup | 45 s |
 | `crow` | One kinematic visitor, perching and hopping on lit digit tops | At most 22 s, including departure | 30 s after departure |
+| `explosion` | Individual digit/AM-PM blocks scatter and bounce | 0.6 s warning + 3.5 s burst + 1.5 s reform | 45 s |
+
+### Exploding digits
+
+Enable **Explosion** in scenario settings, select it in **Clock Controls →
+Preview & Resume**, or use Next Event. It participates in the existing periodic
+mix; it does not create another timer. Missing saved switches default to On,
+without changing the saved profile or other switches. Profile Off still prevents
+automatic events, but explicit previews/triggers work even with Explosion Off.
+
+A single smooth amber warning pulse precedes the release. Each lit digit cell
+and AM/PM pixel gets seeded outward velocity and spin, then falls and bounces
+in Rapier. The colon and date remain readable. This is a small debris event,
+not a generalized blast/damage field, water conversion, or chain reaction.
+The canopy stays decorative: upward launch speed is limited for headroom,
+without adding an invisible ceiling collider.
+
+At most **119 cells** exist (96 digit cells plus 23 label pixels). Standalone
+events use four fixed floor/wall bodies and the existing center drain. With a
+duck, the cells instead enter its **existing mechanics world**, which advances
+once per tick. Debris can hit the duck; controller ownership and motion continue.
+Departure/rejoining hands the same arena back and forth without duplicating
+bodies. The crow leaves when the digit perches disappear.
+
+At reformation, only the event's debris bodies are removed; their last poses
+ease visually back toward the source face while the **latest** reading fades in.
+Standalone physics is already released at this point. Pause freezes the event;
+time/format changes do not recreate its debris. Preview replacement, resize,
+restart and normal completion all release its batch without deleting a live duck.
+
+`clock state` exposes `explosion.cells`, `live_cells`, `max_cells` and
+`shared_arena`, alongside the ordinary event/phase/tick diagnostics. From idle:
+
+```sh
+spacewars-cli clock trigger explosion
+spacewars-cli clock wait --event explosion --phase exploding --min-phase-tick 18
+spacewars-cli screenshot /tmp/clock-explosion.png
+spacewars-cli clock wait --lifecycle idle
+```
+
+Fixed-tick tests cover replay, six aspect ratios, both time formats, full-capacity
+cleanup, paused reading changes, join/depart/rejoin, replacements, real cell–duck
+contact and single stepping through the final event tick. A real-client workflow
+covers launcher/live settings, paused state, recovery, persistence and restart.
+The display-free production-renderer fixture covers Picade, HyperPixel and portrait:
+
+```sh
+SPACEWARS_EXPLOSION_ARTIFACTS=/tmp/clock-explosion \
+  cargo test --locked -p engine-client --bin engine-client --profile ci \
+  clock_explosion_captures
+```
+
+**Device validation (2026-09-26):** Fast-deployed the release client and matching
+CLI to **sw-picade-2 only** (Pi 4, 1024×768, raster scale 2.0), restarting the app
+without rebooting. Phase-aware captures caught an automatic duck sharing the
+event: 54 debris bodies raised the existing arena from 4 to 58 bodies, then
+reformation removed all 54 while the duck continued navigating. The recovery
+health sample reported 60 FPS / 60 UPS, with no unexpected service restarts.
+Existing Demo/Heavy Rain, 12-hour/date and 5% volume settings were preserved;
+the only settings addition was `explosion = true`. These are smoke-test samples,
+not a sustained performance benchmark.
+A separate standalone burst used 66 cells plus four arena bodies, then returned
+to zero bodies/colliders and a closed floor. Its in-burst sample reported
+60 FPS / 60 UPS and a 0.337 ms mean / 0.690 ms p95 scenario step.
+
+| Burst, sharing the duck's course | Debris bouncing on that course |
+| --- | --- |
+| ![Exploding Clock blocks on Picade](screenshots/clock/picade-explosion-burst-device.png) | ![Clock debris and duck on Picade](screenshots/clock/picade-explosion-bounce-device.png) |
+
+Additional actual-device frames: [warning](screenshots/clock/picade-explosion-warning-device.png),
+[reforming](screenshots/clock/picade-explosion-reforming-device.png) and
+[recovered](screenshots/clock/picade-explosion-recovered-device.png).
 
 ### Crow visitor
 
@@ -162,7 +235,7 @@ The crow flies in above the face, lands on an exposed lit block, pauses, and
 occasionally hops along its row or flies to another digit. Only the topmost lit
 block in each digit column is a perch; feet use the rendered block's actual top.
 Time/format changes revalidate the target even while paused, without advancing
-its position or age. Falling, Meltdown, Digit Slide and Marquee withdraw the
+its position or age. Falling, Meltdown, Explosion, Digit Slide and Marquee withdraw the
 perches and make it depart. Rain and Color Cycle can coexist, as can a player or
 automatic duck. Resize/restart clears the visit. A hard 22-second envelope and
 one-resident admission limit prevent lingering or accumulating birds.
@@ -682,7 +755,7 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 8; `NextEvent`
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 9; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -1512,10 +1585,10 @@ captures, run wait and screenshot in the same SSH session; do not manually race
 the animation or sleep a guessed duration. A screenshot captures the next
 available rendered frame, not an exact simulation tick.
 
-`clock state` uses schema version **18** and reports scenario-instance revision,
+`clock state` uses schema version **19** and reports scenario-instance revision,
 event ID, lifecycle (`idle`, `active`, `cooldown`), active event kind, event-local
 phase (`falling`, `reforming`, `cycling`, `melting`, `draining`, `opening`, `running`,
-`exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`), pause state, profile, schedule, current
+`exiting`, `resetting`, `presenting`, `sliding`, `raining`, `clearing`, `warning`, `exploding`), pause state, profile, schedule, current
 reading/target digits, palette RGB, physics counts, floor ownership mode, and typed live `settings`.
 Kind and phase are null
 outside an active event. `phase_tick` counts ticks in the event's current phase,
@@ -1594,17 +1667,18 @@ the acknowledgement waits for saving without blocking the UI. `settings_error` i
 non-null if those settings could not be persisted. Outside Marquee its diagnostics
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
-after completion or cancellation. Use matching client/CLI builds: schema 17 and
-older requests are rejected. The internal Clock action payload is version 8;
-event ordinals 0–6 are unchanged and Crow is 7. Configure contains eight
-switch bits, validated recipe and rain-amount bytes, a `show_date` byte (0/1),
+after completion or cancellation. Use matching client/CLI builds: schema 18 and
+older requests are rejected. The internal Clock action payload is version 9;
+event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
+little-endian u16 switch mask (bits 0–8, reserved bits rejected),
+validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 and 1–32 message bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–7
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–8
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 
 `clock message TEXT` requires a paused active Clock. Its raw request includes
-schema version 18, `message`, `expected_scenario_revision`, and `expected_message`.
+schema version 19, `message`, `expected_scenario_revision`, and `expected_message`.
 The CLI fetches both guards automatically; `--expect-scenario-revision` can pin
 the instance explicitly. Only the message is changed, using the latest values
 for other settings. Invalid text, a changed instance/message, an unpaused or
@@ -1621,8 +1695,8 @@ a pending trigger. `clock wait` binds to the current instance by default and
 fails if it changes. `--timeout` bounds the entire CLI operation. Structured
 failures retain the current Clock state when available, including on timeout.
 Wait predicates can combine lifecycle, kind, phase, event ID, and minimum phase
-tick. A raw `clock trigger` request must include schema version 18, `event`
-(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, or `crow`), `expected_scenario_revision`, and
+tick. A raw `clock trigger` request must include schema version 19, `event`
+(`falling`, `color-cycle`, `meltdown`, `duck`, `marquee`, `digit-slide`, `rain`, `crow`, or `explosion`), `expected_scenario_revision`, and
 `expected_event_id`. Unknown events, missing guards, and old schemas are rejected.
 
 ## Verification

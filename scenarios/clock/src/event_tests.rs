@@ -15,6 +15,7 @@ fn ready(profile: ClockEventProfile, seed: u64) -> ClockState {
                 digit_slide: false,
                 rain: false,
                 crow: false,
+                explosion: false,
             },
             ..ClockConfig::default()
         },

@@ -26,7 +26,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
             ClockEventProfile::Calm,
             ClockEventProfile::Demo,
         ] {
-            for bits in 0..256 {
+            for bits in 0..512 {
                 for marquee_preset in ClockMarqueePreset::ALL {
                     let settings = ClockSettings {
                         time_format,
@@ -44,6 +44,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
                             digit_slide: bits & 32 != 0,
                             rain: bits & 64 != 0,
                             crow: bits & 128 != 0,
+                            explosion: bits & 256 != 0,
                         },
                     };
                     assert_eq!(
@@ -61,6 +62,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
         vec![2, 0, 24, 1, 3, 0],
         vec![3, 0, 24, 1, 3, 0, b'A'], // valid old encoding is rejected
         vec![4, 0, 24, 1, 3, 0, b'A'],
+        vec![8, 0, 24, 1, 255, 0, 0, 0, b'A'], // pre-u16 event mask
         vec![5, 0, 13, 1, 3, 0, 0, b'A'],
         vec![5, 0, 24, 3, 3, 0, 0, b'A'],
         vec![5, 0, 24, 1, 128, 0, 0, b'A'],
@@ -89,7 +91,7 @@ fn settings_actions_round_trip_all_values_and_reject_malformed_payloads() {
     };
     // Exercise the current encoding too, rather than rejecting these merely
     // because they have an older version prefix.
-    for (offset, invalid) in [(2, 13), (3, 3), (5, 255), (6, 4), (7, 2), (8, 0xff)] {
+    for (offset, invalid) in [(2, 13), (3, 3), (5, 2), (6, 255), (7, 4), (8, 2), (9, 0xff)] {
         let mut bytes = payload.clone();
         bytes[offset] = invalid;
         assert_eq!(ClockAction::decode(&Action::scenario(kind, bytes)), None);
@@ -134,6 +136,7 @@ fn live_settings_preserve_falling_physics_and_reform_to_the_new_format() {
             digit_slide: false,
             rain: false,
             crow: false,
+            explosion: false,
         },
         marquee_preset: ClockMarqueePreset::default(),
         rain_amount: ClockRainAmount::Varied,

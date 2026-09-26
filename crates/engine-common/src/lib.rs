@@ -537,10 +537,11 @@ pub enum ClockEventKind {
     DigitSlide = 5,
     Rain = 6,
     Crow = 7,
+    Explosion = 8,
 }
 
 impl ClockEventKind {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Falling,
         Self::ColorCycle,
         Self::Meltdown,
@@ -549,6 +550,7 @@ impl ClockEventKind {
         Self::DigitSlide,
         Self::Rain,
         Self::Crow,
+        Self::Explosion,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -561,6 +563,7 @@ impl ClockEventKind {
             Self::DigitSlide => "digit-slide",
             Self::Rain => "rain",
             Self::Crow => "crow",
+            Self::Explosion => "explosion",
         }
     }
 
@@ -574,6 +577,7 @@ impl ClockEventKind {
             Self::DigitSlide => "Digit Slide",
             Self::Rain => "Rain",
             Self::Crow => "Crow",
+            Self::Explosion => "Explosion",
         }
     }
 }
@@ -590,6 +594,7 @@ pub struct ClockEvents {
     pub digit_slide: bool,
     pub rain: bool,
     pub crow: bool,
+    pub explosion: bool,
 }
 
 impl Default for ClockEvents {
@@ -603,6 +608,7 @@ impl Default for ClockEvents {
             digit_slide: true,
             rain: true,
             crow: true,
+            explosion: true,
         }
     }
 }
@@ -618,8 +624,18 @@ impl ClockEvents {
             ClockEventKind::DigitSlide => self.digit_slide,
             ClockEventKind::Rain => self.rain,
             ClockEventKind::Crow => self.crow,
+            ClockEventKind::Explosion => self.explosion,
         }
     }
+}
+
+/// Bounded physical debris diagnostics; phase/timing live on the timed event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClockExplosionState {
+    pub cells: u32,
+    pub live_cells: u32,
+    pub max_cells: u32,
+    pub shared_arena: bool,
 }
 
 /// Bounded kinematic visitor diagnostics, independent of the timed animation.

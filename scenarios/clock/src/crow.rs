@@ -32,6 +32,7 @@ fn perches(
                 | ClockEventKind::Meltdown
                 | ClockEventKind::DigitSlide
                 | ClockEventKind::Marquee
+                | ClockEventKind::Explosion
         )
     ) {
         return result;

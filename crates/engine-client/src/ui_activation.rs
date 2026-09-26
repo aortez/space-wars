@@ -171,6 +171,7 @@ fn activation_target(
         "pause.clock.rain.next" => pause_clock(12, UiAction::Right),
         "pause.clock.show-date" => pause_clock(13, UiAction::Confirm),
         "pause.clock.crow" => pause_clock(14, UiAction::Confirm),
+        "pause.clock.explosion" => pause_clock(15, UiAction::Confirm),
         "pause.clock.preview-event.previous" => pause_clock(4, UiAction::Left),
         "pause.clock.preview-event.next" => pause_clock(4, UiAction::Right),
         "pause.clock.back" => pause_clock(5, UiAction::Confirm),
@@ -236,6 +237,7 @@ fn launcher_setting_target(control_id: &str) -> Option<ActivationTarget> {
         "launcher.settings.clock.rain" => 11,
         "launcher.settings.clock.show-date" => 12,
         "launcher.settings.clock.crow" => 13,
+        "launcher.settings.clock.explosion" => 14,
         _ => return None,
     };
     Some(launcher_settings(Some(focus_index), action))

@@ -1,6 +1,7 @@
 mod color_cycle;
 pub(crate) mod digit_slide;
 pub(crate) mod duck;
+pub(crate) mod explosion;
 pub(crate) mod falling;
 pub(crate) mod marquee;
 pub(crate) mod meltdown;
@@ -15,6 +16,7 @@ use color_cycle::ColorCycle;
 pub use color_cycle::{COLOR_CYCLE_TICKS, DigitPalette};
 use digit_slide::{DIGIT_SLIDE_TICKS, DigitSlideEvent};
 use duck::DUCK_TICKS;
+use explosion::ExplosionEvent;
 use falling::FallingEvent;
 pub use falling::{FALLING_TICKS, REFORMING_TICKS};
 use marquee::{MARQUEE_TICKS, MarqueeEvent};
@@ -55,6 +57,8 @@ pub enum EventPhase {
     Sliding,
     Raining,
     Clearing,
+    Warning,
+    Exploding,
 }
 
 impl EventPhase {
@@ -73,6 +77,8 @@ impl EventPhase {
             Self::Sliding => "sliding",
             Self::Raining => "raining",
             Self::Clearing => "clearing",
+            Self::Warning => "warning",
+            Self::Exploding => "exploding",
         }
     }
 }
@@ -115,6 +121,7 @@ impl EventDefinition {
                 | ClockEventKind::Meltdown
                 | ClockEventKind::Duck
                 | ClockEventKind::Rain
+                | ClockEventKind::Explosion
         )
     }
 }
@@ -176,6 +183,13 @@ pub const EVENT_CATALOG: [EventDefinition; ClockEventKind::ALL.len()] = [
         duration_ticks: crate::crow::CROW_TICKS,
         cooldown_ticks: 30 * 60,
     },
+    EventDefinition {
+        kind: ClockEventKind::Explosion,
+        trigger: ClockEventTrigger::Periodic,
+        effect: EventEffect::DigitGeometry,
+        duration_ticks: explosion::EXPLOSION_TICKS,
+        cooldown_ticks: 45 * 60,
+    },
 ];
 
 pub(super) struct EventContext<'a> {
@@ -194,6 +208,7 @@ pub(super) enum ActiveEvent {
     Marquee(Box<MarqueeEvent>),
     DigitSlide(DigitSlideEvent),
     Rain(Box<crate::rain::RainEvent>),
+    Explosion(ExplosionEvent),
 }
 
 impl ActiveEvent {
@@ -206,6 +221,7 @@ impl ActiveEvent {
     ) -> Self {
         match kind {
             ClockEventKind::Falling => Self::Falling(FallingEvent::new(context, seed)),
+            ClockEventKind::Explosion => Self::Explosion(ExplosionEvent::new(context, seed)),
             ClockEventKind::ColorCycle => Self::ColorCycle(ColorCycle::default()),
             ClockEventKind::Meltdown => Self::Meltdown(Box::new(MeltdownEvent::new(
                 context,
@@ -234,6 +250,7 @@ impl ActiveEvent {
     pub fn kind(&self) -> ClockEventKind {
         match self {
             Self::Falling(_) => ClockEventKind::Falling,
+            Self::Explosion(_) => ClockEventKind::Explosion,
             Self::ColorCycle(_) => ClockEventKind::ColorCycle,
             Self::Meltdown(_) => ClockEventKind::Meltdown,
             Self::Marquee(_) => ClockEventKind::Marquee,
@@ -245,6 +262,7 @@ impl ActiveEvent {
     pub fn shares_visit_arena(&self) -> bool {
         match self {
             Self::Falling(event) => event.shares_visit_arena(),
+            Self::Explosion(event) => event.shares_visit_arena(),
             Self::Meltdown(event) => event.shares_visit_arena(),
             _ => false,
         }
@@ -253,6 +271,7 @@ impl ActiveEvent {
     pub fn vacant_arena(&self) -> Option<&duck::DuckEvent> {
         match self {
             Self::Falling(event) => event.vacant_arena(),
+            Self::Explosion(event) => event.vacant_arena(),
             Self::Meltdown(event) => event.vacant_arena(),
             _ => None,
         }
@@ -261,6 +280,7 @@ impl ActiveEvent {
     pub fn arena_opacity(&self) -> f32 {
         match self {
             Self::Falling(event) => event.arena_opacity(),
+            Self::Explosion(event) => event.arena_opacity(),
             Self::Meltdown(event) => event.arena_opacity(),
             _ => 1.0,
         }
@@ -277,6 +297,9 @@ impl ActiveEvent {
             Self::Falling(event) => event
                 .rejoin(session, seat)
                 .or_else(|| event.join_player(seed, session, seat)),
+            Self::Explosion(event) => event
+                .rejoin(session, seat)
+                .or_else(|| event.join_player(seed, session, seat)),
             Self::Meltdown(event) => event
                 .rejoin(session, seat)
                 .or_else(|| event.join_player(layout, seed, session, seat)),
@@ -287,6 +310,7 @@ impl ActiveEvent {
     pub fn retain_arena(&mut self, duck: Box<duck::DuckEvent>) {
         match self {
             Self::Falling(event) => event.retain_arena(duck),
+            Self::Explosion(event) => event.retain_arena(duck),
             Self::Meltdown(event) => event.retain_arena(duck),
             _ => unreachable!("only leased mechanics arenas outlive the visit"),
         }
@@ -295,6 +319,7 @@ impl ActiveEvent {
     pub fn release_arena(&mut self, player: Option<&mut duck::DuckEvent>) {
         match self {
             Self::Falling(event) => event.release(player),
+            Self::Explosion(event) => event.release(player),
             Self::Meltdown(event) => event.release(player),
             _ => (),
         }
@@ -304,6 +329,7 @@ impl ActiveEvent {
     pub fn step(&mut self, context: EventContext<'_>) -> bool {
         match self {
             Self::Falling(event) => event.step(context, None),
+            Self::Explosion(event) => event.step(context, None),
             Self::ColorCycle(event) => event.step(),
             Self::Meltdown(event) => event.step(context),
             Self::Marquee(event) => event.step(),
@@ -318,6 +344,7 @@ impl ActiveEvent {
     pub fn phase(&self) -> EventPhase {
         match self {
             Self::Falling(event) => event.phase(),
+            Self::Explosion(event) => event.phase(),
             Self::ColorCycle(_) => EventPhase::Cycling,
             Self::Meltdown(event) => event.phase(),
             Self::Marquee(_) => EventPhase::Presenting,
@@ -329,6 +356,7 @@ impl ActiveEvent {
     pub fn phase_tick(&self) -> u64 {
         match self {
             Self::Falling(event) => event.phase_tick(),
+            Self::Explosion(event) => event.phase_tick(),
             Self::ColorCycle(event) => event.tick,
             Self::Meltdown(event) => event.phase_tick(),
             Self::Marquee(event) => event.tick,
@@ -340,6 +368,7 @@ impl ActiveEvent {
     pub fn physics_counts(&self) -> (usize, usize) {
         match self {
             Self::Falling(event) => event.physics_counts(),
+            Self::Explosion(event) => event.physics_counts(),
             Self::Meltdown(event) => event.physics_counts(),
             Self::ColorCycle(_) | Self::Marquee(_) | Self::DigitSlide(_) => (0, 0),
             Self::Rain(event) => event.physics_counts(),
@@ -357,7 +386,11 @@ impl ActiveEvent {
         matches!(self, Self::Rain(_))
             || matches!(
                 self.phase(),
-                EventPhase::Falling | EventPhase::Melting | EventPhase::Draining
+                EventPhase::Falling
+                    | EventPhase::Melting
+                    | EventPhase::Draining
+                    | EventPhase::Warning
+                    | EventPhase::Exploding
             )
     }
 }
