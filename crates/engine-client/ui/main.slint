@@ -1,6 +1,7 @@
 // Root window for the engine-client.
 
 export struct DeviceInfoRow { id: string, label: string, value: string }
+export struct ControllerRow { id: string, label: string }
 
 export global UserActivity {
     callback notify() -> bool;
@@ -453,6 +454,16 @@ export component MainWindow inherits Window {
     callback autostart-start-now();
     callback autostart-return();
     in-out property <bool> sound-visible: false;
+    in-out property <bool> controllers-visible: false;
+    in-out property <int> controllers-focus-index: 0;
+    in property <[ControllerRow]> controllers-rows;
+    in property <string> controllers-subtitle;
+    in property <string> controllers-detail;
+    in property <string> controllers-status;
+    in property <string> controllers-hint;
+    callback controllers-open();
+    callback controllers-command(string);
+    callback controllers-visibility-changed();
     in-out property <bool> device-info-visible: false;
     in property <bool> device-info-ready: false;
     in property <[DeviceInfoRow]> device-info-rows;
@@ -589,7 +600,14 @@ export component MainWindow inherits Window {
 
     forward-focus: launcher-shortcuts;
     changed sound-visible => {
-        if !root.sound-visible { root.device-info-visible = false; }
+        if !root.sound-visible {
+            root.device-info-visible = false;
+            root.controllers-visible = false;
+        }
+        launcher-shortcuts.focus();
+    }
+    changed controllers-visible => {
+        root.controllers-visibility-changed();
         launcher-shortcuts.focus();
     }
     changed device-info-visible => {
@@ -2496,7 +2514,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.sound-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+    if root.sound-visible && !root.controllers-visible && !root.device-info-visible && !root.autostart-settings-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
         width: parent.width;
         height: parent.height;
         background: #050514;
@@ -2513,11 +2531,11 @@ export component MainWindow inherits Window {
                 x: 24px; y: 82px; width: parent.width - 48px; height: parent.height - 214px;
                 viewport-width: self.width;
                 viewport-height: settings-body.height;
-                property <int> focused-item: root.sound-focus-index;
+                property <int> focused-item: root.sound-focus-index == 7 ? 5 : root.sound-focus-index == 5 || root.sound-focus-index == 6 ? -1 : root.sound-focus-index;
                 property <length> row-height: parent.row-height;
                 property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
                 function reveal-focus() {
-                    if self.focused-item >= 0 && self.focused-item < 5 {
+                    if self.focused-item >= 0 && self.focused-item < 6 {
                         let top = self.focused-item * (self.row-height + 10px);
                         let bottom = top + self.row-height;
                         if -self.viewport-y > top { self.viewport-y = -top; }
@@ -2530,7 +2548,7 @@ export component MainWindow inherits Window {
                 init => { self.reveal-focus(); }
                 settings-body := Rectangle {
                     x: 0px; y: 0px;
-                    width: settings-scroll.width; height: 5 * settings-scroll.row-height + 40px;
+                    width: settings-scroll.width; height: 6 * settings-scroll.row-height + 50px;
                     VolumeRow {
                         x: 0px; y: 0px;
                         width: parent.width; height: settings-scroll.row-height;
@@ -2561,6 +2579,12 @@ export component MainWindow inherits Window {
                         width: parent.width; height: settings-scroll.row-height;
                         label: "Auto-start"; navigation: true; selected: root.sound-focus-index == 4;
                         activated => { root.autostart-open(); }
+                    }
+                    SettingsRow {
+                        y: 5 * (settings-scroll.row-height + 10px);
+                        width: parent.width; height: settings-scroll.row-height;
+                        label: "Controllers"; navigation: true; selected: root.sound-focus-index == 7;
+                        activated => { root.controllers-open(); }
                     }
                 }
             }
@@ -2600,6 +2624,63 @@ export component MainWindow inherits Window {
                 text: "Retry Save";
                 selected: root.sound-focus-index == 6;
                 activated => { root.sound-retry(); }
+            }
+        }
+    }
+
+    if root.controllers-visible && root.sound-visible && (root.launcher-visible || root.ingame-menu-visible): Rectangle {
+        width: parent.width; height: parent.height;
+        background: #050514;
+        TouchArea { width: parent.width; height: parent.height; }
+        MenuPage {
+            available-width: parent.width; available-height: parent.height;
+            heading: "Controllers";
+            subtitle: root.controllers-subtitle;
+            hint: root.controllers-hint;
+            Text {
+                x: 24px; y: 84px; width: parent.width - 48px; height: 144px;
+                text: root.controllers-detail; color: #d8e8f8; font-size: 16px;
+                wrap: word-wrap; overflow: elide;
+            }
+            controller-scroll := Flickable {
+                x: 24px; y: 236px; width: parent.width - 48px; height: parent.height - 312px;
+                viewport-width: self.width;
+                viewport-height: root.controllers-rows.length * 52px;
+                property <int> focus-index: root.controllers-focus-index;
+                property <length> scroll-limit: Math.max(0px, self.viewport-height - self.height);
+                function reveal-focus() {
+                    let top = self.focus-index * 52px;
+                    let bottom = top + 44px;
+                    if -self.viewport-y > top { self.viewport-y = -top; }
+                    if -self.viewport-y + self.height < bottom { self.viewport-y = self.height - bottom; }
+                    self.viewport-y = Math.max(-self.scroll-limit, Math.min(0px, self.viewport-y));
+                }
+                changed focus-index => { self.reveal-focus(); }
+                changed scroll-limit => { self.reveal-focus(); }
+                init => { self.reveal-focus(); }
+                for row[index] in root.controllers-rows: MenuButton {
+                    x: 0px; y: index * 52px;
+                    width: controller-scroll.width; height: 44px;
+                    text: row.label;
+                    selected: root.controllers-focus-index == index;
+                    activated => { root.controllers-command(row.id); }
+                }
+            }
+            if controller-scroll.scroll-limit > 0px: Rectangle {
+                x: parent.width - 18px; y: 236px; width: 3px; height: controller-scroll.height;
+                background: #283a50;
+                Rectangle {
+                    width: parent.width;
+                    height: Math.max(12px, parent.height * controller-scroll.height / controller-scroll.viewport-height);
+                    y: (parent.height - self.height) * Math.min(1, Math.max(0, -controller-scroll.viewport-y / controller-scroll.scroll-limit));
+                    background: #80d8ff;
+                }
+            }
+            Text {
+                x: 24px; y: parent.height - 68px; width: parent.width - 48px; height: 38px;
+                text: root.settings-save-error != "" ? "Save failed. Back to App Settings → Retry Save." : root.settings-save-pending ? "Saving settings…" : root.controllers-status;
+                color: root.settings-save-error != "" ? #ffb0a0 : #9fb4cc;
+                font-size: 14px; wrap: word-wrap; overflow: elide;
             }
         }
     }

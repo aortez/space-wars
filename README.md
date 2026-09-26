@@ -201,6 +201,12 @@ automatic activity returns to the launcher. **Spacewars → Settings → Match
 length** controls the match's own timer: most planets wins at expiry, with
 equal ownership drawing. See [automatic activities](docs/auto-start.md).
 
+**App Settings → Controllers** provides device identification, button/direction
+mapping, and a live input tester. Changes use a timed trial before saving, with
+automatic rollback and a restore-defaults option. Profiles are local to each
+machine and shared by identical controller models; player assignments stay
+unchanged. See [controller setup and cabinet layouts](docs/controller-profiles.md).
+
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames
 submitted to Slint) and **UPS** (simulation updates, or emulated NES frames).

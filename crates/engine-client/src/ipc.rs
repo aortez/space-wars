@@ -922,6 +922,7 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
         launcher_busy: window.get_launcher_busy(),
         sound: window.get_sound_visible(),
         device_info: window.get_device_info_visible(),
+        controllers: window.get_controllers_visible(),
         autostart: window.get_autostart_settings_visible(),
         launcher: window.get_launcher_visible(),
         launcher_controls: window.get_launcher_controls_visible(),
@@ -940,6 +941,12 @@ fn ui_state(window: &MainWindow, tracker: &mut UiStateTracker) -> Result<UiState
             automatic: window.get_autostart_running(),
             autostart_controls: crate::autostart::controls(window),
             autostart_focus: window.get_autostart_focus_index(),
+            controller_controls: if window.get_controllers_visible() {
+                crate::controller_controls::inventory(window)
+            } else {
+                Vec::new()
+            },
+            controller_focus: window.get_controllers_focus_index(),
             device_info_controls: if matches!(screen, UiScreen::LauncherInfo | UiScreen::PauseInfo)
             {
                 crate::device_info::inventory(window)

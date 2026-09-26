@@ -45,6 +45,12 @@ impl SimulatedInput {
         if window.get_launcher_busy() || state.benchmark_active {
             return Err("input is unavailable while launching or benchmarking".into());
         }
+        if window.get_controllers_visible() {
+            return Err(
+                "controller setup requires physical input; use ui commands to navigate its menus"
+                    .into(),
+            );
+        }
         let seat = usize::from(request.player - 1);
         if self
             .gamepads

@@ -129,21 +129,33 @@ pub(crate) fn handle_action(window: &MainWindow, action: UiAction) {
     };
     match action {
         UiAction::Up | UiAction::Down => {
-            window.set_sound_focus_index(ui_navigation::moved_selection(
-                index,
-                count,
+            // Preserve the existing Back/Retry indices and stable CLI IDs.
+            let order: &[i32] = if count == 7 {
+                &[0, 1, 2, 3, 4, 7, 5, 6]
+            } else {
+                &[0, 1, 2, 3, 4, 7, 5]
+            };
+            let position = order
+                .iter()
+                .position(|candidate| *candidate == index)
+                .unwrap_or(0);
+            let next = ui_navigation::moved_selection(
+                position as i32,
+                order.len() as i32,
                 if action == UiAction::Up { -1 } else { 1 },
-            ))
+            );
+            window.set_sound_focus_index(order[next as usize]);
         }
         UiAction::Left | UiAction::Right if index <= 2 => {
             window.invoke_sound_adjust(index, if action == UiAction::Left { -1 } else { 1 })
         }
-        UiAction::Left | UiAction::Right if count == 7 && index >= 5 => {
+        UiAction::Left | UiAction::Right if count == 7 && (index == 5 || index == 6) => {
             window.set_sound_focus_index(if index == 5 { 6 } else { 5 })
         }
         UiAction::Confirm if index == 1 || index == 2 => window.invoke_sound_adjust(index, 0),
         UiAction::Confirm if index == 3 => window.invoke_device_info_open(),
         UiAction::Confirm if index == 4 => window.invoke_autostart_open(),
+        UiAction::Confirm if index == 7 => window.invoke_controllers_open(),
         UiAction::Confirm if index == 6 && count == 7 => window.invoke_sound_retry(),
         UiAction::Back | UiAction::Controls | UiAction::Confirm
             if action != UiAction::Confirm || index == 5 =>

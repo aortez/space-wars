@@ -7,6 +7,8 @@
 mod autostart;
 mod client_scenarios;
 mod clock_controls;
+mod controller_controls;
+mod controller_profile;
 mod device_info;
 mod gamepad;
 mod host;
@@ -495,7 +497,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         !launch_directly && !args.uses_debug_render() && !args.uses_benchmark() && !args.touch_test,
     );
     apply_video_settings(&window, &args, &settings.read().unwrap());
-    let _gamepad_timer = gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input);
+    let controllers =
+        controller_controls::install(&window, Arc::clone(&settings), settings_writer.clone());
+    let _gamepad_timer =
+        gamepad::start_gamepad_pump(&window, Rc::clone(&input), gamepad_input, controllers);
 
     if args.touch_test {
         show_launcher(
@@ -1199,7 +1204,9 @@ fn handle_ui_action(window: &MainWindow, action: UiAction) {
     if window.get_launcher_busy() {
         return;
     }
-    if window.get_autostart_settings_visible() && window.get_sound_visible() {
+    if window.get_controllers_visible() && window.get_sound_visible() {
+        controller_controls::handle_action(window, action);
+    } else if window.get_autostart_settings_visible() && window.get_sound_visible() {
         autostart::handle_action(window, action);
     } else if window.get_device_info_visible() && window.get_sound_visible() {
         device_info::handle_action(window, action);

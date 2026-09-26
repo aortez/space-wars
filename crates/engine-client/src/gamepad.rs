@@ -7,6 +7,8 @@ use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs, Mapping};
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
 use spacewars_control::UiAction;
 
+use crate::controller_controls::{Device, SharedControllers};
+use crate::controller_profile::{self, RawState};
 use crate::input::{self, GameKey, GamepadSeatInput, SharedGamepadInput, SharedInput};
 use crate::{MainWindow, UserActivity};
 
@@ -60,6 +62,7 @@ pub(crate) fn start_gamepad_pump(
     window: &MainWindow,
     input: SharedInput,
     gamepads: SharedGamepadInput,
+    controllers: SharedControllers,
 ) -> Option<Timer> {
     let gilrs = match Gilrs::new() {
         Ok(gilrs) => gilrs,
@@ -69,7 +72,7 @@ pub(crate) fn start_gamepad_pump(
         }
     };
 
-    let mut pump = GamepadPump::new(gilrs, input, gamepads);
+    let mut pump = GamepadPump::new(gilrs, input, gamepads, controllers);
     pump.initialize(window);
 
     let timer = Timer::default();
@@ -91,10 +94,17 @@ struct GamepadPump {
     ui_driver: Option<usize>,
     ui_repeat: UiRepeat,
     mode_handoff: ModeHandoff,
+    controllers: SharedControllers,
+    controller_epoch: u64,
 }
 
 impl GamepadPump {
-    fn new(gilrs: Gilrs, input: SharedInput, gamepads: SharedGamepadInput) -> Self {
+    fn new(
+        gilrs: Gilrs,
+        input: SharedInput,
+        gamepads: SharedGamepadInput,
+        controllers: SharedControllers,
+    ) -> Self {
         Self {
             gilrs,
             assignments: SeatAssignments::default(),
@@ -103,6 +113,8 @@ impl GamepadPump {
             ui_driver: None,
             ui_repeat: UiRepeat::default(),
             mode_handoff: ModeHandoff::default(),
+            controllers,
+            controller_epoch: 0,
         }
     }
 
@@ -120,6 +132,7 @@ impl GamepadPump {
                     "assigned connected gamepad."
                 );
             }
+            self.register_device(id);
         }
         self.observe_mode(window);
         self.sample_gamepads(window);
@@ -150,9 +163,11 @@ impl GamepadPump {
                             "gamepad connected without an available player seat."
                         );
                     }
+                    self.register_device(id);
                     self.refresh_connection_ui(window);
                 }
                 EventType::Disconnected => {
+                    self.controllers.borrow_mut().disconnect(id);
                     if let Some(seat) = self.assignments.disconnect(id) {
                         self.mode_handoff.block(seat);
                         self.gamepads.borrow_mut().disconnect_seat(seat);
@@ -178,6 +193,28 @@ impl GamepadPump {
                     self.refresh_connection_ui(window);
                 }
                 event_type => {
+                    let consumed = self.controllers.borrow().captures_input();
+                    if window.get_controllers_visible() {
+                        let pad = self.gilrs.gamepad(gamepad_id);
+                        let raw = raw_state(&pad);
+                        let mapped = self.mapped_snapshot(id, &pad, &raw);
+                        let edge = match event_type {
+                            EventType::ButtonPressed(..) => Some(true),
+                            EventType::ButtonReleased(..) => Some(false),
+                            _ => None,
+                        };
+                        self.controllers.borrow_mut().observe(
+                            id,
+                            &raw,
+                            &mapped,
+                            edge,
+                            Instant::now(),
+                        );
+                    }
+                    if consumed {
+                        continue;
+                    }
+                    self.observe_mode(window);
                     let Some(seat) = self.assignments.connected_seat(id) else {
                         continue;
                     };
@@ -202,7 +239,9 @@ impl GamepadPump {
 
         self.observe_mode(window);
         self.sample_gamepads(window);
-        if is_ui_mode(window) {
+        self.controllers.borrow_mut().tick(window, Instant::now());
+        self.observe_mode(window);
+        if is_ui_mode(window) && !self.controllers.borrow().captures_input() {
             self.update_ui_navigation(window);
         } else {
             self.ui_repeat.reset();
@@ -219,18 +258,30 @@ impl GamepadPump {
         if window.get_launcher_busy() || !self.mode_handoff.accepts_input(seat) {
             return;
         }
-        let EventType::ButtonPressed(button, _) = event else {
+        let EventType::ButtonPressed(button, code) = event else {
             return;
         };
 
         let gamepad = self.gilrs.gamepad(gamepad_id);
-        let route = button_route(
-            window,
-            button,
-            gamepad.name(),
-            gamepad.is_pressed(Button::Start),
-            gamepad.is_pressed(Button::Select),
-        );
+        let controllers = self.controllers.borrow();
+        let profile = controllers.profile(usize::from(gamepad_id));
+        let (button, start, select) = if let Some(profile) = profile {
+            let Some(control) = controller_profile::button_control(profile, code.into_u32()) else {
+                return;
+            };
+            let raw = raw_state(&gamepad);
+            let mapped =
+                controller_profile::remap(snapshot(&gamepad), profile, &raw, stick_codes(&gamepad));
+            (logical_button(control), mapped.start, mapped.select)
+        } else {
+            (
+                button,
+                gamepad.is_pressed(Button::Start),
+                gamepad.is_pressed(Button::Select),
+            )
+        };
+        drop(controllers);
+        let route = button_route(window, button, gamepad.name(), start, select);
         if matches!(route, ButtonRoute::Menu(_) | ButtonRoute::Host(_)) {
             self.begin_handoff();
         }
@@ -238,16 +289,34 @@ impl GamepadPump {
     }
 
     fn sample_gamepads(&mut self, window: &MainWindow) {
-        if window.get_launcher_busy() {
+        if window.get_launcher_busy() || self.controllers.borrow().captures_input() {
             self.mode_handoff.block_all();
         }
         let snapshots = self
             .gilrs
             .gamepads()
-            .filter_map(|(id, gamepad)| {
-                let seat = self.assignments.connected_seat(usize::from(id))?;
-                Some((seat, snapshot(&gamepad)))
+            .map(|(id, gamepad)| {
+                let id = usize::from(id);
+                let raw = if window.get_controllers_visible()
+                    || self.controllers.borrow().profile(id).is_some()
+                {
+                    raw_state(&gamepad)
+                } else {
+                    RawState::default()
+                };
+                let snapshot = self.mapped_snapshot(id, &gamepad, &raw);
+                if window.get_controllers_visible() {
+                    self.controllers.borrow_mut().observe(
+                        id,
+                        &raw,
+                        &snapshot,
+                        None,
+                        Instant::now(),
+                    );
+                }
+                (self.assignments.connected_seat(id), snapshot)
             })
+            .filter_map(|(seat, snapshot)| seat.map(|seat| (seat, snapshot)))
             .collect::<Vec<_>>();
         let held = snapshots.iter().any(|(_, pad)| autostart_pad_held(pad));
         window.global::<UserActivity>().set_gamepad_held(held);
@@ -262,9 +331,50 @@ impl GamepadPump {
     }
 
     fn observe_mode(&mut self, window: &MainWindow) {
+        let epoch = self.controllers.borrow().epoch;
+        if epoch != self.controller_epoch {
+            self.controller_epoch = epoch;
+            self.begin_handoff();
+        }
         if self.mode_handoff.observe(InputMode::from_window(window)) {
             self.ui_driver = None;
             self.ui_repeat.reset();
+        }
+    }
+
+    fn register_device(&mut self, id: usize) {
+        let pad = self
+            .gilrs
+            .gamepads()
+            .find(|(candidate, _)| usize::from(*candidate) == id)
+            .map(|(_, pad)| pad);
+        if let Some(pad) = pad {
+            let uuid = pad
+                .uuid()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            self.controllers.borrow_mut().connect(Device {
+                id,
+                key: format!(
+                    "gilrs-v1:{}:{uuid}:{:?}:{:?}:{}",
+                    std::env::consts::OS,
+                    pad.vendor_id(),
+                    pad.product_id(),
+                    pad.os_name()
+                ),
+                name: pad.name().to_owned(),
+                seat: self.assignments.connected_seat(id),
+            });
+        }
+    }
+
+    fn mapped_snapshot(&self, id: usize, pad: &Gamepad<'_>, raw: &RawState) -> GamepadSeatInput {
+        let original = snapshot(pad);
+        if let Some(profile) = self.controllers.borrow().profile(id) {
+            controller_profile::remap(original, profile, raw, stick_codes(pad))
+        } else {
+            original
         }
     }
 
@@ -533,6 +643,75 @@ fn snapshot(gamepad: &Gamepad<'_>) -> GamepadSeatInput {
         west: gamepad.is_pressed(Button::West),
         start: gamepad.is_pressed(Button::Start),
         select: gamepad.is_pressed(Button::Select),
+    }
+}
+
+fn stick_codes(gamepad: &Gamepad<'_>) -> [Option<u32>; 4] {
+    [
+        Axis::LeftStickX,
+        Axis::LeftStickY,
+        Axis::RightStickX,
+        Axis::RightStickY,
+    ]
+    .map(|axis| gamepad.axis_code(axis).map(|code| code.into_u32()))
+}
+
+fn raw_state(gamepad: &Gamepad<'_>) -> RawState {
+    RawState {
+        button_values: gamepad
+            .state()
+            .buttons()
+            .map(|(code, data)| (code.into_u32(), data.value()))
+            .collect(),
+        buttons: gamepad
+            .state()
+            .buttons()
+            .map(|(code, data)| {
+                (
+                    code.into_u32(),
+                    if data.is_pressed() {
+                        data.value().max(0.65)
+                    } else {
+                        0.0
+                    },
+                )
+            })
+            .collect(),
+        // Hat axes are already converted into distinct D-pad buttons by
+        // gilrs. Sampling them again would capture a duplicate input.
+        axes: [
+            Axis::LeftStickX,
+            Axis::LeftStickY,
+            Axis::RightStickX,
+            Axis::RightStickY,
+        ]
+        .into_iter()
+        .filter_map(|axis| {
+            gamepad
+                .axis_code(axis)
+                .map(|code| (code.into_u32(), gamepad.value(axis)))
+        })
+        .collect(),
+    }
+}
+
+fn logical_button(control: engine_common::ControllerControl) -> Button {
+    use engine_common::ControllerControl as C;
+    match control {
+        C::Up => Button::DPadUp,
+        C::Down => Button::DPadDown,
+        C::Left => Button::DPadLeft,
+        C::Right => Button::DPadRight,
+        C::South => Button::South,
+        C::East => Button::East,
+        C::West => Button::West,
+        C::North => Button::North,
+        C::LeftBumper => Button::LeftTrigger,
+        C::RightBumper => Button::RightTrigger,
+        C::LeftTrigger => Button::LeftTrigger2,
+        C::RightTrigger => Button::RightTrigger2,
+        C::Select => Button::Select,
+        C::Start => Button::Start,
     }
 }
 

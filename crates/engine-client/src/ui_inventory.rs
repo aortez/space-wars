@@ -8,6 +8,7 @@ pub(crate) struct ScreenVisibility {
     pub(crate) launcher_busy: bool,
     pub(crate) sound: bool,
     pub(crate) device_info: bool,
+    pub(crate) controllers: bool,
     pub(crate) launcher: bool,
     pub(crate) launcher_controls: bool,
     pub(crate) launcher_settings: bool,
@@ -24,7 +25,9 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
     } else if visibility.touch_test {
         UiScreen::LauncherTouchTest
     } else if visibility.launcher {
-        if visibility.sound && visibility.autostart {
+        if visibility.sound && visibility.controllers {
+            UiScreen::LauncherControllers
+        } else if visibility.sound && visibility.autostart {
             UiScreen::LauncherAutostart
         } else if visibility.sound && visibility.device_info {
             UiScreen::LauncherInfo
@@ -39,6 +42,8 @@ pub(crate) fn classify_screen(visibility: ScreenVisibility) -> UiScreen {
         }
     } else if visibility.game_over {
         UiScreen::GameOver
+    } else if visibility.ingame_menu && visibility.sound && visibility.controllers {
+        UiScreen::PauseControllers
     } else if visibility.ingame_menu && visibility.sound && visibility.autostart {
         UiScreen::PauseAutostart
     } else if visibility.ingame_menu && visibility.sound && visibility.device_info {
@@ -62,6 +67,8 @@ pub(crate) struct UiInventoryContext {
     pub(crate) autostart_controls: Vec<UiControl>,
     pub(crate) autostart_focus: i32,
     pub(crate) device_info_controls: Vec<UiControl>,
+    pub(crate) controller_controls: Vec<UiControl>,
+    pub(crate) controller_focus: i32,
     pub(crate) launcher_busy_stage: String,
     pub(crate) launcher_busy_elapsed: String,
     pub(crate) sound_focus_index: i32,
@@ -142,6 +149,21 @@ pub(crate) fn inventory_for_screen(screen: UiScreen, context: &UiInventoryContex
         },
         UiScreen::LauncherMain => launcher_main_inventory(context),
         UiScreen::LauncherSound | UiScreen::PauseSound => sound_inventory(context),
+        UiScreen::LauncherControllers | UiScreen::PauseControllers => UiInventory {
+            selected_control: context
+                .controller_controls
+                .get(context.controller_focus as usize)
+                .filter(|control| control.enabled)
+                .map(|control| control.id.clone()),
+            controls: context.controller_controls.clone(),
+            actions: vec![
+                UiAction::Up,
+                UiAction::Down,
+                UiAction::Confirm,
+                UiAction::Back,
+            ],
+            error: context.settings_save_error.clone(),
+        },
         UiScreen::LauncherInfo | UiScreen::PauseInfo => UiInventory {
             selected_control: Some("info.back".into()),
             controls: context.device_info_controls.clone(),
@@ -785,6 +807,7 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
     );
     controls.push(UiControl::new("settings.device-info", "Device Info", true));
     controls.push(UiControl::new("settings.autostart", "Auto-start", true));
+    controls.push(UiControl::new("settings.controllers", "Controllers", true));
     controls.push(UiControl::new("sound.back", "Back", true));
     let mut ids = vec![
         "sound.volume",
@@ -810,7 +833,11 @@ fn sound_inventory(context: &UiInventoryContext) -> UiInventory {
         ),
     );
     UiInventory {
-        selected_control: selected_from_index(&ids, context.sound_focus_index),
+        selected_control: if context.sound_focus_index == 7 {
+            Some("settings.controllers".into())
+        } else {
+            selected_from_index(&ids, context.sound_focus_index)
+        },
         controls,
         actions: UiAction::ALL.to_vec(),
         error: context.settings_save_error.clone(),
@@ -1134,6 +1161,7 @@ mod tests {
                 launcher_busy: false,
                 sound: false,
                 device_info: false,
+                controllers: false,
                 autostart: false,
                 launcher: true,
                 launcher_controls: true,

@@ -94,50 +94,83 @@ The existing gamepad seat assignment and menu-to-game neutral/release gate
 apply without a userspace input translator. Scenario-specific mappings remain
 those shown by the application's Controls menu. In Clock, HAT Button 3 / West starts
 the next enabled event. Button 4 / North starts or dismisses a player duck;
-the joystick moves it and Button 2 / East jumps. South/A is also a jump binding
-on working controllers, but the non-reporting switch is not required. Use Escape or Start to pause, then choose Clock
+the joystick moves it and Button 2 / East or Button 1 / South jumps. Physical
+positions differ between cabinets; see the verified layouts below. Use Escape
+or Start to pause, then choose Clock
 Controls or Launcher. Enter confirms menu selections;
-Coin/Select opens controls help. Physical button layout can be adjusted by
-changing the `dtparam=buttonN=...` bindings in the Picade profile and rebooting.
+Coin/Select opens controls help. Use **App Settings → Controllers** to compensate
+for front-panel wiring differences without changing the overlay or rebooting;
+see [controller profiles](controller-profiles.md). The table above and measured
+layouts below describe the raw defaults, before a custom profile is applied.
 
 ### Record the physical button layout
 
-Connector numbers do not prove front-panel positions. The following layout was
-recorded on `sw-picade-2` on 2026-09-19, viewed from the player's position:
+Connector numbers and button colors do not prove front-panel positions. The
+layouts below are viewed from the player's position. HAT input names are derived
+from the captured Linux codes and configured overlay, not an inspection of the
+internal wiring. Do not copy one cabinet's positional mapping to another.
+
+#### sw-picade-2
+
+Recorded on 2026-09-19; bottom-left and bottom-middle rechecked on 2026-09-26.
 
 | Physical position | Color | HAT connector | Linux code | Logical input |
 | --- | --- | --- | --- | --- |
 | Top left | Yellow | Button 6 | 311 / BTN_TR | Right shoulder |
 | Top middle | Pink | Button 5 | 310 / BTN_TL | Left shoulder |
 | Top right | Blue | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
-| Bottom left | Pink | Not verified | No event | Not registering |
+| Bottom left | Pink | Button 1 | 304 / BTN_SOUTH | South / A / Clock jump |
 | Bottom middle | Yellow | Button 2 | 305 / BTN_EAST | East / B / Clock jump |
 | Bottom right | Blue | Button 4 | 307 / BTN_NORTH | North / Clock player duck |
 | Left side utility | Black | Escape | 1 / KEY_ESC | Pause / menu back |
 | Right side utility | Black | Enter | 28 / KEY_ENTER | Menu confirm |
 
-The ordered raw capture received five front-button codes (311, 310, 308, 305,
-307), followed by Escape/Enter. The user then individually identified the
-bottom-left pink button as producing no output, resolving the missing position
-in that sequence. The top-right mapping was also separately confirmed by
-repeated isolated presses. South/A (304) is the only configured front-button
-code not observed; Button 1 is therefore a candidate for the bottom-left
-connection, not a verified wiring assignment. The cause of the missing input
-(switch, wiring, or GPIO configuration) has not been diagnosed.
+The original capture did not report bottom-left pink. On 2026-09-26, isolated
+physical presses established its South/A mapping. A kernel-timestamped capture
+recorded one uninterrupted 4.668-second hold, then exactly three short presses
+(456, 620, and 832 ms), each with its matching release and no extra transitions.
+Earlier untimed attempts had inconsistent counts; the controlled tests did not
+reproduce a missing or doubled press. No input configuration or wiring was changed.
+This establishes that the switch currently registers, not that an intermittent
+fault has been diagnosed or repaired. Investigation: [#125](https://github.com/aortez/space-wars/issues/125).
 
-This records the full physical layout, including one non-reporting button;
-it does not establish eight working inputs. `sw-picade` still needs its own
-verification. Colors and wiring may differ between cabinets. The top-right
-Clock-only binding does not change menus, NES, or other scenarios; ordinary
-gamepads use right shoulder.
+#### sw-picade
 
-In Clock, bottom-right blue starts/dismisses a player duck, joystick moves it,
-and bottom-middle yellow jumps from solid ground. If the automatic obstacle-course
-duck is already on screen, bottom-right blue takes control of it in place, even
-mid-jump: no new course, teleport or velocity reset. Release the joystick/jump
-button before steering; press bottom-right again to dismiss, not return to AI.
-Top-right blue cycles compatible visual events, Rain, Falling and Meltdown without
-ending the visit. In water, the joystick paddles;
+All six front buttons were captured on 2026-09-26, including presses and releases.
+Unlike `sw-picade-2`, both rows are yellow/pink/blue, and West, North and South
+occupy different positions.
+
+![sw-picade joystick and six front buttons, viewed from the player's position](images/picade/sw-picade-buttons-2026-09-26.jpg)
+
+| Physical position | Color | HAT connector | Linux code | Logical input |
+| --- | --- | --- | --- | --- |
+| Top left | Yellow | Button 6 | 311 / BTN_TR | Right shoulder |
+| Top middle | Pink | Button 5 | 310 / BTN_TL | Left shoulder |
+| Top right | Blue | Button 4 | 307 / BTN_NORTH | North / Clock player duck |
+| Bottom left | Yellow | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
+| Bottom middle | Pink | Button 2 | 305 / BTN_EAST | East / B / Clock jump |
+| Bottom right | Blue | Button 1 | 304 / BTN_SOUTH | South / A / Clock jump |
+
+Utility-button positions were not verified in this cabinet's capture. Both
+cabinets had the same Picade overlay, kernel version, and active button GPIO/code
+bindings on 2026-09-26; the different front-panel layouts do not require different
+logical button mappings. South/A registered on both. Clock still maps South/A
+and East/B to Jump; a separate Run binding is proposed in
+[#124](https://github.com/aortez/space-wars/issues/124), not implemented here.
+The current in-app Picade position/color hints describe `sw-picade-2`; use this
+cabinet's table instead on `sw-picade`.
+
+#### Clock behavior shared by both cabinets
+
+Use the logical inputs in the tables: North starts/dismisses a player duck,
+the joystick moves it, and East/B or South/A jumps from solid ground. If the
+automatic obstacle-course duck is already on screen, North takes control of it
+in place, even mid-jump: no new course, teleport or velocity reset. Release the
+joystick/jump button before steering; press North again to dismiss, not return
+to AI. Only the controller that joined the duck supplies its movement and jump.
+West cycles compatible visual events, Rain, Falling and Meltdown without
+ending the visit. This Clock-only binding does not change menus, NES, or other
+scenarios; ordinary gamepads use right shoulder. In water, the joystick paddles;
 neutral floats/drifts with the current. Rain shares the fixed course; joining a
 shower already in progress instead keeps its water and moving floor. If a passive
 duck is already floating, it becomes yours in place; otherwise your duck enters
@@ -146,8 +179,8 @@ panels stay physical and gently close after the shower ends. Falling bars and
 the player share one physics world: bars can push the duck, and it can stand/jump
 on them. Leaving removes only the duck; the blocks finish their event, and a new
 visit can reuse that arena. Meltdown's individual blocks can push the duck too;
-they become water on floor contact, not on duck/block contact. Pressing bottom-right
-blue during an existing Falling or Meltdown also joins it in place: no restart,
+they become water on floor contact, not on duck/block contact. Pressing North
+during an existing Falling or Meltdown also joins it in place: no restart,
 new obstacle course, cleared water or reset blocks. The current floor stays after
 the event ends. New automatic duck visits and developer water-lab previews wait
 until the player leaves. Saved event
@@ -204,7 +237,14 @@ press, ignored West input and frozen simulation while paused, Escape/Enter
 pause/resume, and South/A confirmation. It verifies the Clock instance and saved
 preferences remain unchanged. These checks passed on `sw-picade-2` in automatic
 Clock mode on 2026-09-19. Injected South/A successfully confirmed Resume, but
-that does not verify the non-reporting pink switch, its wiring, or GPIO sensing.
+injection alone does not verify a physical switch, its wiring, or GPIO sensing.
+Do not assume an evdev write stays held for the requested duration: during the
+2026-09-26 recheck, a requested 120 ms North press appeared in the raw stream as
+only 1.211 ms. An injected South press also failed to appear in Clock's sampled
+`jump_held` state. Those results do not establish a physical-button failure.
+Use physical holds plus `clock state` telemetry to verify the complete path;
+the app-owned virtual controller is the separate option for bounded gameplay
+holds without physical hardware.
 Manual/automatic equivalence, touch release behavior, and menu handoff guards
 also have backend-neutral Rust tests.
 

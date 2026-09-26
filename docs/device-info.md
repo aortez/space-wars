@@ -79,8 +79,10 @@ to reject stale data as usual.
 
 The launcher chooses/configures scenarios. Pause handles the active session.
 **App Settings** is the shared home for application/device-wide concerns:
-current audio/FPS preferences and Device Info, with **Network** and **Controllers**
-as future sibling screens. Scenario-specific controls do not go here.
+current audio/FPS preferences, Device Info, Auto-start, and
+[Controllers](controller-profiles.md), with **Network** as a future sibling
+screen. Controllers configures the shared logical layout; scenario-specific
+actions and player-seat reassignment are separate work.
 
 Wi-Fi setup belongs in Network, not inside read-only Info. Its implementation
 will need network selection, credential entry usable without a physical keyboard,

@@ -81,6 +81,14 @@ Start explicitly resumes. Navigation guards the screen rather than a transient
 telemetry revision; CPU/network sampling must not introduce timing-sensitive
 test failures. Render tests include the Info panel at 800×480 and 480×800.
 
+The Controllers workflow opens the shared setup screen from launcher and pause,
+checks stable control IDs and the new settings-row navigation, and returns
+without resuming or replacing the game. Display-free tests drive the actual
+setup callbacks with synthetic physical input snapshots, including save/reload,
+timed rollback, disconnect, duplicate inputs, and both measured Picade layouts.
+The live tester and calibration screens have 800×480, 1024×768, and 480×800
+render coverage. See [controller profiles](controller-profiles.md).
+
 Short negative Clock waits check that a paused event does not advance; they
 are not response-latency requirements. A timeout may have no snapshot if no
 reply arrived before its deadline. The UI workflows compare any returned
