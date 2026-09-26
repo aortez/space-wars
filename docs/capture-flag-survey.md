@@ -68,7 +68,8 @@ regression (frozen v13 binary, new code with observer off, observer on), then
 eight complete matches: two SHA-256-derived `native-flag-survey-v1:{0..1}` worlds,
 quiet/three-second asteroid pressure, observer off/on with v13 in both seats.
 All have ten-minute deadlines and native cadenced sensors. No parameters are
-fitted to the outcomes.
+fitted to the outcomes. The headless opt-in observes both seats regardless of
+their controlling policy; native autoplay observes only v13 seats.
 
 Every pair must retain identical full per-tick controller traces, identical
 evaluator bytes, mission telemetry and recorded physical outcomes. Traces are
@@ -116,6 +117,14 @@ though a fixed survey's queries are unchanged. The first shared positive goes
 from 946 to 445 elapsed ticks. This is a reduction in work and simulated survey
 latency, not a measured frame-rate or playing-strength improvement.
 
+Both regression positives belong to the **v10-controlled first seat**, revisit
+the same planet 2 / bearing 14, and have zero-length outbound and return legs:
+the flag is already within reach of the boarding footing. These establish a
+narrow class of adjacent flag/hatch geometry, not varied walking paths or new
+v13-controller evidence. The first sample's cover checks are all false; the
+second has no armed-opponent cover measurement. Neither establishes a safe
+combat approach.
+
 Coverage remains limited. Of the six generated-condition checks, two lack
 landing/boarding/climb evidence, two complete walking routes but fail publication
 geometry validation, and two are cancelled when the request changes. Two of the
@@ -129,7 +138,15 @@ and a newly blocked high climb sample. A native three-minute paired test checks
 v13 evaluation, controller telemetry and physics with the observer off/on.
 Final local validation passed 476 scenario tests, 155 AI tests, the native paired
 test and 339 Python analysis tests. Independent review covered geometry freshness,
-shared work accounting and the sparse index equivalence.
+shared work accounting and the sparse index equivalence. A separate raw-data
+audit reconciled samples and cancelled-job work with allocations and telemetry,
+and checked the compressed traces against their stored hashes.
+
+Runtime `a4bfee1` was deployed to `sw-picade.local`, with both executable hashes
+verified and the kiosk active without automatic restarts. The retained automatic
+match uses P1 v10 / P2 v13. The first live observation completed two site checks:
+one lacked landing/boarding/climb evidence and one found no walking round trip
+in the patch. The diagnostic model reports `observational: true`.
 
 ## Next investigation
 
