@@ -181,3 +181,9 @@ Device evidence is retained beside the study: `deploy.log`,
 `pi-settings.png` and `pi-match.png`. The final independent data review checked
 all raw report hashes, outcomes, regression interpretation, coverage and
 weighted timing arithmetic and found no inaccurate claims.
+
+CI's display tests exposed a test-only assumption that every controller could
+be reached in three clicks. With five choices, wrapping back to Human can
+require four. The test now follows a complete selector cycle and detects
+repeated values instead of imposing that old limit. This changes no runtime
+code or recorded simulation result.
