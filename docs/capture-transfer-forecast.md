@@ -156,8 +156,9 @@ cover withholding and endpoint precedence. It therefore supplies no empirical
 failure-detection rate. The surviving asteroid interruption also demonstrates
 why this model's conditional endpoint cannot predict completion of a real trip.
 
-The next slice can exercise bounded scheduling, source freshness/cancellation
-and shadow-only candidate comparisons using this model. Keep uncertainty,
+The [scheduling experiment](capture-transfer-scheduling.md) exercises bounded
+dispatch and source freshness/cancellation with this model. Future shadow-only
+candidate comparisons must keep uncertainty,
 interruption risk and the value of pursuing an opponent separate from nominal
 travel time. Live use also needs an explicit sensor contract for the orbital and
 mass information currently supplied by the separate privileged snapshot. Live
