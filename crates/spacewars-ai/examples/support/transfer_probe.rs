@@ -31,11 +31,20 @@ pub struct TransferProbeRun {
     forecast_enabled: bool,
     forecast: Option<Value>,
     schedule: Option<super::transfer_schedule::TransferScheduleRun>,
+    acquisition: Option<super::acquisition_probe::AcquisitionProbe>,
 }
 
 impl TransferProbeRun {
     pub fn from_args(out: &Path) -> Option<Self> {
         let destination = super::arg("--probe-transfer-destination", "none");
+        let acquisition = match super::arg("--probe-acquisition-seconds", "none").as_str() {
+            "none" => None,
+            seconds => Some(super::acquisition_probe::AcquisitionProbe::new(
+                seconds
+                    .parse()
+                    .expect("acquisition seconds must be an integer"),
+            )),
+        };
         let schedule = super::transfer_schedule::TransferScheduleRun::from_args(out);
         let forecast_enabled = match super::arg("--forecast-transfer", "false").as_str() {
             "true" => true,
@@ -44,7 +53,7 @@ impl TransferProbeRun {
         };
         if destination == "none" {
             assert!(
-                !forecast_enabled && schedule.is_none(),
+                !forecast_enabled && schedule.is_none() && acquisition.is_none(),
                 "transfer forecast needs a source nomination"
             );
             assert_eq!(super::arg("--probe-transfer-tick", "none"), "none");
@@ -60,10 +69,23 @@ impl TransferProbeRun {
             .parse()
             .expect("probe needs source tick");
         let seconds: u64 = super::arg("--seconds", "180").parse().unwrap();
+        let acquisition_ticks = acquisition.as_ref().map_or(0, |a| a.horizon_ticks);
         assert!(
-            seat < 2 && tick + 3600 < seconds * 60,
-            "probe needs full 60-second horizon"
+            seat < 2 && tick + 3600 + acquisition_ticks < seconds * 60,
+            "probe needs full transfer and optional acquisition horizons"
         );
+        if acquisition.is_some() {
+            assert_eq!(super::arg("--trace", "false"), "true");
+            assert_eq!(super::arg("--trace-start-tick", "0"), "0");
+            assert!(
+                super::arg("--trace-end-tick", "0").parse::<u64>().unwrap()
+                    > tick + 3600 + acquisition_ticks
+            );
+            assert!(
+                schedule.is_none(),
+                "acquisition continuation must not extend a transfer forecast schedule"
+            );
+        }
         assert_eq!(super::arg("--mode", "quiet"), "duel");
         assert_eq!(super::arg("--match", "false"), "true");
         assert_eq!(super::arg("--evaluate-missions", "false"), "true");
@@ -86,6 +108,7 @@ impl TransferProbeRun {
             forecast_enabled,
             forecast: None,
             schedule,
+            acquisition,
         })
     }
 
@@ -151,6 +174,22 @@ impl TransferProbeRun {
         }
         let p = &o.local.combat.recovery.flight.pilot;
         let t = bot.telemetry();
+        if self.acquisition.is_some()
+            && self
+                .outcome
+                .as_ref()
+                .is_some_and(|r| r["tick"].as_u64().unwrap() < p.tick)
+        {
+            // Transfer telemetry and pursuit deferral end at the original
+            // handoff. The caller now supplies its ordinary controller intent.
+            if self.outcome.as_ref().unwrap()["reason"] == "arrived" {
+                self.acquisition
+                    .as_mut()
+                    .unwrap()
+                    .observe(self.destination, t, o);
+            }
+            return;
+        }
         if self.forecast_enabled && p.tick == self.tick && self.forecast.is_none() {
             let started = Instant::now();
             let environment = if self.source.as_ref().unwrap()["nomination"]["accepted"] == true {
@@ -233,6 +272,12 @@ impl TransferProbeRun {
             };
             if let Some(reason) = outcome {
                 self.stop(p.tick, reason);
+                if reason == "arrived"
+                    && let Some(acquisition) = &mut self.acquisition
+                {
+                    acquisition.start(p.tick);
+                    acquisition.observe(self.destination, t, o);
+                }
             }
         }
         serde_json::to_writer(&mut self.trace, &json!({
@@ -264,6 +309,14 @@ impl TransferProbeRun {
         self.outcome.is_some()
     }
 
+    pub fn run_done(&self) -> bool {
+        self.done()
+            && self
+                .acquisition
+                .as_ref()
+                .is_none_or(|a| self.outcome.as_ref().unwrap()["reason"] != "arrived" || a.done())
+    }
+
     pub fn advance(&mut self, tick: u64, remaining: engine_core::planning::Work) -> f64 {
         self.schedule
             .as_mut()
@@ -292,7 +345,11 @@ impl TransferProbeRun {
                 bot.sensor_request(),
                 scenario_spacewars::surface_sortie::mission::LandingSurveyCadence::FourHz,
             );
+            // Preserve the original transfer endpoint row on a censored run.
+            // Acquisition never inspects this synthetic finish observation.
+            let acquisition = self.acquisition.take();
             self.record(self.seat, bot, state, &o, CombatIntent::default());
+            self.acquisition = acquisition;
         }
         self.trace.flush().unwrap();
         let mut report = json!({"schema":1,"seat":self.seat,"source_tick":self.tick,"destination":self.destination,
@@ -302,6 +359,13 @@ impl TransferProbeRun {
             "scope":"Solver contacts include positive separation and do not prove impact. External destination nomination retains controller gates. Optional defer_new suppresses new pursuit only during the nominated transfer after its source tick; existing pursuit, recovery and safety retain priority. Source is pre-intent; terminal next_actions are not executed. Measures handoff, not landing/capture or match strength. Same-state ordinary-control comparisons are not independent physical trajectories. Diagnostic work and IO are outside live planner fuel."});
         if let Some(schedule) = &mut self.schedule {
             report["forecast_schedule"] = schedule.finish(state.tick());
+        }
+        if let Some(acquisition) = &mut self.acquisition {
+            report["acquisition"] =
+                acquisition.finish(state.tick(), state.match_outcome().is_some());
+            report["scope"] = json!(
+                "Transfer trace ends at its original handoff or interruption. With acquisition continuation, the handoff command is executed unless acquisition also terminates on that tick; the final acquisition command is not executed. New pursuit is deferred only before handoff. All later controller intents are ordinary. Acquisition observes first site choice, not landing/capture or match strength; historical reference sites are never forced. Diagnostic work and IO are outside live planner fuel."
+            );
         }
         report
     }

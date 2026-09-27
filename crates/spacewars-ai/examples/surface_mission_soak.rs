@@ -1,4 +1,6 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
+#[path = "support/acquisition_probe.rs"]
+mod acquisition_probe;
 #[path = "support/flag_survey.rs"]
 mod flag_survey;
 #[path = "support/flag_value_shadow.rs"]
@@ -686,7 +688,10 @@ fn main() {
                 actions.extend(intent.encode(owner));
             }
         }
-        if transfer_probe.as_ref().is_some_and(|probe| probe.done()) {
+        if transfer_probe
+            .as_ref()
+            .is_some_and(|probe| probe.run_done())
+        {
             break;
         }
         let mut planning_ms = successor_construction_ms
