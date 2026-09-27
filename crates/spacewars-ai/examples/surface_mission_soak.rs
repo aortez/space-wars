@@ -1,6 +1,8 @@
 //! Shared mission policy in fixed or generated reproducible physical trials.
 #[path = "support/acquisition_probe.rs"]
 mod acquisition_probe;
+#[path = "support/capture_probe.rs"]
+mod capture_probe;
 #[path = "support/flag_survey.rs"]
 mod flag_survey;
 #[path = "support/flag_value_shadow.rs"]
@@ -506,7 +508,14 @@ fn main() {
                     trial.record(i, &pilots[i], &state, &o, intent);
                 }
                 if let Some(probe) = &mut transfer_probe {
-                    probe.record(i, &pilots[i], &state, &o, intent);
+                    probe.record(
+                        i,
+                        &pilots[i],
+                        &state,
+                        &o,
+                        intent,
+                        mission_evaluation.as_ref().map(|e| &e.evaluator),
+                    );
                 }
                 if let Some(reference) = &mut reference_pilots {
                     let reference_site = reference[i].site_request();
