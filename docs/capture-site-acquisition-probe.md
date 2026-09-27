@@ -71,6 +71,10 @@ Require the original ordinary prefix and exact source observations, nominations
 and candidate controls. Compare old/new transfer traces and all controller
 observations byte for byte through the old terminal observation, including both
 players. Verify ordinary evaluator, survey and upstream-work prefixes. This
+includes reconstructing evaluator charges from the live planner's usage and the
+flag allocator's post-evaluation residual; transfer probes do not emit the
+separate evaluator-work file used by scheduled comparisons. Reconcile the
+reconstructed total to the evaluator report. This
 establishes parity **through arrival**, not a post-arrival counterfactual: the old
 executable stops there. Later intents follow the ordinary call path by construction.
 Independently reconcile the new endpoint to native telemetry and lifecycle events,
@@ -78,3 +82,11 @@ retain raw hashes and exercise censoring/precedence/staleness in focused tests.
 
 No deployment, live cost admission or bot-strength claim is part of this slice.
 Results will be recorded below after the frozen study completes.
+
+The first pair was produced at runtime/runner freeze `334a498`, then its audit
+stopped on the absent evaluator-work file. Its raw artifacts are retained in
+`target/capture-flag-survey/acquisition-probe-v1`. The correction reconstructs
+that work from existing logs; it does not change runtime, sources, horizon or
+outcome rules. The full unchanged matrix will run in
+`target/capture-flag-survey/acquisition-probe-v1-rerun`, including the same first
+pair, whose completed trajectories must also match the retained initial files.

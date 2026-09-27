@@ -2,6 +2,7 @@
 """Follow fixed numeric alternative references to their first actual site choice."""
 import argparse
 from collections import Counter
+import csv
 import gzip
 import hashlib
 import importlib.util
@@ -16,7 +17,7 @@ SPEC.loader.exec_module(L)
 C, T, F = L.C, L.T, L.F
 HORIZON_SECONDS = 30
 UPSTREAM = ['mission-evaluations.jsonl', 'flag-survey.jsonl', 'flag-value-shadow.jsonl',
-            'mission-evaluation-work.jsonl', 'flag-survey-work.jsonl',
+            'flag-survey-work.jsonl',
             'flag-value-shadow-work.jsonl', 'destination-cover.jsonl']
 
 
@@ -201,8 +202,51 @@ def audit_pair(before, after):
         old_bytes = (before/name).read_bytes()
         with (after/name).open('rb') as stream:
             assert stream.read(len(old_bytes)) == old_bytes, name
+    def live_work(root):
+        with (root/'live-planning.csv').open() as stream:
+            return [{k: v for k, v in r.items() if k != 'dispatch_ms'} for r in csv.DictReader(stream)]
+    old_work, new_work = live_work(before), live_work(after)
+    assert new_work[:len(old_work)] == old_work
+    a, b = [evaluation_charges(root, live_work(root)) for root in [before, after]]
+    assert b[:len(a)] == a
     return dict(controller_rows=count, controller_prefix_sha256=digest.hexdigest(),
-                exact_transfer_trace=True, exact_upstream_prefix=True)
+                exact_transfer_trace=True, exact_upstream_prefix=True, reconstructed_evaluator_charges=len(a))
+
+
+def evaluation_charges(root, live):
+    """Transfer probes omit the evaluator ledger; reconstruct from residuals.
+
+    The flag allocator records the remaining shared work immediately after the
+    evaluator. The live planner records the work immediately before it. No
+    other optional graph consumer is enabled by this fixed runner.
+    """
+    totals, jobs = {}, {}
+    for r in live:
+        tick = int(r['tick'])
+        assert int(r['graph_budget']) == 4 and int(r['query_budget']) == 384
+        work = (int(r['total_graph']), int(r['total_queries']))
+        assert totals.setdefault(tick, work) == work
+        used = jobs.setdefault(tick, [0, 0])
+        used[0] += int(r['graph'])
+        used[1] += int(r['queries'])
+    assert all(tuple(jobs[t]) == used for t, used in totals.items())
+    charges = []
+    for f in T.rows(root/'flag-survey-work.jsonl'):
+        tick = f['tick']
+        assert tick == len(charges)
+        graph, queries = totals.get(tick, (0, 0))
+        assert 0 <= graph <= 4 and 0 <= queries <= 384
+        remaining = f['remaining_after_evaluation']
+        assert remaining['physics_queries'] == 384-queries
+        charged = 4-graph-remaining['graph']
+        assert 0 <= charged <= 4-graph
+        charges.append(charged)
+    report = json.loads((root/'report.json').read_text())
+    assert len(charges) == report['elapsed_ticks']
+    assert sum(charges) == report['mission_evaluation']['charged']
+    assert sum(v[0] for v in totals.values()) == report['live_objective_planning']['telemetry']['graph']
+    assert sum(v[1] for v in totals.values()) == report['live_objective_planning']['telemetry']['physics_queries']
+    return charges
 
 
 def aggregate(runs):
