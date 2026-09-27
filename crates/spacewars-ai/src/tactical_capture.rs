@@ -110,6 +110,13 @@ impl TacticalCapturePilot {
     pub fn telemetry(&self) -> &CaptureTelemetry {
         &self.telemetry
     }
+    pub(crate) fn landing_choice_comparison(
+        &self,
+        o: &TacticalSortieObservationV1,
+        reference: LandingSiteId,
+    ) -> Result<crate::tactical_sortie::LandingChoiceComparison, &'static str> {
+        self.base.landing_choice_comparison(o, reference)
+    }
     pub fn site_request(&self) -> Option<LandingSiteId> {
         self.base.site_request()
     }

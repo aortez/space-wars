@@ -38,6 +38,12 @@ impl AcquisitionProbe {
         self.outcome.is_some()
     }
 
+    pub fn selected_now(&self, tick: u64) -> bool {
+        self.outcome
+            .as_ref()
+            .is_some_and(|r| r["reason"] == "site_selected" && r["tick"] == tick)
+    }
+
     pub fn observe(&mut self, destination: usize, m: &MissionTelemetry, o: &MissionObservationV1) {
         let p = &o.local.combat.recovery.flight.pilot;
         let start = self
@@ -185,6 +191,9 @@ mod tests {
         assert!(!probe.done());
         probe.record(121, None, site());
         assert!(probe.done());
+        assert!(probe.selected_now(121));
+        assert!(!probe.selected_now(120));
+        assert!(!probe.selected_now(122));
         let report = probe.finish(121, false);
         assert_eq!(report["outcome"]["reason"], "site_selected");
         assert_eq!(report["outcome"]["elapsed_ticks"], 1);
@@ -196,6 +205,7 @@ mod tests {
         let mut probe = AcquisitionProbe::new(30);
         probe.start(120);
         probe.record(120, Some("recovery"), site());
+        assert!(!probe.selected_now(120));
         assert_eq!(probe.finish(120, false)["outcome"]["reason"], "recovery");
     }
 

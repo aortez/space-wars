@@ -302,6 +302,27 @@ impl MaterialMissionPilot {
         capture.start_acquisition(&o.local);
         capture
     }
+    /// Host-only same-observation reassessment of a fresh native landing choice.
+    /// The caller must supply the observation used for this tick's intent; this
+    /// does not authorize a remote site or refresh its historical evidence.
+    pub fn landing_choice_comparison(
+        &self,
+        o: &MissionObservationV1,
+        reference: LandingSiteId,
+    ) -> Result<crate::tactical_sortie::LandingChoiceComparison, &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.previous_tick != Some(p.tick)
+            || self.telemetry.goal != MissionGoal::Capture
+            || self.telemetry.target != Some(p.planet.index)
+            || self.recovery.is_some()
+        {
+            return Err("no current native capture intent");
+        }
+        self.capture
+            .as_ref()
+            .ok_or("capture task unavailable")?
+            .landing_choice_comparison(&o.local, reference)
+    }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
             self.telemetry.goal = goal;

@@ -3,7 +3,11 @@
 use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::{
     ShipForm,
-    surface_sortie::{PilotLocation, SurfaceSortieState, mission::MissionObservationV1},
+    surface_sortie::{
+        PilotLocation, SurfaceSortieState,
+        mission::MissionObservationV1,
+        pilot::{LANDING_SITE_COUNT, LandingSiteId},
+    },
 };
 use serde_json::{Value, json};
 use spacewars_ai::{
@@ -32,6 +36,8 @@ pub struct TransferProbeRun {
     forecast: Option<Value>,
     schedule: Option<super::transfer_schedule::TransferScheduleRun>,
     acquisition: Option<super::acquisition_probe::AcquisitionProbe>,
+    landing_reference: Option<LandingSiteId>,
+    landing_choice: Option<Value>,
 }
 
 impl TransferProbeRun {
@@ -45,6 +51,26 @@ impl TransferProbeRun {
                     .expect("acquisition seconds must be an integer"),
             )),
         };
+        let landing_reference =
+            match super::arg("--probe-landing-reference-bearing", "none").as_str() {
+                "none" => None,
+                bearing => {
+                    assert!(
+                        acquisition.is_some(),
+                        "landing comparison needs acquisition continuation"
+                    );
+                    let bearing = bearing
+                        .parse()
+                        .expect("reference bearing must be an integer");
+                    assert!(bearing < LANDING_SITE_COUNT);
+                    Some(LandingSiteId {
+                        planet: destination
+                            .parse()
+                            .expect("landing comparison needs a destination"),
+                        bearing,
+                    })
+                }
+            };
         let schedule = super::transfer_schedule::TransferScheduleRun::from_args(out);
         let forecast_enabled = match super::arg("--forecast-transfer", "false").as_str() {
             "true" => true,
@@ -109,6 +135,8 @@ impl TransferProbeRun {
             forecast: None,
             schedule,
             acquisition,
+            landing_reference,
+            landing_choice: None,
         })
     }
 
@@ -187,6 +215,7 @@ impl TransferProbeRun {
                     .as_mut()
                     .unwrap()
                     .observe(self.destination, t, o);
+                self.compare_landing_choice(bot, o);
             }
             return;
         }
@@ -280,6 +309,7 @@ impl TransferProbeRun {
                 }
             }
         }
+        self.compare_landing_choice(bot, o);
         serde_json::to_writer(&mut self.trace, &json!({
             "tick":p.tick,"ship":p.ship,"frame":p.planet.index,"target":t.target,"goal":t.goal,
             "queries_ready":p.queries_ready,"ship_available":p.ship_available,
@@ -293,6 +323,34 @@ impl TransferProbeRun {
             "pursuit_control":self.control_comparison.take(),
         })).unwrap();
         writeln!(self.trace).unwrap();
+    }
+
+    fn compare_landing_choice(&mut self, bot: &MissionBot, o: &MissionObservationV1) {
+        let Some(reference) = self.landing_reference else {
+            return;
+        };
+        let p = &o.local.combat.recovery.flight.pilot;
+        if self.landing_choice.is_some()
+            || !self
+                .acquisition
+                .as_ref()
+                .is_some_and(|a| a.selected_now(p.tick))
+        {
+            return;
+        }
+        // The caller passes the exact immutable observation used for this
+        // tick's intent and dense trace. No world queries or controller updates.
+        let started = Instant::now();
+        let result = bot.landing_choice_comparison(o, reference);
+        let assessment_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let (report, unknown) = match result {
+            Ok(report) => (Some(report), None),
+            Err(reason) => (None, Some(reason)),
+        };
+        self.landing_choice = Some(json!({
+            "reference":reference,"observation_tick":p.tick,"actor":p.owner,
+            "report":report,"unknown":unknown,"assessment_ms":assessment_ms,"physics_queries":0,
+        }));
     }
 
     fn stop(&mut self, tick: u64, reason: &'static str) {
@@ -366,6 +424,14 @@ impl TransferProbeRun {
             report["scope"] = json!(
                 "Transfer trace ends at its original handoff or interruption. With acquisition continuation, the handoff command is executed unless acquisition also terminates on that tick; the final acquisition command is not executed. New pursuit is deferred only before handoff. All later controller intents are ordinary. Acquisition observes first site choice, not landing/capture or match strength; historical reference sites are never forced. Diagnostic work and IO are outside live planner fuel."
             );
+        }
+        if let Some(reference) = self.landing_reference {
+            report["landing_choice"] = self.landing_choice.clone().unwrap_or_else(|| {
+                json!({
+                    "reference":reference,"observation_tick":null,"actor":null,"report":null,
+                    "unknown":"no observed site choice","assessment_ms":0.0,"physics_queries":0,
+                })
+            });
         }
         report
     }
