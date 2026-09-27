@@ -323,6 +323,24 @@ impl MaterialMissionPilot {
             .ok_or("capture task unavailable")?
             .landing_choice_comparison(&o.local, reference)
     }
+    /// Observational first-choice timing, with combat cover recorded separately.
+    /// Supply the exact immutable observation used for this tick's intent. The
+    /// native controller validates the choice; no report enters its decisions.
+    pub fn landing_choice_with_neutral_timing(
+        &self,
+        o: &MissionObservationV1,
+        reference: LandingSiteId,
+    ) -> Result<
+        (
+            crate::tactical_sortie::LandingChoiceComparison,
+            crate::mission_evaluation::NeutralCaptureTiming,
+        ),
+        &'static str,
+    > {
+        let choice = self.landing_choice_comparison(o, reference)?;
+        let timing = crate::mission_evaluation::neutral_capture_timing(o, &self.telemetry, &choice);
+        Ok((choice, timing))
+    }
     fn goal(&mut self, goal: MissionGoal, tick: u64) {
         if self.telemetry.goal != goal {
             self.telemetry.goal = goal;
