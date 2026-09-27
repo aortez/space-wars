@@ -1,7 +1,9 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import unittest
+import tempfile
 
 SPEC = importlib.util.spec_from_file_location('acquisition_probe', Path(__file__).resolve().parents[1] / 'probe-site-acquisition.py')
 P = importlib.util.module_from_spec(SPEC)
@@ -49,6 +51,26 @@ def fixture():
 
 
 class AcquisitionProbeAudit(unittest.TestCase):
+    def test_evaluator_work_is_bound_to_both_budget_residual_and_report(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            live = [dict(tick='0', graph_budget='4', query_budget='384', total_graph='1',
+                         total_queries='2', graph='1', queries='2')]
+            flags = [dict(tick=0, remaining_after_evaluation=dict(graph=2, physics_queries=382)),
+                     dict(tick=1, remaining_after_evaluation=dict(graph=0, physics_queries=384))]
+            write = lambda: (root/'flag-survey-work.jsonl').write_text(''.join(json.dumps(f)+'\n' for f in flags))
+            (root/'report.json').write_text(json.dumps(dict(elapsed_ticks=2, mission_evaluation=dict(charged=5),
+                live_objective_planning=dict(telemetry=dict(graph=1, physics_queries=2)))))
+            write()
+            self.assertEqual(P.evaluation_charges(root, live), [1, 4])
+            flags[0]['remaining_after_evaluation']['graph'] = 1
+            write()
+            with self.assertRaises(AssertionError): P.evaluation_charges(root, live)
+            flags[0]['remaining_after_evaluation']['graph'] = 2
+            flags[1]['remaining_after_evaluation']['physics_queries'] = 383
+            write()
+            with self.assertRaises(AssertionError): P.evaluation_charges(root, live)
+
     def test_local_restart_or_frame_change_cannot_count_as_original_choice(self):
         case, report, rows = fixture()
         rows[-1]['mission']['capture']['replans'] = 1
