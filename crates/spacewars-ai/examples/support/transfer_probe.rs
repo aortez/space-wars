@@ -38,6 +38,7 @@ pub struct TransferProbeRun {
     acquisition: Option<super::acquisition_probe::AcquisitionProbe>,
     landing_reference: Option<LandingSiteId>,
     landing_choice: Option<Value>,
+    capture: Option<super::capture_probe::CaptureProbe>,
 }
 
 impl TransferProbeRun {
@@ -71,6 +72,18 @@ impl TransferProbeRun {
                     })
                 }
             };
+        let capture = match super::arg("--probe-capture-seconds", "none").as_str() {
+            "none" => None,
+            seconds => {
+                assert!(
+                    landing_reference.is_some(),
+                    "capture continuation needs a landing comparison"
+                );
+                Some(super::capture_probe::CaptureProbe::new(
+                    seconds.parse().expect("capture seconds must be an integer"),
+                ))
+            }
+        };
         let schedule = super::transfer_schedule::TransferScheduleRun::from_args(out);
         let forecast_enabled = match super::arg("--forecast-transfer", "false").as_str() {
             "true" => true,
@@ -95,17 +108,18 @@ impl TransferProbeRun {
             .parse()
             .expect("probe needs source tick");
         let seconds: u64 = super::arg("--seconds", "180").parse().unwrap();
-        let acquisition_ticks = acquisition.as_ref().map_or(0, |a| a.horizon_ticks);
+        let continuation_ticks = acquisition.as_ref().map_or(0, |a| a.horizon_ticks)
+            + capture.as_ref().map_or(0, |c| c.horizon_ticks);
         assert!(
-            seat < 2 && tick + 3600 + acquisition_ticks < seconds * 60,
-            "probe needs full transfer and optional acquisition horizons"
+            seat < 2 && tick + 3600 + continuation_ticks < seconds * 60,
+            "probe needs full transfer and optional continuation horizons"
         );
         if acquisition.is_some() {
             assert_eq!(super::arg("--trace", "false"), "true");
             assert_eq!(super::arg("--trace-start-tick", "0"), "0");
             assert!(
                 super::arg("--trace-end-tick", "0").parse::<u64>().unwrap()
-                    > tick + 3600 + acquisition_ticks
+                    > tick + 3600 + continuation_ticks
             );
             assert!(
                 schedule.is_none(),
@@ -137,6 +151,7 @@ impl TransferProbeRun {
             acquisition,
             landing_reference,
             landing_choice: None,
+            capture,
         })
     }
 
@@ -196,6 +211,7 @@ impl TransferProbeRun {
         state: &SurfaceSortieState,
         o: &MissionObservationV1,
         intent: CombatIntent,
+        evaluator: Option<&MissionEvaluator>,
     ) {
         if seat != self.seat || self.source.is_none() {
             return;
@@ -211,11 +227,12 @@ impl TransferProbeRun {
             // Transfer telemetry and pursuit deferral end at the original
             // handoff. The caller now supplies its ordinary controller intent.
             if self.outcome.as_ref().unwrap()["reason"] == "arrived" {
-                self.acquisition
-                    .as_mut()
-                    .unwrap()
-                    .observe(self.destination, t, o);
+                let acquisition = self.acquisition.as_mut().unwrap();
+                if !acquisition.done() {
+                    acquisition.observe(self.destination, t, o);
+                }
                 self.compare_landing_choice(bot, o);
+                self.follow_capture(bot, o, evaluator);
             }
             return;
         }
@@ -310,6 +327,7 @@ impl TransferProbeRun {
             }
         }
         self.compare_landing_choice(bot, o);
+        self.follow_capture(bot, o, evaluator);
         serde_json::to_writer(&mut self.trace, &json!({
             "tick":p.tick,"ship":p.ship,"frame":p.planet.index,"target":t.target,"goal":t.goal,
             "queries_ready":p.queries_ready,"ship_available":p.ship_available,
@@ -323,6 +341,35 @@ impl TransferProbeRun {
             "pursuit_control":self.control_comparison.take(),
         })).unwrap();
         writeln!(self.trace).unwrap();
+    }
+
+    fn follow_capture(
+        &mut self,
+        bot: &MissionBot,
+        o: &MissionObservationV1,
+        evaluator: Option<&MissionEvaluator>,
+    ) {
+        // A synthetic finish has no evaluator and cannot start or advance a trip.
+        let (Some(capture), Some(evaluator)) = (&mut self.capture, evaluator) else {
+            return;
+        };
+        let tick = o.local.combat.recovery.flight.pilot.tick;
+        if !capture.started()
+            && self
+                .acquisition
+                .as_ref()
+                .is_some_and(|a| a.selected_now(tick))
+        {
+            capture.start(
+                o,
+                bot.telemetry(),
+                evaluator,
+                self.landing_choice.as_ref().unwrap(),
+            );
+        }
+        if capture.started() && !capture.done() {
+            capture.observe(o, bot.telemetry());
+        }
     }
 
     fn compare_landing_choice(&mut self, bot: &MissionBot, o: &MissionObservationV1) {
@@ -373,6 +420,10 @@ impl TransferProbeRun {
                 .acquisition
                 .as_ref()
                 .is_none_or(|a| self.outcome.as_ref().unwrap()["reason"] != "arrived" || a.done())
+            && self
+                .capture
+                .as_ref()
+                .is_none_or(|c| !c.started() || c.done())
     }
 
     pub fn advance(&mut self, tick: u64, remaining: engine_core::planning::Work) -> f64 {
@@ -406,7 +457,7 @@ impl TransferProbeRun {
             // Preserve the original transfer endpoint row on a censored run.
             // Acquisition never inspects this synthetic finish observation.
             let acquisition = self.acquisition.take();
-            self.record(self.seat, bot, state, &o, CombatIntent::default());
+            self.record(self.seat, bot, state, &o, CombatIntent::default(), None);
             self.acquisition = acquisition;
         }
         self.trace.flush().unwrap();
@@ -432,6 +483,13 @@ impl TransferProbeRun {
                     "unknown":"no observed site choice","assessment_ms":0.0,"physics_queries":0,
                 })
             });
+        }
+        if let Some(capture) = &mut self.capture {
+            report["capture_followthrough"] =
+                capture.finish(state.tick(), state.match_outcome().is_some());
+            report["scope"] = json!(
+                "Transfer and acquisition retain their original endpoints. With capture continuation, the first-choice command executes; ordinary controls follow the first native site until departure, interruption or censor. Only the final continuation command is unexecuted. Empirical costs are frozen at choice, never supplied to controls. No extra queries or live planner work."
+            );
         }
         report
     }

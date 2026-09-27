@@ -103,7 +103,7 @@ def close(actual, expected, tolerance):
     assert abs(actual-expected) <= tolerance, (actual, expected, tolerance)
 
 
-def audit_choice(case, row, choice):
+def audit_choice(case, row, choice, *, allow_delayed_start=False):
     """Audit fresh neutral choices; flagged routes remain outside this fixed corpus."""
     reference = case['candidate']['local_reference']['evidence']['site']
     assert choice['reference'] == reference
@@ -125,7 +125,9 @@ def audit_choice(case, row, choice):
     assert native['reason'] == 'selected_site' and native['tick'] == row['tick']
     assert native['planet'] == p['planet']['index'] and native['revision'] == p['planet']['revision']
     assert native['site_query'] == p['site_query']
-    assert native['selected_site'] == capture['site'] and capture['started_tick'] == row['tick']
+    assert native['selected_site'] == capture['site']
+    assert capture['started_tick'] is not None and capture['started_tick'] <= row['tick']
+    if not allow_delayed_start: assert capture['started_tick'] == row['tick']
     assert choice['unknown'] is None
     r = choice['report']
     assert r['model'] == 'native_landing_choice_comparison_v1'

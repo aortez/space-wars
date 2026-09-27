@@ -55,6 +55,14 @@ def fixture(sun=False, sun_position=None):
 
 
 class LandingChoiceAudit(unittest.TestCase):
+    def test_optional_delayed_first_choice_still_requires_current_native_tick(self):
+        case,row,choice = fixture()
+        row['mission']['capture']['started_tick'] -= 5
+        with self.assertRaises(AssertionError): P.audit_choice(case,row,choice)
+        P.audit_choice(case,row,choice,allow_delayed_start=True)
+        row['mission']['capture']['acquisition']['tick'] -= 1
+        with self.assertRaises(AssertionError): P.audit_choice(case,row,choice,allow_delayed_start=True)
+
     def test_sensor_parity_ignores_time_but_preserves_counts_and_actor_clock(self):
         with tempfile.TemporaryDirectory() as folder:
             a, b = Path(folder)/'a', Path(folder)/'b'

@@ -41,6 +41,43 @@ pub struct LocalCostReference {
 }
 
 impl MissionEvaluator {
+    /// Snapshot the existing empirical phases at the first native site choice.
+    /// Read-only diagnostic: the host binds this to the same observation and
+    /// landing-choice report. Direction/arrival geometry do not tune the medians.
+    pub fn fresh_capture_reference(
+        &self,
+        o: &MissionObservationV1,
+        mission: &MissionTelemetry,
+    ) -> Result<LocalCostReference, &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let capture = mission.capture.as_ref().ok_or("capture unavailable")?;
+        let acquisition = capture.acquisition.ok_or("native choice unavailable")?;
+        let site = capture.site.ok_or("selected site unavailable")?;
+        let visit = selection_tick(mission).ok_or("capture visit unavailable")?;
+        if mission.goal != crate::mission_pilot::MissionGoal::Capture
+            || mission.target != Some(p.planet.index)
+            || mission.recovery.is_some()
+            || capture.started_tick.is_none_or(|tick| tick > p.tick)
+            || capture.failed_tick.is_some()
+            || capture.landing.landed_tick.is_some()
+            || acquisition.reason != "selected_site"
+            || acquisition.tick != p.tick
+            || acquisition.planet != p.planet.index
+            || acquisition.revision != p.planet.revision
+            || acquisition.selected_site != Some(site)
+            || site.planet != p.planet.index
+        {
+            return Err("not the first current native capture choice");
+        }
+        let report = self.source_local_reference(o, mission, p.planet.index, visit, true);
+        if report.observed_choice_tick != Some(p.tick) || report.elapsed_landing_ticks != 0 {
+            return Err(report
+                .unknown
+                .unwrap_or("fresh choice reference clock unavailable"));
+        }
+        Ok(report)
+    }
+
     pub(crate) fn source_local_reference(
         &self,
         o: &MissionObservationV1,
@@ -409,6 +446,87 @@ mod tests {
         if let Some(s) = &mut o.local.landing_objective {
             s.validated_tick = Some(tick);
         }
+    }
+
+    fn fresh_fixture() -> (MissionEvaluator, MissionObservationV1, MissionTelemetry) {
+        use crate::tactical_sortie::AcquisitionTelemetry;
+        let (e, o, mut m) = fixture();
+        let p = &o.local.combat.recovery.flight.pilot;
+        let c = &mut m.capture.as_mut().unwrap().sortie;
+        c.started_tick = Some(p.tick);
+        c.acquisition = Some(AcquisitionTelemetry {
+            tick: p.tick,
+            planet: p.planet.index,
+            revision: p.planet.revision,
+            objective: None,
+            measurement_tick: None,
+            generation: None,
+            objective_work: None,
+            site_query: p.site_query,
+            sites_available: p.sites.len(),
+            required_site: None,
+            selected_site: c.site,
+            reason: "selected_site",
+            survey_rejected_by: None,
+            checks: Default::default(),
+        });
+        (e, o, m)
+    }
+
+    #[test]
+    fn fresh_capture_snapshot_preserves_existing_costs_and_evaluator_work() {
+        let (e, o, m) = fresh_fixture();
+        let before = reference(&e, &o, &m);
+        let pending = e.pending(PlayerId::PLAYER_1);
+        let r = e.fresh_capture_reference(&o, &m).unwrap();
+        assert_eq!(r, before);
+        assert!(r.full.is_some());
+        assert_eq!(r.full, r.remaining);
+        assert_eq!(r.elapsed_landing_ticks, 0);
+        assert_eq!(r.observed_choice_tick, Some(100));
+        assert_eq!(e.pending(PlayerId::PLAYER_1), pending);
+        assert_eq!(reference(&e, &o, &m), before);
+    }
+
+    #[test]
+    fn fresh_capture_snapshot_rejects_retained_mismatched_and_progressed_choices() {
+        for mutation in 0..7 {
+            let (e, o, mut m) = fresh_fixture();
+            let c = &mut m.capture.as_mut().unwrap().sortie;
+            match mutation {
+                0 => c.acquisition.as_mut().unwrap().reason = "retained_site",
+                1 => c.acquisition.as_mut().unwrap().tick -= 1,
+                2 => c.acquisition.as_mut().unwrap().revision += 1,
+                3 => c.acquisition.as_mut().unwrap().selected_site = None,
+                4 => c.started_tick = Some(101),
+                5 => c.landing.landed_tick = Some(100),
+                _ => m.target = None,
+            }
+            assert!(
+                e.fresh_capture_reference(&o, &m).is_err(),
+                "mutation {mutation}"
+            );
+        }
+    }
+
+    #[test]
+    fn delayed_first_choice_starts_its_cost_clock_at_selection() {
+        let (e, o, mut m) = fresh_fixture();
+        m.capture.as_mut().unwrap().sortie.started_tick = Some(95);
+        let r = e.fresh_capture_reference(&o, &m).unwrap();
+        assert_eq!(r.observed_choice_tick, Some(100));
+        assert_eq!(r.elapsed_landing_ticks, 0);
+        assert_eq!(r.full, r.remaining);
+    }
+
+    #[test]
+    fn fresh_capture_snapshot_preserves_unknown_costs() {
+        let (e, mut o, m) = fresh_fixture();
+        o.local.cover.clear();
+        let r = e.fresh_capture_reference(&o, &m).unwrap();
+        assert!(r.full.is_none() && r.remaining.is_none());
+        assert!(r.unknown.is_some());
+        assert_eq!(r.observed_choice_tick, Some(100));
     }
 
     #[test]
