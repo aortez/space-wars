@@ -41,20 +41,20 @@ def fixture():
 class SchedulingAudit(unittest.TestCase):
     def test_independent_upstream_ledger_includes_shadow_and_checks_jobs(self):
         work = lambda graph, queries=0: dict(graph=graph, physics_queries=queries)
-        e = dict(tick=0, remaining_before_evaluation=work(3, 382), allowance=work(3), charged=work(1))
-        f = dict(tick=0, remaining_after_evaluation=work(2, 382),
+        e = dict(tick=0, remaining_before_evaluation=work(3, 382), allowance=work(3), charged=work(0))
+        f = dict(tick=0, remaining_after_evaluation=work(3, 382),
                  allocation=dict(allowance=work(2, 382), charged=work(1, 2), jobs=[dict(charged=work(1, 2))]))
-        s = dict(tick=0, remaining_after_flag_survey=work(1), charged=work(1))
+        s = dict(tick=0, remaining_after_flag_survey=work(2), charged=work(1))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root/'live-planning.csv').write_text('tick,graph_budget,query_budget,total_graph,total_queries,graph,queries\n0,4,384,1,2,1,2\n')
             for name, row in [('mission-evaluation', e), ('flag-survey', f), ('flag-value-shadow', s)]:
                 (root/(name+'-work.jsonl')).write_text(json.dumps(row)+'\n')
-            (root/'report.json').write_text(json.dumps(dict(elapsed_ticks=1, mission_evaluation=dict(charged=1),
+            (root/'report.json').write_text(json.dumps(dict(elapsed_ticks=1, mission_evaluation=dict(charged=0),
                 flag_survey=dict(shadow=dict(charged=1), telemetry=work(1, 2)),
                 live_objective_planning=dict(telemetry=work(1, 2)))))
-            self.assertEqual(S.audit_upstream(root)[0], dict(live=1, evaluator=1, flags=1, shadow=1, total=4))
-            s['charged'] = work(2)
+            self.assertEqual(S.audit_upstream(root)[0], dict(live=1, evaluator=0, flags=1, shadow=1, total=3))
+            s['charged'] = work(3)
             (root/'flag-value-shadow-work.jsonl').write_text(json.dumps(s)+'\n')
             with self.assertRaises(AssertionError): S.audit_upstream(root)
 
