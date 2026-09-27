@@ -164,6 +164,7 @@ pub(super) fn evidence(
                 choice: None,
                 route_source_tick: None,
                 route_validated_tick: None,
+                route_objective: None,
                 remote: true,
             })
         })

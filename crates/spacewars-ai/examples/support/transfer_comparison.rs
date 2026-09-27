@@ -234,6 +234,6 @@ impl TransferComparisonRun {
             "submitted":self.queue.submitted_total,"completed":self.queue.completed_total,
             "cancelled":self.queue.cancelled_total,"charged_graph":self.queue.charged_total,"physics_queries":0,
             "observation":super::timing(self.observation_ms.clone()),"dispatch":super::timing(self.dispatch_ms.clone()),
-            "scope":"Historical conditional travel handoffs only, never capture value or permission. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."})
+            "scope":"Historical transfer and source-local components, never capture value or permission. Unmeasured handoff-to-site-choice time withholds a whole-trip reference. Shared residual allowance after playing/evaluation/survey/shadow work; playing capped at four. Construction/validation/snapshots outside graph quota; IO outside timings. Unknowns and refusals retained. Last snapshots and published reports are historical after cancellation."})
     }
 }

@@ -42,6 +42,7 @@ enum SourceKind {
 
 #[derive(Clone)]
 struct Source {
+    local_reference: Option<crate::mission_evaluation::LocalReferenceContext>,
     kind: SourceKind,
     actor: PlayerId,
     vehicle: VehicleId,
@@ -78,6 +79,7 @@ impl Source {
     ) -> Self {
         let p = &o.local.combat.recovery.flight.pilot;
         Self {
+            local_reference: None,
             kind,
             actor: p.owner,
             vehicle: p.vehicle,
@@ -245,6 +247,13 @@ impl Source {
         if !environment.matches_source(o) {
             return Err("environment observation mismatch");
         }
+        if self
+            .local_reference
+            .as_ref()
+            .is_some_and(|source| !source.matches(o))
+        {
+            return Err("local reference dependencies changed or expired");
+        }
         if p.tick > self.environment.tick {
             self.environment.advance(&mut self.planets);
         }
@@ -287,7 +296,8 @@ impl TransferForecastQueue {
     ) -> Result<RequestToken, &'static str> {
         let job =
             bot.forecast_nominated_transfer(o, environment.clone(), transfer_forecast::MAX_TICKS)?;
-        self.submit_job(bot, o, environment, contact, job, SourceKind::Nominated)
+        let source = Source::read(bot, o, environment.clone(), SourceKind::Nominated);
+        self.submit_job(bot, o, environment, contact, job, source)
     }
 }
 
@@ -302,7 +312,9 @@ impl TransferForecastQueue<TransferComparisonJob> {
         contact: Option<bool>,
     ) -> Result<RequestToken, &'static str> {
         let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?;
-        self.submit_job(actual, o, environment, contact, job, SourceKind::Comparison)
+        let mut source = Source::read(actual, o, environment.clone(), SourceKind::Comparison);
+        source.local_reference = Some(job.local_context(o));
+        self.submit_job(actual, o, environment, contact, job, source)
     }
 
     /// Diagnostic progress only, with the same current-observation barrier as
@@ -350,7 +362,7 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
         environment: TransferEnvironment,
         contact: Option<bool>,
         job: J,
-        kind: SourceKind,
+        mut source: Source,
     ) -> Result<RequestToken, &'static str> {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
@@ -382,7 +394,6 @@ impl<J: PlanningJob> TransferForecastQueue<J> {
             reason: None,
             charged_graph: 0,
         };
-        let mut source = Source::read(bot, o, environment.clone(), kind);
         source.validate(&placeholder, bot, o, &environment, contact)?;
         if let Some(old) = self.state(p.owner) {
             self.cancel(old.token, p.tick, "replaced");
@@ -749,6 +760,86 @@ mod tests {
             q.observe(token, &bot, &changed, &e, Some(false));
             assert_eq!(q.poll(token, e.tick), JobPoll::Stale);
             assert_eq!(q.charged_total, 1);
+        }
+    }
+
+    #[test]
+    fn local_evidence_expiry_revokes_pending_and_ready_comparisons_without_more_work() {
+        use crate::mission_evaluation::{
+            LocalEvidenceSource, LocalReferenceContext, MissionEvaluator, PhaseCosts,
+        };
+        let (state, before, bot, o) = transfer_forecast::tests::source_with_before();
+        for ready in [false, true] {
+            let (mut bot, mut o, mut environment) = (
+                bot.clone(),
+                o.clone(),
+                state.transfer_environment().unwrap(),
+            );
+            // Put a valid flight source exactly on the evidence-age boundary.
+            o.local.combat.recovery.flight.pilot.tick = 1800;
+            bot.previous_tick = Some(1800);
+            environment.tick = 1800;
+            let mut q = TransferForecastQueue::<TransferComparisonJob>::new(1);
+            let token = q
+                .submit_comparison(
+                    &before,
+                    &bot,
+                    &o,
+                    &MissionEvaluator::new(1),
+                    environment.clone(),
+                    Some(false),
+                )
+                .unwrap();
+            let mut local = q.snapshot(token, 1800).unwrap().candidates[0]
+                .local_reference
+                .clone();
+            local.remaining = Some(PhaseCosts {
+                landing: 1.0,
+                exit: 0.0,
+                outbound: 0.0,
+                claim: 3.0,
+                return_board: 0.0,
+                departure: 1.0,
+            });
+            let planet = &o.planets[0];
+            local.evidence = Some(LocalEvidenceSource {
+                site: LandingSiteId {
+                    planet: planet.index,
+                    bearing: 0,
+                },
+                revision: planet.revision,
+                observed_owner: None,
+                radius: planet.radius,
+                stage_seconds: 3.0,
+                flag_range: 3.0,
+                remote: true,
+                tick: 0,
+                age_ticks: 1800,
+                gravity: 0.0,
+                route_source_tick: None,
+                route_validated_tick: None,
+                route_objective: None,
+                choice: None,
+            });
+            q.actors
+                .get_mut(&0)
+                .unwrap()
+                .source
+                .as_mut()
+                .unwrap()
+                .local_reference = Some(LocalReferenceContext::read(&o, [&local].into_iter()));
+            q.advance(1800, work(if ready { 10801 } else { 0 }));
+            assert_eq!(matches!(q.poll(token, 1800), JobPoll::Ready(_)), ready);
+            let charged = q.charged_total;
+            next(&mut bot, &mut o, &mut environment);
+            q.observe(token, &bot, &o, &environment, Some(false));
+            assert_eq!(q.advance(1801, work(10801)).unwrap().charged.graph, 0);
+            assert_eq!(q.poll(token, 1801), JobPoll::Stale);
+            assert_eq!(q.charged_total, charged);
+            assert_eq!(
+                q.state(bot.context.actor).unwrap().reason,
+                Some("local reference dependencies changed or expired")
+            );
         }
     }
 }

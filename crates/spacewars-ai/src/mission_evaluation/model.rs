@@ -46,6 +46,22 @@ impl PlanetKey {
                 _ => false,
             }
     }
+    /// Stricter identity for the observational transfer/local join. Ordinary
+    /// evaluator matching and its playing policies remain unchanged.
+    pub fn reference_matches(&self, other: &Self) -> bool {
+        self.matches(other)
+            && self.radius.is_finite()
+            && self.radius > 0.0
+            && self.radius == other.radius
+            && self.stage_seconds.is_none_or(f32::is_finite)
+            && self.flag_range == other.flag_range
+            && self.flag_range.is_none_or(|v| v.is_finite() && v > 0.0)
+            && match (self.flag, other.flag) {
+                (Some((_, a)), Some((_, b))) => a.distance_to(b) <= 0.002,
+                (None, None) => true,
+                _ => false,
+            }
+    }
     pub fn flag_identity_matches(&self, objective: LandingObjective, radius: f32) -> bool {
         let Some((owner, position)) = self.flag else {
             return false;
@@ -78,6 +94,7 @@ pub(super) struct LocalEvidence {
     pub choice: Option<(u64, u64)>,
     pub route_source_tick: Option<u64>,
     pub route_validated_tick: Option<u64>,
+    pub route_objective: Option<LandingObjective>,
 }
 
 pub(super) fn route_cadence_gap(o: &MissionObservationV1, sample: &LocalEvidence) -> bool {
@@ -238,5 +255,6 @@ pub(super) fn observe_local(
             .landing_objective
             .as_ref()
             .map(|s| s.validated_tick.unwrap_or(s.tick)),
+        route_objective: o.local.landing_objective.as_ref().map(|s| s.objective),
     })
 }

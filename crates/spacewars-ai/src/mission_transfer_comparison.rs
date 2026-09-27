@@ -1,7 +1,7 @@
-//! Historical travel comparisons. These predict a free-flight handoff, never
-//! landing/capture value, and are not consumed by the playing controller.
+//! Historical travel and source-local reference components. Missing acquisition
+//! time stays unknown; the playing controller never consumes this comparison.
 use super::*;
-use crate::mission_evaluation::MissionEvaluator;
+use crate::mission_evaluation::{LocalCostReference, LocalReferenceContext, MissionEvaluator};
 use engine_common::Action;
 use engine_core::planning::{PlanningJob, WorkKind};
 use scenario_spacewars::surface_sortie::transfer_environment::TransferEnvironment;
@@ -16,6 +16,29 @@ pub struct TransferCandidateForecast {
     pub source_actions: [Action; 3],
     pub unknown: Option<&'static str>,
     pub forecast: Option<TransferForecastReport>,
+    pub local_reference: LocalCostReference,
+    /// Explicitly entered by the captured controller, not inferred from a
+    /// rejected free-flight constructor or mere proximity to a planet.
+    pub source_capture: Option<SourceCaptureEntry>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceCaptureEntry {
+    CurrentApproach,
+    NominatedApproach,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CaptureCostComposition {
+    pub destination: usize,
+    pub travel_seconds: Option<f32>,
+    pub local_seconds: Option<f32>,
+    /// Arithmetic sum of available travel and site-choice phase references.
+    /// Not a complete trip when the handoff-to-site-choice interval is absent.
+    pub known_components_seconds: Option<f32>,
+    pub remaining_trip_seconds: Option<f32>,
+    pub unknown: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -37,6 +60,9 @@ pub struct TransferComparisonReport {
     /// Only populated when the whole shortlist has numeric handoffs. This is
     /// a travel comparison, not a capture-value preference or permission.
     pub preferred_handoffs: Vec<usize>,
+    /// Published in the same charged final step. No capture-value ranking or
+    /// live selection consumes these historical conditional components.
+    pub capture_costs: Vec<CaptureCostComposition>,
 }
 
 #[derive(Clone)]
@@ -106,22 +132,20 @@ impl TransferComparisonJob {
                 ranked: false,
                 fastest_known_handoffs: Vec::new(),
                 preferred_handoffs: Vec::new(),
+                capture_costs: Vec::new(),
             },
             jobs: Vec::with_capacity(MAX_CANDIDATES),
             cursor: 0,
         };
         job.add(
-            current,
-            true,
-            None,
-            actual.previous_intent.encode(p.owner),
+            TransferCandidateForecast::source(actual, o, evaluator, current, true, None),
             actual.forecast_current_transfer(o, environment.clone(), transfer_forecast::MAX_TICKS),
         );
         for destination in alternatives {
             // Every hypothetical command starts from the same pre-intent state.
             // Rejections retain ordinary controls and remain explicit unknowns.
             let mut candidate = before.clone();
-            let (intent, nomination) =
+            let (_, nomination) =
                 candidate.intent_with_destination_probe(o, evaluator, destination);
             let forecast = if nomination.accepted {
                 candidate.forecast_nominated_transfer(
@@ -133,10 +157,14 @@ impl TransferComparisonJob {
                 Err(nomination.reason.unwrap_or("nomination rejected"))
             };
             job.add(
-                destination,
-                false,
-                Some(nomination),
-                intent.encode(p.owner),
+                TransferCandidateForecast::source(
+                    &candidate,
+                    o,
+                    evaluator,
+                    destination,
+                    false,
+                    Some(nomination),
+                ),
                 forecast,
             );
         }
@@ -145,25 +173,21 @@ impl TransferComparisonJob {
 
     fn add(
         &mut self,
-        destination: usize,
-        current: bool,
-        nomination: Option<DestinationProbeResult>,
-        source_actions: [Action; 3],
+        mut candidate: TransferCandidateForecast,
         result: Result<TransferForecastJob, &'static str>,
     ) {
         let (forecast, unknown) = match result {
             Ok(job) => (Some(job), None),
             Err(reason) => (None, Some(reason)),
         };
-        self.report.candidates.push(TransferCandidateForecast {
-            destination,
-            current,
-            nomination,
-            source_actions,
-            unknown,
-            forecast: forecast.as_ref().map(|job| job.report().clone()),
-        });
+        candidate.unknown = unknown;
+        candidate.forecast = forecast.as_ref().map(|job| job.report().clone());
+        self.report.candidates.push(candidate);
         self.jobs.push(forecast);
+    }
+
+    pub(super) fn local_context(&self, o: &MissionObservationV1) -> LocalReferenceContext {
+        LocalReferenceContext::read(o, self.report.candidates.iter().map(|c| &c.local_reference))
     }
 
     pub fn snapshot(&self) -> TransferComparisonReport {
@@ -204,6 +228,114 @@ impl TransferComparisonJob {
             self.report.preferred_handoffs = self.report.fastest_known_handoffs.clone();
         }
         self.report.ranked = true;
+        self.report.capture_costs = self
+            .report
+            .candidates
+            .iter()
+            .map(TransferCandidateForecast::compose)
+            .collect();
+    }
+}
+
+impl TransferCandidateForecast {
+    fn source(
+        bot: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &MissionEvaluator,
+        destination: usize,
+        current: bool,
+        nomination: Option<DestinationProbeResult>,
+    ) -> Self {
+        let p = &o.local.combat.recovery.flight.pilot;
+        let capture = bot.telemetry.target == Some(destination)
+            && bot.telemetry.goal == MissionGoal::Capture
+            && bot.previous_tick == Some(p.tick)
+            && bot
+                .capture
+                .as_ref()
+                .is_some_and(|c| destination::uncommitted(c.telemetry()))
+            && bot.recovery.is_none()
+            && bot.telemetry.pursuit.is_none()
+            && !bot.disengaging()
+            && p.queries_ready
+            && p.planet.index == destination;
+        let source_capture = if capture && current {
+            Some(SourceCaptureEntry::CurrentApproach)
+        } else if capture
+            && nomination.as_ref().is_some_and(|n| n.accepted)
+            && bot.selected_tick == p.tick
+            && p.ship.position.distance_to(p.planet.motion.position) < p.planet.radius + 105.0
+            && (p.ship.velocity - p.planet.motion.velocity).length() < 18.0
+        {
+            Some(SourceCaptureEntry::NominatedApproach)
+        } else {
+            None
+        };
+        Self {
+            destination,
+            current,
+            nomination,
+            source_actions: bot.previous_intent.encode(p.owner),
+            unknown: None,
+            forecast: None,
+            source_capture,
+            local_reference: evaluator.source_local_reference(
+                o,
+                bot.telemetry(),
+                destination,
+                bot.selected_tick,
+                source_capture == Some(SourceCaptureEntry::CurrentApproach),
+            ),
+        }
+    }
+
+    fn compose(&self) -> CaptureCostComposition {
+        let travel = if self.source_capture.is_some() {
+            Some(0.0)
+        } else {
+            self.forecast
+                .as_ref()
+                .filter(|f| f.end == Some(TransferForecastEnd::KinematicHandoff))
+                .and_then(|f| f.handoff_seconds)
+        };
+        let local = self
+            .local_reference
+            .remaining
+            .as_ref()
+            .map(|c| c.landing + c.exit + c.outbound + c.claim + c.return_board + c.departure);
+        let components = travel
+            .zip(local)
+            .map(|(a, b)| a + b)
+            .filter(|v| v.is_finite());
+        let bound = self.source_capture == Some(SourceCaptureEntry::CurrentApproach)
+            && self.local_reference.observed_choice_tick.is_some()
+            && self.local_reference.selected_site.is_some_and(|site| {
+                self.local_reference
+                    .evidence
+                    .as_ref()
+                    .is_some_and(|e| e.site == site)
+            });
+        let unknown = if travel.is_none() {
+            Some("transfer handoff or source capture unavailable")
+        } else if local.is_none() {
+            self.local_reference
+                .unknown
+                .or(Some("local reference unavailable"))
+        } else if !bound {
+            Some("handoff to site choice unmeasured; hypothetical site reference only")
+        } else if components.is_none() {
+            Some("component sum invalid")
+        } else {
+            None
+        };
+        CaptureCostComposition {
+            destination: self.destination,
+            travel_seconds: travel,
+            local_seconds: local,
+            known_components_seconds: components,
+            remaining_trip_seconds: unknown.is_none().then_some(components).flatten(),
+            unknown,
+        }
     }
 }
 
@@ -626,5 +758,84 @@ mod tests {
             assert_eq!(q.state(actor).unwrap().charged_graph, 6);
         }
         assert_eq!(q.charged_total, 12);
+    }
+
+    #[test]
+    fn local_entry_requires_captured_controller_state_and_does_not_fill_the_site_choice_gap() {
+        let (_, before, mut bot, mut o) = transfer_forecast::tests::source_with_before();
+        let evaluator = MissionEvaluator::new(1);
+        let p = &mut o.local.combat.recovery.flight.pilot;
+        let target = p.planet.index;
+        p.queries_ready = true;
+        p.ship.position = p.planet.motion.position + Vec2::Y * (p.planet.radius + 100.0);
+        p.ship.velocity = p.planet.motion.velocity;
+        bot.telemetry.target = Some(target);
+        bot.telemetry.goal = MissionGoal::Capture;
+        bot.capture = Some(TacticalCapturePilot::new(bot.context, bot.breaks));
+        bot.telemetry.capture = Some(bot.capture.as_ref().unwrap().telemetry().clone());
+        let accepted = Some(DestinationProbeResult {
+            destination: target,
+            accepted: true,
+            reason: None,
+        });
+        let mut c = TransferCandidateForecast::source(
+            &bot,
+            &o,
+            &evaluator,
+            target,
+            false,
+            accepted.clone(),
+        );
+        assert_eq!(
+            c.source_capture,
+            Some(SourceCaptureEntry::NominatedApproach)
+        );
+        assert_eq!(c.compose().travel_seconds, Some(0.0));
+        let costs = crate::mission_evaluation::PhaseCosts {
+            landing: 10.0,
+            exit: 1.0,
+            outbound: 2.0,
+            claim: 3.0,
+            return_board: 4.0,
+            departure: 5.0,
+        };
+        c.local_reference.full = Some(costs.clone());
+        c.local_reference.remaining = Some(costs);
+        c.local_reference.unknown = None;
+        let composed = c.compose();
+        assert_eq!(composed.known_components_seconds, Some(25.0));
+        assert!(composed.remaining_trip_seconds.is_none());
+        assert!(composed.unknown.unwrap().contains("site choice unmeasured"));
+        bot.capture = None;
+        assert!(
+            TransferCandidateForecast::source(
+                &bot,
+                &o,
+                &evaluator,
+                target,
+                false,
+                accepted.clone()
+            )
+            .source_capture
+            .is_none()
+        );
+        bot.capture = Some(TacticalCapturePilot::new(bot.context, bot.breaks));
+        o.local.combat.recovery.flight.pilot.ship.velocity += Vec2::X * 18.0;
+        assert!(
+            TransferCandidateForecast::source(&bot, &o, &evaluator, target, false, accepted)
+                .source_capture
+                .is_none()
+        );
+        let rejected = Some(DestinationProbeResult {
+            destination: target,
+            accepted: false,
+            reason: Some("refused"),
+        });
+        assert!(
+            TransferCandidateForecast::source(&before, &o, &evaluator, target, false, rejected)
+                .compose()
+                .travel_seconds
+                .is_none()
+        );
     }
 }
