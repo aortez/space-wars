@@ -106,13 +106,29 @@ impl MaterialMissionPilot {
         if !source_schema_matches(o, self.context.actor) {
             return Err("observation version or actor mismatch");
         }
-        let destination = self.telemetry.target.ok_or("no nominated destination")?;
+        self.telemetry.target.ok_or("no nominated destination")?;
         if !self.destination_switched
             || self.selected_tick != p.tick
             || self.previous_tick != Some(p.tick)
         {
             return Err("forecast needs the accepted source command");
         }
+        self.forecast_current_transfer(o, environment, horizon_ticks)
+    }
+
+    /// Snapshot the command actually selected at this source, including its PWM
+    /// and progress memory. Only comparison jobs may bypass the nomination gate.
+    pub(super) fn forecast_current_transfer(
+        &self,
+        o: &MissionObservationV1,
+        environment: TransferEnvironment,
+        horizon_ticks: u64,
+    ) -> Result<TransferForecastJob, &'static str> {
+        let p = &o.local.combat.recovery.flight.pilot;
+        if !source_schema_matches(o, self.context.actor) || self.previous_tick != Some(p.tick) {
+            return Err("forecast needs the current source command");
+        }
+        let destination = self.telemetry.target.ok_or("no current destination")?;
         if !(1..=MAX_TICKS).contains(&horizon_ticks) || !environment.matches_source(o) {
             return Err("forecast horizon or environment mismatch");
         }
@@ -434,6 +450,16 @@ pub(super) mod tests {
         MaterialMissionPilot,
         MissionObservationV1,
     ) {
+        let (state, _, bot, o) = source_with_before();
+        (state, bot, o)
+    }
+
+    pub(crate) fn source_with_before() -> (
+        SurfaceSortieState,
+        MaterialMissionPilot,
+        MaterialMissionPilot,
+        MissionObservationV1,
+    ) {
         let seed = 13100125988314582075;
         let mut state = SurfaceSortieScenario::init_material_arena(seed);
         state.enable_match_rules();
@@ -455,10 +481,11 @@ pub(super) mod tests {
                     && bot.transfer_probe_gate(&o, planet.index).is_ok()
             });
             let intent = if let Some(planet) = alternative {
+                let before = bot.clone();
                 let (intent, result) =
                     bot.intent_with_destination_probe(&o, &evaluator, planet.index);
                 if result.accepted {
-                    return (state, bot, o);
+                    return (state, before, bot, o);
                 }
                 intent
             } else {

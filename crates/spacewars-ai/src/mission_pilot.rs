@@ -31,6 +31,11 @@ pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferFo
 mod transfer_queue;
 pub use transfer_queue::{TransferForecastQueue, TransferForecastState, TransferQueuePhase};
 
+#[path = "mission_transfer_comparison.rs"]
+mod transfer_comparison;
+pub use transfer_comparison::{TransferComparisonJob, TransferComparisonReport};
+pub type TransferComparisonQueue = TransferForecastQueue<TransferComparisonJob>;
+
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{

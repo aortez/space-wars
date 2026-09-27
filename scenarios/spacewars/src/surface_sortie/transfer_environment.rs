@@ -36,6 +36,21 @@ pub struct TransferEnvironment {
 }
 
 impl SurfaceSortieState {
+    /// Existing solver contacts only, including positive separation. No rays,
+    /// overlap queries or material preparation. Removed debris is recorded by
+    /// `damage_observation` and must be checked separately by a forecast host.
+    pub fn transfer_solver_contact(&self, player: usize) -> Option<bool> {
+        let vehicle = self.pilots.get(player)?.vehicle.0;
+        let physics = &self.world.physics;
+        physics.world.motion(physics.ship_body(vehicle))?;
+        Some((0..3).any(|part| {
+            physics
+                .surface_vehicle_contacts(vehicle, part)
+                .next()
+                .is_some()
+        }))
+    }
+
     /// Bounded, read-only capture of known environmental dynamics. Does not
     /// prepare terrain, flush queries or advance a hidden copy of the world.
     pub fn transfer_environment(&self) -> Result<TransferEnvironment, &'static str> {
