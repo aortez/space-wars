@@ -60,7 +60,7 @@ pub use events::{
 };
 use layout::Layout;
 
-pub const CLOCK_ACTION_VERSION: u16 = 9;
+pub const CLOCK_ACTION_VERSION: u16 = 10;
 pub const CLOCK_ACTION_SET_READING: u32 = 1;
 pub const CLOCK_ACTION_TRIGGER_EVENT: u32 = 3;
 pub const CLOCK_ACTION_CONFIGURE: u32 = 4;
@@ -197,7 +197,7 @@ impl ClockAction {
             (CLOCK_ACTION_TOGGLE_PLAYER_DUCK, 3) if (1..=2).contains(&payload[2]) => {
                 Some(Self::TogglePlayerDuck(payload[2]))
             }
-            (CLOCK_ACTION_PLAYER_DUCK_INPUT, 14) => {
+            (CLOCK_ACTION_PLAYER_DUCK_INPUT, 16) => {
                 ClockDuckInput::decode(&payload[2..]).map(Self::PlayerDuckInput)
             }
             (CLOCK_ACTION_NEXT_EVENT, 2) => Some(Self::NextEvent),

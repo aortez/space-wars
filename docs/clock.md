@@ -755,7 +755,7 @@ if all are disabled, a brief “No events enabled” notice replaces no event.
 During any duck visit it cycles Falling, Color Cycle, Meltdown, Marquee, Digit Slide, Rain and Crow without
 replacing the duck. If all enabled events need the arena, a brief notice asks
 you to wait for the duck to leave (or take control and dismiss it). Another Crow
-admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 9; `NextEvent`
+admission waits for its existing visit to end. Preferences are unchanged. The Clock action protocol is version 10; `NextEvent`
 (kind 6) has no payload after the version prefix.
 Physical cabinet mappings are documented in [Picade controls](picade.md).
 
@@ -764,11 +764,15 @@ Physical cabinet mappings are documented in [Picade controls](picade.md).
 Press **D** on the keyboard, **North (Y)** on a gamepad, or the Picade's
 **bottom-right blue** button to start a visit or take over the automatic duck
 already on screen. Press it again to dismiss your duck.
-**Left/Right** or the joystick moves; **Space/Z** or **South/A or East/B**
-jumps. Picade's working **bottom-middle yellow** is Jump. Keyboard belongs to
+**Left/Right** or the joystick moves; **Shift** or **South (bottom face)** runs;
+**Space/Z** or **East (right face)** jumps/swims. Those face buttons are printed
+B (Run) and A (Jump) on the Nintendo-layout SN30 Pro, regardless of its USB name.
+Picade 2's **bottom-left pink** runs and **bottom-middle yellow** jumps/swims;
+use device remapping for a differently wired cabinet. **Down** on the keyboard,
+D-pad, or stick makes a shallow dive while floating. Keyboard belongs to
 P1; the gamepad that starts the visit owns it (P1 or P2). The other controller
 cannot move or dismiss that duck. Pause/Next Event remain shared host controls.
-Release movement/jump controls after starting or resuming before taking control.
+Release movement, Run, Jump and Down after starting or resuming before taking control.
 Touch still opens pause; this first slice does not add touch movement buttons.
 
 This is one player duck in the existing Clock, not another launcher scenario.
@@ -779,7 +783,10 @@ starting from idle opens a seeded course. With an automatic Duck already present
 the button takes control of that same visit; only developer water-lab previews are
 recovered/replaced. The player drives the **same dry movement actuator, gravity,
 jump impulse and circular body shape** used by Careful/Flowing AI. Those brains,
-movement tuning and automatic event duration are unchanged. Full stick/D-pad intent uses run speed; letting go brakes
+movement tuning and automatic event duration are unchanged. Full stick/D-pad
+intent retains the previous pace; holding Run raises the player's target speed
+to **1.5×** that pace with the same bounded acceleration. Jump height is
+unchanged, so a running jump covers more distance. Letting go brakes
 through the same acceleration limit, including airborne braking. Horizontal
 input is screen-relative even when the entrance/course is mirrored. A physical
 rear wall keeps the player in view. The opposite exit appears after entry closes;
@@ -806,7 +813,7 @@ exiting, exact body/contact continuity, normal bounded braking, controller-neutr
 gating, event composition and cleanup. Raster captures compare the takeover frame
 pixel-for-pixel on Picade, HyperPixel and portrait layouts.
 
-A fresh **grounded** jump press is required: no held-button auto-hop, opening
+A fresh **grounded** press is required for a land jump: no held-button auto-hop, opening
 jump buffer, landing buffer or mid-air extra jump. Inputs carry the visit ID and
 controller seat, so old/other-player actions cannot drive a new visit. There is
 no 35-second player timeout. The dry visit has at most **nine** bodies/colliders,
@@ -830,8 +837,21 @@ standalone Rain's responsive panels and passive rubber duck are not created.
 The player's low-density circle uses existing pool buoyancy/flow drag, in the
 same screen coordinates as water. Grounded/dry movement is unchanged. While
 floating, left/right supplies bounded paddling acceleration; neutral does not
-brake away the current. Jump still requires a fresh grounded press; there is no
-water jump, automatic hopping or swimming AI in this slice. Water can carry an
+brake away the current. Run boosts paddling acceleration by 1.5×. While at least
+20% immersed and not grounded, Jump gives a bounded upward swim stroke. Holding
+repeats at most once per 18 simulation ticks (0.3 seconds); releasing/mashing
+cannot reset that cooldown. Each stroke adds at most 12 body radii/second and
+never adds upward speed beyond 15 radii/second. Existing faster collision/flow
+motion is not clamped. A held stroke does not become a ground jump on landing.
+
+Down adds a small downward acceleration only while floating. With the existing
+0.45-density hull, its equilibrium moves from roughly 45% to 79% immersion,
+less than one radius deeper. Full submersion still has net upward buoyancy;
+this is a shallow bob, not unlimited diving. Releasing Down restores ordinary
+floating, and Jump takes priority over Down. Neither control adds wet movement
+on land/in dry air. Shallow water with solid footing retains fresh-press ground
+jumps. No bot strategy, pressure simulation, body, or per-tick allocation is added.
+Water can carry an
 unattended duck into a gap, producing the ordinary fall/exit lifecycle.
 
 Rain steps water once before the one player mechanics world applies its water
@@ -991,9 +1011,24 @@ Floor claims are scoped: face-only events claim no floor; the visit and Rain/Fal
 release only their own claim, for either course or responsive-panel layouts.
 Damage rules and planning around moving digit blocks remain future work.
 
-The version-6 scenario actions add `TogglePlayerDuck` (kind 7: one-based player
+The scenario actions include `TogglePlayerDuck` (kind 7: one-based player
 byte) and `PlayerDuckInput` (kind 8: player byte, little-endian u64 visit ID,
-little-endian i16 horizontal intent in -1000..=1000, and a 0/1 jump-held byte).
+little-endian i16 horizontal intent in -1000..=1000, and 0/1 Jump, Run and Dive
+bytes). Version 10 extends the player setpoint and rejects the old version-9
+payload instead of silently interpreting an incomplete command. Optional JSON
+diagnostics add `run_held`, `dive_held`, `swim_strokes`, and `swim_cooldown_ticks`;
+`spacewars-cli clock state` prints them alongside immersion and velocity.
+
+Deterministic movement fixtures use production physics for flat-ground speed
+and jump comparisons on Picade/HyperPixel/portrait layouts, a deep pool for
+stroke cadence and dive/recovery, shallow-water footing, and a low bank that
+requires swimming to get ashore. Run them with:
+
+```sh
+cargo test --locked -p scenario-clock movement_tests
+cargo test --locked -p engine-client --bin engine-client player_tests::movement
+```
+
 Use the existing bounded virtual-controller CLI for device checks:
 
 ```sh
@@ -1668,12 +1703,12 @@ non-null if those settings could not be persisted. Outside Marquee its diagnosti
 are null. The optional `digit_slide` object reports old/new digits, changed slots,
 eased progress in thousandths, and whether this is a manual preview; it is null
 after completion or cancellation. Use matching client/CLI builds: schema 18 and
-older requests are rejected. The internal Clock action payload is version 9;
+older requests are rejected. The internal Clock action payload is version 10;
 event ordinals 0–7 are unchanged and Explosion is 8. Configure contains a
 little-endian u16 switch mask (bits 0–8, reserved bits rejected),
 validated recipe and rain-amount bytes, a `show_date` byte (0/1),
 and 1–32 message bytes. Reading actions contain either three time bytes or those
-same bytes followed by a little-endian u16 year and u8 month/day. Version 1–8
+same bytes followed by a little-endian u16 year and u8 month/day. Version 1–9
 actions are rejected. Observation version 2 appends `show_date`, year/month/day
 to the existing time/format fields; an absent date is four zero bytes.
 

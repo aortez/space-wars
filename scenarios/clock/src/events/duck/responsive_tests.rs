@@ -35,7 +35,7 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
             "neutral rides the closing panel"
         );
         assert!(duck.responsive_floor().unwrap().opening < before);
-        duck.set_player_input(0, true);
+        duck.set_player_input(0, true, false, false);
         duck.step();
         assert_eq!(duck.jumps, 1);
         assert!(
@@ -53,9 +53,9 @@ fn moving_panel_grounding_and_single_edge_jump_work_in_both_directions() {
         }
         assert!(duck.grounded());
         assert_eq!(duck.jumps, 1, "held button cannot auto-hop");
-        duck.set_player_input(0, false);
+        duck.set_player_input(0, false, false, false);
         duck.step();
-        duck.set_player_input(0, true);
+        duck.set_player_input(0, true, false, false);
         duck.step();
         assert_eq!(duck.jumps, 2);
     }

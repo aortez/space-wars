@@ -112,7 +112,7 @@ fn automatic_duck_paddles_without_learning_from_water_then_resumes_dry_jumps() {
 }
 
 #[test]
-fn player_floats_paddles_in_screen_coordinates_and_cannot_jump_from_water() {
+fn player_floats_and_paddles_in_screen_coordinates_without_input_creating_water() {
     for direction in [-1.0, 1.0] {
         let (mut duck, water) = floating_player(direction);
         let current = duck.player_diagnostics().unwrap();
@@ -124,17 +124,17 @@ fn player_floats_paddles_in_screen_coordinates_and_cannot_jump_from_water() {
         assert!(current.velocity_milli.unwrap()[1].abs() < 100);
         let start = current.duck.position_milli.unwrap();
         let ledger = water.stats();
-        duck.set_player_input(1000, true);
+        duck.set_player_input(1000, false, false, false);
         for _ in 0..45 {
             duck.step_with_water(Some(&water));
         }
         let current = duck.player_diagnostics().unwrap();
-        assert_eq!(current.duck.jumps, 0, "no air/swim jump or auto hop");
+        assert_eq!(current.duck.jumps, 0, "paddling does not jump");
         assert!(
             current.duck.position_milli.unwrap()[0] > start[0] + 2000,
             "{current:?}"
         );
-        duck.set_player_input(-1000, false);
+        duck.set_player_input(-1000, false, false, false);
         for _ in 0..90 {
             duck.step_with_water(Some(&water));
         }
@@ -207,7 +207,7 @@ fn leaving_water_restores_dry_controls_and_does_not_leave_a_stale_lift_force() {
     assert_eq!(current.submerged_milli, 0);
     assert!(current.duck.grounded);
     assert!(current.duck.position_milli.unwrap()[1] < start - 10000);
-    duck.set_player_input(0, true);
+    duck.set_player_input(0, true, false, false);
     duck.step();
     assert_eq!(duck.player_diagnostics().unwrap().duck.jumps, 1);
     assert!(water.stats().pooled > 0.0);

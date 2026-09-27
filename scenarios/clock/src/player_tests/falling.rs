@@ -101,6 +101,8 @@ fn falling_shares_one_world_through_dismiss_rejoin_reformation_and_completion() 
                 player: 1,
                 move_milli: 1000,
                 jump: true,
+                run: true,
+                dive: true,
             });
             tick(&mut state, &[stale]);
             ticks(&mut state, 40);

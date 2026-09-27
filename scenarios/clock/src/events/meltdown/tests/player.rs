@@ -434,6 +434,8 @@ fn shared_meltdown_steps_once_and_preserves_visit_through_final_tick() {
                         player,
                         move_milli: if elapsed % 60 < 10 { 400 } else { 0 },
                         jump: elapsed == 120,
+                        run: false,
+                        dive: false,
                     })],
                     Duration::from_nanos(16_666_667),
                 );

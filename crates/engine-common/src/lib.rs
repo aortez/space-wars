@@ -934,6 +934,14 @@ pub struct ClockPlayerDuckState {
     pub phase_tick: u64,
     pub move_milli: i16,
     pub jump_held: bool,
+    #[serde(default)]
+    pub run_held: bool,
+    #[serde(default)]
+    pub dive_held: bool,
+    #[serde(default)]
+    pub swim_strokes: u32,
+    #[serde(default)]
+    pub swim_cooldown_ticks: u32,
     pub facing_right: bool,
     /// Some(opening) for the moving Rain panels, None for a fixed course.
     #[serde(default)]

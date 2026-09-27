@@ -352,12 +352,14 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
         }
         if let Some(player) = &state.player_duck {
             println!(
-                "Player duck: P{} session={} phase={} move={} jump-held={} grounded={} jumps={} position={:?} outcome={:?}; automatic-events-suspended={}",
+                "Player duck: P{} session={} phase={} move={} jump-held={} run-held={} dive-held={} grounded={} jumps={} position={:?} outcome={:?}; automatic-events-suspended={}",
                 player.player,
                 player.session_id,
                 player.phase,
                 player.move_milli,
                 player.jump_held,
+                player.run_held,
+                player.dive_held,
                 player.duck.grounded,
                 player.duck.jumps,
                 world_vector(player.duck.position_milli),
@@ -365,9 +367,11 @@ fn print_state(state: &ClockState, json: bool) -> Result<(), CliError> {
                 state.automatic_events_suspended,
             );
             println!(
-                "Player water: {:.1}% submerged, velocity={:?}",
+                "Player water: {:.1}% submerged, velocity={:?}, strokes={}, stroke cooldown={} ticks",
                 player.submerged_milli as f32 / 10.0,
-                world_vector(player.velocity_milli)
+                world_vector(player.velocity_milli),
+                player.swim_strokes,
+                player.swim_cooldown_ticks,
             );
             if let Some(opening) = player.floor_open_milli {
                 println!(
