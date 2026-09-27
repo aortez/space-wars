@@ -17,6 +17,7 @@ pub struct EvaluationRun {
     pub alternative_survey: bool,
     pub last_charged: Work,
     file: BufWriter<File>,
+    work: Option<BufWriter<File>>,
     written: [Option<u64>; 2],
     budget: u32,
     construction_ms: Vec<f64>,
@@ -45,6 +46,9 @@ impl EvaluationRun {
             alternative_survey,
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
+            work: (super::arg("--schedule-transfer-forecast", "false") == "true").then(|| {
+                BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
+            }),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
                 .parse()
@@ -71,6 +75,15 @@ impl EvaluationRun {
         assert!(charged.graph <= allowed.graph && charged.physics_queries == 0);
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
+        if let Some(file) = &mut self.work {
+            serde_json::to_writer(
+                &mut *file,
+                &json!({"tick":tick,
+                "remaining_before_evaluation":remaining,"allowance":allowed,"charged":charged}),
+            )
+            .unwrap();
+            writeln!(file).unwrap();
+        }
         for seat in 0..2 {
             if let Some(report) = self.evaluator.latest(PlayerId::from_index(seat).unwrap())
                 && self.written[seat] != Some(report.source_tick)
@@ -84,6 +97,9 @@ impl EvaluationRun {
     }
     pub fn report(&mut self) -> Value {
         self.file.flush().unwrap();
+        if let Some(file) = &mut self.work {
+            file.flush().unwrap();
+        }
         let models = ["--p1-policy", "--p2-policy"]
             .map(|flag| model_for_policy(&super::arg(flag, "material_mission_v9")));
         let mut report = json!({

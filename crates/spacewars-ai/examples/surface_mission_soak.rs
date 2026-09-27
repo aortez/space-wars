@@ -23,6 +23,8 @@ mod successor_continuation;
 mod successor_probe;
 #[path = "support/transfer_probe.rs"]
 mod transfer_probe;
+#[path = "support/transfer_schedule.rs"]
+mod transfer_schedule;
 #[path = "support/transfer_sources.rs"]
 mod transfer_sources;
 use engine_common::{
@@ -694,13 +696,19 @@ fn main() {
                     .map_or(0, |probe| probe.last_charged),
             );
             planning_ms += evaluator.advance(state.tick(), remaining);
+            remaining.graph -= evaluator.last_charged.graph;
+            remaining.physics_queries -= evaluator.last_charged.physics_queries;
             if let Some(flags) = &mut flag_survey {
-                remaining.graph -= evaluator.last_charged.graph;
                 planning_ms += flags.advance(
                     &state,
                     remaining,
                     live_planning.as_ref().unwrap().physical_actors(),
                 );
+                remaining.graph -= flags.last_charged.graph;
+                remaining.physics_queries -= flags.last_charged.physics_queries;
+            }
+            if let Some(probe) = &mut transfer_probe {
+                planning_ms += probe.advance(state.tick(), remaining);
             }
         }
         let clock = Instant::now();
