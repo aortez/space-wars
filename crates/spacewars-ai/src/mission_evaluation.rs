@@ -21,12 +21,15 @@ mod flag_survey;
 mod flag_value_shadow;
 mod model;
 mod selection;
+mod source_local;
 mod survey;
 mod transfer;
 mod value;
 pub use flag_value_shadow::{FlagShadowAdmission, FlagValueShadow, FlagValueShadowReport};
 use model::{LocalEvidence, PlanetKey};
 pub(crate) use selection::CaptureSelection;
+pub(crate) use source_local::LocalReferenceContext;
+pub use source_local::{LocalCostReference, LocalEvidenceSource};
 pub use transfer::{TransferDiagnostic, TransferReference, TransferRejection, TransferSource};
 pub use value::{CaptureValue, ValueComparison, ValueDecision};
 #[cfg(test)]
@@ -249,6 +252,7 @@ struct Dependencies {
 }
 #[derive(Clone, Default)]
 struct ActorState {
+    local_choice: Option<source_local::LocalChoice>,
     survey: Option<survey::AlternativeSurvey>,
     flag_survey: Option<flag_survey::RequestState>,
     last_tick: Option<u64>,
@@ -350,6 +354,12 @@ impl MissionEvaluator {
             *state = ActorState::default();
         }
         state.last_tick = Some(p.tick);
+        state.local_choice = source_local::LocalChoice::observe(
+            state.local_choice.as_ref(),
+            o,
+            mission,
+            selection_tick(mission),
+        );
         let mut dependencies = Dependencies {
             policy: mission.policy,
             transfer: value::enabled(mission.policy).then(|| TransferSource::from_observation(o)),

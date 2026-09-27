@@ -34,6 +34,7 @@ pub(super) fn known(planet: &PilotPlanetObservation, tick: u64, seconds: f32) ->
         choice: None,
         route_source_tick: None,
         route_validated_tick: None,
+        route_objective: None,
         costs: Some(PhaseCosts {
             landing: seconds,
             exit: 0.0,
