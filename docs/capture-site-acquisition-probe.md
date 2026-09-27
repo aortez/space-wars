@@ -179,3 +179,9 @@ explicitly. That can establish what a proposed landing plan must contain before
 we test its remaining physical capture loop and admit whole-trip costs into
 mission selection. Current-state refresh and explicit enemy-flag evidence
 admission remain separate requirements.
+
+The [native landing-choice comparison](capture-landing-choice-comparison.md)
+now resolves this slice's eight mismatches: all retain a safe reference direction,
+but the native approach score favors the chosen site. Its shared ranker and raw
+audits leave playing controls unchanged. Physical follow-through after choice
+remains the next measurement boundary.
