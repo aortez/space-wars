@@ -128,7 +128,8 @@ Across all candidates at allowance 32, 23 finish a handoff and 30 remain pending
 when the source is invalidated. No partial job publishes a ranking.
 
 Both budgets retain the same cancellation causes: 18 source expiries at age 121,
-two ends of unassisted flight, and one terrain/ownership revision change. At 64,
+two ends of unassisted flight, and one material revision change (planet 0, revision
+14 to 15; ownership is unchanged). At 64,
 all jobs publish before their later cancellation, including the job that completes
 at age seven before the changed terrain at age 13. These historical results do
 not remain fresh after cancellation. Completion counts include explicit unknowns;
