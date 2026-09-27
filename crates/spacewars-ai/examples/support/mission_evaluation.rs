@@ -46,9 +46,11 @@ impl EvaluationRun {
             alternative_survey,
             last_charged: Work::default(),
             file: BufWriter::new(File::create(out.join("mission-evaluations.jsonl")).unwrap()),
-            work: (super::arg("--schedule-transfer-forecast", "false") == "true").then(|| {
-                BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
-            }),
+            work: (super::arg("--schedule-transfer-forecast", "false") == "true"
+                || super::arg("--compare-transfer-sources", "none") != "none")
+                .then(|| {
+                    BufWriter::new(File::create(out.join("mission-evaluation-work.jsonl")).unwrap())
+                }),
             written: [None; 2],
             budget: super::arg("--mission-evaluation-budget", "4")
                 .parse()

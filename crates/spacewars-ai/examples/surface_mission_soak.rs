@@ -21,6 +21,8 @@ mod planning_probe;
 mod successor_continuation;
 #[path = "support/successor_probe.rs"]
 mod successor_probe;
+#[path = "support/transfer_comparison.rs"]
+mod transfer_comparison;
 #[path = "support/transfer_probe.rs"]
 mod transfer_probe;
 #[path = "support/transfer_schedule.rs"]
@@ -168,6 +170,7 @@ fn main() {
     let mut flag_survey = flag_survey::FlagSurveyRun::from_args(&out);
     let mut transfer_probe = transfer_probe::TransferProbeRun::from_args(&out);
     let mut transfer_sources = transfer_sources::TransferSources::from_args(&out);
+    let mut transfer_comparison = transfer_comparison::TransferComparisonRun::from_args(&out);
     assert!(live_planning.is_none() || (!compare_landing_surveys && !verify_on_foot_surveys));
     let mut landing_probe = compare_landing_surveys
         .then(|| landing_cadence_probe::LandingCadenceProbe::new(&out.join("landing-cadence.csv")));
@@ -462,6 +465,9 @@ fn main() {
                 if let Some(sources) = &mut transfer_sources {
                     sources.observe(i, &pilots[i], &o);
                 }
+                let comparison_before = transfer_comparison
+                    .as_ref()
+                    .and_then(|c| c.before_intent(&pilots[i], i, state.tick()));
                 let clock = Instant::now();
                 let nominated = transfer_probe.as_mut().and_then(|probe| {
                     probe.intent(
@@ -482,6 +488,15 @@ fn main() {
                 };
                 policies.push(clock.elapsed().as_secs_f64() * 1000.0);
                 policy_times[i] = *policies.last().unwrap();
+                if let Some(comparison) = &mut transfer_comparison {
+                    comparison.observe(
+                        comparison_before.as_ref(),
+                        &pilots[i],
+                        &state,
+                        &o,
+                        &mission_evaluation.as_ref().unwrap().evaluator,
+                    );
+                }
                 if let Some(probe) = &mut successor_probe {
                     successor_construction_ms += probe.observe(i, &pilots[i], &o);
                 }
@@ -710,6 +725,9 @@ fn main() {
             if let Some(probe) = &mut transfer_probe {
                 planning_ms += probe.advance(state.tick(), remaining);
             }
+            if let Some(comparison) = &mut transfer_comparison {
+                planning_ms += comparison.advance(state.tick(), remaining);
+            }
         }
         let clock = Instant::now();
         SurfaceSortieScenario::step(&mut state, &actions, Duration::from_nanos(16_666_667));
@@ -862,6 +880,9 @@ fn main() {
     }
     if let Some(sources) = &mut transfer_sources {
         report["transfer_sources"] = sources.report();
+    }
+    if let Some(comparison) = &mut transfer_comparison {
+        report["transfer_comparison"] = comparison.finish(state.tick());
     }
     if acquisition_seats.contains(&true) {
         report["bounded_acquisition"] = json!({

@@ -161,7 +161,7 @@ impl MaterialMissionPilot {
     }
 }
 
-fn uncommitted(t: &CaptureTelemetry) -> bool {
+pub(super) fn uncommitted(t: &CaptureTelemetry) -> bool {
     t.landing.landed_tick.is_none()
         && t.failure.is_none()
         && matches!(

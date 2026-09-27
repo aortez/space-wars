@@ -3,7 +3,7 @@
 use super::*;
 use crate::mission_evaluation::MAX_RESULT_AGE;
 use engine_core::planning::{
-    JobLimits, JobPhase, JobPoll, PlanningQueue, PlanningReport, RequestToken, Work,
+    JobLimits, JobPhase, JobPoll, PlanningJob, PlanningQueue, PlanningReport, RequestToken, Work,
 };
 use scenario_spacewars::surface_sortie::{
     LandingPhase, SpacelingId, VehicleId, mission::MissionBoundary,
@@ -24,6 +24,7 @@ pub struct TransferForecastState {
     pub token: RequestToken,
     pub actor: PlayerId,
     pub source_tick: u64,
+    /// Real controller destination; alternatives never replace this anchor.
     pub destination: usize,
     pub validated_tick: Option<u64>,
     pub completed_tick: Option<u64>,
@@ -33,8 +34,15 @@ pub struct TransferForecastState {
     pub charged_graph: u64,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum SourceKind {
+    Nominated,
+    Comparison,
+}
+
 #[derive(Clone)]
 struct Source {
+    kind: SourceKind,
     actor: PlayerId,
     vehicle: VehicleId,
     spaceling: SpacelingId,
@@ -44,6 +52,8 @@ struct Source {
     bounded_acquisition: bool,
     disengagement: Option<(bool, bool, bool)>,
     selected_tick: u64,
+    destination_switched: bool,
+    capture_site: Option<Option<LandingSiteId>>,
     health: f32,
     planets: Vec<PilotPlanetObservation>,
     environment: TransferEnvironment,
@@ -64,9 +74,11 @@ impl Source {
         bot: &MaterialMissionPilot,
         o: &MissionObservationV1,
         environment: TransferEnvironment,
+        kind: SourceKind,
     ) -> Self {
         let p = &o.local.combat.recovery.flight.pilot;
         Self {
+            kind,
             actor: p.owner,
             vehicle: p.vehicle,
             spaceling: p.spaceling,
@@ -76,6 +88,8 @@ impl Source {
             bounded_acquisition: bot.bounded_acquisition,
             disengagement: Self::disengagement_config(bot),
             selected_tick: bot.selected_tick,
+            destination_switched: bot.destination_switched,
+            capture_site: bot.capture.as_ref().map(|c| c.telemetry().site),
             health: p.ship_health,
             planets: o.planets.clone(),
             environment,
@@ -183,14 +197,19 @@ impl Source {
         if bot.previous_tick != Some(p.tick)
             || bot.telemetry.target != Some(state.destination)
             || bot.selected_tick != self.selected_tick
-            || bot.capture.is_some()
+            || bot.destination_switched != self.destination_switched
+            || bot.capture.as_ref().map(|c| c.telemetry().site) != self.capture_site
+            || bot.capture.as_ref().is_some_and(|c| {
+                self.kind == SourceKind::Nominated || !destination::uncommitted(c.telemetry())
+            })
             || bot.recovery.is_some()
             || bot.telemetry.pursuit.is_some()
             || bot.disengaging()
-            || !matches!(
+            || !(matches!(
                 bot.telemetry.goal,
                 MissionGoal::Launch | MissionGoal::Transfer | MissionGoal::AvoidSun
-            )
+            ) || (self.kind == SourceKind::Comparison
+                && bot.telemetry.goal == MissionGoal::Capture))
         {
             return Err("transfer changed");
         }
@@ -247,8 +266,8 @@ struct Slot {
 /// Validation is bounded by eight planets and one ephemeris step, separately
 /// from charged prediction work. Missing ticks cancel; there is no catch-up.
 #[derive(Clone)]
-pub struct TransferForecastQueue {
-    queue: PlanningQueue<(), TransferForecastJob>,
+pub struct TransferForecastQueue<J: PlanningJob = TransferForecastJob> {
+    queue: PlanningQueue<(), J>,
     actors: BTreeMap<u64, Slot>,
     capacity: usize,
     last_advance: Option<u64>,
@@ -259,6 +278,44 @@ pub struct TransferForecastQueue {
 }
 
 impl TransferForecastQueue {
+    pub fn submit(
+        &mut self,
+        bot: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+    ) -> Result<RequestToken, &'static str> {
+        let job =
+            bot.forecast_nominated_transfer(o, environment.clone(), transfer_forecast::MAX_TICKS)?;
+        self.submit_job(bot, o, environment, contact, job, SourceKind::Nominated)
+    }
+}
+
+impl TransferForecastQueue<TransferComparisonJob> {
+    pub fn submit_comparison(
+        &mut self,
+        before: &MaterialMissionPilot,
+        actual: &MaterialMissionPilot,
+        o: &MissionObservationV1,
+        evaluator: &crate::mission_evaluation::MissionEvaluator,
+        environment: TransferEnvironment,
+        contact: Option<bool>,
+    ) -> Result<RequestToken, &'static str> {
+        let job = TransferComparisonJob::new(before, actual, o, evaluator, environment.clone())?;
+        self.submit_job(actual, o, environment, contact, job, SourceKind::Comparison)
+    }
+
+    /// Diagnostic progress only, with the same current-observation barrier as
+    /// publication. A partial snapshot contains no completed comparison.
+    pub fn snapshot(&mut self, token: RequestToken, tick: u64) -> Option<TransferComparisonReport> {
+        if matches!(self.poll(token, tick), JobPoll::Stale) {
+            return None;
+        }
+        self.queue.job(token).map(TransferComparisonJob::snapshot)
+    }
+}
+
+impl<J: PlanningJob> TransferForecastQueue<J> {
     pub fn new(capacity: usize) -> Self {
         Self {
             queue: PlanningQueue::new(capacity),
@@ -286,12 +343,14 @@ impl TransferForecastQueue {
         self.actors.get(&(actor.index() as u64)).map(|s| &s.state)
     }
 
-    pub fn submit(
+    fn submit_job(
         &mut self,
         bot: &MaterialMissionPilot,
         o: &MissionObservationV1,
         environment: TransferEnvironment,
         contact: Option<bool>,
+        job: J,
+        kind: SourceKind,
     ) -> Result<RequestToken, &'static str> {
         let p = &o.local.combat.recovery.flight.pilot;
         let actor = p.owner.index() as u64;
@@ -308,8 +367,6 @@ impl TransferForecastQueue {
         {
             return Err("source already submitted");
         }
-        let job =
-            bot.forecast_nominated_transfer(o, environment.clone(), transfer_forecast::MAX_TICKS)?;
         let placeholder = TransferForecastState {
             token: RequestToken {
                 actor,
@@ -317,7 +374,7 @@ impl TransferForecastQueue {
             },
             actor: p.owner,
             source_tick: p.tick,
-            destination: job.report().destination,
+            destination: bot.telemetry.target.ok_or("no current destination")?,
             validated_tick: Some(p.tick),
             completed_tick: None,
             cancelled_tick: None,
@@ -325,7 +382,7 @@ impl TransferForecastQueue {
             reason: None,
             charged_graph: 0,
         };
-        let mut source = Source::read(bot, o, environment.clone());
+        let mut source = Source::read(bot, o, environment.clone(), kind);
         source.validate(&placeholder, bot, o, &environment, contact)?;
         if let Some(old) = self.state(p.owner) {
             self.cancel(old.token, p.tick, "replaced");
@@ -390,7 +447,7 @@ impl TransferForecastQueue {
 
     /// The tick must be the current real observation tick, never the source tick
     /// retained by a caller. Historical report duration is not time remaining.
-    pub fn poll(&mut self, token: RequestToken, tick: u64) -> JobPoll<'_, TransferForecastReport> {
+    pub fn poll(&mut self, token: RequestToken, tick: u64) -> JobPoll<'_, J::Output> {
         if self
             .actors
             .get(&token.actor)
