@@ -72,3 +72,14 @@ source nomination and `--objective-graph-budget 4`; use
 `--schedule-transfer-forecast true --transfer-forecast-allowance 4` (or 32).
 Immediate draining and queued forecasting are mutually exclusive. No new UI
 setting or device deployment is part of this slice.
+
+## Audit correction before the completed matrix
+
+Runtime and plan were frozen at `036a36e`. The first physical run preserved full
+control/output and upstream-work parity, then stopped at an audit assertion:
+the script incorrectly equated the flag survey's allowance with the entire
+residual. That planner already caps its graph allowance at two operations.
+Correct the audit to enforce that cap and cover it in the ledger test. Runtime,
+forecast equations, budgets, lifetime and source list stay frozen. Preserve that
+initial raw run under `target/capture-flag-survey/transfer-scheduling-v1-initial-audit`
+and rerun the same fixed matrix; this is an audit repair, not source resampling.

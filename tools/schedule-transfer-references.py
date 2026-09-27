@@ -58,9 +58,9 @@ def audit_upstream(root):
         assert 0 <= eg <= e['allowance']['graph'] and e['charged']['physics_queries'] == 0
         f, s = flags[tick], shadows[tick]
         assert f['remaining_after_evaluation'] == dict(graph=4-lg-eg, physics_queries=384-lq)
-        assert f['allocation']['allowance'] == f['remaining_after_evaluation']
+        assert f['allocation']['allowance'] == dict(graph=min(2, 4-lg-eg), physics_queries=384-lq)
         fg, fq = (f['allocation']['charged'][k] for k in ['graph', 'physics_queries'])
-        assert 0 <= fg <= 4-lg-eg and 0 <= fq <= 384-lq
+        assert 0 <= fg <= min(2, 4-lg-eg) and 0 <= fq <= 384-lq
         assert (fg, fq) == tuple(sum(j['charged'][k] for j in f['allocation']['jobs']) for k in ['graph', 'physics_queries'])
         assert s['remaining_after_flag_survey'] == dict(graph=4-lg-eg-fg, physics_queries=0)
         sg = s['charged']['graph']
