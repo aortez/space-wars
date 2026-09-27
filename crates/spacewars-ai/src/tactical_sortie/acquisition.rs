@@ -3,7 +3,6 @@ use super::*;
 use scenario_spacewars::surface_sortie::{
     live_planning::ObjectiveWorkState, pilot::LandingSiteQuery,
 };
-use std::cell::Cell;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 pub struct CandidateCheckCounts {
@@ -74,13 +73,4 @@ impl AcquisitionTelemetry {
             checks: CandidateCheckCounts::default(),
         }
     }
-}
-
-pub(super) fn count(
-    counts: &Cell<CandidateCheckCounts>,
-    change: impl FnOnce(&mut CandidateCheckCounts),
-) {
-    let mut value = counts.get();
-    change(&mut value);
-    counts.set(value);
 }
