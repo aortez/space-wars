@@ -90,3 +90,98 @@ the source-local summary is
 The archived acquisition executable is retained as
 `target/capture-flag-survey/surface-mission-soak-334a498`, SHA-256
 `e99cc0a530f101d39b22ce8abbae28cd5b93bb0fda6a065a2487a12758bb3827`.
+
+## Results: 26 September 2026
+
+Runtime, runner, tolerances and plan were frozen at `2796bb2`, with a clean
+worktree. All **33 runs pass**: 20 acquisition comparisons and 13 ordinary
+regressions. There were no runtime/plan adjustments after an outcome. The
+executable SHA-256 is
+`c52acdf36943c6a36c16615efa2992783a12171984d70d452e4750bd53515000`.
+The raw main summary is
+`target/capture-flag-survey/landing-choice-v1/summary.json`, SHA-256
+`3af41999d1a280bef54838ace5be018cd505ef5607adf414428c548e06a73e60`.
+The ordinary summary is in its `ordinary/` subdirectory, SHA-256
+`3d8eefb818859405daa23ab31daccb87c266c4bebe761cd0629ab6de514d6a9b`.
+[The tracked record](data/capture-landing-choice-v1.json) retains the full plan,
+audited comparisons, selected/reference assessments and raw hashes; full
+per-direction ledgers remain in the hashed raw reports.
+
+**All eight mismatches are higher approach scores, not rejection of the entire
+historical site.** Every historical reference has an eligible direction. The
+other 12 choices match the historical site. None of the 20 native choices is
+exposed to a nearby opponent, so cover and ground-route contributions are zero.
+In this corpus, the winning score is the shorter safe approach arc from the
+actual arrival position. These are controller score units, not duration estimates.
+
+| Differing choices | Cases | Historical → selected bearing | Historical score | Selected score |
+| --- | ---: | --- | ---: | ---: |
+| Historical world 1 sources | 4 | 31 → 33 | 16.69–18.25 | 1.25–2.81 |
+| Fresh world 1, seat 0, both pressure settings | 2 | 33 → 17 | 265.66 | 4.17 |
+| Holdout world 1, seat 0, both pressure settings | 2 | 45 → 46 | 12.90 | 0.38 |
+
+Fresh-world-1's reference bearing 33 also has an unsafe **opposite** direction:
+its forecast approach clearance is −50.24. Its preferred direction is safe and
+still loses on score. Describing that reference site as wholly unsafe would be
+incorrect. The four historical and two holdout mismatches have both reference
+directions eligible. Repeated pressure settings and source snapshots remain
+correlated, rather than eight independent worlds.
+
+Across the full local surveys, the diagnostic emits **2,502 direction assessments**:
+1,914 eligible and 588 rejected by solar checks. Independent raw-geometry
+reconstruction agrees within 0.000123 world units, comfortably inside the frozen
+0.01 tolerance; no clearance sign is independently unresolved. It explicitly
+retains 351 departure-side near ties, including exact ties, within the 0.02
+two-corridor tolerance. Those are direction-preference ambiguities, not uncertain
+safety signs. Each selected full solar plan also matches native telemetry exactly.
+No comparison returns unknown in these 20 trials; unknown, absent, rejected,
+stale and constrained cases have focused tests.
+
+The new 20 trajectories preserve all **48,940 controller/observation rows**
+(398,322,559 decompressed bytes), complete transfer/acquisition reports and traces,
+physical outcomes, observer output and upstream allocations. The 13 ordinary
+regressions preserve another **49,440 rows** and all previous source-local and
+forecast results. Sensor profile actor/tick, counters and stage calls also match
+for all 98,380 rows. There are 376 hashed raw files across the 33 runs. They execute
+49,170 physical ticks, **13.66 simulated minutes including repeated prefixes**;
+each acquisition continuation still ends at its first choice one tick after
+arrival. This does not measure the remaining physical landing or capture loop.
+
+The optional comparison alone takes 0.128–0.168 ms per case on this desktop
+(median 0.148 ms), with zero extra queries. This is a host diagnostic outside live
+planner fuel; these timings do not establish a device or live scheduling budget.
+
+Validation: 206 AI tests (10 new selection/diagnostic tests), seven example tests,
+412 Python tests (11 new audit/mutation tests), formatting and strict AI Clippy
+pass. Independent pre-run review strengthened non-winning departure-side checks,
+required-site context validation and sensor-profile parity. The playing policy,
+destination selection, acquisition deadline and live cost admission remain
+unchanged. Nothing was deployed.
+
+The independent post-run audit found no remaining issues. It verifies all 376
+new and 376 reference file hashes, all 98,380 trace rows (789,840,239 decompressed
+bytes), complete reports outside wall times and the added comparison, sensor
+calls/counters and upstream work. Its separate geometry reconstruction reproduces
+all 20 exact winners and approach scores. Original source/evidence ages remain
+11–1,765 ticks at choice; ordinary comparison work remains 56,085 graph operations
+for the same 21 completed jobs. The tracked projection and the quantities above
+also reconcile. The audit is embedded in the tracked data record, with raw file
+`target/capture-flag-survey/landing-choice-post-audit.json`, SHA-256
+`43db6fc3c16f7a3a949380be6d048b37cb0c96e56f28254c03dbfe5c638298a5`.
+Its sibling `.py` script has SHA-256
+`70d1f6842feb1cdffe9d074a476cdebfaa6d841341e03edd794ebdbb33e821ef`.
+
+## Next boundary
+
+The mismatch has a concrete explanation: the historical two-bearing evidence
+does not specify the approach the controller will choose from its arrival pose.
+It should remain a conditional site hypothesis. It should not be forced into
+execution or relabeled as the chosen site's landing cost.
+
+Next, bind a local phase reference to the **actual chosen site and direction**,
+with current material/claim identity and the native approach context, then follow
+ordinary landing → exit → claim → board → departure. Preserve replans,
+interruptions and censors instead of treating choice as completed travel. This
+will test whether the remaining phase references describe the executed capture
+loop. Source-time prediction of that arrival choice, enemy-flag evidence admission,
+current-state refresh and whole-mission value remain separate unresolved steps.
