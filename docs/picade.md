@@ -94,7 +94,8 @@ The existing gamepad seat assignment and menu-to-game neutral/release gate
 apply without a userspace input translator. Scenario-specific mappings remain
 those shown by the application's Controls menu. In Clock, HAT Button 3 / West starts
 the next enabled event. Button 4 / North starts or dismisses a player duck;
-the joystick moves it and Button 2 / East or Button 1 / South jumps. Physical
+the joystick moves it, Button 2 / East jumps/swims, and Button 1 / South runs.
+Hold joystick Down for a shallow dive in water. Physical
 positions differ between cabinets; see the verified layouts below. Use Escape
 or Start to pause, then choose Clock
 Controls or Launcher. Enter confirms menu selections;
@@ -125,7 +126,7 @@ Recorded on 2026-09-19; bottom-left and bottom-middle rechecked on 2026-09-26.
 | Top left | Yellow | Button 6 | 311 / BTN_TR | Right shoulder |
 | Top middle | Pink | Button 5 | 310 / BTN_TL | Left shoulder |
 | Top right | Blue | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
-| Bottom left | Pink | Button 1 | 304 / BTN_SOUTH | South / A / Clock jump |
+| Bottom left | Pink | Button 1 | 304 / BTN_SOUTH | South / A / Clock Run |
 | Bottom middle | Yellow | Button 2 | 305 / BTN_EAST | East / B / Clock jump |
 | Bottom right | Blue | Button 4 | 307 / BTN_NORTH | North / Clock player duck |
 | Left side utility | Black | Escape | 1 / KEY_ESC | Pause / menu back |
@@ -155,24 +156,29 @@ occupy different positions.
 | Top right | Blue | Button 4 | 307 / BTN_NORTH | North / Clock player duck |
 | Bottom left | Yellow | Button 3 | 308 / BTN_WEST | West / Clock Next Event |
 | Bottom middle | Pink | Button 2 | 305 / BTN_EAST | East / B / Clock jump |
-| Bottom right | Blue | Button 1 | 304 / BTN_SOUTH | South / A / Clock jump |
+| Bottom right | Blue | Button 1 | 304 / BTN_SOUTH | South / A / Clock Run |
 
 Utility-button positions were not verified in this cabinet's capture. Both
 cabinets had the same Picade overlay, kernel version, and active button GPIO/code
 bindings on 2026-09-26; the different front-panel layouts do not require different
-logical button mappings. South/A registered on both. Clock still maps South/A
-and East/B to Jump; a separate Run binding is proposed in
-[#124](https://github.com/aortez/space-wars/issues/124), not implemented here.
+logical button mappings. South/A registered on both. Clock now uses South for
+Run and East for Jump/swim; use the remapping UI to choose consistent physical
+positions between cabinets. These A/B names describe host controls; on the
+Nintendo-layout SN30 Pro, South is printed B and East is printed A.
 The current in-app Picade position/color hints describe `sw-picade-2`; use this
 cabinet's table instead on `sw-picade`.
 
 #### Clock behavior shared by both cabinets
 
 Use the logical inputs in the tables: North starts/dismisses a player duck,
-the joystick moves it, and East/B or South/A jumps from solid ground. If the
+the joystick moves it, East jumps/swims, and South runs/paddles faster. On the
+default Picade 2 layout, hold bottom-left pink to Run and tap bottom-middle
+yellow to Jump. In water, holding Jump repeats strokes and holding Down dives
+a little deeper; releasing Down restores floating. Jump takes priority over
+Down. Ground jumps still need a fresh press. If the
 automatic obstacle-course duck is already on screen, North takes control of it
 in place, even mid-jump: no new course, teleport or velocity reset. Release the
-joystick/jump button before steering; press North again to dismiss, not return
+joystick/Run/Jump controls before steering; press North again to dismiss, not return
 to AI. Only the controller that joined the duck supplies its movement and jump.
 West cycles compatible visual events, Rain, Falling and Meltdown without
 ending the visit. This Clock-only binding does not change menus, NES, or other

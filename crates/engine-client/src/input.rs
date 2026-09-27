@@ -272,6 +272,8 @@ pub(crate) enum GameKey {
     NesA,
     NesSelect,
     NesStart,
+    ClockRunLeft,
+    ClockRunRight,
     TerrainDrill,
     TerrainTool,
     TerrainView,
@@ -414,7 +416,17 @@ impl ClientInput {
             self.clock_duck_ready = false;
         }
         let (session_id, player) = session?;
-        let (mut axis, mut jump, alt_jump) = self.spaceling_gamepad_input(usize::from(player - 1));
+        let (mut axis, mut run, mut jump) = self.spaceling_gamepad_input(usize::from(player - 1));
+        let mut dive = self
+            .gamepads
+            .borrow()
+            .seat(usize::from(player - 1))
+            .filter(|pad| pad.connected)
+            .is_some_and(|pad| match (pad.dpad_up, pad.dpad_down) {
+                (false, true) => true,
+                (true, _) => false,
+                (false, false) => shape_stick(pad.left_stick_y) < -0.25,
+            });
         if player == 1 {
             let keyboard = f32::from(self.is_pressed(GameKey::NesRight))
                 - f32::from(self.is_pressed(GameKey::NesLeft));
@@ -422,17 +434,19 @@ impl ClientInput {
                 axis = keyboard;
             }
             jump |= self.is_pressed(GameKey::P1Laser) || self.is_pressed(GameKey::NesA);
+            run |=
+                self.is_pressed(GameKey::ClockRunLeft) || self.is_pressed(GameKey::ClockRunRight);
+            dive |= self.is_pressed(GameKey::NesDown);
         }
-        // East is the working bottom-middle yellow Picade button. South remains
-        // a standard controller's A alternative; no dependency on the bad switch.
-        jump |= alt_jump;
         let move_milli = (axis * 1000.0).round() as i16;
-        self.clock_duck_ready |= move_milli == 0 && !jump;
+        self.clock_duck_ready |= move_milli == 0 && !jump && !run && !dive;
         Some(scenario_clock::ClockDuckInput {
             session_id,
             player,
             move_milli: if self.clock_duck_ready { move_milli } else { 0 },
             jump: self.clock_duck_ready && jump,
+            run: self.clock_duck_ready && run,
+            dive: self.clock_duck_ready && dive,
         })
     }
 
@@ -1933,6 +1947,8 @@ fn game_key_from_key_code(code: KeyCode) -> Option<GameKey> {
         KeyCode::KeyZ => Some(GameKey::NesA),
         KeyCode::Tab => Some(GameKey::NesSelect),
         KeyCode::Enter => Some(GameKey::NesStart),
+        KeyCode::ShiftLeft => Some(GameKey::ClockRunLeft),
+        KeyCode::ShiftRight => Some(GameKey::ClockRunRight),
         KeyCode::KeyE => Some(GameKey::TerrainDrill),
         KeyCode::KeyT => Some(GameKey::TerrainTool),
         KeyCode::KeyV => Some(GameKey::TerrainView),

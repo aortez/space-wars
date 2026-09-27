@@ -264,6 +264,9 @@ fn clock_duck_keys_use_backend_neutral_holds_without_repeating_across_pause() {
         (Key::LeftArrow.into(), 0),
         (Key::RightArrow.into(), 1),
         (SharedString::from(" "), 2),
+        (Key::Shift.into(), 4),
+        (Key::ShiftR.into(), 5),
+        (Key::DownArrow.into(), 6),
     ] {
         window
             .window()
@@ -278,12 +281,16 @@ fn clock_duck_keys_use_backend_neutral_holds_without_repeating_across_pause() {
             }
         );
         assert_eq!(sampled.jump, code == 2);
+        assert_eq!(sampled.run, matches!(code, 4 | 5));
+        assert_eq!(sampled.dive, code == 6);
         window
             .window()
             .dispatch_event(WindowEvent::KeyReleased { text });
         let sampled = input.borrow_mut().clock_duck_input(Some((1, 1))).unwrap();
         assert_eq!(sampled.move_milli, 0);
         assert!(!sampled.jump);
+        assert!(!sampled.run);
+        assert!(!sampled.dive);
     }
     window.window().dispatch_event(WindowEvent::KeyPressed {
         text: Key::RightArrow.into(),

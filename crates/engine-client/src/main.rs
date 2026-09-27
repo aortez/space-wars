@@ -1140,6 +1140,9 @@ fn install_keyboard_navigation(window: &MainWindow, input: input::SharedInput) {
             1 => input::GameKey::NesRight,
             2 => input::GameKey::P1Laser,
             3 => input::GameKey::NesA,
+            4 => input::GameKey::ClockRunLeft,
+            5 => input::GameKey::ClockRunRight,
+            6 => input::GameKey::NesDown,
             _ => return,
         };
         if pressed {

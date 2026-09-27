@@ -44,8 +44,11 @@ The local launcher includes the following scenarios and presets:
   A lightweight crow flies in, perches and hops on lit digit tops, then leaves;
   it takes flight when its support disappears and adds no physics bodies.
   **D** / gamepad **North (Y)** / Picade **bottom-right blue** starts or dismisses
-  a player duck. Use arrows/joystick to move and Space/Z or A/B to jump
-  (Picade: bottom-middle yellow). Falling, Meltdown, Color Cycle, Marquee, Digit Slide and Rain
+  a player duck. Use arrows/joystick to move, Shift/South (bottom face button)
+  to run, and Space/Z/East (right face button) to jump or swim. Holding Jump
+  repeats bounded swim strokes; hold Down for a shallow dive, release to float.
+  On Picade 2, bottom-left pink runs and bottom-middle yellow jumps/swims.
+  Falling, Meltdown, Color Cycle, Marquee, Digit Slide and Rain
   continue alongside the player. Rain shares the stable course, or join a live
   shower on its moving floor without clearing the water. The duck walks/jumps
   on panels, floats, drifts and paddles with the joystick. Falling bars share

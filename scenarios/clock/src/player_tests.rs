@@ -63,6 +63,8 @@ fn input(state: &ClockState, move_milli: i16, jump: bool) -> Action {
         player,
         move_milli,
         jump,
+        run: false,
+        dive: false,
     })
 }
 
@@ -93,7 +95,7 @@ fn player_actions_are_versioned_bounded_and_reject_stale_or_other_owner_input() 
             .is_none()
         );
     }
-    for (index, value) in [(0, 0), (2, 0), (2, 3), (13, 2)] {
+    for (index, value) in [(0, 0), (2, 0), (2, 3), (13, 2), (14, 2), (15, 2)] {
         let mut bad = payload.clone();
         bad[index] = value;
         assert!(
@@ -120,19 +122,52 @@ fn player_actions_are_versioned_bounded_and_reject_stale_or_other_owner_input() 
         player: 2,
         move_milli: 1000,
         jump: true,
+        run: true,
+        dive: true,
     });
     let foreign = ClockAction::player_duck_input(ClockDuckInput {
         session_id: original.0,
         player: 1,
         move_milli: 1000,
         jump: true,
+        run: true,
+        dive: true,
     });
     tick(&mut state, &[stale, foreign]);
     assert_eq!(state.player_duck_state().unwrap().move_milli, 0);
+    assert!(!state.player_duck_state().unwrap().run_held);
+    assert!(!state.player_duck_state().unwrap().dive_held);
     toggle(&mut state, 2);
     ticks(&mut state, 30);
     toggle(&mut state, 2);
     assert_ne!(state.player_duck_session().unwrap().0, original.0);
+}
+
+#[test]
+fn all_player_movement_flags_round_trip_and_old_payloads_are_rejected() {
+    for player in [1, 2] {
+        for flags in 0..8 {
+            let input = ClockDuckInput {
+                session_id: 42,
+                player,
+                move_milli: -333,
+                jump: flags & 1 != 0,
+                run: flags & 2 != 0,
+                dive: flags & 4 != 0,
+            };
+            let action = ClockAction::player_duck_input(input);
+            assert!(
+                matches!(ClockAction::decode(&action), Some(ClockAction::PlayerDuckInput(decoded)) if decoded == input)
+            );
+            let Action::Scenario { kind, mut payload } = action else {
+                unreachable!()
+            };
+            payload[..2].copy_from_slice(&9_u16.to_le_bytes());
+            assert!(ClockAction::decode(&Action::scenario(kind, payload.clone())).is_none());
+            payload.truncate(14);
+            assert!(ClockAction::decode(&Action::scenario(kind, payload)).is_none());
+        }
+    }
 }
 
 #[test]

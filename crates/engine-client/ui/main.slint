@@ -1444,6 +1444,9 @@ export component MainWindow inherits Window {
                 if (event.text == Key.RightArrow) { root.clock-input-key(1, false); }
                 if (event.text == " ") { root.clock-input-key(2, false); }
                 if (event.text == "z" || event.text == "Z") { root.clock-input-key(3, false); }
+                if (event.text == Key.Shift) { root.clock-input-key(4, false); }
+                if (event.text == Key.ShiftR) { root.clock-input-key(5, false); }
+                if (event.text == Key.DownArrow) { root.clock-input-key(6, false); }
             }
             return reject;
         }
@@ -1471,6 +1474,18 @@ export component MainWindow inherits Window {
                 }
                 if (event.text == "z" || event.text == "Z") {
                     if (!event.repeat) { root.clock-input-key(3, true); }
+                    return accept;
+                }
+                if (event.text == Key.Shift) {
+                    if (!event.repeat) { root.clock-input-key(4, true); }
+                    return accept;
+                }
+                if (event.text == Key.ShiftR) {
+                    if (!event.repeat) { root.clock-input-key(5, true); }
+                    return accept;
+                }
+                if (event.text == Key.DownArrow) {
+                    if (!event.repeat) { root.clock-input-key(6, true); }
                     return accept;
                 }
             }

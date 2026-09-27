@@ -7,9 +7,12 @@ mod controller;
 mod debris_tests;
 mod drain;
 mod flow;
+#[cfg(test)]
+mod movement_tests;
 pub(crate) mod planner;
 #[cfg(test)]
 mod platform_tests;
+mod player_control;
 mod responsive;
 #[cfg(test)]
 mod responsive_tests;
@@ -33,6 +36,7 @@ use engine_rapier::world::{
     PhysicsWorld, PhysicsWorldConfig,
 };
 use engine_water::{WaterWorld, immersion::HullShape};
+use player_control::PlayerControl;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 
 use super::EventPhase;
@@ -95,30 +99,6 @@ pub(crate) struct DuckEvent {
     player: Option<PlayerControl>,
 }
 
-struct PlayerControl {
-    session_id: u64,
-    seat: u8,
-    move_milli: i16,
-    jump_held: bool,
-    jump_pending: bool,
-    facing: f32,
-    exit_at_tick: u64,
-}
-
-impl PlayerControl {
-    fn new(session_id: u64, seat: u8, facing: f32, exit_at_tick: u64) -> Self {
-        Self {
-            session_id,
-            seat,
-            move_milli: 0,
-            jump_held: false,
-            jump_pending: false,
-            facing,
-            exit_at_tick,
-        }
-    }
-}
-
 impl DuckEvent {
     pub fn new_player(
         layout: Layout,
@@ -179,7 +159,7 @@ impl DuckEvent {
         self.movement = Movement::new(self.width, self.radius);
     }
 
-    pub fn set_player_input(&mut self, move_milli: i16, jump: bool) {
+    pub fn set_player_input(&mut self, move_milli: i16, jump: bool, run: bool, dive: bool) {
         if self.phase == EventPhase::Resetting {
             return;
         }
@@ -187,6 +167,8 @@ impl DuckEvent {
             return;
         };
         player.move_milli = move_milli.clamp(-1000, 1000);
+        player.run_held = run;
+        player.dive_held = dive;
         // No buffered landing jump or opening-phase jump. A new press must
         // happen while running; holding the button never becomes auto-hop.
         player.jump_pending |= jump
@@ -210,6 +192,10 @@ impl DuckEvent {
             phase_tick: self.phase_tick,
             move_milli: player.move_milli,
             jump_held: player.jump_held,
+            run_held: player.run_held,
+            dive_held: player.dive_held,
+            swim_strokes: player.swim_strokes,
+            swim_cooldown_ticks: player.next_swim_tick.saturating_sub(self.tick) as u32,
             facing_right: player.facing * self.direction > 0.0,
             floor_open_milli: self
                 .responsive_floor
@@ -571,7 +557,11 @@ impl DuckEvent {
                 player.facing = axis.signum();
             }
             Command {
-                gait: Gait::Pace(axis.abs()),
+                gait: if player.run_held {
+                    Gait::Sprint(axis.abs())
+                } else {
+                    Gait::Pace(axis.abs())
+                },
                 direction: axis.signum(),
                 jump: std::mem::take(&mut player.jump_pending),
             }
@@ -602,14 +592,17 @@ impl DuckEvent {
         if self.water_report.submerged_fraction > 0.05 && !grounded {
             // In water, input supplies a bounded paddling acceleration instead
             // of cancelling flow with a zero-velocity target. Neutral drifts.
-            let axis = command.direction
-                * match command.gait {
-                    Gait::Still => 0.0,
-                    Gait::Walk => self.movement.walk_speed / self.movement.run_speed,
-                    Gait::Run => 1.0,
-                    Gait::Pace(fraction) => fraction.clamp(0.0, 1.0),
-                };
-            delta.x = axis * self.movement.run_speed * DT * PADDLE_ACCELERATION;
+            delta.x =
+                command.direction * self.movement.speed(command.gait) * DT * PADDLE_ACCELERATION;
+        }
+        if let Some(player) = &mut self.player {
+            delta.y += player.water_delta(
+                &self.movement,
+                self.radius,
+                observed,
+                self.water_report.submerged_fraction,
+                self.tick,
+            );
         }
         delta.x *= screen;
         if command.jump && grounded {
@@ -639,6 +632,8 @@ impl DuckEvent {
             player.move_milli = 0;
             player.jump_held = false;
             player.jump_pending = false;
+            player.run_held = false;
+            player.dive_held = false;
         }
         self.enter(EventPhase::Resetting);
     }

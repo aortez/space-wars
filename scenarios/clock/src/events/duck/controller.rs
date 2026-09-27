@@ -31,6 +31,7 @@ pub(super) enum Gait {
     Walk,
     Run,
     Pace(f32),
+    Sprint(f32),
 }
 
 pub(super) struct Command {
@@ -66,14 +67,18 @@ impl Movement {
         }
     }
 
+    pub fn speed(&self, gait: Gait) -> f32 {
+        match gait {
+            Gait::Still => 0.0,
+            Gait::Walk => self.walk_speed,
+            Gait::Run => self.run_speed,
+            Gait::Pace(fraction) => self.run_speed * fraction.clamp(0.0, 1.0),
+            Gait::Sprint(fraction) => self.run_speed * 1.5 * fraction.clamp(0.0, 1.0),
+        }
+    }
+
     pub fn velocity_delta(&self, observed: Observation, command: &Command) -> Vec2 {
-        let target = command.direction
-            * match command.gait {
-                Gait::Still => 0.0,
-                Gait::Walk => self.walk_speed,
-                Gait::Run => self.run_speed,
-                Gait::Pace(fraction) => self.run_speed * fraction.clamp(0.0, 1.0),
-            };
+        let target = command.direction * self.speed(command.gait);
         Vec2::new(
             (target - observed.velocity.x)
                 .clamp(-self.run_speed * DT * 6.0, self.run_speed * DT * 6.0),

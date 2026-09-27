@@ -6,6 +6,7 @@ mod autonomous;
 mod falling;
 mod join;
 mod meltdown;
+mod movement;
 mod takeover;
 
 fn scenario(viewport: Viewport) -> ClockClientScenario {
@@ -267,6 +268,8 @@ fn rain_and_player_share_a_visible_course_in_all_layouts() {
                         player: 1,
                         move_milli: axis,
                         jump: false,
+                        run: false,
+                        dive: false,
                     },
                 )],
                 Duration::from_nanos(16_666_667),
@@ -365,6 +368,8 @@ fn player_joins_live_rain_and_keeps_visible_panels_through_cleanup_in_all_layout
                         player: 1,
                         move_milli: axis,
                         jump: false,
+                        run: false,
+                        dive: false,
                     },
                 )],
                 Duration::from_nanos(16_666_667),

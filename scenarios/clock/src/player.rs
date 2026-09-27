@@ -11,6 +11,8 @@ pub struct ClockDuckInput {
     /// Screen-relative horizontal intent in -1000..=1000.
     pub move_milli: i16,
     pub jump: bool,
+    pub run: bool,
+    pub dive: bool,
 }
 
 impl ClockDuckInput {
@@ -20,11 +22,13 @@ impl ClockDuckInput {
             session_id: u64::from_le_bytes(payload[1..9].try_into().ok()?),
             move_milli: i16::from_le_bytes(payload[9..11].try_into().ok()?),
             jump: payload[11] == 1,
+            run: payload[12] == 1,
+            dive: payload[13] == 1,
         };
         ((1..=2).contains(&input.player)
             && (-1000..=1000).contains(&input.move_milli)
-            && payload[11] <= 1)
-            .then_some(input)
+            && payload[11..14].iter().all(|flag| *flag <= 1))
+        .then_some(input)
     }
 }
 
@@ -41,6 +45,8 @@ impl ClockAction {
         payload.extend_from_slice(&input.session_id.to_le_bytes());
         payload.extend_from_slice(&input.move_milli.to_le_bytes());
         payload.push(u8::from(input.jump));
+        payload.push(u8::from(input.run));
+        payload.push(u8::from(input.dive));
         Action::scenario(CLOCK_ACTION_PLAYER_DUCK_INPUT, payload)
     }
 }
@@ -192,7 +198,7 @@ impl ClockState {
         if let Some(duck) = &mut self.duck_visit
             && duck.player_session() == Some((input.session_id, input.player))
         {
-            duck.set_player_input(input.move_milli, input.jump);
+            duck.set_player_input(input.move_milli, input.jump, input.run, input.dive);
         }
     }
 

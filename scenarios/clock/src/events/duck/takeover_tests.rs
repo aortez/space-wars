@@ -107,7 +107,7 @@ fn airborne_takeover_has_one_gravity_step_bounded_braking_and_no_extra_jump() {
             let jumps = duck.jumps;
             let tick = duck.tick;
             assert!(duck.take_control(1, 1));
-            duck.set_player_input(0, true);
+            duck.set_player_input(0, true, false, false);
             duck.step();
             let after = duck.world.as_ref().unwrap().motion(DUCK_BODY).unwrap();
             assert_eq!(duck.tick, tick + 1);
@@ -133,7 +133,7 @@ fn grounded_takeover_can_jump_immediately_and_player_does_not_inherit_the_timeou
         let start = duck.position().unwrap();
         let jumps = duck.jumps;
         assert!(duck.take_control(1, 1));
-        duck.set_player_input(0, true);
+        duck.set_player_input(0, true, false, false);
         duck.step();
         assert_eq!(
             duck.jumps,
