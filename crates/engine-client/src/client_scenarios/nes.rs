@@ -32,7 +32,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: true,
         captures_gamepad_select: true,
     },
-    controls_help: "NES Library: each assigned gamepad is a standard NES controller. D-pad, A, B, Select, and Start are passed to the cartridge. Press Start+Select together for the host controls menu. Keyboard P1: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
+    controls_help: "NES Library: each assigned gamepad is a standard NES controller. Right/East face button = NES A; bottom/South face button = NES B (Nintendo layout). D-pad, Select, and Start are passed to the cartridge. Press Start+Select together for the host controls menu. Keyboard P1: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
     create,
 };
 
@@ -316,8 +316,8 @@ mod tests {
         assert_eq!(
             NesAction::decode(&actions[0]),
             Some([
-                ControllerButtons::LEFT | ControllerButtons::A,
-                ControllerButtons::RIGHT | ControllerButtons::B,
+                ControllerButtons::LEFT | ControllerButtons::B,
+                ControllerButtons::RIGHT | ControllerButtons::A,
             ])
         );
     }

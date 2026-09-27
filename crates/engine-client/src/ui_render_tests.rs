@@ -27,6 +27,7 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
         &ui,
         Arc::new(RwLock::new(Settings::default())),
         SettingsWriter::new(directory.path().join("settings.toml")).unwrap(),
+        crate::input::new_shared_input().1,
     );
     for (id, name) in [(0, "Space-Wars Picade"), (1, "Xbox 360 USB Controller")] {
         state.borrow_mut().connect(Device {
@@ -44,12 +45,25 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
     }
     for (width, height) in [(800, 480), (1024, 768), (480, 800)] {
         windows.borrow()[0].set_size(PhysicalSize::new(width, height));
+        // ReusedBuffer repaints only dirty regions. Retain the other pixels
+        // across small updates such as changing a player label or selection.
+        let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
         ui.invoke_controllers_open();
         for stage in [
-            "devices", "device", "capture", "review", "trial", "tester", "settings",
+            "devices",
+            "device",
+            "assigned",
+            "device-bottom",
+            "capture",
+            "review",
+            "trial",
+            "tester",
+            "settings",
         ] {
             match stage {
                 "device" => ui.invoke_controllers_command("controllers.device.0".into()),
+                "assigned" => ui.invoke_controllers_command("controllers.assign-p2".into()),
+                "device-bottom" => ui.set_controllers_focus_index(5),
                 "capture" => ui.invoke_controllers_command("controllers.remap".into()),
                 "review" => {
                     for (code, _) in ControllerControl::ALL.iter().enumerate() {
@@ -118,7 +132,9 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
                 }
                 _ => {}
             }
-            let mut pixels = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+            // The real event loop runs deferred property-change handlers,
+            // including scrolling a newly focused controller row into view.
+            slint::platform::update_timers_and_animations();
             windows.borrow()[0].request_redraw();
             windows.borrow()[0].draw_if_needed(|renderer| {
                 renderer.render(pixels.make_mut_slice(), width as usize);
@@ -132,6 +148,21 @@ fn controller_setup_renders_on_picade_and_hyperpixel_layouts() {
                     > 300,
                 "missing menu text for {stage}"
             );
+            if stage == "device-bottom" {
+                let selected_pixels = pixels
+                    .as_slice()
+                    .chunks(width as usize)
+                    .skip(height as usize / 2)
+                    .flatten()
+                    .filter(|pixel| {
+                        pixel.r < 70 && pixel.g > 60 && pixel.b > 90 && pixel.b > pixel.g
+                    })
+                    .count();
+                assert!(
+                    selected_pixels > 1000,
+                    "focused Back row did not scroll into view at {width}x{height}"
+                );
+            }
             if let Some(output) = &output {
                 crate::thruster_visual_tests::write_png(
                     &output.join(format!("controllers-{width}x{height}-{stage}.png")),

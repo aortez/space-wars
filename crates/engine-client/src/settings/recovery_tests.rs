@@ -41,6 +41,8 @@ fn missing_fields_and_sections_use_declared_defaults_without_resetting_siblings(
     choices.video.height = 900;
     choices.clock.show_date = true;
     choices.spacewars.player_health_percent = 200;
+    choices.controls.player_1_device = Some("gilrs-v1:linux:usb".into());
+    choices.controls.player_2_device = Some("gilrs-v1:linux:picade".into());
     let original = toml::Value::try_from(&choices).unwrap();
     let default_json = serde_json::to_value(defaults).unwrap();
     let mut all_paths = Vec::new();
@@ -70,6 +72,49 @@ fn missing_fields_and_sections_use_declared_defaults_without_resetting_siblings(
             parts.join(".")
         );
     }
+}
+
+#[test]
+fn player_preferences_recover_individually_and_clear_without_erasing_profiles() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.toml");
+    let mut settings = Settings::default();
+    settings
+        .controls
+        .controller_profiles
+        .push(profile("picade"));
+    settings.controls.player_1_device = Some("gilrs-v1:linux:usb".into());
+    settings.controls.player_2_device = Some("gilrs-v1:linux:picade".into());
+    let mut table = toml::Value::try_from(settings).unwrap();
+    table["controls"]["player_1_device"] = toml::Value::Integer(7);
+    table["controls"]
+        .as_table_mut()
+        .unwrap()
+        .insert("future_option".into(), toml::Value::Boolean(true));
+    fs::write(&path, toml::to_string(&table).unwrap()).unwrap();
+    let mut loaded = load_settings(&path).unwrap();
+    let LoadStatus::RecoveredFields { fields, .. } = &loaded.status else {
+        panic!("{:?}", loaded.status)
+    };
+    assert_eq!(fields, &["controls.player_1_device"]);
+    assert_eq!(loaded.settings.controls.player_1_device, None);
+    assert_eq!(
+        loaded.settings.controls.player_2_device.as_deref(),
+        Some("gilrs-v1:linux:picade")
+    );
+    loaded.settings.controls.player_2_device = None;
+    save_settings(&loaded.settings, &path).unwrap();
+    let reloaded = load_settings(&path).unwrap();
+    assert_eq!(reloaded.settings.controls.player_1_device, None);
+    assert_eq!(reloaded.settings.controls.player_2_device, None);
+    assert_eq!(
+        reloaded.settings.controls.controller_profiles,
+        vec![profile("picade")]
+    );
+    assert_eq!(
+        read_table(&path)["controls"]["future_option"].as_bool(),
+        Some(true)
+    );
 }
 
 #[test]

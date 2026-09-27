@@ -291,6 +291,10 @@ pub struct ControlBindings {
     /// Local to this installation. Matching controller models share a profile;
     /// connection order and player assignments are deliberately not identities.
     pub controller_profiles: Vec<ControllerProfile>,
+    /// Preferred device models, not connection IDs. Identical controllers can
+    /// be assigned for the current session but cannot be uniquely remembered.
+    pub player_1_device: Option<String>,
+    pub player_2_device: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,6 +1,6 @@
 //! Backend-neutral gamepad polling, seat assignment, and controller UI routing.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs, Mapping};
@@ -16,6 +16,8 @@ use crate::{MainWindow, UserActivity};
 mod simulated;
 #[cfg(unix)]
 pub(crate) use simulated::SimulatedInput;
+#[cfg(test)]
+mod assignment_tests;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const UI_REPEAT_DELAY: Duration = Duration::from_millis(350);
@@ -88,10 +90,10 @@ pub(crate) fn start_gamepad_pump(
 
 struct GamepadPump {
     gilrs: Gilrs,
-    assignments: SeatAssignments,
     input: SharedInput,
     gamepads: SharedGamepadInput,
     ui_driver: Option<usize>,
+    ui_snapshot: GamepadSeatInput,
     ui_repeat: UiRepeat,
     mode_handoff: ModeHandoff,
     controllers: SharedControllers,
@@ -107,10 +109,10 @@ impl GamepadPump {
     ) -> Self {
         Self {
             gilrs,
-            assignments: SeatAssignments::default(),
             input,
             gamepads,
             ui_driver: None,
+            ui_snapshot: GamepadSeatInput::default(),
             ui_repeat: UiRepeat::default(),
             mode_handoff: ModeHandoff::default(),
             controllers,
@@ -122,18 +124,13 @@ impl GamepadPump {
         let connected = self.gilrs.gamepads().map(|(id, _)| id).collect::<Vec<_>>();
         for id in connected {
             apply_controller_profile(&mut self.gilrs, id);
-            let name = self.gilrs.gamepad(id).name().to_owned();
-            let id = usize::from(id);
-            if let Some(seat) = self.assignments.connect(id) {
-                tracing::info!(
-                    gamepad_id = id,
-                    player = seat + 1,
-                    gamepad = %name,
-                    "assigned connected gamepad."
-                );
-            }
-            self.register_device(id);
         }
+        let devices = self
+            .gilrs
+            .gamepads()
+            .map(|(id, _)| self.device(id))
+            .collect();
+        self.controllers.borrow_mut().connect_many(devices);
         self.observe_mode(window);
         self.sample_gamepads(window);
         self.refresh_connection_ui(window);
@@ -146,10 +143,13 @@ impl GamepadPump {
             let id = usize::from(event.id);
             match event.event {
                 EventType::Connected => {
+                    self.mode_handoff.block(id);
                     apply_controller_profile(&mut self.gilrs, event.id);
                     let name = self.gilrs.gamepad(event.id).name().to_owned();
-                    if let Some(seat) = self.assignments.connect(id) {
-                        self.mode_handoff.block(seat);
+                    self.controllers
+                        .borrow_mut()
+                        .connect(self.device(gamepad_id));
+                    if let Some(seat) = self.controllers.borrow().seat(id) {
                         tracing::info!(
                             gamepad_id = id,
                             player = seat + 1,
@@ -163,13 +163,13 @@ impl GamepadPump {
                             "gamepad connected without an available player seat."
                         );
                     }
-                    self.register_device(id);
                     self.refresh_connection_ui(window);
                 }
                 EventType::Disconnected => {
+                    let seat = self.controllers.borrow().seat(id);
                     self.controllers.borrow_mut().disconnect(id);
-                    if let Some(seat) = self.assignments.disconnect(id) {
-                        self.mode_handoff.block(seat);
+                    self.mode_handoff.forget(id);
+                    if let Some(seat) = seat {
                         self.gamepads.borrow_mut().disconnect_seat(seat);
                         tracing::warn!(gamepad_id = id, player = seat + 1, "gamepad disconnected.");
                         if !window.get_launcher_visible() {
@@ -215,11 +215,8 @@ impl GamepadPump {
                         continue;
                     }
                     self.observe_mode(window);
-                    let Some(seat) = self.assignments.connected_seat(id) else {
-                        continue;
-                    };
                     if is_pad_activity(event_type) {
-                        self.ui_driver = Some(seat);
+                        self.ui_driver = Some(id);
                     }
                     let deliberate = match event_type {
                         EventType::ButtonPressed(..) | EventType::ButtonRepeated(..) => true,
@@ -231,7 +228,7 @@ impl GamepadPump {
                         self.begin_handoff();
                         continue;
                     }
-                    self.route_button_edge(window, seat, gamepad_id, event_type);
+                    self.route_button_edge(window, gamepad_id, event_type);
                 }
             }
             self.observe_mode(window);
@@ -248,14 +245,9 @@ impl GamepadPump {
         }
     }
 
-    fn route_button_edge(
-        &mut self,
-        window: &MainWindow,
-        seat: usize,
-        gamepad_id: GamepadId,
-        event: EventType,
-    ) {
-        if window.get_launcher_busy() || !self.mode_handoff.accepts_input(seat) {
+    fn route_button_edge(&mut self, window: &MainWindow, gamepad_id: GamepadId, event: EventType) {
+        let id = usize::from(gamepad_id);
+        if window.get_launcher_busy() || !self.mode_handoff.accepts_input(id) {
             return;
         }
         let EventType::ButtonPressed(button, code) = event else {
@@ -282,10 +274,16 @@ impl GamepadPump {
         };
         drop(controllers);
         let route = button_route(window, button, gamepad.name(), start, select);
+        let seat = self.controllers.borrow().seat(id);
+        if !route_allowed_for_assignment(route, seat) {
+            return;
+        }
         if matches!(route, ButtonRoute::Menu(_) | ButtonRoute::Host(_)) {
             self.begin_handoff();
         }
-        apply_button_route(window, &self.input, route, seat as u8 + 1);
+        // Menu/host routes do not consume the player argument. Unassigned
+        // controllers may recover via menus, but never send scenario actions.
+        apply_button_route(window, &self.input, route, seat.unwrap_or(0) as u8 + 1);
     }
 
     fn sample_gamepads(&mut self, window: &MainWindow) {
@@ -314,27 +312,28 @@ impl GamepadPump {
                         Instant::now(),
                     );
                 }
-                (self.assignments.connected_seat(id), snapshot)
+                (id, self.controllers.borrow().seat(id), snapshot)
             })
-            .filter_map(|(seat, snapshot)| seat.map(|seat| (seat, snapshot)))
             .collect::<Vec<_>>();
-        let held = snapshots.iter().any(|(_, pad)| autostart_pad_held(pad));
+        let held = snapshots.iter().any(|(_, _, pad)| autostart_pad_held(pad));
         window.global::<UserActivity>().set_gamepad_held(held);
-        let snapshots = snapshots
-            .into_iter()
-            .map(|(seat, snapshot)| (seat, self.mode_handoff.filter(seat, snapshot)))
-            .collect::<Vec<_>>();
-        let mut gamepads = self.gamepads.borrow_mut();
-        for (seat, snapshot) in snapshots {
-            gamepads.set_seat(seat, snapshot);
-        }
+        self.ui_snapshot = publish_gamepad_samples(
+            &mut self.mode_handoff,
+            &mut self.gamepads.borrow_mut(),
+            self.ui_driver,
+            snapshots,
+        );
     }
 
     fn observe_mode(&mut self, window: &MainWindow) {
         let epoch = self.controllers.borrow().epoch;
-        if epoch != self.controller_epoch {
-            self.controller_epoch = epoch;
-            self.begin_handoff();
+        if self
+            .mode_handoff
+            .observe_epoch(&mut self.controller_epoch, epoch)
+        {
+            self.ui_driver = None;
+            self.ui_repeat.reset();
+            self.refresh_connection_ui(window);
         }
         if self.mode_handoff.observe(InputMode::from_window(window)) {
             self.ui_driver = None;
@@ -342,30 +341,24 @@ impl GamepadPump {
         }
     }
 
-    fn register_device(&mut self, id: usize) {
-        let pad = self
-            .gilrs
-            .gamepads()
-            .find(|(candidate, _)| usize::from(*candidate) == id)
-            .map(|(_, pad)| pad);
-        if let Some(pad) = pad {
-            let uuid = pad
-                .uuid()
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect::<String>();
-            self.controllers.borrow_mut().connect(Device {
-                id,
-                key: format!(
-                    "gilrs-v1:{}:{uuid}:{:?}:{:?}:{}",
-                    std::env::consts::OS,
-                    pad.vendor_id(),
-                    pad.product_id(),
-                    pad.os_name()
-                ),
-                name: pad.name().to_owned(),
-                seat: self.assignments.connected_seat(id),
-            });
+    fn device(&self, id: GamepadId) -> Device {
+        let pad = self.gilrs.gamepad(id);
+        let uuid = pad
+            .uuid()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        Device {
+            id: usize::from(id),
+            key: format!(
+                "gilrs-v1:{}:{uuid}:{:?}:{:?}:{}",
+                std::env::consts::OS,
+                pad.vendor_id(),
+                pad.product_id(),
+                pad.os_name()
+            ),
+            name: pad.name().to_owned(),
+            seat: None,
         }
     }
 
@@ -385,25 +378,17 @@ impl GamepadPump {
     }
 
     fn update_ui_navigation(&mut self, window: &MainWindow) {
-        let Some(seat) = self.ui_driver else {
+        let Some(_) = self.ui_driver else {
             self.ui_repeat.reset();
             return;
         };
-        let gamepad = self
-            .gamepads
-            .borrow()
-            .physical_seat(seat)
-            .cloned()
-            .unwrap_or_default();
+        let gamepad = &self.ui_snapshot;
         if !gamepad.connected {
             self.ui_repeat.reset();
             return;
         }
 
-        if let Some(action) = self
-            .ui_repeat
-            .update(ui_direction(&gamepad), Instant::now())
-        {
+        if let Some(action) = self.ui_repeat.update(ui_direction(gamepad), Instant::now()) {
             window.invoke_ui_action(action.code());
         }
     }
@@ -413,11 +398,7 @@ impl GamepadPump {
             .gilrs
             .gamepads()
             .map(|(id, pad)| {
-                let seat = self
-                    .assignments
-                    .seats
-                    .iter()
-                    .position(|assigned| *assigned == Some(usize::from(id)));
+                let seat = self.controllers.borrow().seat(usize::from(id));
                 format!(
                     "{} · {}",
                     pad.name(),
@@ -431,10 +412,9 @@ impl GamepadPump {
         } else {
             devices.join("\n").into()
         });
-        let connected = &self.assignments.connected;
         let binding = |seat: usize| {
             let player = seat + 1;
-            if self.assignments.seats[seat].is_some_and(|id| connected.contains(&id)) {
+            if self.controllers.borrow().connected_id(seat).is_some() {
                 format!("P{player} PAD + KEY")
             } else {
                 format!("P{player} KEY")
@@ -442,11 +422,43 @@ impl GamepadPump {
         };
         window.set_p1_input_binding(SharedString::from(binding(0)));
         window.set_p2_input_binding(SharedString::from(binding(1)));
-        if !self.assignments.has_disconnected_seat() {
+        if !self.controllers.borrow().has_disconnected_seat() {
             window.set_controller_disconnected_visible(false);
             window.set_controller_disconnected_text(SharedString::from(""));
+        } else if window.get_controller_disconnected_visible() {
+            window.set_controller_disconnected_text(format!(
+                "{} controller disconnected — slot reserved. Use App Settings → Controllers to replace it; keyboard/touch still work.",
+                self.controllers.borrow().disconnected_player_labels(),
+            ).into());
         }
     }
+}
+
+/// Use physical-device gates even for unassigned controllers: they must still
+/// navigate menus, without being folded into either player's gameplay state.
+fn publish_gamepad_samples(
+    handoff: &mut ModeHandoff,
+    gamepads: &mut input::GamepadInput,
+    ui_driver: Option<usize>,
+    snapshots: Vec<(usize, Option<usize>, GamepadSeatInput)>,
+) -> GamepadSeatInput {
+    let mut seats = std::array::from_fn(|_| GamepadSeatInput::default());
+    let mut ui = GamepadSeatInput::default();
+    for (id, seat, pad) in snapshots {
+        let pad = handoff.filter(id, pad);
+        if ui_driver == Some(id) {
+            ui = pad.clone();
+        }
+        if let Some(seat) = seat.and_then(|seat| seats.get_mut(seat)) {
+            *seat = pad;
+        }
+    }
+    gamepads.replace_seats(seats);
+    ui
+}
+
+fn route_allowed_for_assignment(route: ButtonRoute, seat: Option<usize>) -> bool {
+    seat.is_some() || matches!(route, ButtonRoute::Menu(_) | ButtonRoute::Host(_))
 }
 
 fn clock_next_event_button(gamepad_name: &str) -> Button {
@@ -808,10 +820,19 @@ impl InputMode {
 #[derive(Debug, Default)]
 struct ModeHandoff {
     mode: Option<InputMode>,
-    awaiting_neutral: [bool; 2],
+    awaiting_neutral: BTreeMap<usize, bool>,
 }
 
 impl ModeHandoff {
+    fn observe_epoch(&mut self, observed: &mut u64, current: u64) -> bool {
+        if *observed == current {
+            return false;
+        }
+        *observed = current;
+        self.block_all();
+        true
+    }
+
     fn observe(&mut self, mode: InputMode) -> bool {
         if self.mode == Some(mode) {
             return false;
@@ -822,29 +843,31 @@ impl ModeHandoff {
     }
 
     fn block_all(&mut self) {
-        self.awaiting_neutral.fill(true);
-    }
-
-    fn block(&mut self, seat: usize) {
-        if let Some(awaiting_neutral) = self.awaiting_neutral.get_mut(seat) {
-            *awaiting_neutral = true;
-        }
-    }
-
-    fn accepts_input(&self, seat: usize) -> bool {
         self.awaiting_neutral
-            .get(seat)
+            .values_mut()
+            .for_each(|waiting| *waiting = true);
+    }
+
+    fn block(&mut self, device: usize) {
+        self.awaiting_neutral.insert(device, true);
+    }
+
+    fn forget(&mut self, device: usize) {
+        self.awaiting_neutral.remove(&device);
+    }
+
+    fn accepts_input(&self, device: usize) -> bool {
+        self.awaiting_neutral
+            .get(&device)
             .is_some_and(|awaiting_neutral| !awaiting_neutral)
     }
 
-    fn filter(&mut self, seat: usize, snapshot: GamepadSeatInput) -> GamepadSeatInput {
-        if self.accepts_input(seat) {
+    fn filter(&mut self, device: usize, snapshot: GamepadSeatInput) -> GamepadSeatInput {
+        if self.accepts_input(device) {
             return snapshot;
         }
         if is_neutral(&snapshot) {
-            if let Some(awaiting_neutral) = self.awaiting_neutral.get_mut(seat) {
-                *awaiting_neutral = false;
-            }
+            self.awaiting_neutral.insert(device, false);
             snapshot
         } else {
             neutral_snapshot(&snapshot)
@@ -963,43 +986,6 @@ impl UiRepeat {
     }
 }
 
-#[derive(Debug, Default)]
-struct SeatAssignments {
-    seats: [Option<usize>; 2],
-    connected: BTreeSet<usize>,
-}
-
-impl SeatAssignments {
-    fn connect(&mut self, id: usize) -> Option<usize> {
-        self.connected.insert(id);
-        if let Some(seat) = self.seats.iter().position(|assigned| *assigned == Some(id)) {
-            return Some(seat);
-        }
-        let seat = self.seats.iter().position(Option::is_none)?;
-        self.seats[seat] = Some(id);
-        Some(seat)
-    }
-
-    fn disconnect(&mut self, id: usize) -> Option<usize> {
-        self.connected.remove(&id);
-        self.seats.iter().position(|assigned| *assigned == Some(id))
-    }
-
-    fn connected_seat(&self, id: usize) -> Option<usize> {
-        self.connected
-            .contains(&id)
-            .then(|| self.seats.iter().position(|assigned| *assigned == Some(id)))
-            .flatten()
-    }
-
-    fn has_disconnected_seat(&self) -> bool {
-        self.seats
-            .iter()
-            .flatten()
-            .any(|id| !self.connected.contains(id))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1036,32 +1022,6 @@ mod tests {
             false,
             true
         ));
-    }
-
-    #[test]
-    fn gamepads_take_the_first_two_seats_in_connection_order() {
-        let mut assignments = SeatAssignments::default();
-
-        assert_eq!(assignments.connect(41), Some(0));
-        assert_eq!(assignments.connect(12), Some(1));
-        assert_eq!(assignments.connect(99), None);
-        assert_eq!(assignments.connected_seat(41), Some(0));
-        assert_eq!(assignments.connected_seat(12), Some(1));
-        assert_eq!(assignments.connected_seat(99), None);
-    }
-
-    #[test]
-    fn reconnect_reclaims_the_reserved_seat() {
-        let mut assignments = SeatAssignments::default();
-        assignments.connect(41);
-        assignments.connect(12);
-
-        assert_eq!(assignments.disconnect(41), Some(0));
-        assert!(assignments.has_disconnected_seat());
-        assert_eq!(assignments.connected_seat(41), None);
-        assert_eq!(assignments.connect(41), Some(0));
-        assert_eq!(assignments.connected_seat(41), Some(0));
-        assert!(!assignments.has_disconnected_seat());
     }
 
     #[test]

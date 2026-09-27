@@ -201,11 +201,12 @@ automatic activity returns to the launcher. **Spacewars → Settings → Match
 length** controls the match's own timer: most planets wins at expiry, with
 equal ownership drawing. See [automatic activities](docs/auto-start.md).
 
-**App Settings → Controllers** provides device identification, button/direction
-mapping, and a live input tester. Changes use a timed trial before saving, with
-automatic rollback and a restore-defaults option. Profiles are local to each
-machine and shared by identical controller models; player assignments stay
-unchanged. See [controller setup and cabinet layouts](docs/controller-profiles.md).
+**App Settings → Controllers** provides player assignment, device identification,
+button/direction mapping, and a live input tester. **Use as Player 1/2** swaps
+occupied slots and remembers distinguishable device models. Button mappings use
+a timed trial before saving, with automatic rollback and a restore-defaults
+option. Profiles are local to each machine and shared by identical controller
+models. See [controller setup and cabinet layouts](docs/controller-profiles.md).
 
 The FPS counter is off by default and saved as `video.show_fps`. When enabled,
 a small translucent, non-interactive overlay shows **FPS** (new scenario frames
@@ -615,11 +616,14 @@ emitted intent. `--output json` includes the same structured events for offline
 comparison. Tracing is available on custom batches rather than named suites so
 the suite contract and its normal report size remain fixed.
 
-Falling and NES Library pass the d-pad, `A`, `B`, `Select`, and `Start` to the
-cartridge. Press `Start` + `Select` together for the host controls menu so a
+Falling and NES Library use Nintendo-style gamepad positions: **right/East =
+NES A**, **bottom/South = NES B**, regardless of the reported device name. D-pad,
+`Select`, and `Start` pass to the cartridge. This NES-specific mapping applies
+to both players, including Picade inputs; menu and other scenario bindings are
+unchanged. Press `Start` + `Select` together for the host controls menu so a
 gamepad-only player can restart or return to the launcher. Keyboard equivalents
-for player 1 are the arrow keys, `Z`/`Space`, `X`, `Tab`, and `Enter`; `Esc`
-opens the host pause menu.
+for player 1 are arrows, `Z`/`Space` = A, `X` = B, `Tab` = Select, and `Enter` =
+Start; `Esc` opens the host pause menu.
 
 ## Raspberry Pi / kiosk launch
 

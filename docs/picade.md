@@ -103,6 +103,12 @@ for front-panel wiring differences without changing the overlay or rebooting;
 see [controller profiles](controller-profiles.md). The table above and measured
 layouts below describe the raw defaults, before a custom profile is applied.
 
+NES Library and Falling use Nintendo-style bindings: **HAT Button 2 / East =
+NES A**, **HAT Button 1 / South = NES B**. In Super Mario Bros., those are Jump
+and Run respectively. This swaps the previous NES-only A/B assignments on both
+cabinets; menu confirm/back and Clock controls are unchanged. The tables' A/B
+labels refer to the common host controls, not to the emulated NES buttons.
+
 ### Record the physical button layout
 
 Connector numbers and button colors do not prove front-panel positions. The
@@ -260,9 +266,13 @@ With the cabinet and a USB gamepad attached, both can navigate host menus but
 their gameplay inputs remain separate: the cabinet occupies P1 and the USB
 gamepad P2 in the tested setup. A single-player NES game can therefore appear
 unresponsive to the USB gamepad even though it works in two-player mode.
-Visible device/player assignment and swapping are deferred to
-[issue #57](https://github.com/aortez/space-wars/issues/57); this bring-up does
-not merge both devices into P1 or change player assignments during gameplay.
+Use **App Settings → Controllers → USB gamepad → Use as Player 1** to swap it
+with the cabinet. Distinct model preferences survive restart; missing devices
+reserve their slots. Any connected controller can navigate menus, including an
+unassigned replacement. Gameplay inputs remain separate, and changing players
+requires a fresh release before held controls are forwarded. See
+[controller assignments and identical-device limits](controller-profiles.md#player-assignments)
+for reconnect, reset, and persistence behavior (issue #57).
 
 Upstream currently does not declare a source license. The recipe explicitly
 uses Yocto's `CLOSED` license marker rather than attributing our MIT license to
