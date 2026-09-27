@@ -185,3 +185,7 @@ interruptions and censors instead of treating choice as completed travel. This
 will test whether the remaining phase references describe the executed capture
 loop. Source-time prediction of that arrival choice, enemy-flag evidence admission,
 current-state refresh and whole-mission value remain separate unresolved steps.
+
+The [physical follow-through study](capture-physical-followthrough.md) now covers
+that next boundary: 14 complete loops and six material interruptions, with the
+remaining reference-admission gap recorded explicitly.
