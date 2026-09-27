@@ -1,5 +1,9 @@
 # Source-bound transfer and local references
 
+Follow-up: [physical handoff through first site choice](capture-site-acquisition-probe.md)
+measures the acquisition gap for all 20 numeric alternatives and checks whether
+the bot selects their historical reference sites.
+
 Continue the [destination comparison](capture-transfer-comparison.md) with a
 read-only local cost snapshot at each forecast source. This remains an observer
 in PR #122. No controller selection, policy default or deployment changes.

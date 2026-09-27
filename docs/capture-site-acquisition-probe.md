@@ -81,12 +81,101 @@ Independently reconcile the new endpoint to native telemetry and lifecycle event
 retain raw hashes and exercise censoring/precedence/staleness in focused tests.
 
 No deployment, live cost admission or bot-strength claim is part of this slice.
-Results will be recorded below after the frozen study completes.
-
 The first pair was produced at runtime/runner freeze `334a498`, then its audit
 stopped on the absent evaluator-work file. Its raw artifacts are retained in
 `target/capture-flag-survey/acquisition-probe-v1`. The correction reconstructs
 that work from existing logs; it does not change runtime, sources, horizon or
 outcome rules. The full unchanged matrix will run in
 `target/capture-flag-survey/acquisition-probe-v1-rerun`, including the same first
-pair, whose completed trajectories must also match the retained initial files.
+pair. Both repeated trajectories match the retained initial files exactly:
+11,018 off and 11,020 on controller rows, physical outcomes, probe reports,
+ordinary observer outputs and upstream work.
+
+## Results: 26 September 2026
+
+Runtime was frozen at `334a498`; the corrected runner and unchanged plan were
+frozen at `de053d0`, with a clean worktree before the full matrix. All **40 runs
+completed and passed**: 20 frozen-executable transfer probes and 20 acquisition
+continuations. No source, runtime rule or observation horizon was tuned after
+an outcome. The executable SHA-256 is
+`e99cc0a530f101d39b22ce8abbae28cd5b93bb0fda6a065a2487a12758bb3827`.
+Raw summary SHA-256:
+`ba5db63795995442a17088eeda800957c931cd8d5b20d063c68b0a70fb3f78c5`.
+The record is [capture-site-acquisition-v1.json](data/capture-site-acquisition-v1.json).
+
+All 20 transfers arrive, and **every first site choice is observed one tick
+later (1/60 second)**. Their neutral handoff consumes one physics step; the next
+controller observation makes the choice. The 30-second observation horizon is
+never reached. Each waiting interval has one `no_current_native_update` row,
+the initial handoff. No acquisition rejection, interruption or censor occurs in
+these physical trials. Those boundaries are tested by focused unit/mutation
+cases, not demonstrated as successful failure handling in this corpus.
+
+| Nominated alternatives | Cases | Transfer duration | Same historical site |
+| --- | ---: | --- | ---: |
+| Immediate capture entry | 4 | 0 ticks | 4 |
+| Other departure-frame destinations | 12 | 1–120 ticks | 8 |
+| Historical remote destination | 4 | 1,537–1,692 ticks | 0 |
+| Total | 20 | | 12 |
+
+The **12 matching choices** retain compatible material, owner, flag, radius and
+claim settings; their evidence is still within its age bound. **Eight choices
+use another site.** The four historical snapshots all estimated bearing 31 and
+choose bearing 33. Fresh-world-1 seat 0 chooses 17 instead of 33 in both pressure
+settings; holdout-world-1 seat 0 chooses 46 instead of 45 in both settings.
+These are repeated conditions/source snapshots, not eight independent worlds.
+Across all 20 runs, source identities remain unchanged and evidence ages at
+choice range from 11 to 1,765 ticks. No age is refreshed by the continuation.
+
+Every historical reference site is still present in the first post-handoff survey,
+including all eight mismatches. The remote evaluator tests two bearings and
+retains measured cover evidence; the native landing controller considers the
+full local survey with current approach, solar and cover conditions. They need
+not select the same site. Aggregate solar rejection counters do not identify
+which particular direction/site failed; this study does not assign that cause
+to a mismatch. Native choice snapshots are retained in the data record.
+
+The old/new probes preserve **48,900 controller/observation rows byte for byte**
+through the original transfer endpoints, all 20 transfer traces/reports and the
+ordinary evaluator/survey/upstream prefixes. The on runs add 20 physics steps
+and 40 controller rows, totaling 48,940 rows. Their extra evaluator work belongs
+to those executed handoff ticks, after the old trials stopped. The 40 runs cover
+48,880 physical ticks, **13.58 simulated minutes including repeated prefixes**;
+they do not provide 13 minutes of acquisition waiting. The raw record binds
+440 file hashes. The initial pair retained after the audit-file error adds two
+separate reproducibility runs and is excluded from these matrix totals.
+
+Validation: 196 AI tests, seven example tests (five new observer boundary tests),
+401 Python tests (15 new acquisition tests), formatting and strict AI Clippy
+pass. Independent pre-run review corrected range binding, attempt/frame guards
+and censored endpoint labels. No playing controller, native acquisition deadline,
+destination ranking, live cost model or device deployment changed.
+
+The independent post-run audit found no blockers. It checks all 440 recorded
+file hashes and 97,840 controller rows (794,703,410 decompressed bytes), the
+original 62-candidate denominator and source bindings, transfer/control prefixes,
+native site choices and historical evidence ages. It reconstructs all upstream
+graph/query allocations and verifies the retained first-pair reproduction.
+The audit is embedded in the data record; its raw artifact is
+`target/capture-flag-survey/acquisition-post-audit.json`, SHA-256
+`d909a43f7093ce7375ab5cca638ae80a379b2182af7d23f4cdf600b1ddffc8d1`.
+The independent script is beside it as `acquisition-post-audit.py`, SHA-256
+`12412796a8b3e12766350231b071e644da18108271682d8fe11436bae6be1593`.
+
+## Implication for the next slice
+
+For this source-numeric neutral subset, waiting to choose a site is small;
+**binding an estimate to the landing plan actually selected remains unresolved**.
+Do not insert a universal one-tick acquisition constant or treat all 20 component
+sums as complete trip predictions. This selection excludes the unknown enemy-flag
+alternatives where the [broader acquisition investigation](bot-site-acquisition.md)
+found substantial waiting and abandonment. It also ends before executing the
+first selected-site command, so it measures neither successful landing nor the
+remaining capture/departure duration.
+
+The next bounded step should compare the remote site's proposal with the native
+arrival choice and its safety/approach requirements, preserving disagreements
+explicitly. That can establish what a proposed landing plan must contain before
+we test its remaining physical capture loop and admit whole-trip costs into
+mission selection. Current-state refresh and explicit enemy-flag evidence
+admission remain separate requirements.
