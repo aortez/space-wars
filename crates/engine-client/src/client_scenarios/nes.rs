@@ -32,7 +32,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: true,
         captures_gamepad_select: true,
     },
-    controls_help: "NES Library: each assigned gamepad is a standard NES controller. Right/East face button = NES A; bottom/South face button = NES B (Nintendo layout). D-pad, Select, and Start are passed to the cartridge. Press Start+Select together for the host controls menu. Keyboard P1: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
+    controls_help: "NES Library: each assigned gamepad is a standard NES controller. Right/East face button = NES A; bottom/South face button = NES B (Nintendo layout). D-pad or left stick controls directions; Select and Start are passed to the cartridge. Press Start+Select together for the host controls menu. Keyboard P1: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
     create,
 };
 
@@ -281,13 +281,13 @@ mod tests {
     }
 
     #[test]
-    fn generic_client_maps_both_gamepad_seats() {
+    fn generic_client_maps_stick_and_dpad_seats() {
         let gamepads = Rc::new(RefCell::new(GamepadInput::default()));
         gamepads.borrow_mut().set_seat(
             0,
             GamepadSeatInput {
                 connected: true,
-                dpad_left: true,
+                left_stick_x: -1.0,
                 south: true,
                 ..GamepadSeatInput::default()
             },

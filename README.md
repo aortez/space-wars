@@ -620,13 +620,14 @@ comparison. Tracing is available on custom batches rather than named suites so
 the suite contract and its normal report size remain fixed.
 
 Falling and NES Library use Nintendo-style gamepad positions: **right/East =
-NES A**, **bottom/South = NES B**, regardless of the reported device name. D-pad,
-`Select`, and `Start` pass to the cartridge. This NES-specific mapping applies
-to both players, including Picade inputs; menu and other scenario bindings are
-unchanged. Press `Start` + `Select` together for the host controls menu so a
-gamepad-only player can restart or return to the launcher. Keyboard equivalents
-for player 1 are arrows, `Z`/`Space` = A, `X` = B, `Tab` = Select, and `Enter` =
-Start; `Esc` opens the host pause menu.
+NES A**, **bottom/South = NES B**, regardless of the reported device name. D-pad
+or left stick controls directions; `Select` and `Start` pass to the cartridge.
+This NES-specific mapping applies to both players, including Picade inputs;
+menu and other scenario bindings are unchanged. Press `Start` + `Select`
+together for the host controls menu so a gamepad-only player can restart or
+return to the launcher. Keyboard equivalents for player 1 are arrows,
+`Z`/`Space` = A, `X` = B, `Tab` = Select, and `Enter` = Start; `Esc` opens the
+host pause menu.
 
 ## Raspberry Pi / kiosk launch
 

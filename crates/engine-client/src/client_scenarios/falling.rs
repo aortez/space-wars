@@ -28,7 +28,7 @@ pub(super) const REGISTRATION: ScenarioRegistration = ScenarioRegistration {
         captures_gamepad_start: true,
         captures_gamepad_select: true,
     },
-    controls_help: "Falling: d-pad left/right moves during play; up/down chooses a title mode; Start begins or pauses the game. Right/East face button = NES A; bottom/South face button = NES B (Nintendo layout). Select is passed to the game. Press Start+Select together for the host controls menu. Keyboard: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
+    controls_help: "Falling: d-pad or left stick left/right moves during play; up/down chooses a title mode; Start begins or pauses the game. Right/East face button = NES A; bottom/South face button = NES B (Nintendo layout). Select is passed to the game. Press Start+Select together for the host controls menu. Keyboard: arrows, Z/Space = A, X = B, Tab = Select, Enter = Start, Esc = host pause.",
     create,
 };
 
@@ -156,7 +156,7 @@ mod tests {
             0,
             GamepadSeatInput {
                 connected: true,
-                dpad_right: true,
+                left_stick_x: 1.0,
                 south: true,
                 ..GamepadSeatInput::default()
             },

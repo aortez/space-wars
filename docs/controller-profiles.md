@@ -14,6 +14,12 @@ Nintendo layout: on an SN30 Pro, the printed A jumps and B runs in Super Mario
 Bros. The mapping does not depend on the reported device name: a Nintendo-layout
 controller may identify itself as an Xbox controller over USB.
 
+Both players can use the **D-pad or left stick** for NES directions. Stick
+input becomes digital at half travel on each axis; smaller movement is ignored
+to avoid drift. D-pad input takes priority on each axis, and diagonal input is
+supported. This also supports controllers such as the 8BitDo Micro when their
+physical D-pad reports left-stick axes. The right stick is not used for NES.
+
 This is a scenario binding, not a global controller remap. The setup/tester's
 `A / South` and `B / East` labels describe the common host controls, not NES
 buttons. Menu confirm/back and other scenarios are unchanged; NES keyboard
