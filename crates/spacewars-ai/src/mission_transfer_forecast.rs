@@ -13,6 +13,18 @@ const DT: f32 = 1.0 / 60.0;
 pub const MAX_TICKS: u64 = 3600;
 const MAX_SEGMENTS: usize = 128;
 
+pub(super) fn source_schema_matches(o: &MissionObservationV1, actor: PlayerId) -> bool {
+    let f = &o.local.combat.recovery.flight;
+    o.version == 1
+        && o.local.version == 1
+        && o.local.combat.version == 2
+        && o.local.combat.recovery.version == 1
+        && f.version == 2
+        && f.flight.version == 1
+        && f.pilot.version == 1
+        && f.pilot.owner == actor
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferForecastEnd {
@@ -91,15 +103,7 @@ impl MaterialMissionPilot {
         horizon_ticks: u64,
     ) -> Result<TransferForecastJob, &'static str> {
         let p = &o.local.combat.recovery.flight.pilot;
-        if o.version != 1
-            || o.local.version != 1
-            || o.local.combat.version != 2
-            || o.local.combat.recovery.version != 1
-            || o.local.combat.recovery.flight.version != 2
-            || o.local.combat.recovery.flight.flight.version != 1
-            || p.version != 1
-            || p.owner != self.context.actor
-        {
+        if !source_schema_matches(o, self.context.actor) {
             return Err("observation version or actor mismatch");
         }
         let destination = self.telemetry.target.ok_or("no nominated destination")?;
@@ -417,7 +421,7 @@ impl PlanningJob for TransferForecastJob {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::{mission_evaluation::MissionEvaluator, mission_policy::MissionPolicy};
     use engine_common::Scenario;
@@ -425,7 +429,7 @@ mod tests {
     use scenario_spacewars::surface_sortie::{SurfaceSortieScenario, SurfaceSortieState};
     use std::time::Duration;
 
-    fn source() -> (
+    pub(crate) fn source() -> (
         SurfaceSortieState,
         MaterialMissionPilot,
         MissionObservationV1,

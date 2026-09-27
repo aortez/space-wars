@@ -9,6 +9,7 @@ use std::{
 };
 
 pub struct FlagSurveyRun {
+    pub last_charged: Work,
     pub planner: FlagSurveyPlanner,
     pub shadow: Option<super::flag_value_shadow::ShadowRun>,
     samples: BufWriter<File>,
@@ -40,6 +41,7 @@ impl FlagSurveyRun {
             "flag survey requires evaluation and shared live planning"
         );
         enabled.then(|| Self {
+            last_charged: Work::default(),
             planner: FlagSurveyPlanner::new(2),
             shadow: super::flag_value_shadow::ShadowRun::from_args(out),
             samples: BufWriter::new(File::create(out.join("flag-survey.jsonl")).unwrap()),
@@ -51,6 +53,7 @@ impl FlagSurveyRun {
     pub fn advance(&mut self, state: &SurfaceSortieState, remaining: Work, busy: &[usize]) -> f64 {
         let start = Instant::now();
         let allocation = self.planner.advance(state, remaining, busy).unwrap();
+        self.last_charged = allocation.charged;
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
         serde_json::to_writer(
@@ -70,15 +73,19 @@ impl FlagSurveyRun {
                 writeln!(self.samples).unwrap();
             }
         }
-        ms + self.shadow.as_mut().map_or(0.0, |shadow| {
-            shadow.advance(
+        let shadow_ms = self.shadow.as_mut().map_or(0.0, |shadow| {
+            let ms = shadow.advance(
                 state.tick(),
                 Work {
                     graph: remaining.graph - allocation.charged.graph,
                     physics_queries: 0,
                 },
-            )
-        })
+            );
+            self.last_charged.graph += shadow.last_charged.graph;
+            self.last_charged.physics_queries += shadow.last_charged.physics_queries;
+            ms
+        });
+        ms + shadow_ms
     }
     pub fn report(&mut self) -> Value {
         self.samples.flush().unwrap();

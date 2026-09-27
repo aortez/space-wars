@@ -107,6 +107,67 @@ impl SurfaceSortieState {
 }
 
 impl TransferEnvironment {
+    /// Compare an independently advanced source snapshot to a current capture.
+    /// Never rebase the prediction onto later observations. Fixed parameters and
+    /// scripted phases are exact; completed-body readings allow only the small
+    /// numeric tolerances already checked against native motion/gravity tests.
+    pub fn matches_advanced_environment(&self, observed: &Self) -> bool {
+        let finite_vector = |v: Vec2| v.x.is_finite() && v.y.is_finite();
+        let finite = |e: &Self| {
+            finite_vector(e.ship_gravity_offset)
+                && e.sun.is_none_or(|(sun, scale)| {
+                    finite_vector(sun.position)
+                        && sun.radius.is_finite()
+                        && sun.radius > 0.0
+                        && scale.is_finite()
+                        && scale >= 0.0
+                })
+                && !e.planets.is_empty()
+                && e.planets.len() <= MAX_TRANSFER_PLANETS
+                && e.planets.iter().all(|p| {
+                    finite_vector(p.translation_velocity)
+                        && p.radius.is_finite()
+                        && p.radius > 0.0
+                        && p.wrapper_angle.is_finite()
+                        && p.wrapper_rate.is_finite()
+                        && p.gravity_scale.is_finite()
+                        && p.gravity_scale >= 0.0
+                        && p.gravity_radius.is_finite()
+                        && p.gravity_radius >= 0.0
+                        && p.orbit.is_none_or(|o| {
+                            finite_vector(o.center)
+                                && o.radius.is_finite()
+                                && o.radius > 0.0
+                                && o.phase.is_finite()
+                                && o.rate.is_finite()
+                        })
+                })
+        };
+        finite(self)
+            && finite(observed)
+            && self.tick == observed.tick
+            && self.sun == observed.sun
+            && self.ship_gravity_offset == observed.ship_gravity_offset
+            && self.planets.len() == observed.planets.len()
+            && self.planets.iter().zip(&observed.planets).all(|(a, b)| {
+                a.orbit == b.orbit
+                    && a.translation_velocity == b.translation_velocity
+                    && a.radius == b.radius
+                    && a.wrapper_angle == b.wrapper_angle
+                    && a.wrapper_rate == b.wrapper_rate
+                    && a.gravity_scale == b.gravity_scale
+                    && a.gravity_radius == b.gravity_radius
+                    && a.motion.position.distance_to(b.motion.position) < 0.002
+                    && a.motion.velocity.distance_to(b.motion.velocity) < 0.02
+                    && (a.motion.angle - b.motion.angle)
+                        .sin()
+                        .atan2((a.motion.angle - b.motion.angle).cos())
+                        .abs()
+                        < 0.002
+                    && (a.motion.spin - b.motion.spin).abs() < 0.002
+            })
+    }
+
     /// Ship gravity retains the engine's legacy unrotated render-position
     /// offset; observations and motor guidance use the rigid-body origin.
     pub fn ship_gravity(&self, body_origin: Vec2) -> Vec2 {
@@ -208,6 +269,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn validation_pins_dynamics_and_rejects_accumulated_drift_and_nonfinite_sources() {
+        let state =
+            SurfaceSortieScenario::init_material_moving_crossing_trial(42, 0, 60.0, 0.08, 0.065);
+        let e = state.transfer_environment().unwrap();
+        let changes: &[fn(&mut TransferEnvironment)] = &[
+            |e| e.planets[0].orbit.as_mut().unwrap().rate += 0.001,
+            |e| e.planets[0].orbit.as_mut().unwrap().phase += 0.001,
+            |e| e.planets[0].orbit.as_mut().unwrap().radius += 0.001,
+            |e| e.planets[0].orbit.as_mut().unwrap().center.x += 0.001,
+            |e| e.planets[0].translation_velocity.x += 0.001,
+            |e| e.planets[0].wrapper_rate += 0.001,
+            |e| e.planets[0].wrapper_angle += 0.001,
+            |e| e.planets[0].gravity_scale += 1.0,
+            |e| e.planets[0].gravity_radius += 0.001,
+            |e| e.ship_gravity_offset.x += 0.001,
+            |e| e.sun.as_mut().unwrap().1 += 1.0,
+            |e| e.planets[0].motion.velocity.x += 0.03,
+            |e| e.planets[0].motion.angle += 0.003,
+            |e| e.planets[0].motion.spin += 0.003,
+            |e| e.planets[0].motion.position.x = f32::NAN,
+            |e| e.planets[0].gravity_scale = f32::INFINITY,
+        ];
+        for change in changes {
+            let mut changed = e.clone();
+            change(&mut changed);
+            assert!(!e.matches_advanced_environment(&changed));
+        }
+        let mut changed = e.clone();
+        changed.planets[0].motion.position.x += 0.001;
+        assert!(e.matches_advanced_environment(&changed));
+        changed.planets[0].motion.position.x += 0.002;
+        assert!(!e.matches_advanced_environment(&changed)); // Compare to source, never rebase.
+        let mut invalid = e;
+        invalid.planets[0].gravity_scale = f32::INFINITY;
+        assert!(!invalid.matches_advanced_environment(&invalid));
+    }
+
+    #[test]
     fn snapshot_tracks_scripted_frames_and_shared_gravity_without_mutating_world() {
         for (spin, orbit) in [(0.08, 0.065), (-0.02, -0.065), (0.0, 0.0)] {
             let mut state = SurfaceSortieScenario::init_material_moving_crossing_trial(
@@ -230,6 +329,10 @@ mod tests {
                 environment.advance(&mut planets);
                 SurfaceSortieScenario::step(&mut state, &[], Duration::from_nanos(16_666_667));
                 assert_eq!(environment.tick, state.tick());
+                assert!(
+                    environment
+                        .matches_advanced_environment(&state.transfer_environment().unwrap())
+                );
                 for a in &planets {
                     let b = motion::SurfaceFrame::read(&state.world.physics, a.index);
                     assert!(a.motion.position.distance_to(b.position) < 0.002);

@@ -189,8 +189,8 @@ def audit_unchanged(case, before, after, before_trace_hash, after_trace_hash):
     a, b = [json.loads((root / 'report.json').read_text()) for root in [before, after]]
     assert F.D.same_physical_outcomes(a, b), 'forecast changed physical outcome'
     assert a['missions'] == b['missions']
-    assert {k: v for k, v in a['transfer_probe'].items() if k != 'forecast'} == {
-           k: v for k, v in b['transfer_probe'].items() if k != 'forecast'}
+    assert {k: v for k, v in a['transfer_probe'].items() if k not in {'forecast', 'forecast_schedule'}} == {
+           k: v for k, v in b['transfer_probe'].items() if k not in {'forecast', 'forecast_schedule'}}
     return dict(exact_controller_trace=True, exact_evaluations_and_surveys=True,
                 exact_probe=True, exact_physics=True, controller_trace_sha256=after_trace_hash)
 

@@ -30,11 +30,13 @@ pub struct TransferProbeRun {
     control_comparison: Option<Value>,
     forecast_enabled: bool,
     forecast: Option<Value>,
+    schedule: Option<super::transfer_schedule::TransferScheduleRun>,
 }
 
 impl TransferProbeRun {
     pub fn from_args(out: &Path) -> Option<Self> {
         let destination = super::arg("--probe-transfer-destination", "none");
+        let schedule = super::transfer_schedule::TransferScheduleRun::from_args(out);
         let forecast_enabled = match super::arg("--forecast-transfer", "false").as_str() {
             "true" => true,
             "false" => false,
@@ -42,7 +44,7 @@ impl TransferProbeRun {
         };
         if destination == "none" {
             assert!(
-                !forecast_enabled,
+                !forecast_enabled && schedule.is_none(),
                 "transfer forecast needs a source nomination"
             );
             assert_eq!(super::arg("--probe-transfer-tick", "none"), "none");
@@ -83,6 +85,7 @@ impl TransferProbeRun {
             control_comparison: None,
             forecast_enabled,
             forecast: None,
+            schedule,
         })
     }
 
@@ -190,6 +193,18 @@ impl TransferProbeRun {
         let debris_contact = damage
             .last_contact_tick
             .is_some_and(|tick| tick > self.tick);
+        if let Some(schedule) = &mut self.schedule {
+            schedule.observe(
+                bot,
+                state,
+                o,
+                intent,
+                p.tick == self.tick,
+                contacts
+                    .is_object()
+                    .then_some(solver_contact || debris_contact),
+            );
+        }
         let arrived = t
             .events
             .iter()
@@ -249,6 +264,12 @@ impl TransferProbeRun {
         self.outcome.is_some()
     }
 
+    pub fn advance(&mut self, tick: u64, remaining: engine_core::planning::Work) -> f64 {
+        self.schedule
+            .as_mut()
+            .map_or(0.0, |s| s.advance(tick, remaining))
+    }
+
     pub fn finish(&mut self, state: &SurfaceSortieState, bot: &MissionBot) -> Value {
         if !self.done() {
             self.stop(
@@ -274,10 +295,14 @@ impl TransferProbeRun {
             self.record(self.seat, bot, state, &o, CombatIntent::default());
         }
         self.trace.flush().unwrap();
-        json!({"schema":1,"seat":self.seat,"source_tick":self.tick,"destination":self.destination,
+        let mut report = json!({"schema":1,"seat":self.seat,"source_tick":self.tick,"destination":self.destination,
             "source":self.source,"outcome":self.outcome,"horizon_ticks":3600,
             "pursuit_policy":if self.defer_pursuit {"defer_new"} else {"ordinary"},
             "forecast":self.forecast,
-            "scope":"Solver contacts include positive separation and do not prove impact. External destination nomination retains controller gates. Optional defer_new suppresses new pursuit only during the nominated transfer after its source tick; existing pursuit, recovery and safety retain priority. Source is pre-intent; terminal next_actions are not executed. Measures handoff, not landing/capture or match strength. Same-state ordinary-control comparisons are not independent physical trajectories. Diagnostic work and IO are outside live planner fuel."})
+            "scope":"Solver contacts include positive separation and do not prove impact. External destination nomination retains controller gates. Optional defer_new suppresses new pursuit only during the nominated transfer after its source tick; existing pursuit, recovery and safety retain priority. Source is pre-intent; terminal next_actions are not executed. Measures handoff, not landing/capture or match strength. Same-state ordinary-control comparisons are not independent physical trajectories. Diagnostic work and IO are outside live planner fuel."});
+        if let Some(schedule) = &mut self.schedule {
+            report["forecast_schedule"] = schedule.finish(state.tick());
+        }
+        report
     }
 }

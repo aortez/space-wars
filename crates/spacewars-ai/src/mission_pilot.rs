@@ -27,6 +27,10 @@ pub use destination::{DestinationPlanningTelemetry, DestinationProbeResult, Dest
 mod transfer_forecast;
 pub use transfer_forecast::{TransferForecastEnd, TransferForecastJob, TransferForecastReport};
 
+#[path = "mission_transfer_queue.rs"]
+mod transfer_queue;
+pub use transfer_queue::{TransferForecastQueue, TransferForecastState, TransferQueuePhase};
+
 #[path = "mission_disengagement.rs"]
 mod disengagement;
 pub use disengagement::{

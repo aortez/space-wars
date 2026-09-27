@@ -16,6 +16,7 @@ use std::{
 };
 
 pub struct ShadowRun {
+    pub last_charged: Work,
     shadow: FlagValueShadow,
     reports: BufWriter<File>,
     work: BufWriter<File>,
@@ -31,6 +32,7 @@ impl ShadowRun {
             _ => panic!("--shadow-capture-flags must be true or false"),
         };
         enabled.then(|| Self {
+            last_charged: Work::default(),
             shadow: FlagValueShadow::new(2),
             reports: BufWriter::new(File::create(out.join("flag-value-shadow.jsonl")).unwrap()),
             work: BufWriter::new(File::create(out.join("flag-value-shadow-work.jsonl")).unwrap()),
@@ -54,6 +56,7 @@ impl ShadowRun {
     pub fn advance(&mut self, tick: u64, remaining: Work) -> f64 {
         let start = Instant::now();
         let charged = self.shadow.advance(tick, remaining);
+        self.last_charged = charged;
         let ms = start.elapsed().as_secs_f64() * 1000.0;
         self.dispatch_ms.push(ms);
         assert!(charged.graph <= remaining.graph && charged.physics_queries == 0);
