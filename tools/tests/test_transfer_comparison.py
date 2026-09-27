@@ -6,6 +6,9 @@ import unittest
 SPEC = importlib.util.spec_from_file_location('comparison', Path(__file__).resolve().parents[1] / 'compare-transfer-destinations.py')
 C = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(C)
+FIXTURE_SPEC = importlib.util.spec_from_file_location('forecast_fixture', Path(__file__).with_name('test_transfer_forecast.py'))
+F = importlib.util.module_from_spec(FIXTURE_SPEC)
+FIXTURE_SPEC.loader.exec_module(F)
 
 
 def fixture():
@@ -48,6 +51,50 @@ def fixture():
 
 
 class ComparisonAudit(unittest.TestCase):
+    def test_new_candidates_are_checked_against_geometry_without_an_old_prediction(self):
+        _, probe, control, _ = F.fixture()
+        forecast = probe['forecast']
+        C.audit_candidate(forecast['report'], control['observation'], forecast['environment'])
+        for change in ['range', 'speed', 'target', 'frame', 'sample', 'source', 'nonfinite']:
+            f = copy.deepcopy(forecast)
+            sample = f['report']['samples'][-1]
+            if change == 'range': sample['ship']['position']['x'] = 10000
+            elif change == 'speed': sample['ship']['velocity']['x'] = 10000
+            elif change == 'target': sample['target']['position']['x'] += 1
+            elif change == 'frame': sample['frame'] = 0
+            elif change == 'sample': f['report']['samples'].pop(1)
+            elif change == 'source': f['report']['samples'][0]['gravity']['x'] = 100
+            else: sample['ship']['spin'] = float('nan')
+            with self.subTest(change=change), self.assertRaises(AssertionError):
+                C.audit_candidate(f['report'], control['observation'], f['environment'])
+
+    def test_source_shortlist_and_command_are_derived_from_ordinary_play(self):
+        _, probe, control, _ = F.fixture()
+        control['mission'] = dict(target=1, goal='capture', events=[dict(kind='selected', planet=1, tick=5)])
+        for p in control['observation']['planets']: p['claim'] = None
+        normal = [dict(copy.deepcopy(control), tick=9), control]
+        schedule = fixture()[0]
+        source = schedule['sources'][0]
+        source['environment'] = probe['forecast']['environment']
+        r = source['initial']
+        r['candidates'][0]['source_actions'] = control['actions']
+        r['candidates'][1].update(destination=0, forecast=None, unknown='unsupported')
+        source['last_snapshot'] = copy.deepcopy(r)
+        case = dict(sources=[dict(seat=0, tick=10)])
+        C.audit_sources(case, schedule, normal)
+        for change in ['omit', 'truncate', 'selection', 'goal', 'command', 'actor', 'source', 'unplanned']:
+            s = copy.deepcopy(schedule)
+            r = s['sources'][0]['initial']
+            if change == 'omit': r['candidates'].pop()
+            elif change == 'truncate': r['candidates_truncated'] = True
+            elif change == 'selection': r['current_selected_tick'] = 9
+            elif change == 'goal': r['current_goal'] = 'launch'
+            elif change == 'command': r['candidates'][0]['source_actions'] = ['hypothetical']
+            elif change == 'actor': r['actor'] = 'player_2'
+            elif change == 'source': r['source_tick'] += 1
+            else: s['sources'] *= 2
+            with self.subTest(change=change), self.assertRaises(AssertionError): C.audit_sources(case, s, normal)
+
     def test_unknown_current_with_known_alternative_is_not_a_preference(self):
         schedule, *rest = fixture()
         result = C.audit_schedule(schedule, *rest)
